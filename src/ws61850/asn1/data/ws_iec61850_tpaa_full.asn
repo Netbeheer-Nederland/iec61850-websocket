@@ -1,0 +1,1064 @@
+IEC61850 DEFINITIONS ::= BEGIN
+
+-- Direct mapping of IEC 61850 ACSI services
+-- for questions please contact info@mz-automation.de
+
+-- TPAA (Two party application association) PDU
+TpaaPdu ::= CHOICE
+{
+    associate   [0] AssociateType,
+    request     [1] RequestType,
+    response    [2] ResponseType,
+    unconfirmed [3] UnconfirmedType
+}
+
+UnconfirmedType ::= SEQUENCE
+{
+    associateId [0] AssociateID,
+    service     [1] UnconfirmedServiceType
+}
+
+UnconfirmedServiceType ::= CHOICE
+{
+    report   [0] Report,
+    cmdTerm  [1] CommandTerminationRequest
+}
+
+AssociateType ::= CHOICE
+{
+    service  [1] AssociateServiceType
+}
+
+AssociateServiceType ::= CHOICE
+{
+    associateRequest  [0] AssociateRequest,
+    associateResponse [1] AssociateResponse,
+    releaseRequest    [2] ReleaseRequest,
+    releaseResponse   [3] ReleaseResponse,
+    abortRequest      [4] AbortRequest,
+    abortResponse     [5] AbortResponse,
+    refreshToken      [6] AccessToken
+}
+
+AccessToken ::= SEQUENCE
+{
+	associateId    [0] AssociateID,
+	token          [1] UTF8String (SIZE(1..4096))
+}
+
+AssociateRequest ::= SEQUENCE
+{
+    -- TODO:authentication parameter
+    -- TODO:servicesSupported
+    -- TODO:outstandingRequests
+    calledAP  [0]       UTF8String OPTIONAL,       
+    maxMessageSize [1]  INTEGER (0..4294967295)    -- (32-bit unsigned) CHECK RANGE!
+}
+
+AssociateResponse ::= SEQUENCE
+{
+    -- TODO:authentication parameter
+    -- TODO:servicesSupported
+	maxMessageSize [0]  INTEGER (0..4294967295),
+	associateId    [1] AssociateID,
+    maxOutstandingCalls [2] INTEGER (0..65535) OPTIONAL,
+	serviceError   [3] ServiceStatusKind OPTIONAL
+}
+
+ReleaseRequest ::= SEQUENCE
+{
+    invokeId    [0] IMPLICIT INTEGER,
+    associateId [1] AssociateID
+}
+
+ReleaseResponse ::= SEQUENCE
+{
+    invokeId     [0] IMPLICIT INTEGER,
+	associateId  [1] AssociateID,
+    serviceError [2] ServiceStatusKind OPTIONAL
+}
+
+AbortRequest ::= SEQUENCE
+{
+    invokeId    [0] IMPLICIT INTEGER,
+    associateId [1] AssociateID
+}
+
+AbortResponse ::= SEQUENCE
+{
+    invokeId     [0] IMPLICIT INTEGER,
+    associateId  [1] AssociateID,
+    serviceError [2] ServiceStatusKind OPTIONAL
+}
+
+RequestType ::= SEQUENCE
+{
+    associateId [0] AssociateID,
+    invokeId    [1] IMPLICIT INTEGER,
+    service     [2] RequestServiceType
+}
+
+ResponseType ::= SEQUENCE
+{
+    associateId [0] AssociateID,
+    invokeId    [1] IMPLICIT INTEGER,
+    service     [2] ResponseServiceType
+}
+
+AssociateID ::= UTF8String (SIZE(0..36))
+
+ServiceStatusKind ::= ENUMERATED
+{
+    noError                  (0),
+    instanceNotAvailable                  (1),
+    instanceInUse                         (2),
+    accessViolation                       (3),
+    accessNotAllowedInCurrentState       (4),
+    parameterValueInappropriate          (5),
+    parameterValueInconsistent           (6),
+    classNotSupported                     (7),
+    instanceLockedByOtherClient          (8),
+    controlMustBeSelected                 (9),
+    typeConflict                          (10),
+    failedDueToCommunicationsConstraint  (11),
+    failedDueToServerConstraint           (12)
+}
+
+RequestServiceType ::= CHOICE
+{
+    -- reserved to align with serviceError in response
+    getLogicalDeviceDirectory        [1] GetLogicalDeviceDirectoryRequest,
+    getLogicalNodeDirectory          [2] GetLogicalNodeDirectoryRequest,
+    getDataValues                    [3] GetDataValuesRequest,
+    setDataValues                    [4] SetDataValuesRequest,
+    getDataDirectory                 [5] GetDataDirectoryRequest,
+    getDataDefinition                [6] GetDataDefinitionRequest,
+    getDatasetValues                 [7] GetDataSetValuesRequest,
+    setDataSetValues                 [8] SetDataSetValuesRequest,
+    createDataSet                    [9] CreateDataSetRequest,
+    deleteDataSet                   [10] DeleteDataSetRequest,
+    getDataSetDirectory             [11] GetDataSetDirectoryRequest,
+    getBRCBValues                   [12] GetBRCBValuesRequest,
+    setBRCBValues                   [13] SetBRCBValuesRequest,
+    getURCBValues                   [14] GetURCBValuesRequest,
+    setURCBValues                   [15] SetURCBValuesRequest,
+    getLCBValues                    [16] GetLCBValuesRequest,
+    setLCBValues                    [17] SetLCBValuesRequest,
+    -- reserved range for other control block related services
+    queryLogByTime                  [20] QueryLogByTimeRequest,
+    queryLogAfter                   [21] QueryLogAfterRequest,
+    getLogStatusValues                 [22] GetLogStatusValuesRequest,
+    select                          [23] SelectRequest,
+    selectWithValue                 [24] SelectWithValueRequest,
+    cancel                          [25] CancelRequest,
+    operate                         [26] OperateRequest,
+    timeActivatedOperate            [27] TimeActivatedOperateRequest,
+    timeActivatedOPerateTermination [28] TimeActivatedOperateRequest,
+    getServerDirectory              [29] GetServerDirectoryRequest
+}
+
+ResponseServiceType ::= CHOICE
+{
+    serviceError                     [0] ServiceStatusKind,
+    getLogicalDeviceDirectory        [1] GetLogicalDeviceDirectoryResponse,
+    getLogicalNodeDirectory          [2] GetLogicalNodeDirectoryResponse,
+    getDataValues                    [3] GetDataValuesResponse,
+    setDataValues                    [4] SetDataValuesResponse,
+    getDataDirectory                 [5] GetDataDirectoryResponse,
+    getDataDefinition                [6] GetDataDefinitionResponse,
+    getDatasetValues                 [7] GetDataSetValuesResponse,
+    setDataSetValues                 [8] SetDataSetValuesResponse,
+    createDataSet                    [9] CreateDataSetResponse,
+    deleteDataSet                   [10] DeleteDataSetResponse,
+	getDataSetDirectory             [11] GetDataSetDirectoryResponse,
+	getBRCBValues                   [12] GetBRCBValuesResponse,
+    setBRCBValues                   [13] SetBRCBValuesResponse,
+    getURCBValues                   [14] GetURCBValuesResponse,
+    setURCBValues                   [15] SetURCBValuesResponse,    
+    getLCBValues                    [16] GetLCBValuesResponse,
+    setLCBValues                    [17] SetLCBValuesResponse,
+    -- reserved range for other control block related services
+    queryLogByTime                  [20] QueryLogByTimeResponse,
+    queryLogAfter                   [21] QueryLogAfterResponse,
+    getLogStatusValues              [22] GetLogStatusValuesResponse,
+    select                          [23] SelectResponse,
+    selectWithValue                 [24] SelectWithValueResponse,
+    cancel                          [25] CancelResponse,
+    operate                         [26] OperateResponse,
+    timeActivatedOperate            [27] TimeActivatedOperateResponse,
+    timeActivatedOPerateTermination [28] TimeActivatedOperateResponse,
+    getServerDirectory              [29] GetServerDirectoryResponse
+}
+
+--server
+ObjectClass ::= ENUMERATED
+{
+    logicalDevice (0),
+    fileSystem    (1)
+}
+
+GetServerDirectoryRequest ::= SEQUENCE
+{
+    objectClass   [0] ObjectClass,
+    continueAfter [1] ObjectName OPTIONAL
+}
+
+GetServerDirectoryResponse ::= SEQUENCE
+{
+    result      [0] SEQUENCE OF VisString255,
+    moreFollows [1] BOOLEAN OPTIONAL
+}
+
+--logicalDevice
+GetLogicalDeviceDirectoryRequest ::= SEQUENCE
+{
+    ldName        [0] ObjectName,
+    continueAfter [1] ObjectReference OPTIONAL
+}
+
+GetLogicalDeviceDirectoryResponse ::= SEQUENCE
+{
+    lnRef       [0] SEQUENCE OF ObjectReference,
+    moreFollows [1] BOOLEAN OPTIONAL
+}
+
+--logicalNode
+GetLogicalNodeDirectoryRequest ::= SEQUENCE
+{
+    lnRef         [0] ObjectReference,
+	-- Format: \p{L}[\d,\p{L},_]*/[\p{L},_]*[\d]*
+
+    aCSIClass     [1] ACSIClassKind,
+    continueAfter [2] ObjectName OPTIONAL
+}
+
+GetLogicalNodeDirectoryResponse ::= SEQUENCE
+{
+    instanceNames [0] SEQUENCE OF ObjectName,
+    moreFollows   [1] BOOLEAN OPTIONAL
+}
+--dataValue
+
+GetAllDataValuesRequest ::= SEQUENCE
+{
+    lnRef         [0] ObjectReference,
+    fc            [1] FC OPTIONAL,
+    continueAfter [2] ObjectReference OPTIONAL
+}
+
+GetAllDataValuesResponse ::= SEQUENCE
+{
+    dataAttrRef [0] SEQUENCE OF ObjectReference,
+    dataAttrVal [1] SEQUENCE OF DataAttributeValue,
+    moreFollows [2] BOOLEAN OPTIONAL
+}
+
+GetDataValuesRequest ::= SEQUENCE
+{
+    ref                [0] FcdFcdaType,
+    includeElementName [1] BOOLEAN DEFAULT FALSE
+}
+
+GetDataValuesResponse ::= SEQUENCE
+{
+    dataAttrVal [0] SEQUENCE OF DataAttributeValue
+}
+
+SetDataValuesRequest ::= SEQUENCE
+{
+    ref         [0] FcdFcdaType,
+    dataAttrVal [1] SEQUENCE OF DataAttributeValue
+}
+
+SetDataValuesResponse ::= SEQUENCE
+{
+    result [0] Result
+}
+
+GetDataDirectoryRequest ::= SEQUENCE
+{
+    dataRef       [0] ObjectReference,
+    continueAfter [1] ObjectReference OPTIONAL
+}
+
+GetDataDirectoryResponse ::= SEQUENCE
+{
+    subDataObjectName [0] SEQUENCE OF ObjectName OPTIONAL,
+    dataAttrName      [1] SEQUENCE OF ObjectName OPTIONAL,
+	moreFollows       [2] BOOLEAN OPTIONAL
+}
+
+GetDataDefinitionRequest ::= SEQUENCE
+{
+    dataRef       [0] ObjectReference,
+    continueAfter [1] ObjectReference OPTIONAL
+}
+
+GetDataDefinitionResponse::= SEQUENCE
+{
+    cdc                     [0] VisibleString OPTIONAL,
+	count                   [1] INTEGER OPTIONAL, -- default 0 / allowed range!
+    subDataDefinition       [2] SEQUENCE OF DataObjectDefinition OPTIONAL,
+    dataAttributeDefinition [3] SEQUENCE OF DataAttributeDefinition OPTIONAL,
+	moreFollows             [4] BOOLEAN OPTIONAL
+}
+--dataset
+
+GetDataSetValuesRequest ::= SEQUENCE
+{
+    dsRef [0] ObjectReference
+	--pattern: "\p{L}[\d,\p{L},_]*/[\p{L},_]*[\d]*.[\p{L}]*|@[\p{L},_]*"/
+}
+
+GetDataSetValuesResponse::= SEQUENCE
+{
+    dsMemberValue [0] SEQUENCE OF DataAttributeValue
+}
+
+SetDataSetValuesRequest ::= SEQUENCE
+{
+    dsRef       [0] ObjectReference,
+	--pattern: "\p{L}[\d,\p{L},_]*/[\p{L},_]*[\d]*.[\p{L}]*|@[\p{L},_]*"/
+	dataAttrVal [1] SEQUENCE OF DataAttributeValue
+}
+
+SetDataSetValuesResponse::= SEQUENCE
+{
+    result [0] WriteResponse
+}
+
+WriteResponse ::= SEQUENCE OF CHOICE
+{
+	failure		[0] IMPLICIT DataAccessError,
+	success		[1] IMPLICIT NULL
+}
+
+CreateDataSetRequest ::= SEQUENCE
+{
+    dsRef       [0] ObjectReference,
+	dsMemberRef [1] SEQUENCE OF FcdFcdaType
+}
+
+CreateDataSetResponse::= SEQUENCE
+{
+    result [0] Result
+}
+
+DeleteDataSetRequest ::= SEQUENCE
+{
+    dsRef [0] ObjectReference
+}
+
+DeleteDataSetResponse::= SEQUENCE
+{
+    result [0] Result
+}
+
+GetDataSetDirectoryRequest ::= SEQUENCE
+{
+    dsRef         [0] ObjectReference,
+    continueAfter [1] FcdFcdaType OPTIONAL
+}
+
+GetDataSetDirectoryResponse::= SEQUENCE
+{
+    dsMemberRef [0] SEQUENCE OF FcdFcdaType,
+	moreFollows [1] BOOLEAN OPTIONAL
+}
+
+--reportControl
+
+GetBRCBValuesRequest::= SEQUENCE
+{
+	brcbRef [0] ObjectReference
+	--pattern: \p{L}[\d,\p{L},_]*/[\p{L},_]*[\d]*.[\p{L},_]"/
+}
+
+GetBRCBValuesResponse::= SEQUENCE
+{
+    rptID        [0] VisString129,
+    rptEna       [1] BOOLEAN,
+    dataSet      [2] ObjectReference,
+    confRev      [3] INTEGER (0..4294967295),
+    optFlds      [4] OptFldsRCB,
+    bufTm        [5] INTEGER (0..4294967295),
+    sqNum        [6] INTEGER (0..65535),
+    trgOp        [7] TrgOps,
+    intgPd       [8] INTEGER (0..4294967295),
+    gi           [9] BOOLEAN,
+    purgeBuf    [10] BOOLEAN,
+    entryID     [11] EntryID,
+    timeOfEntry [12] TimeStamp,
+    rsvdTimeSec [13] INTEGER (-32768..32767),
+    owner       [14] OCTET STRING (SIZE(64)) OPTIONAL
+}
+
+SetBRCBValuesRequest ::= SEQUENCE
+{
+    brcbRef      [0] ObjectReference,
+    bufTm        [1] INTEGER (0..4294967295) OPTIONAL,
+    dataSet      [2] ObjectReference OPTIONAL,
+    entryID      [3] EntryID OPTIONAL,
+    gi           [4] BOOLEAN OPTIONAL,
+    intgPd       [5] INTEGER (0..4294967295) OPTIONAL,
+    optFlds      [6] OptFldsRCB OPTIONAL,
+    purgeBuf     [7] BOOLEAN OPTIONAL,
+    rptEna       [8] BOOLEAN OPTIONAL,
+    rptID        [9] VisString64 OPTIONAL,
+    rsvdTimeSec [10] INTEGER (-32768..32767) OPTIONAL,
+    trgOp       [11] TrgOps OPTIONAL
+}
+
+SetBRCBValuesResponse::= SEQUENCE
+{
+    result [0] Result OPTIONAL
+}
+
+GetURCBValuesRequest::= SEQUENCE
+{
+	urcbRef [0] ObjectReference
+	--pattern: \p{L}[\d,\p{L},_]*/[\p{L},_]*[\d]*.[\p{L},_]"/
+}
+
+GetURCBValuesResponse::= SEQUENCE
+{
+    rptID        [0] VisibleString,
+	rptEna       [1] BOOLEAN,
+	dataSet      [2] ObjectReference,
+	confRev      [3] INTEGER (0..4294967295),
+	optFlds      [4] OptFldsRCB,
+	bufTm        [5] INTEGER (0..4294967295),
+	sqNum        [6] INTEGER (0..65535),
+	trgOp        [7] TrgOps,
+	intgPd       [8] INTEGER (0..4294967295),
+	gi           [9] BOOLEAN,
+    resv        [12] BOOLEAN,
+    owner       [13] OCTET STRING (SIZE(64)) OPTIONAL
+}
+
+SetURCBValuesRequest ::= SEQUENCE
+{
+    urcbRef      [0] ObjectReference,
+    bufTm        [1] INTEGER (0..4294967295) OPTIONAL,
+    dataSet      [2] ObjectReference OPTIONAL,
+    gi           [4] BOOLEAN OPTIONAL,
+    intgPd       [5] INTEGER (0..4294967295) OPTIONAL,
+    optFlds      [6] OptFldsRCB OPTIONAL,
+    rptEna       [7] BOOLEAN OPTIONAL,
+    rptID        [8] VisString64 OPTIONAL,
+    resv         [9] BOOLEAN OPTIONAL,
+    trgOp       [10] TrgOps OPTIONAL
+}
+
+SetURCBValuesResponse::= SEQUENCE
+{
+    result [0] Result OPTIONAL
+}
+
+--logControl
+GetLCBValuesRequest::= SEQUENCE
+{
+	lcbRef [0] ObjectReference
+}
+
+GetLCBValuesResponse::= SEQUENCE
+{
+    logEna    [0] BOOLEAN,
+    dsRef     [1] ObjectReference,
+    trgOpEna  [2] TrgOps,
+    intgPd    [3] INTEGER(0..4294967295),
+    logRef    [4] ObjectReference,
+    optFlds   [5] LCBLogEntryOptions OPTIONAL,
+    bufTm     [6] INTEGER (0..4294967295) OPTIONAL
+}
+
+SetLCBValuesRequest::= SEQUENCE
+{
+    bufTm        [0] INTEGER (0..4294967295) OPTIONAL,
+    dsRef        [1] ObjectReference OPTIONAL,
+    intgPd       [2] INTEGER(0..4294967295) OPTIONAL,
+    lcbRef       [3] ObjectReference,
+    logEna       [4] BOOLEAN OPTIONAL,
+    logRef       [5] ObjectReference OPTIONAL,
+    optFlds      [6] LCBLogEntryOptions OPTIONAL,
+    trgOpEna     [7] TrgOps
+}
+
+SetLCBValuesResponse::= SEQUENCE
+{
+	result [0] Result OPTIONAL
+}
+
+LCBLogEntryOptions ::= SEQUENCE
+{
+    reasonForInclusion [0] BOOLEAN,
+    reserved           [1] BOOLEAN,
+    smpRate            [2] BOOLEAN,
+    dsName             [3] BOOLEAN,
+    smpMode            [4] BOOLEAN
+}
+
+--log 
+
+QueryLogByTimeRequest ::= SEQUENCE
+{
+    logRef         [0] ObjectReference,
+    rangeStartTime [1] TimeStamp,
+    rangeStopTime  [2] TimeStamp,
+    continueAfter  [3] ObjectReference OPTIONAL
+}
+
+QueryLogByTimeResponse::= SEQUENCE
+{
+    listOfLogEntries [0] SEQUENCE OF LOG,
+	moreFollows      [1] BOOLEAN OPTIONAL
+}
+
+QueryLogAfterRequest ::= SEQUENCE
+{
+    logRef         [0] ObjectReference,
+    rangeStartTime [1] TimeStamp,
+    entryID        [2] EntryID,
+    continueAfter  [3] ObjectReference OPTIONAL -- should be of type EntryID?
+}
+
+QueryLogAfterResponse::= SEQUENCE
+{
+    listOfLogEntries [0] SEQUENCE OF LOG,
+	moreFollows      [1] BOOLEAN OPTIONAL
+}
+
+GetLogStatusValuesRequest ::= SEQUENCE
+{
+    logRef [0] ObjectReference
+}
+
+GetLogStatusValuesResponse::= SEQUENCE
+{
+    oldestEntryTime [0] TimeStamp,
+    newestEntryTime [1] TimeStamp,
+    oldestEntry     [2] EntryID,
+    newestEntry     [3] EntryID
+}
+
+LOG ::= SEQUENCE
+{
+    logName   [0] ObjectName,
+    logRef    [1] ObjectReference,
+    oldEntrTm [2] TimeStamp,
+    newEntrTm [3] TimeStamp,
+    oldEntr   [4] EntryID,
+    newEntr   [5] EntryID,
+    logEntry  [6] SEQUENCE OF LOGEntry
+}
+
+EntryID ::= OCTET STRING (SIZE(8))
+
+EntryData1 ::= SEQUENCE
+{
+    dataRef    [0] ObjectReference,
+    value      [1] SEQUENCE OF DataAttributeValue,
+    reasonCode [2] ReasonForInclusionInLog
+}
+
+EntryData2 ::= SEQUENCE
+{
+    lcbRef [0] ObjectReference,
+    value  [1] BOOLEAN
+}
+
+LOGEntry ::= SEQUENCE
+{
+    timeOfEntry [0] TimeStamp,
+    entryID     [1] EntryID,
+    entryData   [2] CHOICE{
+        multipleEntries SEQUENCE OF EntryData1,
+        singleEntry EntryData2
+    }
+}
+
+ReasonForInclusionInLog ::= SEQUENCE
+{
+    dataChange           [0] BOOLEAN DEFAULT FALSE,
+    qualityChange        [1] BOOLEAN DEFAULT FALSE,
+    dataUpdate           [2] BOOLEAN DEFAULT FALSE,
+    integrity            [3] BOOLEAN DEFAULT FALSE,
+    generalInterrogation [4] BOOLEAN DEFAULT FALSE,
+    applicationTrigger   [5] BOOLEAN DEFAULT FALSE
+}
+
+TrgOps ::= SEQUENCE {
+    dchg         [0] BOOLEAN DEFAULT FALSE,
+    qchg         [1] BOOLEAN DEFAULT FALSE,
+    dupd         [2] BOOLEAN DEFAULT FALSE,
+    integrity    [3] BOOLEAN DEFAULT FALSE,
+    gi           [4] BOOLEAN DEFAULT FALSE
+}
+
+OptFldsRCB ::= SEQUENCE
+{
+    seqNum     [0] BOOLEAN,
+    timeStamp  [1] BOOLEAN,
+    dataSet    [2] BOOLEAN,
+    bufOvfl    [3] BOOLEAN,
+    configRef  [4] BOOLEAN,
+    entryID    [5] BOOLEAN,
+    dataRef    [6] BOOLEAN,
+    reasonCode [7] BOOLEAN
+}
+
+Result ::= ENUMERATED {
+    ok (0)
+    --TODO: add the list of errors 
+}
+
+FcdFcdaType ::= SEQUENCE
+{
+    ref [0] ObjectReference,
+	--pattern: "\p{L}[\d,\p{L},_]*/[\p{L},_]*[\d]*.[\p{L},_,.]*"
+    fc  [1] FC
+}
+
+DataAttributeDefinition ::= SEQUENCE
+{
+    daRef  [0] ObjectName,
+    fc     [1] FC,
+	daType [2] TypeSpecification
+}
+
+DataObjectDefinition ::= SEQUENCE
+{
+    name                    [0] ObjectName,
+    cdc                     [1] VisibleString OPTIONAL,
+	count                   [2] INTEGER OPTIONAL,
+    subDataDefinition       [3] SEQUENCE OF DataObjectDefinition OPTIONAL,
+    dataAttributeDefinition [4] SEQUENCE OF DataAttributeDefinition OPTIONAL
+}
+
+DataAttributeValue ::= SEQUENCE
+{
+    name [0] VisibleString OPTIONAL,
+    data [1] Data
+}
+
+TypeSpecification ::= CHOICE
+{
+	-- context tag 0 is reserved
+    boolean          [1] IMPLICIT NULL,
+    int8             [2] IMPLICIT NULL,
+    int16            [3] IMPLICIT NULL,
+    int24            [4] IMPLICIT NULL,
+    int32            [5] IMPLICIT NULL,
+    int64            [6] IMPLICIT NULL,
+    int8u            [7] IMPLICIT NULL,
+    -- 8 is reserved
+    int16u           [9] IMPLICIT NULL,
+    int24u          [10] IMPLICIT NULL,
+    int32u          [11] IMPLICIT NULL,
+    float32         [12] IMPLICIT NULL,
+    octetString     [13] IMPLICIT Integer32, -- size of octet-string in bytes
+    visString64     [14] IMPLICIT NULL,
+    visString129    [15] IMPLICIT NULL,
+    visString255    [16] IMPLICIT NULL,
+	array			[17] IMPLICIT SEQUENCE
+		{
+		numberOfElements [1] IMPLICIT Unsigned32,
+		elementType		 [2] TypeSpecification
+		},
+	structure		[18] IMPLICIT SEQUENCE OF StructComponent,
+	bitstring		[19] IMPLICIT Integer32, -- size of bitstring in bits
+	generalizedtime	[21] IMPLICIT NULL,
+	binarytime		[22] IMPLICIT NULL,
+    quality         [23] IMPLICIT NULL,
+    timeStamp       [24] IMPLICIT NULL,
+    enumerated      [25] IMPLICIT NULL,
+    check           [26] IMPLICIT NULL
+}
+
+StructComponent ::=	SEQUENCE
+{
+    cmpName		[0] IMPLICIT Identifier OPTIONAL,
+    cmpType		[1] TypeSpecification
+}
+
+DataAccessError ::= INTEGER
+{
+	objectinvalidated		     (0),
+	hardwarefault			     (1),
+	temporarilyunavailable		 (2),
+	objectaccessdenied		     (3),
+	objectundefined		         (4),
+	invalidaddress			     (5),
+	typeunsupported		         (6),
+	typeinconsistent		     (7),
+	objectattributeinconsistent	 (8),
+	objectaccessunsupported	     (9),
+	objectnonexistent		    (10),
+	objectvalueinvalid		    (11)
+}
+
+ACSIClassKind ::= ENUMERATED
+{
+    dataObject (0),
+    dataset    (1),
+    brcb       (2),
+    urcb       (3),
+    lcb        (4),
+    log        (5),
+    sgcb       (6),
+    gocb       (7),
+    gscb       (8),
+    msvcb      (9),
+    usvcb     (10)
+}
+
+FC ::= ENUMERATED
+{
+    st  (0),
+    mx  (1),
+    sp  (2),
+    sv  (3),
+    cf  (4),
+    dc  (5),
+    sg  (6),
+    se  (7),
+    sr  (8),
+    or  (9),
+    bl  (10),
+    ex  (11),
+    lg  (12),
+    co  (13)
+}
+
+VisString64 ::= UTF8String (SIZE(0..64))
+VisString129 ::= UTF8String (SIZE(0..129))
+VisString255 ::= UTF8String (SIZE(0..255))
+
+Data ::= CHOICE
+{
+	-- context tag 0 is reserved
+    boolean          [1] BOOLEAN,
+    int8             [2] INTEGER (-128..127),
+    int16            [3] INTEGER (-32768..32767),
+    int24            [4] INTEGER (-8388608..8388607),
+    int32            [5] INTEGER (-2147483648..2147483647),
+    int64            [6] INTEGER,
+    int8u            [7] INTEGER (0..255),
+    -- 8 is reserved 
+    int16u           [9] INTEGER (0..65535),
+    int24u          [10] INTEGER (0..16777215),
+    int32u          [11] INTEGER (0..4294967295),
+    float32         [12] REAL,     
+    octetString     [13] OCTET STRING,
+    visString64     [14] UTF8String (SIZE(0..64)),
+    visString129    [15] UTF8String (SIZE(0..129)),
+    visString255    [16] UTF8String (SIZE(0..255)),
+	array			[17] IMPLICIT DataSequence,
+	structure		[18] IMPLICIT DataSequence,
+	bitstring		[19] IMPLICIT BIT STRING,
+	generalizedtime	[21] IMPLICIT GeneralizedTime,
+	binarytime		[22] IMPLICIT TIME-OF-DAY,
+    quality         [23] IMPLICIT Quality,
+    timeStamp       [24] IMPLICIT TimeStamp,
+    enumerated      [25] INTEGER (0..255),
+    check           [26] CheckConditions
+}
+
+DataSequence ::= SEQUENCE
+{
+    name [0] VisibleString OPTIONAL,
+    data [1] SEQUENCE OF Data
+}
+
+TimeOfDay ::= OCTET STRING -- (SIZE (4 | 6))
+
+Identifier ::= VisibleString
+
+Integer8  ::= INTEGER(-128..127)		-- range -128 <= i <= 127
+Integer16 ::= INTEGER(-32768..32767)		-- range -32,768 <= i <= 32,767
+Integer32 ::= INTEGER(-2147483648..2147483647)	-- range -2**31 <= i <= 2**31 - 1
+
+Unsigned8  ::= INTEGER(0..255)
+Unsigned16 ::= INTEGER(0..65535)
+Unsigned32 ::= INTEGER(0..4294967295)
+
+CodedEnum ::= SEQUENCE
+{
+    codedValue  [0] INTEGER,         -- The actual value (base of the extension)
+    numBits     [1] INTEGER          -- Required attribute
+}
+
+EnumeratedType ::= SEQUENCE
+{
+    name   UTF8String,     
+    ord    INTEGER         
+}
+
+Quality ::= SEQUENCE
+{
+    detailQual     [0] DetailQual OPTIONAL,
+    validity       [1] Validity DEFAULT good,
+    source         [2] Source DEFAULT process,
+    test           [3] BOOLEAN DEFAULT FALSE,
+    operatorBlock  [4] BOOLEAN DEFAULT FALSE
+}
+
+Validity ::= ENUMERATED
+{
+    good          (0),
+    invalid       (1),
+    reserved      (2),
+    questionable  (3)
+}
+
+Source ::= ENUMERATED
+{
+    process      (0),
+    substituted  (1)
+}
+
+DetailQual ::= SEQUENCE
+{
+    overflow      [0] BOOLEAN DEFAULT FALSE,
+    outOfRange    [1] BOOLEAN DEFAULT FALSE,
+    badReference  [2] BOOLEAN DEFAULT FALSE,
+    oscillatory   [3] BOOLEAN DEFAULT FALSE,
+    failure       [4] BOOLEAN DEFAULT FALSE,
+    oldData       [5] BOOLEAN DEFAULT FALSE,
+    inconsistent  [6] BOOLEAN DEFAULT FALSE,
+    inaccurate    [7] BOOLEAN DEFAULT FALSE
+}
+
+TimeStamp ::= SEQUENCE
+{
+    secondSinceEpoch    [0] INTEGER (0..4294967295),        -- unsignedInt
+    fractionOfSecond    [1] INTEGER (0..16777215),          -- tInt24u (24-bit unsigned integer)
+    timeQuality         [2] TimeQuality
+}
+
+TimeQuality ::= SEQUENCE
+{
+    leapSecondsKnown     [0] BOOLEAN DEFAULT TRUE,
+    clockFailure         [1] BOOLEAN DEFAULT FALSE,
+    clockNotSynchronized [2] BOOLEAN DEFAULT FALSE,
+    timeAccuracy         [3] INTEGER (0..127)
+}
+
+--TimeAccuracy ::= INTEGER (0..31)
+
+ObjectName ::= VisString64
+
+ObjectReference ::= VisString129
+
+INT8U ::= INTEGER (0..127)
+INT16U ::= INTEGER (0..65535)
+INT32U ::= INTEGER (0..4294967295)
+
+--control services
+
+SelectRequest ::= SEQUENCE
+{
+    ref [0] ObjectReference
+}
+
+SelectResponse ::= SEQUENCE
+{
+    success      [0] BOOLEAN DEFAULT FALSE,
+    serviceError [1] ServiceStatusKind OPTIONAL,
+    addCause     [2] ControlServiceStatusKind OPTIONAL
+}
+
+SelectWithValueRequest ::= SEQUENCE
+{
+    ref    [0] ObjectReference,
+    ctlVal [1] Data,
+    origin [2] Originator,
+    ctlNum [3] INT8U,
+    t      [4] TimeStamp,
+    test   [5] BOOLEAN,
+    check  [6] CheckConditions,
+    operTm [7] TimeStamp OPTIONAL
+}
+
+SelectWithValueResponse ::= SEQUENCE
+{
+    ref      [0] ObjectReference,
+    ctlVal   [1] Data,
+    origin   [2] Originator,
+    ctlNum   [3] INT8U,
+    t        [4] TimeStamp,
+    test     [5] BOOLEAN,
+    check    [6] CheckConditions,
+    operTm   [7] TimeStamp OPTIONAL,
+    addCause [8] ControlServiceStatusKind OPTIONAL
+}
+
+CancelRequest ::= SEQUENCE
+{
+    ref    [0] ObjectReference,
+    ctlVal [1] Data,
+    operTm [2] TimeStamp OPTIONAL,
+    origin [3] Originator,
+    ctlNum [4] INT8U,
+    t      [5] TimeStamp,
+    test   [6]   BOOLEAN
+}
+
+CancelResponse ::= SEQUENCE
+{
+    ref      [0] ObjectReference,
+    ctlVal   [1] Data,
+    operTm   [2] TimeStamp OPTIONAL,
+    origin   [3] Originator,
+    ctlNum   [4] INT8U,
+    t        [5] TimeStamp,
+    test     [6] BOOLEAN,
+    addCause [7] ControlServiceStatusKind OPTIONAL
+}
+
+OperateRequest ::= SEQUENCE
+{
+    ref    [0] ObjectReference,
+    ctlVal [1] Data,
+    origin [2] Originator,
+    ctlNum [3] INT8U,
+    t      [4] TimeStamp,
+    test   [5] BOOLEAN DEFAULT FALSE,
+    check  [6] CheckConditions OPTIONAL
+}
+
+OperateResponse ::= SEQUENCE
+{
+    success      [0] BOOLEAN DEFAULT FALSE,
+    serviceError [1] ServiceStatusKind OPTIONAL,
+    addCause     [2] ControlServiceStatusKind OPTIONAL
+}
+
+CommandTerminationRequest ::= SEQUENCE
+{
+    ref      [0] ObjectReference,
+    ctlVal   [1] Data,
+    operTm   [2] TimeStamp OPTIONAL,
+    origin   [3] Originator,
+    ctlNum   [4] INT8U,
+    t        [5] TimeStamp,
+    test     [6] BOOLEAN,
+    check    [7] CheckConditions,
+    addCause [8] ControlServiceStatusKind OPTIONAL
+}
+
+TimeActivatedOperateRequest ::= SEQUENCE
+{
+    ref    [0] ObjectReference,
+    ctlVal [1] Data,
+    operTm [2] TimeStamp OPTIONAL,
+    origin [3] Originator,
+    ctlNum [4] INT8U,
+    t      [5] TimeStamp,
+    test   [6] BOOLEAN,
+    check  [7] CheckConditions
+}
+
+TimeActivatedOperateResponse ::= SEQUENCE
+{
+    ref      [0] ObjectReference,
+    ctlVal   [1] Data,
+    operTm   [2] TimeStamp OPTIONAL,
+    origin   [3] Originator,
+    ctlNum   [4] INT8U,
+    t        [5] TimeStamp,
+    test     [6] BOOLEAN,
+    check    [7] CheckConditions,
+    addCause [8] ControlServiceStatusKind OPTIONAL
+}
+
+TimeActivatedOperateTerminationRequest ::= SEQUENCE
+{
+    ref      [0] ObjectReference,
+    ctlVal   [1] Data,
+    operTm   [2] TimeStamp OPTIONAL,
+    origin   [3] Originator,
+    ctlNum   [4] INT8U,
+    t        [5] TimeStamp,
+    test     [6] BOOLEAN,
+    check    [7] CheckConditions,
+    addCause [8] ControlServiceStatusKind OPTIONAL
+}
+
+ControlServiceStatusKind ::= ENUMERATED
+{
+    unknown                      (0),
+    notSupported                 (1),
+    blockedBySwitchingHierarchy  (2),
+    selectFailed                 (3),
+    invalidPosition              (4),
+    positionReached              (5),
+    parameterChangeInExecution   (6),
+    stepLimit                    (7),
+    blockedByMode                (8),
+    blockedByProcess             (9),
+    blockedByInterlocking       (10),
+    blockedBySynchrocheck       (11),
+    commandAlreadyInExecution   (12),
+    blockedByHealth             (13),
+    oneOfNControl               (14),
+    abortionByCancel            (15),
+    timeLimitOver               (16),
+    abortionByTrip              (17),
+    objectNotSelected           (18),
+    objectAlreadySelected       (19),
+    noAccessAuthority           (20),
+    endedWithOvershoot          (21),
+    abortionDueToDeviation      (22),
+    abortionByCommunicationLoss (23),
+    blockedByCommand            (24),
+    none                        (25),
+    inconsistentParameters      (26),
+    lockedByOtherClient         (27)
+}
+
+CheckConditions ::= SEQUENCE
+{
+    synchroCheck   [0] BOOLEAN,
+    interlockCheck [1] BOOLEAN
+}
+
+Originator ::= SEQUENCE
+{
+    orCat   [0] OriginatorCategoryKind,
+    orIdent [1] OCTET STRING (SIZE(64))
+}
+
+OriginatorCategoryKind ::= ENUMERATED
+{
+    notSupported     (0),
+    bayControl       (1), 
+    stationControl   (2),
+    remoteControl    (3),
+    automaticBay     (4), 
+    automaticStation (5),
+    automaticRemote  (6),
+    maintenance      (7),
+    process          (8)
+}
+
+Report ::= SEQUENCE
+{
+    rptID              [0] VisString129,
+    sqNum              [1] INT16U OPTIONAL,
+    subSqNum           [2] INT16U DEFAULT 0,
+    moreSegmentsFollow [3] BOOLEAN DEFAULT FALSE,
+    dataSet            [4] ObjectReference OPTIONAL,
+    bufOvfl            [5] BOOLEAN DEFAULT FALSE,
+    confRev            [6] INT32U OPTIONAL,
+    entry              [7] Entry
+}
+
+Entry ::= SEQUENCE
+{
+    timeOfEntry [0] TimeStamp OPTIONAL,
+    entryID     [1] EntryID OPTIONAL,
+    entryData   [2] SEQUENCE OF EntryData1
+}
+
+END

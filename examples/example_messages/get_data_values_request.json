@@ -1,0 +1,15 @@
+{
+    "request": {
+        "associateId": "id_cp1",
+        "invokeId": 3,
+        "service": {
+            "getDataValues": {
+                "ref": {
+                    "ref": "LD0/MMXU1.MinWPhs",
+                    "fc": "mx"
+                },
+                "includeElementName": true
+            }
+        }
+    }
+}

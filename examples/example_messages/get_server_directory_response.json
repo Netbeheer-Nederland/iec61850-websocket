@@ -1,0 +1,14 @@
+{
+    "response": {
+        "associateId": "id_cp1",
+        "invokeId": 0,
+        "service": {
+            "getServerDirectory": {
+                "result": [
+                    "LD0",
+                    "PROT"
+                ]
+            }
+        }
+    }
+}

@@ -1,0 +1,62 @@
+from os import access
+
+import asn1.encode_decode
+from Examples.ieds.high_level_model import ied as ied1
+from Examples.ieds.ied_model_2 import ied as ied2
+from Endpoint.endpoint import *
+import asyncio
+from IEC61850.server.IEC61850Server import *
+from oauth.oauth_functions import *
+import jwt
+from IEC61850.server.control_handling import *
+from IEC61850.server.service_error import *
+from TLSConfig.TLSConfiguration import *
+import sys
+
+project_root = ""
+for path in sys.path:
+    if path.endswith("exploration"):
+        project_root = path
+        break
+cert_path = os.path.join(project_root, 'certs', 'root_CA1.pem')
+
+maxMessageSize = 65000
+
+def control_handler_for_float(obj_ref, ctlVal_value, parameter):
+    if ctlVal_value is not None:
+        if ctlVal_value["type"].startswith("float"):
+            if ctlVal_value["value"] <50:
+                return ControlHandlerResult.OK, None
+            else:
+                return ControlHandlerResult.FAILED, ControlServiceStatusKind.invalidPosition
+    else:
+        return None, ServiceStatusKind.instanceNotAvailable
+    return None, None
+
+async def schedule_abort(iec61850_server, endpoint):
+    await asyncio.sleep(4)
+    websocket_info = endpoint.get_websocket_info(iec61850_server)
+    await iec61850_server.abort_function(websocket_info)
+
+async def schedule_release(iec61850_server, endpoint):
+    await asyncio.sleep(10)
+    websocket_info = endpoint.get_websocket_info(iec61850_server)
+
+    await iec61850_server.release_function(websocket_info)
+
+async def main():
+
+    ep_wsClient_1 = WebSocketEndpoint()
+    iec61850_server_1 = IEC61850Server(ied1, "cp1")
+    iec61850_server_1.set_control_handler(control_handler_for_float, None)
+    report_task_1 = asyncio.create_task(iec61850_server_1.periodic_report_start())
+    ep_wsClient_1.add_iec61850_server(iec61850_server_1)
+
+    task1 = asyncio.create_task(ep_wsClient_1.start("active","localhost", 8765, "cp1",
+                                                    protocol=["iec61850-tpaa-jer-v1"]
+                                                    ))
+
+    await asyncio.gather(task1, report_task_1)
+
+if __name__ == "__main__":
+    asyncio.run(main())

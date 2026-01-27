@@ -85,22 +85,30 @@ iec61850-websocket/
 
 ## Getting started
 
-### 1. Prerequisites
+### Prerequisites
+- **UV** - [Install UV](https://docs.astral.sh/uv/getting-started/installation/)
+- **Python 3.10-3.12** (3.12 recommended) - [Download Python](https://www.python.org/downloads/)
+- **Git** - [Install Git](https://git-scm.com/downloads)
 
-- Python **3.10+**
-- `uv` **or** `pip`
+
 - Basic understanding of:
   - Async Python
   - WebSockets
   - IEC 61850 terminology (Logical Node, Data Object)
 
----
+### Setup environment
 
-### 2. Setup environment
-
-Using **uv** (recommended):
+```shell
+# Clone the repository
+# 1. Clone and enter the project
+git clone https://github.com/Netbeheer-Nederland/iec61850-websocket.git
+cd iec61850-websocket
+```
 
 ```bash
+# 2. Create and activate a virtual environment
 uv venv
 uv sync
+```
+
 
