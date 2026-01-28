@@ -2,17 +2,8 @@ import os
 from os import access
 from random import randint
 
-# import asn1.encode_decode
-# from Examples.ieds.high_level_model import ied as ied1
-# from Examples.ieds.ied_model_2 import ied as ied2
-# from Endpoint.endpoint import *
 import asyncio
-# from IEC61850.server.IEC61850Server import *
-# from oauth.oauth_functions import *
 import jwt
-# from IEC61850.server.control_handling import *
-# from IEC61850.server.service_error import *
-# from TLSConfig.TLSConfiguration import *
 import sys
 
 from testing.ieds.high_level_model import make_ied_model1

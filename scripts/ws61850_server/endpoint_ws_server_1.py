@@ -14,9 +14,6 @@ for path in sys.path:
         project_root = path
         break
 
-# cert_path = os.path.join(project_root, 'certs', 'server.crt')
-# key_path = os.path.join(project_root, 'certs', 'server.key')
-
 maxMessageSize_server = 65000
 
 optFlds = {"seqNum": False, "timeStamp": True, "dataSet": True, "bufOvfl": True, "configRef": False,
