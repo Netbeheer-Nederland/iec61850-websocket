@@ -1,20 +1,16 @@
-from time import sleep
-
-from Endpoint.endpoint import *
-import asyncio
-from IEC61850.client.IEC61850Client import *
+from ws61850.endpoint.endpoint import *
+from ws61850.iec61850.client.iec61850_client import *
 
 maxMessageSize_server = 65000
 
-
 trgOp = {"dchg": True, "qchg": False, "dupd": False, "integrity": False, "gi": False}
-
 
 urcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints", True)
 urcb.trgOps = trgOp
 
 urcb_2 = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints", True)
 urcb_2.rptEna = True
+
 
 async def main():
     # websocket server
@@ -49,9 +45,8 @@ async def main():
     else:
         print("did not enter first if ")
 
-
-
     await server_task
+
 
 if __name__ == "__main__":
     asyncio.run(main())

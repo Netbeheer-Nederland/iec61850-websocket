@@ -57,8 +57,15 @@ build-backend = "setuptools.build_meta"
 #ws61850-client = "ws61850.iec61850.client.ws_client:main"
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+
+markers = [
+    "unit: fast unit tests",
+    "integration: integration tests",
+    "performance: performance and load tests",
+]
 
 [tool.ruff]
 line-length = 88

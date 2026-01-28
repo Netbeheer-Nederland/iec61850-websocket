@@ -1,14 +1,12 @@
-from Examples.ieds.high_level_model import ied as ied1
-from Examples.ieds.ied_model_2 import ied as ied2
-from Endpoint.endpoint import *
 import asyncio
-from IEC61850.server.IEC61850Server import *
-from IEC61850.server.control_handling import *
-from IEC61850.server.service_error import *
+from random import randint
 
-
+from testing.ieds.high_level_model import make_ied_model1
+from ws61850.endpoint.endpoint import *
+from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
 maxMessageSize = 65000
+
 
 async def toggle_custom_value(iec61150_server, obj_ref):
     while True:
@@ -17,15 +15,17 @@ async def toggle_custom_value(iec61150_server, obj_ref):
         print(f"Value of {obj_ref} changed to {value}")
         await asyncio.sleep(5)
 
+
 async def main():
     ep_wsClient_1 = WebSocketEndpoint()
-    iec61850_server_1 = IEC61850Server(ied1, "cp1")
+    iec61850_server_1 = IEC61850Server(make_ied_model1(), "cp1")
     toggle_task_1 = asyncio.create_task(toggle_custom_value(iec61850_server_1, "LD0/DGEN1.DEROpSt.stVal"))
     ep_wsClient_1.add_iec61850_server(iec61850_server_1)
 
-    task1 = asyncio.create_task(ep_wsClient_1.start("active","localhost", 8765, "cp1"))
+    task1 = asyncio.create_task(ep_wsClient_1.start("active", "localhost", 8765, "cp1"))
 
     await asyncio.gather(task1, toggle_task_1)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

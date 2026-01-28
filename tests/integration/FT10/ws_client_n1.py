@@ -1,15 +1,16 @@
-from os import access
-
-import asn1.encode_decode
-from Examples.ieds.high_level_model import ied as ied1
-from Examples.ieds.ied_model_2 import ied as ied2
-from Endpoint.endpoint import *
 import asyncio
-from IEC61850.server.IEC61850Server import *
-from oauth.oauth_functions import *
+
 import jwt
 
+from testing.ieds.high_level_model import make_ied_model1
+from ws61850 import asn1
+from ws61850.endpoint.endpoint import *
+from ws61850.iec61850.client.request_handling import create_token_refresh
+from ws61850.iec61850.server.iec61850_server import IEC61850Server
+from ws61850.security.oauth import get_access_token
+
 maxMessageSize = 65000
+
 
 async def refresh_token_if_needed(url, client_id, client_secret, token, websocket_endpoint, cp):
     while True:
@@ -31,16 +32,16 @@ async def refresh_token_if_needed(url, client_id, client_secret, token, websocke
 
 
 async def main():
-
     at = "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI4SUdMWmlEQ1M5dzZ2aFdZOFZmYW9zaTYxNDN5OFM4NlV6UjY0bHh2X2pZIn0.eyJleHAiOjE3NjA1MTY5NzYsImlhdCI6MTc2MDUxNjkxNiwianRpIjoidHJydGNjOmE5NjA1MTBjLTkyNTQtNGY0MC05NDkxLTY5NjA5YTEzNThkYiIsImlzcyI6Imh0dHBzOi8vbG9jYWxob3N0Ojg0NDMvcmVhbG1zL21hc3RlciIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJmNjE1OWU5My0zMDRiLTRmNGEtODAzMy1jNjRmZGNhNGJlYjQiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJ3c19jbGllbnRfMSIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbImRlZmF1bHQtcm9sZXMtbWFzdGVyIiwib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoicHJvZmlsZSBlbWFpbCIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwiY2xpZW50SG9zdCI6IjA6MDowOjA6MDowOjA6MSIsInByZWZlcnJlZF91c2VybmFtZSI6InNlcnZpY2UtYWNjb3VudC13c19jbGllbnRfMSIsImNsaWVudEFkZHJlc3MiOiIwOjA6MDowOjA6MDowOjEiLCJjbGllbnRfaWQiOiJ3c19jbGllbnRfMSJ9.EJVfanhbxkCwCoC94DwNq2p9D15N7iCVo4LNNiPXRRwbD0SLB_bSnukoSjvugAhmOK74VfvkcwIbXmLGKbf3v_TP7Ng8pKRA8pNoL0mtbtmsDgql82wXDKvn3lk_erFYjDpxmdnySl-JWHR1PbF69nCs8a2HI4Afg3GDq6s-R1FtJgU-z2K-nfBtpdIAy8a_8DEdzvLmqU94yHGDi9QZ_TjbGZWcadg4cVadBFRLW82JzMlbGuoU9rfAfYxs-tNn0ZDiNWNsc2b6eo98QWiS9Rm9P9LwlMJhKqhp3cKRYKQ6NAs7Rl2KoQKtByeZYEnF8Emo2_uTkllZ9e_JVIxsZT"
 
     ep_wsClient_1 = WebSocketEndpoint(oauth_enable=True)
-    iec61850_server_1 = IEC61850Server(ied1, "cp1")
+    iec61850_server_1 = IEC61850Server(make_ied_model1(), "cp1")
     ep_wsClient_1.add_iec61850_server(iec61850_server_1)
 
-    task1 = asyncio.create_task(ep_wsClient_1.start("active","localhost", 8765, "cp1", at))
+    task1 = asyncio.create_task(ep_wsClient_1.start("active", "localhost", 8765, "cp1", at))
 
     await asyncio.gather(task1)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

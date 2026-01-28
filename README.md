@@ -3,7 +3,7 @@
 > Experimental reference implementation for IEC 61850 Phase 2 / RTI-style communication over WebSockets.
 
 ⚠️ **Project status:**  
-This repository contains an **experimental proof of concept**. 
+This repository contains an **experimental proof of concept**.
 It is **not production-ready** and is intended for exploration, learning, and architectural validation.
 
 ## Overview
@@ -26,15 +26,17 @@ protocol stack.
 IEC 61850 is powerful but traditionally bound to MMS/TCP, and this PoC shows how to:
 
 ### In scope
-- ASN.1 schema loading and message encoding/decoding  
-- WebSocket-based client/server communication  
-- Demonstration of message flows  
-- Security concepts at PoC level  
-- Clear separation between protocol, transport, and examples  
+
+- ASN.1 schema loading and message encoding/decoding
+- WebSocket-based client/server communication
+- Demonstration of message flows
+- Security concepts at PoC level
+- Clear separation between protocol, transport, and examples
 
 ### Explicitly out of scope
-- Production-grade robustness  
-- Performance optimization (however a performance test is a key goal for this PoC)  
+
+- Production-grade robustness
+- Performance optimization (however a performance test is a key goal for this PoC)
 - Complete IEC 61850 profile coverage
 - Formal conformance testing
 - Long-term API stability
@@ -118,6 +120,11 @@ cd iec61850-websocket
 # 2. Create and activate a virtual environment
 uv venv
 uv sync
+```
+
+```shell
+# 3. Add the development environment to uv 
+uv sync -e dev
 ```
 
 

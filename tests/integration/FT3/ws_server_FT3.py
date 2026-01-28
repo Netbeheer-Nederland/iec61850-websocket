@@ -1,13 +1,14 @@
-from time import sleep
-
-from Endpoint.endpoint import *
-import asyncio
-from IEC61850.client.IEC61850Client import *
+from ws61850.endpoint.endpoint import *
+from ws61850.iec61850.client.iec61850_client import *
+from ws61850.iec61850.server.request_handling import retrieve_sdos, print_node, retrieve_attributes_sdo, retrieve_das, \
+    print_direct_da
 
 maxMessageSize_server = 65000
 
+
 def callback_called(result, param):
     print("callback called: ", result)
+
 
 async def main():
     # websocket server
@@ -15,7 +16,6 @@ async def main():
 
     iec61850_client = IEC61850Client("cp1")
     ep_wsServer.add_iec61850_client(iec61850_client)
-
 
     server_task = asyncio.create_task(
         ep_wsServer.start("passive", "localhost", 8765)
@@ -32,18 +32,20 @@ async def main():
                     ld_prefix = "└── " if is_last_ld else "├── "
                     print(f"{ld_prefix}{ld_inst}")
 
-                    ln_refs = await ep_wsServer.client_list[0].get_logical_device_directory(ld_inst, websocket_info, None, None)
+                    ln_refs = await ep_wsServer.client_list[0].get_logical_device_directory(ld_inst, websocket_info,
+                                                                                            None, None)
                     for ln_index, ln_inst in enumerate(ln_refs):
                         is_last_ln = ln_index == len(ln_refs) - 1
                         ln_prefix = "    └── " if is_last_ld else "│   └── " if is_last_ln else (
                             "    ├── " if is_last_ld else "│   ├── ")
                         print(f"{ln_prefix}{ln_inst}")
 
-                        ln_directory_urcb = await ep_wsServer.client_list[0].get_logical_node_directory(ld_inst, ln_inst,
-                                                                                                      "urcb",
-                                                                                                      websocket_info,
-                                                                                                      None,
-                                                                                                      None)
+                        ln_directory_urcb = await ep_wsServer.client_list[0].get_logical_node_directory(ld_inst,
+                                                                                                        ln_inst,
+                                                                                                        "urcb",
+                                                                                                        websocket_info,
+                                                                                                        None,
+                                                                                                        None)
                         for urcb_index, urcb_inst in enumerate(ln_directory_urcb):
                             urcb_prefix = (
                                 "        └── [URCB] "
@@ -76,8 +78,8 @@ async def main():
 
                             print(f"{ds_prefix}{ds_inst}")
                             ds_items = await ep_wsServer.client_list[0].get_dataset_directory(ld_inst, ln_inst, ds_inst,
-                                                                                             websocket_info,
-                                                                                             None, None)
+                                                                                              websocket_info,
+                                                                                              None, None)
                             for item_index, item_inst in enumerate(ds_items):
                                 item_text = item_inst["ref"] + f"[{item_inst['fc']}]"
                                 item_prefix = (
@@ -98,9 +100,10 @@ async def main():
                             )
                             print(f"{do_prefix}{do_inst}")
 
-                            da_def = await ep_wsServer.client_list[0].get_data_definition(ld_inst + "/" + ln_inst + "." + do_inst,
-                                                                                      websocket_info,
-                                                                                      None, None)
+                            da_def = await ep_wsServer.client_list[0].get_data_definition(
+                                ld_inst + "/" + ln_inst + "." + do_inst,
+                                websocket_info,
+                                None, None)
 
                             sdos = retrieve_sdos(da_def)
                             for sdo_index, sdo_inst in enumerate(sdos):
@@ -112,11 +115,12 @@ async def main():
                                 print_direct_da(da_list)
 
                 print("running the negative test cases:")
-                ln_refs = await ep_wsServer.client_list[0].get_logical_device_directory("wrong_ld_name", websocket_info, None,
+                ln_refs = await ep_wsServer.client_list[0].get_logical_device_directory("wrong_ld_name", websocket_info,
+                                                                                        None,
                                                                                         None)
                 print(ln_refs)
 
-                ln_directory_ds = await ep_wsServer.client_list[0].get_logical_node_directory("LD0","wrong_ln",
+                ln_directory_ds = await ep_wsServer.client_list[0].get_logical_node_directory("LD0", "wrong_ln",
                                                                                               "dataset",
                                                                                               websocket_info,
                                                                                               None,
@@ -132,6 +136,7 @@ async def main():
         print("did not enter first if ")
 
     await server_task
+
 
 if __name__ == "__main__":
     asyncio.run(main())

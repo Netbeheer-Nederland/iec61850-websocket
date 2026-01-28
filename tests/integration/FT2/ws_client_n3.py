@@ -1,5 +1,5 @@
-from Endpoint.endpoint import *
-from IEC61850.client.IEC61850Client import *
+from ws61850.endpoint.endpoint import *
+from ws61850.iec61850.client.iec61850_client import *
 
 
 async def test_protocol_rejection(endpoint, mode, host, port, cp, protocol):
@@ -18,8 +18,9 @@ async def main():
     ep_wsClient_1.add_iec61850_client(iec61850_client_1)
     protocol = ["wrong-protocol-v1"]
 
-    await test_protocol_rejection(ep_wsClient_1, mode = 'active', host = 'localhost', port = 8765, cp = 'cp1',
+    await test_protocol_rejection(ep_wsClient_1, mode='active', host='localhost', port=8765, cp='cp1',
                                   protocol=protocol)
+
 
 if __name__ == "__main__":
     try:

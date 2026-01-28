@@ -1,11 +1,10 @@
-from time import sleep
-
-from Endpoint.endpoint import *
-import asyncio
-from IEC61850.client.IEC61850Client import *
+import os
+import ssl
 import sys
 
-from TLSConfig.TLSConfiguration import *
+from ws61850.endpoint.endpoint import *
+from ws61850.iec61850.client.iec61850_client import *
+from ws61850.security.tls import TLSConfiguration
 
 project_root = ""
 for path in sys.path:
@@ -15,9 +14,7 @@ for path in sys.path:
 cert_path = os.path.join(project_root, 'server_perf.crt')
 key_path = os.path.join(project_root, 'server_perf.key')
 
-
 maxMessageSize_server = 65000
-
 
 data_WMaxSetPct = [{"name": "setMag", "data": ("structure", {"name": "f", "data": [("float32", 19.48)]})}]
 
@@ -63,69 +60,69 @@ def callback_called(result, param):
 data_attribute_value = {
     "name": "Oper",
     "data": ("structure",
-        {
-            "data": [
-                        ("structure",
-                            {
-                                "name": "f",
-                                "data": [("float32", 10.5)]
-                            }
-                        ),
-                        ("structure", {
-                            "name": "origin",
-                            "data": [("enumerated", "bayControl"), ("octetString", b"ORIGIN_ID_1234567890")]
-                        }),
-                        ("int8u", 2),
-                        ("timeStamp", {
-                                    "secondSinceEpoch": 1757588367,
-                                    "fractionOfSecond": 8120140,
-                                    "timeQuality": {
-                                        "leapSecondKnown": False,
-                                        "clockFailure": False,
-                                        "clockNotSynchronized": False,
-                                        "timeAccuracy": 3
-                                    }
-                                }),
-                        ("boolean", False),
-                        ("check",
-                                {
-                                    "synchroCheck": False,
-                                    "interlockCheck": True
-                                }
-                        )
-            ]
-        }
-    )
+             {
+                 "data": [
+                     ("structure",
+                      {
+                          "name": "f",
+                          "data": [("float32", 10.5)]
+                      }
+                      ),
+                     ("structure", {
+                         "name": "origin",
+                         "data": [("enumerated", "bayControl"), ("octetString", b"ORIGIN_ID_1234567890")]
+                     }),
+                     ("int8u", 2),
+                     ("timeStamp", {
+                         "secondSinceEpoch": 1757588367,
+                         "fractionOfSecond": 8120140,
+                         "timeQuality": {
+                             "leapSecondKnown": False,
+                             "clockFailure": False,
+                             "clockNotSynchronized": False,
+                             "timeAccuracy": 3
+                         }
+                     }),
+                     ("boolean", False),
+                     ("check",
+                      {
+                          "synchroCheck": False,
+                          "interlockCheck": True
+                      }
+                      )
+                 ]
+             }
+             )
 }
 
 data_WMaxSetPct = [{"name": "setMag", "data": ("structure", {"name": "f", "data": [("float32", 19.666)]})}]
 
-oper_val= {
-            "ref": "LD0/DWMX1.WMaxSpt", "ctlVal":('structure', {'data': [('structure', {'data': [('float32', 666.43)]})]}),
-            "origin": {
-                    "orCat": "stationControl",
-                    "orIdent": b'ORIGIN_ID_1234567890'
-           },
-           "ctlNum": 10,
-           "t" : {
-                    "secondSinceEpoch": 1757588367,
-                    "fractionOfSecond": 8120140,
-                    "timeQuality": {
-                      "leapSecondKnown": False,
-                      "clockFailure": False,
-                      "clockNotSynchronized": False,
-                      "timeAccuracy": 3
-                  }
-                },
-           "test": True,
-           "check": {
-                        "synchroCheck": False,
-                        'interlockCheck': False
-                    }
-           }
+oper_val = {
+    "ref": "LD0/DWMX1.WMaxSpt", "ctlVal": ('structure', {'data': [('structure', {'data': [('float32', 666.43)]})]}),
+    "origin": {
+        "orCat": "stationControl",
+        "orIdent": b'ORIGIN_ID_1234567890'
+    },
+    "ctlNum": 10,
+    "t": {
+        "secondSinceEpoch": 1757588367,
+        "fractionOfSecond": 8120140,
+        "timeQuality": {
+            "leapSecondKnown": False,
+            "clockFailure": False,
+            "clockNotSynchronized": False,
+            "timeAccuracy": 3
+        }
+    },
+    "test": True,
+    "check": {
+        "synchroCheck": False,
+        'interlockCheck': False
+    }
+}
+
 
 async def main():
-
     tls_config = TLSConfiguration(cert_path, key_path, True)
     tls_config.set_min_and_max_version(min_version=ssl.TLSVersion.TLSv1_2, max_version=ssl.TLSVersion.TLSv1_2)
 
@@ -144,21 +141,30 @@ async def main():
         websocket_info = ep_wsServer.get_websocket_info(ep_wsServer.client_list[0])
         if websocket_info is not None:
             try:
-                server_list = await ep_wsServer.client_list[0].get_server_directory(websocket_info, callback_called, None)
-                ld_directory = await ep_wsServer.client_list[0].get_logical_device_directory("LD0", websocket_info, callback_called, None)
+                server_list = await ep_wsServer.client_list[0].get_server_directory(websocket_info, callback_called,
+                                                                                    None)
+                ld_directory = await ep_wsServer.client_list[0].get_logical_device_directory("LD0", websocket_info,
+                                                                                             callback_called, None)
                 ln_directory_ds = await ep_wsServer.client_list[0].get_logical_node_directory("LD0", "LLN0", "dataset",
-                                                                            websocket_info, callback_called, None)
-                ln_directory_do = await ep_wsServer.client_list[0].get_logical_node_directory("LD0", "LLN0", "dataObject",
-                                                                            websocket_info, callback_called, None)
+                                                                                              websocket_info,
+                                                                                              callback_called, None)
+                ln_directory_do = await ep_wsServer.client_list[0].get_logical_node_directory("LD0", "LLN0",
+                                                                                              "dataObject",
+                                                                                              websocket_info,
+                                                                                              callback_called, None)
                 ds_directory = await ep_wsServer.client_list[0].get_dataset_directory("LD0", "LLN0", "DataSetMinMaxAvg",
-                                                                                 websocket_info, callback_called, None)
+                                                                                      websocket_info, callback_called,
+                                                                                      None)
                 set_urcb_res = await ep_wsServer.client_list[0].set_URCB_values(urcb, websocket_info, None,
                                                                                 None)
-                da_def = await ep_wsServer.client_list[0].get_data_definition("LD0/DWMX1.WMaxSptPct", websocket_info, callback_called, None)
+                da_def = await ep_wsServer.client_list[0].get_data_definition("LD0/DWMX1.WMaxSptPct", websocket_info,
+                                                                              callback_called, None)
 
-                set_da_res = await ep_wsServer.client_list[0].set_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value],
-                                                               websocket_info, callback_called, None)
-                da_val = await ep_wsServer.client_list[0].get_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info, callback_called, None)
+                set_da_res = await ep_wsServer.client_list[0].set_data_values("LD0/DWMX1.WMaxSpt.Oper", "co",
+                                                                              [data_attribute_value],
+                                                                              websocket_info, callback_called, None)
+                da_val = await ep_wsServer.client_list[0].get_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", True,
+                                                                          websocket_info, callback_called, None)
 
                 print("printing the list or returned items from client 1")
                 print("server_list:", server_list)
@@ -178,6 +184,7 @@ async def main():
         print("did not enter first if ")
 
     await server_task
+
 
 if __name__ == "__main__":
     asyncio.run(main())

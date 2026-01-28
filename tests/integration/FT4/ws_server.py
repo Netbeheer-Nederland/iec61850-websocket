@@ -1,59 +1,57 @@
-from time import sleep
-
-from Endpoint.endpoint import *
-import asyncio
-from IEC61850.client.IEC61850Client import *
+from ws61850.endpoint.endpoint import *
+from ws61850.iec61850.client.iec61850_client import *
 
 maxMessageSize_server = 65000
 
-oper_val= {
-            "ref": "LD0/DWMX1.WMaxSpt", "ctlVal":('float32', 26.43),
-            "origin": {
-                    "orCat": "stationControl",
-                    "orIdent": b'ORIGIN_ID_1234567890'
-           },
-           "ctlNum": 10,
-           "t" : {
-                    "secondSinceEpoch": 1757588367,
-                    "fractionOfSecond": 8120140,
-                    "timeQuality": {
-                      "leapSecondKnown": False,
-                      "clockFailure": False,
-                      "clockNotSynchronized": False,
-                      "timeAccuracy": 3
-                  }
-                },
-           "test": True,
-           "check": {
-                        "synchroCheck": False,
-                        'interlockCheck': False
-                    }
-           }
-oper_val_setMag= {
-            "ref": "DWMX1.WMaxSet.setMag", "ctlVal":('structure', {'data': [('float32', 11.86)]}),
-            "origin": {
-                    "orCat": "stationControl",
-                    "orIdent": b'ORIGIN_ID_333'
-           },
-           "ctlNum": 10,
-           "t" : {
-                    "secondSinceEpoch": 1757588367,
-                    "fractionOfSecond": 8120140,
-                    "timeQuality": {
-                      "leapSecondKnown": False,
-                      "clockFailure": False,
-                      "clockNotSynchronized": False,
-                      "timeAccuracy": 3
-                  }
-                },
-           "test": True,
-           "check": {
-                        "synchroCheck": False,
-                        'interlockCheck': False
-                    }
-           }
+oper_val = {
+    "ref": "LD0/DWMX1.WMaxSpt", "ctlVal": ('float32', 26.43),
+    "origin": {
+        "orCat": "stationControl",
+        "orIdent": b'ORIGIN_ID_1234567890'
+    },
+    "ctlNum": 10,
+    "t": {
+        "secondSinceEpoch": 1757588367,
+        "fractionOfSecond": 8120140,
+        "timeQuality": {
+            "leapSecondKnown": False,
+            "clockFailure": False,
+            "clockNotSynchronized": False,
+            "timeAccuracy": 3
+        }
+    },
+    "test": True,
+    "check": {
+        "synchroCheck": False,
+        'interlockCheck': False
+    }
+}
+oper_val_setMag = {
+    "ref": "DWMX1.WMaxSet.setMag", "ctlVal": ('structure', {'data': [('float32', 11.86)]}),
+    "origin": {
+        "orCat": "stationControl",
+        "orIdent": b'ORIGIN_ID_333'
+    },
+    "ctlNum": 10,
+    "t": {
+        "secondSinceEpoch": 1757588367,
+        "fractionOfSecond": 8120140,
+        "timeQuality": {
+            "leapSecondKnown": False,
+            "clockFailure": False,
+            "clockNotSynchronized": False,
+            "timeAccuracy": 3
+        }
+    },
+    "test": True,
+    "check": {
+        "synchroCheck": False,
+        'interlockCheck': False
+    }
+}
 
 setMag_val = [{'name': 'setMag', 'data': ('structure', {'data': [('float32', 67.39)]})}]
+
 
 async def main():
     # websocket server
@@ -90,8 +88,9 @@ async def main():
                                                                           websocket_info, None, None)
                 print(da_val)
 
-                set_val_res = await ep_wsServer.client_list[0].set_data_values("LD0/DWMX1.WMaxSet.setMag", "sp", setMag_val,
-                                                               websocket_info, None, None)
+                set_val_res = await ep_wsServer.client_list[0].set_data_values("LD0/DWMX1.WMaxSet.setMag", "sp",
+                                                                               setMag_val,
+                                                                               websocket_info, None, None)
                 print(set_val_res)
 
                 da_val = await ep_wsServer.client_list[0].get_data_values("LD0/DWMX1.WMaxSet", "sp", True,
@@ -107,6 +106,7 @@ async def main():
         print("did not enter first if ")
 
     await server_task
+
 
 if __name__ == "__main__":
     asyncio.run(main())

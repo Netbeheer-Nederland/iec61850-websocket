@@ -1,12 +1,10 @@
-from time import sleep
-
-# from Endpoint.endpoint import *
+# from ws61850.endpoint.endpoint import *
 import asyncio
-# from IEC61850.client.IEC61850Client import *
 
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
-from ws61850.iec61850.data_model.helper import get_now_time
+
+# from ws61850.iec61850.client.iec61850_client import *
 
 maxMessageSize_server = 65000
 
@@ -23,6 +21,7 @@ async def main():
     )
 
     await server_task
+
 
 if __name__ == "__main__":
     asyncio.run(main())
