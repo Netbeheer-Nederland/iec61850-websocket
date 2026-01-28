@@ -19,7 +19,7 @@ import logging
 import asn1tools
 from os.path import join
 
-from ws61850.asn1.schema import data_path
+from ws61850.asn1.schema import schema_path
 
 asn1_file_path = join(schema_path, 'ws_iec61850_tpaa_full.asn')
 
