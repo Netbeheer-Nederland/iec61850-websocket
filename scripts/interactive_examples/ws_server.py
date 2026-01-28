@@ -1,9 +1,13 @@
 from time import sleep
 import re
-from Endpoint.endpoint import *
+# from Endpoint.endpoint import *
 import asyncio
-from IEC61850.client.IEC61850Client import *
+# from IEC61850.client.IEC61850Client import *
 import ast
+
+from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.iec61850.client.iec61850_client import IEC61850Client
+from ws61850.iec61850.data_model.helper import get_now_time
 
 maxMessageSize_server = 65000
 def callback_called(result, param):

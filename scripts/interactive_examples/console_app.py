@@ -1,6 +1,7 @@
 import asyncio
 import subprocess
 
+
 async def run_script(path, interactive=False):
     if interactive:
         # Inherit stdin/stdout/stderr so input() works in the terminal
@@ -23,10 +24,13 @@ async def run_script(path, interactive=False):
             print(f"Error from {path}:\n{stderr.decode()}")
 
     await proc.wait()
+
+
 async def main():
     await asyncio.gather(
         run_script("ws_client.py"),
         run_script("ws_server.py", True)
     )
+
 
 asyncio.run(main())

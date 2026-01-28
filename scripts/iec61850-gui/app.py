@@ -1,4 +1,4 @@
-"""Flask based GUI for IEC 61850 client operations.
+"""Flask-based GUI for IEC 61850 client operations.
 """
 from flask import Flask, jsonify, render_template, request
 import os
@@ -9,12 +9,19 @@ from collections import deque
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from Endpoint.endpoint import WebSocketEndpoint, WebSocketInfo
-from IEC61850.client.IEC61850Client import IEC61850Client
-from TLSConfig.TLSConfiguration import *
-from oauth.oauth_functions import *
-from asn1.encode_decode import encode_tpaa_message
-from IEC61850.client.request_functions import create_token_refresh
+# from Endpoint.endpoint import WebSocketEndpoint, WebSocketInfo
+# from IEC61850.client.IEC61850Client import IEC61850Client
+# from TLSConfig.TLSConfiguration import *
+# from oauth.oauth_functions import *
+# from asn1.encode_decode import encode_tpaa_message
+# from IEC61850.client.request_functions import create_token_refresh
+
+from testing.ieds.high_level_model import make_ied_model1
+from ws61850.endpoint.endpoint import WebSocketEndpoint, WebSocketInfo
+from ws61850.iec61850.server.control_handling import ControlHandlerResult, ControlServiceStatusKind
+from ws61850.iec61850.server.iec61850_server import IEC61850Server
+from ws61850.iec61850.server.service_error import ServiceStatusKind
+
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 

@@ -15,22 +15,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import datetime
-import threading
-import websockets
-
-import requests
-from http import HTTPStatus
-import jwt
-from jwt import decode, PyJWKClient, ExpiredSignatureError, InvalidTokenError, algorithms
-from oauth.oauth_functions import *
 import time
+from http import HTTPStatus
+
+import jwt
 import requests
-import sys
+import websockets
+from jwt import decode, PyJWKClient, ExpiredSignatureError, InvalidTokenError, algorithms
+from websockets.asyncio.server import serve
+
+from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
+from ws61850.iec61850.client.request_handling import create_tpaa_associate_request
+from ws61850.iec61850.server.request_handling import extract_associate_request_type, \
+    retrieve_associate_id_from_decoded_msg, retrieve_max_outstanding_calls_from_decoded_msg
+from ws61850.iec61850.server.response_handling import create_tpaa_abort_response, create_tpaa_release_response, \
+    create_tpaa_associate_response
+from ws61850.iec61850.server.service_error import ServiceStatusKind
+from ws61850.security.oauth import check_token_validity_and_expiry, get_jwt_algorithm
 
 maxMessageSize = 65000
 
 maxMessageSize_server = 65000
+
 
 class WebSocketInfo:
     def __init__(self, websocket, associate_id, cp=None, access_token=None):
@@ -42,20 +50,22 @@ class WebSocketInfo:
         self.access_token = access_token
         self.is_ber_protocol = False
 
+
 class WebSocketEndpoint:
     """
     Class to represent a websocket endpoint
     """
-    def __init__(self, tls_config=None, is_direct = False, oauth_enable=False, try_reconnect=True,
+
+    def __init__(self, tls_config=None, is_direct=False, oauth_enable=False, try_reconnect=True,
                  at_endpoint=None,
                  at_endpoint_tls=None, kc_cert=None, own_cert=None, cert_endpoint=None, token_issuer=None
                  ):
         """
         Initializing function
         """
-        #self.id = id
+        # self.id = id
         self.server_list = []
-        self.client_list  =[]
+        self.client_list = []
         self.mode = None
         self.websocket_info_list = []
         self.incoming_queue = asyncio.Queue()
@@ -100,7 +110,8 @@ class WebSocketEndpoint:
         except Exception as e:
             print(f"Error stopping passive server: {e}")
 
-    async def on_connection_closed(self, websocket, clean_path, is_ws_client=False, hostname=None, port=None, protocol=None):
+    async def on_connection_closed(self, websocket, clean_path, is_ws_client=False, hostname=None, port=None,
+                                   protocol=None):
         try:
             selected_server = next((server for server in self.server_list if server.cp == clean_path), None)
 
@@ -111,7 +122,7 @@ class WebSocketEndpoint:
                 selected_client.is_connected = False
                 selected_client.disconnect_event.set()
 
-            if  selected_server is not None:
+            if selected_server is not None:
                 selected_server.set_quality_to_questionable()
 
         except Exception as e:
@@ -124,8 +135,8 @@ class WebSocketEndpoint:
                 try:
 
                     self.websocket_info_list = [
-                    ws_info for ws_info in self.websocket_info_list
-                    if ws_info.websocket.request.path.lstrip("/") != clean_path]
+                        ws_info for ws_info in self.websocket_info_list
+                        if ws_info.websocket.request.path.lstrip("/") != clean_path]
                     try:
                         await websocket.close()
                     except Exception:
@@ -143,8 +154,6 @@ class WebSocketEndpoint:
                 except Exception as e:
                     print(f"Unexpected error: {e}")
                     await asyncio.sleep(self.retry_connection_delay)
-
-
 
     async def close_on_expiry(self, websocket, exp_timestamp):
         """Closes the connection when the token expires."""
@@ -165,12 +174,12 @@ class WebSocketEndpoint:
 
             if self.is_direct:
                 selected_server = next((server for server in self.server_list if server.cp == clean_path), None)
-                #selected_server.install_send_msg_callback(self.send_msg_callback)
+                # selected_server.install_send_msg_callback(self.send_msg_callback)
                 if selected_server is not None:
                     selected_server.ready_event.set()
                     self.websocket_info_list = [
-                    ws_info for ws_info in self.websocket_info_list
-                    if ws_info.websocket.request.path.lstrip("/") != clean_path]
+                        ws_info for ws_info in self.websocket_info_list
+                        if ws_info.websocket.request.path.lstrip("/") != clean_path]
 
                     websocket_info = WebSocketInfo(websocket, "", cp=clean_path)
                     if protocol:
@@ -186,12 +195,12 @@ class WebSocketEndpoint:
                             self.close_on_expiry(websocket, current_access_token["access_token"]["exp"]))
 
                     async for message in websocket:
-                        #print(f"Received from websocket server (IEC61850 client): {message}")
+                        # print(f"Received from websocket server (IEC61850 client): {message}")
                         if self.recv_msg_callback is not None:
                             self.recv_msg_callback(message, datetime.datetime.now())
-                        #else:
+                        # else:
                         #    print(f"Received message: {message}")
-                        #print(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
+                        # print(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
                         decoded_message = await asyncio.to_thread(decode_tpaa_message, message,
                                                                   websocket_info.is_ber_protocol)
 
@@ -241,7 +250,7 @@ class WebSocketEndpoint:
                         if "iec61850-tpaa-ber-v1" == protocol:
                             is_ber = True
 
-                    #request = encode_tpaa_message(tpaa_request, is_ber)
+                    # request = encode_tpaa_message(tpaa_request, is_ber)
                     request = await asyncio.to_thread(encode_tpaa_message, tpaa_request,
                                                       is_ber)
                     await websocket.send(request)
@@ -254,8 +263,8 @@ class WebSocketEndpoint:
                 selected_client = next((client for client in self.client_list if client.cp == clean_path), None)
                 if selected_client is not None:
                     self.websocket_info_list = [
-                    ws_info for ws_info in self.websocket_info_list
-                    if ws_info.websocket.request.path.lstrip("/") != clean_path
+                        ws_info for ws_info in self.websocket_info_list
+                        if ws_info.websocket.request.path.lstrip("/") != clean_path
                     ]
                     websocket_info = WebSocketInfo(websocket, "", cp=clean_path)
                     if protocol:
@@ -273,29 +282,31 @@ class WebSocketEndpoint:
                     tpaa_request = create_tpaa_associate_request(selected_client.cp, 65000)
                     request = await asyncio.to_thread(encode_tpaa_message, tpaa_request,
                                                       websocket_info.is_ber_protocol)
-                    #request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
+                    # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
                     await websocket.send(request)
                     if self.send_msg_callback is not None:
                         self.send_msg_callback(request, datetime.datetime.now())
 
                     async for message in websocket:
-                        #print("message in receiver: ", message)
+                        # print("message in receiver: ", message)
                         if self.recv_msg_callback is not None:
                             self.recv_msg_callback(message, datetime.datetime.now())
                         else:
                             print("Received message in endpoint handler: ", message)
-                            #print(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
+                            # print(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
                         if not selected_client.is_connected:
                             if not self.if_message_is_report(message):
-                                decoded_message = await asyncio.to_thread(decode_tpaa_message, message, websocket_info.is_ber_protocol)
+                                decoded_message = await asyncio.to_thread(decode_tpaa_message, message,
+                                                                          websocket_info.is_ber_protocol)
 
-                                #decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
+                                # decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
 
                                 if decoded_message[0] == "associate":
                                     associate_type = extract_associate_request_type(decoded_message)
                                     if associate_type == "associateResponse":
                                         asc_id = retrieve_associate_id_from_decoded_msg(decoded_message)
-                                        max_outstanding_calls = retrieve_max_outstanding_calls_from_decoded_msg(decoded_message)
+                                        max_outstanding_calls = retrieve_max_outstanding_calls_from_decoded_msg(
+                                            decoded_message)
                                         selected_client.max_outstanding_calls = max_outstanding_calls
                                         websocket_info.associate_id = asc_id
                                         selected_client.is_connected = True
@@ -303,14 +314,15 @@ class WebSocketEndpoint:
 
                         else:
                             if not self.if_message_is_report(message):
-                                decoded_message = await asyncio.to_thread(decode_tpaa_message, message, websocket_info.is_ber_protocol)
-                                #decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
+                                decoded_message = await asyncio.to_thread(decode_tpaa_message, message,
+                                                                          websocket_info.is_ber_protocol)
+                                # decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
                                 if decoded_message[0] == "associate":
                                     associate_type = extract_associate_request_type(decoded_message)
                                     if associate_type == "abortRequest":
                                         tpaa_request = create_tpaa_abort_response(websocket_info.invoke_id,
                                                                                   websocket_info.associate_id)
-                                        #request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
+                                        # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
                                         request = await asyncio.to_thread(encode_tpaa_message, tpaa_request,
                                                                           websocket_info.is_ber_protocol)
                                         await websocket.send(request)
@@ -320,7 +332,7 @@ class WebSocketEndpoint:
                                     elif associate_type == "releaseRequest":
                                         tpaa_request = create_tpaa_release_response(websocket_info.invoke_id,
                                                                                     websocket_info.associate_id)
-                                        #request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
+                                        # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
                                         request = await asyncio.to_thread(encode_tpaa_message, tpaa_request,
                                                                           websocket_info.is_ber_protocol)
                                         await websocket.send(request)
@@ -328,9 +340,10 @@ class WebSocketEndpoint:
                                         print("Association released by server")
                                         break
                                     elif associate_type == "refreshToken":
-                                        validity, expiry = check_token_validity_and_expiry(decoded_message[1][1][1]["token"],
-                                                                                                    self.kc_cert,self.own_cert,
-                                                                                           self.cert_endpoint, self.token_issuer)
+                                        validity, expiry = check_token_validity_and_expiry(
+                                            decoded_message[1][1][1]["token"],
+                                            self.kc_cert, self.own_cert,
+                                            self.cert_endpoint, self.token_issuer)
                                         if validity is True and expiry is not None:
                                             websocket_info.expiry_task.cancel()
                                             try:
@@ -341,7 +354,8 @@ class WebSocketEndpoint:
                                             websocket_info.expiry_task = asyncio.create_task(
                                                 self.close_on_expiry(websocket, expiry))
 
-                                invoke_id = selected_client.add_to_outstanding_calls(decoded_message, websocket_info.is_ber_protocol)
+                                invoke_id = selected_client.add_to_outstanding_calls(decoded_message,
+                                                                                     websocket_info.is_ber_protocol)
                                 if invoke_id and invoke_id > websocket_info.invoke_id:
                                     print("invoke id invalid, closing the connection ...")
                                     await websocket.close()
@@ -354,7 +368,7 @@ class WebSocketEndpoint:
                         if "iec61850-tpaa-ber-v1" in protocol:
                             is_ber = True
 
-                    #request = encode_tpaa_message(tpaa_request, is_ber)
+                    # request = encode_tpaa_message(tpaa_request, is_ber)
                     request = await asyncio.to_thread(encode_tpaa_message, tpaa_request,
                                                       is_ber)
                     await websocket.send(request)
@@ -373,8 +387,6 @@ class WebSocketEndpoint:
 
             await self.on_connection_closed(websocket, clean_path)
 
-
-
     async def process_request(self, path, request_headers):
 
         headers = request_headers.headers
@@ -384,11 +396,11 @@ class WebSocketEndpoint:
             token = auth_header[len("Bearer "):]
 
             session = requests.Session()
-            #session.cert = ("/home/raspberry/Desktop/rti2_protocol_spec/exploration/certs/server_ws.crt",
+            # session.cert = ("/home/raspberry/Desktop/rti2_protocol_spec/exploration/certs/server_ws.crt",
             #            "/home/raspberry/Desktop/rti2_protocol_spec/exploration/certs/server_ws.key" )
-            #jwks_url = "https://localhost:8443/realms/master/protocol/openid-connect/certs"
+            # jwks_url = "https://localhost:8443/realms/master/protocol/openid-connect/certs"
             jwks_url = self.cert_endpoint
-            session.verify=self.kc_cert
+            session.verify = self.kc_cert
             response = session.get(jwks_url)
 
             jwks_data = response.json()
@@ -408,7 +420,8 @@ class WebSocketEndpoint:
                     issuer=self.token_issuer
                 )
 
-                self.access_token_list.append({"access_token": decoded, "cp": path.request.path.lstrip("/"), "access_token_raw": token})
+                self.access_token_list.append(
+                    {"access_token": decoded, "cp": path.request.path.lstrip("/"), "access_token_raw": token})
 
             except ExpiredSignatureError:
                 print("Token has expired")
@@ -420,7 +433,6 @@ class WebSocketEndpoint:
                 return HTTPStatus.FORBIDDEN, [], b"Invalid token\n"
         else:
             return HTTPStatus.UNAUTHORIZED, [], b"Missing or invalid token\n"
-
 
     async def start(self, mode, hostname, port, cp=None, access_token=None, protocol=None, *arg):
         if mode == "passive":
@@ -435,15 +447,15 @@ class WebSocketEndpoint:
         if self.tls_config is not None:
             async with (serve(self.handle_client, hostname, port, ssl=self.tls_config.ssl_context, subprotocols=protocol
             if protocol else None, process_request=self.process_request if self.oauth_enable else None, ping_interval=15
-                              , ping_timeout=30)
+                    , ping_timeout=30)
                         as server):
                 print(f"WebSocket server started on wss://{hostname}:{port}")
                 await server.serve_forever()
         else:
             async with serve(self.handle_client, hostname, port, subprotocols=protocol if protocol is not None else None
-                             , process_request=self.process_request if self.oauth_enable else None, ping_interval=15
-                             , ping_timeout=30) as server:
-   
+                    , process_request=self.process_request if self.oauth_enable else None, ping_interval=15
+                    , ping_timeout=30) as server:
+
                 self.server = server
                 print(f"WebSocket server started on ws://{hostname}:{port}")
                 await server.serve_forever()
@@ -458,9 +470,12 @@ class WebSocketEndpoint:
 
         async with websockets.connect(uri, ssl=self.tls_config.ssl_context if self.tls_config else None,
                                       subprotocols=protocol if protocol is not None else None,
-                                      additional_headers={"Authorization": f"Bearer {access_token}"} if access_token else None,
+                                      additional_headers={
+                                          "Authorization": f"Bearer {access_token}"} if access_token else None,
                                       compression=None) as websocket:
             print("Started client connection to", uri)
+            websocket_info = None
+
             try:
                 if self.is_direct:
                     selected_client = next((client for client in self.client_list if client.cp == cp), None)
@@ -485,7 +500,7 @@ class WebSocketEndpoint:
                         tpaa_request = create_tpaa_associate_request(selected_client.cp, 65000)
                         request = await asyncio.to_thread(encode_tpaa_message, tpaa_request,
                                                           websocket_info.is_ber_protocol)
-                        #request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
+                        # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
                         await websocket.send(request)
                         if self.send_msg_callback is not None:
                             self.send_msg_callback(request, datetime.datetime.now())
@@ -494,13 +509,14 @@ class WebSocketEndpoint:
                             if self.recv_msg_callback is not None:
                                 self.recv_msg_callback(message, datetime.datetime.now())
                             else:
-                                print(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
+                                print(
+                                    f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
                             if not selected_client.is_connected:
                                 if not self.if_message_is_report(message):
                                     decoded_message = await asyncio.to_thread(decode_tpaa_message, message,
                                                                               websocket_info.is_ber_protocol)
 
-                                    #decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
+                                    # decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
                                     if decoded_message[0] == "associate":
                                         associate_type = extract_associate_request_type(decoded_message)
                                         if associate_type == "associateResponse":
@@ -517,13 +533,13 @@ class WebSocketEndpoint:
                                     decoded_message = await asyncio.to_thread(decode_tpaa_message, message,
                                                                               websocket_info.is_ber_protocol)
 
-                                    #decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
+                                    # decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
                                     if decoded_message[0] == "associate":
                                         associate_type = extract_associate_request_type(decoded_message)
                                         if associate_type == "abortRequest":
                                             tpaa_request = create_tpaa_abort_response(websocket_info.invoke_id,
                                                                                       websocket_info.associate_id)
-                                            #request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
+                                            # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
                                             request = await asyncio.to_thread(encode_tpaa_message, tpaa_request,
                                                                               websocket_info.is_ber_protocol)
                                             await websocket.send(request)
@@ -533,7 +549,7 @@ class WebSocketEndpoint:
                                         elif associate_type == "releaseRequest":
                                             tpaa_request = create_tpaa_release_response(websocket_info.invoke_id,
                                                                                         websocket_info.associate_id)
-                                            #request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
+                                            # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
                                             request = await asyncio.to_thread(encode_tpaa_message, tpaa_request,
                                                                               websocket_info.is_ber_protocol)
                                             await websocket.send(request)
@@ -556,14 +572,14 @@ class WebSocketEndpoint:
                                                     self.close_on_expiry(websocket, expiry))
 
                                     invoke_id = selected_client.add_to_outstanding_calls(decoded_message,
-                                                                                                    websocket_info.is_ber_protocol)
+                                                                                         websocket_info.is_ber_protocol)
                                     if invoke_id and invoke_id > websocket_info.invoke_id:
                                         print("invoke id invalid, closing the connection ...")
                                         await websocket.close()
                     else:
                         tpaa_request = create_tpaa_associate_response(65000, cp,
                                                                       ServiceStatusKind.instanceNotAvailable.name)
-                        #request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
+                        # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
                         is_ber = False
                         if protocol:
                             if "iec61850-tpaa-ber-v1" in protocol:
@@ -582,8 +598,8 @@ class WebSocketEndpoint:
                     if selected_server is not None:
                         ied = selected_server.ied_model
                         self.websocket_info_list = [
-                        ws_info for ws_info in self.websocket_info_list
-                        if ws_info.websocket.request.path.lstrip("/") != cp  # or cp for __start_active
+                            ws_info for ws_info in self.websocket_info_list
+                            if ws_info.websocket.request.path.lstrip("/") != cp  # or cp for __start_active
                         ]
                         websocket_info = WebSocketInfo(websocket, "", cp=cp)
 
@@ -596,13 +612,14 @@ class WebSocketEndpoint:
                         async for message in websocket:
                             if self.recv_msg_callback is not None:
                                 self.recv_msg_callback(message, datetime.datetime.now())
-                            #else:
+                            # else:
                             #    print(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
 
                             await selected_server.handle_request(message, cp, websocket_info)
                     else:
-                        tpaa_request = create_tpaa_associate_response(65000, cp, ServiceStatusKind.instanceNotAvailable.name)
-                        #request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
+                        tpaa_request = create_tpaa_associate_response(65000, cp,
+                                                                      ServiceStatusKind.instanceNotAvailable.name)
+                        # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
                         is_ber = False
                         if protocol:
                             if "iec61850-tpaa-ber-v1" in protocol:
@@ -616,7 +633,6 @@ class WebSocketEndpoint:
                         print("Connection failed: Access Point not available")
                         await websocket.close()
 
-
             except websockets.exceptions.ConnectionClosedError as e:
                 if "no close frame" in str(e):
                     print("Connection aborted without close frame (likely via transport.abort())")
@@ -626,10 +642,8 @@ class WebSocketEndpoint:
             except websockets.exceptions.ConnectionClosedOK:
                 print("Connection closed gracefully")
 
-
             except Exception as e:
                 print("Unhandled error in start_active:", e)
-
 
             finally:
                 print(f"Client disconnected: {websocket.remote_address}")
@@ -660,7 +674,8 @@ class WebSocketEndpoint:
         Function used for finding the correct webSocketInfo instance
         """
         websocket_info = next(
-            (ws_info for ws_info in self.websocket_info_list if ws_info.websocket.request.path.lstrip("/") == iec61850_client.cp),
+            (ws_info for ws_info in self.websocket_info_list if
+             ws_info.websocket.request.path.lstrip("/") == iec61850_client.cp),
             None)
         return websocket_info
 
@@ -669,7 +684,7 @@ class WebSocketEndpoint:
         Function used for finding the correct webSocketInfo instance
         """
         websocket_info = next(
-            (ws_info for ws_info in self.websocket_info_list if ws_info.websocket.request.path.lstrip("/") == server.cp),
+            (ws_info for ws_info in self.websocket_info_list if
+             ws_info.websocket.request.path.lstrip("/") == server.cp),
             None)
         return websocket_info
-

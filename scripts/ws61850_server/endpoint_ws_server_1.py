@@ -1,8 +1,9 @@
 import os
 
-import asyncio
 import sys
 import traceback
+
+import asyncio
 
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
@@ -13,8 +14,8 @@ for path in sys.path:
         project_root = path
         break
 
-cert_path = os.path.join(project_root, 'certs', 'server.crt')
-key_path = os.path.join(project_root, 'certs', 'server.key')
+# cert_path = os.path.join(project_root, 'certs', 'server.crt')
+# key_path = os.path.join(project_root, 'certs', 'server.key')
 
 maxMessageSize_server = 65000
 

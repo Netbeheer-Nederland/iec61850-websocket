@@ -1,17 +1,25 @@
+import os
 from os import access
+from random import randint
 
-import asn1.encode_decode
-from Examples.ieds.high_level_model import ied as ied1
-from Examples.ieds.ied_model_2 import ied as ied2
-from Endpoint.endpoint import *
+# import asn1.encode_decode
+# from Examples.ieds.high_level_model import ied as ied1
+# from Examples.ieds.ied_model_2 import ied as ied2
+# from Endpoint.endpoint import *
 import asyncio
-from IEC61850.server.IEC61850Server import *
-from oauth.oauth_functions import *
+# from IEC61850.server.IEC61850Server import *
+# from oauth.oauth_functions import *
 import jwt
-from IEC61850.server.control_handling import *
-from IEC61850.server.service_error import *
-from TLSConfig.TLSConfiguration import *
+# from IEC61850.server.control_handling import *
+# from IEC61850.server.service_error import *
+# from TLSConfig.TLSConfiguration import *
 import sys
+
+from testing.ieds.high_level_model import make_ied_model1
+from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.iec61850.server.control_handling import ControlHandlerResult, ControlServiceStatusKind
+from ws61850.iec61850.server.iec61850_server import IEC61850Server
+from ws61850.iec61850.server.service_error import ServiceStatusKind
 
 project_root = ""
 for path in sys.path:
@@ -62,7 +70,7 @@ async def schedule_release(iec61850_server, endpoint):
 async def main():
 
     ep_wsClient_1 = WebSocketEndpoint()
-    iec61850_server_1 = IEC61850Server(ied1, "cp1")
+    iec61850_server_1 = IEC61850Server(make_ied_model1(), "cp1")
     iec61850_server_1.set_control_handler(control_handler_for_float, None)
     report_task_1 = asyncio.create_task(iec61850_server_1.periodic_report_start())
     #toggle_task_1 = asyncio.create_task(toggle_custom_value(iec61850_server_1, "LD0/DGEN1.DEROpSt.stVal"))
