@@ -14,13 +14,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import logging
 import asn1tools
 from os.path import join
 
-from ws61850.asn1.data import data_path
+from ws61850.asn1.schema import data_path
 
-asn1_file_path = join(data_path, 'ws_iec61850_tpaa_full.asn')
+asn1_file_path = join(schema_path, 'ws_iec61850_tpaa_full.asn')
 
 logger = logging.getLogger(__name__)
 
