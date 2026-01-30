@@ -16,28 +16,29 @@
 # limitations under the License.
 
 import logging
-import asn1tools
 from os.path import join
+
+import asn1tools
 
 from ws61850.asn1.schema import schema_path
 
-asn1_file_path = join(schema_path, 'ws_iec61850_tpaa_full.asn')
+asn1_file_path = join(schema_path, "ws_iec61850_tpaa_full.asn")
 
 logger = logging.getLogger(__name__)
 
-foo = asn1tools.compile_files(asn1_file_path, codec='jer')
-foo_ber = asn1tools.compile_files(asn1_file_path, codec='ber')
+foo = asn1tools.compile_files(asn1_file_path, codec="jer")
+foo_ber = asn1tools.compile_files(asn1_file_path, codec="ber")
 
 
 def encode_tpaa_message(tpaa_request, is_ber=False):
     if is_ber:
-        encoded_request: bytes = foo_ber.encode('TpaaPdu', tpaa_request)
+        encoded_request: bytes = foo_ber.encode("TpaaPdu", tpaa_request)
         # byte_length = len(encoded_request)
         # print("the tpaa_request is: ", tpaa_request)
         # print(f"Encoded message length (BER): {byte_length} bytes")
         return_val = encoded_request
     else:
-        encoded_request: bytes = foo.encode('TpaaPdu', tpaa_request)
+        encoded_request: bytes = foo.encode("TpaaPdu", tpaa_request)
         # jer_bytes = encoded_request  # already bytes from asn1tools
         # byte_length = len(jer_bytes)
         # print("the tpaa_request is: ", tpaa_request)
@@ -50,9 +51,9 @@ def encode_tpaa_message(tpaa_request, is_ber=False):
 def decode_tpaa_message(tpaa_message, is_ber=False):
     if is_ber:
         received_bytes = tpaa_message
-        decoded_request = foo_ber.decode('TpaaPdu', received_bytes)
+        decoded_request = foo_ber.decode("TpaaPdu", received_bytes)
     else:
-        received_bytes = tpaa_message.encode('utf-8')
-        decoded_request = foo.decode('TpaaPdu', received_bytes)
+        received_bytes = tpaa_message.encode("utf-8")
+        decoded_request = foo.decode("TpaaPdu", received_bytes)
 
     return decoded_request
