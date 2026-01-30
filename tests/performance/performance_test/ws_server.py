@@ -124,9 +124,7 @@ async def add_iec61850_client_requests(iec61850_client, ep_wsServer):
         websocket_info = ep_wsServer.get_websocket_info(iec61850_client)
         if websocket_info is not None:
             try:
-                server_list = await iec61850_client.get_server_directory(
-                    websocket_info, callback_called, None
-                )
+                server_list = await iec61850_client.get_server_directory(websocket_info, callback_called, None)
                 ld_directory = await iec61850_client.get_logical_device_directory(
                     "LD0", websocket_info, callback_called, None
                 )
@@ -144,9 +142,7 @@ async def add_iec61850_client_requests(iec61850_client, ep_wsServer):
                     callback_called,
                     None,
                 )
-                set_urcb_res = await iec61850_client.set_URCB_values(
-                    urcb, websocket_info, None, None
-                )
+                set_urcb_res = await iec61850_client.set_URCB_values(urcb, websocket_info, None, None)
                 da_def = await iec61850_client.get_data_definition(
                     "LD0/DWMX1.WMaxSptPct", websocket_info, callback_called, None
                 )
@@ -168,9 +164,7 @@ async def add_iec61850_client_requests(iec61850_client, ep_wsServer):
                     None,
                 )
 
-                print(
-                    f"printing the list or returned items from client {iec61850_client.cp}"
-                )
+                print(f"printing the list or returned items from client {iec61850_client.cp}")
                 print("server_list:", server_list)
                 print("ld_directory:", ld_directory)
                 print("ln_directory_ds:", ln_directory_ds)
