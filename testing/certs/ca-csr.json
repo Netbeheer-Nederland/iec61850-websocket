@@ -1,0 +1,15 @@
+{
+  "CN": "WS61850 Test Root CA",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "NL",
+      "O": "Test CA",
+      "OU": "Development",
+      "L": "Elst"
+    }
+  ]
+}
