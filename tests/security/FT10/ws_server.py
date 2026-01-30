@@ -89,19 +89,13 @@ async def main():
                 server_list = await ep_ws_server.client_list[0].get_server_directory(
                     websocket_info, callback_called, None
                 )
-                ld_directory = await ep_ws_server.client_list[
-                    0
-                ].get_logical_device_directory(
+                ld_directory = await ep_ws_server.client_list[0].get_logical_device_directory(
                     "LD0", websocket_info, callback_called, None
                 )
-                ln_directory_ds = await ep_ws_server.client_list[
-                    0
-                ].get_logical_node_directory(
+                ln_directory_ds = await ep_ws_server.client_list[0].get_logical_node_directory(
                     "LD0", "LLN0", "dataset", websocket_info, callback_called, None
                 )
-                ln_directory_do = await ep_ws_server.client_list[
-                    0
-                ].get_logical_node_directory(
+                ln_directory_do = await ep_ws_server.client_list[0].get_logical_node_directory(
                     "LD0", "LLN0", "dataObject", websocket_info, callback_called, None
                 )
                 ds_directory = await ep_ws_server.client_list[0].get_dataset_directory(
