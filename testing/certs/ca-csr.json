@@ -1,5 +1,5 @@
 {
-  "CN": "WS61850 Test Root CA",
+  "CN": "IEC61850 Test Root CA",
   "key": {
     "algo": "rsa",
     "size": 2048

@@ -13,6 +13,8 @@ command -v cfssl >/dev/null 2>&1 || {
   exit 1
 }
 
+SERVER_HOSTNAMES="${SERVER_HOSTNAMES:-localhost,127.0.0.1}"
+
 echo "🔐 Generating CA..."
 cfssl gencert -initca ca-csr.json | cfssljson -bare ca
 
@@ -22,6 +24,7 @@ cfssl gencert \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
   -profile=server \
+  -hostname="${SERVER_HOSTNAMES}" \
   server-csr.json | cfssljson -bare server
 
 echo "🔐 Generating client certificate..."
@@ -30,9 +33,10 @@ cfssl gencert \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
   -profile=client \
+  -hostname="${SERVER_HOSTNAMES}" \
   client-csr.json | cfssljson -bare client
 
-chmod 600 *.key.pem
+chmod 600 *-key.pem
 
 echo
 echo "✅ Certificates generated:"
