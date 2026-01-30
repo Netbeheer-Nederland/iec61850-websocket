@@ -1,14 +1,17 @@
 var searchData=
 [
-  ['acsiclasskind_0',['ACSIClassKind',['../classied_model_1_1_a_c_s_i_class_kind.html',1,'iedModel']]],
-  ['add_5fdataattribute_1',['add_dataAttribute',['../classied_model_1_1_data_attribute.html#a21193363aa6c91016f5dd5cdc67e1995',1,'iedModel::DataAttribute']]],
-  ['add_5fdataobject_2',['add_dataObject',['../classied_model_1_1_logical_node.html#a76658829396ffa8d15e4dccf2a49682a',1,'iedModel::LogicalNode']]],
-  ['add_5fdataset_3',['add_dataSet',['../classied_model_1_1_ied_model.html#ac3438c63e3ec32e5a52ed2480929e5ba',1,'iedModel::IedModel']]],
-  ['add_5fdo_5for_5fda_4',['add_do_or_da',['../classied_model_1_1_data_object.html#a7a20f80519d24c9654cc9dd52e5c134a',1,'iedModel::DataObject']]],
-  ['add_5fiec61850_5fclient_5',['add_iec61850_client',['../classendpoint_1_1_web_socket_endpoint.html#a87c44c043a85b8e5ac229cc54777d2d0',1,'endpoint::WebSocketEndpoint']]],
-  ['add_5fiec61850_5fserver_6',['add_iec61850_server',['../classendpoint_1_1_web_socket_endpoint.html#a41e15b480e7ead2016a38d9e22114733',1,'endpoint::WebSocketEndpoint']]],
-  ['add_5flogical_5fnode_7',['add_logical_node',['../classied_model_1_1_logical_device.html#af5788a208f625c84c3f2453141e0b015',1,'iedModel::LogicalDevice']]],
-  ['add_5flogicaldevice_8',['add_logicalDevice',['../classied_model_1_1_ied_model.html#a5b221f5fdfd7c5533fb1216f41a15e6e',1,'iedModel::IedModel']]],
-  ['add_5freportcontrol_9',['add_reportControl',['../classied_model_1_1_ied_model.html#a378eca9435b79338fde8407d7bd15782',1,'iedModel::IedModel']]],
-  ['await_5fresponse_10',['await_response',['../class_i_e_c61850_client_1_1_i_e_c61850_client.html#ae9df82bec96cbf268081f1bf0bab531f',1,'IEC61850Client::IEC61850Client']]]
+  ['abort_0',['abort',['../classws61850_1_1iec61850_1_1client_1_1iec61850__client_1_1IEC61850Client.html#aabebf41c2702e85c8687dce2c98a31cb',1,'ws61850::iec61850::client::iec61850_client::IEC61850Client']]],
+  ['abort_5ffunction_1',['abort_function',['../classws61850_1_1iec61850_1_1server_1_1iec61850__server_1_1IEC61850Server.html#a574a5b7b287de0d0d6260404821b38af',1,'ws61850::iec61850::server::iec61850_server::IEC61850Server']]],
+  ['acsiclasskind_2',['ACSIClassKind',['../classws61850_1_1iec61850_1_1data__model_1_1ied__model_1_1ACSIClassKind.html',1,'ws61850::iec61850::data_model::ied_model']]],
+  ['add_5fdataattribute_3',['add_dataAttribute',['../classws61850_1_1iec61850_1_1data__model_1_1ied__model_1_1DataAttribute.html#a7198fb3c503219b4fd8b7034ec9d9472',1,'ws61850::iec61850::data_model::ied_model::DataAttribute']]],
+  ['add_5fdataobject_4',['add_dataObject',['../classws61850_1_1iec61850_1_1data__model_1_1ied__model_1_1LogicalNode.html#aeef7d10bd50165f22606535981c8842c',1,'ws61850::iec61850::data_model::ied_model::LogicalNode']]],
+  ['add_5fdataset_5',['add_dataset',['../classws61850_1_1iec61850_1_1data__model_1_1ied__model_1_1IedModel.html#a918536eeabc9ef112fc444bc369b731f',1,'ws61850.iec61850.data_model.ied_model.IedModel.add_dataSet()'],['../classws61850_1_1iec61850_1_1data__model_1_1ied__model_1_1LogicalNode.html#a94785e92283e29e124cb4dfd63a8546b',1,'ws61850.iec61850.data_model.ied_model.LogicalNode.add_dataSet()']]],
+  ['add_5fdo_5for_5fda_6',['add_do_or_da',['../classws61850_1_1iec61850_1_1data__model_1_1ied__model_1_1DataObject.html#aab2a686e0f17ce100293614ce3cf9cd5',1,'ws61850::iec61850::data_model::ied_model::DataObject']]],
+  ['add_5fiec61850_5fclient_7',['add_iec61850_client',['../classws61850_1_1endpoint_1_1endpoint_1_1WebSocketEndpoint.html#aaf8c91ab12bb71f4a7ea83eaf6509170',1,'ws61850::endpoint::endpoint::WebSocketEndpoint']]],
+  ['add_5fiec61850_5fserver_8',['add_iec61850_server',['../classws61850_1_1endpoint_1_1endpoint_1_1WebSocketEndpoint.html#a257e5b1f35872ca559771688c7d9d2eb',1,'ws61850::endpoint::endpoint::WebSocketEndpoint']]],
+  ['add_5flogical_5fnode_9',['add_logical_node',['../classws61850_1_1iec61850_1_1data__model_1_1ied__model_1_1LogicalDevice.html#a8ee1607051a2259ba85bb3f6367496d0',1,'ws61850::iec61850::data_model::ied_model::LogicalDevice']]],
+  ['add_5flogicaldevice_10',['add_logicalDevice',['../classws61850_1_1iec61850_1_1data__model_1_1ied__model_1_1IedModel.html#ade9a280554e124a11fb883ed0d6d3ae5',1,'ws61850::iec61850::data_model::ied_model::IedModel']]],
+  ['add_5freportcontrol_11',['add_reportcontrol',['../classws61850_1_1iec61850_1_1data__model_1_1ied__model_1_1IedModel.html#a5726dcaa38a9810748117fc748ded4d9',1,'ws61850.iec61850.data_model.ied_model.IedModel.add_reportControl()'],['../classws61850_1_1iec61850_1_1data__model_1_1ied__model_1_1LogicalNode.html#a7724f0128c2aa93bb97e005285b5ab23',1,'ws61850.iec61850.data_model.ied_model.LogicalNode.add_reportControl()']]],
+  ['add_5fto_5foutstanding_5fcalls_12',['add_to_outstanding_calls',['../classws61850_1_1iec61850_1_1client_1_1iec61850__client_1_1IEC61850Client.html#aa2ef476c6f0811b0b18d45d5c09a98d7',1,'ws61850::iec61850::client::iec61850_client::IEC61850Client']]],
+  ['await_5fresponse_13',['await_response',['../classws61850_1_1iec61850_1_1client_1_1iec61850__client_1_1IEC61850Client.html#a84dbd848c41baca1e27ddd9722d2faa2',1,'ws61850::iec61850::client::iec61850_client::IEC61850Client']]]
 ];

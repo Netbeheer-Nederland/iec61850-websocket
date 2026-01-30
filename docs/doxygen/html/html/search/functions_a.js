@@ -1,9 +1,5 @@
 var searchData=
 [
-  ['select_0',['select',['../class_i_e_c61850_client_1_1_i_e_c61850_client.html#ac458a96182e831c1c87e3c42421ade45',1,'IEC61850Client::IEC61850Client']]],
-  ['set_5fbrcb_5fvalues_1',['set_BRCB_values',['../class_i_e_c61850_client_1_1_i_e_c61850_client.html#a002e144b2b868ead80248758ddefa0b0',1,'IEC61850Client::IEC61850Client']]],
-  ['set_5fcontrol_5fhandler_2',['set_control_handler',['../class_i_e_c61850_server_1_1_i_e_c61850_server.html#ab856ffd5998f38d4fb7b25a873918cbd',1,'IEC61850Server::IEC61850Server']]],
-  ['set_5fctlval_5fvalue_3',['set_ctlVal_value',['../class_i_e_c61850_server_1_1_i_e_c61850_server.html#a0923ac56e1f1f99eb1802349bfc9eebf',1,'IEC61850Server::IEC61850Server']]],
-  ['set_5fdata_5fvalues_4',['set_data_values',['../class_i_e_c61850_client_1_1_i_e_c61850_client.html#af36f70839f41635877e5634dabae145e',1,'IEC61850Client::IEC61850Client']]],
-  ['set_5furcb_5fvalues_5',['set_URCB_values',['../class_i_e_c61850_client_1_1_i_e_c61850_client.html#a8001e3484d48e983240d328cee833cac',1,'IEC61850Client::IEC61850Client']]]
+  ['release_0',['release',['../classws61850_1_1iec61850_1_1client_1_1iec61850__client_1_1IEC61850Client.html#a04bec21e363294e7b3ac0b82610d022e',1,'ws61850::iec61850::client::iec61850_client::IEC61850Client']]],
+  ['release_5ffunction_1',['release_function',['../classws61850_1_1iec61850_1_1server_1_1iec61850__server_1_1IEC61850Server.html#aba7a3b324f68d3df38605da1a51529ce',1,'ws61850::iec61850::server::iec61850_server::IEC61850Server']]]
 ];

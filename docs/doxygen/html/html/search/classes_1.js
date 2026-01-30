@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['clientreportcontrolblock_0',['ClientReportControlBlock',['../class_i_e_c61850_client_1_1_i_e_c61850_client_1_1_client_report_control_block.html',1,'IEC61850Client::IEC61850Client']]],
-  ['controlhandlerresult_1',['ControlHandlerResult',['../classcontrol__handling_1_1_control_handler_result.html',1,'control_handling']]],
-  ['controlservicestatuskind_2',['ControlServiceStatusKind',['../classcontrol__handling_1_1_control_service_status_kind.html',1,'control_handling']]]
+  ['clientreportcontrolblock_0',['ClientReportControlBlock',['../classws61850_1_1iec61850_1_1client_1_1iec61850__client_1_1IEC61850Client_1_1ClientReportControlBlock.html',1,'ws61850::iec61850::client::iec61850_client::IEC61850Client']]],
+  ['controlhandlerresult_1',['ControlHandlerResult',['../classws61850_1_1iec61850_1_1server_1_1control__handling_1_1ControlHandlerResult.html',1,'ws61850::iec61850::server::control_handling']]],
+  ['controlservicestatuskind_2',['ControlServiceStatusKind',['../classws61850_1_1iec61850_1_1server_1_1control__handling_1_1ControlServiceStatusKind.html',1,'ws61850::iec61850::server::control_handling']]]
 ];

@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['operate_0',['operate',['../class_i_e_c61850_client_1_1_i_e_c61850_client.html#a354e51f9e42a9ba2979c0288a1465332',1,'IEC61850Client::IEC61850Client']]]
+  ['operate_0',['operate',['../classws61850_1_1iec61850_1_1client_1_1iec61850__client_1_1IEC61850Client.html#acd5d9ce367cd0448c1b5dabaaa24191e',1,'ws61850::iec61850::client::iec61850_client::IEC61850Client']]]
 ];

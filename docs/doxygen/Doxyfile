@@ -42,7 +42,7 @@ DOXYFILE_ENCODING      = UTF-8
 # title of most generated pages and in a few other places.
 # The default value is: My Project.
 
-PROJECT_NAME           = rti2
+PROJECT_NAME           = IEC61850-websocket
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number. This
 # could be handy for archiving the generated documentation or if some version
@@ -54,7 +54,7 @@ PROJECT_NUMBER         =
 # for a project that appears at the top of each page and should give viewers a
 # quick idea about the purpose of the project. Keep the description short.
 
-PROJECT_BRIEF          = C:\Users\romin\workspace-git\rti2_protocol_spec\exploration
+PROJECT_BRIEF          = "IEC61850 Websocket reference implementation"
 
 # With the PROJECT_LOGO tag one can specify a logo or an icon that is included
 # in the documentation. The maximum height of the logo should not exceed 55
@@ -74,7 +74,7 @@ PROJECT_ICON           =
 # entered, it will be relative to the location where Doxygen was started. If
 # left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = C:/Users/romin/workspace-git/rti2_protocol_spec/exploration/doxygen/html
+OUTPUT_DIRECTORY       = ./html
 
 # If the CREATE_SUBDIRS tag is set to YES then Doxygen will create up to 4096
 # sub-directories (in 2 levels) under the output directory of each output format
@@ -2986,3 +2986,11 @@ MSCGEN_TOOL            =
 # command).
 
 MSCFILE_DIRS           =
+
+
+INPUT                  = ../../src
+FILE_PATTERNS          = *.py
+RECURSIVE              = YES
+
+
+MARKDOWN_SUPPORT       = YES

@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['iec61850client_0',['IEC61850Client',['../class_i_e_c61850_client_1_1_i_e_c61850_client.html',1,'IEC61850Client']]],
-  ['iec61850server_1',['IEC61850Server',['../class_i_e_c61850_server_1_1_i_e_c61850_server.html',1,'IEC61850Server']]],
-  ['iedmodel_2',['IedModel',['../classied_model_1_1_ied_model.html',1,'iedModel']]]
+  ['iec61850client_0',['IEC61850Client',['../classws61850_1_1iec61850_1_1client_1_1iec61850__client_1_1IEC61850Client.html',1,'ws61850::iec61850::client::iec61850_client']]],
+  ['iec61850server_1',['IEC61850Server',['../classws61850_1_1iec61850_1_1server_1_1iec61850__server_1_1IEC61850Server.html',1,'ws61850::iec61850::server::iec61850_server']]],
+  ['iedmodel_2',['IedModel',['../classws61850_1_1iec61850_1_1data__model_1_1ied__model_1_1IedModel.html',1,'ws61850::iec61850::data_model::ied_model']]]
 ];

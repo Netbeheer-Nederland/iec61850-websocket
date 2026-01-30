@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['websocketendpoint_0',['WebSocketEndpoint',['../classendpoint_1_1_web_socket_endpoint.html',1,'endpoint']]],
-  ['websocketinfo_1',['WebSocketInfo',['../classendpoint_1_1_web_socket_info.html',1,'endpoint']]]
+  ['websocketendpoint_0',['WebSocketEndpoint',['../classws61850_1_1endpoint_1_1endpoint_1_1WebSocketEndpoint.html',1,'ws61850::endpoint::endpoint']]],
+  ['websocketinfo_1',['WebSocketInfo',['../classws61850_1_1endpoint_1_1endpoint_1_1WebSocketInfo.html',1,'ws61850::endpoint::endpoint']]]
 ];
