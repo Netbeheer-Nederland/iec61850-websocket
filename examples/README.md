@@ -10,9 +10,6 @@ For demonstration there is also a web based GUI client tool.
 
 Notes
 
-- Examples pairing: run matching client/server scripts from `Examples/WS_Client` and `Examples/WS_Server` depending on
-  the mode:
-    - `endpoint_ws_client_1.py` ↔ `endpoint_ws_server_1.py` (“reversed” mode: IEC61850Server in client, IEC61850Client
-      in server)
-    - `endpoint_ws_client_2.py` ↔ `endpoint_ws_server_2.py` (“direct” mode: IEC61850Server in server, IEC61850Client in
-      client)
+- Examples pairing: run matching client/server scripts from `examples/ws61850_mode` depending on the mode:
+    - “reversed” mode: IEC61850Server in client, IEC61850Client in server
+    - “direct” mode: IEC61850Server in server, IEC61850Client in client
