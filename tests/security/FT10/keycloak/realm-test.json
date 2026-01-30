@@ -1,0 +1,27 @@
+{
+  "realm": "iec61850-test",
+  "enabled": true,
+  "eventsEnabled": true,
+  "eventsListeners": [
+    "jboss-logging"
+  ],
+  "enabledEventTypes": [
+    "CLIENT_LOGIN",
+    "REFRESH_TOKEN",
+    "CODE_TO_TOKEN"
+  ],
+  "accessTokenLifespan": 60,
+  "clients": [
+    {
+      "clientId": "ws-client",
+      "name": "WS Client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "K4Nrd14seXG52J3xpnIqfMyILTJJu3VI",
+      "directAccessGrantsEnabled": false
+    }
+  ]
+}

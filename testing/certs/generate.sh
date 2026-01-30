@@ -37,6 +37,8 @@ cfssl gencert \
   client-csr.json | cfssljson -bare client
 
 chmod 600 *-key.pem
+chmod 611 server.pem
+chmod 611 server-key.pem
 
 echo
 echo "✅ Certificates generated:"
