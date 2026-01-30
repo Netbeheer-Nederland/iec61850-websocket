@@ -100,7 +100,10 @@ iec61850-websocket/
 - **UV** - [Install UV](https://docs.astral.sh/uv/getting-started/installation/)
 - **Python 3.10-3.12** (3.12 recommended) - [Download Python](https://www.python.org/downloads/)
 - **Git** - [Install Git](https://git-scm.com/downloads)
-
+- **Docker** - [Install Docker](https://docs.docker.com/get-docker/)
+- **Docker Compose** - [Install Docker Compose](https://docs.docker.com/compose/install/)
+- **sfssl** - [Install sfssl](https://github.com/cloudflare/cfssl/releases) – used for TLS certificate generation
+- **doxygen** - [Install doxygen](https://www.doxygen.nl) - used to generate documentation (optional)
 
 - Basic understanding of:
     - Async Python

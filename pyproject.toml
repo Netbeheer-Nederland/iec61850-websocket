@@ -36,6 +36,8 @@ dependencies = [
     "urllib3 == 2.6.3",
     "aiohttp == 3.13.3",
     "flask>=3.1.2",
+    "black>=26.1.0",
+    "ruff>=0.14.14",
 ]
 
 [project.optional-dependencies]
