@@ -1,9 +1,25 @@
 from dataclasses import asdict
 
-from ws61850.iec61850.data_model.helper import create_apc_do, create_asg_do_custom, create_lpl_do, create_ens_do, \
-    create_mv_do, create_wye_do, create_del_do
-from ws61850.iec61850.data_model.ied_model import IedModel, LogicalDevice, LogicalNode, DataObject, DataSet, \
-    DataSetEntry, OptFldsRCB, ReportControl, FunctionalConstraint
+from ws61850.iec61850.data_model.helper import (
+    create_apc_do,
+    create_asg_do_custom,
+    create_del_do,
+    create_ens_do,
+    create_lpl_do,
+    create_mv_do,
+    create_wye_do,
+)
+from ws61850.iec61850.data_model.ied_model import (
+    DataObject,
+    DataSet,
+    DataSetEntry,
+    FunctionalConstraint,
+    IedModel,
+    LogicalDevice,
+    LogicalNode,
+    OptFldsRCB,
+    ReportControl,
+)
 
 
 def make_ied_model2():
@@ -13,13 +29,19 @@ def make_ied_model2():
     # Create LD and LogicalNodes
     ld = LogicalDevice(name="LD0", ldName="LD_INST")
     ld_1 = LogicalDevice(name="LD1", ldName="LD_INST")
-    ln1 = LogicalNode(name="LLN0", parent=ld)
+    ln_lln0 = LogicalNode(name="LLN0", parent=ld)
     # ln2 = LogicalNode(name="LPHD1", parent=ld)
-    ln3 = LogicalNode(name="DWMX1", parent=ld)
-    ln4 = LogicalNode(name="DGEN1", parent=ld)
-    ln5 = LogicalNode(name="MMXU1", parent=ld)
+    ln_dwmx1 = LogicalNode(name="DWMX1", parent=ld)
+    ln_dgen1 = LogicalNode(name="DGEN1", parent=ld)
+    ln_mmxu1 = LogicalNode(name="MMXU1", parent=ld)
 
-    # For LLN0 (ln1)
+    def add_do(parent_ln, name=None, factory=None, data_object=None):
+        if data_object is None:
+            data_object = factory(name, parent=parent_ln)
+        parent_ln.add_dataObject(data_object)
+        return data_object
+
+    # For LLN0 (ln_lln0)
     # do_Mod = DataObject("Mod", 0, -1, cdc="enc", parent=ln1)
     # ln1.add_dataObject(do_Mod)
     #
@@ -45,84 +67,31 @@ def make_ied_model2():
     # do_PwrUp = DataObject("PwrUp", 0, -1, cdc="ens", parent=ln2)
     # ln2.add_dataObject(do_PwrUp)
 
-    # For LN = DWMX1 (ln3)
-    do_NamPlt = DataObject("NamPlt", 0, -1, cdc="lpl", parent=ln3)
-    ln3.add_dataObject(do_NamPlt)
+    # For LN = DWMX1 (ln_dwmx1)
+    add_do(ln_dwmx1, "NamPlt", create_lpl_do)
+    add_do(ln_dwmx1, "Beh", create_ens_do)
+    add_do(ln_dwmx1, "WMaxSptPct", create_apc_do)
+    add_do(ln_dwmx1, "WMaxSpt", create_apc_do)
+    add_do(ln_dwmx1, "WMaxSetPct", lambda n, parent: create_asg_do_custom(n, parent))
+    add_do(ln_dwmx1, "WMaxSet", lambda n, parent: create_asg_do_custom(n, parent))
+    add_do(ln_dwmx1, data_object=DataObject("WMaxFto", 0, -1, cdc="ing", parent=ln_dwmx1))
+    add_do(ln_dwmx1, data_object=DataObject("SptReas", 0, -1, cdc="inc", parent=ln_dwmx1))
 
-    do_Beh = DataObject("Beh", 0, -1, cdc="ens", parent=ln3)
-    ln3.add_dataObject(do_Beh)
+    # For LN = DGEN1 (ln_dgen1)
+    add_do(ln_dgen1, "NamPlt", create_lpl_do)
+    add_do(ln_dgen1, "Beh", create_ens_do)
+    add_do(ln_dgen1, "DEROpSt", create_ens_do)
 
-    # do_WMaxSptPct = DataObject("WMaxSptPct", 0, -1, cdc="apc", parent=ln3)
-    do_WMaxSptPct = create_apc_do("WMaxSptPct", parent=ln3)
-    ln3.add_dataObject(do_WMaxSptPct)
-
-    # do_WMaxSpt = DataObject("WMaxSpt", 0, -1, cdc="apc", parent=ln3)
-    do_WMaxSpt = create_apc_do("WMaxSpt", parent=ln3)
-    ln3.add_dataObject(do_WMaxSpt)
-
-    # do_WMaxSetPct = DataObject("WMaxSetPct", 0, -1, cdc="asg", parent=ln3)
-    do_WMaxSetPct = create_asg_do_custom("WMaxSetPct", ln3)
-    ln3.add_dataObject(do_WMaxSetPct)
-
-    # do_WMaxSet = DataObject("WMaxSet", 0, -1, cdc="asg", parent=ln3)
-    do_WMaxSet = create_asg_do_custom("WMaxSet", ln3)
-    ln3.add_dataObject(do_WMaxSet)
-
-    do_WMaxFto = DataObject("WMaxFto", 0, -1, cdc="ing", parent=ln3)
-    ln3.add_dataObject(do_WMaxFto)
-
-    do_SptReas = DataObject("SptReas", 0, -1, cdc="inc", parent=ln3)
-    ln3.add_dataObject(do_SptReas)
-
-    # For LN = DGEN1 (ln4)
-    # do_NamPlt = DataObject("NamPlt", 0, -1, cdc="lpl", parent=ln4)
-    do_NamPlt = create_lpl_do("NamPlt", ln4)
-    ln4.add_dataObject(do_NamPlt)
-
-    # do_Beh = DataObject("Beh", 0, -1, cdc="ens", parent=ln4)
-    do_Beh = create_ens_do("Beh", ln4)
-    ln4.add_dataObject(do_Beh)
-
-    # do_DEROpSt = DataObject("DEROpSt", 0, -1, cdc="ens", parent=ln4)
-    do_DEROpSt = create_ens_do("DEROpSt", ln4)
-    ln4.add_dataObject(do_DEROpSt)
-    # For MMXU1 (ln5)
-    # do_Beh = DataObject("Beh", 0, -1, type_="ens", parent=ln5)
-    do_Beh = create_ens_do("Beh", ln5)
-    ln5.add_dataObject(do_Beh)
-
-    # do_TotW = DataObject("TotW", 0, -1, type_="mv", parent=ln5)
-    do_TotW = create_mv_do("TotW", ln5)
-    ln5.add_dataObject(do_TotW)
-
-    # do_TotVAr = DataObject("TotVAr", 0, -1, type_="mv", parent=ln5)
-    do_TotVAr = create_mv_do("TotVAr", ln5)
-    ln5.add_dataObject(do_TotVAr)
-
-    # do_PhV = DataObject("PhV", 0, -1, type_="wye", parent=ln5)
-    # do_PhV = DataObject("PhV", 0, -1, type_="wye", parent=ln5)
-    do_PhV = create_wye_do("PhV", ln5)
-    ln5.add_dataObject(do_PhV)
-
-    # do_PPV = DataObject("PPV", 0, -1, cdc="del", parent=ln5)
-    do_PPV = create_del_do("PPV", ln5)
-    ln5.add_dataObject(do_PPV)
-
-    # do_A = DataObject("A", 0, -1, cdc="wye", parent=ln5)
-    do_A = create_wye_do("A", parent=ln5)
-    ln5.add_dataObject(do_A)
-
-    # do_AvWPhs = DataObject("AvWPhs", 0, -1, type_="mv", parent=ln5)
-    do_AvWPhs = create_mv_do("AvWPhs", parent=ln5)
-    ln5.add_dataObject(do_AvWPhs)
-
-    # do_MaxWPhs = DataObject("MaxWPhs", 0, -1, type_="mv", parent=ln5)
-    do_MaxWPhs = create_mv_do("MaxWPhs", parent=ln5)
-    ln5.add_dataObject(do_MaxWPhs)
-
-    # do_MinWPhs = DataObject("MinWPhs", 0, -1, type_="mv", parent=ln5)
-    do_MinWPhs = create_mv_do("MinWPhs", parent=ln5)
-    ln5.add_dataObject(do_MinWPhs)
+    # For MMXU1 (ln_mmxu1)
+    add_do(ln_mmxu1, "Beh", create_ens_do)
+    add_do(ln_mmxu1, "TotW", create_mv_do)
+    add_do(ln_mmxu1, "TotVAr", create_mv_do)
+    add_do(ln_mmxu1, "PhV", create_wye_do)
+    add_do(ln_mmxu1, "PPV", create_del_do)
+    add_do(ln_mmxu1, "A", create_wye_do)
+    add_do(ln_mmxu1, "AvWPhs", create_mv_do)
+    add_do(ln_mmxu1, "MaxWPhs", create_mv_do)
+    add_do(ln_mmxu1, "MinWPhs", create_mv_do)
 
     ##DAs PhV
     # do_phsA = DataObject(name="phsA", parent=do_PhV, type_="cmv")
@@ -150,23 +119,25 @@ def make_ied_model2():
 
     ##DAs MaxWPhs
 
-    quality = {
+    QUALITY_DEFAULT = {
         # 'detailQual' omitted (OPTIONAL)
-        'validity': 'good',  # must provide a value; choose from: 'good', 'invalid', 'questionable'
-        'source': 'process',  # choose from: 'process', 'substituted'
-        'test': False,
-        'operatorBlock': False
+        "validity": "good",  # must provide a value; choose from: 'good', 'invalid', 'questionable'
+        "source": "process",  # choose from: 'process', 'substituted'
+        "test": False,
+        "operatorBlock": False,
     }
-    timestamp = {
+    TIMESTAMP_DEFAULT = {
         "secondSinceEpoch": 1720458123,  # Example: some UTC time in seconds
         "fractionOfSecond": 1234567,  # Example: partial seconds (e.g., microseconds * 10)
         "timeQuality": {
             "leapSecondKnown": False,
             "clockFailure": False,
             "clockNotSynchronized": False,
-            "timeAccuracy": 3  # e.g., ±1 ms, depending on definition
-        }
+            "timeAccuracy": 3,  # e.g., ±1 ms, depending on definition
+        },
     }
+    quality = QUALITY_DEFAULT
+    timestamp = TIMESTAMP_DEFAULT
 
     # da_mag = DataAttribute('mag',0,-1,DataAttributeType.structure, FunctionalConstraint.mx, 0,[], 0, do_MaxWPhs)
     # da_f = DataAttribute('f',0,-1,DataAttributeType.float32, FunctionalConstraint.mx, 0,12.54, 0, da_mag)
@@ -187,15 +158,15 @@ def make_ied_model2():
     # do_MaxWPhs.add_dataAttribute(da_units)
 
     # Add LNs to LD
-    ld.add_logical_node(ln1)
+    ld.add_logical_node(ln_lln0)
     # ld.add_logical_node(ln2)
-    ld.add_logical_node(ln3)
-    ld.add_logical_node(ln4)
-    ld.add_logical_node(ln5)
+    ld.add_logical_node(ln_dwmx1)
+    ld.add_logical_node(ln_dgen1)
+    ld.add_logical_node(ln_mmxu1)
 
     ## DataSet
 
-    dataset_min_max_avg = DataSet(ln1, "LD0", "DataSetMinMaxAvg", 3)
+    dataset_min_max_avg = DataSet(ln_lln0, "LD0", "DataSetMinMaxAvg", 3)
 
     data_entry_1 = DataSetEntry("LD0", False, "LD0/MMXU1.MinWPhs", -1, None, None, FunctionalConstraint.mx)
     data_entry_2 = DataSetEntry("LD0", False, "LD0/MMXU1.MaxWPhs", -1, None, None, FunctionalConstraint.mx)
@@ -205,9 +176,9 @@ def make_ied_model2():
     dataset_min_max_avg.dataSet_addEntry(data_entry_2)
     dataset_min_max_avg.dataSet_addEntry(data_entry_3)
 
-    ln1.add_dataSet(dataset_min_max_avg)
+    ln_lln0.add_dataSet(dataset_min_max_avg)
 
-    dataset_set_setpoints = DataSet(ln1, "LD0", "DataSetSetpoints", 1)
+    dataset_set_setpoints = DataSet(ln_lln0, "LD0", "DataSetSetpoints", 1)
 
     data_entry_1 = DataSetEntry("LD0", False, "LD0/DGEN1.DEROpSt", -1, None, None, FunctionalConstraint.st)
     data_entry_2 = DataSetEntry("LD0", False, "LD0/DWMX1.WMaxSptPct", -1, None, None, FunctionalConstraint.mx)
@@ -216,28 +187,75 @@ def make_ied_model2():
     dataset_set_setpoints.dataSet_addEntry(data_entry_2)
     # dataset_min_max_avg.dataSet_addEntry(data_entry_3)
 
-    ln1.add_dataSet(dataset_set_setpoints)
+    ln_lln0.add_dataSet(dataset_set_setpoints)
 
     ##BRCB
     optFields = asdict(OptFldsRCB(False, True, True, True, False, True, False, False))
-    trgOpts = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": False}
+    trgOpts = {
+        "dchg": False,
+        "qchg": False,
+        "dupd": False,
+        "integrity": True,
+        "gi": False,
+    }
 
-    brcb = ReportControl("LD0/LLN0.rcbMinMaxAvg", ln1, "rcbMinMaxAvg", "MinMaxAvg", True,
-                         "DataSetMinMaxAvg", 1, trgOpts, optFields, "None", 2, None, False)
+    brcb = ReportControl(
+        "LD0/LLN0.rcbMinMaxAvg",
+        ln_lln0,
+        "rcbMinMaxAvg",
+        "MinMaxAvg",
+        True,
+        "DataSetMinMaxAvg",
+        1,
+        trgOpts,
+        optFields,
+        "None",
+        2,
+        None,
+        False,
+    )
 
-    ln1.add_reportControl(brcb)
+    ln_lln0.add_reportControl(brcb)
 
     # URCB
     optFields = asdict(
-        OptFldsRCB(seqNum=False, timeStamp=True, dataSet=False, reasonCode=True, dataRef=False, entryID=False,
-                   configRef=False, bufOvfl=False))
+        OptFldsRCB(
+            seqNum=False,
+            timeStamp=True,
+            dataSet=False,
+            reasonCode=True,
+            dataRef=False,
+            entryID=False,
+            configRef=False,
+            bufOvfl=False,
+        )
+    )
     # trgOpts = asdict(TrgOps(integrity=True))
-    trgOpts = {"dchg": True, "qchg": False, "dupd": False, "integrity": True, "gi": True}
+    trgOpts = {
+        "dchg": True,
+        "qchg": False,
+        "dupd": False,
+        "integrity": True,
+        "gi": True,
+    }
 
-    urcb = ReportControl("LD0/LLN0.rcbSetpoints", ln1, "rcbSetpoints", "Setpoints", False,
-                         "DataSetSetpoints", 1, trgOpts, optFields, 100, 900000, None, False)
+    urcb = ReportControl(
+        "LD0/LLN0.rcbSetpoints",
+        ln_lln0,
+        "rcbSetpoints",
+        "Setpoints",
+        False,
+        "DataSetSetpoints",
+        1,
+        trgOpts,
+        optFields,
+        100,
+        900000,
+        None,
+        False,
+    )
 
-    ln1.add_reportControl(urcb)
+    ln_lln0.add_reportControl(urcb)
 
     # Add LD to IED
     ied.add_logicalDevice(ld)
