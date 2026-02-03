@@ -1,12 +1,15 @@
 import asyncio
-import subprocess
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
 async def run_script(path, interactive=False):
+    script = BASE_DIR / path
     if interactive:
         # Inherit stdin/stdout/stderr so input() works in the terminal
         proc = await asyncio.create_subprocess_exec(
-            "python", path,
+            "python", str(script),
             stdin=None,
             stdout=None,
             stderr=None
@@ -14,14 +17,14 @@ async def run_script(path, interactive=False):
     else:
         # Capture output silently
         proc = await asyncio.create_subprocess_exec(
-            "python", path,
+            "python", str(script),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await proc.communicate()
-        print(f"Output from {path}:\n{stdout.decode()}")
+        print(f"Output from {script}:\n{stdout.decode()}")
         if stderr:
-            print(f"Error from {path}:\n{stderr.decode()}")
+            print(f"Error from {script}:\n{stderr.decode()}")
 
     await proc.wait()
 

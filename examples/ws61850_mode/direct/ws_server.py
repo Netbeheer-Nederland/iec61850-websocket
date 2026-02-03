@@ -1,9 +1,9 @@
 import asyncio
 from random import randint
 
-from testing.ieds.high_level_model import make_ied_model1
-from testing.ieds.ied_model_2 import make_ied_model2
+
 from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.iec61850.data_model.example_ieds import build_model1, build_model2
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
 maxMessageSize = 65000
@@ -30,18 +30,16 @@ async def main():
     ep_wsServer = WebSocketEndpoint(is_direct=True)
     ep_wsServer.recv_msg_callback = received_msg_callback
     ep_wsServer.send_msg_callback = send_msg_callback
-    iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
+    iec61850_server = IEC61850Server(build_model1(), "cp1")
     report_task_1 = asyncio.create_task(iec61850_server.periodic_report_start())
     ep_wsServer.add_iec61850_server(iec61850_server)
 
-    iec61850_server = IEC61850Server(make_ied_model2(), "cp2")
+    iec61850_server = IEC61850Server(build_model2(), "cp2")
     toggle_task_2 = asyncio.create_task(toggle_custom_value(iec61850_server, "LD0/DGEN1.DEROpSt.stVal"))
 
     ep_wsServer.add_iec61850_server(iec61850_server)
 
-    server_task = asyncio.create_task(
-        ep_wsServer.start("passive", "localhost", 8765)
-    )
+    server_task = asyncio.create_task(ep_wsServer.start("passive", "localhost", 8765))
 
     # await server_task
     await asyncio.gather(server_task, report_task_1, toggle_task_2)

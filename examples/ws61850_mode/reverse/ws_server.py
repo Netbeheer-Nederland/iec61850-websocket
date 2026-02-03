@@ -1,23 +1,21 @@
-import os
-
-import sys
-import traceback
-
 import asyncio
+import traceback
 
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
-project_root = ""
-for path in sys.path:
-    if path.endswith("exploration"):
-        project_root = path
-        break
-
 maxMessageSize_server = 65000
 
-optFlds = {"seqNum": False, "timeStamp": True, "dataSet": True, "bufOvfl": True, "configRef": False,
-           "entryID": True, "dataRef": False, "reasonCode": False}
+optFlds = {
+    "seqNum": False,
+    "timeStamp": True,
+    "dataSet": True,
+    "bufOvfl": True,
+    "configRef": False,
+    "entryID": True,
+    "dataRef": False,
+    "reasonCode": False,
+}
 
 trgOp = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": False}
 
@@ -39,7 +37,13 @@ trgOp = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": F
 # brcb.timeOfEntry = get_now_time()
 # brcb.resvTms = 5
 
-trgOp_urcb = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": False}
+trgOp_urcb = {
+    "dchg": False,
+    "qchg": False,
+    "dupd": False,
+    "integrity": True,
+    "gi": False,
+}
 
 urcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints", False)
 
@@ -66,51 +70,53 @@ def callback_called(result, param):
 
 data_attribute_value = {
     "name": "Oper",
-    "data": ("structure",
-             {
-                 "data": [
-                     ("structure",
-                      {
-                          "name": "f",
-                          "data": [("float32", 10.5)]
-                      }
-                      ),
-                     ("structure", {
-                         "name": "origin",
-                         "data": [("enumerated", 1), ("octetString", b"ORIGIN_ID_1234567890")]
-                     }),
-                     ("int8u", 2),
-                     ("timeStamp", {
-                         "secondSinceEpoch": 1757588367,
-                         "fractionOfSecond": 8120140,
-                         "timeQuality": {
-                             "leapSecondKnown": False,
-                             "clockFailure": False,
-                             "clockNotSynchronized": False,
-                             "timeAccuracy": 3
-                         }
-                     }),
-                     ("boolean", False),
-                     ("check",
-                      {
-                          "synchroCheck": False,
-                          "interlockCheck": True
-                      }
-                      )
-                 ]
-             }
-             )
+    "data": (
+        "structure",
+        {
+            "data": [
+                ("structure", {"name": "f", "data": [("float32", 10.5)]}),
+                (
+                    "structure",
+                    {
+                        "name": "origin",
+                        "data": [
+                            ("enumerated", 1),
+                            ("octetString", b"ORIGIN_ID_1234567890"),
+                        ],
+                    },
+                ),
+                ("int8u", 2),
+                (
+                    "timeStamp",
+                    {
+                        "secondSinceEpoch": 1757588367,
+                        "fractionOfSecond": 8120140,
+                        "timeQuality": {
+                            "leapSecondKnown": False,
+                            "clockFailure": False,
+                            "clockNotSynchronized": False,
+                            "timeAccuracy": 3,
+                        },
+                    },
+                ),
+                ("boolean", False),
+                ("check", {"synchroCheck": False, "interlockCheck": True}),
+            ]
+        },
+    ),
 }
 
-data_WMaxSetPct = [{"name": "setMag", "data": ("structure", {"name": "f", "data": [("float32", 19.666)]})}]
+data_WMaxSetPct = [
+    {
+        "name": "setMag",
+        "data": ("structure", {"name": "f", "data": [("float32", 19.666)]}),
+    }
+]
 
 oper_val = {
     "ref": "LD0/DWMX1.WMaxSpt.mxVal",
-    "ctlVal": ('structure', {'data': [('structure', {'data': [('float32', 666.43)]})]}),
-    "origin": {
-        "orCat": "stationControl",
-        "orIdent": b'ORIGIN_ID_1234567890'
-    },
+    "ctlVal": ("structure", {"data": [("structure", {"data": [("float32", 666.43)]})]}),
+    "origin": {"orCat": "stationControl", "orIdent": b"ORIGIN_ID_1234567890"},
     "ctlNum": 10,
     "t": {
         "secondSinceEpoch": 1757588367,
@@ -119,14 +125,11 @@ oper_val = {
             "leapSecondKnown": False,
             "clockFailure": False,
             "clockNotSynchronized": False,
-            "timeAccuracy": 3
-        }
+            "timeAccuracy": 3,
+        },
     },
     "test": True,
-    "check": {
-        "synchroCheck": False,
-        'interlockCheck': False
-    }
+    "check": {"synchroCheck": False, "interlockCheck": False},
 }
 
 
@@ -180,8 +183,9 @@ async def main():
                 ###                                                callback_called, None)
 
                 # set_brcb_res = await ep_wsServer.client_list[0].set_BRCB_values(brcb, websocket_info, callback_called, None)
-                set_urcb_res = await ep_wsServer.client_list[0].set_URCB_values(urcb, websocket_info, callback_called,
-                                                                                None)
+                set_urcb_res = await ep_wsServer.client_list[0].set_URCB_values(
+                    urcb, websocket_info, callback_called, None
+                )
 
                 print("printing the list or returned items from client 1")
                 # print("urcb_list:", urcb_list)
@@ -197,8 +201,6 @@ async def main():
                 ###print("set_da_res:", set_da_res)
                 # print("set_brcb_res:", set_brcb_res)
                 print("set_urcb_res:", set_urcb_res)
-
-
 
             except Exception as e:
                 print("handler not called:", e)
