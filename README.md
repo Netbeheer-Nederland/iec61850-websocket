@@ -88,6 +88,7 @@ iec61850-websocket/
 │  └─ conftest.py                  # Shared pytest configuration and fixtures
 ├─ examples/                       # Example clients/servers and interactive demos
 ├─ docs/                           # Generated and hand-written documentation (e.g. Doxygen, specs)
+│  └─ protocol_specification/      # IEC61850 WebSocket protocol specification
 └─ scripts/                        # Helper scripts (setup, tooling, test helpers)
 ```
 
