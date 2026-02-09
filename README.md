@@ -1,10 +1,10 @@
 # IEC 61850 WebSocket Proof-of-Concept
 
-> Experimental reference implementation for IEC 61850 Phase 2 / RTI-style communication over WebSockets.
-
 ⚠️ **Project status:**  
 This repository contains an **experimental proof of concept**.
 It is **not production-ready** and is intended for exploration, learning, and architectural validation.
+
+It contains a reference implementation RealTI-style for IEC 61850 communication over WebSockets.
 
 ## Overview
 
@@ -111,6 +111,8 @@ iec61850-websocket/
     - WebSockets
     - IEC 61850 terminology (Logical Node, Data Object)
 
+---
+
 ### Setup environment
 
 ```shell
@@ -126,9 +128,30 @@ uv venv
 uv sync
 ```
 
-```shell
-# 3. Add the development environment to uv 
-uv sync -e dev
+```bash
+# 3. Build the project
+uv build
 ```
 
+---
+
+## Examples
+
+Example clients, servers, and interactive demos live under the `examples/` directory in this repository. It also
+describes how to run them in the [README](examples/README.md).
+
+## Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull
+requests to us.
+
+## License
+
+This project is licensed under the Apache License, version 2.0 – see LICENSE for details
+
+## Licenses third-party code
+
+This project includes third-party code, which is licensed under their own respective Open-Source licenses.
+SPDX-License-Identifier headers are used to show which license is applicable. The concerning license files can be found
+in the LICENSES directory in the root of the documentation. 
 

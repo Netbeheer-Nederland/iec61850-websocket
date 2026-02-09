@@ -1,0 +1,30 @@
+THIRD-PARTY LICENSES
+
+This project bundles the following third-party Python packages:
+
+MIT License:
+- asn1tools
+- bitstruct
+- charset-normalizer
+- PyJWT
+- pyparsing
+- urllib3
+- black
+- ruff
+
+BSD 3-Clause License:
+- websockets
+- idna
+- pycparser
+- Flask
+
+Apache License 2.0:
+- requests
+- aiohttp
+- cryptography (dual licensed)
+
+Mozilla Public License 2.0:
+- certifi
+
+MIT No Attribution:
+- cffi
