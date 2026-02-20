@@ -13,7 +13,7 @@ services:
       KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/server.pem
       KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/server-key.pem
     volumes:
-      - ./keycloak:/opt/keycloak/data/import
-      - ../../../testing/certs/server.pem:/opt/keycloak/conf/server.pem
-      - ../../../testing/certs/server-key.pem:/opt/keycloak/conf/server-key.pem
+      - ./data:/opt/keycloak/data/import
+      - ../../testing/certs/server.pem:/opt/keycloak/conf/server.pem
+      - ../../testing/certs/server-key.pem:/opt/keycloak/conf/server-key.pem
 

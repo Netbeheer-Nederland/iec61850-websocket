@@ -17,12 +17,13 @@ Confirm that:
 ## Getting Started
 
 * Keycloak exposed on the local port 8080 and created an initial admin user with the username admin
-  and password admin.
+  and password admin (see the Keycloak docker compose file in the scripts/keycloak directory to change the default admin
+  user credentials).
 * The Keycloak realm and client configuration used by this test are imported from the local `keycloak` directory in this
   test folder.
 * The Keycloak Docker image is used to start the Keycloak server.
 * SSL is enabled for the Keycloak server and uses a self-signed certificate located in the `testing/certs` directory.
-* Run the following command to start Keycloak:
+* Run the following command to start Keycloak in the scripts/keycloak directory:
 
 ```shell
 docker compose up
