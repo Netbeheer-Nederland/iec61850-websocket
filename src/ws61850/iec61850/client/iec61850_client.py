@@ -15,24 +15,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
-
 import asyncio
+import datetime
 from collections import deque
 
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
 from ws61850.endpoint.endpoint import WebSocketInfo
-from ws61850.iec61850.client.reconstruct_tree_client import extract_invoke_id, extract_associate_request_type, \
-    retrieve_associate_id, retrieve_service_name, retrieve_success, retrieve_lds, retrieve_lns, retrieve_ln_items, \
-    retrieve_ds_items, retrieve_ds_values, retrieve_data_definition, build_fcd_ref, retrieve_data_val, \
-    retrieve_set_result, retrieve_rcb_val
-from ws61850.iec61850.client.request_handling import create_tpaa_request_select, create_tpaa_request_operate, \
-    create_tpaa_request_getServerDirectory, create_tpaa_request_getLDDirectory, \
-    create_tpaa_request_getLogicalNodeDirectory, create_tpaa_request_getDataSetDirectoryRequest, \
-    create_tpaa_request_getDataSetValues, create_tpaa_request_getDataDefinition, create_tpaa_request_getDataDirectory, \
-    create_tpaa_request_getDataValues, create_tpaa_request_setDataValues, create_tpaa_request_getBRCBValuesRequest, \
-    create_tpaa_request_setBRCBValuesRequest, create_tpaa_request_setURCBValuesRequest, \
-    create_tpaa_request_getURCBValuesRequest, create_tpaa_abort_request, create_tpaa_release_request
+from ws61850.iec61850.client.reconstruct_tree_client import (
+    build_fcd_ref,
+    extract_associate_request_type,
+    extract_invoke_id,
+    retrieve_associate_id,
+    retrieve_data_definition,
+    retrieve_data_val,
+    retrieve_ds_items,
+    retrieve_ds_values,
+    retrieve_lds,
+    retrieve_ln_items,
+    retrieve_lns,
+    retrieve_rcb_val,
+    retrieve_service_name,
+    retrieve_set_result,
+    retrieve_success,
+)
+from ws61850.iec61850.client.request_handling import (
+    create_tpaa_abort_request,
+    create_tpaa_release_request,
+    create_tpaa_request_getBRCBValuesRequest,
+    create_tpaa_request_getDataDefinition,
+    create_tpaa_request_getDataDirectory,
+    create_tpaa_request_getDataSetDirectoryRequest,
+    create_tpaa_request_getDataSetValues,
+    create_tpaa_request_getDataValues,
+    create_tpaa_request_getLDDirectory,
+    create_tpaa_request_getLogicalNodeDirectory,
+    create_tpaa_request_getServerDirectory,
+    create_tpaa_request_getURCBValuesRequest,
+    create_tpaa_request_operate,
+    create_tpaa_request_select,
+    create_tpaa_request_setBRCBValuesRequest,
+    create_tpaa_request_setDataValues,
+    create_tpaa_request_setURCBValuesRequest,
+)
 
 
 class IEC61850Client:
@@ -202,8 +226,9 @@ class IEC61850Client:
         Function used for sending getServerDirectory request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_getServerDirectory(websocket_info.invoke_id, websocket_info.associate_id,
-                                                              "logicalDevice")
+        tpaa_request = create_tpaa_request_getServerDirectory(
+            websocket_info.invoke_id, websocket_info.associate_id, "logicalDevice"
+        )
 
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
         await websocket_info.websocket.send(request)
@@ -233,8 +258,9 @@ class IEC61850Client:
         Function used for sending getLogicalDeviceDirectory request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_getLDDirectory(websocket_info.invoke_id, websocket_info.associate_id,
-                                                          ld_inst)
+        tpaa_request = create_tpaa_request_getLDDirectory(
+            websocket_info.invoke_id, websocket_info.associate_id, ld_inst
+        )
 
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
         await websocket_info.websocket.send(request)
@@ -261,16 +287,16 @@ class IEC61850Client:
             websocket_info.invoke_id += 1
             return None
 
-    async def get_logical_node_directory(self, ld_inst, ln_inst, mode, websocket_info: WebSocketInfo, callback,
-                                         parameter):
+    async def get_logical_node_directory(
+        self, ld_inst, ln_inst, mode, websocket_info: WebSocketInfo, callback, parameter
+    ):
         """
         Function used for sending getLogicalNodeDirectory request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_getLogicalNodeDirectory(websocket_info.invoke_id,
-                                                                   websocket_info.associate_id,
-                                                                   ld_inst + "/" + ln_inst,
-                                                                   aCSIClass=mode)
+        tpaa_request = create_tpaa_request_getLogicalNodeDirectory(
+            websocket_info.invoke_id, websocket_info.associate_id, ld_inst + "/" + ln_inst, aCSIClass=mode
+        )
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
         await websocket_info.websocket.send(request)
         if self.send_msg_callback is not None:
@@ -298,9 +324,9 @@ class IEC61850Client:
         Function used for sending getDatasetDirectory request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_getDataSetDirectoryRequest(websocket_info.invoke_id,
-                                                                      websocket_info.associate_id,
-                                                                      ld_inst + "/" + ln_inst + "." + ds_inst)
+        tpaa_request = create_tpaa_request_getDataSetDirectoryRequest(
+            websocket_info.invoke_id, websocket_info.associate_id, ld_inst + "/" + ln_inst + "." + ds_inst
+        )
 
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
         await websocket_info.websocket.send(request)
@@ -328,8 +354,9 @@ class IEC61850Client:
         Function used for sending getDatasetDirectory request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_getDataSetValues(websocket_info.invoke_id, websocket_info.associate_id,
-                                                            ld_inst + "/" + ln_inst + "." + ds_inst)
+        tpaa_request = create_tpaa_request_getDataSetValues(
+            websocket_info.invoke_id, websocket_info.associate_id, ld_inst + "/" + ln_inst + "." + ds_inst
+        )
 
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
         await websocket_info.websocket.send(request)
@@ -358,8 +385,9 @@ class IEC61850Client:
         Function used for sending getDataDefinition request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_getDataDefinition(websocket_info.invoke_id, websocket_info.associate_id,
-                                                             obj_ref)
+        tpaa_request = create_tpaa_request_getDataDefinition(
+            websocket_info.invoke_id, websocket_info.associate_id, obj_ref
+        )
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
         await websocket_info.websocket.send(request)
         if self.send_msg_callback is not None:
@@ -388,8 +416,9 @@ class IEC61850Client:
         Function used for sending getDataDefinition request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_getDataDirectory(websocket_info.invoke_id, websocket_info.associate_id,
-                                                            obj_ref)
+        tpaa_request = create_tpaa_request_getDataDirectory(
+            websocket_info.invoke_id, websocket_info.associate_id, obj_ref
+        )
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
         await websocket_info.websocket.send(request)
         if self.send_msg_callback is not None:
@@ -418,8 +447,9 @@ class IEC61850Client:
         Function used for sending getDataValues request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_getDataValues(websocket_info.invoke_id, websocket_info.associate_id,
-                                                         build_fcd_ref(obj_ref, fc), include_element_name)
+        tpaa_request = create_tpaa_request_getDataValues(
+            websocket_info.invoke_id, websocket_info.associate_id, build_fcd_ref(obj_ref, fc), include_element_name
+        )
 
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
         await websocket_info.websocket.send(request)
@@ -448,8 +478,9 @@ class IEC61850Client:
         Function used for sending setDataValues request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_setDataValues(websocket_info.invoke_id, websocket_info.associate_id,
-                                                         build_fcd_ref(obj_ref, fc), value)
+        tpaa_request = create_tpaa_request_setDataValues(
+            websocket_info.invoke_id, websocket_info.associate_id, build_fcd_ref(obj_ref, fc), value
+        )
 
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
         await websocket_info.websocket.send(request)
@@ -481,8 +512,9 @@ class IEC61850Client:
         Function used for sending getBRCBValues request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_getBRCBValuesRequest(websocket_info.invoke_id, websocket_info.associate_id,
-                                                                obj_ref)
+        tpaa_request = create_tpaa_request_getBRCBValuesRequest(
+            websocket_info.invoke_id, websocket_info.associate_id, obj_ref
+        )
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
 
         await websocket_info.websocket.send(request)
@@ -512,8 +544,9 @@ class IEC61850Client:
         Function used for sending setBRCBValues request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_setBRCBValuesRequest(websocket_info.invoke_id, websocket_info.associate_id,
-                                                                client_report_control)
+        tpaa_request = create_tpaa_request_setBRCBValuesRequest(
+            websocket_info.invoke_id, websocket_info.associate_id, client_report_control
+        )
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
         await websocket_info.websocket.send(request)
         if self.send_msg_callback is not None:
@@ -546,8 +579,9 @@ class IEC61850Client:
         Function used for sending setURCBValues request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_setURCBValuesRequest(websocket_info.invoke_id, websocket_info.associate_id,
-                                                                client_report_control)
+        tpaa_request = create_tpaa_request_setURCBValuesRequest(
+            websocket_info.invoke_id, websocket_info.associate_id, client_report_control
+        )
 
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
 
@@ -583,8 +617,9 @@ class IEC61850Client:
         Function used for sending getURCBValues request and awaiting its response
         """
 
-        tpaa_request = create_tpaa_request_getURCBValuesRequest(websocket_info.invoke_id, websocket_info.associate_id,
-                                                                obj_ref)
+        tpaa_request = create_tpaa_request_getURCBValuesRequest(
+            websocket_info.invoke_id, websocket_info.associate_id, obj_ref
+        )
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
 
         await websocket_info.websocket.send(request)
@@ -610,8 +645,8 @@ class IEC61850Client:
 
     async def abort(self, websocket_info, callback, parameter):
         """
-              Function used for sending getURCBValues request and awaiting its response
-              """
+        Function used for sending getURCBValues request and awaiting its response
+        """
 
         tpaa_request = create_tpaa_abort_request(websocket_info.invoke_id, websocket_info.associate_id)
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
@@ -626,8 +661,8 @@ class IEC61850Client:
 
     async def release(self, websocket_info, callback, parameter):
         """
-              Function used for sending getURCBValues request and awaiting its response
-              """
+        Function used for sending getURCBValues request and awaiting its response
+        """
 
         tpaa_request = create_tpaa_release_request(websocket_info.invoke_id, websocket_info.associate_id)
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
@@ -672,10 +707,10 @@ def get_now_time():
         "secondSinceEpoch": int(now.timestamp()),  # UTC seconds since Unix epoch
         "fractionOfSecond": now.microsecond * 10,  # microseconds × 10
         "timeQuality": {
-            "leapSecondKnown": False,
+            "leapSecondsKown": False,
             "clockFailure": False,
             "clockNotSynchronized": False,
-            "timeAccuracy": 3  # Example value: ±1 ms
-        }
+            "timeAccuracy": 3,  # Example value: ±1 ms
+        },
     }
     return timestamp

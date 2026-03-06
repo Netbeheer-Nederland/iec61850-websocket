@@ -1270,7 +1270,7 @@ def format_value_for_write(value, data_type, attr_name):
                     "secondSinceEpoch": value,
                     "fractionOfSecond": 0,
                     "timeQuality": {
-                        "leapSecondKnown": False,
+                        "leapSecondsKown": False,
                         "clockFailure": False,
                         "clockNotSynchronized": False,
                         "timeAccuracy": 0,
@@ -1334,7 +1334,7 @@ def format_value_for_type(value, data_type):
                     "secondSinceEpoch": value,
                     "fractionOfSecond": 0,
                     "timeQuality": {
-                        "leapSecondKnown": False,
+                        "leapSecondsKown": False,
                         "clockFailure": False,
                         "clockNotSynchronized": False,
                         "timeAccuracy": 0,
@@ -1947,7 +1947,7 @@ def control_operate():
                 "secondSinceEpoch": current_time,
                 "fractionOfSecond": 0,
                 "timeQuality": {
-                    "leapSecondKnown": False,
+                    "leapSecondsKown": False,
                     "clockFailure": False,
                     "clockNotSynchronized": False,
                     "timeAccuracy": 0,

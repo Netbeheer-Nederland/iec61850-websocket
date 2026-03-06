@@ -85,7 +85,7 @@ data_attribute_value = {
                         "secondSinceEpoch": 1757588367,
                         "fractionOfSecond": 8120140,
                         "timeQuality": {
-                            "leapSecondKnown": False,
+                            "leapSecondsKown": False,
                             "clockFailure": False,
                             "clockNotSynchronized": False,
                             "timeAccuracy": 3,
@@ -115,7 +115,7 @@ oper_val = {
         "secondSinceEpoch": 1757588367,
         "fractionOfSecond": 8120140,
         "timeQuality": {
-            "leapSecondKnown": False,
+            "leapSecondsKown": False,
             "clockFailure": False,
             "clockNotSynchronized": False,
             "timeAccuracy": 3,

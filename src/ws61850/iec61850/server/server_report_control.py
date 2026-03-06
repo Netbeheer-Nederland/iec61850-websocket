@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 
 from ws61850.iec61850.data_model.ied_model import IedModel
 
@@ -25,6 +25,7 @@ class ReasonForInclusionInLog:
     """
     Class to represent why a report is generated
     """
+
     dataChange: bool = False
     qualityChange: bool = False
     dataUpdate: bool = False
@@ -40,11 +41,11 @@ timestamp_zero = {
     "secondSinceEpoch": 0,  # Example: some UTC time in seconds
     "fractionOfSecond": 0,  # Example: partial seconds (e.g., microseconds * 10)
     "timeQuality": {
-        "leapSecondKnown": False,
+        "leapSecondsKown": False,
         "clockFailure": False,
         "clockNotSynchronized": False,
-        "timeAccuracy": 0  # e.g., ±1 ms, depending on definition
-    }
+        "timeAccuracy": 0,  # e.g., ±1 ms, depending on definition
+    },
 }
 
 

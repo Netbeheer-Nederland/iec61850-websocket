@@ -130,7 +130,7 @@ def make_ied_model2():
         "secondSinceEpoch": 1720458123,  # Example: some UTC time in seconds
         "fractionOfSecond": 1234567,  # Example: partial seconds (e.g., microseconds * 10)
         "timeQuality": {
-            "leapSecondKnown": False,
+            "leapSecondsKown": False,
             "clockFailure": False,
             "clockNotSynchronized": False,
             "timeAccuracy": 3,  # e.g., ±1 ms, depending on definition
