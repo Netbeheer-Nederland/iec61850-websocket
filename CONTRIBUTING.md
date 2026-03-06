@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 'Copyright Contributors to the [name_open_source_project] project' 
+SPDX-FileCopyrightText: 'Copyright Contributors to the 'IEC 61850 WebSocket Proof-of-Concept' project' 
 
 SPDX-License-Identifier: Apache-2.0
 -->
@@ -25,7 +25,7 @@ Read [GitHub Help](https://docs.github.com/en/free-pro-team@latest/github/managi
 for more information on using GitHub Issues.
 
 If you think you've found a potential vulnerability in this project, please
-email <YOUR_PROJECT_EMAIL_ADRESS@address.com> to responsibly disclose it.
+email <rti@netbeheernederland.nl> to responsibly disclose it.
 
 ## Community guidelines
 
