@@ -82,10 +82,10 @@ iec61850-websocket/
 │     │  └─ oauth.py               # OAuth utilities for client identification
 │     └─ asn1/                     # ASN.1 schema, encode/decode, formatters, and tests
 ├─ tests/                          # Functional and performance-oriented test suites
-│  ├─ unit/                        # Unit-level tests
+│  ├─ unit/                        # Unit-level tests (in progress)
 │  ├─ integration/                 # Integration and protocol-level tests
 │  ├─ performance/                 # Performance and load tests
-│  └─ conftest.py                  # Shared pytest configuration and fixtures
+│  └─ security/                    # Security tests
 ├─ examples/                       # Example clients/servers and interactive demos
 ├─ docs/                           # Generated and hand-written documentation (e.g. Doxygen, specs)
 │  └─ protocol_specification/      # IEC61850 WebSocket protocol specification
@@ -103,7 +103,7 @@ iec61850-websocket/
 - **Git** - [Install Git](https://git-scm.com/downloads)
 - **Docker** - [Install Docker](https://docs.docker.com/get-docker/)
 - **Docker Compose** - [Install Docker Compose](https://docs.docker.com/compose/install/)
-- **sfssl** - [Install sfssl](https://github.com/cloudflare/cfssl/releases) – used for TLS certificate generation
+- **cfssl** - [Install cfssl](https://github.com/cloudflare/cfssl/releases) – used for TLS certificate generation
 - **doxygen** - [Install doxygen](https://www.doxygen.nl) - used to generate documentation (optional)
 
 - Basic understanding of:
