@@ -12,12 +12,7 @@ Notes
 The getting started guide describes how to build and install the Python reference implementation of the WebSocket/
 JSON-based IEC 61850 SCSM. The reference data-models are also included in the distribution.
 
-Run the build and install it from the project root directory:
-
-```bash
-uv build
-pip install dist/iec61850_websocket-*.whl --force-reinstall
-```
+Run the setup instructions and run the examples from the project root directory:
 
 ## IEC61850 mode
 
@@ -140,15 +135,19 @@ command.
 
 ## IEC61850 UI
 
-For demonstration there is also a web based GUI client tool.
+For demonstration there is also a web-based GUI client tool and this takes two steps: first, the websocket server and
+client is started,
+second, the UI is started.
 
 ### Execute
 
-The websocket server and client run together.
+First, start the websocket server and client together.
 
 ```bash
 python examples/ws61850_interactive/console_app.py
 ```
+
+Second, start the UI.
 
 ```bash
 export PORT=5000   # optional; defaults to 5000

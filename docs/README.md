@@ -8,6 +8,8 @@ and supporting artifacts.
 ```
 docs/
 ├─ README.md                              # This overview
+├─ THIRD_PARTY_LICENSES.txt               # License information
+├─ LICENSES                               # Directory with Licenses
 ├─ protocol_specification/
 │  ├─ RTI_2.0_Protocol_Specification.md   # RTIv2 protocol specification
 │  └─ media/                              # Figures referenced by the spec
