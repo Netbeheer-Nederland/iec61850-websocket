@@ -2,7 +2,7 @@ import asyncio
 from random import randint
 
 from testing.ieds.high_level_model import make_ied_model1
-from ws61850.endpoint.endpoint import *
+from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
 maxMessageSize = 65000

@@ -1,7 +1,7 @@
 import asyncio
 
 from testing.ieds.high_level_model import make_ied_model1
-from ws61850.endpoint.endpoint import *
+from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
 maxMessageSize = 65000
@@ -14,9 +14,7 @@ async def main():
     iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
     ep_wsServer.add_iec61850_server(iec61850_server)
 
-    server_task = asyncio.create_task(
-        ep_wsServer.start("passive", "localhost", 8765, protocol=protocol)
-    )
+    server_task = asyncio.create_task(ep_wsServer.start("passive", "localhost", 8765, protocol=protocol))
 
     # await server_task
     await asyncio.gather(server_task)

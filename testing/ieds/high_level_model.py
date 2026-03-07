@@ -232,15 +232,9 @@ def make_ied_model1():
 
     dataset_min_max_avg = DataSet(ln2, "LD0", "DataSetMinMaxAvg", 3)
 
-    data_entry_1 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.MinWPhs", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_2 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.MaxWPhs", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_3 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.AvWPhs", -1, None, None, FunctionalConstraint.mx
-    )
+    data_entry_1 = DataSetEntry("LD0", False, "LD0/MMXU1.MinWPhs", -1, None, None, FunctionalConstraint.mx)
+    data_entry_2 = DataSetEntry("LD0", False, "LD0/MMXU1.MaxWPhs", -1, None, None, FunctionalConstraint.mx)
+    data_entry_3 = DataSetEntry("LD0", False, "LD0/MMXU1.AvWPhs", -1, None, None, FunctionalConstraint.mx)
 
     dataset_min_max_avg.dataSet_addEntry(data_entry_1)
     dataset_min_max_avg.dataSet_addEntry(data_entry_2)
@@ -250,9 +244,7 @@ def make_ied_model1():
 
     dataset_set_setpoints = DataSet(ln2, "LD0", "DataSetSetpoints", 1)
 
-    data_entry_1 = DataSetEntry(
-        "LD0", False, "LD0/DWMX1.SptReas", -1, None, None, FunctionalConstraint.st
-    )
+    data_entry_1 = DataSetEntry("LD0", False, "LD0/DWMX1.SptReas", -1, None, None, FunctionalConstraint.st)
     data_entry_2 = DataSetEntry(
         "LD0",
         False,
@@ -280,15 +272,9 @@ def make_ied_model1():
         None,
         FunctionalConstraint.sp,
     )
-    data_entry_5 = DataSetEntry(
-        "LD0", False, "LD0/DWMX1.WMaxSpt", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_6 = DataSetEntry(
-        "LD0", False, "LD0/DWMX1.WMaxSptPct", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_7 = DataSetEntry(
-        "LD0", False, "LD0/DGEN1.DEROpSt", -1, None, None, FunctionalConstraint.st
-    )
+    data_entry_5 = DataSetEntry("LD0", False, "LD0/DWMX1.WMaxSpt", -1, None, None, FunctionalConstraint.mx)
+    data_entry_6 = DataSetEntry("LD0", False, "LD0/DWMX1.WMaxSptPct", -1, None, None, FunctionalConstraint.mx)
+    data_entry_7 = DataSetEntry("LD0", False, "LD0/DGEN1.DEROpSt", -1, None, None, FunctionalConstraint.st)
     # data_entry_8 = DataSetEntry("LD0", False, "LD0/LPHD1.PhyNam", -1, None, None, FunctionalConstraint.dc)
 
     dataset_set_setpoints.dataSet_addEntry(data_entry_1)
@@ -304,39 +290,17 @@ def make_ied_model1():
 
     dataset_set_actualValues = DataSet(ln2, "LD0", "DataSetActualValues", 1)
 
-    data_entry_1 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.TotW", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_2 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.TotVAr", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_3 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.PhV.phsA", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_4 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.PhV.phsB", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_5 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.PhV.phsC", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_6 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.PPV.phsAB", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_7 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.PPV.phsBC", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_8 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.PPV.phsCA", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_9 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.A.phsA", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_10 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.A.phsB", -1, None, None, FunctionalConstraint.mx
-    )
-    data_entry_11 = DataSetEntry(
-        "LD0", False, "LD0/MMXU1.A.phsC", -1, None, None, FunctionalConstraint.mx
-    )
+    data_entry_1 = DataSetEntry("LD0", False, "LD0/MMXU1.TotW", -1, None, None, FunctionalConstraint.mx)
+    data_entry_2 = DataSetEntry("LD0", False, "LD0/MMXU1.TotVAr", -1, None, None, FunctionalConstraint.mx)
+    data_entry_3 = DataSetEntry("LD0", False, "LD0/MMXU1.PhV.phsA", -1, None, None, FunctionalConstraint.mx)
+    data_entry_4 = DataSetEntry("LD0", False, "LD0/MMXU1.PhV.phsB", -1, None, None, FunctionalConstraint.mx)
+    data_entry_5 = DataSetEntry("LD0", False, "LD0/MMXU1.PhV.phsC", -1, None, None, FunctionalConstraint.mx)
+    data_entry_6 = DataSetEntry("LD0", False, "LD0/MMXU1.PPV.phsAB", -1, None, None, FunctionalConstraint.mx)
+    data_entry_7 = DataSetEntry("LD0", False, "LD0/MMXU1.PPV.phsBC", -1, None, None, FunctionalConstraint.mx)
+    data_entry_8 = DataSetEntry("LD0", False, "LD0/MMXU1.PPV.phsCA", -1, None, None, FunctionalConstraint.mx)
+    data_entry_9 = DataSetEntry("LD0", False, "LD0/MMXU1.A.phsA", -1, None, None, FunctionalConstraint.mx)
+    data_entry_10 = DataSetEntry("LD0", False, "LD0/MMXU1.A.phsB", -1, None, None, FunctionalConstraint.mx)
+    data_entry_11 = DataSetEntry("LD0", False, "LD0/MMXU1.A.phsC", -1, None, None, FunctionalConstraint.mx)
 
     dataset_set_actualValues.dataSet_addEntry(data_entry_1)
     dataset_set_actualValues.dataSet_addEntry(data_entry_2)

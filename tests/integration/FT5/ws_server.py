@@ -1,5 +1,7 @@
-from ws61850.endpoint.endpoint import *
-from ws61850.iec61850.client.iec61850_client import *
+import asyncio
+
+from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
 maxMessageSize_server = 65000
 
@@ -89,9 +91,7 @@ async def main():
     iec61850_client = IEC61850Client("cp1")
     ep_wsServer.add_iec61850_client(iec61850_client)
 
-    server_task = asyncio.create_task(
-        ep_wsServer.start("passive", "192.168.100.14", 8765)
-    )
+    server_task = asyncio.create_task(ep_wsServer.start("passive", "192.168.100.14", 8765))
 
     await ep_wsServer.client_list[0].ready_event.wait()
     if ep_wsServer.client_list[0].is_connected is True:
@@ -108,13 +108,9 @@ async def main():
                 )
                 print("set_urcb_res:", set_urcb_res)
 
-                select_result = await ep_wsServer.client_list[0].select(
-                    "LD0/DWMX1.WMaxSpt", websocket_info, None, None
-                )
+                select_result = await ep_wsServer.client_list[0].select("LD0/DWMX1.WMaxSpt", websocket_info, None, None)
                 print(select_result)
-                operate_result = await ep_wsServer.client_list[0].operate(
-                    oper_val, websocket_info, None, None
-                )
+                operate_result = await ep_wsServer.client_list[0].operate(oper_val, websocket_info, None, None)
                 print(operate_result)
 
             except Exception as e:

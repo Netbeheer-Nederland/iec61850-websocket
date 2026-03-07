@@ -1,15 +1,8 @@
-# from Examples.ieds.high_level_model import ied as ied1
-# from Examples.ieds.ied_model_2 import ied as ied2
-# from ws61850.endpoint.endpoint import *
 import asyncio
 
 from testing.ieds.high_level_model import make_ied_model1
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
-
-# from IEC61850.server.IEC61850Server import *
-# from IEC61850.server.control_handling import *
-# from IEC61850.server.service_error import *
 
 maxMessageSize = 65000
 

@@ -63,6 +63,8 @@ curl -X POST \
   -d "client_secret=K4Nrd14seXG52J3xpnIqfMyILTJJu3VI"
 ```
 
+The actual tests cases use the HTTPS protocol, with CA certificate verification enabled.
+
 ## Test Case Design
 
 This test case is used for checking the functionality of FT10 module.

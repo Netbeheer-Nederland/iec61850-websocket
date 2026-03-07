@@ -1,11 +1,15 @@
 import asyncio
 
 from testing.ieds.high_level_model import make_ied_model1
-from ws61850.endpoint.endpoint import *
-from ws61850.iec61850.server.control_handling import ControlHandlerResult, ControlServiceStatusKind
+from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.iec61850.server.control_handling import (
+    ControlHandlerResult,
+    ControlServiceStatusKind,
+)
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
+from ws61850.iec61850.server.service_error import ServiceStatusKind
 
-maxMessageSize = 65000
+max_message_size = 65000
 
 
 def control_handler_for_float(obj_ref, ctlVal_value, parameter):
@@ -21,13 +25,13 @@ def control_handler_for_float(obj_ref, ctlVal_value, parameter):
 
 
 async def main():
-    ep_wsClient_1 = WebSocketEndpoint()
+    ep_ws_client_1 = WebSocketEndpoint()
     iec61850_server_1 = IEC61850Server(make_ied_model1(), "cp1")
     iec61850_server_1.set_control_handler(control_handler_for_float, None)
     report_task_1 = asyncio.create_task(iec61850_server_1.periodic_report_start())
-    ep_wsClient_1.add_iec61850_server(iec61850_server_1)
+    ep_ws_client_1.add_iec61850_server(iec61850_server_1)
 
-    task1 = asyncio.create_task(ep_wsClient_1.start("active", "localhost", 8765, "cp1"))
+    task1 = asyncio.create_task(ep_ws_client_1.start("active", "localhost", 8765, "cp1"))
     await asyncio.gather(task1, report_task_1)
 
 

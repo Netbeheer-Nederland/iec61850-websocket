@@ -1,5 +1,7 @@
-from ws61850.endpoint.endpoint import *
-from ws61850.iec61850.client.iec61850_client import *
+import asyncio
+
+from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
 maxMessageSize_server = 65000
 
@@ -78,9 +80,7 @@ oper_val_setMag = {
 }
 
 setMag_val = [{"name": "setMag", "data": ("structure", {"data": [("float32", 67.39)]})}]
-setMag_wrong = [
-    {"name": "setMag", "data": ("structure", {"data": [("boolean", False)]})}
-]
+setMag_wrong = [{"name": "setMag", "data": ("structure", {"data": [("boolean", False)]})}]
 
 
 async def main():
@@ -111,9 +111,7 @@ async def main():
                 operate_result = await ep_wsServer.client_list[0].operate(
                     oper_val_wrong_type, websocket_info, None, None
                 )
-                print(
-                    "result for incorrect data type in operate request", operate_result
-                )
+                print("result for incorrect data type in operate request", operate_result)
 
                 operate_result = await ep_wsServer.client_list[0].operate(
                     oper_val_incorrect_do, websocket_info, None, None
@@ -143,13 +141,9 @@ async def main():
                     None,
                 )
                 #
-                print(
-                    "result for setDataValue for a incorrect type of value", set_val_res
-                )
+                print("result for setDataValue for a incorrect type of value", set_val_res)
                 #
-                select_result = await ep_wsServer.client_list[0].select(
-                    "LD0/DWMX1.WMaxSpt", websocket_info, None, None
-                )
+                select_result = await ep_wsServer.client_list[0].select("LD0/DWMX1.WMaxSpt", websocket_info, None, None)
                 print("select result: ", select_result)
 
                 operate_result = await ep_wsServer.client_list[0].operate(

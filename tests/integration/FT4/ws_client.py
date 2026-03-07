@@ -1,9 +1,11 @@
 import asyncio
 
 from testing.ieds.high_level_model import make_ied_model1
-from ws61850.endpoint.endpoint import *
+from ws61850.endpoint.endpoint import WebSocketEndpoint
+
 from ws61850.iec61850.server.control_handling import ControlHandlerResult, ControlServiceStatusKind
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
+from ws61850.iec61850.server.service_error import ServiceStatusKind
 
 maxMessageSize = 65000
 

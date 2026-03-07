@@ -1,5 +1,7 @@
-from ws61850.endpoint.endpoint import *
-from ws61850.iec61850.client.iec61850_client import *
+import asyncio
+
+from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
 maxMessageSize_server = 65000
 
@@ -62,13 +64,9 @@ async def main():
                     "LD0/DWMX1.WMaxSpt", "mx", True, websocket_info, None, None
                 )
                 print(da_val)
-                select_result = await ep_wsServer.client_list[0].select(
-                    "LD0/DWMX1.WMaxSpt", websocket_info, None, None
-                )
+                select_result = await ep_wsServer.client_list[0].select("LD0/DWMX1.WMaxSpt", websocket_info, None, None)
                 print(select_result)
-                operate_result = await ep_wsServer.client_list[0].operate(
-                    oper_val, websocket_info, None, None
-                )
+                operate_result = await ep_wsServer.client_list[0].operate(oper_val, websocket_info, None, None)
                 print(operate_result)
 
                 da_val = await ep_wsServer.client_list[0].get_data_values(
