@@ -11,9 +11,9 @@ from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.iec61850.server.service_error import ServiceStatusKind
 from ws61850.security.tls import TLSConfiguration
 
-maxMessageSize = 65000
+max_message_size = 65000
 
-test_ca_path = CERT_DIR / "ca.pem"
+cafile = CERT_DIR / "ca.pem"
 
 
 def control_handler_for_float(obj_ref, ctlVal_value, parameter):
@@ -32,8 +32,8 @@ def control_handler_for_float(obj_ref, ctlVal_value, parameter):
 
 
 async def main():
-    print(f"{test_ca_path}")
-    tls_config = TLSConfiguration(test_ca_path, None, False)
+    print(f"{cafile}")
+    tls_config = TLSConfiguration(cafile, None, False)
     ep_ws_client = WebSocketEndpoint(tls_config=tls_config)
     iec61850_server_1 = IEC61850Server(make_ied_model1(), "cp1")
     iec61850_server_1.set_control_handler(control_handler_for_float, None)

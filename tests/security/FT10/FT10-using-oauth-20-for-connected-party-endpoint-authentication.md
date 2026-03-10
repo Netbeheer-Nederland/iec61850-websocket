@@ -16,7 +16,7 @@ Confirm that:
 
 ## Getting Started
 
-* Keycloak exposed on the local port 8080 and created an initial admin user with the username admin
+* Keycloak exposed on the local port 8080 and created an initial 'admin' user with the username 'admin"
   and password admin (see the Keycloak docker compose file in the scripts/keycloak directory to change the default admin
   user credentials).
 * The Keycloak realm and client configuration used by this test are imported from the local `keycloak` directory in this
@@ -29,8 +29,7 @@ Confirm that:
 docker compose up
 ```
 
-* Log in to the Admin Console, and go to the Keycloak Admin Console.
-* Log in with the username and password you created earlier.
+* Log in to the Admin Console (http://localhost:8080), with the username and password you created earlier
 
 ![key-cloak start screen](./images/keycloak-start-screen.png)
 
