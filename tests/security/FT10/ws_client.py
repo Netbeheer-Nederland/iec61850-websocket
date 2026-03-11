@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 import time
 
 import jwt
@@ -13,6 +14,11 @@ from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.security.oauth import get_access_token
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 cafile = CERT_DIR / "ca.pem"
 

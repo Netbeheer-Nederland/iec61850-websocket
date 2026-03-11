@@ -64,4 +64,4 @@ Thumbs.db
 
 # Resource or info files
 resources.txt
-other/
+**/data/client_credentials.json

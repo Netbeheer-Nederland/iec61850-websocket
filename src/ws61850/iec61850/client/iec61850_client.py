@@ -17,6 +17,7 @@
 
 import asyncio
 import datetime
+import logging
 from collections import deque
 
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
@@ -57,6 +58,8 @@ from ws61850.iec61850.client.request_handling import (
     create_tpaa_request_setDataValues,
     create_tpaa_request_setURCBValuesRequest,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class IEC61850Client:
@@ -131,7 +134,7 @@ class IEC61850Client:
         while (asyncio.get_event_loop().time() - start_time) < timeout:
 
             if self.disconnect_event.is_set():
-                print(f"Connection closed while waiting for invoke_id={invoke_id}")
+                logger.info(f"Connection closed while waiting for invoke_id={invoke_id}")
                 await asyncio.sleep(0.2)
                 self.response_received.clear()
                 return None
@@ -147,7 +150,7 @@ class IEC61850Client:
                             if call[1][1][1].get("invokeId") == invoke_id:
                                 return call
             except Exception as e:
-                print("error in await_response: ", e)
+                logger.info("error in await_response: ", e)
 
             # Wait for next response notification (with short timeout to allow periodic checks)
             try:
@@ -156,7 +159,7 @@ class IEC61850Client:
             except asyncio.TimeoutError:
                 continue  # Check again
         self.response_received.clear()
-        print(f"response not found for invoke_id={invoke_id}!")
+        logger.info(f"response not found for invoke_id={invoke_id}!")
         return None
 
     async def select(self, data, websocket_info: WebSocketInfo, callback, parameter):

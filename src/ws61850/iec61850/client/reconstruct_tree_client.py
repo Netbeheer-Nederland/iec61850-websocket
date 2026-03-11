@@ -16,10 +16,19 @@
 # limitations under the License.
 
 import json
+import logging
 import re
 
-from ws61850.iec61850.data_model.ied_model import IedModel, LogicalDevice, LogicalNode, DataObject, DataAttribute, \
-    DataAttributeType
+from ws61850.iec61850.data_model.ied_model import (
+    DataAttribute,
+    DataAttributeType,
+    DataObject,
+    IedModel,
+    LogicalDevice,
+    LogicalNode,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def retrieve_success(response):
@@ -50,7 +59,7 @@ def retrieve_ln_items(response):
     """
     Extracts the name of the items in a logical node from getLogicalNodeDirectory response
     """
-    ln_items = response[1]["service"][1]['instanceNames']
+    ln_items = response[1]["service"][1]["instanceNames"]
     return ln_items
 
 
@@ -66,7 +75,7 @@ def retrieve_ds_items(response):
     """
     Extracts the name of the datasets in a logical node from getDataSetDirectory response
     """
-    ds_refs = response[1]["service"][1]['dsMemberRef']
+    ds_refs = response[1]["service"][1]["dsMemberRef"]
     return ds_refs
 
 
@@ -74,7 +83,7 @@ def retrieve_ds_values(response):
     """
     Extracts the name of the datasets in a logical node from getDataSetDirectory response
     """
-    ds_vals = response[1]["service"][1]['dsMemberValue']
+    ds_vals = response[1]["service"][1]["dsMemberValue"]
     return ds_vals
 
 
@@ -168,8 +177,8 @@ def retrieve_sdos(da_def):
     Extracts the name of sub data attributes from getDataDefinition response
     """
     # response = json.loads(response_raw)
-    sdos = da_def['subDataDefinition']
-    sdo_names = [sdo['name'] for sdo in sdos]
+    sdos = da_def["subDataDefinition"]
+    sdo_names = [sdo["name"] for sdo in sdos]
     return sdo_names
 
 
@@ -178,7 +187,7 @@ def retrieve_das(da_def):
     Extracts the name of the dataAttribute definitions from getDataDefinition response
     """
     # response = json.loads(response_raw)
-    das = da_def['dataAttributeDefinition']
+    das = da_def["dataAttributeDefinition"]
     return das
 
 
@@ -187,15 +196,15 @@ def retrieve_attributes_sdo(da_def, sdo_name):
     Extracts the dataAttributeDefinition for each sub data object from getDataDefinition response
     """
     da_refs = []
-    sdos = da_def['subDataDefinition']
+    sdos = da_def["subDataDefinition"]
     for sub in sdos:
         if sub["name"] == sdo_name:
-            da_def = sub['dataAttributeDefinition']
+            da_def = sub["dataAttributeDefinition"]
             for da_index, da in enumerate(da_def):
-                print_node_da(da_index, da['daRef'], len(da_refs), 0, True)
+                print_node_da(da_index, da["daRef"], len(da_refs), 0, True)
                 # da_refs.append(da['daRef'])
-                if next(iter(da['daType'])) == 'structure':
-                    structure_list = da['daType'][1]
+                if next(iter(da["daType"])) == "structure":
+                    structure_list = da["daType"][1]
                     print_structure(structure_list, da_index, len(da_refs), 1)
 
 
@@ -203,11 +212,8 @@ def print_node(index, item, last_index):
     """
     prints sdos in the reconstructed tree in the console
     """
-    sdo_prefix = (
-        "          ├── " if index != last_index - 1 else
-        "          └── "
-    )
-    print(f"{sdo_prefix}{item}")
+    sdo_prefix = "          ├── " if index != last_index - 1 else "          └── "
+    logger.info(f"{sdo_prefix}{item}")
 
 
 def print_node_da(index, item, last_index, go_to_next_level, is_structure):
@@ -217,14 +223,11 @@ def print_node_da(index, item, last_index, go_to_next_level, is_structure):
     if is_structure:
         sdo_prefix = "               └── "
     else:
-        sdo_prefix = (
-            "               ├── " if index != last_index - 1 else
-            "               └── "
-        )
-    if (go_to_next_level > 0):
-        print(go_to_next_level * "     " + f"{sdo_prefix}{item}")
+        sdo_prefix = "               ├── " if index != last_index - 1 else "               └── "
+    if go_to_next_level > 0:
+        logger.info(go_to_next_level * "     " + f"{sdo_prefix}{item}")
     else:
-        print(f"{sdo_prefix}{item}")
+        logger.info(f"{sdo_prefix}{item}")
 
 
 def print_structure(structure_list, item_index, list_len, go_to_next_level):
@@ -232,22 +235,22 @@ def print_structure(structure_list, item_index, list_len, go_to_next_level):
     Prints structured items in the reconstructed tree in the console
     """
     for index, struct_item in enumerate(structure_list):
-        if next(iter(struct_item['cmpType'])) != "structure":
-            print_node_da(index, struct_item['cmpName'], len(structure_list), go_to_next_level, False)
+        if next(iter(struct_item["cmpType"])) != "structure":
+            print_node_da(index, struct_item["cmpName"], len(structure_list), go_to_next_level, False)
         else:
-            print_node_da(item_index, struct_item['cmpName'], len(structure_list), go_to_next_level, True)
-            struct_item = struct_item['cmpType'][1]
+            print_node_da(item_index, struct_item["cmpName"], len(structure_list), go_to_next_level, True)
+            struct_item = struct_item["cmpType"][1]
             print_structure(struct_item, index, len(struct_item), 2)
 
 
 def print_direct_da(da_list):
     """
-    print data attributes that are directly added to a direct Data Object (not a sub data object)
+    logger.info data attributes that are directly added to a direct Data Object (not a sub data object)
     """
     for da_index, da in enumerate(da_list):
-        print_node_da(da_index, da['daRef'], len(da_list), 0, True)
-        if next(iter(da['daType'])) == 'structure':
-            structure_list = da['daType'][1]
+        print_node_da(da_index, da["daRef"], len(da_list), 0, True)
+        if next(iter(da["daType"])) == "structure":
+            structure_list = da["daType"][1]
             print_structure(structure_list, da_index, len(da_list), 1)
 
 
@@ -347,11 +350,11 @@ def get_list_of_items_ln(ln_ref, asci_service, ied: IedModel):
     Returns the list of requested items from the logical node in getLogicalNodeDirectory
     """
     return_list = []
-    ld_name, ln_name = re.split(r'[/]', ln_ref)
+    ld_name, ln_name = re.split(r"[/]", ln_ref)
     foundLD: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
-    if (foundLD):
+    if foundLD:
         foundLN: LogicalNode = next((ln for ln in foundLD.logical_nodes if ln.name == ln_name), None)
-        if (foundLN):
+        if foundLN:
             if asci_service == "dataObject":
                 return_list = [do.name for do in foundLN.data_objects]
             elif asci_service == "dataset":
@@ -426,18 +429,19 @@ def find_do_with_ref(data_ref, ied):
     Finding a Data Object from IED tree using its object reference
     """
     return_do = None
-    ld_name, ln_name, first_do, *seg_ref = re.split(r'[/ .]', data_ref)
+    ld_name, ln_name, first_do, *seg_ref = re.split(r"[/ .]", data_ref)
     foundLD: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
-    if (foundLD):
+    if foundLD:
         foundLN: LogicalNode = next((ln for ln in foundLD.logical_nodes if ln.name == ln_name), None)
-        if (foundLN):
+        if foundLN:
             foundDO = next((do for do in foundLN.data_objects if do.name == first_do), None)
-            if (len(seg_ref) != 0):
-                if (foundDO):
+            if len(seg_ref) != 0:
+                if foundDO:
                     inner_do: DataObject = foundDO
                     for i in range(0, len(seg_ref)):
-                        inner_do = next((do for do in inner_do.get_do_from_do_or_da_list() if do.name == seg_ref[i]),
-                                        None)
+                        inner_do = next(
+                            (do for do in inner_do.get_do_from_do_or_da_list() if do.name == seg_ref[i]), None
+                        )
                     return_do = inner_do
 
             else:
@@ -454,8 +458,13 @@ def look_in_da_or_do_list(seg_ref, foundDO):
     for ref_index, ref_item in enumerate(seg_ref):
         if isinstance(found_obj, DataObject):
             found_item = next(
-                (item for item in found_obj.get_do_from_do_or_da_list() + found_obj.get_da_from_do_or_da_list() if
-                 item.name == ref_item), None)
+                (
+                    item
+                    for item in found_obj.get_do_from_do_or_da_list() + found_obj.get_da_from_do_or_da_list()
+                    if item.name == ref_item
+                ),
+                None,
+            )
         else:
             found_item = next((item for item in found_obj.data_attributes if item.name == ref_item), None)
         if found_item is not None:
@@ -474,7 +483,7 @@ def find_ds_in_tree(data_ref, ied):
     Find a DataObject or DataAttribute in the IED tree
     """
     foundDS = None
-    ld_name, ln_name, ds_name = re.split(r'[/ .]', data_ref)
+    ld_name, ln_name, ds_name = re.split(r"[/ .]", data_ref)
 
     foundDS = next((ds for ds in ied.data_sets if ds.name == ds_name), None)
     return foundDS
@@ -485,13 +494,13 @@ def find_object_in_tree(data_ref, ied):
     Find a DataObject or DataAttribute in the IED tree
     """
     return_do = None
-    ld_name, ln_name, first_do, *seg_ref = re.split(r'[/ .]', data_ref)
+    ld_name, ln_name, first_do, *seg_ref = re.split(r"[/ .]", data_ref)
     foundLD: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
-    if (foundLD):
+    if foundLD:
         foundLN: LogicalNode = next((ln for ln in foundLD.logical_nodes if ln.name == ln_name), None)
-        if (foundLN):
+        if foundLN:
             foundDO = next((do for do in foundLN.data_objects if do.name == first_do), None)
-            if (len(seg_ref) != 0):
+            if len(seg_ref) != 0:
                 return_do = look_in_da_or_do_list(seg_ref, foundDO)
 
             else:
@@ -534,10 +543,10 @@ def create_subDataDefinition_list(subDo_list):
     primary_da = []
     for sdo_item in subDo_list:
         input_data = {
-            'name': sdo_item.name,
-            'cdc': sdo_item.cdc,
-            'count': sdo_item.elementCount,
-            'dataAttributeDefinition': create_DataAttributeDefinition_list(sdo_item.get_da_from_do_or_da_list())
+            "name": sdo_item.name,
+            "cdc": sdo_item.cdc,
+            "count": sdo_item.elementCount,
+            "dataAttributeDefinition": create_DataAttributeDefinition_list(sdo_item.get_da_from_do_or_da_list()),
         }
         primary_da.extend(sdo_item.get_da_from_do_or_da_list())
         return_list.append(input_data)
@@ -559,11 +568,7 @@ def create_DataAttributeDefinition_list(da_list):
         else:
             value = get_structure_value_def(da_item)
 
-        input_data = {
-            'daRef': da_item.name,
-            'fc': da_item.fc.name,
-            'daType': (da_item.type.name, value)
-        }
+        input_data = {"daRef": da_item.name, "fc": da_item.fc.name, "daType": (da_item.type.name, value)}
         return_list.append(input_data)
     return return_list
 
@@ -592,10 +597,7 @@ def get_structure_value_def(da_item: DataAttribute):
                 value = get_octetString_size(da_interal.mmsValue)
             else:
                 value = get_structure_value_def(da_interal)
-            input_data.append({
-                'cmpName': da_interal.name,
-                'cmpType': (da_interal.type.name, value)
-            })
+            input_data.append({"cmpName": da_interal.name, "cmpType": (da_interal.type.name, value)})
 
     return input_data
 
@@ -609,21 +611,16 @@ def get_structure_value(da_item: DataAttribute, include_element_name):
     return_obj = None
     if len(da_item.data_attributes) != 0:
         for da_interal in da_item.data_attributes:
-            if (da_interal.type.name != "structure"):
+            if da_interal.type.name != "structure":
                 value = da_interal.mmsValue
             else:
                 value = get_structure_value(da_interal, include_element_name)
             if include_element_name:
 
-                return_obj = {
-                    "name": da_interal.name,
-                    "data": [(da_interal.type.name, value)]
-                }
+                return_obj = {"name": da_interal.name, "data": [(da_interal.type.name, value)]}
 
             else:
-                return_obj = {
-                    "data": [(da_interal.type.name, value)]
-                }
+                return_obj = {"data": [(da_interal.type.name, value)]}
 
     return return_obj
 
@@ -671,7 +668,7 @@ def flatten_nested_data_attributes(object):
         for sub_do in object.get_do_from_do_or_da_list():
             for attr_ in sub_do.get_da_from_do_or_da_list():
                 if attr_ not in flat_list:
-                    print(attr_.name)
+                    logger.info(attr_.name)
                     flat_list.append(attr_)
         for attr in object.get_da_from_do_or_da_list():
             if attr not in flat_list:
@@ -681,29 +678,29 @@ def flatten_nested_data_attributes(object):
         for attr in object.data_attributes:
             if attr not in flat_list:
                 flat_list.append(attr)
-                print(attr.name)
+                logger.info(attr.name)
 
     return flat_list
 
 
 def flatten_nested_data_attributes_with_fc(object, fc):
     """
-     Flatten the list of nested data attributes that have a specific FC
-     """
+    Flatten the list of nested data attributes that have a specific FC
+    """
     flat_list = []
 
     if isinstance(object, DataObject):
         for sub_do in object.get_do_from_do_or_da_list():
             for attr_ in sub_do.get_da_from_do_or_da_list():
                 if attr_ not in flat_list and attr_.fc.name == fc:
-                    print(attr_.name)
+                    logger.info(attr_.name)
                     flat_list.append(attr_)
         for attr in object.get_da_from_do_or_da_list():
             if attr not in flat_list and attr.fc.name == fc:
                 flat_list.append(attr)
 
     else:
-        print("fdsgdghrgedg", type(object))
+        logger.info("fdsgdghrgedg", type(object))
         for attr in object.data_attributes:
             if attr not in flat_list and attr.fc == fc:
                 flat_list.append(attr)
@@ -713,10 +710,7 @@ def flatten_nested_data_attributes_with_fc(object, fc):
 
 def build_fcd_ref(obj_ref, fc):
     """Building a fcda definition"""
-    fcda_ref = {
-        "ref": obj_ref,
-        "fc": fc
-    }
+    fcda_ref = {"ref": obj_ref, "fc": fc}
     return fcda_ref
 
 
@@ -729,14 +723,9 @@ def build_data_value(da: DataAttribute, type, value, include_element_name):
 
     value = (type, value)
     if include_element_name:
-        return_item = {
-            "name": da.name,
-            "data": value
-        }
+        return_item = {"name": da.name, "data": value}
     else:
-        return_item = {
-            "data": value
-        }
+        return_item = {"data": value}
     return return_item
 
 
@@ -745,14 +734,9 @@ def build_data_obj_value(do: DataObject, value, include_element_name):
     Creating the data values of structured values to use in getDataValues Response
     """
     if include_element_name:
-        return_item = {
-            "name": do.name,
-            "data": ("structure", value)
-        }
+        return_item = {"name": do.name, "data": ("structure", value)}
     else:
-        return_item = {
-            "data": ("structure", value)
-        }
+        return_item = {"data": ("structure", value)}
         return_item = ("structure", return_item)
     return return_item
 
@@ -832,5 +816,5 @@ def assign_urcb_value(server_urcb, values):
 
         return "ok"
     except (AttributeError, TypeError, ValueError, KeyError) as e:
-        print("error in assign urcb values is: ", e)
+        logger.info("error in assign urcb values is: ", e)
         return "failure"

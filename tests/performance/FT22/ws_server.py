@@ -1,13 +1,23 @@
+import argparse
 import asyncio
+import logging
+import os
+import sys
 
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.data_model.helper import get_now_time
 
-maxMessageSize_server = 65000
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
+max_message_size_server = 65000
 
-optFlds = {
+optional_fields = {
     "seqNum": False,
     "timeStamp": True,
     "dataSet": True,
@@ -24,7 +34,7 @@ brcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbMinMaxAvg", True)
 
 brcb.rptEna = True
 brcb.confRev = 5
-brcb.opt_flds = optFlds
+brcb.opt_flds = optional_fields
 brcb.bufTm = 1000
 brcb.sqNum = 42
 brcb.trgOps = trgOp
@@ -38,7 +48,7 @@ brcb.resvTms = 5
 urcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints", True)
 urcb.rptEna = True
 urcb.confRev = 5
-urcb.opt_flds = optFlds
+urcb.opt_flds = optional_fields
 urcb.bufTm = 1000
 urcb.sqNum = 88
 urcb.trgOps = trgOp
@@ -50,7 +60,7 @@ urcb.resv = True
 
 
 def callback_called(result, param):
-    print("callback called: ", result)
+    logger.info(f"callback called: {result}")
 
 
 data_attribute_value = {
@@ -118,10 +128,44 @@ oper_val = {
 }
 
 
-async def add_iec61850_client_requests(iec61850_client, ep_wsServer):
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=("WebSocketServer"))
+    default_host = os.getenv("WS_SERVER_HOST", "localhost")
+    port = os.getenv("WS_SERVER_PORT", "8765")
+    if port is None:
+        default_port = 8765
+    else:
+        try:
+            default_port = int(port)
+        except ValueError:
+            parser.error("WS_SERVER_PORT must be an integer")
+
+    parser.add_argument(
+        "--pocc",
+        type=int,
+        default="100",
+        help="the number of support PoCC (default: '100').",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default=default_host,
+        help="hostname for the websocket server (default: 'localhost').",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=default_port,
+        help="port for the websocket server (default: 8765).",
+    )
+
+    return parser.parse_args()
+
+
+async def add_iec61850_client_requests(iec61850_client, ws_server):
     await iec61850_client.ready_event.wait()
     if iec61850_client.is_connected is True:
-        websocket_info = ep_wsServer.get_websocket_info(iec61850_client)
+        websocket_info = ws_server.get_websocket_info(iec61850_client)
         if websocket_info is not None:
             try:
                 server_list = await iec61850_client.get_server_directory(websocket_info, callback_called, None)
@@ -164,39 +208,43 @@ async def add_iec61850_client_requests(iec61850_client, ep_wsServer):
                     None,
                 )
 
-                print(f"printing the list or returned items from client {iec61850_client.cp}")
-                print("server_list:", server_list)
-                print("ld_directory:", ld_directory)
-                print("ln_directory_ds:", ln_directory_ds)
-                print("ln_directory_do:", ln_directory_do)
-                print("ds_directory:", ds_directory)
-                print("da_def:", da_def)
-                print("da_val:", da_val)
-                print("set_da_res:", set_da_res)
-                print("set_da_res:", set_urcb_res)
+                logger.info(f"printing the list or returned items from client {iec61850_client.cp}")
+                logger.info(f"server_list: {server_list}")
+                logger.info(f"ld_directory: {ld_directory}")
+                logger.info(f"ln_directory_ds: {ln_directory_ds}")
+                logger.info(f"ln_directory_do:{ln_directory_do}")
+                logger.info(f"ds_directory: {ds_directory}")
+                logger.info(f"da_def: {da_def}")
+                logger.info(f"da_val: {da_val}")
+                logger.info(f"set_da_res: {set_da_res}")
+                logger.info(f"set_da_res: {set_urcb_res}")
 
             except Exception as e:
-                print("handler not called:", e)
+                logger.error("handler not called:", e)
 
 
-async def add_iec61850_clients(ep_wsServer, cp):
+async def add_iec61850_clients(ws_server, cp):
     iec61850_client = IEC61850Client(cp)
-    ep_wsServer.add_iec61850_client(iec61850_client)
+    ws_server.add_iec61850_client(iec61850_client)
 
 
 async def main():
-    ep_wsServer = WebSocketEndpoint()
+    args = parse_args()
+    ep_ws_server = WebSocketEndpoint()
 
-    for i in range(0, 1001):
-        await add_iec61850_clients(ep_wsServer, "cp" + str(i))
+    for pocc_num in range(1, args.pocc + 1):
+        pocc_id = f"EAN{pocc_num:03}"
+        logger.info(f"Registering IEC61850 Client on WS-server with ID: {pocc_id}")
+        await add_iec61850_clients(ep_ws_server, pocc_id)
 
-    server_task = asyncio.create_task(ep_wsServer.start("passive", "localhost", 8765))
+    logger.info(f"Starting WebSocket endpoint in {args.mode} mode on {args.host}:{args.port}")
+    server_task = asyncio.create_task(ep_ws_server.start("passive", args.host, args.port))
 
     await asyncio.sleep(2)
 
     request_tasks = []
-    for client in ep_wsServer.client_list:
-        task = asyncio.create_task(add_iec61850_client_requests(client, ep_wsServer))
+    for client in ep_ws_server.client_list:
+        task = asyncio.create_task(add_iec61850_client_requests(client, ep_ws_server))
         request_tasks.append(task)
 
     await asyncio.gather(*request_tasks)

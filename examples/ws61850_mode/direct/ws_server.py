@@ -1,7 +1,6 @@
 import asyncio
 from random import randint
 
-
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.data_model.example_ieds import build_model1, build_model2
 from ws61850.iec61850.server.iec61850_server import IEC61850Server

@@ -14,7 +14,7 @@
   "clients": [
     {
       "clientId": "ws-client",
-      "name": "WS Client",
+      "name": "ws-client",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,

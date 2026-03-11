@@ -1,22 +1,32 @@
 import asyncio
+import logging
+import os
 import sys
-from time import sleep
+from pathlib import Path
 
-from Endpoint.endpoint import *
-from IEC61850.client.IEC61850Client import *
-from TLSConfig.TLSConfiguration import *
+from testing.certs.paths import CERT_DIR
+from testing.utils.credentials_store import load_credentials
+from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.iec61850.client.iec61850_client import IEC61850Client
+from ws61850.iec61850.data_model.helper import get_now_time
+from ws61850.security.tls import TLSConfiguration
 
-cert_path = ""
-for path in sys.path:
-    if path.endswith("certs"):
-        cert_path = path
-        break
-key_path = os.path.join(cert_path, "server_perf.key")
-server_cert_path = os.path.join(cert_path, "server_perf.crt")
-maxMessageSize_server = 65000
+cafile = CERT_DIR / "ca.pem"
+cert_path = CERT_DIR / "server.pem"
+key_path = CERT_DIR / "server-key.pem"
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 
-optFlds = {
+max_message_size_server = 65000  # noqa: N816
+
+
+optional_fields = {
     "seqNum": False,
     "timeStamp": True,
     "dataSet": True,
@@ -32,7 +42,7 @@ trgOp = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": F
 brcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbMinMaxAvg", True)
 brcb.rptEna = True
 brcb.confRev = 5
-brcb.opt_flds = optFlds
+brcb.opt_flds = optional_fields
 brcb.bufTm = 1000
 brcb.sqNum = 42
 brcb.trgOps = trgOp
@@ -46,7 +56,7 @@ brcb.resvTms = 5
 urcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints", True)
 urcb.rptEna = True
 urcb.confRev = 5
-urcb.opt_flds = optFlds
+urcb.opt_flds = optional_fields
 urcb.bufTm = 1000
 urcb.sqNum = 88
 urcb.trgOps = trgOp
@@ -55,10 +65,6 @@ urcb.gi = True
 urcb.entryId = b"\x01\x02\x03\x04\x05\x06\x07\x08"
 urcb.timeOfEntry = get_now_time()
 urcb.resv = True
-
-
-def callback_called(result, param):
-    print("callback called: ", result)
 
 
 data_attribute_value = {
@@ -99,7 +105,7 @@ data_attribute_value = {
     ),
 }
 
-data_WMaxSetPct = [
+data_w_max_set_pct = [
     {
         "name": "setMag",
         "data": ("structure", {"name": "f", "data": [("float32", 19.666)]}),
@@ -126,10 +132,22 @@ oper_val = {
 }
 
 
-async def add_iec61850_client_requests(iec61850_client, ep_wsServer):
+def resolve_credentials_path(credentials_file_path: str) -> Path:
+    path = Path(credentials_file_path)
+    if path.is_absolute():
+        return path
+    project_root = Path(__file__).resolve().parent
+    return (project_root / path).resolve()
+
+
+def callback_called(result, param):
+    logger.info(f"callback called: {result}")
+
+
+async def add_iec61850_client_requests(iec61850_client, ws_server):
     await iec61850_client.ready_event.wait()
     if iec61850_client.is_connected is True:
-        websocket_info = ep_wsServer.get_websocket_info(iec61850_client)
+        websocket_info = ws_server.get_websocket_info(iec61850_client)
         if websocket_info is not None:
             try:
                 server_list = await iec61850_client.get_server_directory(websocket_info, None, None)
@@ -159,55 +177,50 @@ async def add_iec61850_client_requests(iec61850_client, ep_wsServer):
                 )
 
             except Exception as e:
-                print("handler not called:", e)
+                logger.info("handler not called:", e)
 
 
-async def add_iec61850_clients(ep_wsServer, cp):
+async def add_iec61850_clients(server, cp):
     iec61850_client = IEC61850Client(cp)
-    ep_wsServer.add_iec61850_client(iec61850_client)
+    server.add_iec61850_client(iec61850_client)
 
 
-project_root = ""
-for path in sys.path:
-    if path.endswith("certs"):
-        project_root = path
-        break
-kc_cert_path = os.path.join(project_root, "keycloak.crt")
+CREDENTIALS_FILE = "data/client_credentials.json"
+BASE = os.environ.get("KEYCLOAK_URL", "https://localhost:8443")
+TARGET_REALM = os.environ.get("IEC61850_REALM", "iec61850-test")
+cert_endpoint = f"{BASE}/realms/{TARGET_REALM}/protocol/openid-connect/certs"
+token_issuer = f"{BASE}/realms/{TARGET_REALM}"
 
 
 async def main():
     # TLS config for server
-    try:
-        tls_config_server = TLSConfiguration(cert_path=server_cert_path, key_path=key_path, is_ws_server=True)
-        ssl_context = tls_config_server.ssl_context
-        tls_config_server.ssl_context.keylog_filename = os.path.join("tlskeys.log")
-    except FileNotFoundError:
-        print(
-            "CRITICAL ERROR: Server certificate or key not found. Ensure 'server.crt' and 'server.key' exist in the 'certs' directory."
-        )
-        return
-    except Exception as e:
-        print(f"CRITICAL ERROR: Failed to load server TLS configuration: {e}")
-        return
+    tls_config = TLSConfiguration(cert_path=cert_path, key_path=key_path, is_ws_server=True)
 
-    ep_wsServer = WebSocketEndpoint(
+    ep_ws_server = WebSocketEndpoint(
         oauth_enable=True,
-        tls_config=tls_config_server,
-        cert_endpoint="https://192.168.100.15:8443/realms/master/protocol/openid-connect/certs",
-        token_issuer="https://192.168.100.15:8443/realms/master",
-        kc_cert=kc_cert_path,
+        # tls_config=tls_config,
+        cert_endpoint=cert_endpoint,
+        token_issuer=token_issuer,
+        kc_cert=cafile,
     )
 
-    for i in range(0, 1001):
-        await add_iec61850_clients(ep_wsServer, "cp" + str(i))
+    credentials_path = resolve_credentials_path(CREDENTIALS_FILE)
+    credentials = load_credentials(credentials_path)
 
-    server_task = asyncio.create_task(ep_wsServer.start("passive", "localhost", 8765))
+    logger.info(f"Starting loading of {len(credentials)} clients...")
+    for i, client_config in enumerate(credentials):
+        # Assign IED Model based on client ID number
+        pocc_id = client_config["pocc_id"]
+        logger.info(f"Registering IEC61850 Client with ID: {pocc_id}")
+        await add_iec61850_clients(ep_ws_server, pocc_id)
+
+    server_task = asyncio.create_task(ep_ws_server.start("passive", "localhost", 8765))
 
     await asyncio.sleep(2)
 
     request_tasks = []
-    for client in ep_wsServer.client_list:
-        task = asyncio.create_task(add_iec61850_client_requests(client, ep_wsServer))
+    for client in ep_ws_server.client_list:
+        task = asyncio.create_task(add_iec61850_client_requests(client, ep_ws_server))
         request_tasks.append(task)
 
     await asyncio.gather(*request_tasks)

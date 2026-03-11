@@ -17,6 +17,7 @@
 
 import asyncio
 import datetime
+import logging
 import time
 from http import HTTPStatus
 
@@ -46,6 +47,8 @@ from ws61850.iec61850.server.response_handling import (
 )
 from ws61850.iec61850.server.service_error import ServiceStatusKind
 from ws61850.security.oauth import check_token_validity_and_expiry, get_jwt_algorithm
+
+logger = logging.getLogger(__name__)
 
 max_message_size = 65000
 max_message_size_server = 65000
@@ -125,11 +128,11 @@ class WebSocketEndpoint:
             if self.server is not None:
                 self.server.close()
                 await self.server.wait_closed()
-                print("WebSocket passive server stopped")
+                logger.info("WebSocket passive server stopped")
             else:
-                print("Passive server stop requested but server reference is None")
+                logger.info("Passive server stop requested but server reference is None")
         except Exception as e:
-            print(f"Error stopping passive server: {e}")
+            logger.error(f"Error stopping passive server: {e}")
 
     async def on_connection_closed(
         self,
@@ -145,7 +148,7 @@ class WebSocketEndpoint:
 
             selected_client = next((client for client in self.client_list if client.cp == clean_path), None)
             if selected_client:
-                print("clearing the client flags")
+                logger.info("clearing the client flags")
                 selected_client.ready_event.clear()  # <-- Reset event so main() can wait again
                 selected_client.is_connected = False
                 selected_client.disconnect_event.set()
@@ -154,7 +157,7 @@ class WebSocketEndpoint:
                 selected_server.set_quality_to_questionable()
 
         except Exception as e:
-            print(e)
+            logger.error(f"error{e}")
 
         if is_ws_client:
             attempt = 0
@@ -174,14 +177,14 @@ class WebSocketEndpoint:
                     break
                 except (ConnectionRefusedError, OSError) as e:
                     attempt += 1
-                    print(f"Connection failed: {e}")
+                    logger.warning(f"Connection failed: {e}")
                     if self.max_retries and attempt >= self.max_retries:
-                        print(" Max retries reached. Giving up.")
+                        logger.warning(" Max retries reached. Giving up.")
                         return
-                    print(f"Retrying in {self.retry_connection_delay} seconds...")
+                    logger.warning(f"Retrying in {self.retry_connection_delay} seconds...")
                     await asyncio.sleep(self.retry_connection_delay)
                 except Exception as e:
-                    print(f"Unexpected error: {e}")
+                    logger.error(f"Unexpected error: {e}")
                     await asyncio.sleep(self.retry_connection_delay)
 
     async def close_on_expiry(self, websocket, exp_timestamp):
@@ -231,12 +234,12 @@ class WebSocketEndpoint:
                         )
 
                     async for message in websocket:
-                        # print(f"Received from websocket server (IEC61850 client): {message}")
+                        # logger.info(f"Received from websocket server (IEC61850 client): {message}")
                         if self.recv_msg_callback is not None:
                             self.recv_msg_callback(message, datetime.datetime.now())
                         # else:
-                        #    print(f"Received message: {message}")
-                        # print(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
+                        #    logger.info(f"Received message: {message}")
+                        # logger.info(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
                         decoded_message = await asyncio.to_thread(
                             decode_tpaa_message, message, websocket_info.is_ber_protocol
                         )
@@ -256,7 +259,7 @@ class WebSocketEndpoint:
                                 )
                                 await websocket.send(request)
                                 websocket.transport.abort()
-                                print("Association aborted by server")
+                                logger.info("Association aborted by server")
                                 break
                             elif associate_type == "releaseRequest":
                                 tpaa_request = create_tpaa_release_response(
@@ -271,7 +274,7 @@ class WebSocketEndpoint:
                                 )
                                 await websocket.send(request)
                                 await websocket.close()
-                                print("Association released by server")
+                                logger.info("Association released by server")
                                 break
                             elif associate_type == "refreshToken":
                                 validity, expiry = check_token_validity_and_expiry(
@@ -307,7 +310,7 @@ class WebSocketEndpoint:
                     await websocket.send(request)
                     if self.send_msg_callback is not None:
                         self.send_msg_callback(request, datetime.datetime.now())
-                    print("Connection failed: Access Point not available")
+                    logger.info("Connection failed: Access Point not available")
                     await websocket.close()
 
             else:
@@ -349,12 +352,12 @@ class WebSocketEndpoint:
                         self.send_msg_callback(request, datetime.datetime.now())
 
                     async for message in websocket:
-                        # print("message in receiver: ", message)
+                        # logger.info("message in receiver: ", message)
                         if self.recv_msg_callback is not None:
                             self.recv_msg_callback(message, datetime.datetime.now())
                         else:
-                            print("Received message in endpoint handler: ", message)
-                            # print(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
+                            logger.info(f"Received message: {message}")
+                            # logger.info(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
                         if not selected_client.is_connected:
                             if not self.if_message_is_report(message):
                                 decoded_message = await asyncio.to_thread(
@@ -400,7 +403,7 @@ class WebSocketEndpoint:
                                         )
                                         await websocket.send(request)
                                         websocket.transport.abort()
-                                        print("Association aborted by server")
+                                        logger.info("Association aborted by server")
                                         break
                                     elif associate_type == "releaseRequest":
                                         tpaa_request = create_tpaa_release_response(
@@ -415,7 +418,7 @@ class WebSocketEndpoint:
                                         )
                                         await websocket.send(request)
                                         await websocket.close()
-                                        print("Association released by server")
+                                        logger.info("Association released by server")
                                         break
                                     elif associate_type == "refreshToken":
                                         validity, expiry = check_token_validity_and_expiry(
@@ -440,7 +443,7 @@ class WebSocketEndpoint:
                                     decoded_message, websocket_info.is_ber_protocol
                                 )
                                 if invoke_id and invoke_id > websocket_info.invoke_id:
-                                    print("invoke id invalid, closing the connection ...")
+                                    logger.info("invoke id invalid, closing the connection ...")
                                     await websocket.close()
 
                 else:
@@ -457,15 +460,15 @@ class WebSocketEndpoint:
                     await websocket.send(request)
                     if self.send_msg_callback is not None:
                         self.send_msg_callback(request, datetime.datetime.now())
-                    print("Connection failed: access point not available")
+                    logger.info("Connection failed: access point not available")
                     await websocket.close()
         except Exception as e:
-            print(f"Error in server handler function: {e}")
+            logger.error(f"Error in server handler function: {e}")
 
         finally:
             await websocket.wait_closed()
 
-            print(f"Client disconnected: {websocket.remote_address}")
+            logger.info(f"Client disconnected: {websocket.remote_address}")
 
             await self.on_connection_closed(websocket, clean_path)
 
@@ -510,11 +513,11 @@ class WebSocketEndpoint:
                 )
 
             except ExpiredSignatureError:
-                print("Token has expired")
+                logger.warning("Token has expired")
                 return HTTPStatus.FORBIDDEN, [], b"Expired token\n"
 
             except InvalidTokenError as e:
-                print("Invalid token:", e)
+                logger.warning("Invalid token:", e)
                 return HTTPStatus.FORBIDDEN, [], b"Invalid token\n"
         else:
             return HTTPStatus.UNAUTHORIZED, [], b"Missing or invalid token\n"
@@ -540,7 +543,7 @@ class WebSocketEndpoint:
                 ping_interval=15,
                 ping_timeout=30,
             ) as server:
-                print(f"WebSocket server started on wss://{hostname}:{port}")
+                logger.info(f"WebSocket server started on wss://{hostname}:{port}")
                 await server.serve_forever()
         else:
             async with serve(
@@ -553,7 +556,7 @@ class WebSocketEndpoint:
                 ping_timeout=30,
             ) as server:
                 self.server = server
-                print(f"WebSocket server started on ws://{hostname}:{port}")
+                logger.info(f"WebSocket server started on ws://{hostname}:{port}")
                 await server.serve_forever()
 
     async def __start_active(self, url, port, cp, protocol=None, access_token=None):
@@ -571,7 +574,7 @@ class WebSocketEndpoint:
             additional_headers={"Authorization": f"Bearer {access_token}"} if access_token else None,
             compression=None,
         ) as websocket:
-            print("Started client connection to", uri)
+            logger.info(f"Started client connection to {uri}")
             websocket_info = None
 
             try:
@@ -611,7 +614,7 @@ class WebSocketEndpoint:
                             if self.recv_msg_callback is not None:
                                 self.recv_msg_callback(message, datetime.datetime.now())
                             else:
-                                print(
+                                logger.info(
                                     f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}"
                                 )
                             if not selected_client.is_connected:
@@ -659,7 +662,7 @@ class WebSocketEndpoint:
                                             )
                                             await websocket.send(request)
                                             websocket.transport.abort()
-                                            print("Association aborted by server")
+                                            logger.info("Association aborted by server")
                                             break
                                         elif associate_type == "releaseRequest":
                                             tpaa_request = create_tpaa_release_response(
@@ -674,7 +677,7 @@ class WebSocketEndpoint:
                                             )
                                             await websocket.send(request)
                                             await websocket.close()
-                                            print("Association released by server")
+                                            logger.info("Association released by server")
                                             break
                                         elif associate_type == "refreshToken":
                                             validity, expiry = check_token_validity_and_expiry(
@@ -700,7 +703,7 @@ class WebSocketEndpoint:
                                         websocket_info.is_ber_protocol,
                                     )
                                     if invoke_id and invoke_id > websocket_info.invoke_id:
-                                        print("invoke id invalid, closing the connection ...")
+                                        logger.info("invoke id invalid, closing the connection ...")
                                         await websocket.close()
                     else:
                         tpaa_request = create_tpaa_associate_response(
@@ -716,7 +719,7 @@ class WebSocketEndpoint:
                         await websocket.send(request)
                         if self.send_msg_callback is not None:
                             self.send_msg_callback(request, datetime.datetime.now())
-                        print("Connection failed: access point not available")
+                        logger.info("Connection failed: access point not available")
                         await websocket.close()
 
                 else:
@@ -740,7 +743,7 @@ class WebSocketEndpoint:
                             if self.recv_msg_callback is not None:
                                 self.recv_msg_callback(message, datetime.datetime.now())
                             # else:
-                            #    print(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
+                            #    logger.info(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
 
                             await selected_server.handle_request(message, cp, websocket_info)
                     else:
@@ -757,23 +760,23 @@ class WebSocketEndpoint:
                         await websocket.send(request)
                         if self.send_msg_callback is not None:
                             self.send_msg_callback(request, datetime.datetime.now())
-                        print("Connection failed: Access Point not available")
+                        logger.info("Connection failed: Access Point not available")
                         await websocket.close()
 
             except websockets.exceptions.ConnectionClosedError as e:
                 if "no close frame" in str(e):
-                    print("Connection aborted without close frame (likely via transport.abort())")
+                    logger.info("Connection aborted without close frame (likely via transport.abort())")
                 else:
-                    print(f"Connection closed unexpectedly: code={e.code}, reason={e.reason}")
+                    logger.info(f"Connection closed unexpectedly: code={e.code}, reason={e.reason}")
 
             except websockets.exceptions.ConnectionClosedOK:
-                print("Connection closed gracefully")
+                logger.info("Connection closed gracefully")
 
             except Exception as e:
-                print("Unhandled error in start_active:", e)
+                logger.info("Unhandled error in start_active:", e)
 
             finally:
-                print(f"Client disconnected: {websocket.remote_address}")
+                logger.info(f"Client disconnected: {websocket.remote_address}")
                 await self.on_connection_closed(websocket, cp, True, url, port, protocol)
 
     def add_iec61850_client(self, client):
