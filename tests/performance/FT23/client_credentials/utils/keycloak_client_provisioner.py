@@ -1,11 +1,21 @@
 import logging
 import os
+import sys
 from pathlib import Path
 
 import requests
 import urllib3
 
-from testing.utils.credentials_store import load_credentials, save_credentials
+# Ensure the project root is on sys.path so that `testing` is importable
+# when this script is run directly (outside of pytest).
+_project_root = Path(__file__).resolve().parents[5]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from testing.utils.credentials_store import (  # noqa: E402
+    load_credentials,
+    save_credentials,
+)
 
 # urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 

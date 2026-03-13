@@ -4,12 +4,17 @@ import os
 import sys
 from pathlib import Path
 
-from testing.certs.paths import CERT_DIR
-from testing.utils.credentials_store import load_credentials
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.data_model.helper import get_now_time
 from ws61850.security.tls import TLSConfiguration
+
+_project_root = Path(__file__).resolve().parents[3]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from testing.certs.paths import CERT_DIR  # noqa: E402
+from testing.utils.credentials_store import load_credentials  # noqa: E402
 
 cafile = CERT_DIR / "ca.pem"
 cert_path = CERT_DIR / "server.pem"
@@ -198,7 +203,7 @@ async def main():
 
     ep_ws_server = WebSocketEndpoint(
         oauth_enable=True,
-        # tls_config=tls_config,
+        tls_config=tls_config,
         cert_endpoint=cert_endpoint,
         token_issuer=token_issuer,
         kc_cert=cafile,

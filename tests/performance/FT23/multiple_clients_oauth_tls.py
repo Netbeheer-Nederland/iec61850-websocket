@@ -7,15 +7,20 @@ import sys
 import time
 from pathlib import Path
 
-from testing.certs.paths import CERT_DIR
-from testing.ieds.high_level_model import make_ied_model1
-from testing.tasks.refresh_token_if_needed import refresh_token_if_needed
-from testing.tasks.runner import run_tasks
-from testing.utils.credentials_store import load_credentials
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.security.oauth import get_access_token
 from ws61850.security.tls import TLSConfiguration
+
+_project_root = Path(__file__).resolve().parents[3]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from testing.certs.paths import CERT_DIR  # noqa: E402
+from testing.ieds.high_level_model import make_ied_model1  # noqa: E402
+from testing.tasks.refresh_token_if_needed import refresh_token_if_needed  # noqa: E402
+from testing.tasks.runner import run_tasks  # noqa: E402
+from testing.utils.credentials_store import load_credentials  # noqa: E402
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -90,17 +95,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-# def get_now_time():
-#     return int(time.time())
-
-
-# def callback_called(result, param):
-#     # Callback for request handling
-#     logger.info(f"callback called: {result}")
-#     pass
-#
-
-
 async def toggle_float_value(iec61150_server, obj_ref):
     while True:
         value = random.uniform(5.5, 10.0)
@@ -149,8 +143,7 @@ async def start_client_process(client_config, i, args):
     tls_config = TLSConfiguration(cafile, None, False)
 
     # Initialize Endpoint and Server
-    # ep_ws_client = WebSocketEndpoint(oauth_enable=True, tls_config=tls_config)
-    ep_ws_client = WebSocketEndpoint(oauth_enable=True)
+    ep_ws_client = WebSocketEndpoint(oauth_enable=True, tls_config=tls_config)
 
     # Assign IED Model based on client ID number
     pocc_id = client_config["pocc_id"]
@@ -158,21 +151,16 @@ async def start_client_process(client_config, i, args):
     ep_ws_client.add_iec61850_server(iec61850_server)
 
     task_list = []
-    # Start WebSocket Connection - Now correctly including an empty list [] for subprotocols
+    # start WebSocket Connection - Now correctly including an empty list [] for subprotocols
     controller_task = asyncio.create_task(
         ep_ws_client.start("active", args.host, args.port, pocc_id, access_token=access_token)
     )
     task_list.append(controller_task)
 
-    # Add a report task
+    # add a report task
     if args.report:
         report_task = asyncio.create_task(iec61850_server.periodic_report_start())
         task_list.append(report_task)
-    # toggle_task = asyncio.create_task(toggle_float_value(iec61850_server, "LD0/MMXU1.TotW.mag.f"))
-
-    # Add Request Handling Task
-    # request_task = asyncio.create_task(add_iec61850_client_requests(iec61850_client, ep_ws_client))
-    # websocket_info = ep_ws_client.get_websocket_info(iec61850_client)
 
     refresh_task = asyncio.create_task(
         refresh_token_if_needed(
@@ -193,31 +181,22 @@ async def start_client_process(client_config, i, args):
 
 async def run_multi_clients():
     args = parse_args()
-    start_time = time.time()
 
     credentials_path = resolve_credentials_path(CREDENTIALS_FILE)
     credentials = load_credentials(credentials_path)
-    logger.info(f"Starting concurrent execution of {len(credentials)} clients...")
+    total = args.stop - args.start + 1
+    logger.info(f"Starting concurrent execution of {total} clients...")
 
     startup_tasks = []
     for i, config in enumerate(credentials):
+        if args.start - 1 > i >= args.stop:
+            break
         routine = start_client_process(config, i, args)
         task = asyncio.create_task(routine, name=f"Task-{config['pocc_id']}")
         startup_tasks.append(task)
         await asyncio.sleep(args.delay)
 
     await run_tasks(startup_tasks)
-
-    # try:
-    #     await asyncio.gather(*startup_tasks)
-    # except Exception:
-    #     logger.exception("An unexpected exception occurred during client execution")
-    #
-    # end_time = time.time()
-    # total_time = end_time - start_time
-    # logger.info("-" * 40)
-    # logger.info(f"Batch 1 finished. Clients: {len(credentials)}.")
-    # logger.info(f"Total Runner Execution Time: {total_time:.2f} seconds.")
 
 
 if __name__ == "__main__":
