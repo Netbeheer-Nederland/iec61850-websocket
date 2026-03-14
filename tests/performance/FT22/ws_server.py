@@ -237,7 +237,7 @@ async def main():
         logger.info(f"Registering IEC61850 Client on WS-server with ID: {pocc_id}")
         await add_iec61850_clients(ep_ws_server, pocc_id)
 
-    logger.info(f"Starting WebSocket endpoint in {args.mode} mode on {args.host}:{args.port}")
+    logger.info(f"Starting WebSocket endpoint in 'passive' mode on {args.host}:{args.port}")
     server_task = asyncio.create_task(ep_ws_server.start("passive", args.host, args.port))
 
     await asyncio.sleep(2)
