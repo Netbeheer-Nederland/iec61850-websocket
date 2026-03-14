@@ -18,3 +18,19 @@ docs/
 └─ doxygen/
    └─ Doxyfile                            # Doxygen configuration for generating documentation
 ```
+
+## Generate Doxygen
+
+From the repository root, run:
+
+```bash
+doxygen docs/doxygen/Doxyfile
+```
+
+The generated HTML output is written to:
+
+```text
+docs/doxygen/html/index.html
+```
+
+Make sure `doxygen` is installed locally before running this command.

@@ -5,6 +5,7 @@ var classws61850_1_1iec61850_1_1server_1_1iec61850__server_1_1IEC61850Server =
     [ "check_for_changed_trigger", "classws61850_1_1iec61850_1_1server_1_1iec61850__server_1_1IEC61850Server.html#acfa782c62c8a70184f0d8b12d22db05d", null ],
     [ "find_ds_in_tree", "classws61850_1_1iec61850_1_1server_1_1iec61850__server_1_1IEC61850Server.html#a3582bdf9e69f0515faa9950e20a98f75", null ],
     [ "find_object_in_tree", "classws61850_1_1iec61850_1_1server_1_1iec61850__server_1_1IEC61850Server.html#a049bf29a27c2482cd86d512dbdc90cac", null ],
+    [ "get_control_data_object", "classws61850_1_1iec61850_1_1server_1_1iec61850__server_1_1IEC61850Server.html#aad670f3195ec9886165276774af8acba", null ],
     [ "get_ctlVal_value", "classws61850_1_1iec61850_1_1server_1_1iec61850__server_1_1IEC61850Server.html#a05ba2d5006235b9b3a15f7ae07d83e63", null ],
     [ "get_do_parent", "classws61850_1_1iec61850_1_1server_1_1iec61850__server_1_1IEC61850Server.html#a5342841d307f76d8bd0ebe43554a5731", null ],
     [ "handle_request", "classws61850_1_1iec61850_1_1server_1_1iec61850__server_1_1IEC61850Server.html#a21c45756b636a9528be068f38b06f322", null ],

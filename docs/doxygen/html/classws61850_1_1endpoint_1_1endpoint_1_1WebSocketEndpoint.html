@@ -93,6 +93,7 @@ $(document).ready(function(){initNavTree('classws61850_1_1endpoint_1_1endpoint_1
   <div class="summary">
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-attribs">Public Attributes</a> &#124;
+<a href="#pro-static-methods">Static Protected Member Functions</a> &#124;
 <a href="classws61850_1_1endpoint_1_1endpoint_1_1WebSocketEndpoint-members.html">List of all members</a>  </div>
   <div class="headertitle"><div class="title">ws61850.endpoint.endpoint.WebSocketEndpoint Class Reference</div></div>
 </div><!--header-->
@@ -102,9 +103,9 @@ $(document).ready(function(){initNavTree('classws61850_1_1endpoint_1_1endpoint_1
 Public Member Functions</h2></td></tr>
 <tr class="memitem:abd7961f091188a0c9dcc57f61ec78670" id="r_abd7961f091188a0c9dcc57f61ec78670"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classws61850_1_1endpoint_1_1endpoint_1_1WebSocketEndpoint.html#abd7961f091188a0c9dcc57f61ec78670">__init__</a> (self, tls_config=None, is_direct=False, oauth_enable=False, try_reconnect=True, at_endpoint=None, at_endpoint_tls=None, kc_cert=None, own_cert=None, cert_endpoint=None, token_issuer=None)</td></tr>
 <tr class="separator:abd7961f091188a0c9dcc57f61ec78670"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1bb99868a7b8c2c4288efc10cb0b9de9" id="r_a1bb99868a7b8c2c4288efc10cb0b9de9"><td class="memItemLeft" align="right" valign="top"><a id="a1bb99868a7b8c2c4288efc10cb0b9de9" name="a1bb99868a7b8c2c4288efc10cb0b9de9"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>if_message_is_report</b> (self, message)</td></tr>
-<tr class="separator:a1bb99868a7b8c2c4288efc10cb0b9de9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5b50780b00a2f927716c8befbedf79a2" id="r_a5b50780b00a2f927716c8befbedf79a2"><td class="memItemLeft" align="right" valign="top"><a id="a5b50780b00a2f927716c8befbedf79a2" name="a5b50780b00a2f927716c8befbedf79a2"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>if_message_is_report</b> (self, message, is_ber_protocol=False)</td></tr>
+<tr class="separator:a5b50780b00a2f927716c8befbedf79a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9de103a8d25cd5e16b56c1d9544ef27d" id="r_a9de103a8d25cd5e16b56c1d9544ef27d"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classws61850_1_1endpoint_1_1endpoint_1_1WebSocketEndpoint.html#a9de103a8d25cd5e16b56c1d9544ef27d">stop_passive</a> (self)</td></tr>
 <tr class="separator:a9de103a8d25cd5e16b56c1d9544ef27d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5d8150bfe48d5e198c4b25d69a44a3aa" id="r_a5d8150bfe48d5e198c4b25d69a44a3aa"><td class="memItemLeft" align="right" valign="top"><a id="a5d8150bfe48d5e198c4b25d69a44a3aa" name="a5d8150bfe48d5e198c4b25d69a44a3aa"></a>
@@ -197,6 +198,12 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:aaa1bf07c28a6cc96b70a4587fb31fcc8" id="r_aaa1bf07c28a6cc96b70a4587fb31fcc8"><td class="memItemLeft" align="right" valign="top"><a id="aaa1bf07c28a6cc96b70a4587fb31fcc8" name="aaa1bf07c28a6cc96b70a4587fb31fcc8"></a>
 &#160;</td><td class="memItemRight" valign="bottom"><b>handle_client</b></td></tr>
 <tr class="separator:aaa1bf07c28a6cc96b70a4587fb31fcc8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pro-static-methods" name="pro-static-methods"></a>
+Static Protected Member Functions</h2></td></tr>
+<tr class="memitem:a9b5ebc205b5159ed6ac9c39543acfc87" id="r_a9b5ebc205b5159ed6ac9c39543acfc87"><td class="memItemLeft" align="right" valign="top"><a id="a9b5ebc205b5159ed6ac9c39543acfc87" name="a9b5ebc205b5159ed6ac9c39543acfc87"></a>
+Response&#160;</td><td class="memItemRight" valign="bottom"><b>_http_error_response</b> (HTTPStatus status, bytes body)</td></tr>
+<tr class="separator:a9b5ebc205b5159ed6ac9c39543acfc87"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><pre class="fragment">Class to represent a websocket endpoint
