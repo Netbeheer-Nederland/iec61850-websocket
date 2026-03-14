@@ -1,6 +1,8 @@
 import asyncio
+import logging
+import sys
+from pathlib import Path
 
-from testing.ieds.high_level_model import make_ied_model1
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.server.control_handling import (
     ControlHandlerResult,
@@ -8,6 +10,19 @@ from ws61850.iec61850.server.control_handling import (
 )
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.iec61850.server.service_error import ServiceStatusKind
+
+_project_root = Path(__file__).resolve().parents[3]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from testing.ieds.high_level_model import make_ied_model1  # noqa: E402
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 
 def control_handler_for_float(obj_ref, ctlVal_value, parameter):

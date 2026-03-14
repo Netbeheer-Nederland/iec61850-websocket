@@ -112,15 +112,9 @@ class WebSocketEndpoint:
         self.cert_endpoint = cert_endpoint
         self.token_issuer = token_issuer
 
-    def if_message_is_report(self, message):
-        import json
-
-        data = json.loads(message)
-        top_key = next(iter(data))  # gets the first key from the dict
-        if top_key == "unconfirmed":
-            return True
-        else:
-            return False
+    def if_message_is_report(self, message, is_ber_protocol=False):
+        decoded_message = decode_tpaa_message(message, is_ber_protocol)
+        return decoded_message[0] == "unconfirmed"
 
     async def stop_passive(self):
         """Gracefully stop passive websocket server if running."""
@@ -359,7 +353,7 @@ class WebSocketEndpoint:
                             logger.info(f"Received message: {message}")
                             # logger.info(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
                         if not selected_client.is_connected:
-                            if not self.if_message_is_report(message):
+                            if not self.if_message_is_report(message, websocket_info.is_ber_protocol):
                                 decoded_message = await asyncio.to_thread(
                                     decode_tpaa_message,
                                     message,
@@ -381,7 +375,7 @@ class WebSocketEndpoint:
                                         selected_client.ready_event.set()
 
                         else:
-                            if not self.if_message_is_report(message):
+                            if not self.if_message_is_report(message, websocket_info.is_ber_protocol):
                                 decoded_message = await asyncio.to_thread(
                                     decode_tpaa_message,
                                     message,
@@ -618,7 +612,7 @@ class WebSocketEndpoint:
                                     f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}"
                                 )
                             if not selected_client.is_connected:
-                                if not self.if_message_is_report(message):
+                                if not self.if_message_is_report(message, websocket_info.is_ber_protocol):
                                     decoded_message = await asyncio.to_thread(
                                         decode_tpaa_message,
                                         message,
@@ -639,7 +633,7 @@ class WebSocketEndpoint:
                                             selected_client.ready_event.set()
 
                             else:
-                                if not self.if_message_is_report(message):
+                                if not self.if_message_is_report(message, websocket_info.is_ber_protocol):
                                     decoded_message = await asyncio.to_thread(
                                         decode_tpaa_message,
                                         message,
