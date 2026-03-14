@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import sys
 from pathlib import Path
 
@@ -18,9 +19,16 @@ if str(_project_root) not in sys.path:
 from testing.certs.paths import CERT_DIR  # noqa: E402
 from testing.ieds.high_level_model import make_ied_model1  # noqa: E402
 
-max_message_size = 65000
-
 cafile = CERT_DIR / "ca.pem"
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
+
+max_message_size = 65000
 
 
 def control_handler_for_float(obj_ref, ctlVal_value, parameter):
