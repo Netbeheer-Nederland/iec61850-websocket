@@ -1,15 +1,30 @@
 import asyncio
+import logging
 import os
 import ssl
+import sys
+from pathlib import Path
 
-from testing.certs.paths import CERT_DIR
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.data_model.helper import get_now_time
 from ws61850.security.tls import TLSConfiguration
 
+_project_root = Path(__file__).resolve().parents[3]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from testing.certs.paths import CERT_DIR  # noqa: E402
+
 cert_path = CERT_DIR / "server.pem"
 key_path = CERT_DIR / "server-key.pem"
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 maxMessageSize_server = 65000
 
