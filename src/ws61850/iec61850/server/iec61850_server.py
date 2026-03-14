@@ -268,13 +268,23 @@ class IEC61850Server:
         """
         Function used for getting the parent DataObject of an element
         """
-        return_item = None
-        parent_item = item.parent
-        if isinstance(parent_item, DataObject) is True:
-            return_item = parent_item
-        else:
-            return_item = self.get_do_parent(parent_item)
-        return return_item
+        current_item = item
+        while current_item is not None:
+            if isinstance(current_item, DataObject):
+                return current_item
+            current_item = current_item.parent
+        return None
+
+    def get_control_data_object(self, data_ref, ied):
+        """
+        Resolve control service refs to the owning DataObject.
+        """
+        control_item = find_object_in_tree(data_ref, ied)
+        if isinstance(control_item, DataObject):
+            return control_item
+        if isinstance(control_item, DataAttribute):
+            return self.get_do_parent(control_item)
+        return None
 
     def update_timestamp(self, item):
         """
@@ -784,104 +794,114 @@ class IEC61850Server:
 
             elif service_name == "operate":
                 ref = extract_operate_or_select_ref(decoded_message)
-                control_do = find_object_in_tree(ref, ied)
-                operate_item = next(
-                    (
-                        da
-                        for da in control_do.get_da_from_do_or_da_list()
-                        if da.fc == FunctionalConstraint.co and da.name == "Oper"
-                    ),
-                    None,
-                )
-                if operate_item is None:
+                control_do = self.get_control_data_object(ref, ied)
+                if control_do is None:
                     tpaa_response = create_tpaa_response_operate(
-                        invoke_id, associate_id, False, ControlServiceStatusKind.inconsistentParameters.name, None
+                        invoke_id, associate_id, False, None, ServiceStatusKind.instanceNotAvailable.name
                     )
                     response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
                 else:
-                    server_control_obj = next(
+                    operate_item = next(
                         (
-                            control_obj
-                            for control_obj in self.server_control_objects
-                            if control_obj.data_object.get_objRef() == control_do.get_objRef()
+                            da
+                            for da in control_do.get_da_from_do_or_da_list()
+                            if da.fc == FunctionalConstraint.co and da.name == "Oper"
                         ),
                         None,
                     )
-                    control_da = next((da for da in operate_item.data_attributes if da.name == "ctlVal"), None)
-                    if control_da is not None:
-                        ctl_num = next((da for da in operate_item.data_attributes if da.name == "ctlNum"), None)
-                        ctlVal_tree_item = next(
-                            (da for da in operate_item.data_attributes if da.name == "ctlVal"), None
+                    if operate_item is None:
+                        tpaa_response = create_tpaa_response_operate(
+                            invoke_id, associate_id, False, ControlServiceStatusKind.inconsistentParameters.name, None
                         )
-                        tpaa_response = None
+                        response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                    else:
+                        server_control_obj = next(
+                            (
+                                control_obj
+                                for control_obj in self.server_control_objects
+                                if control_obj.data_object.get_objRef() == control_do.get_objRef()
+                            ),
+                            None,
+                        )
+                        control_da = next((da for da in operate_item.data_attributes if da.name == "ctlVal"), None)
+                        if control_da is not None:
+                            ctl_num = next((da for da in operate_item.data_attributes if da.name == "ctlNum"), None)
+                            ctlVal_tree_item = next(
+                                (da for da in operate_item.data_attributes if da.name == "ctlVal"), None
+                            )
+                            tpaa_response = None
 
-                        if self.control_handler is not None:
-                            ctlVal_request = extract_ctlVal_from_operate_request(decoded_message)
-                            assign_result = assign_da_item(control_da, ctlVal_request, control_da.fc.name)
+                            if self.control_handler is not None:
+                                ctlVal_request = extract_ctlVal_from_operate_request(decoded_message)
+                                assign_result = assign_da_item(control_da, ctlVal_request, control_da.fc.name)
 
-                            if assign_result:
+                                if assign_result:
 
-                                if control_do.get_objRef() == "LD0/DWMX1.WMaxSpt":
-                                    await self.set_quality_to_good(control_do)
+                                    if control_do.get_objRef() == "LD0/DWMX1.WMaxSpt":
+                                        await self.set_quality_to_good(control_do)
 
-                                ctl_val = self.get_ctlVal_value(control_da.get_objRef())
+                                    ctl_val = self.get_ctlVal_value(control_da.get_objRef())
 
-                                result, error = self.control_handler[0](
-                                    control_da.get_objRef(), ctl_val, self.control_handler[1]
-                                )
-
-                                if not server_control_obj.is_selected:
-                                    tpaa_response = create_tpaa_response_operate(
-                                        invoke_id,
-                                        associate_id,
-                                        False,
-                                        None,
-                                        ServiceStatusKind.controlMustBeSelected.name,
+                                    result, error = self.control_handler[0](
+                                        control_da.get_objRef(), ctl_val, self.control_handler[1]
                                     )
-                                    response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
-                                else:
-                                    if result == ControlHandlerResult.OK:
-                                        ctl_num.mmsValue += 1
+
+                                    if not server_control_obj.is_selected:
                                         tpaa_response = create_tpaa_response_operate(
-                                            invoke_id, associate_id, True, None, None
+                                            invoke_id,
+                                            associate_id,
+                                            False,
+                                            None,
+                                            ServiceStatusKind.controlMustBeSelected.name,
                                         )
                                         response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
-
                                     else:
-                                        if isinstance(error, ControlServiceStatusKind):
+                                        if result == ControlHandlerResult.OK:
                                             ctl_num.mmsValue += 1
                                             tpaa_response = create_tpaa_response_operate(
-                                                invoke_id, associate_id, False, error.name, None
+                                                invoke_id, associate_id, True, None, None
                                             )
+                                            response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
 
-                                            response = encode_tpaa_message(
-                                                tpaa_response, websocket_info.is_ber_protocol
-                                            )
+                                        else:
+                                            if isinstance(error, ControlServiceStatusKind):
+                                                ctl_num.mmsValue += 1
+                                                tpaa_response = create_tpaa_response_operate(
+                                                    invoke_id, associate_id, False, error.name, None
+                                                )
+
+                                                response = encode_tpaa_message(
+                                                    tpaa_response, websocket_info.is_ber_protocol
+                                                )
+                                else:
+                                    tpaa_response = create_tpaa_response_operate(
+                                        invoke_id, associate_id, False, None, ServiceStatusKind.typeConflict.name
+                                    )
+                                    response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
                             else:
                                 tpaa_response = create_tpaa_response_operate(
-                                    invoke_id, associate_id, False, None, ServiceStatusKind.typeConflict.name
+                                    invoke_id,
+                                    associate_id,
+                                    False,
+                                    None,
+                                    ServiceStatusKind.failedDueToServerConstraint.name,
                                 )
+
                                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
                         else:
                             tpaa_response = create_tpaa_response_operate(
-                                invoke_id, associate_id, False, None, ServiceStatusKind.failedDueToServerConstraint.name
+                                invoke_id, associate_id, False, None, ServiceStatusKind.instanceNotAvailable.name
                             )
-
                             response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
-                    else:
-                        tpaa_response = create_tpaa_response_operate(
-                            invoke_id, associate_id, False, None, ServiceStatusKind.instanceNotAvailable.name
-                        )
-                        response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
 
             elif service_name == "select":
                 ref = extract_operate_or_select_ref(decoded_message)
-                control_do = find_object_in_tree(ref, ied)
+                control_do = self.get_control_data_object(ref, ied)
                 server_control_obj = next(
                     (
                         control_obj
                         for control_obj in self.server_control_objects
-                        if control_obj.data_object.get_objRef() == control_do.get_objRef()
+                        if control_do is not None and control_obj.data_object.get_objRef() == control_do.get_objRef()
                     ),
                     None,
                 )

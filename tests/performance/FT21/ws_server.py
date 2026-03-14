@@ -1,10 +1,18 @@
 import asyncio
+import logging
+import sys
 import traceback
 
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
-# maxMessageSize_server = 65000
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
+
 
 trgOp_urcb = {
     "dchg": False,
