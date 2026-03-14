@@ -1,11 +1,21 @@
 import asyncio
 import logging
 import sys
+from pathlib import Path
 
-from testing.certs.paths import CERT_DIR
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.data_model.helper import get_now_time
+
+_project_root = Path(__file__).resolve().parents[3]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from testing.certs.paths import CERT_DIR  # noqa: E402
+
+cafile = CERT_DIR / "ca.pem"
+cert_path = CERT_DIR / "server.pem"
+key_path = CERT_DIR / "server-key.pem"
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -67,12 +77,7 @@ urcb.resv = True
 
 
 def callback_called(result, param):
-    logger.info("callback called: ", result)
-
-
-cafile = CERT_DIR / "ca.pem"
-cert_path = CERT_DIR / "server.pem"
-key_path = CERT_DIR / "server-key.pem"
+    logger.info(f"callback called: {result}")
 
 
 async def main():
@@ -136,16 +141,16 @@ async def main():
                     brcb, websocket_info, callback_called, None
                 )
 
-                logger.info("printing the list or returned items from client 1")
-                logger.info("server_list:", server_list)
-                logger.info("ld_directory:", ld_directory)
-                logger.info("ln_directory_ds:", ln_directory_ds)
-                logger.info("ln_directory_do:", ln_directory_do)
-                logger.info("ds_directory:", ds_directory)
-                logger.info("da_def:", da_def)
-                logger.info("da_val:", da_val)
-                logger.info("set_da_res:", set_da_res)
-                logger.info("set_brcb_res:", set_brcb_res)
+                logger.info(f"printing the list or returned items from client {iec61850_client.cp}")
+                logger.info(f"server_list: {server_list}")
+                logger.info(f"ld_directory: {ld_directory}")
+                logger.info(f"ln_directory_ds: {ln_directory_ds}")
+                logger.info(f"ln_directory_do:{ln_directory_do}")
+                logger.info(f"ds_directory: {ds_directory}")
+                logger.info(f"da_def: {da_def}")
+                logger.info(f"da_val: {da_val}")
+                logger.info(f"set_da_res: {set_da_res}")
+                logger.info(f"set_brcb_res: {set_brcb_res}")
 
             except Exception as e:
                 logger.error("handler not called:", e)
