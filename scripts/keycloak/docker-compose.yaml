@@ -1,0 +1,19 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: keycloak-dev
+    command: [ "start-dev", "--import-realm" ]
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      KC_HOSTNAME: localhost
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/server.pem
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/server-key.pem
+    volumes:
+      - ./data:/opt/keycloak/data/import
+      - ../../testing/certs/server.pem:/opt/keycloak/conf/server.pem
+      - ../../testing/certs/server-key.pem:/opt/keycloak/conf/server-key.pem
+

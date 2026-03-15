@@ -1,0 +1,28 @@
+{
+    "report": {
+        "rptId": "RPT1",
+        "sqNum": 1,
+        "entry": [
+            {
+                "idx": 0,
+                "time": 1239493011243,
+                "value": {
+                    "boolean": true
+                },
+                "reason": {
+                    "dchg": true
+                }
+            },
+            {
+                "idx": 1,
+                "time": 1239493011243,
+                "value": {
+                    "boolean": false
+                },
+                "reason": {
+                    "dchg": true
+                }
+            }
+        ]
+    }
+}

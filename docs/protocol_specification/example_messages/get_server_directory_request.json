@@ -1,0 +1,11 @@
+{
+    "request": {
+        "associateId": "id_cp1",
+        "invokeId": 0,
+        "service": {
+            "getServerDirectory": {
+                "objectClass": "logicalDevice"
+            }
+        }
+    }
+}

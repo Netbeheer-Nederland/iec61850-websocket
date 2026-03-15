@@ -1,10 +1,23 @@
 # IEC 61850 WebSocket Proof-of-Concept
 
-This project is a **proof-of-concept (PoC)** that exposes IEC 61850 information and events to modern applications using
-**WebSockets**. It demonstrates how IEC 61850 data can be consumed by web, analytics, or control platforms without requiring IEC 61850
-protocol stacks on the client side.
+⚠️ **Project status:**  
+This repository contains an **experimental proof of concept**.
+It is **not production-ready** and is intended for exploration, learning, and architectural validation.
 
-The PoC is intentionally small, readable, and hackable.
+It contains a reference implementation RealTI-style for IEC 61850 communication over WebSockets.
+
+## Overview
+
+This project explores how **IEC 61850-based information models and messages** can be transported using **modern web
+technologies**, specifically **WebSockets**, while remaining aligned with:
+
+- IEC 61850 concepts and data modeling
+- ASN.1-based encoding/decoding
+- Secure communication patterns (TLS, OAuth-based concepts)
+- Event-driven, asynchronous communication
+
+The codebase is intentionally kept small and explicit, serving as a **reference and discussion vehicle**, not a full
+protocol stack.
 
 ---
 
@@ -12,10 +25,21 @@ The PoC is intentionally small, readable, and hackable.
 
 IEC 61850 is powerful but traditionally bound to MMS/TCP, and this PoC shows how to:
 
-- Acquire or simulate IEC 61850 data
-- Map it to a simple JSON representation
-- Publish updates over WebSockets
-- Enable near-real-time consumption by web UIs, dashboards, or integration services
+### In scope
+
+- ASN.1 schema loading and message encoding/decoding
+- WebSocket-based client/server communication
+- Demonstration of message flows
+- Security concepts at PoC level
+- Clear separation between protocol, transport, and examples
+
+### Explicitly out of scope
+
+- Production-grade robustness
+- Performance optimization (however a performance test is a key goal for this PoC)
+- Complete IEC 61850 profile coverage
+- Formal conformance testing
+- Long-term API stability
 
 ---
 
@@ -40,19 +64,6 @@ IEC 61850 is powerful but traditionally bound to MMS/TCP, and this PoC shows how
 
 ---
 
-## Project goals (PoC scope)
-
-✔ Simple, readable Python code  
-✔ Explicit separation of concerns  
-✔ Push-based (event driven) updates  
-✔ No heavy IEC 61850 stack required on the client
-
-🚫 Not production-ready  
-🚫 No full IEC 61850 conformance  
-🚫 Security kept intentionally minimal
-
----
-
 ## Repository structure
 
 ```
@@ -61,46 +72,86 @@ iec61850-websocket/
 ├─ README.md
 ├─ src/
 │  └─ ws61850/
-│     ├─ __init__.py
-│     ├─ iec61850/
-│     │  ├─ client/
-│     │  ├─ server/
-│     │  ├─ data_model/
-│     │  └─ __init__.py
-│     ├─ endpoint/
+│     ├─ iec61850/                 # Client/server logic and IEC 61850 data model helpers
+│     │  ├─ client/                # IEC 61850 WebSocket client implementations
+│     │  ├─ server/                # IEC 61850 WebSocket server implementations
+│     │  ├─ data_model/            # IEC 61850 data model abstractions and helpers
+│     ├─ endpoint/                 # WebSocket endpoint implementation
 │     ├─ security/
-│     │  ├─ tls.py
-│     │  └─ oauth.py
-│     └─ asn1/
-├─ tests/
-│  ├─ unit/
-│  ├─ integration/
-│  ├─ performance/
-│  └─ conftest.py
-├─ examples/
-├─ docs/
-└─ scripts/
+│     │  ├─ tls.py                 # TLS configuration container and helpers
+│     │  └─ oauth.py               # OAuth utilities for client identification
+│     └─ asn1/                     # ASN.1 schema, encode/decode, formatters, and tests
+├─ tests/                          # Functional and performance-oriented test suites
+│  ├─ unit/                        # Unit-level tests (in progress)
+│  ├─ integration/                 # Integration and protocol-level tests
+│  ├─ performance/                 # Performance and load tests
+│  └─ security/                    # Security tests
+├─ examples/                       # Example clients/servers and interactive demos
+├─ docs/                           # Generated and hand-written documentation (e.g. Doxygen, specs)
+│  └─ protocol_specification/      # IEC61850 WebSocket protocol specification
+└─ scripts/                        # Helper scripts (setup, tooling, test helpers)
 ```
+
 ---
 
 ## Getting started
 
-### 1. Prerequisites
+### Prerequisites
 
-- Python **3.10+**
-- `uv` **or** `pip`
+- **UV** - [Install UV](https://docs.astral.sh/uv/getting-started/installation/)
+- **Python 3.10-3.12** (3.12 recommended) - [Download Python](https://www.python.org/downloads/)
+- **Git** - [Install Git](https://git-scm.com/downloads)
+- **Docker** - [Install Docker](https://docs.docker.com/get-docker/)
+- **Docker Compose** - [Install Docker Compose](https://docs.docker.com/compose/install/)
+- **cfssl** - [Install cfssl](https://github.com/cloudflare/cfssl/releases) – used for TLS certificate generation
+- **doxygen** - [Install doxygen](https://www.doxygen.nl) - used to generate documentation (optional)
+
 - Basic understanding of:
-  - Async Python
-  - WebSockets
-  - IEC 61850 terminology (Logical Node, Data Object)
+    - Async Python
+    - WebSockets
+    - IEC 61850 terminology (Logical Node, Data Object)
 
 ---
 
-### 2. Setup environment
+### Setup environment
 
-Using **uv** (recommended):
+```shell
+# Clone the repository
+# 1. Clone and enter the project
+git clone https://github.com/Netbeheer-Nederland/iec61850-websocket.git
+cd iec61850-websocket
+```
 
 ```bash
+# 2. Create and activate a virtual environment
 uv venv
 uv sync
+```
+
+```bash
+# 3. Build the project
+uv build
+```
+
+---
+
+## Examples
+
+Example clients, servers, and interactive demos live under the `examples/` directory in this repository. It also
+describes how to run them in the [README](examples/README.md).
+
+## Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull
+requests to us.
+
+## License
+
+This project is licensed under the Apache License, version 2.0 – see LICENSE for details
+
+## Licenses third-party code
+
+This project includes third-party code, which is licensed under their own respective Open-Source licenses.
+SPDX-License-Identifier headers are used to show which license is applicable. The concerning license files can be found
+in the LICENSES directory in the root of the documentation. 
 
