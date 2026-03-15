@@ -1,23 +1,135 @@
-## FT21: Verify JER encoding
+# FT21: Verify JER Encoding
 
-This test verifies IEC 61850 communication over WebSocket using JER encoding (`iec61850-tpaa-jer-v1`).
+## Scope
 
-## Test design
+This document describes how to run the FT21 scenario that verifies IEC 61850 communication over WebSocket using JER
+encoding with the `iec61850-tpaa-jer-v1` subprotocol.
 
-- `ws_server_jer.py` starts a passive endpoint on `localhost:8765` with JER protocol enabled.
-- `ws_client_jer.py` starts an active endpoint for `cp1` with JER protocol enabled.
-- The passive test script (`ws_server_jer.py`) runs service calls after connection:
-  - directory and data model reads
-  - data write (`set_data_values`)
-  - control workflow (`select` and `operate`)
-  - report control configuration (`set_URCB_values`)
+The current FT21 flow is implemented by:
 
-## How to run
+- `tests/performance/FT21/ws_server.py`
+- `tests/performance/FT21/ws_client.py`
 
-1. Start `ws_server_jer.py`.
-2. Start `ws_client_jer.py`.
+## What the test starts
 
-## Notes
+`ws_server.py`:
 
-- Both scripts must use the same JER protocol list: `["iec61850-tpaa-jer-v1"]`.
-- The current FT21 client script only starts `cp1`; `cp2` is registered in `ws_server_jer.py` but not exercised by `ws_client_jer.py`.
+- starts a passive endpoint on `localhost:8765`
+- enables the JER WebSocket subprotocol
+- registers IEC 61850 clients `cp1` and `cp2`
+- runs IEC 61850 service calls against `cp1` after the connection is ready
+
+`ws_client.py`:
+
+- starts an active endpoint for `cp1`
+- enables the same JER WebSocket subprotocol
+- hosts an IEC 61850 server model built from `testing.ieds.high_level_model.make_ied_model1()`
+- starts periodic reporting for the connected server instance
+
+## Prerequisites
+
+Install the project dependencies from the repository root:
+
+```bash
+uv sync
+```
+
+No Keycloak setup is required for FT21.
+
+No TLS certificate setup is required for FT21.
+
+## Supported configuration
+
+The FT21 scripts currently use these fixed values:
+
+| Setting               | Value                    |
+|-----------------------|--------------------------|
+| WebSocket server host | `localhost`              |
+| WebSocket server port | `8765`                   |
+| WebSocket subprotocol | `iec61850-tpaa-jer-v1`   |
+| Passive-side clients  | `cp1`, `cp2`             |
+| Active-side server    | `cp1`                    |
+
+The current FT21 scripts do not expose command-line options or environment variables for these values.
+
+## Run the FT21 passive side
+
+Open a terminal in the repository root and start the passive endpoint:
+
+```bash
+uv run python tests/performance/FT21/ws_server.py
+```
+
+Current passive-side behavior:
+
+- listens on `ws://localhost:8765`
+- waits for `cp1` to become ready
+- issues these IEC 61850 operations after the connection is established:
+  - server directory read
+  - logical device, logical node, dataset, and data definition reads
+  - data write with `set_data_values`
+  - control sequence with `select` and `operate`
+  - data readback with `get_data_values`
+  - report control configuration with `set_URCB_values`
+
+## Run the FT21 active side
+
+In another terminal, start the active endpoint:
+
+```bash
+uv run python tests/performance/FT21/ws_client.py
+```
+
+Current active-side behavior:
+
+- connects as `cp1` to `localhost:8765`
+- exposes the sample IEC 61850 server data model
+- uses a control handler that accepts float control values below `50`
+- starts periodic report generation while connected
+
+## Expected result
+
+When FT21 is configured correctly:
+
+- the passive endpoint starts on `ws://localhost:8765`
+- the active endpoint connects successfully using `iec61850-tpaa-jer-v1`
+- the passive script completes the JER-encoded IEC 61850 request flow against `cp1`
+- the control operation and URCB configuration requests are handled without protocol mismatch errors
+
+Useful log indicators:
+
+- passive-side logs show the connection reaching the ready state
+- passive-side logs show the service calls progressing after connection setup
+- active-side logs show the `cp1` connection and periodic reporting activity
+
+## Troubleshooting
+
+If the peers do not connect:
+
+- verify `ws_server.py` is running before `ws_client.py`
+- verify both scripts still use `localhost:8765`
+- verify both sides still use `iec61850-tpaa-jer-v1`
+
+If the control operation fails:
+
+- verify the control handler in `ws_client.py` still accepts the requested float value
+- verify the sample data model from `make_ied_model1()` still exposes the referenced control objects
+
+If you expect `cp2` traffic:
+
+- note that `cp2` is registered by `ws_server.py` but the current FT21 client script only starts `cp1`
+
+## Minimal run sequence
+
+From the repository root:
+
+```bash
+uv sync
+uv run python tests/performance/FT21/ws_server.py
+```
+
+In another terminal:
+
+```bash
+uv run python tests/performance/FT21/ws_client.py
+```

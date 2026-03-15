@@ -1,16 +1,41 @@
+# SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright 2025 Netbeheer Nederland
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import ast
 import asyncio
+import logging
 import re
+import sys
 
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.data_model.helper import get_now_time
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
+
 maxMessageSize_server = 65000
 
 
 def callback_called(result, param):
-    print("callback called: ", result)
+    logger.info("callback called: %s", result)
 
 
 def extract_function_name_and_arguments(input):
@@ -29,8 +54,8 @@ def extract_function_name_and_arguments(input):
                 # If it's not a literal (e.g. variable name), keep as string
                 val = arg
             args.append(val)
-    # print("func_name: ", func_name)
-    # print("args: ", args)
+    # logger.info("func_name: ", func_name)
+    # logger.info("args: ", args)
     return func_name, args
 
 
@@ -51,8 +76,38 @@ def parse_command(command: str):
     return func_name, args, kwargs
 
 
-async def async_input(prompt: str = ""):
-    return await asyncio.to_thread(input, prompt)
+async def async_input(prompt: str, disconnect_event: asyncio.Event):
+    loop = asyncio.get_running_loop()
+    input_future = loop.create_future()
+
+    def on_input_ready():
+        try:
+            line = sys.stdin.readline()
+        except Exception as exc:
+            if not input_future.done():
+                input_future.set_exception(exc)
+            return
+        if not input_future.done():
+            input_future.set_result(line.rstrip("\n"))
+
+    print(prompt, end="", flush=True)
+    loop.add_reader(sys.stdin, on_input_ready)
+
+    disconnect_task = asyncio.create_task(disconnect_event.wait())
+    try:
+        done, _ = await asyncio.wait(
+            {input_future, disconnect_task},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if disconnect_task in done:
+            if not input_future.done():
+                input_future.cancel()
+            print()
+            return None
+        return input_future.result()
+    finally:
+        loop.remove_reader(sys.stdin)
+        disconnect_task.cancel()
 
 
 async def main():
@@ -69,146 +124,129 @@ async def main():
 
     server_task = asyncio.create_task(ep_wsServer.start("passive", "localhost", 8765))
 
-    await ep_wsServer.client_list[0].ready_event.wait()
-    if ep_wsServer.client_list[0].is_connected is True:
-        websocket_info = ep_wsServer.get_websocket_info(ep_wsServer.client_list[0])
-        if websocket_info is not None:
-            while True:
-                try:
-                    # input_command = input("Please enter the command: ")
-                    input_command = await async_input("Please enter the command: ")
+    selected_client = ep_wsServer.client_list[0]
+    while True:
+        await selected_client.ready_event.wait()
+        if not selected_client.is_connected:
+            continue
 
-                    # print("the input is: ", input_command)
-                    function_name, args = extract_function_name_and_arguments(input_command)
-                    if function_name == "get_server_directory":
-                        server_list = await ep_wsServer.client_list[0].get_server_directory(websocket_info, None, None)
-                        print("server directory: ", server_list)
-                    elif function_name == "get_logical_device_directory":
-                        ln_refs = await ep_wsServer.client_list[0].get_logical_device_directory(
-                            args[0], websocket_info, None, None
-                        )
-                        print("LN list: ", ln_refs)
-                    elif function_name == "get_logical_node_directory":
-                        ln_directory_items = await ep_wsServer.client_list[0].get_logical_node_directory(
-                            args[0], args[1], args[2], websocket_info, None, None
-                        )
-                        print("LN directory: ", ln_directory_items)
-                    elif function_name == "get_data_definition":
-                        da_def = await ep_wsServer.client_list[0].get_data_definition(
-                            args[0], websocket_info, None, None
-                        )
-                        print(da_def)
-                    elif function_name == "get_data_values":
-                        data_val = await ep_wsServer.client_list[0].get_data_values(
-                            args[0], args[1], args[2], websocket_info, None, None
-                        )
-                        print("data value: ", data_val)
-                    elif function_name == "select":
-                        select_result = await ep_wsServer.client_list[0].select(args[0], websocket_info, None, None)
-                        print(select_result)
+        selected_client.disconnect_event.clear()
+        websocket_info = ep_wsServer.get_websocket_info(selected_client)
+        if websocket_info is None:
+            continue
 
-                    elif function_name == "operate":
-                        values = {
-                            "ref": args[0],
-                            "ctlVal": (
-                                "structure",
-                                {"data": [("structure", {"data": [(args[1], args[2])]})]},
-                            ),
-                            "origin": {
-                                "orCat": "stationControl",
-                                "orIdent": b"CONSOLE_APPLICATION_ID",
-                            },
-                            "ctlNum": ctl_num,
-                            "t": get_now_time(),
-                        }
-                        ctl_num += 1
-                        operate_res = await ep_wsServer.client_list[0].operate(values, websocket_info, None, None)
-                        print("operate result: ", operate_res)
+        logger.info("Client connected, console input enabled")
+        while selected_client.is_connected:
+            try:
+                input_command = await async_input("\nPlease enter the command: ", selected_client.disconnect_event)
+                if input_command is None:
+                    logger.info("Client disconnected, console input disabled")
+                    break
 
-                    elif function_name == "set_data_values":
-                        value = [{"data": (args[2], args[3])}]
-                        set_data_val_result = await ep_wsServer.client_list[0].set_data_values(
-                            args[0], args[1], value, websocket_info, None, None
-                        )
-                        print("set data values result: ", set_data_val_result)
-                    elif function_name == "get_dataset_directory":
-                        ds_directory = await ep_wsServer.client_list[0].get_dataset_directory(
-                            args[0], args[1], args[2], websocket_info, None, None
-                        )
-                        print("dataset directory: ", ds_directory)
-                    elif function_name == "get_BRCB_values":
-                        brcb_val = await ep_wsServer.client_list[0].get_BRCB_values(args[0], websocket_info, None, None)
-                        print("brcb value: ", brcb_val)
+                function_name, args = extract_function_name_and_arguments(input_command)
+                if function_name == "get_server_directory":
+                    server_list = await selected_client.get_server_directory(websocket_info, None, None)
+                    logger.info("server directory: %s", server_list)
+                elif function_name == "get_logical_device_directory":
+                    ln_refs = await selected_client.get_logical_device_directory(
+                        args[0], websocket_info, None, None
+                    )
+                    logger.info("LN list: %s", ln_refs)
+                elif function_name == "get_logical_node_directory":
+                    ln_directory_items = await selected_client.get_logical_node_directory(
+                        args[0], args[1], args[2], websocket_info, None, None
+                    )
+                    logger.info("LN directory: %s", ln_directory_items)
+                elif function_name == "get_data_definition":
+                    da_def = await selected_client.get_data_definition(args[0], websocket_info, None, None)
+                    logger.info(da_def)
+                elif function_name == "get_data_values":
+                    data_val = await selected_client.get_data_values(args[0], args[1], args[2], websocket_info, None, None)
+                    logger.info("data value: %s", data_val)
+                elif function_name == "select":
+                    select_result = await selected_client.select(args[0], websocket_info, None, None)
+                    logger.info(select_result)
+                elif function_name == "operate":
+                    values = {
+                        "ref": args[0],
+                        "ctlVal": (
+                            "structure",
+                            {"data": [("structure", {"data": [(args[1], args[2])]})]},
+                        ),
+                        "origin": {
+                            "orCat": "stationControl",
+                            "orIdent": b"CONSOLE_APPLICATION_ID",
+                        },
+                        "ctlNum": ctl_num,
+                        "t": get_now_time(),
+                    }
+                    ctl_num += 1
+                    operate_res = await selected_client.operate(values, websocket_info, None, None)
+                    logger.info("operate result: %s", operate_res)
+                elif function_name == "set_data_values":
+                    value = [{"data": (args[2], args[3])}]
+                    set_data_val_result = await selected_client.set_data_values(
+                        args[0], args[1], value, websocket_info, None, None
+                    )
+                    logger.info("set data values result: %s", set_data_val_result)
+                elif function_name == "get_dataset_directory":
+                    ds_directory = await selected_client.get_dataset_directory(
+                        args[0], args[1], args[2], websocket_info, None, None
+                    )
+                    logger.info("dataset directory: %s", ds_directory)
+                elif function_name == "get_BRCB_values":
+                    brcb_val = await selected_client.get_BRCB_values(args[0], websocket_info, None, None)
+                    logger.info("brcb value: %s", brcb_val)
+                elif function_name == "get_URCB_values":
+                    urcb_val = await selected_client.get_URCB_values(args[0], websocket_info, None, None)
+                    logger.info(urcb_val)
+                elif function_name == "get_dataset_values":
+                    ds_values = await selected_client.get_dataset_values(
+                        args[0], args[1], args[2], websocket_info, None, None
+                    )
+                    logger.info("dataset values: %s", ds_values)
+                elif function_name == "set_BRCB_values":
+                    func, args, kwargs = parse_command(input_command)
 
-                    elif function_name == "get_URCB_values":
-                        urcb_val = await ep_wsServer.client_list[0].get_URCB_values(args[0], websocket_info, None, None)
-                        print(urcb_val)
-
-                    elif function_name == "get_dataset_values":
-                        ds_values = await ep_wsServer.client_list[0].get_dataset_values(
-                            args[0], args[1], args[2], websocket_info, None, None
-                        )
-                        print("dataset values: ", ds_values)
-                    elif function_name == "set_BRCB_values":
-                        func, args, kwargs = parse_command(input_command)
-
-                        # print("func_name:", func)
-                        # print("args:", args)
-                        # print("kwargs:", kwargs)
-
-                        brcb = IEC61850Client.ClientReportControlBlock(args[0], True)
-                        # key, value = args[1].split("=", 1)
-                        key, value = next(iter(kwargs.items()))
-                        for attr in dir(brcb):
-                            if attr.lower() == key.lower():
-                                # only evaluate if it's a string
-                                if isinstance(value, str):
-                                    try:
-                                        value = ast.literal_eval(value)
-                                    except Exception:
-                                        pass  # leave as string if not a literal
-                                setattr(brcb, attr, value)
-                                break
-                        else:
-                            print(f"Warning: No matching attribute found for {key}")
-
-                        set_brcb_res = await ep_wsServer.client_list[0].set_BRCB_values(
-                            brcb, websocket_info, None, None
-                        )
-                        print("set brcb result: ", set_brcb_res)
-
-                    elif function_name == "set_URCB_values":
-                        func, args, kwargs = parse_command(input_command)
-
-                        urcb = IEC61850Client.ClientReportControlBlock(args[0], False)
-                        # key, value = args[1].split("=", 1)
-                        key, value = next(iter(kwargs.items()))
-                        for attr in dir(urcb):
-                            if attr.lower() == key.lower():
-                                # only evaluate if it's a string
-                                if isinstance(value, str):
-                                    try:
-                                        value = ast.literal_eval(value)
-                                    except Exception:
-                                        pass  # leave as string if not a literal
-                                setattr(urcb, attr, value)
-                                break
-                        else:
-                            print(f"Warning: No matching attribute found for {key}")
-
-                        set_urcb_res = await ep_wsServer.client_list[0].set_URCB_values(
-                            urcb, websocket_info, None, None
-                        )
-                        print("set urcb result: ", set_urcb_res)
-
+                    brcb = IEC61850Client.ClientReportControlBlock(args[0], True)
+                    key, value = next(iter(kwargs.items()))
+                    for attr in dir(brcb):
+                        if attr.lower() == key.lower():
+                            if isinstance(value, str):
+                                try:
+                                    value = ast.literal_eval(value)
+                                except Exception:
+                                    pass
+                            setattr(brcb, attr, value)
+                            break
                     else:
-                        print("Incorrect command, please try again!")
+                        logger.info("Warning: No matching attribute found for %s", key)
 
-                except Exception as e:
-                    print("error in processing the request:", e)
+                    set_brcb_res = await selected_client.set_BRCB_values(brcb, websocket_info, None, None)
+                    logger.info("set brcb result: %s", set_brcb_res)
+                elif function_name == "set_URCB_values":
+                    func, args, kwargs = parse_command(input_command)
 
-    else:
-        print("did not enter first if ")
+                    urcb = IEC61850Client.ClientReportControlBlock(args[0], False)
+                    key, value = next(iter(kwargs.items()))
+                    for attr in dir(urcb):
+                        if attr.lower() == key.lower():
+                            if isinstance(value, str):
+                                try:
+                                    value = ast.literal_eval(value)
+                                except Exception:
+                                    pass
+                            setattr(urcb, attr, value)
+                            break
+                    else:
+                        logger.info("Warning: No matching attribute found for %s", key)
+
+                    set_urcb_res = await selected_client.set_URCB_values(urcb, websocket_info, None, None)
+                    logger.info("set urcb result: %s", set_urcb_res)
+                else:
+                    logger.info("Incorrect command, please try again!")
+            except Exception as e:
+                logger.info("error in processing the request: %s", e)
 
     await server_task
 

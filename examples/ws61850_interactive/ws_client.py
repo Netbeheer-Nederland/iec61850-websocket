@@ -1,4 +1,22 @@
+# SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright 2025 Netbeheer Nederland
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import asyncio
+import logging
+import sys
 from random import randint
 
 from ws61850.endpoint.endpoint import WebSocketEndpoint
@@ -10,12 +28,19 @@ from ws61850.iec61850.server.control_handling import (
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.iec61850.server.service_error import ServiceStatusKind
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
+
 
 async def toggle_custom_value(iec61150_server, obj_ref):
     while True:
         value = randint(1, 5)
         await iec61150_server.update_value(obj_ref, value)
-        print(f"Value of {obj_ref} changed to {value}")
+        logger.info(f"Value of {obj_ref} changed to {value}")
         await asyncio.sleep(5)
 
 
@@ -29,7 +54,7 @@ async def toggle_quality_value(iec61150_server, obj_ref):
             "operatorBlock": random_operate_Block,
         }
         await iec61150_server.update_value(obj_ref, value)
-        print(f"Value of {obj_ref} changed to {value}")
+        logger.info(f"Value of {obj_ref} changed to {value}")
         await asyncio.sleep(5)
 
 

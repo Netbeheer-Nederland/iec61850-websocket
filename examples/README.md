@@ -48,15 +48,12 @@ The mode is equal to the directory name.
 
 The interactive command line mode interface is also available.
 
-### Execute
+See `examples/ws61850_interactive/README.md` for a dedicated runbook covering the interactive server, client, launcher,
+supported commands, and troubleshooting:
 
-The websocket server and client run together.
+- `examples/ws61850_interactive/README.md`: interactive IEC 61850 WebSocket example with a console prompt on the
+  passive side that is enabled only while a client is connected
 
-```bash
-python examples/ws61850_interactive/console_app.py
-```
-
-By running the console_app.py, the user can use a terminal to send requests and receive the respective responses.
 Running this example will establish a websocket connection between IEC61850 Server(WS Client) and IEC61850 Client(WS
 Server). It is also possible to run ws_server.py and ws_client.py separately for more comprehensible logs.  
 For the requests to be sent correctly and without error, it is important to follow the exact template of each command. A

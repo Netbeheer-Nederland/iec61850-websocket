@@ -1,12 +1,34 @@
+# SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright 2025 Netbeheer Nederland
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import argparse
 import asyncio
 import logging
 import os
 import sys
+from pathlib import Path
 
-from testing.ieds.high_level_model import make_ied_model1
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
+
+_project_root = Path(__file__).resolve().parents[3]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from testing.ieds.high_level_model import make_ied_model1  # noqa: E402
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(

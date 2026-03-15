@@ -135,6 +135,22 @@ uv build
 
 ---
 
+## Running tests
+
+The functional and performance scenarios in `tests/` are intended to be run from the repository root with `uv`.
+Start by installing dependencies with `uv sync`, then open the markdown description for the scenario you want to run in
+`tests/integration/`, `tests/performance/`, or `tests/security/`.
+
+Most tests follow the same pattern: start the passive side first, for example
+`uv run python tests/performance/FT20/ws_server.py`, and then start the active side in
+another terminal, for example `uv run python tests/performance/FT20/ws_client.py`.
+
+Some scenarios also require extra setup such as generated TLS certificates in `testing/certs/` or a local Keycloak
+instance started with `docker compose -f scripts/keycloak/docker-compose.yaml up`; those prerequisites are documented in
+the corresponding test markdown files.
+
+---
+
 ## Examples
 
 Example clients, servers, and interactive demos live under the `examples/` directory in this repository. It also
@@ -154,4 +170,3 @@ This project is licensed under the Apache License, version 2.0 – see LICENSE f
 This project includes third-party code, which is licensed under their own respective Open-Source licenses.
 SPDX-License-Identifier headers are used to show which license is applicable. The concerning license files can be found
 in the LICENSES directory in the root of the documentation. 
-

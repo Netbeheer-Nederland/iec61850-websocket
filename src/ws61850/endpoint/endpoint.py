@@ -27,10 +27,11 @@ import websockets
 from jwt import (
     ExpiredSignatureError,
     InvalidTokenError,
-    PyJWKClient,
     algorithms,
     decode,
 )
+from websockets.datastructures import Headers
+from websockets.http11 import Response
 from websockets.asyncio.server import serve
 
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
@@ -112,15 +113,17 @@ class WebSocketEndpoint:
         self.cert_endpoint = cert_endpoint
         self.token_issuer = token_issuer
 
-    def if_message_is_report(self, message):
-        import json
+    def if_message_is_report(self, message, is_ber_protocol=False):
+        decoded_message = decode_tpaa_message(message, is_ber_protocol)
+        return decoded_message[0] == "unconfirmed"
 
-        data = json.loads(message)
-        top_key = next(iter(data))  # gets the first key from the dict
-        if top_key == "unconfirmed":
-            return True
-        else:
-            return False
+    @staticmethod
+    def _http_error_response(status: HTTPStatus, body: bytes) -> Response:
+        headers = Headers()
+        headers["Content-Type"] = "text/plain; charset=utf-8"
+        headers["Content-Length"] = str(len(body))
+        headers["Connection"] = "close"
+        return Response(status.value, status.phrase, headers, body)
 
     async def stop_passive(self):
         """Gracefully stop passive websocket server if running."""
@@ -359,7 +362,7 @@ class WebSocketEndpoint:
                             logger.info(f"Received message: {message}")
                             # logger.info(f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}")
                         if not selected_client.is_connected:
-                            if not self.if_message_is_report(message):
+                            if not self.if_message_is_report(message, websocket_info.is_ber_protocol):
                                 decoded_message = await asyncio.to_thread(
                                     decode_tpaa_message,
                                     message,
@@ -381,7 +384,7 @@ class WebSocketEndpoint:
                                         selected_client.ready_event.set()
 
                         else:
-                            if not self.if_message_is_report(message):
+                            if not self.if_message_is_report(message, websocket_info.is_ber_protocol):
                                 decoded_message = await asyncio.to_thread(
                                     decode_tpaa_message,
                                     message,
@@ -476,51 +479,56 @@ class WebSocketEndpoint:
         headers = request_headers.headers
         auth_header = headers.get("Authorization")
 
-        if auth_header:
-            token = auth_header[len("Bearer ") :]
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Missing or invalid token\n")
 
-            session = requests.Session()
-            # session.cert = ("/home/raspberry/Desktop/rti2_protocol_spec/exploration/certs/server_ws.crt",
-            #            "/home/raspberry/Desktop/rti2_protocol_spec/exploration/certs/server_ws.key" )
-            # jwks_url = "https://localhost:8443/realms/master/protocol/openid-connect/certs"
-            jwks_url = self.cert_endpoint
-            session.verify = self.kc_cert
+        token = auth_header[len("Bearer ") :]
+
+        session = requests.Session()
+        jwks_url = self.cert_endpoint
+        session.verify = self.kc_cert
+
+        try:
             response = session.get(jwks_url)
-
+            response.raise_for_status()
             jwks_data = response.json()
-            jwks_client = PyJWKClient("https://dummy-url")
-            jwks_client._jwks_data = jwks_data
-            header = jwt.get_unverified_header(token)  # Extract 'kid' from token
+        except (requests.RequestException, ValueError) as e:
+            logger.error(f"Failed to retrieve JWKS data: {e}")
+            return self._http_error_response(HTTPStatus.SERVICE_UNAVAILABLE, b"Token verification unavailable\n")
+
+        try:
+            header = jwt.get_unverified_header(token)
             kid = header["kid"]
-            jwk = next(key for key in jwks_data["keys"] if key["kid"] == kid)
+            jwk = next(key for key in jwks_data.get("keys", []) if key.get("kid") == kid)
             signing_key = algorithms.RSAAlgorithm.from_jwk(jwk)
+        except (InvalidTokenError, KeyError, StopIteration, TypeError, ValueError) as e:
+            logger.warning(f"Invalid token header or signing key: {e}")
+            return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Invalid token\n")
 
-            try:
-                decoded = decode(
-                    token,
-                    signing_key,
-                    algorithms=[get_jwt_algorithm(token)],
-                    audience="account",
-                    issuer=self.token_issuer,
-                )
+        try:
+            decoded = decode(
+                token,
+                signing_key,
+                algorithms=[get_jwt_algorithm(token)],
+                audience="account",
+                issuer=self.token_issuer,
+            )
 
-                self.access_token_list.append(
-                    {
-                        "access_token": decoded,
-                        "cp": path.request.path.lstrip("/"),
-                        "access_token_raw": token,
-                    }
-                )
+            self.access_token_list.append(
+                {
+                    "access_token": decoded,
+                    "cp": path.request.path.lstrip("/"),
+                    "access_token_raw": token,
+                }
+            )
 
-            except ExpiredSignatureError:
-                logger.warning("Token has expired")
-                return HTTPStatus.FORBIDDEN, [], b"Expired token\n"
+        except ExpiredSignatureError:
+            logger.warning("Token has expired")
+            return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Expired token\n")
 
-            except InvalidTokenError as e:
-                logger.warning("Invalid token:", e)
-                return HTTPStatus.FORBIDDEN, [], b"Invalid token\n"
-        else:
-            return HTTPStatus.UNAUTHORIZED, [], b"Missing or invalid token\n"
+        except InvalidTokenError as e:
+            logger.warning(f"Invalid token: {e}")
+            return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Invalid token\n")
 
     async def start(self, mode, hostname, port, cp=None, access_token=None, protocol=None, *arg):
         if mode == "passive":
@@ -618,7 +626,7 @@ class WebSocketEndpoint:
                                     f"Received message: {decode_tpaa_message(message, websocket_info.is_ber_protocol)}"
                                 )
                             if not selected_client.is_connected:
-                                if not self.if_message_is_report(message):
+                                if not self.if_message_is_report(message, websocket_info.is_ber_protocol):
                                     decoded_message = await asyncio.to_thread(
                                         decode_tpaa_message,
                                         message,
@@ -639,7 +647,7 @@ class WebSocketEndpoint:
                                             selected_client.ready_event.set()
 
                             else:
-                                if not self.if_message_is_report(message):
+                                if not self.if_message_is_report(message, websocket_info.is_ber_protocol):
                                     decoded_message = await asyncio.to_thread(
                                         decode_tpaa_message,
                                         message,

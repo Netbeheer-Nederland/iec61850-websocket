@@ -27,7 +27,7 @@ dependencies = [
     "certifi== 2026.1.4",
     "cffi == 2.0.0",
     "charset-normalizer == 3.4.4",
-    "cryptography == 46.0.2",
+    "cryptography == 46.0.5",
     "idna == 3.11",
     "pycparser == 2.23",
     "pyjwt == 2.10.1",
