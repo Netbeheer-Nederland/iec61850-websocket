@@ -134,7 +134,7 @@ If the peers do not connect:
 If the prompt does not appear:
 
 - verify the client reached the connected state
-- verify you started `ws_server.py` directly or through `console_app.py`
+- verify you started `ws_server.py` directly
 - note that the prompt is intentionally hidden until `cp1` is connected
 
 If a control operation fails:
