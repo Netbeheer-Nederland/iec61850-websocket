@@ -31,18 +31,12 @@ from jwt import (
     algorithms,
     decode,
 )
-from websockets.datastructures import Headers
-from websockets.http11 import Response
-from websockets.http11 import Request
 from websockets.asyncio.server import serve
+from websockets.datastructures import Headers
+from websockets.http11 import Request, Response
 
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
 from ws61850.iec61850.client.request_handling import create_tpaa_associate_request
-from ws61850.shared.extractors import (
-    extract_associate_request_type,
-    retrieve_associate_id_from_decoded_msg,
-    retrieve_max_outstanding_calls_from_decoded_msg,
-)
 from ws61850.iec61850.server.response_handling import (
     create_tpaa_abort_response,
     create_tpaa_associate_response,
@@ -50,22 +44,18 @@ from ws61850.iec61850.server.response_handling import (
 )
 from ws61850.iec61850.server.service_error import ServiceStatusKind
 from ws61850.security.oauth import check_token_validity_and_expiry, get_jwt_algorithm
+from ws61850.shared.extractors import (
+    extract_associate_request_type,
+    retrieve_associate_id_from_decoded_msg,
+    retrieve_max_outstanding_calls_from_decoded_msg,
+)
+
+from ws61850.endpoint.base import EndpointProtocol, WebSocketInfo  # re-exported for callers
 
 logger = logging.getLogger(__name__)
 
 max_message_size = 65000
 max_message_size_server = 65000
-
-
-class WebSocketInfo:
-    def __init__(self, websocket, associate_id, cp=None, access_token=None):
-        self.websocket = websocket
-        self.associate_id = associate_id
-        self.invoke_id = 0
-        self.cp = cp
-        self.expiry_task = None
-        self.access_token = access_token
-        self.is_ber_protocol = False
 
 
 class _WebSocketServerLogger(logging.LoggerAdapter):
@@ -78,11 +68,7 @@ class _WebSocketServerLogger(logging.LoggerAdapter):
         if isinstance(exc, tuple):
             exc = exc[1]
 
-        if (
-            msg == "opening handshake failed"
-            and isinstance(exc, EOFError)
-            and "before end of line" in str(exc)
-        ):
+        if msg == "opening handshake failed" and isinstance(exc, EOFError) and "before end of line" in str(exc):
             self.logger.info("WebSocket peer disconnected before sending a handshake request")
             self.logger.debug("Handshake EOF while awaiting request line", exc_info=kwargs.get("exc_info"))
             return

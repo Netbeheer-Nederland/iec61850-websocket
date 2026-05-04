@@ -21,7 +21,7 @@ import logging
 from collections import deque
 
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
-from ws61850.endpoint.endpoint import WebSocketInfo
+from ws61850.endpoint.base import WebSocketInfo
 from ws61850.iec61850.client.reconstruct_tree_client import (
     build_fcd_ref,
     extract_associate_request_type,
