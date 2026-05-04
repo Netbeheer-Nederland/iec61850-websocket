@@ -12,7 +12,8 @@ from gui.connection.runtime import ConnectionRuntime
 from gui.connection.security import SecurityFactory
 from gui.protocol_utils import convert_bytes_to_hex
 from gui.state import RuntimeState
-from ws61850.endpoint.endpoint import WebSocketEndpoint, WebSocketInfo
+from ws61850.endpoint import EndpointProtocol, WebSocketInfo
+from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.data_model.example_ieds import build_model1, build_model2
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
@@ -44,7 +45,7 @@ class ConnectionManager:
         self,
         state: RuntimeState,
         *,
-        endpoint_cls: type[WebSocketEndpoint] = WebSocketEndpoint,
+        endpoint_cls: type = WebSocketEndpoint,
         client_cls: type[IEC61850Client] = IEC61850Client,
         server_factory: Callable[[str], IEC61850Server] | None = None,
         security_factory: SecurityFactory | None = None,

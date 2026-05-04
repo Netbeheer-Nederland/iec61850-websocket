@@ -1,8 +1,8 @@
 import asyncio
 from typing import Any
 
-from bff.connection.profile import ConnectionProfile
-from bff.connection.security import SecurityContext
+from gui.connection.profile import ConnectionProfile
+from gui.connection.security import SecurityContext
 from ws61850.endpoint import EndpointProtocol
 
 

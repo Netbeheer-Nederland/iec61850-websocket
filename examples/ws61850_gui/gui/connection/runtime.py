@@ -5,11 +5,11 @@ from typing import Any
 
 import jwt
 
-from bff.connection.bindings import ApplicationBinding, IecClientBinding, IecServerBinding, ServerFactory
-from bff.connection.profile import ConnectionProfile
-from bff.connection.security import SecurityContext, SecurityFactory
-from bff.connection.transports import WsClientTransport, WsServerTransport
-from bff.state import RuntimeState
+from gui.connection.bindings import ApplicationBinding, IecClientBinding, IecServerBinding, ServerFactory
+from gui.connection.profile import ConnectionProfile
+from gui.connection.security import SecurityContext, SecurityFactory
+from gui.connection.transports import WsClientTransport, WsServerTransport
+from gui.state import RuntimeState
 from ws61850.asn1.encode_decode import encode_tpaa_message
 from ws61850.endpoint import EndpointProtocol
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
