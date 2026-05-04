@@ -26,6 +26,8 @@ from ws61850.iec61850.data_model.ied_model import (
     LogicalDevice,
     LogicalNode,
 )
+from ws61850.shared.refs import build_fcd_ref
+from ws61850.shared.tree_render import print_direct_da, print_node, print_node_da, print_structure
 from ws61850.shared.extractors import (
     extract_acsiType,
     extract_associate_request_type,
@@ -185,51 +187,6 @@ def retrieve_attributes_sdo(da_def, sdo_name):
                     structure_list = da["daType"][1]
                     print_structure(structure_list, da_index, len(da_refs), 1)
 
-
-def print_node(index, item, last_index):
-    """
-    prints sdos in the reconstructed tree in the console
-    """
-    sdo_prefix = "          ├── " if index != last_index - 1 else "          └── "
-    logger.info(f"{sdo_prefix}{item}")
-
-
-def print_node_da(index, item, last_index, go_to_next_level, is_structure):
-    """
-    prints the data attributes in the reconstructed tree in the console
-    """
-    if is_structure:
-        sdo_prefix = "               └── "
-    else:
-        sdo_prefix = "               ├── " if index != last_index - 1 else "               └── "
-    if go_to_next_level > 0:
-        logger.info(go_to_next_level * "     " + f"{sdo_prefix}{item}")
-    else:
-        logger.info(f"{sdo_prefix}{item}")
-
-
-def print_structure(structure_list, item_index, list_len, go_to_next_level):
-    """
-    Prints structured items in the reconstructed tree in the console
-    """
-    for index, struct_item in enumerate(structure_list):
-        if next(iter(struct_item["cmpType"])) != "structure":
-            print_node_da(index, struct_item["cmpName"], len(structure_list), go_to_next_level, False)
-        else:
-            print_node_da(item_index, struct_item["cmpName"], len(structure_list), go_to_next_level, True)
-            struct_item = struct_item["cmpType"][1]
-            print_structure(struct_item, index, len(struct_item), 2)
-
-
-def print_direct_da(da_list):
-    """
-    logger.info data attributes that are directly added to a direct Data Object (not a sub data object)
-    """
-    for da_index, da in enumerate(da_list):
-        print_node_da(da_index, da["daRef"], len(da_list), 0, True)
-        if next(iter(da["daType"])) == "structure":
-            structure_list = da["daType"][1]
-            print_structure(structure_list, da_index, len(da_list), 1)
 
 
 
@@ -493,37 +450,6 @@ def flatten_nested_data_attributes_with_fc(object, fc):
     return flat_list
 
 
-def build_fcd_ref(obj_ref, fc):
-    """Building a fcda definition"""
-    fcda_ref = {"ref": obj_ref, "fc": fc}
-    return fcda_ref
-
-
-def build_data_value(da: DataAttribute, type, value, include_element_name):
-    """
-    Creating the data values to use in getDataValues Response
-    """
-    if da.type == DataAttributeType.structure:
-        value = get_structure_value(da, include_element_name)
-
-    value = (type, value)
-    if include_element_name:
-        return_item = {"name": da.name, "data": value}
-    else:
-        return_item = {"data": value}
-    return return_item
-
-
-def build_data_obj_value(do: DataObject, value, include_element_name):
-    """
-    Creating the data values of structured values to use in getDataValues Response
-    """
-    if include_element_name:
-        return_item = {"name": do.name, "data": ("structure", value)}
-    else:
-        return_item = {"data": ("structure", value)}
-        return_item = ("structure", return_item)
-    return return_item
 
 
 def assign_brcb_value(server_brcb, values):
