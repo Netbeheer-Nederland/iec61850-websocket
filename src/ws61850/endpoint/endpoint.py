@@ -36,21 +36,23 @@ from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
 
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
+from ws61850.endpoint.association_handler import (
+    ACTION_ABORT,
+    ACTION_RELEASE,
+    AssociationHandler,
+)
+from ws61850.endpoint.base import EndpointProtocol, WebSocketInfo  # re-exported for callers
 from ws61850.iec61850.client.request_handling import create_tpaa_associate_request
 from ws61850.iec61850.server.response_handling import (
-    create_tpaa_abort_response,
     create_tpaa_associate_response,
-    create_tpaa_release_response,
 )
 from ws61850.iec61850.server.service_error import ServiceStatusKind
-from ws61850.security.oauth import check_token_validity_and_expiry, get_jwt_algorithm
+from ws61850.security.oauth import get_jwt_algorithm
 from ws61850.shared.extractors import (
     extract_associate_request_type,
     retrieve_associate_id_from_decoded_msg,
     retrieve_max_outstanding_calls_from_decoded_msg,
 )
-
-from ws61850.endpoint.base import EndpointProtocol, WebSocketInfo  # re-exported for callers
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +125,13 @@ class WebSocketEndpoint:
         self.cert_endpoint = cert_endpoint
         self.token_issuer = token_issuer
         self.websocket_server_logger = _WebSocketServerLogger(logging.getLogger("websockets.server"), {})
+        self._assoc_handler = AssociationHandler(
+            kc_cert=kc_cert,
+            own_cert=own_cert,
+            cert_endpoint=cert_endpoint,
+            token_issuer=token_issuer,
+            close_on_expiry_fn=self.close_on_expiry,
+        )
 
     def if_message_is_report(self, message, is_ber_protocol=False):
         decoded_message = decode_tpaa_message(message, is_ber_protocol)
@@ -260,54 +269,11 @@ class WebSocketEndpoint:
 
                         if decoded_message[0] == "associate":
                             associate_type = extract_associate_request_type(decoded_message)
-                            if associate_type == "abortRequest":
-                                tpaa_request = create_tpaa_abort_response(
-                                    websocket_info.invoke_id,
-                                    websocket_info.associate_id,
-                                )
-                                # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
-                                request = await asyncio.to_thread(
-                                    encode_tpaa_message,
-                                    tpaa_request,
-                                    websocket_info.is_ber_protocol,
-                                )
-                                await websocket.send(request)
-                                websocket.transport.abort()
-                                logger.info("Association aborted by server")
+                            action = await self._assoc_handler.handle(
+                                associate_type, decoded_message, websocket, websocket_info
+                            )
+                            if action in (ACTION_ABORT, ACTION_RELEASE):
                                 break
-                            elif associate_type == "releaseRequest":
-                                tpaa_request = create_tpaa_release_response(
-                                    websocket_info.invoke_id,
-                                    websocket_info.associate_id,
-                                )
-                                # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
-                                request = await asyncio.to_thread(
-                                    encode_tpaa_message,
-                                    tpaa_request,
-                                    websocket_info.is_ber_protocol,
-                                )
-                                await websocket.send(request)
-                                await websocket.close()
-                                logger.info("Association released by server")
-                                break
-                            elif associate_type == "refreshToken":
-                                validity, expiry = check_token_validity_and_expiry(
-                                    decoded_message[1][1][1]["token"],
-                                    self.kc_cert,
-                                    self.own_cert,
-                                    self.cert_endpoint,
-                                    self.token_issuer,
-                                )
-                                if validity is True and expiry is not None:
-                                    websocket_info.expiry_task.cancel()
-                                    try:
-                                        await websocket_info.expiry_task
-                                    except asyncio.CancelledError:
-                                        pass
-
-                                    websocket_info.expiry_task = asyncio.create_task(
-                                        self.close_on_expiry(websocket, expiry)
-                                    )
 
                         await selected_server.handle_request(message, clean_path, websocket_info)
                 else:
@@ -401,57 +367,13 @@ class WebSocketEndpoint:
                                     message,
                                     websocket_info.is_ber_protocol,
                                 )
-                                # decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
                                 if decoded_message[0] == "associate":
                                     associate_type = extract_associate_request_type(decoded_message)
-                                    if associate_type == "abortRequest":
-                                        tpaa_request = create_tpaa_abort_response(
-                                            websocket_info.invoke_id,
-                                            websocket_info.associate_id,
-                                        )
-                                        # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
-                                        request = await asyncio.to_thread(
-                                            encode_tpaa_message,
-                                            tpaa_request,
-                                            websocket_info.is_ber_protocol,
-                                        )
-                                        await websocket.send(request)
-                                        websocket.transport.abort()
-                                        logger.info("Association aborted by server")
+                                    action = await self._assoc_handler.handle(
+                                        associate_type, decoded_message, websocket, websocket_info
+                                    )
+                                    if action in (ACTION_ABORT, ACTION_RELEASE):
                                         break
-                                    elif associate_type == "releaseRequest":
-                                        tpaa_request = create_tpaa_release_response(
-                                            websocket_info.invoke_id,
-                                            websocket_info.associate_id,
-                                        )
-                                        # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
-                                        request = await asyncio.to_thread(
-                                            encode_tpaa_message,
-                                            tpaa_request,
-                                            websocket_info.is_ber_protocol,
-                                        )
-                                        await websocket.send(request)
-                                        await websocket.close()
-                                        logger.info("Association released by server")
-                                        break
-                                    elif associate_type == "refreshToken":
-                                        validity, expiry = check_token_validity_and_expiry(
-                                            decoded_message[1][1][1]["token"],
-                                            self.kc_cert,
-                                            self.own_cert,
-                                            self.cert_endpoint,
-                                            self.token_issuer,
-                                        )
-                                        if validity is True and expiry is not None:
-                                            websocket_info.expiry_task.cancel()
-                                            try:
-                                                await websocket_info.expiry_task
-                                            except asyncio.CancelledError:
-                                                pass
-
-                                            websocket_info.expiry_task = asyncio.create_task(
-                                                self.close_on_expiry(websocket, expiry)
-                                            )
 
                                 invoke_id = selected_client.add_to_outstanding_calls(
                                     decoded_message, websocket_info.is_ber_protocol
@@ -666,58 +588,13 @@ class WebSocketEndpoint:
                                         message,
                                         websocket_info.is_ber_protocol,
                                     )
-
-                                    # decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
                                     if decoded_message[0] == "associate":
                                         associate_type = extract_associate_request_type(decoded_message)
-                                        if associate_type == "abortRequest":
-                                            tpaa_request = create_tpaa_abort_response(
-                                                websocket_info.invoke_id,
-                                                websocket_info.associate_id,
-                                            )
-                                            # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
-                                            request = await asyncio.to_thread(
-                                                encode_tpaa_message,
-                                                tpaa_request,
-                                                websocket_info.is_ber_protocol,
-                                            )
-                                            await websocket.send(request)
-                                            websocket.transport.abort()
-                                            logger.info("Association aborted by server")
+                                        action = await self._assoc_handler.handle(
+                                            associate_type, decoded_message, websocket, websocket_info
+                                        )
+                                        if action in (ACTION_ABORT, ACTION_RELEASE):
                                             break
-                                        elif associate_type == "releaseRequest":
-                                            tpaa_request = create_tpaa_release_response(
-                                                websocket_info.invoke_id,
-                                                websocket_info.associate_id,
-                                            )
-                                            # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
-                                            request = await asyncio.to_thread(
-                                                encode_tpaa_message,
-                                                tpaa_request,
-                                                websocket_info.is_ber_protocol,
-                                            )
-                                            await websocket.send(request)
-                                            await websocket.close()
-                                            logger.info("Association released by server")
-                                            break
-                                        elif associate_type == "refreshToken":
-                                            validity, expiry = check_token_validity_and_expiry(
-                                                decoded_message[1][1][1]["token"],
-                                                self.kc_cert,
-                                                self.own_cert,
-                                                self.cert_endpoint,
-                                                self.token_issuer,
-                                            )
-                                            if validity is True and expiry is not None:
-                                                websocket_info.expiry_task.cancel()
-                                                try:
-                                                    await websocket_info.expiry_task
-                                                except asyncio.CancelledError:
-                                                    pass
-
-                                                websocket_info.expiry_task = asyncio.create_task(
-                                                    self.close_on_expiry(websocket, expiry)
-                                                )
 
                                     invoke_id = selected_client.add_to_outstanding_calls(
                                         decoded_message,
