@@ -42,11 +42,8 @@ from ws61850.endpoint.association_handler import (
     AssociationHandler,
 )
 from ws61850.endpoint.base import EndpointProtocol, WebSocketInfo  # re-exported for callers
+from ws61850.endpoint.connection_router import ConnectionRouter
 from ws61850.iec61850.client.request_handling import create_tpaa_associate_request
-from ws61850.iec61850.server.response_handling import (
-    create_tpaa_associate_response,
-)
-from ws61850.iec61850.server.service_error import ServiceStatusKind
 from ws61850.security.oauth import get_jwt_algorithm
 from ws61850.shared.extractors import (
     extract_associate_request_type,
@@ -132,6 +129,7 @@ class WebSocketEndpoint:
             token_issuer=token_issuer,
             close_on_expiry_fn=self.close_on_expiry,
         )
+        self._router = ConnectionRouter(self.server_list, self.client_list)
 
     def if_message_is_report(self, message, is_ber_protocol=False):
         decoded_message = decode_tpaa_message(message, is_ber_protocol)
@@ -277,21 +275,9 @@ class WebSocketEndpoint:
 
                         await selected_server.handle_request(message, clean_path, websocket_info)
                 else:
-                    tpaa_request = create_tpaa_associate_response(
-                        65000, clean_path, ServiceStatusKind.instanceNotAvailable.name
+                    await self._router.send_not_found_response(
+                        websocket, clean_path, protocol, self.send_msg_callback
                     )
-                    is_ber = False
-                    if protocol:
-                        if "iec61850-tpaa-ber-v1" == protocol:
-                            is_ber = True
-
-                    # request = encode_tpaa_message(tpaa_request, is_ber)
-                    request = await asyncio.to_thread(encode_tpaa_message, tpaa_request, is_ber)
-                    await websocket.send(request)
-                    if self.send_msg_callback is not None:
-                        self.send_msg_callback(request, datetime.datetime.now())
-                    logger.info("Connection failed: Access Point not available")
-                    await websocket.close()
 
             else:
                 selected_client = next(
@@ -383,21 +369,9 @@ class WebSocketEndpoint:
                                     await websocket.close()
 
                 else:
-                    tpaa_request = create_tpaa_associate_response(
-                        65000, clean_path, ServiceStatusKind.instanceNotAvailable.name
+                    await self._router.send_not_found_response(
+                        websocket, clean_path, protocol, self.send_msg_callback
                     )
-                    is_ber = False
-                    if protocol:
-                        if "iec61850-tpaa-ber-v1" in protocol:
-                            is_ber = True
-
-                    # request = encode_tpaa_message(tpaa_request, is_ber)
-                    request = await asyncio.to_thread(encode_tpaa_message, tpaa_request, is_ber)
-                    await websocket.send(request)
-                    if self.send_msg_callback is not None:
-                        self.send_msg_callback(request, datetime.datetime.now())
-                    logger.info("Connection failed: access point not available")
-                    await websocket.close()
         except Exception as e:
             logger.error(f"Error in server handler function: {e}")
 
@@ -604,21 +578,9 @@ class WebSocketEndpoint:
                                         logger.info("invoke id invalid, closing the connection ...")
                                         await websocket.close()
                     else:
-                        tpaa_request = create_tpaa_associate_response(
-                            65000, cp, ServiceStatusKind.instanceNotAvailable.name
+                        await self._router.send_not_found_response(
+                            websocket, cp, protocol, self.send_msg_callback
                         )
-                        # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
-                        is_ber = False
-                        if protocol:
-                            if "iec61850-tpaa-ber-v1" in protocol:
-                                websocket_info.is_ber_protocol = True
-
-                        request = await asyncio.to_thread(encode_tpaa_message, tpaa_request, is_ber)
-                        await websocket.send(request)
-                        if self.send_msg_callback is not None:
-                            self.send_msg_callback(request, datetime.datetime.now())
-                        logger.info("Connection failed: access point not available")
-                        await websocket.close()
 
                 else:
                     selected_server = next((server for server in self.server_list if server.cp == cp), None)
@@ -645,21 +607,9 @@ class WebSocketEndpoint:
 
                             await selected_server.handle_request(message, cp, websocket_info)
                     else:
-                        tpaa_request = create_tpaa_associate_response(
-                            65000, cp, ServiceStatusKind.instanceNotAvailable.name
+                        await self._router.send_not_found_response(
+                            websocket, cp, protocol, self.send_msg_callback
                         )
-                        # request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
-                        is_ber = False
-                        if protocol:
-                            if "iec61850-tpaa-ber-v1" in protocol:
-                                websocket_info.is_ber_protocol = True
-
-                        request = await asyncio.to_thread(encode_tpaa_message, tpaa_request, is_ber)
-                        await websocket.send(request)
-                        if self.send_msg_callback is not None:
-                            self.send_msg_callback(request, datetime.datetime.now())
-                        logger.info("Connection failed: Access Point not available")
-                        await websocket.close()
 
             except websockets.exceptions.ConnectionClosedError as e:
                 if "no close frame" in str(e):
