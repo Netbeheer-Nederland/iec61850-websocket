@@ -29,6 +29,26 @@ from ws61850.iec61850.data_model.ied_model import (
     LogicalDevice,
     LogicalNode,
 )
+from ws61850.shared.extractors import (
+    extract_acsiType,
+    extract_associate_request_type,
+    extract_brcb_ref,
+    extract_data_ref,
+    extract_dataAttrVal,
+    extract_ds_ref,
+    extract_includeElementName,
+    extract_invoke_id,
+    extract_ld_name,
+    extract_ln_ref,
+    extract_max_message_size,
+    extract_ref,
+    extract_service_name,
+    extract_urcb_ref,
+    retrieve_associate_id,
+    retrieve_associate_id_from_decoded_msg,
+    retrieve_max_message_size,
+    retrieve_max_outstanding_calls_from_decoded_msg,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,47 +89,6 @@ def retrieve_ds_items(response_raw):
     return ds_refs
 
 
-def retrieve_associate_id(response_raw):
-    """
-    Extracts association id from associateResponse
-    """
-    response = json.loads(response_raw)
-
-    try:
-        return response["associate"]["service"]["associateResponse"]["associateId"]
-    except (KeyError, TypeError) as e:
-        raise ValueError("Invalid structure for associateId extraction") from e
-
-
-def retrieve_associate_id_from_decoded_msg(decoded_msg):
-    """
-    Extracts association id from associateResponse from a decoded message
-    """
-    try:
-        return decoded_msg[1][1][1]["associateId"]
-    except (KeyError, TypeError) as e:
-        raise ValueError("Invalid structure for associateId extraction") from e
-
-
-def retrieve_max_outstanding_calls_from_decoded_msg(decoded_msg):
-    """
-    Extracts association id from associateResponse from a decoded message
-    """
-    try:
-        return decoded_msg[1][1][1]["maxOutstandingCalls"]
-    except (KeyError, TypeError) as e:
-        raise ValueError("Invalid structure for associateId extraction") from e
-
-
-def retrieve_max_message_size(response_raw):
-    """
-    Extracts the max message size from associateResponse
-    """
-    response = json.loads(response_raw)
-    try:
-        return response["associate"]["service"]["associateResponse"]["maxMessageSize"]
-    except (IndexError, KeyError, TypeError):
-        raise ValueError("Invalid TPAA structure for maxMessageSize")
 
 
 def retrieve_sdos(response_raw):
@@ -196,95 +175,6 @@ def print_direct_da(da_list):
             print_structure(structure_list, da_index, len(da_list), 1)
 
 
-def extract_associate_request_type(tpaa_tuple):
-    """
-    Extracts the request type from an associate TPAA tuple.
-    Example input:
-    ("associate", ("service", ("associateRequest", {...})))
-    Returns: "associateRequest"
-    """
-    try:
-        if tpaa_tuple[0] != "associate":
-            raise ValueError("Not an 'associate' TPAA PDU")
-        return tpaa_tuple[1][1][0]
-    except (IndexError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for associateRequest") from e
-
-
-def extract_service_name(tpaa_tuple):
-    """
-    Extracts the service name from a TPAA tuple.
-    Example input:
-    ("response", { "invokeId": ..., "associateId": ..., "service": ("serviceName", {...}) })
-    """
-    try:
-        return tpaa_tuple[1]["service"][0]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for service name") from e
-
-
-def extract_invoke_id(tpaa_tuple):
-    """
-    Extracts the invoke id a TPAA tuple.
-    Example input:
-    ("response", { "invokeId": ..., "associateId": ..., "service": ("..., {...}) })
-    """
-    try:
-        return tpaa_tuple[1]["invokeId"]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for service name") from e
-
-
-def extract_ld_name(tpaa_tuple):
-    """
-    Extracts the ldName from a TPAA request tuple.
-    Assumes structure:
-    ("request", { ..., "service": ("getLogicalDeviceDirectory", {"ldName": "LD1"}) })
-    """
-    try:
-        service = tpaa_tuple[1]["service"]
-        return service[1]["ldName"]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for ldName") from e
-
-
-def extract_ln_ref(tpaa_tuple):
-    """
-    Extracts the lnName from a TPAA request tuple.
-    Assumes structure:
-    ("request", { ..., "service": ("getLogicalNodeDirectory", {"lnRef": "LLN0"}) })
-    """
-    try:
-        service = tpaa_tuple[1]["service"]
-        return service[1]["lnRef"]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for ldName") from e
-
-
-def extract_acsiType(tpaa_tuple):
-    """
-    Extracts the acsiType from a TPAA request tuple.
-    Assumes structure:
-    ("request", { ..., "service": ("getLogicalNodeDirectory", {"acsiType": "dataObject"}) })
-    """
-    try:
-        service = tpaa_tuple[1]["service"]
-        return service[1]["aCSIClass"]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for ldName") from e
-
-
-def extract_ds_ref(tpaa_tuple):
-    """
-    Extracts the dataset reference from a TPAA request tuple.
-    Assumes structure:
-    ("request", { ..., "service": ("getDataSetDirectory", {"dsRef": "@Dataset1"}) })
-    """
-    try:
-        service = tpaa_tuple[1]["service"]
-        return service[1]["dsRef"]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for ldName") from e
 
 
 def get_list_of_items_ln(ln_ref, asci_service, ied: IedModel):
@@ -317,66 +207,6 @@ def get_list_of_items_ln(ln_ref, asci_service, ied: IedModel):
     return None
 
 
-def extract_data_ref(tpaa_tuple):
-    """
-    Extracts the dataRef from a TPAA request tuple.
-    Assumes structure:
-    ("request", { ..., "service": ("getDataDirectory", {"dataRef": "LD0/LLN0.Mod"}) })
-    """
-    try:
-        service = tpaa_tuple[1]["service"]
-        return service[1]["dataRef"]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for dataRef") from e
-
-
-def extract_ref(tpaa_tuple):
-    """
-    Extracts the ref from a TPAA request tuple.
-    Assumes structure:
-    ("request", { ..., "service": ("getDataValues", {"ref": "LD0/LLN0.Mod"}) })
-    """
-    try:
-        service = tpaa_tuple[1]["service"]
-        return service[1]["ref"]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for dataRef") from e
-
-
-def extract_dataAttrVal(tpaa_tuple):
-    """
-    Extracts the dataAttrVal from a TPAA request tuple.
-    Assumes structure:
-    ("request", { ..., "service": ("setDataValues", {"dataAttrVal": ...}) })
-    """
-    try:
-        service = tpaa_tuple[1]["service"]
-        return service[1]["dataAttrVal"]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for dataRef") from e
-
-
-def extract_includeElementName(tpaa_tuple):
-    """
-    Extracts the includeElementName from a TPAA request tuple of getDataValues.
-    Assumes structure:
-    ("request", { ..., "service": ("getDataValues", {"includeElementName": True}) })
-    """
-    try:
-        service = tpaa_tuple[1]["service"]
-        return service[1]["includeElementName"]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for dataRef") from e
-
-
-def extract_max_message_size(tpaa):
-    """
-    Extracts the maxMessagesize from a TPAA request tuple
-    """
-    try:
-        return tpaa[1][1][1]["maxMessageSize"]
-    except (IndexError, KeyError, TypeError):
-        raise ValueError("Invalid TPAA structure for maxMessageSize")
 
 
 def find_do_with_ref(data_ref, ied):
@@ -464,30 +294,6 @@ def find_object_in_tree(data_ref, ied):
     return return_do
 
 
-def extract_brcb_ref(tpaa_tuple):
-    """
-    Extracts the brcbRef from a TPAA request tuple.
-    Assumes structure:
-    ("request", { ..., "service": ("getBRCBValues", {"brcbRef": "rcb1"}) })
-    """
-    try:
-        service = tpaa_tuple[1]["service"]
-        return service[1]["brcbRef"]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for dataRef") from e
-
-
-def extract_urcb_ref(tpaa_tuple):
-    """
-    Extracts the urcbRef from a TPAA request tuple.
-    Assumes structure:
-    ("request", { ..., "service": ("getURCBValues", {"UrcbRef": "rcb1"}) })
-    """
-    try:
-        service = tpaa_tuple[1]["service"]
-        return service[1]["urcbRef"]
-    except (IndexError, KeyError, TypeError) as e:
-        raise ValueError("Invalid TPAA structure for dataRef") from e
 
 
 def extract_operate_or_select_ref(tpaa_tuple):

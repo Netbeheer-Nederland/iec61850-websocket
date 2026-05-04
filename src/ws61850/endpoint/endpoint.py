@@ -38,7 +38,7 @@ from websockets.asyncio.server import serve
 
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
 from ws61850.iec61850.client.request_handling import create_tpaa_associate_request
-from ws61850.iec61850.server.request_handling import (
+from ws61850.shared.extractors import (
     extract_associate_request_type,
     retrieve_associate_id_from_decoded_msg,
     retrieve_max_outstanding_calls_from_decoded_msg,
