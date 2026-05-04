@@ -19,7 +19,7 @@
 import logging
 import os
 
-from gui.backend.app_factory import create_app
+from bff.backend.app_factory import create_app
 
 logging.basicConfig(
     level=os.environ.get("WS61850_GUI_LOG_LEVEL", "INFO").upper(),

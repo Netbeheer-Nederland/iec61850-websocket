@@ -17,24 +17,44 @@
             </div>
         </div>
     </h1>
-    <div id="connect">
-        <label>Host: <input id="host" value="localhost" aria-describedby="hostHelp"></label>
-        <span id="hostHelp" class="input-help"
-              title="Accepted formats: IPv4 (e.g., 127.0.0.1), IPv6 (e.g., ::1), or hostname (e.g., example.com)">?
-        <span class="sr-only">Accepted formats: IPv4 (for example 127.0.0.1), IPv6 (for example ::1), or hostname (for example example.com)</span>
-      </span>
-        <span id="hostError" class="input-error" aria-live="polite"></span>
-        <label>Port: <input id="port" value="8765"></label>
-        <span id="portError" class="input-error" aria-live="polite"></span>
-        <label>Access point (AP): <input id="cp" value="cp1"></label>
-        <label><input type="checkbox" id="directMode" checked>WS Client Mode</label>
-        <span class="input-help"
-              title="When checked: Connect to WebSocket server. When unchecked: Act as server and wait for WebSocket client to connect.">?</span>
-        <!--        <button id="securityBtn" class="secondary-btn" style="margin-right: 5px;">Security</button>-->
-        <button id="connectBtn">Connect</button>
-    </div>
+    <section id="connectPanels" class="connect-panels">
+        <article class="connect-card" data-role-card="client-server">
+            <div class="connect-card-header">
+                <span class="connect-card-kicker">Outbound Gateway</span>
+                <h2>WebSocket Client + IEC 61850 Server</h2>
+                <p>Connect to a remote WebSocket endpoint and expose IEC 61850 services over that session.</p>
+            </div>
+            <div class="connect-fields">
+                <label>Host: <input id="wsClientHost" value="localhost" aria-describedby="wsClientHostHelp"></label>
+                <span id="wsClientHostHelp" class="input-help"
+                      title="Accepted formats: IPv4 (e.g., 127.0.0.1), IPv6 (e.g., ::1), or hostname (e.g., example.com)">?
+                    <span class="sr-only">Accepted formats: IPv4, IPv6, or hostname</span>
+                </span>
+                <span id="wsClientHostError" class="input-error" aria-live="polite"></span>
+                <label>Port: <input id="wsClientPort" value="8765"></label>
+                <span id="wsClientPortError" class="input-error" aria-live="polite"></span>
+                <label>Access point (AP): <input id="wsClientCp" value="cp1"></label>
+                <button id="wsClientConnectBtn" data-role="client-server">Connect</button>
+            </div>
+        </article>
+        <article class="connect-card" data-role-card="server-client">
+            <div class="connect-card-header">
+                <span class="connect-card-kicker">Inbound Browser</span>
+                <h2>WebSocket Server + IEC 61850 Client</h2>
+                <p>Start a local WebSocket server and use an IEC 61850 client binding to invoke remote services.</p>
+            </div>
+            <div class="connect-fields">
+                <label>Listen Host: <input id="wsServerHost" value="0.0.0.0"></label>
+                <label>Port: <input id="wsServerPort" value="8765"></label>
+                <span id="wsServerPortError" class="input-error" aria-live="polite"></span>
+                <label>Access point (AP): <input id="wsServerCp" value="cp1"></label>
+                <button id="wsServerConnectBtn" data-role="server-client">Start Server</button>
+            </div>
+        </article>
+    </section>
     <div class="status-row">
         <div id="status" style="margin-top:8px;font-weight:600;">Status: <span id="statusText">not-connected</span>
+            <span id="activeRoleText" class="status-meta">No active endpoint</span>
         </div>
         <div class="status-buttons">
             <button id="refresh">Fetch Model</button>
@@ -380,7 +400,7 @@
     </div>
 </div>
 
-<script src="/static/tree.js"></script>
+<script type="module" src="/static/app/main.js"></script>
 <script>
     // Security Modal Logic
     (function () {
@@ -389,7 +409,6 @@
         const closeBtn = document.getElementById('closeSecurityModal');
         const cancelBtn = document.getElementById('cancelSecurityBtn');
         const saveBtn = document.getElementById('saveSecurityBtn');
-        const directModeCheckbox = document.getElementById('directMode');
         const subtitle = document.getElementById('securitySubtitle');
 
         // Client Fields
@@ -439,7 +458,8 @@
 
         // Toggle visibility
         function updateVisibility() {
-            const isClientMode = directModeCheckbox ? directModeCheckbox.checked : true;
+            const activeRole = (window.currentConnectionDraft && window.currentConnectionDraft.applicationRole) || 'iec_server';
+            const isClientMode = activeRole === 'iec_server';
 
             if (isClientMode) {
                 subtitle.textContent = "Configure security for WebSocket Client Mode";
@@ -462,10 +482,6 @@
         enableOAuth.addEventListener('change', updateVisibility);
         serverEnableTLS.addEventListener('change', updateVisibility);
         serverEnableOAuth.addEventListener('change', updateVisibility);
-
-        if (directModeCheckbox) {
-            directModeCheckbox.addEventListener('change', updateVisibility);
-        }
 
         // File readers
         function setupFileReader(fileInputId, textareaId) {
@@ -492,7 +508,7 @@
         setupFileReader('secServerOAuthCACertFile', 'secServerOAuthCACert');
 
         // Open Modal
-        btn.addEventListener('click', () => {
+        if (btn) btn.addEventListener('click', () => {
             // Load current settings into UI
 
             // Client
@@ -553,7 +569,8 @@
             closeModal();
 
             // Visual feedback
-            const isClientMode = directModeCheckbox ? directModeCheckbox.checked : true;
+            const activeRole = (window.currentConnectionDraft && window.currentConnectionDraft.applicationRole) || 'iec_server';
+            const isClientMode = activeRole === 'iec_server';
             let isActive = false;
 
             if (isClientMode) {
@@ -563,11 +580,15 @@
             }
 
             if (isActive) {
-                btn.style.border = "2px solid #4CAF50";
-                btn.title = "Security settings active";
+                if (btn) {
+                    btn.style.border = "2px solid #4CAF50";
+                    btn.title = "Security settings active";
+                }
             } else {
-                btn.style.border = "";
-                btn.title = "";
+                if (btn) {
+                    btn.style.border = "";
+                    btn.title = "";
+                }
             }
         });
 
@@ -579,7 +600,7 @@
                     const body = JSON.parse(options.body);
                     // Only inject if not already present
                     if (!body.security) {
-                        const isClientMode = directModeCheckbox ? directModeCheckbox.checked : true;
+                        const isClientMode = body.application_role === 'iec_server';
 
                         if (isClientMode) {
                             // Inject Client Settings

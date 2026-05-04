@@ -92,17 +92,73 @@ h1 {
     opacity: 0.9;
 }
 
-#connect {
-    padding: 20px 24px;
-    background: var(--bg-white);
+.connect-panels {
+    padding: 22px 24px 26px;
+    background:
+        radial-gradient(circle at top right, rgba(0, 123, 255, 0.08), transparent 32%),
+        linear-gradient(180deg, #f7fbff 0%, #ffffff 72%);
     border-bottom: 2px solid var(--border-color);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 18px;
+    align-items: stretch;
+}
+
+.connect-card {
     display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    border: 1px solid rgba(0, 86, 179, 0.12);
+    border-radius: 14px;
+    padding: 18px 18px 16px;
+    box-shadow: 0 10px 30px rgba(0, 61, 130, 0.08);
+}
+
+.connect-card-header {
+    margin-bottom: 14px;
+}
+
+.connect-card-header h2 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    line-height: 1.2;
+    color: var(--primary-blue-dark);
+}
+
+.connect-card-header p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text-light);
+}
+
+.connect-card-kicker {
+    display: inline-block;
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(0, 86, 179, 0.08);
+    color: var(--primary-blue-dark);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.connect-fields {
+    display: flex;
+    flex: 1 1 auto;
+    align-content: flex-start;
     gap: 12px;
     align-items: center;
     flex-wrap: wrap;
 }
 
-#connect label {
+.connect-fields button {
+    margin-top: auto;
+}
+
+.connect-fields label {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -151,7 +207,7 @@ h1 {
     border: 0;
 }
 
-#connect input[type="text"] {
+.connect-fields input[type="text"] {
     padding: 8px 12px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -159,13 +215,13 @@ h1 {
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-#connect input[type="text"]:focus {
+.connect-fields input[type="text"]:focus {
     outline: none;
     border-color: var(--primary-blue);
     box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
 }
 
-#connect button, #refresh, #disconnectBtn, #autoReconnectBtn {
+.connect-fields button, #refresh, #disconnectBtn, #autoReconnectBtn {
     padding: 8px 16px;
     background: var(--primary-blue);
     color: white;
@@ -183,11 +239,11 @@ h1 {
     background: #8aaedc !important;
 }
 
-#connect button:hover, #refresh:hover, #disconnectBtn:hover, #autoReconnectBtn:hover {
+.connect-fields button:hover, #refresh:hover, #disconnectBtn:hover, #autoReconnectBtn:hover {
     background: var(--primary-blue-dark);
 }
 
-#connect button:active, #refresh:active, #disconnectBtn:active, #autoReconnectBtn:active {
+.connect-fields button:active, #refresh:active, #disconnectBtn:active, #autoReconnectBtn:active {
     transform: translateY(1px);
 }
 
@@ -219,6 +275,15 @@ h1 {
     border-bottom: none;
 }
 
+.status-meta {
+    margin-left: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
 .status-buttons {
     display: flex;
     gap: 12px;
@@ -235,6 +300,21 @@ h1 {
 
 #autoReconnectBtn[data-enabled="true"] {
     background: var(--success);
+}
+
+@media (max-width: 720px) {
+    .connect-fields {
+        align-items: stretch;
+    }
+
+    .connect-fields label {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .connect-fields button {
+        width: 100%;
+    }
 }
 
 .node {

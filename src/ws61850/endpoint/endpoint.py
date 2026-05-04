@@ -18,6 +18,7 @@
 import asyncio
 import datetime
 import logging
+import sys
 import time
 from http import HTTPStatus
 
@@ -32,6 +33,7 @@ from jwt import (
 )
 from websockets.datastructures import Headers
 from websockets.http11 import Response
+from websockets.http11 import Request
 from websockets.asyncio.server import serve
 
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
@@ -64,6 +66,28 @@ class WebSocketInfo:
         self.expiry_task = None
         self.access_token = access_token
         self.is_ber_protocol = False
+
+
+class _WebSocketServerLogger(logging.LoggerAdapter):
+    """Downgrade expected handshake disconnects from error tracebacks to info logs."""
+
+    def error(self, msg, *args, **kwargs):
+        exc = kwargs.get("exc_info")
+        if exc is True:
+            exc = sys.exc_info()
+        if isinstance(exc, tuple):
+            exc = exc[1]
+
+        if (
+            msg == "opening handshake failed"
+            and isinstance(exc, EOFError)
+            and "before end of line" in str(exc)
+        ):
+            self.logger.info("WebSocket peer disconnected before sending a handshake request")
+            self.logger.debug("Handshake EOF while awaiting request line", exc_info=kwargs.get("exc_info"))
+            return
+
+        super().error(msg, *args, **kwargs)
 
 
 class WebSocketEndpoint:
@@ -112,6 +136,7 @@ class WebSocketEndpoint:
         self.own_cert = own_cert
         self.cert_endpoint = cert_endpoint
         self.token_issuer = token_issuer
+        self.websocket_server_logger = _WebSocketServerLogger(logging.getLogger("websockets.server"), {})
 
     def if_message_is_report(self, message, is_ber_protocol=False):
         decoded_message = decode_tpaa_message(message, is_ber_protocol)
@@ -475,8 +500,8 @@ class WebSocketEndpoint:
 
             await self.on_connection_closed(websocket, clean_path)
 
-    async def process_request(self, path, request_headers):
-        headers = request_headers.headers
+    async def process_request(self, connection, request: Request):
+        headers = request.headers
         auth_header = headers.get("Authorization")
 
         if not auth_header or not auth_header.startswith("Bearer "):
@@ -517,7 +542,7 @@ class WebSocketEndpoint:
             self.access_token_list.append(
                 {
                     "access_token": decoded,
-                    "cp": path.request.path.lstrip("/"),
+                    "cp": connection.request.path.lstrip("/"),
                     "access_token_raw": token,
                 }
             )
@@ -550,6 +575,7 @@ class WebSocketEndpoint:
                 process_request=self.process_request if self.oauth_enable else None,
                 ping_interval=15,
                 ping_timeout=30,
+                logger=self.websocket_server_logger,
             ) as server:
                 logger.info(f"WebSocket server started on wss://{hostname}:{port}")
                 await server.serve_forever()
@@ -562,6 +588,7 @@ class WebSocketEndpoint:
                 process_request=self.process_request if self.oauth_enable else None,
                 ping_interval=15,
                 ping_timeout=30,
+                logger=self.websocket_server_logger,
             ) as server:
                 self.server = server
                 logger.info(f"WebSocket server started on ws://{hostname}:{port}")
@@ -781,7 +808,7 @@ class WebSocketEndpoint:
                 logger.info("Connection closed gracefully")
 
             except Exception as e:
-                logger.info("Unhandled error in start_active:", e)
+                logger.exception("Unhandled error in start_active: %s", e)
 
             finally:
                 logger.info(f"Client disconnected: {websocket.remote_address}")

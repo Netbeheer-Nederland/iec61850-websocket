@@ -18,6 +18,13 @@ function asn1TimeStampToISOString(ts) {
   return date.toISOString();
 }
 let modelPollTimer = null;
+let statusPollTimer = null;
+let reportPollTimer = null;
+let connectionPollingEnabled = false;
+let connectionPollSession = 0;
+let actionsPollInFlight = false;
+let statusPollInFlight = false;
+let reportPollInFlight = false;
 async function fetchModel(initial=true){
   if (initial && modelPollTimer){
     clearTimeout(modelPollTimer); modelPollTimer = null;
@@ -72,12 +79,25 @@ async function fetchModel(initial=true){
 }
 
 // Connection state & auto-reconnect
-let lastConnection = {url:null, port:null, cp:null, direct:false};
+const connectionDrafts = {
+  clientServer: {url:null, port:null, cp:null, direct:true, isServer:false, applicationRole:'iec_server', target:'client-server'},
+  serverClient: {url:null, port:null, cp:null, direct:true, isServer:true, applicationRole:'iec_client', target:'server-client'}
+};
+const panelStates = {
+  clientServer: 'not-connected',
+  serverClient: 'not-connected'
+};
+const previousPanelStates = {
+  clientServer: 'not-connected',
+  serverClient: 'not-connected'
+};
 let autoReconnectEnabled = false;
 let reconnectAttempt = 0;
 let reconnectPending = false;
-// Track if the most recent disconnect was manually initiated by the user so we suppress auto-reconnect
-let manualDisconnect = false;
+const manualDisconnectByPanel = {
+  clientServer: false,
+  serverClient: false
+};
 // Timer id for a scheduled reconnect attempt so we can cancel on manual disconnect
 let reconnectTimerId = null;
 const MAX_BACKOFF_MS = 15000;
@@ -87,13 +107,54 @@ const doDefCache = {};
 // --- Action log polling (footer status line) ---
 let actionsPollTimer = null;
 let lastActionRendered = null; // store message+time to avoid redundant DOM churn
-const ACTIONS_POLL_INTERVAL = 1500; // ms
+const ACTIONS_POLL_INTERVAL_CONNECTED = 1500; // ms
+const ACTIONS_POLL_INTERVAL_IDLE = 5000; // ms
+const STATUS_POLL_INTERVAL_CONNECTED = 2000; // ms
+const STATUS_POLL_INTERVAL_IDLE = 5000; // ms
+const REPORT_POLL_INTERVAL_CONNECTED = 1000; // ms
+const REPORT_POLL_INTERVAL_IDLE = 10000; // ms
 const MAX_HISTORY = 10;
 let actionHistory = []; // store last N actions
 let pollingPaused = false; // due to visibility
 let frozen = false; // freeze main footer updates
 let lastActionTimestamp = null; // epoch ms
 let elapsedTimer = null;
+
+function panelHasLiveConnection(panelKey){
+  return ['connected', 'connecting', 'starting', 'listening'].includes(panelStates[panelKey]);
+}
+
+function anyPanelActive(){
+  return Object.keys(panelStates).some(panelHasLiveConnection);
+}
+
+function primaryStatusState(){
+  return panelStates.serverClient === 'connected' || panelStates.serverClient === 'listening'
+    ? panelStates.serverClient
+    : panelStates.clientServer;
+}
+
+function updateGlobalStatusSummary(){
+  const el = document.getElementById('statusText');
+  if (!el) return;
+  const currentState = primaryStatusState();
+  el.textContent = currentState;
+  el.style.color = ({
+    'connected':'green',
+    'connecting':'orange',
+    'listening':'blue',
+    'starting':'orange',
+    'not-connected':'#666',
+    'error':'red'
+  })[currentState] || '#333';
+}
+
+function updateActiveRoleSummary(){
+  const labels = [];
+  if (panelHasLiveConnection('serverClient')) labels.push(CONNECTION_FORMS.serverClient.roleLabel);
+  if (panelHasLiveConnection('clientServer')) labels.push(CONNECTION_FORMS.clientServer.roleLabel);
+  setActiveRoleLabel(labels.length ? labels.join(' + ') : 'No active endpoint');
+}
 
 function svgIcon(kind){
   const base = {
@@ -156,6 +217,12 @@ function renderHistory(){
 }
 
 async function pollActionsOnce(){
+  const session = connectionPollSession;
+  if (!connectionPollingEnabled) {
+    actionsPollTimer = null;
+    return;
+  }
+  actionsPollInFlight = true;
   try {
     const res = await fetch('/api/actions');
     if (!res.ok) throw new Error('status ' + res.status);
@@ -173,8 +240,13 @@ async function pollActionsOnce(){
     // Only surface fetch errors if we previously had a message; else remain idle
     setFooterMessage('Action log unavailable', 'warn');
   } finally {
-    if (!pollingPaused){
-      actionsPollTimer = setTimeout(pollActionsOnce, ACTIONS_POLL_INTERVAL);
+    actionsPollInFlight = false;
+    if (!pollingPaused && connectionPollingEnabled && session === connectionPollSession){
+      const summaryState = primaryStatusState();
+      const actionDelay = (summaryState === 'connected' || summaryState === 'listening')
+        ? ACTIONS_POLL_INTERVAL_CONNECTED
+        : ACTIONS_POLL_INTERVAL_IDLE;
+      actionsPollTimer = setTimeout(pollActionsOnce, actionDelay);
     } else {
       actionsPollTimer = null;
     }
@@ -182,9 +254,40 @@ async function pollActionsOnce(){
 }
 
 function startActionsPolling(){
-  if (actionsPollTimer) return; // already polling
+  if (actionsPollTimer || actionsPollInFlight) return;
   setFooterMessage('Idle.', 'info');
   pollActionsOnce();
+}
+
+function stopActionsPolling(){
+  if (!actionsPollTimer) return;
+  clearTimeout(actionsPollTimer);
+  actionsPollTimer = null;
+}
+
+function startConnectionPolling(){
+  if (!connectionPollingEnabled){
+    connectionPollSession += 1;
+  }
+  connectionPollingEnabled = true;
+  if (!statusPollTimer && !statusPollInFlight) pollStatus();
+  if (!reportPollTimer && !reportPollInFlight) pollReportUpdates();
+  if (!actionsPollTimer) startActionsPolling();
+}
+
+function stopConnectionPolling(){
+  if (anyPanelActive()) return;
+  connectionPollingEnabled = false;
+  connectionPollSession += 1;
+  if (statusPollTimer){
+    clearTimeout(statusPollTimer);
+    statusPollTimer = null;
+  }
+  if (reportPollTimer){
+    clearTimeout(reportPollTimer);
+    reportPollTimer = null;
+  }
+  stopActionsPolling();
 }
 
 // Provide a hook to temporarily show a message (e.g., before first action appears)
@@ -196,10 +299,13 @@ function indicateFetchingModel(){
 document.addEventListener('visibilitychange', () => {
   if (document.hidden){
     pollingPaused = true;
+    if (actionsPollTimer) { clearTimeout(actionsPollTimer); actionsPollTimer = null; }
+    if (statusPollTimer) { clearTimeout(statusPollTimer); statusPollTimer = null; }
+    if (reportPollTimer) { clearTimeout(reportPollTimer); reportPollTimer = null; }
   } else {
     pollingPaused = false;
-    if (!actionsPollTimer){
-      startActionsPolling();
+    if (connectionPollingEnabled){
+      startConnectionPolling();
     }
   }
 });
@@ -238,8 +344,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
 function scheduleReconnect(){
   // Suppress auto-reconnect if user explicitly disconnected
-  if (manualDisconnect) return;
+  if (manualDisconnectByPanel.clientServer) return;
   if (!autoReconnectEnabled || reconnectPending) return;
+  const lastConnection = connectionDrafts.clientServer;
   if (!lastConnection.url || !lastConnection.port || !lastConnection.cp) return;
   reconnectPending = true;
   const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), MAX_BACKOFF_MS);
@@ -257,22 +364,30 @@ function scheduleReconnect(){
 }
 
 async function doReconnect(){
+  const lastConnection = connectionDrafts.clientServer;
   // Double-check suppression in case a timer fired after manualDisconnect was set
-  if (manualDisconnect) {
+  if (manualDisconnectByPanel.clientServer) {
     throw new Error('manual reconnect suppressed');
   }
+  startConnectionPolling();
   const res = await fetch('/api/connect', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
+      target: lastConnection.target,
       url: lastConnection.url,
       port: lastConnection.port,
       cp: lastConnection.cp,
-      is_direct: lastConnection.direct
+      is_direct: lastConnection.direct,
+      is_server: false,
+      application_role: lastConnection.applicationRole
     })
   });
   const data = await res.json();
-  if (data.error) throw new Error(data.error);
+  if (data.error) {
+    stopConnectionPolling();
+    throw new Error(data.error);
+  }
 }
 
 function renderModel(data, container){
@@ -897,28 +1012,30 @@ document.getElementById('refresh').addEventListener('click', async () => {
 // Legacy connect button listener removed (replaced by unified handler)
 
 // Input validation helpers and wiring
-function displayHostError(msg){
-  const el = document.getElementById('hostError');
+function displayHostError(id, msg){
+  const el = document.getElementById(id);
   if (!el) return;
   el.textContent = msg || '';
   el.style.display = msg ? 'inline-block' : 'none';
-  const input = document.getElementById('host');
+  const input = id === 'wsClientHostError' ? document.getElementById('wsClientHost') : null;
   if (input) {
     if (msg) input.classList.add('input-invalid'); else input.classList.remove('input-invalid');
   }
-  updateConnectButtonState();
 }
 
-function displayPortError(msg){
-  const el = document.getElementById('portError');
+function displayPortError(id, msg){
+  const el = document.getElementById(id);
   if (!el) return;
   el.textContent = msg || '';
   el.style.display = msg ? 'inline-block' : 'none';
-  const input = document.getElementById('port');
+  const input = id === 'wsClientPortError'
+    ? document.getElementById('wsClientPort')
+    : id === 'wsServerPortError'
+      ? document.getElementById('wsServerPort')
+      : null;
   if (input) {
     if (msg) input.classList.add('input-invalid'); else input.classList.remove('input-invalid');
   }
-  updateConnectButtonState();
 }
 
 // Validate host: allow IP v4, IPv6 (simple), or DNS name
@@ -946,152 +1063,194 @@ function validatePort(port){
   return true;
 }
 
-// Live validation on input
-const hostInput = document.getElementById('host');
-const portInput = document.getElementById('port');
-if (hostInput){
-  hostInput.addEventListener('input', () => {
-    const ok = validateHost(hostInput.value.trim());
-    displayHostError(ok ? '' : 'Invalid host');
-  });
-}
-if (portInput){
-  portInput.addEventListener('input', () => {
-    const ok = validatePort(portInput.value.trim());
-    displayPortError(ok ? '' : 'Invalid port');
-  });
-}
-
-// Disable connect button when inputs invalid
-function updateConnectButtonState(){
-  const hostVal = (document.getElementById('host') || {}).value || '';
-  const portVal = (document.getElementById('port') || {}).value || '';
-  const directMode = (document.getElementById('directMode') || {}).checked;
-  const isServerMode = !directMode;
-
-  // In server mode, host is not required
-  const hostOk = isServerMode || validateHost(hostVal.trim());
-  const portOk = validatePort(portVal.trim());
-  const btn = document.getElementById('connectBtn');
-  if (!btn) return;
-  if (hostOk && portOk) {
-    btn.disabled = false;
-    btn.classList.remove('btn-disabled');
-  } else {
-    btn.disabled = true;
-    btn.classList.add('btn-disabled');
+const CONNECTION_FORMS = {
+  clientServer: {
+    target: 'client-server',
+    hostId: 'wsClientHost',
+    hostErrorId: 'wsClientHostError',
+    portId: 'wsClientPort',
+    portErrorId: 'wsClientPortError',
+    cpId: 'wsClientCp',
+    buttonId: 'wsClientConnectBtn',
+    roleLabel: 'WS Client / IEC Server',
+    connectLabel: 'Connect',
+    busyLabel: 'Connecting…',
+    disconnectLabel: 'Disconnect',
+    isServer: false,
+    applicationRole: 'iec_server'
+  },
+  serverClient: {
+    target: 'server-client',
+    hostId: 'wsServerHost',
+    hostErrorId: null,
+    portId: 'wsServerPort',
+    portErrorId: 'wsServerPortError',
+    cpId: 'wsServerCp',
+    buttonId: 'wsServerConnectBtn',
+    roleLabel: 'WS Server / IEC Client',
+    connectLabel: 'Start Server',
+    busyLabel: 'Starting…',
+    disconnectLabel: 'Stop Server',
+    isServer: true,
+    applicationRole: 'iec_client'
   }
+};
+
+function setButtonState(button, enabled) {
+  if (!button) return;
+  button.disabled = !enabled;
+  button.classList.toggle('btn-disabled', !enabled);
 }
 
-// Initialize connect button state on load
-updateConnectButtonState();
+function updateConnectButtonState(formKey){
+  const form = CONNECTION_FORMS[formKey];
+  if (!form) return;
+  const hostValue = ((document.getElementById(form.hostId) || {}).value || '').trim();
+  const portValue = ((document.getElementById(form.portId) || {}).value || '').trim();
+  const hostOk = form.isServer || validateHost(hostValue);
+  const portOk = validatePort(portValue);
+  setButtonState(document.getElementById(form.buttonId), hostOk && portOk);
+}
 
-// Handle WS Client Mode checkbox to toggle UI
-const directModeCheckbox = document.getElementById('directMode');
-
-function updateUIForMode() {
-  const hostInput = document.getElementById('host');
-  const isClientMode = directModeCheckbox.checked;
-  const isServerMode = !isClientMode;
-
-  // Enable/disable host input based on mode
-  if (hostInput) {
-    hostInput.disabled = isServerMode;
-    hostInput.style.opacity = isServerMode ? '0.5' : '1';
+function bindConnectionValidation(formKey){
+  const form = CONNECTION_FORMS[formKey];
+  const hostInput = document.getElementById(form.hostId);
+  const portInput = document.getElementById(form.portId);
+  if (hostInput && !form.isServer){
+    hostInput.addEventListener('input', () => {
+      const ok = validateHost(hostInput.value.trim());
+      displayHostError(form.hostErrorId, ok ? '' : 'Invalid host');
+      updateConnectButtonState(formKey);
+    });
   }
-
-  // Clear host error when switching to server mode
-  if (isServerMode) {
-    displayHostError('');
+  if (portInput){
+    portInput.addEventListener('input', () => {
+      const ok = validatePort(portInput.value.trim());
+      displayPortError(form.portErrorId, ok ? '' : 'Invalid port');
+      updateConnectButtonState(formKey);
+    });
   }
+  updateConnectButtonState(formKey);
+}
 
-  // Update connect button state
-  updateConnectButtonState();
+function setActiveRoleLabel(text){
+  const el = document.getElementById('activeRoleText');
+  if (el) el.textContent = text;
+}
 
-  // Update button text
-  const connectBtn = document.getElementById('connectBtn');
-  if (connectBtn) {
-    const statusEl = document.getElementById('statusText');
-    const currentStatus = statusEl ? statusEl.textContent : 'not-connected';
-    const baseLabels = ['Connect','Start Server'];
-    if (baseLabels.includes(connectBtn.textContent) || ['not-connected','error'].includes(currentStatus)){
-      connectBtn.textContent = isServerMode ? 'Start Server' : 'Connect';
+function syncConnectionButtons(){
+  Object.entries(CONNECTION_FORMS).forEach(([key, form]) => {
+    const btn = document.getElementById(form.buttonId);
+    if (!btn) return;
+    const state = panelStates[key];
+    switch(state){
+      case 'connected':
+      case 'listening':
+        btn.textContent = form.disconnectLabel;
+        break;
+      case 'connecting':
+      case 'starting':
+        btn.textContent = form.busyLabel;
+        break;
+      default:
+        btn.textContent = form.connectLabel;
     }
-  }
+  });
 }
 
-if (directModeCheckbox) {
-  directModeCheckbox.addEventListener('change', updateUIForMode);
-  updateUIForMode();
-}
-
-async function handleUnifiedConnectionButton(){
-  const btn = document.getElementById('connectBtn');
+async function handleConnectionButton(formKey){
+  const form = CONNECTION_FORMS[formKey];
+  const btn = document.getElementById(form.buttonId);
   if (!btn) return;
-  const direct = document.getElementById('directMode').checked;
-  const isServer = !direct;
   const label = btn.textContent.trim();
-  if (['Disconnect','Stop Server'].includes(label)){
+  if ([form.disconnectLabel].includes(label)){
     try {
       btn.disabled = true;
-      btn.textContent = label === 'Disconnect' ? 'Disconnecting…' : 'Stopping…';
+      btn.textContent = form.isServer ? 'Stopping…' : 'Disconnecting…';
       // Set manualDisconnect BEFORE issuing the request to avoid race with pollStatus scheduling
-      manualDisconnect = true;
+      manualDisconnectByPanel[formKey] = true;
       // Cancel any pending reconnect timers
       if (reconnectTimerId){
         clearTimeout(reconnectTimerId);
         reconnectTimerId = null;
       }
       reconnectPending = false;
-      const res = await fetch('/api/disconnect', {method:'POST'});
+      const res = await fetch('/api/disconnect', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({target: form.target})
+      });
       const data = await res.json();
       if (data.error){
         alert('Disconnect error: ' + data.error);
       }
       markLogicalDevicesOld();
-      const st = document.getElementById('statusText');
-      if (st) st.textContent = 'not-connected';
-      btn.textContent = isServer ? 'Start Server' : 'Connect';
+      panelStates[formKey] = 'not-connected';
+      updateGlobalStatusSummary();
+      updateActiveRoleSummary();
+      syncConnectionButtons();
+      stopConnectionPolling();
     } catch(e){
       console.error('disconnect failed', e);
-      btn.textContent = isServer ? 'Start Server' : 'Connect';
+      syncConnectionButtons();
     } finally {
       btn.disabled = false;
     }
     return;
   }
   // Initiate connection
-  const url = document.getElementById('host').value.trim();
-  const port = document.getElementById('port').value.trim();
-  const cp = document.getElementById('cp').value;
-  const hostValid = isServer || validateHost(url);
+  const url = document.getElementById(form.hostId).value.trim();
+  const port = document.getElementById(form.portId).value.trim();
+  const cp = document.getElementById(form.cpId).value;
+  const hostValid = form.isServer || validateHost(url);
   const portValid = validatePort(port);
-  displayHostError(isServer ? '' : (hostValid ? '' : 'Invalid host (hostname or IP address expected)'));
-  displayPortError(portValid ? '' : 'Invalid port (1-65535 expected)');
+  if (form.hostErrorId) {
+    displayHostError(form.hostErrorId, hostValid ? '' : 'Invalid host (hostname or IP address expected)');
+  }
+  displayPortError(form.portErrorId, portValid ? '' : 'Invalid port (1-65535 expected)');
   if (!hostValid || !portValid) return;
-  lastConnection = {url, port, cp, direct};
-  const payload = isServer ? {port, cp, is_server: true} : {url, port, cp, is_direct: direct, is_server: false};
+  connectionDrafts[formKey] = {
+    url,
+    port,
+    cp,
+    direct: !form.isServer,
+    isServer: form.isServer,
+    applicationRole: form.applicationRole,
+    panel: formKey,
+    target: form.target
+  };
+  const payload = form.isServer
+    ? {target: form.target, url, port, cp, is_direct: true, is_server: true, application_role: form.applicationRole}
+    : {target: form.target, url, port, cp, is_direct: true, is_server: false, application_role: form.applicationRole};
+  window.currentConnectionDraft = payload;
   try {
     btn.disabled = true;
-    btn.textContent = isServer ? 'Starting…' : 'Connecting…';
+    btn.textContent = form.busyLabel;
+    panelStates[formKey] = form.isServer ? 'listening' : 'connecting';
+    startConnectionPolling();
     const res = await fetch('/api/connect', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
     const data = await res.json();
     if (data.error){
+      panelStates[formKey] = 'not-connected';
+      updateGlobalStatusSummary();
+      updateActiveRoleSummary();
+      stopConnectionPolling();
       alert('Connect error: ' + data.error);
-      btn.textContent = isServer ? 'Start Server' : 'Connect';
+      syncConnectionButtons();
       return;
     }
     // User is actively connecting again; clear manual disconnect suppression
-    manualDisconnect = false;
+    manualDisconnectByPanel[formKey] = false;
     // Safe to clear any stale reconnect timer state
     if (reconnectTimerId){
       clearTimeout(reconnectTimerId);
       reconnectTimerId = null;
     }
-    const st = document.getElementById('statusText');
-    if (st) st.textContent = isServer ? 'listening' : 'connecting';
-    btn.textContent = isServer ? 'Stop Server' : 'Disconnect';
-    if (!isServer){
+    panelStates[formKey] = form.isServer ? 'listening' : 'connecting';
+    updateGlobalStatusSummary();
+    updateActiveRoleSummary();
+    syncConnectionButtons();
+    if (!form.isServer){
       setTimeout(fetchModel, 1500);
     } else {
       const treeContainer = document.getElementById('tree');
@@ -1103,19 +1262,23 @@ async function handleUnifiedConnectionButton(){
       treeContainer.appendChild(msg);
     }
   } catch(e){
+    panelStates[formKey] = 'not-connected';
+    updateGlobalStatusSummary();
+    updateActiveRoleSummary();
+    stopConnectionPolling();
     console.error('connect failed', e);
-    btn.textContent = isServer ? 'Start Server' : 'Connect';
+    syncConnectionButtons();
   } finally {
     btn.disabled = false;
   }
 }
 
-document.getElementById('connectBtn').addEventListener('click', handleUnifiedConnectionButton);
+bindConnectionValidation('clientServer');
+bindConnectionValidation('serverClient');
+document.getElementById('wsClientConnectBtn').addEventListener('click', () => handleConnectionButton('clientServer'));
+document.getElementById('wsServerConnectBtn').addEventListener('click', () => handleConnectionButton('serverClient'));
 
 document.getElementById('autoReconnectBtn').addEventListener('click', () => {
-  const directModeChecked = (document.getElementById('directMode')||{}).checked;
-  // Ignore clicks in passive/server mode
-  if (!directModeChecked) return;
   autoReconnectEnabled = !autoReconnectEnabled;
   const btn = document.getElementById('autoReconnectBtn');
   btn.dataset.enabled = autoReconnectEnabled ? 'true' : 'false';
@@ -1123,7 +1286,7 @@ document.getElementById('autoReconnectBtn').addEventListener('click', () => {
   if (autoReconnectEnabled){
     reconnectAttempt = 0;
     // Only schedule if previous state was connected and we are now disconnected due to remote closure
-    if (!manualDisconnect && lastConnectionState === 'connected'){
+    if (!manualDisconnectByPanel.clientServer && panelStates.clientServer === 'connected'){
       scheduleReconnect();
     }
   }
@@ -2555,68 +2718,36 @@ document.addEventListener('contextmenu', (e) => {
   }
 });
 
-let lastConnectionState = null;
-
 async function pollStatus(){
+  const session = connectionPollSession;
+  statusPollTimer = null;
+  if (!connectionPollingEnabled) return;
+  statusPollInFlight = true;
   try {
-    const res = await fetch('/api/status');
-    const data = await res.json();
-    const el = document.getElementById('statusText');
-    if(data.state){
-      el.textContent = data.state;
-      el.style.color = ({
-        'connected':'green',
-        'connecting':'orange',
-        'listening':'blue',
-        'starting':'orange',
-        'not-connected':'#666',
-        'error':'red'
-      })[data.state] || '#333';
+    const res = await fetch('/api/statuses');
+    const statuses = await res.json();
+    const serverClientStatus = (statuses && statuses['server-client']) || {state: 'not-connected'};
+    const clientServerStatus = (statuses && statuses['client-server']) || {state: 'not-connected'};
 
-      // Adjust unified connect button label based on state
-      const btn = document.getElementById('connectBtn');
-      if (btn){
-        const direct = (document.getElementById('directMode')||{}).checked;
-        const isServer = !direct;
-        switch(data.state){
-          case 'connected':
-            btn.textContent = isServer ? 'Stop Server' : 'Disconnect';
-            break;
-          case 'listening':
-            btn.textContent = 'Stop Server';
-            break;
-          case 'connecting':
-          case 'starting':
-            btn.textContent = isServer ? 'Starting…' : 'Connecting…';
-            break;
-          case 'not-connected':
-          case 'error':
-            btn.textContent = isServer ? 'Start Server' : 'Connect';
-            break;
-        }
-      }
+      panelStates.serverClient = serverClientStatus.state || 'not-connected';
+      panelStates.clientServer = clientServerStatus.state || 'not-connected';
 
-      // Enable/disable Auto Reconnect button (only for active/client mode)
+      updateGlobalStatusSummary();
+      updateActiveRoleSummary();
+      syncConnectionButtons();
+
       const autoBtn = document.getElementById('autoReconnectBtn');
       if (autoBtn){
-        const directModeChecked = (document.getElementById('directMode')||{}).checked;
-        if (!directModeChecked){
-          autoBtn.disabled = true;
-          autoBtn.classList.add('btn-disabled');
-        } else {
-          autoBtn.disabled = false;
-          autoBtn.classList.remove('btn-disabled');
-        }
+        autoBtn.disabled = false;
+        autoBtn.classList.remove('btn-disabled');
       }
 
-      // Detect transition from listening to connected (client connected in server mode)
-      if (lastConnectionState === 'listening' && data.state === 'connected') {
+      if (previousPanelStates.serverClient === 'listening' && panelStates.serverClient === 'connected') {
         console.log('[Status] Client connected in server mode, fetching model');
         fetchModel();
       }
 
-      // Detect transition from connected to listening (client disconnected in server mode)
-      if (lastConnectionState === 'connected' && data.state === 'listening') {
+      if (previousPanelStates.serverClient === 'connected' && panelStates.serverClient === 'listening') {
         console.log('[Status] Client disconnected in server mode, clearing model tree');
         const treeContainer = document.getElementById('tree');
         treeContainer.innerHTML = '';
@@ -2628,34 +2759,52 @@ async function pollStatus(){
         treeContainer.appendChild(msg);
       }
 
-      // If we transition to not-connected or error after having a model, mark old
-      if ((data.state === 'not-connected' || data.state === 'error') && document.getElementById('tree').children.length){
+      if ((panelStates.serverClient === 'not-connected' || panelStates.serverClient === 'error') && document.getElementById('tree').children.length){
         markLogicalDevicesOld();
-        const direct = (document.getElementById('directMode')||{}).checked;
-        // Auto reconnect only in active mode when previous state was connected (remote closure)
-        if (direct && lastConnectionState === 'connected'){
-          scheduleReconnect(); // scheduleReconnect respects manualDisconnect & autoReconnectEnabled
+      }
+
+      if ((panelStates.clientServer === 'not-connected' || panelStates.clientServer === 'error') && previousPanelStates.clientServer === 'connected'){
+        if (!manualDisconnectByPanel.clientServer){
+          scheduleReconnect();
         }
       }
 
-      // Remember last state
-      lastConnectionState = data.state;
-    }
+      previousPanelStates.serverClient = panelStates.serverClient;
+      previousPanelStates.clientServer = panelStates.clientServer;
+
+      if (!anyPanelActive()) {
+        stopConnectionPolling();
+      }
   } catch(e){
-    const el = document.getElementById('statusText');
-    el.textContent = 'error';
-    el.style.color = 'red';
+    panelStates.serverClient = 'error';
+    panelStates.clientServer = 'error';
+    updateGlobalStatusSummary();
+    syncConnectionButtons();
   } finally {
-    setTimeout(pollStatus, 2000);
+    statusPollInFlight = false;
+    if (!pollingPaused && connectionPollingEnabled && session === connectionPollSession) {
+      const summaryState = primaryStatusState();
+      const statusDelay = (summaryState === 'connected' || summaryState === 'listening')
+        ? STATUS_POLL_INTERVAL_CONNECTED
+        : STATUS_POLL_INTERVAL_IDLE;
+      statusPollTimer = setTimeout(pollStatus, statusDelay);
+    }
   }
 }
 
-pollStatus();
-
 // Poll for report updates
 async function pollReportUpdates() {
+  const session = connectionPollSession;
+  reportPollTimer = null;
+  if (!connectionPollingEnabled) return;
+  reportPollInFlight = true;
   try {
-    const res = await fetch('/api/report-updates');
+    const shouldPollReports = !document.hidden && panelStates.serverClient === 'connected';
+    if (!shouldPollReports) {
+      return;
+    }
+
+    const res = await fetch('/api/report-updates?target=server-client');
     const data = await res.json();
     if (data.updates && data.updates.length > 0) {
       data.updates.forEach(update => {
@@ -2665,7 +2814,13 @@ async function pollReportUpdates() {
   } catch(e) {
     console.error('Error polling report updates:', e);
   } finally {
-    setTimeout(pollReportUpdates, 500);  // Poll frequently for report updates
+    reportPollInFlight = false;
+    if (!pollingPaused && connectionPollingEnabled && session === connectionPollSession) {
+      const reportDelay = panelStates.serverClient === 'connected'
+        ? REPORT_POLL_INTERVAL_CONNECTED
+        : REPORT_POLL_INTERVAL_IDLE;
+      reportPollTimer = setTimeout(pollReportUpdates, reportDelay);
+    }
   }
 }
 
@@ -2708,11 +2863,7 @@ function updateTreeWithReportData(dataRef, values) {
   console.log('[Report] Tree updated for:', dataRef);
 }
 
-pollReportUpdates();
-
-// Start action polling & auto-fetch model
-startActionsPolling();
-fetchModel();
+setFooterMessage('Idle.', 'info', {overrideFreeze:true});
 
 // ==================== Message Monitor ====================
 let messagesFrozen = false;
@@ -4276,4 +4427,3 @@ document.getElementById('writeValueModal').addEventListener('click', (e) => {
     document.getElementById('writeValueModal').classList.add('hidden');
   }
 });
-
