@@ -15,56 +15,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Deprecated: import from ws61850.security.oauth2.* instead.
+
+This module remains as a backward-compatible shim so that existing callers
+(examples/*/connection/runtime.py, endpoint.py) keep working without changes.
+"""
+
 import base64
 import json
-import ssl
 
-import aiohttp
 import jwt
 import requests
 from jwt import ExpiredSignatureError, InvalidTokenError, algorithms, decode
 
+from ws61850.security.oauth2.client_credentials import ClientCredentialsProvider
+
 
 async def get_access_token(url, client_id, client_secret, cafile):
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-
-    body = {
-        "grant_type": "client_credentials",
-        "client_id": client_id,
-        "client_secret": client_secret,
-    }
-
-    ssl_context = ssl.create_default_context(cafile=cafile) if cafile else None
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=headers, data=body, ssl=ssl_context) as response:
-            token_response = await response.json()
-            access_token = token_response.get("access_token")
-
-            return access_token
+    provider = ClientCredentialsProvider(
+        token_url=url,
+        client_id=client_id,
+        client_secret=client_secret,
+        cafile=cafile,
+    )
+    return await provider.get_access_token()
 
 
 def get_jwt_algorithm(token):
     header_b64 = token.split(".")[0]
-
     padding = "=" * (-len(header_b64) % 4)
     header_b64 += padding
-
     header_json = base64.urlsafe_b64decode(header_b64).decode("utf-8")
     header = json.loads(header_json)
-
     return header.get("alg", "No 'alg' found")
 
 
 def check_token_validity_and_expiry(token, kc_cert, cert, cert_endpoint, token_issuer):
     session = requests.Session()
-    # session.cert = cert
-    jwks_url = cert_endpoint
     session.verify = kc_cert
-    response = session.get(jwks_url)
-
+    response = session.get(cert_endpoint)
     jwks_data = response.json()
-    header = jwt.get_unverified_header(token)  # Extract 'kid' from token
+    header = jwt.get_unverified_header(token)
     kid = header["kid"]
     jwk = next(key for key in jwks_data["keys"] if key["kid"] == kid)
     signing_key = algorithms.RSAAlgorithm.from_jwk(jwk)
@@ -77,13 +69,10 @@ def check_token_validity_and_expiry(token, kc_cert, cert, cert_endpoint, token_i
             audience="account",
             issuer=token_issuer,
         )
-
         return True, decoded["exp"]
-
     except ExpiredSignatureError:
         print("Token has expired")
         return False, None
-
     except InvalidTokenError as e:
         print("Invalid token:", e)
         return False, None
@@ -93,11 +82,7 @@ def introspect_token(id, secret, url, access_token, kc_cert, certs):
     if access_token != "":
         data = {"token": access_token, "client_id": id, "client_secret": secret}
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-
         response = requests.post(url, headers=headers, data=data, verify=kc_cert, cert=certs)
-
         token_response = response.json()
-        is_active = token_response.get("active")
-
-        return is_active
+        return token_response.get("active")
     return None
