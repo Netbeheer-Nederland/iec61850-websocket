@@ -11,7 +11,7 @@ from bff.connection.security import SecurityContext, SecurityFactory
 from bff.connection.transports import WsClientTransport, WsServerTransport
 from bff.state import RuntimeState
 from ws61850.asn1.encode_decode import encode_tpaa_message
-from ws61850.endpoint import EndpointProtocol
+from ws61850.endpoint import ActiveEndpoint, EndpointProtocol, PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.client.request_handling import create_token_refresh
 
@@ -26,7 +26,6 @@ class ConnectionRuntime:
         profile: ConnectionProfile,
         target: str,
         *,
-        endpoint_cls: type,
         client_cls: type[IEC61850Client],
         server_factory: ServerFactory | None,
         security_factory: SecurityFactory | None = None,
@@ -35,7 +34,6 @@ class ConnectionRuntime:
         self.state = state
         self.profile = profile
         self.target = target
-        self.endpoint_cls = endpoint_cls
         self.client_cls = client_cls
         self.server_factory = server_factory
         self.security_factory = security_factory or SecurityFactory()
@@ -77,7 +75,7 @@ class ConnectionRuntime:
                 transport_role=self.profile.transport_role,
             )
             self.binding = self._create_binding()
-            self.endpoint = self.endpoint_cls(
+            kwargs = dict(
                 is_direct=self.profile.is_direct,
                 tls_config=self.security_context.tls_config,
                 oauth_enable=self.security_context.oauth_enable,
@@ -85,6 +83,10 @@ class ConnectionRuntime:
                 token_issuer=self.security_context.token_issuer,
                 kc_cert=self.security_context.kc_cert,
             )
+            if self.profile.transport_role == "ws_server":
+                self.endpoint = PassiveEndpoint(**kwargs)
+            else:
+                self.endpoint = ActiveEndpoint(**kwargs, try_reconnect=True)
             self.endpoint.send_msg_callback = lambda msg, ts: self.manager.log_message(
                 "send",
                 msg,

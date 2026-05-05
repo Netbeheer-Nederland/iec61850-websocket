@@ -13,7 +13,6 @@ from bff.connection.security import SecurityFactory
 from bff.protocol_utils import convert_bytes_to_hex
 from bff.state import RuntimeState
 from ws61850.endpoint import EndpointProtocol, WebSocketInfo
-from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.data_model.example_ieds import build_model1, build_model2
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
@@ -49,12 +48,10 @@ class ConnectionManager:
         self,
         state: RuntimeState,
         *,
-        endpoint_cls: type = WebSocketEndpoint,
         client_cls: type[IEC61850Client] = IEC61850Client,
         server_factory: Callable[[str], IEC61850Server] | None = None,
         security_factory: SecurityFactory | None = None,
     ) -> None:
-        self.endpoint_cls = endpoint_cls
         self.client_cls = client_cls
         self.server_factory = server_factory or create_default_server
         self.security_factory = security_factory or SecurityFactory()
@@ -311,7 +308,6 @@ class ConnectionManager:
                 state,
                 profile,
                 target,
-                endpoint_cls=self.endpoint_cls,
                 client_cls=self.client_cls,
                 server_factory=self.server_factory,
                 security_factory=self.security_factory,
@@ -354,7 +350,7 @@ class ConnectionManager:
 
     def ensure_connection(
         self, timeout: int = 10, *, target: str | None = None
-    ) -> tuple[Any, WebSocketEndpoint, WebSocketInfo, asyncio.AbstractEventLoop]:
+    ) -> tuple[Any, EndpointProtocol, WebSocketInfo, asyncio.AbstractEventLoop]:
         runtime = self._get_runtime(target)
         if runtime is None:
             raise RuntimeError("not-connected")
@@ -362,7 +358,7 @@ class ConnectionManager:
 
     def invoke(
         self,
-        coro_factory: Callable[[Any, WebSocketEndpoint, WebSocketInfo], Any],
+        coro_factory: Callable[[Any, EndpointProtocol, WebSocketInfo], Any],
         timeout: int = 10,
         *,
         locked: bool = True,

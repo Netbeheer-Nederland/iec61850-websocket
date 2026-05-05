@@ -16,7 +16,6 @@ class WsClientTransport:
         security: SecurityContext,
     ) -> None:
         await endpoint.start(
-            "active",
             profile.host,
             profile.port,
             profile.cp,
@@ -38,7 +37,7 @@ class WsServerTransport:
         profile: ConnectionProfile,
         security: SecurityContext,
     ) -> None:
-        await endpoint.start("passive", profile.host, profile.port)
+        await endpoint.start(profile.host, profile.port)
 
     async def wait_until_listening(self, endpoint: EndpointProtocol, start_task: asyncio.Task[Any] | None) -> None:
         if start_task is None:
