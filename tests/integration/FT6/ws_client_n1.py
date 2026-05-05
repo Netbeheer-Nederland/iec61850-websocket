@@ -15,32 +15,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import logging
+import sys
 from random import randint
 
 from testing.ieds.high_level_model import make_ied_model1
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
-maxMessageSize = 65000
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 
-async def toggle_custom_value(iec61150_server, obj_ref):
+async def toggle_custom_value(iec61850_server, obj_ref):
     while True:
         value = randint(1, 5)
-        await iec61150_server.update_value(obj_ref, value)
-        print(f"Value of {obj_ref} changed to {value}")
+        await iec61850_server.update_value(obj_ref, value)
+        logger.info("Value of %s changed to %s", obj_ref, value)
         await asyncio.sleep(5)
 
 
 async def main():
-    ep_wsClient_1 = WebSocketEndpoint()
-    iec61850_server_1 = IEC61850Server(make_ied_model1(), "cp1")
-    toggle_task_1 = asyncio.create_task(toggle_custom_value(iec61850_server_1, "LD0/DGEN1.DEROpSt.stVal"))
-    ep_wsClient_1.add_iec61850_server(iec61850_server_1)
+    endpoint = ActiveEndpoint()
 
-    task1 = asyncio.create_task(ep_wsClient_1.start("active", "localhost", 8765, "cp1"))
+    iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
+    toggle_task = asyncio.create_task(toggle_custom_value(iec61850_server, "LD0/DGEN1.DEROpSt.stVal"))
+    endpoint.add_iec61850_server(iec61850_server)
 
-    await asyncio.gather(task1, toggle_task_1)
+    logger.info("Connecting to localhost:8765 cp=cp1")
+    await asyncio.gather(endpoint.start("localhost", 8765, "cp1"), toggle_task)
 
 
 if __name__ == "__main__":

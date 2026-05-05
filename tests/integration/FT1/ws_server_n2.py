@@ -15,24 +15,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import logging
+import sys
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
-# maxMessageSize_server = 65000
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 
 async def main():
-    protocol = ["iec61850-tpaa-jer-v1"]
-    # websocket server
-    ep_ws_server = WebSocketEndpoint()
+    endpoint = PassiveEndpoint()
 
-    iec61850_client = IEC61850Client("cp1")
-    ep_ws_server.add_iec61850_client(iec61850_client)
+    client = IEC61850Client("cp1")
+    endpoint.add_iec61850_client(client)
 
-    server_task = asyncio.create_task(ep_ws_server.start("passive", "localhost", 8765, protocol=protocol))
-
-    await server_task
+    logger.info("Waiting for client connections on localhost:8765 (JER only)")
+    await endpoint.start("localhost", 8765, protocol=["iec61850-tpaa-jer-v1"])
 
 
 if __name__ == "__main__":

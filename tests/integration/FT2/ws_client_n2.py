@@ -15,34 +15,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import logging
+import sys
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
-
-async def test_protocol_rejection(endpoint, mode, host, port, cp, protocol):
-    try:
-        await endpoint.start(mode, host, port, cp, protocol=protocol)
-
-    except Exception as e:
-        print(f"Caught exception type: {type(e).__name__}")
-        print(f"Error Message: {e}")
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 
 async def main():
-    # websocket server
-    ep_wsClient_1 = WebSocketEndpoint(is_direct=True)
-    iec61850_client_1 = IEC61850Client("cp1")
-    ep_wsClient_1.add_iec61850_client(iec61850_client_1)
-    protocol = ["iec61850-tpaa-ber-v1"]
+    endpoint = ActiveEndpoint(is_direct=True, try_reconnect=False)
 
-    await test_protocol_rejection(
-        ep_wsClient_1, mode="active", host="localhost", port=8765, cp="cp1", protocol=protocol
-    )
+    client = IEC61850Client("cp1")
+    endpoint.add_iec61850_client(client)
+
+    logger.info("Connecting to localhost:8765 cp=cp1 (BER, direct)")
+    try:
+        await endpoint.start("localhost", 8765, "cp1", protocol=["iec61850-tpaa-ber-v1"])
+    except Exception as e:
+        logger.info("Caught exception type: %s — %s", type(e).__name__, e)
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nTest stopped by user.")
+        logger.info("Test stopped by user.")

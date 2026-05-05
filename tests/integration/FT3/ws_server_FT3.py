@@ -15,8 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import logging
+import sys
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.server.request_handling import (
     print_direct_da,
@@ -26,36 +28,34 @@ from ws61850.iec61850.server.request_handling import (
     retrieve_sdos,
 )
 
-maxMessageSize_server = 65000
-
-
-def callback_called(result, param):
-    print("callback called: ", result)
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 
 async def main():
-    # websocket server
-    ep_wsServer = WebSocketEndpoint()
+    endpoint = PassiveEndpoint()
 
-    iec61850_client = IEC61850Client("cp1")
-    ep_wsServer.add_iec61850_client(iec61850_client)
+    client = IEC61850Client("cp1")
+    endpoint.add_iec61850_client(client)
 
-    server_task = asyncio.create_task(ep_wsServer.start("passive", "localhost", 8765))
+    server_task = asyncio.create_task(endpoint.start("localhost", 8765))
 
-    await ep_wsServer.client_list[0].ready_event.wait()
-    if ep_wsServer.client_list[0].is_connected is True:
-        websocket_info = ep_wsServer.get_websocket_info(ep_wsServer.client_list[0])
+    await client.ready_event.wait()
+    if client.is_connected is True:
+        websocket_info = endpoint.get_websocket_info(client)
         if websocket_info is not None:
             try:
-                server_list = await ep_wsServer.client_list[0].get_server_directory(websocket_info, None, None)
+                server_list = await client.get_server_directory(websocket_info, None, None)
                 for ld_index, ld_inst in enumerate(server_list):
                     is_last_ld = ld_index == len(server_list) - 1
                     ld_prefix = "└── " if is_last_ld else "├── "
                     print(f"{ld_prefix}{ld_inst}")
 
-                    ln_refs = await ep_wsServer.client_list[0].get_logical_device_directory(
-                        ld_inst, websocket_info, None, None
-                    )
+                    ln_refs = await client.get_logical_device_directory(ld_inst, websocket_info, None, None)
                     for ln_index, ln_inst in enumerate(ln_refs):
                         is_last_ln = ln_index == len(ln_refs) - 1
                         ln_prefix = (
@@ -65,38 +65,31 @@ async def main():
                         )
                         print(f"{ln_prefix}{ln_inst}")
 
-                        ln_directory_urcb = await ep_wsServer.client_list[0].get_logical_node_directory(
+                        ln_directory_urcb = await client.get_logical_node_directory(
                             ld_inst, ln_inst, "urcb", websocket_info, None, None
                         )
-                        for urcb_index, urcb_inst in enumerate(ln_directory_urcb):
-                            urcb_prefix = "        └── [URCB] "
+                        for urcb_inst in ln_directory_urcb:
+                            print(f"        └── [URCB] {urcb_inst}")
 
-                            print(f"{urcb_prefix}{urcb_inst}")
-
-                        ln_directory_brcb = await ep_wsServer.client_list[0].get_logical_node_directory(
+                        ln_directory_brcb = await client.get_logical_node_directory(
                             ld_inst, ln_inst, "brcb", websocket_info, None, None
                         )
-                        for brcb_index, brcb_inst in enumerate(ln_directory_brcb):
-                            brcb_prefix = "        └── [BRCB] "
+                        for brcb_inst in ln_directory_brcb:
+                            print(f"        └── [BRCB] {brcb_inst}")
 
-                            print(f"{brcb_prefix}{brcb_inst}")
-
-                        ln_directory_ds = await ep_wsServer.client_list[0].get_logical_node_directory(
+                        ln_directory_ds = await client.get_logical_node_directory(
                             ld_inst, ln_inst, "dataset", websocket_info, None, None
                         )
-                        for ds_index, ds_inst in enumerate(ln_directory_ds):
-                            ds_prefix = "        └── [DS] "
-
-                            print(f"{ds_prefix}{ds_inst}")
-                            ds_items = await ep_wsServer.client_list[0].get_dataset_directory(
+                        for ds_inst in ln_directory_ds:
+                            print(f"        └── [DS] {ds_inst}")
+                            ds_items = await client.get_dataset_directory(
                                 ld_inst, ln_inst, ds_inst, websocket_info, None, None
                             )
-                            for item_index, item_inst in enumerate(ds_items):
+                            for item_inst in ds_items:
                                 item_text = item_inst["ref"] + f"[{item_inst['fc']}]"
-                                item_prefix = "            └── "
-                                print(f"{item_prefix}{item_text}")
+                                print(f"            └── {item_text}")
 
-                        ln_directory_do = await ep_wsServer.client_list[0].get_logical_node_directory(
+                        ln_directory_do = await client.get_logical_node_directory(
                             ld_inst, ln_inst, "dataObject", websocket_info, None, None
                         )
                         for do_index, do_inst in enumerate(ln_directory_do):
@@ -104,7 +97,7 @@ async def main():
                             do_prefix = "        └── " if is_last_do else "        ├── "
                             print(f"{do_prefix}{do_inst}")
 
-                            da_def = await ep_wsServer.client_list[0].get_data_definition(
+                            da_def = await client.get_data_definition(
                                 ld_inst + "/" + ln_inst + "." + do_inst, websocket_info, None, None
                             )
 
@@ -114,25 +107,22 @@ async def main():
                                 retrieve_attributes_sdo(da_def, sdo_inst)
 
                             da_list = retrieve_das(da_def)
-                            if (len(da_list)) != 0:
+                            if len(da_list) != 0:
                                 print_direct_da(da_list)
 
-                print("running the negative test cases:")
-                ln_refs = await ep_wsServer.client_list[0].get_logical_device_directory(
-                    "wrong_ld_name", websocket_info, None, None
-                )
-                print(ln_refs)
+                logger.info("Running negative test cases:")
+                ln_refs = await client.get_logical_device_directory("wrong_ld_name", websocket_info, None, None)
+                logger.info("wrong LD result: %s", ln_refs)
 
-                ln_directory_ds = await ep_wsServer.client_list[0].get_logical_node_directory(
+                ln_directory_ds = await client.get_logical_node_directory(
                     "LD0", "wrong_ln", "dataset", websocket_info, None, None
                 )
-                print(ln_directory_ds)
+                logger.info("wrong LN result: %s", ln_directory_ds)
 
             except Exception as e:
-                print("handler not called:", e)
-
+                logger.exception("Service call failed: %s", e)
     else:
-        print("did not enter first if ")
+        logger.warning("Client did not connect")
 
     await server_task
 

@@ -15,11 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import logging
+import sys
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
-maxMessageSize_server = 65000
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 oper_val_wrong_type = {
     "ref": "LD0/DWMX1.WMaxSpt",
@@ -76,102 +83,57 @@ oper_val_incorrect_do = {
     "check": {"synchroCheck": False, "interlockCheck": False},
 }
 
-oper_val_setMag = {
-    "ref": "DWMX1.WMaxSet",
-    "ctlVal": ("float32", 11.86),
-    "origin": {"orCat": "stationControl", "orIdent": b"ORIGIN_ID_333"},
-    "ctlNum": 10,
-    "t": {
-        "secondSinceEpoch": 1757588367,
-        "fractionOfSecond": 8120140,
-        "timeQuality": {
-            "leapSecondsKown": False,
-            "clockFailure": False,
-            "clockNotSynchronized": False,
-            "timeAccuracy": 3,
-        },
-    },
-    "test": True,
-    "check": {"synchroCheck": False, "interlockCheck": False},
-}
-
 setMag_val = [{"name": "setMag", "data": ("structure", {"data": [("float32", 67.39)]})}]
 setMag_wrong = [{"name": "setMag", "data": ("structure", {"data": [("boolean", False)]})}]
 
 
 async def main():
-    # websocket server
-    ep_wsServer = WebSocketEndpoint()
+    endpoint = PassiveEndpoint()
 
-    iec61850_client = IEC61850Client("cp1")
-    ep_wsServer.add_iec61850_client(iec61850_client)
+    client = IEC61850Client("cp1")
+    endpoint.add_iec61850_client(client)
 
-    server_task = asyncio.create_task(ep_wsServer.start("passive", "localhost", 8765))
+    server_task = asyncio.create_task(endpoint.start("localhost", 8765))
 
-    await ep_wsServer.client_list[0].ready_event.wait()
-    if ep_wsServer.client_list[0].is_connected is True:
-        websocket_info = ep_wsServer.get_websocket_info(ep_wsServer.client_list[0])
+    await client.ready_event.wait()
+    if client.is_connected is True:
+        websocket_info = endpoint.get_websocket_info(client)
         if websocket_info is not None:
             try:
-                print("doing the negative test case: ")
-                da_val = await ep_wsServer.client_list[0].get_data_values(
-                    "LD0/DWMX1.WMaxSpt_wrong", "mx", True, websocket_info, None, None
-                )
-                print("result of getDataValues with a wrong reference", da_val)
+                logger.info("Running negative test cases:")
 
-                select_result = await ep_wsServer.client_list[0].select(
-                    "LD0/DWMX1.WMaxSetPct", websocket_info, None, None
-                )
-                print(select_result)
+                da_val = await client.get_data_values("LD0/DWMX1.WMaxSpt_wrong", "mx", True, websocket_info, None, None)
+                logger.info("getDataValues with wrong reference: %s", da_val)
 
-                operate_result = await ep_wsServer.client_list[0].operate(
-                    oper_val_wrong_type, websocket_info, None, None
-                )
-                print("result for incorrect data type in operate request", operate_result)
+                select_result = await client.select("LD0/DWMX1.WMaxSetPct", websocket_info, None, None)
+                logger.info("select result: %s", select_result)
 
-                operate_result = await ep_wsServer.client_list[0].operate(
-                    oper_val_incorrect_do, websocket_info, None, None
-                )
-                print(
-                    "result for incorrect data object for performing operate request",
-                    operate_result,
-                )
+                operate_result = await client.operate(oper_val_wrong_type, websocket_info, None, None)
+                logger.info("operate with incorrect data type: %s", operate_result)
 
-                set_val_res = await ep_wsServer.client_list[0].set_data_values(
-                    "LD0/DWMX1.WMaxSet.setMag_wrong",
-                    "sp",
-                    setMag_val,
-                    websocket_info,
-                    None,
-                    None,
-                )
+                operate_result = await client.operate(oper_val_incorrect_do, websocket_info, None, None)
+                logger.info("operate with incorrect data object: %s", operate_result)
 
-                print("result for setDataValue for a nonexistent object", set_val_res)
-
-                set_val_res = await ep_wsServer.client_list[0].set_data_values(
-                    "LD0/DWMX1.WMaxSet.setMag",
-                    "sp",
-                    setMag_wrong,
-                    websocket_info,
-                    None,
-                    None,
+                set_val_res = await client.set_data_values(
+                    "LD0/DWMX1.WMaxSet.setMag_wrong", "sp", setMag_val, websocket_info, None, None
                 )
-                #
-                print("result for setDataValue for a incorrect type of value", set_val_res)
-                #
-                select_result = await ep_wsServer.client_list[0].select("LD0/DWMX1.WMaxSpt", websocket_info, None, None)
-                print("select result: ", select_result)
+                logger.info("setDataValues for nonexistent object: %s", set_val_res)
 
-                operate_result = await ep_wsServer.client_list[0].operate(
-                    oper_val_out_of_range, websocket_info, None, None
+                set_val_res = await client.set_data_values(
+                    "LD0/DWMX1.WMaxSet.setMag", "sp", setMag_wrong, websocket_info, None, None
                 )
-                print("result for out of range data in operate request", operate_result)
+                logger.info("setDataValues with incorrect type: %s", set_val_res)
+
+                select_result = await client.select("LD0/DWMX1.WMaxSpt", websocket_info, None, None)
+                logger.info("select result: %s", select_result)
+
+                operate_result = await client.operate(oper_val_out_of_range, websocket_info, None, None)
+                logger.info("operate with out-of-range data: %s", operate_result)
 
             except Exception as e:
-                print("handler not called:", e)
-
+                logger.exception("Service call failed: %s", e)
     else:
-        print("did not enter first if ")
+        logger.warning("Client did not connect")
 
     await server_task
 
