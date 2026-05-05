@@ -15,11 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import logging
+import sys
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
-maxMessageSize_server = 65000
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 oper_val = {
     "ref": "LD0/DWMX1.WMaxSpt",
@@ -62,61 +69,46 @@ setMag_val = [{"name": "setMag", "data": ("structure", {"data": [("float32", 67.
 
 
 async def main():
-    # websocket server
-    ep_wsServer = WebSocketEndpoint()
+    endpoint = PassiveEndpoint()
 
-    iec61850_client = IEC61850Client("cp1")
-    ep_wsServer.add_iec61850_client(iec61850_client)
+    client = IEC61850Client("cp1")
+    endpoint.add_iec61850_client(client)
 
-    server_task = asyncio.create_task(ep_wsServer.start("passive", "localhost", 8765))
+    server_task = asyncio.create_task(endpoint.start("localhost", 8765))
+    logger.info("Waiting for client to connect on localhost:8765")
 
-    await ep_wsServer.client_list[0].ready_event.wait()
-    if ep_wsServer.client_list[0].is_connected is True:
-        websocket_info = ep_wsServer.get_websocket_info(ep_wsServer.client_list[0])
+    await client.ready_event.wait()
+    if client.is_connected:
+        websocket_info = endpoint.get_websocket_info(client)
         if websocket_info is not None:
             try:
-                ###mxVal
-                da_val = await ep_wsServer.client_list[0].get_data_values(
-                    "LD0/DWMX1.WMaxSpt", "mx", True, websocket_info, None, None
-                )
-                print(da_val)
-                select_result = await ep_wsServer.client_list[0].select("LD0/DWMX1.WMaxSpt", websocket_info, None, None)
-                print(select_result)
-                operate_result = await ep_wsServer.client_list[0].operate(oper_val, websocket_info, None, None)
-                print(operate_result)
+                da_val = await client.get_data_values("LD0/DWMX1.WMaxSpt", "mx", True, websocket_info, None, None)
+                logger.info("get_data_values WMaxSpt: %s", da_val)
 
-                da_val = await ep_wsServer.client_list[0].get_data_values(
-                    "LD0/DWMX1.WMaxSpt", "mx", True, websocket_info, None, None
-                )
-                print(da_val)
+                select_result = await client.select("LD0/DWMX1.WMaxSpt", websocket_info, None, None)
+                logger.info("select: %s", select_result)
 
-                ####setMag
+                operate_result = await client.operate(oper_val, websocket_info, None, None)
+                logger.info("operate: %s", operate_result)
 
-                da_val = await ep_wsServer.client_list[0].get_data_values(
-                    "LD0/DWMX1.WMaxSet", "sp", True, websocket_info, None, None
-                )
-                print(da_val)
+                da_val = await client.get_data_values("LD0/DWMX1.WMaxSpt", "mx", True, websocket_info, None, None)
+                logger.info("get_data_values WMaxSpt after operate: %s", da_val)
 
-                set_val_res = await ep_wsServer.client_list[0].set_data_values(
-                    "LD0/DWMX1.WMaxSet.setMag",
-                    "sp",
-                    setMag_val,
-                    websocket_info,
-                    None,
-                    None,
-                )
-                print(set_val_res)
+                da_val = await client.get_data_values("LD0/DWMX1.WMaxSet", "sp", True, websocket_info, None, None)
+                logger.info("get_data_values WMaxSet: %s", da_val)
 
-                da_val = await ep_wsServer.client_list[0].get_data_values(
-                    "LD0/DWMX1.WMaxSet", "sp", True, websocket_info, None, None
+                set_val_res = await client.set_data_values(
+                    "LD0/DWMX1.WMaxSet.setMag", "sp", setMag_val, websocket_info, None, None
                 )
-                print(da_val)
+                logger.info("set_data_values setMag: %s", set_val_res)
+
+                da_val = await client.get_data_values("LD0/DWMX1.WMaxSet", "sp", True, websocket_info, None, None)
+                logger.info("get_data_values WMaxSet after set: %s", da_val)
 
             except Exception as e:
-                print("handler not called:", e)
-
+                logger.exception("Service call failed: %s", e)
     else:
-        print("did not enter first if ")
+        logger.warning("Client did not connect")
 
     await server_task
 

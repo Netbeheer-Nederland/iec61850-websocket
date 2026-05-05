@@ -19,20 +19,18 @@ import asyncio
 from ws61850.endpoint.endpoint import WebSocketEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
-maxMessageSize_server = 65000
+# maxMessageSize_server = 65000
 
 
 async def main():
     protocol = ["iec61850-tpaa-jer-v1", "iec61850-tpaa-ber-v1"]
     # websocket server
-    ep_wsServer = WebSocketEndpoint()
+    ep_ws_server = WebSocketEndpoint()
 
     iec61850_client = IEC61850Client("cp1")
-    ep_wsServer.add_iec61850_client(iec61850_client)
+    ep_ws_server.add_iec61850_client(iec61850_client)
 
-    server_task = asyncio.create_task(
-        ep_wsServer.start("passive", "localhost", 8765, protocol=protocol)
-    )
+    server_task = asyncio.create_task(ep_ws_server.start("passive", "localhost", 8765, protocol=protocol))
 
     await server_task
 

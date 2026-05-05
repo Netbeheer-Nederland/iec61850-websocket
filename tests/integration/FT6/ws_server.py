@@ -15,11 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import logging
+import sys
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
-maxMessageSize_server = 65000
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 trgOp = {"dchg": True, "qchg": False, "dupd": False, "integrity": False, "gi": False}
 
@@ -31,30 +38,29 @@ urcb_2.rptEna = True
 
 
 async def main():
-    # websocket server
-    ep_wsServer = WebSocketEndpoint()
+    endpoint = PassiveEndpoint()
 
-    iec61850_client = IEC61850Client("cp1")
-    ep_wsServer.add_iec61850_client(iec61850_client)
+    client = IEC61850Client("cp1")
+    endpoint.add_iec61850_client(client)
 
-    server_task = asyncio.create_task(ep_wsServer.start("passive", "localhost", 8765))
+    server_task = asyncio.create_task(endpoint.start("localhost", 8765))
+    logger.info("Waiting for client to connect on localhost:8765")
 
-    await ep_wsServer.client_list[0].ready_event.wait()
-    if ep_wsServer.client_list[0].is_connected is True:
-        websocket_info = ep_wsServer.get_websocket_info(ep_wsServer.client_list[0])
+    await client.ready_event.wait()
+    if client.is_connected:
+        websocket_info = endpoint.get_websocket_info(client)
         if websocket_info is not None:
             try:
-                set_urcb_res = await ep_wsServer.client_list[0].set_URCB_values(urcb, websocket_info, None, None)
-                print("set_urcb_res:", set_urcb_res)
+                set_urcb_res = await client.set_URCB_values(urcb, websocket_info, None, None)
+                logger.info("set_URCB_values (trgOps dchg): %s", set_urcb_res)
 
-                set_urcb_res = await ep_wsServer.client_list[0].set_URCB_values(urcb_2, websocket_info, None, None)
-                print("set_urcb_res:", set_urcb_res)
+                set_urcb_res = await client.set_URCB_values(urcb_2, websocket_info, None, None)
+                logger.info("set_URCB_values (rptEna): %s", set_urcb_res)
 
             except Exception as e:
-                print("handler not called:", e)
-
+                logger.exception("Service call failed: %s", e)
     else:
-        print("did not enter first if ")
+        logger.warning("Client did not connect")
 
     await server_task
 
