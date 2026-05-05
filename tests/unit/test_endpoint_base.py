@@ -43,8 +43,4 @@ class TestEndpointProtocol:
         ep = ActiveEndpoint()
         assert isinstance(ep, EndpointProtocol)
 
-    def test_websocket_endpoint_shim_satisfies_protocol(self):
-        from ws61850.endpoint.endpoint import WebSocketEndpoint
 
-        ep = WebSocketEndpoint()
-        assert isinstance(ep, EndpointProtocol)

@@ -1,6 +1,5 @@
 from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.endpoint.base import EndpointProtocol, WebSocketInfo
-from ws61850.endpoint.endpoint import WebSocketEndpoint  # deprecated shim
 from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 
 __all__ = [
@@ -8,7 +7,6 @@ __all__ = [
     "EndpointProtocol",
     "PassiveEndpoint",
     "ActiveEndpoint",
-    "WebSocketEndpoint",
     "create_endpoint",
 ]
 
