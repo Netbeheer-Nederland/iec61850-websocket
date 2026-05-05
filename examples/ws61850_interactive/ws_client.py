@@ -16,11 +16,12 @@
 # limitations under the License.
 import asyncio
 import logging
+import pathlib
 import sys
 from random import randint
 
 from ws61850.endpoint import ActiveEndpoint
-from ws61850.iec61850.data_model.example_ieds import build_model1
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.control_handling import (
     ControlHandlerResult,
     ControlServiceStatusKind,
@@ -34,6 +35,8 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     stream=sys.stdout,
 )
+
+_MODEL_PATH = pathlib.Path(__file__).parent / "ied_model1.json"
 
 
 async def toggle_custom_value(iec61150_server, obj_ref):
@@ -75,7 +78,7 @@ def control_handler_for_float(obj_ref, ctlVal_value, parameter):
 
 async def main():
     ep_wsClient_1 = ActiveEndpoint()
-    iec61850_server_1 = IEC61850Server(build_model1(), "cp1")
+    iec61850_server_1 = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     iec61850_server_1.set_control_handler(control_handler_for_float, None)
     ep_wsClient_1.add_iec61850_server(iec61850_server_1)
 

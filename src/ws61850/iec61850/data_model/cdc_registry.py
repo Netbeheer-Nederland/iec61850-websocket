@@ -38,6 +38,7 @@ CdcFactory = Callable[[str, object], DataObject]
 _REGISTRY: dict[str, CdcFactory] = {
     "mv": helper.create_mv_do,
     "asg": helper.create_asg_do,
+    "asg_custom": helper.create_asg_do_custom,
     "apc": helper.create_apc_do,
     "inc": helper.create_inc_do,
     "ens": helper.create_ens_do,

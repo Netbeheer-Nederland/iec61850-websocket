@@ -16,10 +16,11 @@
 # limitations under the License.
 import asyncio
 import logging
+import pathlib
 from random import randint
 
 from ws61850.endpoint import ActiveEndpoint
-from ws61850.iec61850.data_model.example_ieds import build_model1
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.control_handling import (
     ControlHandlerResult,
     ControlServiceStatusKind,
@@ -28,6 +29,8 @@ from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.iec61850.server.service_error import ServiceStatusKind
 
 logger = logging.getLogger(__name__)
+
+_MODEL_PATH = pathlib.Path(__file__).parent.parent / "ied_model1.json"
 
 
 async def toggle_custom_value(iec61150_server, obj_ref):
@@ -82,7 +85,7 @@ async def schedule_release(iec61850_server, endpoint):
 
 async def main():
     ep_ws_client_1 = ActiveEndpoint()
-    iec61850_server_1 = IEC61850Server(build_model1(), "cp1")
+    iec61850_server_1 = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     iec61850_server_1.set_control_handler(control_handler_for_float, None)
     report_task_1 = asyncio.create_task(iec61850_server_1.periodic_report_start())
     # toggle_task_1 = asyncio.create_task(toggle_custom_value(iec61850_server_1, "LD0/DGEN1.DEROpSt.stVal"))

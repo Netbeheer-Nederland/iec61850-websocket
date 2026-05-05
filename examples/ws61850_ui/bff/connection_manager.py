@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import pathlib
 import threading
 import time
 from collections import deque
@@ -14,10 +15,13 @@ from bff.protocol_utils import convert_bytes_to_hex
 from bff.state import RuntimeState
 from ws61850.endpoint import EndpointProtocol, WebSocketInfo
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
-from ws61850.iec61850.data_model.example_ieds import build_model1, build_model2
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
 logger = logging.getLogger(__name__)
+
+_MODEL1_PATH = pathlib.Path(__file__).parent.parent.parent / "ied_model1.json"
+_MODEL2_PATH = pathlib.Path(__file__).parent.parent.parent / "ied_model2.json"
 
 DEFAULT_TARGET = "rti-so"
 KNOWN_TARGETS = ("rti-so", "rti-fsp")
@@ -34,9 +38,8 @@ TARGET_ALIASES = {
 
 
 def _build_default_ied_model(cp: str):
-    if cp == "cp2":
-        return build_model2()
-    return build_model1()
+    path = _MODEL2_PATH if cp == "cp2" else _MODEL1_PATH
+    return IedModelLoader.from_file(path)
 
 
 def create_default_server(cp: str) -> IEC61850Server:

@@ -17,12 +17,16 @@ Environment variables:
 import asyncio
 import logging
 import os
+import pathlib
 import random
 import sys
 
 from ws61850.endpoint import ActiveEndpoint
-from ws61850.iec61850.data_model.example_ieds import build_model1, build_model2
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
+
+_MODEL1_PATH = pathlib.Path(__file__).parent.parent / "ied_model1.json"
+_MODEL2_PATH = pathlib.Path(__file__).parent.parent / "ied_model2.json"
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
@@ -59,7 +63,7 @@ async def _simulate_values(server: IEC61850Server) -> None:
 
 async def main() -> None:
     endpoint = ActiveEndpoint(is_direct=False, try_reconnect=True)
-    ied_model = build_model2() if FSP_MODEL == "2" else build_model1()
+    ied_model = IedModelLoader.from_file(_MODEL2_PATH if FSP_MODEL == "2" else _MODEL1_PATH)
     server = IEC61850Server(ied_model, FSP_CP)
 
     endpoint.add_iec61850_server(server)

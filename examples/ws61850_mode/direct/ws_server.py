@@ -15,11 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import pathlib
 from random import randint
 
 from ws61850.endpoint import PassiveEndpoint
-from ws61850.iec61850.data_model.example_ieds import build_model1, build_model2
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
+
+_MODEL1_PATH = pathlib.Path(__file__).parent.parent / "ied_model1.json"
+_MODEL2_PATH = pathlib.Path(__file__).parent.parent / "ied_model2.json"
 
 maxMessageSize = 65000
 
@@ -45,11 +49,11 @@ async def main():
     ep_wsServer = PassiveEndpoint(is_direct=True)
     ep_wsServer.recv_msg_callback = received_msg_callback
     ep_wsServer.send_msg_callback = send_msg_callback
-    iec61850_server = IEC61850Server(build_model1(), "cp1")
+    iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL1_PATH), "cp1")
     report_task_1 = asyncio.create_task(iec61850_server.periodic_report_start())
     ep_wsServer.add_iec61850_server(iec61850_server)
 
-    iec61850_server = IEC61850Server(build_model2(), "cp2")
+    iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL2_PATH), "cp2")
     toggle_task_2 = asyncio.create_task(toggle_custom_value(iec61850_server, "LD0/DGEN1.DEROpSt.stVal"))
 
     ep_wsServer.add_iec61850_server(iec61850_server)
