@@ -17,7 +17,7 @@
 import asyncio
 from random import randint
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint import PassiveEndpoint
 from ws61850.iec61850.data_model.example_ieds import build_model1, build_model2
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
@@ -42,7 +42,7 @@ def send_msg_callback(msg, timestamp):
 
 async def main():
     # websocket client
-    ep_wsServer = WebSocketEndpoint(is_direct=True)
+    ep_wsServer = PassiveEndpoint(is_direct=True)
     ep_wsServer.recv_msg_callback = received_msg_callback
     ep_wsServer.send_msg_callback = send_msg_callback
     iec61850_server = IEC61850Server(build_model1(), "cp1")
@@ -54,7 +54,7 @@ async def main():
 
     ep_wsServer.add_iec61850_server(iec61850_server)
 
-    server_task = asyncio.create_task(ep_wsServer.start("passive", "localhost", 8765))
+    server_task = asyncio.create_task(ep_wsServer.start("localhost", 8765))
 
     # await server_task
     await asyncio.gather(server_task, report_task_1, toggle_task_2)

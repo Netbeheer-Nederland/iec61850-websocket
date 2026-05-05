@@ -19,7 +19,7 @@ import logging
 import sys
 from random import randint
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint import ActiveEndpoint
 from ws61850.iec61850.data_model.example_ieds import build_model1
 from ws61850.iec61850.server.control_handling import (
     ControlHandlerResult,
@@ -74,12 +74,12 @@ def control_handler_for_float(obj_ref, ctlVal_value, parameter):
 
 
 async def main():
-    ep_wsClient_1 = WebSocketEndpoint()
+    ep_wsClient_1 = ActiveEndpoint()
     iec61850_server_1 = IEC61850Server(build_model1(), "cp1")
     iec61850_server_1.set_control_handler(control_handler_for_float, None)
     ep_wsClient_1.add_iec61850_server(iec61850_server_1)
 
-    task1 = asyncio.create_task(ep_wsClient_1.start("active", "localhost", 9100, "cp1"))
+    task1 = asyncio.create_task(ep_wsClient_1.start("localhost", 9100, "cp1"))
 
     await asyncio.gather(task1)
 

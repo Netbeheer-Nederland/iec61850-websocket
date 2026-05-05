@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# RTI-SO: Headless ws_server + iec_client — accepts connections from RTI-FSP or IEDs.
+# Build context: repo root  (docker compose sets this via `context: ../..`)
+
+FROM python:3.12-slim AS deps
+WORKDIR /build
+
+RUN pip install --no-cache-dir \
+        asn1tools==0.167.0 \
+        websockets==16.0 \
+        bitstruct==8.21.0 \
+        certifi==2026.1.4 \
+        cryptography==46.0.5 \
+        pyjwt==2.10.1 \
+        requests==2.32.5 \
+        aiohttp==3.13.3
+
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
+RUN pip install --no-cache-dir -e .
+
+
+FROM deps AS runtime
+WORKDIR /app
+
+COPY examples/ws61850_ui/simulator/rti_so.py ./
+
+ENV PYTHONUNBUFFERED=1 \
+    IEC_HOST=0.0.0.0 \
+    IEC_PORT=9100 \
+    IEC_CP=cp1,cp2 \
+    IEC_POLL_INTERVAL=30 \
+    LOG_LEVEL=INFO
+
+EXPOSE 9100
+
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
+    CMD python -c "import asyncio, websockets; asyncio.run(websockets.connect('ws://localhost:${IEC_PORT}'))" \
+    || exit 1
+
+CMD ["python", "rti_so.py"]

@@ -20,7 +20,7 @@ import logging
 import re
 import sys
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.data_model.helper import get_now_time
 
@@ -114,7 +114,7 @@ async def main():
     ctl_num = 0
 
     # websocket server
-    ep_wsServer = WebSocketEndpoint()
+    ep_wsServer = PassiveEndpoint()
 
     iec61850_client = IEC61850Client("cp1")
     ep_wsServer.add_iec61850_client(iec61850_client)
@@ -122,7 +122,7 @@ async def main():
     iec61850_client = IEC61850Client("cp2")
     ep_wsServer.add_iec61850_client(iec61850_client)
 
-    server_task = asyncio.create_task(ep_wsServer.start("passive", "localhost", 8765))
+    server_task = asyncio.create_task(ep_wsServer.start("localhost", 8765))
 
     selected_client = ep_wsServer.client_list[0]
     while True:

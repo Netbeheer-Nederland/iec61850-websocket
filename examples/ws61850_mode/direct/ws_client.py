@@ -20,7 +20,7 @@ import time
 import jwt
 
 from ws61850 import asn1
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint import ActiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.client.request_handling import create_token_refresh
 from ws61850.iec61850.data_model.helper import get_now_time
@@ -170,7 +170,7 @@ async def main():
     # client_id_1 = "ws_client_1"
     # access_token_1 = get_access_token(token_request_url, client_id_1, client_secret_1)
 
-    ep_wsClient_1 = WebSocketEndpoint(is_direct=True)
+    ep_wsClient_1 = ActiveEndpoint(is_direct=True)
     ep_wsClient_1.recv_msg_callback = received_msg_callback
     ep_wsClient_1.send_msg_callback = send_msg_callback
     iec61850_client_1 = IEC61850Client("cp1")
@@ -180,14 +180,14 @@ async def main():
     # client_id_2 = "ws_client_2"
     # access_token_2 = get_access_token(token_request_url, client_id_2, client_secret_2)
 
-    ep_wsClient_2 = WebSocketEndpoint(is_direct=True)
+    ep_wsClient_2 = ActiveEndpoint(is_direct=True)
     ep_wsClient_2.recv_msg_callback = received_msg_callback
     ep_wsClient_2.send_msg_callback = send_msg_callback
     iec61850_client_2 = IEC61850Client("cp2")
     ep_wsClient_2.add_iec61850_client(iec61850_client_2)
 
-    task1 = asyncio.create_task(ep_wsClient_1.start("active", "localhost", 8765, "cp1"))
-    task2 = asyncio.create_task(ep_wsClient_2.start("active", "localhost", 8765, "cp2"))
+    task1 = asyncio.create_task(ep_wsClient_1.start("localhost", 8765, "cp1"))
+    task2 = asyncio.create_task(ep_wsClient_2.start("localhost", 8765, "cp2"))
 
     # task_token_1 = asyncio.create_task(refresh_token_if_needed(token_request_url,client_id_1, client_secret_1, access_token_1, ep_wsClient_1, "cp1"))
     # task_token_2 = asyncio.create_task(refresh_token_if_needed(token_request_url,client_id_2, client_secret_2, access_token_2, ep_wsClient_2, "cp2"))
