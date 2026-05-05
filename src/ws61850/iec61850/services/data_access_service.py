@@ -56,9 +56,9 @@ class DataAccessService:
             return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
         if isinstance(item, DataObject):
             da_list = flatten_nested_data_attributes_with_fc(item, data_ref["fc"])
-            da_fc = [build_data_value(da, da.type.name, da.mmsValue, include_element_name) for da in da_list]
+            da_fc = [build_data_value(da, da.attr_type.name, da.mms_value, include_element_name) for da in da_list]
         else:
-            da_fc = [build_data_value(item, item.type.name, item.mmsValue, include_element_name)]
+            da_fc = [build_data_value(item, item.attr_type.name, item.mms_value, include_element_name)]
         return create_tpaa_response_getDataValues(invoke_id, associate_id, da_fc)
 
     def set_data_values(self, invoke_id, associate_id, decoded_message):
@@ -70,7 +70,7 @@ class DataAccessService:
             return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
 
         fc = data_ref["fc"]
-        if fc == FunctionalConstraint.co.name:
+        if fc == FunctionalConstraint.co.wire_name:
             return create_tpaa_service_error_response(invoke_id, associate_id, "accessViolation")
 
         if isinstance(item, DataObject):
@@ -83,7 +83,7 @@ class DataAccessService:
                         assign_do_item(item.do_or_da[da_do_index], value["data"], fc)
             return create_tpaa_response_setDataValues(invoke_id, associate_id, "ok")
         else:
-            if fc == item.fc.name:
+            if fc == item.fc.wire_name:
                 result = assign_da_item(item, dataAttr_val[0]["data"], fc)
                 if result is False:
                     return create_tpaa_service_error_response(invoke_id, associate_id, "typeConflict")
@@ -114,9 +114,9 @@ class DataAccessService:
             item = find_object_in_tree(ds_entry.variable_name, ied)
             if item is not None:
                 if isinstance(item, DataObject):
-                    da_list = flatten_nested_data_attributes_with_fc(item, ds_entry.fc.name)
+                    da_list = flatten_nested_data_attributes_with_fc(item, ds_entry.fc.wire_name)
                     for da in da_list:
-                        value_list.append(build_data_value(da, da.type.name, da.mmsValue, True))
+                        value_list.append(build_data_value(da, da.attr_type.name, da.mms_value, True))
                 else:
-                    value_list.append(build_data_value(item, item.type.name, item.mmsValue, True))
+                    value_list.append(build_data_value(item, item.attr_type.name, item.mms_value, True))
         return create_tpaa_response_getDataSetValues(invoke_id, associate_id, value_list)

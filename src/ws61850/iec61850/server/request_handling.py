@@ -223,11 +223,15 @@ def find_ds_in_tree(data_ref, ied):
     """
     Find a DataSet in the IED tree
     """
-    foundDS = None
     ld_name, ln_name, ds_name = re.split(r"[/ .]", data_ref)
-
-    foundDS = next((ds for ds in ied.data_sets if ds.name == ds_name), None)
-    return foundDS
+    for ld in ied.logical_devices:
+        if ld.name != ld_name:
+            continue
+        for ln in ld.logical_nodes:
+            if ln.name != ln_name:
+                continue
+            return next((ds for ds in ln.data_sets if ds.name == ds_name), None)
+    return None
 
 
 def find_object_in_tree(data_ref, ied):
@@ -308,12 +312,12 @@ def create_DataAttributeDefinition_list(da_list):
     for da_item in da_list:
         value = None
 
-        if da_item.type.name != "structure":
+        if da_item.attr_type.name != "structure":
             value = None
         else:
             value = get_structure_value_def(da_item)
 
-        input_data = {"daRef": da_item.name, "fc": da_item.fc.name, "daType": (da_item.type.name, value)}
+        input_data = {"daRef": da_item.name, "fc": da_item.fc.wire_name, "daType": (da_item.attr_type.name, value)}
         return_list.append(input_data)
     # return_dict['dataAttributeDefinition'] = return_list
     return return_list
@@ -337,13 +341,13 @@ def get_structure_value_def(da_item: DataAttribute):
     input_data = []
     if len(da_item.data_attributes) != 0:
         for da_interal in da_item.data_attributes:
-            if da_interal.type.name != "structure" and da_interal.type.name != "octetString":
+            if da_interal.attr_type.name != "structure" and da_interal.attr_type.name != "octetString":
                 value = None
-            elif da_interal.type.name != "structure" and da_interal.type.name == "octetString":
-                value = get_octetString_size(da_interal.mmsValue)
+            elif da_interal.attr_type.name != "structure" and da_interal.attr_type.name == "octetString":
+                value = get_octetString_size(da_interal.mms_value)
             else:
                 value = get_structure_value_def(da_interal)
-            input_data.append({"cmpName": da_interal.name, "cmpType": (da_interal.type.name, value)})
+            input_data.append({"cmpName": da_interal.name, "cmpType": (da_interal.attr_type.name, value)})
 
     return input_data
 
@@ -359,12 +363,12 @@ def get_structure_value(da_item: DataAttribute, include_element_name):
     # return_obj = None
     if len(da_item.data_attributes) != 0:
         for da_interal in da_item.data_attributes:
-            if da_interal.type.name != "structure":
-                value = da_interal.mmsValue
+            if da_interal.attr_type.name != "structure":
+                value = da_interal.mms_value
             else:
                 value = get_structure_value(da_interal, include_element_name)
 
-            value_list.append((da_interal.type.name, value))
+            value_list.append((da_interal.attr_type.name, value))
 
     return_obj = {"data": value_list}
     return return_obj
@@ -412,8 +416,8 @@ def assign_da_item(item, value, fc):
     """
     if len(item.data_attributes) == 0:
         if value[0] != "structure" and value[0] != "check":
-            if item.type.name == value[0] and item.fc.name == fc:
-                item.mmsValue = value[1]
+            if item.attr_type.name == value[0] and item.fc.wire_name == fc:
+                item.mms_value = value[1]
             else:
                 return False
         elif value[0] == "structure":
@@ -422,16 +426,14 @@ def assign_da_item(item, value, fc):
             set_check_val(item, value)
     else:
         for da_index, da_item in enumerate(item.data_attributes):
-            if da_item.fc.name == fc:
-                if da_item.type != DataAttributeType.structure and da_item.type != DataAttributeType.check:
-                    # if da_item.type.name == value[1]["data"][da_index][0]:
-                    #     da_item.mmsValue = value[1]["data"][da_index][1]
-                    if da_item.type.name == value[0]:
-                        da_item.mmsValue = value[1]
+            if da_item.fc.wire_name == fc:
+                if da_item.attr_type != DataAttributeType.structure and da_item.attr_type != DataAttributeType.check:
+                    if da_item.attr_type.name == value[0]:
+                        da_item.mms_value = value[1]
                     else:
                         return False
 
-                elif da_item.type == DataAttributeType.structure:
+                elif da_item.attr_type == DataAttributeType.structure:
                     set_struct_val(da_item, value[1]["data"][da_index])
                 else:
                     set_check_val(da_item, value[1]["data"][da_index])
@@ -487,10 +489,10 @@ def flatten_nested_data_attributes_with_fc(object, fc):
     if isinstance(object, DataObject):
         for sub_do in object.get_do_from_do_or_da_list():
             for attr_ in sub_do.get_da_from_do_or_da_list():
-                if attr_ not in flat_list and attr_.fc.name == fc:
+                if attr_ not in flat_list and attr_.fc.wire_name == fc:
                     flat_list.append(attr_)
         for attr in object.get_da_from_do_or_da_list():
-            if attr not in flat_list and attr.fc.name == fc:
+            if attr not in flat_list and attr.fc.wire_name == fc:
                 flat_list.append(attr)
 
     else:
@@ -503,7 +505,7 @@ def flatten_nested_data_attributes_with_fc(object, fc):
 
 def build_data_value(da: DataAttribute, type, value, include_element_name):
     """Creates a data value entry for getDataValues responses."""
-    if da.type == DataAttributeType.structure:
+    if da.attr_type == DataAttributeType.structure:
         value = get_structure_value(da, include_element_name)
     value = (type, value)
     if include_element_name:
@@ -527,19 +529,19 @@ def assign_brcb_value(server_brcb, values, iec61850_server):
     try:
         brcb.obj_ref = brcb.get_objRef()
         if "bufTm" in values:
-            brcb.bufferedTime = values["bufTm"]
+            brcb.buffered_time = values["bufTm"]
 
         if "dataSet" in values:
-            brcb.datasetName = values["dataSet"]
+            brcb.dataset_name = values["dataSet"]
 
         if "gi" in values:
             brcb.gi = values["gi"]
 
         if "intgPd" in values:
-            brcb.intPeriod = values["intgPd"]
+            brcb.int_period = values["intgPd"]
 
         if "optFlds" in values:
-            brcb.options = values["optFlds"]
+            brcb.opt_flds = values["optFlds"]
 
         if "rptEna" in values:
             task, cancellation_check = check_for_task_cancellation(
@@ -551,10 +553,10 @@ def assign_brcb_value(server_brcb, values, iec61850_server):
                 restart_report_task(task, server_brcb, iec61850_server)
 
         if "rptID" in values:
-            brcb.rptId = values["rptID"]
+            brcb.rpt_id = values["rptID"]
 
         if "trgOp" in values:
-            brcb.trgOps = values["trgOp"]
+            brcb.trg_ops = values["trgOp"]
 
         if "entryID" in values:
             server_brcb.entry_id = values["entryID"]
@@ -600,19 +602,19 @@ def assign_urcb_value(server_urcb, values, iec61850_server):
         urcb.obj_ref = values["urcbRef"]
 
         if "bufTm" in values:
-            urcb.bufferedTime = values["bufTm"]
+            urcb.buffered_time = values["bufTm"]
 
         if "dataSet" in values:
-            urcb.datasetName = values["dataSet"]
+            urcb.dataset_name = values["dataSet"]
 
         if "gi" in values:
             urcb.gi = values["gi"]
 
         if "intgPd" in values:
-            urcb.intPeriod = values["intgPd"]
+            urcb.int_period = values["intgPd"]
 
         if "optFlds" in values:
-            urcb.options = values["optFlds"]
+            urcb.opt_flds = values["optFlds"]
 
         if "rptEna" in values:
             task, cancellation_check = check_for_task_cancellation(
@@ -625,10 +627,10 @@ def assign_urcb_value(server_urcb, values, iec61850_server):
                 server_urcb.resv = False
                 restart_report_task(task, server_urcb, iec61850_server)
         if "rptID" in values:
-            urcb.rptId = values["rptID"]
+            urcb.rpt_id = values["rptID"]
 
         if "trgOp" in values:
-            urcb.trgOps = values["trgOp"]
+            urcb.trg_ops = values["trgOp"]
 
         if "resv" in values:
             server_urcb.resv = values["resv"]
@@ -648,11 +650,11 @@ def create_data_attribute_list_from_dataset(dataset: DataSet, ied, reason_for_in
         item = find_object_in_tree(dataset_entry.variable_name, ied)
         if isinstance(item, DataAttribute):
             if item.fc == dataset_entry.fc:
-                if item.type.name != "structure":
+                if item.attr_type.name != "structure":
                     return_list.append(
                         {
                             "dataRef": item.get_objRef(),
-                            "value": [{"data": (item.type.name, item.mmsValue)}],
+                            "value": [{"data": (item.attr_type.name, item.mms_value)}],
                             "reasonCode": reason_for_inclusion_in_log.get_true_values_dict(),
                         }
                     )
@@ -671,11 +673,11 @@ def create_data_attribute_list_from_dataset(dataset: DataSet, ied, reason_for_in
         else:
             for data_attribute in item.get_da_from_do_or_da_list():
                 if data_attribute.fc == dataset_entry.fc:
-                    if data_attribute.type.name != "structure":
+                    if data_attribute.attr_type.name != "structure":
                         return_list.append(
                             {
                                 "dataRef": data_attribute.get_objRef(),
-                                "value": [{"data": (data_attribute.type.name, data_attribute.mmsValue)}],
+                                "value": [{"data": (data_attribute.attr_type.name, data_attribute.mms_value)}],
                                 "reasonCode": reason_for_inclusion_in_log.get_true_values_dict(),
                             }
                         )
@@ -698,10 +700,10 @@ def create_signle_entry_for_report(item, reason_for_inclusion_in_log):
     """
     Creates report appropriate single entry
     """
-    if item.type.name != "structure":
+    if item.attr_type.name != "structure":
         return {
             "dataRef": item.get_objRef(),
-            "value": [{"data": (item.type.name, item.mmsValue)}],
+            "value": [{"data": (item.attr_type.name, item.mms_value)}],
             "reasonCode": reason_for_inclusion_in_log.get_true_values_dict(),
         }
     else:
@@ -724,12 +726,12 @@ def get_structure_value_ds(da_item: DataAttribute):
     return_obj = None
     if len(da_item.data_attributes) != 0:
         for da_interal in da_item.data_attributes:
-            if da_interal.type.name != "structure":
-                value = da_interal.mmsValue
+            if da_interal.attr_type.name != "structure":
+                value = da_interal.mms_value
             else:
                 value = get_structure_value_ds(da_interal)
 
-            return_obj = (da_interal.type.name, value)
+            return_obj = (da_interal.attr_type.name, value)
 
     return return_obj
 
@@ -738,7 +740,7 @@ def build_dataset_value(da: DataAttribute, type, value):
     """
     Creating the data values to use in getDataValues Response
     """
-    if da.type == DataAttributeType.structure:
+    if da.attr_type == DataAttributeType.structure:
         value = get_structure_value(da, True)
 
     return_value = (type, value)

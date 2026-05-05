@@ -32,18 +32,18 @@ def control_ied():
     ln = LogicalNode(name="CSWI1")
     ld.add_logical_node(ln)
 
-    pos = DataObject(name="Pos")
+    pos = DataObject(name="Pos", cdc="")
     pos.parent = ln
 
-    oper = DataAttribute(name="Oper", fc=FunctionalConstraint.co, type_=DataAttributeType.structure)
+    oper = DataAttribute(name="Oper", attr_type=DataAttributeType.structure, fc=FunctionalConstraint.co)
     oper.parent = pos
 
-    ctl_val = DataAttribute(name="ctlVal", fc=FunctionalConstraint.co, type_=DataAttributeType.boolean, mmsValue=False)
+    ctl_val = DataAttribute(name="ctlVal", attr_type=DataAttributeType.boolean, fc=FunctionalConstraint.co, mms_value=False)
     ctl_val.parent = oper
-    ctl_num = DataAttribute(name="ctlNum", fc=FunctionalConstraint.co, type_=DataAttributeType.int32, mmsValue=0)
+    ctl_num = DataAttribute(name="ctlNum", attr_type=DataAttributeType.int32, fc=FunctionalConstraint.co, mms_value=0)
     ctl_num.parent = oper
-    oper.add_dataAttribute(ctl_val)
-    oper.add_dataAttribute(ctl_num)
+    oper.add_data_attribute(ctl_val)
+    oper.add_data_attribute(ctl_num)
     pos.add_do_or_da(oper)
     ln.add_dataObject(pos)
 

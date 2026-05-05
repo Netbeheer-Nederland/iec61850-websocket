@@ -41,7 +41,7 @@ timestamp_zero = {
     "secondSinceEpoch": 0,  # Example: some UTC time in seconds
     "fractionOfSecond": 0,  # Example: partial seconds (e.g., microseconds * 10)
     "timeQuality": {
-        "leapSecondsKown": False,
+        "leapSecondsKnown": False,
         "clockFailure": False,
         "clockNotSynchronized": False,
         "timeAccuracy": 0,  # e.g., ±1 ms, depending on definition

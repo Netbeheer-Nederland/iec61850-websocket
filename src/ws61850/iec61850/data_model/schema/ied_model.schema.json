@@ -1,0 +1,180 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ied_model.schema.json",
+  "title": "IedModel",
+  "description": "JSON representation of an IEC 61850 IED model. CDC factory functions expand each data object into its full DataAttribute tree.",
+  "type": "object",
+  "required": ["name", "logical_devices"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "IED name, e.g. \"TestIED\""
+    },
+    "logical_devices": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/LogicalDevice" }
+    }
+  },
+  "definitions": {
+    "LogicalDevice": {
+      "type": "object",
+      "required": ["name", "ld_name", "logical_nodes"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Logical device instance name as it appears in object references, e.g. \"LD0\""
+        },
+        "ld_name": {
+          "type": "string",
+          "description": "Logical device name attribute, e.g. \"LD0\""
+        },
+        "logical_nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/LogicalNode" }
+        }
+      }
+    },
+    "LogicalNode": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Logical node name, e.g. \"LLN0\", \"DWMX1\""
+        },
+        "data_objects": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/DataObject" },
+          "default": []
+        },
+        "data_sets": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/DataSet" },
+          "default": []
+        },
+        "report_controls": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ReportControl" },
+          "default": []
+        }
+      }
+    },
+    "DataObject": {
+      "type": "object",
+      "required": ["name", "cdc"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Data object name, e.g. \"TotW\", \"WMaxSpt\""
+        },
+        "cdc": {
+          "type": "string",
+          "description": "Common Data Class name (case-insensitive). Known values: mv, asg, apc, inc, ens, sps, enc, lpl, dpl, cmv, ing, wye, del",
+          "enum": ["mv", "asg", "apc", "inc", "ens", "sps", "enc", "lpl", "dpl", "cmv", "ing", "wye", "del"]
+        }
+      }
+    },
+    "DataSet": {
+      "type": "object",
+      "required": ["name", "entries"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "DataSet name, e.g. \"DataSet1\""
+        },
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/DataSetEntry" }
+        }
+      }
+    },
+    "DataSetEntry": {
+      "type": "object",
+      "required": ["variable_name", "fc"],
+      "additionalProperties": false,
+      "properties": {
+        "variable_name": {
+          "type": "string",
+          "description": "Object reference within the LD, e.g. \"DWMX1.TotW.mag.f\""
+        },
+        "fc": {
+          "type": "string",
+          "description": "Functional constraint wire name, e.g. \"mx\", \"st\", \"cf\", \"co\""
+        }
+      }
+    },
+    "ReportControl": {
+      "type": "object",
+      "required": ["name", "buffered", "dataset_name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "RCB name, e.g. \"brcb01\""
+        },
+        "buffered": {
+          "type": "boolean",
+          "description": "true for BRCB, false for URCB"
+        },
+        "dataset_name": {
+          "type": "string",
+          "description": "Full three-part reference: LD/LN.DataSetName, e.g. \"LD0/LLN0.DataSet1\""
+        },
+        "rpt_id": {
+          "type": "string",
+          "default": ""
+        },
+        "conf_rev": {
+          "type": "integer",
+          "default": 1
+        },
+        "trg_ops": { "$ref": "#/definitions/TrgOps" },
+        "opt_flds": { "$ref": "#/definitions/OptFlds" },
+        "buffered_time": {
+          "type": ["integer", "string"],
+          "default": 0
+        },
+        "int_period": {
+          "type": "integer",
+          "default": 1000
+        },
+        "indexed": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "TrgOps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dchg": { "type": "boolean", "default": false },
+        "qchg": { "type": "boolean", "default": false },
+        "dupd": { "type": "boolean", "default": false },
+        "integrity": { "type": "boolean", "default": false },
+        "gi": { "type": "boolean", "default": false }
+      }
+    },
+    "OptFlds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seqNum": { "type": "boolean", "default": false },
+        "timeStamp": { "type": "boolean", "default": false },
+        "dataSet": { "type": "boolean", "default": false },
+        "bufOvfl": { "type": "boolean", "default": false },
+        "configRef": { "type": "boolean", "default": false },
+        "entryID": { "type": "boolean", "default": false },
+        "dataRef": { "type": "boolean", "default": false },
+        "reasonCode": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}

@@ -15,574 +15,324 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
-from enum import Enum
+"""
+IEC 61850 data model classes.
+
+The model tree is:
+
+    IedModel
+      └── LogicalDevice  (1..*)
+            └── LogicalNode  (1..*)
+                  ├── DataObject  (0..*)
+                  │     └── DataObject | DataAttribute  (0..*)  [do_or_da]
+                  │                         └── DataAttribute  (0..*)  [data_attributes]
+                  ├── DataSet  (0..*)
+                  └── ReportControl  (0..*)
+
+Protocol-level enumerations (DataAttributeType, FunctionalConstraint, …) live in
+``ws61850.protocol.types`` — import from there, not from this module.
+"""
+
+from ws61850.protocol.types import DataAttributeType, FunctionalConstraint  # noqa: F401 — re-exported for callers
 
 
 class IedModel:
-    """
-    This class is used to represent and IED and the objects inside it
-    """
+    """Root of the IED model tree."""
 
-    def __init__(
-        self,
-        name: str = None,
-        logical_devices=None,
-        data_sets=None,
-        rcbs=None,
-        gse_cbs=None,
-        sv_cbs=None,
-        sgcbs=None,
-        lcbs=None,
-        logs=None,
-        initializer=None,
-    ):
-        """
-        This function Initializes the IedModel instance.
-        :param name:
-        :param logical_devices:
-        :param data_sets:
-        :param rcbs:
-        :param gse_cbs:
-        :param sv_cbs:
-        :param sgcbs:
-        :param lcbs:
-        :param logs:
-        :param initializer:
-        """
+    def __init__(self, name: str, logical_devices=None):
         self.name = name
         self.logical_devices = logical_devices if logical_devices is not None else []
-        self.data_sets = data_sets if data_sets is not None else []
-        self.rcbs = rcbs if rcbs is not None else []
-        self.gse_cbs = gse_cbs if gse_cbs is not None else []
-        self.sv_cbs = sv_cbs if sv_cbs is not None else []
-        self.sgcbs = sgcbs if sgcbs is not None else []
-        self.lcbs = lcbs if lcbs is not None else []
-        self.logs = logs if logs is not None else []
-        self.initializer = initializer
 
-    def add_logicalDevice(self, logical_device):
-        """
-        Adds logical devices to IED
-        """
+    def add_logical_device(self, logical_device: "LogicalDevice") -> None:
         logical_device.parent = self
         self.logical_devices.append(logical_device)
 
-    def add_dataSet(self, data_set):
-        """
-        Adds datasets to IED
-        """
-        # data_set.parent = self
-        self.data_sets.append(data_set)
-
-    def add_reportControl(self, report_control):
-        """
-        Adds report controls to IED
-        """
-        self.rcbs.append(report_control)
+    # Legacy name kept so existing server code compiles without change
+    def add_logicalDevice(self, logical_device: "LogicalDevice") -> None:
+        self.add_logical_device(logical_device)
 
 
 class ModelNode:
-    """
-    Represents a node in the IED model structure
-    """
+    """Abstract base for all nodes in the model tree."""
 
-    def __init__(self, model_type, name, parent=None):
-        self.model_type = model_type  # corresponds to ModelNodeType enum
-        self.name = name  # string
-        self.parent = parent  # reference to another ModelNode or None
-        # self.sibling = sibling         # reference to another ModelNode or None
-        # self.first_child = first_child # reference to another ModelNode or None
+    def __init__(self, name: str, parent=None):
+        self.name = name
+        self.parent = parent
 
 
 class LogicalDevice(ModelNode):
-    """
-    Represents a Logical Device
-    """
+    """Represents a Logical Device (LD)."""
 
-    def __init__(self, name, ldName, parent=None):
-        # Pass the correct model type constant for LogicalDevice
-        super().__init__(
-            model_type=ModelNodeType.LogicalDeviceModelType,
-            name=name,
-            parent=parent,
-            # sibling=sibling,
-            # first_child=firstChild
-        )
-        self.ldName = ldName  # ldName when using functional naming
-        self.logical_nodes = []
+    def __init__(self, name: str, ldName: str, parent=None):
+        super().__init__(name=name, parent=parent)
+        self.ldName = ldName
+        self.logical_nodes: list["LogicalNode"] = []
 
-    def add_logical_node(self, ln):
-        """
-        Adds Logical Nodes to Logical Devices
-        """
-        ln.parent = self  # set parent reference
+    def add_logical_node(self, ln: "LogicalNode") -> None:
+        ln.parent = self
         self.logical_nodes.append(ln)
 
 
-class LogicalNode(ModelNode):  # Corresponds to sLogicalNode
-    """
-    Represents a Logical Node
-    """
+class LogicalNode(ModelNode):
+    """Represents a Logical Node (LN)."""
 
-    def __init__(self, name, parent=None):
-        super().__init__(
-            model_type=ModelNodeType.LogicalNodeModelType,
-            name=name,
-            parent=parent,
-            # sibling=sibling,
-            # first_child=firstChild
-        )
-        """
-        Initializes the Logical Node instance
-        """
-        self.data_objects = []
-        self.data_sets = []
-        self.rcbs = []
-        self.data_sets = []
+    def __init__(self, name: str, parent=None):
+        super().__init__(name=name, parent=parent)
+        self.data_objects: list["DataObject"] = []
+        self.data_sets: list["DataSet"] = []
+        self.rcbs: list["ReportControl"] = []
 
-    def add_dataObject(self, data_object):
-        """
-        Adds Data Objects to a Logical Node
-        """
-        data_object.parent = self  # set parent reference
+    def add_data_object(self, data_object: "DataObject") -> None:
+        data_object.parent = self
         self.data_objects.append(data_object)
 
-    def add_reportControl(self, rcb):
-        """
-        Adds Report Controls to a Logical Node
-        """
+    def add_report_control(self, rcb: "ReportControl") -> None:
         rcb.ln = self
+        rcb.obj_ref = rcb.get_obj_ref()
         self.rcbs.append(rcb)
 
-    def add_dataSet(self, data_set):
-        """
-        Adds Data Sets to a Logical Node
-        """
+    def add_data_set(self, data_set: "DataSet") -> None:
         self.data_sets.append(data_set)
 
-    def get_ref_until_ln(self):
-        """
-        Get the logical node item using an object reference
-        """
-        return_ref = self.name
-        obj = self.parent
-        while not isinstance(obj.parent, LogicalNode):
-            return_ref = "." + obj.name + return_ref
-            obj = obj.parent
+    # Legacy names so existing server/test code compiles without change
+    def add_dataObject(self, data_object: "DataObject") -> None:
+        self.add_data_object(data_object)
 
-        ln = obj.parent
-        return_ref = ln.name + "." + return_ref
-        ld = ln.parent
-        return_ref = ld.name + "/" + return_ref
-        return return_ref
+    def add_reportControl(self, rcb: "ReportControl") -> None:
+        self.add_report_control(rcb)
 
-    def get_objRef(self):
-        """
-        Function used for getting the object reference of a logical node
-        """
-        return self.get_ref_until_ln()
+    def add_dataSet(self, data_set: "DataSet") -> None:
+        self.add_data_set(data_set)
+
+    def get_obj_ref(self) -> str:
+        ld = self.parent
+        return f"{ld.name}/{self.name}"
+
+    def get_objRef(self) -> str:
+        return self.get_obj_ref()
 
 
 class DataObject(ModelNode):
     """
-    Represents a Data Object
+    Represents a Data Object (DO).
+
+    ``cdc`` is a string like ``"mv"``, ``"asg"``, ``"apc"`` that names the
+    Common Data Class.  It is returned verbatim in ``getDataDefinition`` wire
+    responses, so it must match a value known to the remote client.
+
+    ``elementCount`` is always 0 for scalar DOs and is included solely because
+    the ``getDataDefinition`` response embeds it in the wire message.
     """
 
-    def __init__(self, name, elementCount=0, arrayIndex=-1, type_=None, parent=None, cdc=None):
-        super().__init__(
-            model_type=ModelNodeType.DataObjectModelType,
-            name=name,
-            parent=parent,
-        )
-        self.elementCount = elementCount  # > 0 if this is an array
-        self.arrayIndex = arrayIndex  # > -1 if this is an array element
-        self.type_ = type_
+    def __init__(self, name: str, cdc: str, parent=None):
+        super().__init__(name=name, parent=parent)
         self.cdc = cdc
-        self.do_or_da = do_or_da = []
+        self.elementCount = 0  # wire field; always 0 for non-array DOs
+        self.do_or_da: list = []  # List[DataObject | DataAttribute]
 
-    def get_ref_until_ln(self):
-        """
-        Internal Function used for creating the object reference
-        """
-        return_ref = ""
-        obj = self
-        while not isinstance(obj, LogicalNode):
-            return_ref = "." + obj.name + return_ref
-            obj = obj.parent
-
-        ln = obj
-        return_ref = ln.name + return_ref
-        ld = ln.parent
-        return_ref = ld.name + "/" + return_ref
-        return return_ref
-
-    def get_objRef(self):
-        """
-        Function used for getting the object reference
-        """
-        return self.get_ref_until_ln()
-
-    def add_do_or_da(self, item):
-        """
-        Function used for adding data object or attribute to a Data Object
-        """
+    def add_do_or_da(self, item) -> None:
         self.do_or_da.append(item)
 
-    def get_da_from_do_or_da_list(self):
-        """
-        Getting the list of Data Attributes from the list of data object or attributes
-        """
+    def get_da_from_do_or_da_list(self) -> list:
         return [da for da in self.do_or_da if isinstance(da, DataAttribute)]
 
-    def get_do_from_do_or_da_list(self):
-        """
-        Getting the list of Data Objects from the list of data object or attributes
-        """
+    def get_do_from_do_or_da_list(self) -> list:
         return [do for do in self.do_or_da if isinstance(do, DataObject)]
+
+    def get_obj_ref(self) -> str:
+        parts = []
+        obj = self
+        while not isinstance(obj, LogicalNode):
+            parts.append(obj.name)
+            obj = obj.parent
+        ln = obj
+        ld = ln.parent
+        return f"{ld.name}/{ln.name}." + ".".join(reversed(parts))
+
+    def get_objRef(self) -> str:
+        return self.get_obj_ref()
 
 
 class DataAttribute(ModelNode):
     """
-    Class used for representing Data Attributes
+    Represents a Data Attribute (DA).
+
+    ``attr_type`` is a :class:`DataAttributeType` whose ``.name`` is used
+    directly as the ASN1 ``Data ::= CHOICE`` discriminator in wire encoding.
+
+    ``fc`` is a :class:`FunctionalConstraint`; use ``fc.wire_name`` (not
+    ``fc.name``) when building wire-format strings to avoid the ``or_`` edge case.
+
+    ``mms_value`` is the live runtime value.  Its Python type depends on
+    ``attr_type``:
+
+    ========================  ========================
+    attr_type                 mms_value Python type
+    ========================  ========================
+    float32                   float
+    int8, int32, …            int
+    boolean                   bool
+    visString255, …           str
+    enumerated                int
+    octetString               bytes
+    quality                   dict (keys: validity, source, test, operatorBlock)
+    timeStamp                 dict (keys: secondSinceEpoch, fractionOfSecond, timeQuality)
+    check                     dict (keys: synchroCheck, interlockCheck)
+    structure                 [] (children accessed via data_attributes)
+    ========================  ========================
     """
 
     def __init__(
         self,
-        name,
-        elementCount=0,
-        arrayIndex=-1,
-        type_=None,
-        fc=None,
-        triggerOptions=0,
-        mmsValue=None,
-        sAddr=0,
+        name: str,
+        attr_type: DataAttributeType,
+        fc: FunctionalConstraint,
+        mms_value=None,
         parent=None,
     ):
-        super().__init__(
-            model_type=ModelNodeType.DataAttributeModelType,
-            name=name,
-            parent=parent,
-            # sibling=sibling,
-            # first_child=firstChild
-        )
-        """
-        Function used for initializing Data Attributes
-        """
-        self.elementCount = elementCount  # > 0 if this is an array
-        self.arrayIndex = arrayIndex  # > -1 if this is an array element
-        self.fc = fc  # FunctionalConstraint
-        self.type = type_  # DataAttributeType
-        self.triggerOptions = triggerOptions  # Bit flags
-        self.mmsValue = mmsValue  # Reference to an MmsValue object
-        self.sAddr = sAddr  # Deprecated field
-        self.data_attributes = []
+        super().__init__(name=name, parent=parent)
+        self.attr_type = attr_type
+        self.fc = fc
+        self.mms_value = mms_value
+        self.data_attributes: list["DataAttribute"] = []
 
-    def add_dataAttribute(self, data_attribute):
-        """
-        Function for adding data attributes to a data attribute object
-        """
+    def add_data_attribute(self, data_attribute: "DataAttribute") -> None:
         data_attribute.parent = self
         self.data_attributes.append(data_attribute)
 
-    def get_ref_until_ln(self):
-        """
-        Function used for creating the object reference
-        """
-        return_ref = ""
+    # Legacy name
+    def addDataAttribute(self, data_attribute: "DataAttribute") -> None:
+        self.add_data_attribute(data_attribute)
+
+    def get_obj_ref(self) -> str:
+        parts = []
         obj = self
         while not isinstance(obj, LogicalNode):
-            return_ref = "." + obj.name + return_ref
+            parts.append(obj.name)
             obj = obj.parent
-
         ln = obj
-        return_ref = ln.name + return_ref
         ld = ln.parent
-        return_ref = ld.name + "/" + return_ref
-        return return_ref
+        return f"{ld.name}/{ln.name}." + ".".join(reversed(parts))
 
-    def get_objRef(self):
-        """
-        function used for getting the object reference of the data attribute
-        """
-        return self.get_ref_until_ln()
+    def get_objRef(self) -> str:
+        return self.get_obj_ref()
 
+    # ------------------------------------------------------------------
+    # Legacy attribute aliases so server code that reads da.type and
+    # da.mmsValue compiles without change during incremental migration.
+    # ------------------------------------------------------------------
 
-class FunctionalConstraint(Enum):
-    """
-    Class to represent the Functional Constraints
-    """
+    @property
+    def type(self):
+        return self.attr_type
 
-    st = 0
-    mx = 1
-    sp = 2
-    sv = 3
-    cf = 4
-    dc = 5
-    sg = 6
-    se = 7
-    sr = 8
-    or_ = 9
-    bl = 10
-    ex = 11
-    lg = 12
-    co = 13
+    @type.setter
+    def type(self, value):
+        self.attr_type = value
 
+    @property
+    def mmsValue(self):
+        return self.mms_value
 
-class DataAttributeType(Enum):
-    """
-    Class used for representing data attribute type
-    """
-
-    boolean = 1
-    int8 = 2
-    int16 = 3
-    int24 = 4
-    int32 = 5
-    int64 = 6
-    int8u = 7
-    # 8 is reserved
-    int16u = 9
-    int24u = 10
-    int32u = 11
-    float32 = 12
-    octetString = 13  # expects Integer32 (size in bytes)
-    visString64 = 14
-    visString129 = 15
-    visString255 = 16
-    array = 17  # SEQUENCE { numberOfElements, elementType }
-    structure = 18  # SEQUENCE OF StructComponent
-    bitstring = 19  # expects Integer32 (size in bits)
-    generalizedtime = 21
-    binaryTime = 22
-    quality = 23
-    timeStamp = 24
-    enumerated = 25
-    check = 26
-
-
-class ModelNodeType(Enum):
-    """
-    Class used for representing Model Node
-    """
-
-    LogicalDeviceModelType = 0
-    LogicalNodeModelType = 1
-    DataObjectModelType = 2
-    DataAttributeModelType = 3
-
-
-class ACSIClassKind(Enum):
-    """
-    Class used for representing ASCI Class Kind
-    """
-
-    dataObject = 0
-    dataset = 1
-    brcb = 2
-    urcb = 3
-    lcb = 4
-    log = 5
-    sgcb = 6
-    gocb = 7
-    gscb = 8
-    msvcb = 9
-    usvcb = 10
+    @mmsValue.setter
+    def mmsValue(self, value):
+        self.mms_value = value
 
 
 class DataSet:
-    """
-    Class used to represent data sets
-    """
+    """Represents a DataSet belonging to a LogicalNode."""
 
-    def __init__(self, parent, logical_device_name, name, element_count=0, fcdas=None):
-        """
-        Function used for initializing Data Sets
-        :param logical_device_name:
-        :param name:
-        :param element_count:
-        :param fcdas:
-        """
-        self.logical_device_name = logical_device_name  # logical device instance name (string)
-        self.name = name  # dataset name (string)
-        self.element_count = element_count  # integer
-        self.fcdas = fcdas if fcdas is not None else []
-        self.parent = parent  # reference to LogicalNode
+    def __init__(self, parent: LogicalNode, logical_device_name: str, name: str, fcdas=None):
+        self.parent = parent
+        self.logical_device_name = logical_device_name
+        self.name = name
+        self.fcdas: list["DataSetEntry"] = fcdas if fcdas is not None else []
 
-    def dataSet_addEntry(self, dataEntry):
-        """
-        Function used for adding entries to data set instance
-        """
-        self.fcdas.append(dataEntry)
+    def add_entry(self, entry: "DataSetEntry") -> None:
+        self.fcdas.append(entry)
 
-    def get_objRef(self):
-        """
-        Function used for getting the object reference of Data Sets
-        :return:
-        """
+    # Legacy name
+    def dataSet_addEntry(self, entry: "DataSetEntry") -> None:
+        self.add_entry(entry)
+
+    def get_obj_ref(self) -> str:
         ln = self.parent
-        return self.logical_device_name + "/" + ln.name + "." + self.name
+        return f"{self.logical_device_name}/{ln.name}.{self.name}"
+
+    def get_objRef(self) -> str:
+        return self.get_obj_ref()
 
 
 class DataSetEntry:
-    """
-    Class representing data set entry
-    """
+    """One FCDA (Functionally Constrained Data Attribute) reference in a DataSet."""
 
     def __init__(
         self,
-        logical_device_name,
-        is_ld_name_dynamically_allocated=False,
-        variable_name=None,
-        index=-1,
-        component_name=None,
-        value=None,
-        # sibling=None
-        fc=None,
+        logical_device_name: str,
+        variable_name: str,
+        fc: FunctionalConstraint,
     ):
-        """
-        Function used for initializing Data Set Entry
-        :param logical_device_name:
-        :param is_ld_name_dynamically_allocated:
-        :param variable_name:
-        :param index:
-        :param component_name:
-        :param value:
-        :param fc:
-        """
-        self.logical_device_name = logical_device_name  # string
-        self.is_ld_name_dynamically_allocated = is_ld_name_dynamically_allocated  # bool
-        self.variable_name = variable_name  # string
-        self.index = index  # int
-        self.component_name = component_name  # string
-        self.value = value  # MmsValue instance or None
+        self.logical_device_name = logical_device_name
+        self.variable_name = variable_name
         self.fc = fc
-
-
-@dataclass
-class TrgOps:
-    """
-    Class used to represent trigger options
-    """
-
-    dchg: bool = False
-    qchg: bool = False
-    dupd: bool = False
-    integrity: bool = False
-    gi: bool = False
-
-
-@dataclass
-class OptFldsRCB:
-    """
-    Class used for representing optional fields
-    """
-
-    seqNum: bool
-    timeStamp: bool
-    dataSet: bool
-    bufOvfl: bool
-    configRef: bool
-    entryID: bool
-    dataRef: bool
-    reasonCode: bool
 
 
 class ReportControl:
     """
-    Class used for representing report controls
+    Report Control Block (RCB) — buffered (BRCB) or unbuffered (URCB).
+
+    All parameters after ``name`` are keyword-only with sensible defaults so
+    that callers need not provide the full 13-positional-argument list.
+
+    ``trg_ops`` and ``opt_flds`` must be plain dicts with keys matching the
+    ASN1 ``TrgOps`` and ``OptFldsRCB`` field names respectively.  The easiest
+    way to build them is via :meth:`ws61850.protocol.types.TrgOps.to_wire` and
+    :meth:`ws61850.protocol.types.OptFlds.to_wire`.
+
+    ``dataset_name`` must be the full three-part path ``LD/LN.DataSetName``.
+    The server's ``find_ds_in_tree`` splits on ``[/.]`` and expects exactly
+    three components; a short name will silently produce no dataset match.
+
+    ``ln`` and ``obj_ref`` are set by :meth:`LogicalNode.add_report_control`
+    and should not be supplied in the constructor.
     """
 
     def __init__(
         self,
-        obj_ref: str,
-        ln: LogicalNode,
         name: str,
-        rptId: str,
-        # rptEna : bool,
+        *,
         buffered: bool,
-        datasetName: str,
-        confRev,
-        trgOps,
-        options,
-        bufferedTime,
-        intPeriod,
-        client_reservation: bytearray,
-        indexed,
+        dataset_name: str,
+        rpt_id: str = "",
+        conf_rev: int = 1,
+        trg_ops: dict | None = None,
+        opt_flds: dict | None = None,
+        buffered_time: int | str = 0,
+        int_period: int = 1000,
+        indexed: bool = False,
     ):
-        """
-        function used for initializing Report Control Instance
-        :param ln:
-        :param name:
-        :param rptId:
-        :param rptEna:
-        :param buffered:
-        :param datasetName:
-        :param confRev:
-        :param trgOps:
-        :param options:
-        :param bufferedTime:
-        :param intPeriod:
-        :param client_reservation:
-        """
-        self.ln = ln
         self.name = name
-        self.rptId = rptId
         self.buffered = buffered
-        self.datasetName = datasetName
-        self.confRev = confRev
-        self.trgOps = trgOps
-        self.options = options
-        self.bufferedTime = bufferedTime
-        self.intPeriod = intPeriod
-        self.client_reservation = client_reservation
+        self.dataset_name = dataset_name
+        self.rpt_id = rpt_id or name
+        self.conf_rev = conf_rev
+        self.trg_ops: dict = trg_ops if trg_ops is not None else {}
+        self.opt_flds: dict = opt_flds if opt_flds is not None else {}
+        self.buffered_time = buffered_time
+        self.int_period = int_period
         self.indexed = indexed
-        self.obj_ref = obj_ref
-        # self.RCBTrkInst : RCBTrkInst = RCBTrkInst()
+        # set by LogicalNode.add_report_control:
+        self.ln: LogicalNode | None = None
+        self.obj_ref: str = ""
+        # runtime state (set by server):
         self.client_connection = None
         self.gi: bool = False
 
-    def get_objRef(self):
+    def get_obj_ref(self) -> str:
+        if self.ln is None:
+            return self.obj_ref
         ld = self.ln.parent
-        obj_ref = ld.name + "/" + self.ln.name + "." + self.name
+        return f"{ld.name}/{self.ln.name}.{self.name}"
 
-        return obj_ref
-
-
-@dataclass
-class RCBReportOptions:
-    """
-    Representation of ASN.1 RCBReportOptions ::= SEQUENCE {
-        sequenceNumber     BOOLEAN,
-        reportTimeStamp    BOOLEAN,
-        reasonForInclusion BOOLEAN,
-        dataSetName        BOOLEAN,
-        dataReference      BOOLEAN,
-        bufferOverFlow     BOOLEAN,
-        entryID            BOOLEAN,
-        confRevision       BOOLEAN,
-        segmentation       BOOLEAN
-    }
-    """
-
-    sequenceNumber: bool = False
-    reportTimeStamp: bool = False
-    reasonForInclusion: bool = False
-    dataSetName: bool = False
-    dataReference: bool = False
-    bufferOverFlow: bool = False
-    entryID: bool = False
-    confRevision: bool = False
-    segmentation: bool = False
-
-
-class OriginatorCategoryKind(Enum):
-    notSupported = 0
-    bayControl = 1
-    stationControl = 2
-    remoteControl = 3
-    automaticBay = 4
-    automaticStation = 5
-    automaticRemote = 6
-    maintenance = 7
-    process = 8
+    def get_objRef(self) -> str:
+        return self.get_obj_ref()

@@ -17,12 +17,12 @@ from ws61850.iec61850.data_model.ied_model import (
 
 
 def _make_da(name, fc, type_=DataAttributeType.boolean, value=False, parent=None):
-    da = DataAttribute(name=name, fc=fc, type_=type_, mmsValue=value, parent=parent)
+    da = DataAttribute(name=name, attr_type=type_, fc=fc, mms_value=value, parent=parent)
     return da
 
 
-def _make_do(name, parent=None):
-    return DataObject(name=name, parent=parent)
+def _make_do(name, parent=None, cdc=""):
+    return DataObject(name=name, cdc=cdc, parent=parent)
 
 
 @pytest.fixture

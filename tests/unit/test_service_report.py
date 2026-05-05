@@ -11,20 +11,18 @@ from ws61850.iec61850.server.server_report_control import ServerReportControl
 
 def _make_rcb(name, ln, buffered=True):
     rcb = ReportControl(
-        obj_ref=f"LD0/{ln.name}.{name}",
-        ln=ln,
-        name=name,
-        rptId=name,
+        name,
         buffered=buffered,
-        datasetName="DS1",
-        confRev=1,
-        trgOps={"gi": True, "dchg": True},
-        options={},
-        bufferedTime=0,
-        intPeriod=0,
-        client_reservation=bytearray(),
+        dataset_name="LD0/LLN0.DS1",
+        rpt_id=name,
+        conf_rev=1,
+        trg_ops={"gi": True, "dchg": True},
+        opt_flds={},
+        buffered_time=0,
+        int_period=0,
         indexed=False,
     )
+    ln.add_report_control(rcb)
     return rcb
 
 
@@ -41,7 +39,6 @@ def _svc_tuple(service_name, **fields):
 def brcb_control(simple_ied):
     lln0 = simple_ied.logical_devices[0].logical_nodes[0]
     rcb = _make_rcb("BR$rcb01", lln0, buffered=True)
-    lln0.add_reportControl(rcb)
     src = _make_server_rc(rcb)
     return src
 
@@ -50,7 +47,6 @@ def brcb_control(simple_ied):
 def urcb_control(simple_ied):
     lln0 = simple_ied.logical_devices[0].logical_nodes[0]
     rcb = _make_rcb("RP$rcb01", lln0, buffered=False)
-    lln0.add_reportControl(rcb)
     src = _make_server_rc(rcb)
     return src
 

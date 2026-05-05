@@ -90,7 +90,7 @@ def build_ds_refs_from_dataset(ds_list):
     for entry in ds_list:
         ds_refs.append({
             "ref": entry.variable_name,
-            "fc": entry.fc.name
+            "fc": entry.fc.wire_name
         })
     return ds_refs
 
@@ -160,15 +160,15 @@ def create_tpaa_response_getBRCBValues(invoke_id, associate_id, server_brcb: Ser
     """
     brcb = server_brcb.rcb
     service_data = {
-        "rptID": brcb.rptId,
+        "rptID": brcb.rpt_id,
         "rptEna": server_brcb.rptEna,
-        "dataSet": brcb.datasetName,
-        "confRev": brcb.confRev,
-        "optFlds": brcb.options,
-        "bufTm": brcb.bufferedTime,
+        "dataSet": brcb.dataset_name,
+        "confRev": brcb.conf_rev,
+        "optFlds": brcb.opt_flds,
+        "bufTm": brcb.buffered_time,
         "sqNum": server_brcb.seq_num,
-        "trgOp": brcb.trgOps,
-        "intgPd": brcb.intPeriod,
+        "trgOp": brcb.trg_ops,
+        "intgPd": brcb.int_period,
         "gi": brcb.gi,
         "purgeBuf": server_brcb.purge_buff,
         "entryID": server_brcb.entry_id,
@@ -198,15 +198,15 @@ def create_tpaa_response_getURCBValues(invoke_id, associate_id, server_urcb: Ser
     """
     urcb = server_urcb.rcb
     service_data = {
-        "rptID": urcb.rptId,
+        "rptID": urcb.rpt_id,
         "rptEna": server_urcb.rptEna,
-        "dataSet": urcb.datasetName,
-        "confRev": urcb.confRev,
-        "optFlds": urcb.options,
-        "bufTm": urcb.bufferedTime,
+        "dataSet": urcb.dataset_name,
+        "confRev": urcb.conf_rev,
+        "optFlds": urcb.opt_flds,
+        "bufTm": urcb.buffered_time,
         "sqNum": server_urcb.seq_num,
-        "trgOp": urcb.trgOps,
-        "intgPd": urcb.intPeriod,
+        "trgOp": urcb.trg_ops,
+        "intgPd": urcb.int_period,
         "gi": urcb.gi,
         "entryID": server_urcb.entry_id,
         "timeOfEntry": server_urcb.time_of_entry,
@@ -407,12 +407,12 @@ def create_tpaa_report(server_report_control: ServerReportControl, da_entry_list
     """
     report_control = server_report_control.rcb
     report_instance = {
-        "rptID": report_control.rptId,
+        "rptID": report_control.rpt_id,
         "sqNum": server_report_control.seq_num,
         "moreSegmentsFollow": False,
-        "dataSet": report_control.datasetName,
-        "bufOvfl": report_control.options["bufOvfl"],
-        "confRev": report_control.confRev,
+        "dataSet": report_control.dataset_name,
+        "bufOvfl": report_control.opt_flds.get("bufOvfl", False),
+        "confRev": report_control.conf_rev,
         "entry": {
             "timeOfEntry": server_report_control.time_of_entry,
             "entryID": server_report_control.entry_id,

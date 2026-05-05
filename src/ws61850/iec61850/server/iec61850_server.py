@@ -90,10 +90,6 @@ class IEC61850Server:
             ied_model, self.server_control_objects, lambda: self.control_handler
         )
 
-        quality_item = self.find_object_in_tree("LD0/DWMX1.WMaxSpt.q")
-        if quality_item is not None:
-            quality_item.mmsValue["validity"] = "questionable"
-
     def install_send_msg_callback(self, callback):
         self.send_msg_callback = callback
 
@@ -260,7 +256,7 @@ class IEC61850Server:
         """
         parent_item = self.get_do_parent(item)
         if isinstance(parent_item, DataObject) is True:
-            da_time = next((da for da in parent_item.do_or_da if da.name == "t" and da.fc.name == item.fc.name), None)
+            da_time = next((da for da in parent_item.do_or_da if da.name == "t" and da.fc.wire_name == item.fc.wire_name), None)
             current_time = get_now_time()
             if da_time is not None:
                 da_time.mmsValue = current_time
@@ -292,8 +288,8 @@ class IEC61850Server:
             for server_report_control in self.server_report_controls:
                 if server_report_control.rptEna:
                     try:
-                        if server_report_control.rcb.trgOps["dchg"] is True or server_report_control.rcb.trgOps["qchg"]:
-                            obj_ref = server_report_control.rcb.datasetName
+                        if server_report_control.rcb.trg_ops.get("dchg") is True or server_report_control.rcb.trg_ops.get("qchg"):
+                            obj_ref = server_report_control.rcb.dataset_name
                             dataset = self.find_ds_in_tree(obj_ref)
                             is_in_dataset = next(
                                 (
@@ -344,8 +340,8 @@ class IEC61850Server:
         try:
             while True:
 
-                if server_report_control.rptEna and server_report_control.rcb.trgOps["integrity"]:
-                    obj_ref = server_report_control.rcb.datasetName
+                if server_report_control.rptEna and server_report_control.rcb.trg_ops.get("integrity"):
+                    obj_ref = server_report_control.rcb.dataset_name
                     dataset = self.find_ds_in_tree(obj_ref)
                     if dataset is not None:
                         da_list = create_data_attribute_list_from_dataset(
@@ -365,7 +361,7 @@ class IEC61850Server:
                             self.send_msg_callback(encoded_report, datetime.datetime.now())
 
                         server_report_control.seq_num += 1
-                await asyncio.sleep(server_report_control.rcb.intPeriod / 1000)  # Convert milliseconds to seconds
+                await asyncio.sleep(server_report_control.rcb.int_period / 1000)  # Convert milliseconds to seconds
 
         except ConnectionClosedOK:
             current_task = asyncio.current_task()
@@ -512,7 +508,7 @@ class IEC61850Server:
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
                 if gi_brcb is not None:
                     logger.info("value set, sending the one time gi")
-                    dataset = self.find_ds_in_tree(gi_brcb.rcb.datasetName)
+                    dataset = self.find_ds_in_tree(gi_brcb.rcb.dataset_name)
                     if dataset is not None:
                         da_list = create_data_attribute_list_from_dataset(
                             dataset, self.ied_model, ReasonForInclusionInLog(generalInterrogation=True)
@@ -532,7 +528,7 @@ class IEC61850Server:
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
                 if gi_urcb is not None:
                     logger.info("value set, sending the one time gi")
-                    dataset = self.find_ds_in_tree(gi_urcb.rcb.datasetName)
+                    dataset = self.find_ds_in_tree(gi_urcb.rcb.dataset_name)
                     if dataset is not None:
                         da_list = create_data_attribute_list_from_dataset(
                             dataset, self.ied_model, ReasonForInclusionInLog(generalInterrogation=True)
