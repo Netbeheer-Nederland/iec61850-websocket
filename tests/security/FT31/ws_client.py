@@ -16,11 +16,13 @@
 # limitations under the License.
 import asyncio
 import logging
-import os
 import sys
+import time
 from pathlib import Path
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+import jwt
+
+from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.security.oauth import get_access_token
 
@@ -37,13 +39,13 @@ cafile = CERT_DIR / "ca.pem"
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     stream=sys.stdout,
 )
 
 
-BASE = os.environ.get("KEYCLOAK_URL", "https://localhost:8443")
-TARGET_REALM = os.environ.get("IEC61850_REALM", "iec61850-test")
+BASE = "https://localhost:8443"
+TARGET_REALM = "iec61850-test"
 token_endpoint = f"{BASE}/realms/{TARGET_REALM}/protocol/openid-connect/token"
 
 
@@ -53,18 +55,19 @@ async def main():
     client_id = "ws-client"
     client_secret = "K4Nrd14seXG52J3xpnIqfMyILTJJu3VI"
     access_token = await get_access_token(token_endpoint, client_id, client_secret, cafile)
-    logger.info(f"Access-Token: {access_token}")
+    logger.info("Access-Token: %s", access_token)
 
-    ep_ws_client_1 = WebSocketEndpoint(oauth_enable=True)
-    iec61850_server_1 = IEC61850Server(make_ied_model1(), "cp1")
-    ep_ws_client_1.add_iec61850_server(iec61850_server_1)
+    endpoint = ActiveEndpoint(oauth_enable=True)
 
-    task1 = asyncio.create_task(ep_ws_client_1.start("active", "localhost", 8765, "cp1", access_token=access_token))
-    task_token_1 = asyncio.create_task(
-        refresh_token_if_needed(token_endpoint, client_id, client_secret, "cp1", access_token, ep_ws_client_1, cafile)
+    iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
+    endpoint.add_iec61850_server(iec61850_server)
+
+    task = asyncio.create_task(endpoint.start("localhost", 8765, "cp1", access_token=access_token))
+    task_token = asyncio.create_task(
+        refresh_token_if_needed(token_endpoint, client_id, client_secret, "cp1", access_token, endpoint, cafile)
     )
 
-    await asyncio.gather(task1, task_token_1)
+    await asyncio.gather(task, task_token)
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ import logging
 import sys
 from pathlib import Path
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.data_model.helper import get_now_time
 
@@ -36,12 +36,9 @@ key_path = CERT_DIR / "server-key.pem"
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     stream=sys.stdout,
 )
-
-
-max_message_size_server = 65000
 
 data_w_max_set_pct = [
     {
@@ -65,7 +62,6 @@ trgOp = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": F
 
 brcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbMinMaxAvg", True)
 brcb.rptEna = True
-
 brcb.confRev = 5
 brcb.optFlds = opt_flds
 brcb.bufTm = 1000
@@ -93,87 +89,64 @@ urcb.resv = True
 
 
 def callback_called(result, param):
-    logger.info(f"callback called: {result}")
+    logger.info("callback called: %s", result)
 
 
 async def main():
-    ep_ws_server = WebSocketEndpoint(
+    endpoint = PassiveEndpoint(
         oauth_enable=True,
         cert_endpoint="https://localhost:8443/realms/iec61850-test/protocol/openid-connect/certs",
         token_issuer="https://localhost:8443/realms/iec61850-test",
         kc_cert=cafile,
     )
 
-    iec61850_client = IEC61850Client("cp1")
-    ep_ws_server.add_iec61850_client(iec61850_client)
+    client = IEC61850Client("cp1")
+    endpoint.add_iec61850_client(client)
 
-    server_task = asyncio.create_task(ep_ws_server.start("passive", "localhost", 8765))
+    server_task = asyncio.create_task(endpoint.start("localhost", 8765))
 
-    await ep_ws_server.client_list[0].ready_event.wait()
-    if ep_ws_server.client_list[0].is_connected is True:
-        websocket_info = ep_ws_server.get_websocket_info(ep_ws_server.client_list[0])
+    await client.ready_event.wait()
+    if client.is_connected is True:
+        websocket_info = endpoint.get_websocket_info(client)
         if websocket_info is not None:
             try:
-                server_list = await ep_ws_server.client_list[0].get_server_directory(
-                    websocket_info, callback_called, None
-                )
-                ld_directory = await ep_ws_server.client_list[0].get_logical_device_directory(
-                    "LD0", websocket_info, callback_called, None
-                )
-                ln_directory_ds = await ep_ws_server.client_list[0].get_logical_node_directory(
+                server_list = await client.get_server_directory(websocket_info, callback_called, None)
+                ld_directory = await client.get_logical_device_directory("LD0", websocket_info, callback_called, None)
+                ln_directory_ds = await client.get_logical_node_directory(
                     "LD0", "LLN0", "dataset", websocket_info, callback_called, None
                 )
-                ln_directory_do = await ep_ws_server.client_list[0].get_logical_node_directory(
+                ln_directory_do = await client.get_logical_node_directory(
                     "LD0", "LLN0", "dataObject", websocket_info, callback_called, None
                 )
-                ds_directory = await ep_ws_server.client_list[0].get_dataset_directory(
-                    "LD0",
-                    "LLN0",
-                    "DataSetMinMaxAvg",
-                    websocket_info,
-                    callback_called,
-                    None,
+                ds_directory = await client.get_dataset_directory(
+                    "LD0", "LLN0", "DataSetMinMaxAvg", websocket_info, callback_called, None
                 )
-                da_def = await ep_ws_server.client_list[0].get_data_definition(
-                    "LD0/LLN0.Mod", websocket_info, callback_called, None
+                da_def = await client.get_data_definition("LD0/LLN0.Mod", websocket_info, callback_called, None)
+                da_val = await client.get_data_values(
+                    "LD0/DWMX1.WMaxSetPct", "sp", True, websocket_info, callback_called, None
                 )
-                da_val = await ep_ws_server.client_list[0].get_data_values(
-                    "LD0/DWMX1.WMaxSetPct",
-                    "sp",
-                    True,
-                    websocket_info,
-                    callback_called,
-                    None,
+                set_da_res = await client.set_data_values(
+                    "LD0/DWMX1.WMaxSetPct", "sp", data_w_max_set_pct, websocket_info, callback_called, None
                 )
-                set_da_res = await ep_ws_server.client_list[0].set_data_values(
-                    "LD0/DWMX1.WMaxSetPct",
-                    "sp",
-                    data_w_max_set_pct,
-                    websocket_info,
-                    callback_called,
-                    None,
-                )
-                set_brcb_res = await ep_ws_server.client_list[0].set_BRCB_values(
-                    brcb, websocket_info, callback_called, None
-                )
+                set_brcb_res = await client.set_BRCB_values(brcb, websocket_info, callback_called, None)
 
-                logger.info(f"printing the list or returned items from client {iec61850_client.cp}")
-                logger.info(f"server_list: {server_list}")
-                logger.info(f"ld_directory: {ld_directory}")
-                logger.info(f"ln_directory_ds: {ln_directory_ds}")
-                logger.info(f"ln_directory_do:{ln_directory_do}")
-                logger.info(f"ds_directory: {ds_directory}")
-                logger.info(f"da_def: {da_def}")
-                logger.info(f"da_val: {da_val}")
-                logger.info(f"set_da_res: {set_da_res}")
-                logger.info(f"set_brcb_res: {set_brcb_res}")
+                logger.info("Results from client %s", client.cp)
+                logger.info("server_list: %s", server_list)
+                logger.info("ld_directory: %s", ld_directory)
+                logger.info("ln_directory_ds: %s", ln_directory_ds)
+                logger.info("ln_directory_do: %s", ln_directory_do)
+                logger.info("ds_directory: %s", ds_directory)
+                logger.info("da_def: %s", da_def)
+                logger.info("da_val: %s", da_val)
+                logger.info("set_da_res: %s", set_da_res)
+                logger.info("set_brcb_res: %s", set_brcb_res)
 
             except Exception as e:
-                logger.error("handler not called:", e)
+                logger.exception("Service call failed: %s", e)
         else:
             logger.warning("websocket_info is None")
     else:
-        logger.warning("did not enter first if ")
+        logger.warning("Client did not connect")
 
     await server_task
 

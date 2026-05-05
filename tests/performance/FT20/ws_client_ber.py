@@ -1,13 +1,38 @@
+# SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright 2025 Netbeheer Nederland
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import asyncio
+import logging
+import sys
 
 from testing.ieds.high_level_model import make_ied_model1
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.iec61850.server.control_handling import (
     ControlHandlerResult,
     ControlServiceStatusKind,
 )
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.iec61850.server.service_error import ServiceStatusKind
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 
 def control_handler_for_float(obj_ref, ctlVal_value, parameter):
@@ -26,17 +51,19 @@ def control_handler_for_float(obj_ref, ctlVal_value, parameter):
 
 
 async def main():
-    ep_ws_client = WebSocketEndpoint()
-    iec61850_server_1 = IEC61850Server(make_ied_model1(), "cp1")
-    iec61850_server_1.set_control_handler(control_handler_for_float, None)
-    report_task_1 = asyncio.create_task(iec61850_server_1.periodic_report_start())
-    ep_ws_client.add_iec61850_server(iec61850_server_1)
+    endpoint = ActiveEndpoint()
 
-    task1 = asyncio.create_task(
-        ep_ws_client.start("active", "localhost", 8765, "cp1", protocol=["iec61850-tpaa-ber-v1"])
+    iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
+    iec61850_server.set_control_handler(control_handler_for_float, None)
+    report_task = asyncio.create_task(iec61850_server.periodic_report_start())
+    endpoint.add_iec61850_server(iec61850_server)
+
+    logger.info("Connecting to localhost:8765 cp=cp1 (BER)")
+    task = asyncio.create_task(
+        endpoint.start("localhost", 8765, "cp1", protocol=["iec61850-tpaa-ber-v1"])
     )
 
-    await asyncio.gather(task1, report_task_1)
+    await asyncio.gather(task, report_task)
 
 
 if __name__ == "__main__":

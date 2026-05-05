@@ -19,7 +19,7 @@ import logging
 import sys
 from pathlib import Path
 
-from ws61850.endpoint.endpoint import WebSocketEndpoint
+from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.iec61850.server.control_handling import (
     ControlHandlerResult,
     ControlServiceStatusKind,
@@ -40,11 +40,9 @@ cafile = CERT_DIR / "ca.pem"
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     stream=sys.stdout,
 )
-
-max_message_size = 65000
 
 
 def control_handler_for_float(obj_ref, ctlVal_value, parameter):
@@ -63,17 +61,20 @@ def control_handler_for_float(obj_ref, ctlVal_value, parameter):
 
 
 async def main():
-    print(f"{cafile}")
+    logger.info("cafile: %s", cafile)
     tls_config = TLSConfiguration(cafile, None, False)
-    ep_ws_client = WebSocketEndpoint(tls_config=tls_config)
-    iec61850_server_1 = IEC61850Server(make_ied_model1(), "cp1")
-    iec61850_server_1.set_control_handler(control_handler_for_float, None)
-    report_task_1 = asyncio.create_task(iec61850_server_1.periodic_report_start())
-    ep_ws_client.add_iec61850_server(iec61850_server_1)
 
-    task1 = asyncio.create_task(ep_ws_client.start("active", "localhost", 8765, "cp1"))
+    endpoint = ActiveEndpoint(tls_config=tls_config)
 
-    await asyncio.gather(task1, report_task_1)
+    iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
+    iec61850_server.set_control_handler(control_handler_for_float, None)
+    report_task = asyncio.create_task(iec61850_server.periodic_report_start())
+    endpoint.add_iec61850_server(iec61850_server)
+
+    logger.info("Connecting to localhost:8765 cp=cp1")
+    task = asyncio.create_task(endpoint.start("localhost", 8765, "cp1"))
+
+    await asyncio.gather(task, report_task)
 
 
 if __name__ == "__main__":
