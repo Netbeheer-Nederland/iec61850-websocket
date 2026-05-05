@@ -22,13 +22,10 @@ import sys
 from pathlib import Path
 
 from ws61850.endpoint.active_endpoint import ActiveEndpoint
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
-_project_root = Path(__file__).resolve().parents[3]
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
-
-from testing.ieds.high_level_model import make_ied_model1  # noqa: E402
+_MODEL_PATH = Path(__file__).resolve().parents[3] / "testing" / "ieds" / "ied_model1.json"
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -91,7 +88,7 @@ def parse_args() -> argparse.Namespace:
 
 async def create_ws_clients(cp, task_list, args):
     endpoint = ActiveEndpoint()
-    iec61850_server = IEC61850Server(make_ied_model1(), cp)
+    iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), cp)
     endpoint.add_iec61850_server(iec61850_server)
 
     controller_task = asyncio.create_task(endpoint.start(args.host, args.port, cp))

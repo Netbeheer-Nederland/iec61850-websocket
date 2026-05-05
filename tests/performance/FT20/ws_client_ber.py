@@ -17,15 +17,18 @@
 import asyncio
 import logging
 import sys
+from pathlib import Path
 
-from testing.ieds.high_level_model import make_ied_model1
 from ws61850.endpoint.active_endpoint import ActiveEndpoint
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.control_handling import (
     ControlHandlerResult,
     ControlServiceStatusKind,
 )
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.iec61850.server.service_error import ServiceStatusKind
+
+_MODEL_PATH = Path(__file__).parent.parent.parent.parent / "testing" / "ieds" / "ied_model1.json"
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -53,7 +56,7 @@ def control_handler_for_float(obj_ref, ctlVal_value, parameter):
 async def main():
     endpoint = ActiveEndpoint()
 
-    iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
+    iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     iec61850_server.set_control_handler(control_handler_for_float, None)
     report_task = asyncio.create_task(iec61850_server.periodic_report_start())
     endpoint.add_iec61850_server(iec61850_server)

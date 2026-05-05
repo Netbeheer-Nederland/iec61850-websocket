@@ -1,0 +1,128 @@
+{
+  "name": "IED1",
+  "logical_devices": [
+    {
+      "name": "LD0",
+      "ld_name": "LD_INST",
+      "logical_nodes": [
+        {
+          "name": "LLN0",
+          "data_objects": [
+            {"name": "Mod",    "cdc": "enc"},
+            {"name": "NamPlt", "cdc": "lpl"},
+            {"name": "Beh",    "cdc": "ens"},
+            {"name": "Health", "cdc": "ens"}
+          ],
+          "data_sets": [
+            {
+              "name": "DataSetMinMaxAvg",
+              "entries": [
+                {"variable_name": "LD0/MMXU1.MinWPhs", "fc": "mx"},
+                {"variable_name": "LD0/MMXU1.MaxWPhs", "fc": "mx"},
+                {"variable_name": "LD0/MMXU1.AvWPhs",  "fc": "mx"}
+              ]
+            },
+            {
+              "name": "DataSetSetpoints",
+              "entries": [
+                {"variable_name": "LD0/DWMX1.SptReas",            "fc": "st"},
+                {"variable_name": "LD0/DWMX1.WMaxFto.setVal",     "fc": "sp"},
+                {"variable_name": "LD0/DWMX1.WMaxSet.setMag.f",   "fc": "sp"},
+                {"variable_name": "LD0/DWMX1.WMaxSetPct.setMag.f","fc": "sp"},
+                {"variable_name": "LD0/DWMX1.WMaxSpt",            "fc": "mx"},
+                {"variable_name": "LD0/DWMX1.WMaxSptPct",         "fc": "mx"},
+                {"variable_name": "LD0/DGEN1.DEROpSt",            "fc": "st"}
+              ]
+            },
+            {
+              "name": "DataSetActualValues",
+              "entries": [
+                {"variable_name": "LD0/MMXU1.TotW",     "fc": "mx"},
+                {"variable_name": "LD0/MMXU1.TotVAr",   "fc": "mx"},
+                {"variable_name": "LD0/MMXU1.PhV.phsA", "fc": "mx"},
+                {"variable_name": "LD0/MMXU1.PhV.phsB", "fc": "mx"},
+                {"variable_name": "LD0/MMXU1.PhV.phsC", "fc": "mx"},
+                {"variable_name": "LD0/MMXU1.PPV.phsAB","fc": "mx"},
+                {"variable_name": "LD0/MMXU1.PPV.phsBC","fc": "mx"},
+                {"variable_name": "LD0/MMXU1.PPV.phsCA","fc": "mx"},
+                {"variable_name": "LD0/MMXU1.A.phsA",   "fc": "mx"},
+                {"variable_name": "LD0/MMXU1.A.phsB",   "fc": "mx"},
+                {"variable_name": "LD0/MMXU1.A.phsC",   "fc": "mx"}
+              ]
+            }
+          ],
+          "report_controls": [
+            {
+              "name": "rcbMinMaxAvg",
+              "buffered": true,
+              "dataset_name": "LD0/LLN0.DataSetMinMaxAvg",
+              "trg_ops": {"integrity": true},
+              "opt_flds": {"timeStamp": true, "dataSet": true, "bufOvfl": true, "entryID": true},
+              "int_period": 2000
+            },
+            {
+              "name": "rcbSetpoints",
+              "buffered": false,
+              "dataset_name": "LD0/LLN0.DataSetSetpoints",
+              "trg_ops": {"dchg": true, "integrity": true, "gi": true},
+              "opt_flds": {"timeStamp": true, "reasonCode": true},
+              "buffered_time": 100
+            },
+            {
+              "name": "rcbActualValues",
+              "buffered": false,
+              "dataset_name": "LD0/LLN0.DataSetActualValues",
+              "trg_ops": {"dchg": true, "qchg": true, "gi": true},
+              "opt_flds": {"timeStamp": true, "configRef": true, "reasonCode": true},
+              "buffered_time": 1000
+            }
+          ]
+        },
+        {
+          "name": "LPHD1",
+          "data_objects": [
+            {"name": "PhyNam",    "cdc": "dpl"},
+            {"name": "PhyHealth", "cdc": "ens"},
+            {"name": "Proxy",     "cdc": "sps"},
+            {"name": "PwrUp",     "cdc": "sps"}
+          ]
+        },
+        {
+          "name": "DWMX1",
+          "data_objects": [
+            {"name": "NamPlt",    "cdc": "lpl"},
+            {"name": "Beh",       "cdc": "ens"},
+            {"name": "WMaxSptPct","cdc": "apc"},
+            {"name": "WMaxSpt",   "cdc": "apc"},
+            {"name": "WMaxSetPct","cdc": "asg"},
+            {"name": "WMaxSet",   "cdc": "asg"},
+            {"name": "WMaxFto",   "cdc": "ing"},
+            {"name": "SptReas",   "cdc": "inc"}
+          ]
+        },
+        {
+          "name": "DGEN1",
+          "data_objects": [
+            {"name": "NamPlt",  "cdc": "lpl"},
+            {"name": "Beh",     "cdc": "ens"},
+            {"name": "DEROpSt", "cdc": "ens"}
+          ]
+        },
+        {
+          "name": "MMXU1",
+          "data_objects": [
+            {"name": "Beh",     "cdc": "ens"},
+            {"name": "TotW",    "cdc": "mv"},
+            {"name": "TotVAr",  "cdc": "mv"},
+            {"name": "PhV",     "cdc": "wye"},
+            {"name": "PPV",     "cdc": "del"},
+            {"name": "A",       "cdc": "wye"},
+            {"name": "AvWPhs",  "cdc": "mv"},
+            {"name": "MaxWPhs", "cdc": "mv"},
+            {"name": "MinWPhs", "cdc": "mv"}
+          ]
+        }
+      ]
+    }
+  ]
+}

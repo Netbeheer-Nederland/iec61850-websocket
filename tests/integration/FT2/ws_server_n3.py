@@ -16,11 +16,14 @@
 # limitations under the License.
 import asyncio
 import logging
+import pathlib
 import sys
 
-from testing.ieds.high_level_model import make_ied_model1
 from ws61850.endpoint.passive_endpoint import PassiveEndpoint
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
+
+_MODEL_PATH = pathlib.Path(__file__).parent.parent.parent.parent / "testing" / "ieds" / "ied_model1.json"
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -33,7 +36,7 @@ logging.basicConfig(
 async def main():
     endpoint = PassiveEndpoint(is_direct=True)
 
-    iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
+    iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     endpoint.add_iec61850_server(iec61850_server)
 
     logger.info("Waiting for client connections on localhost:8765 (JER + BER, direct)")

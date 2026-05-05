@@ -16,12 +16,15 @@
 # limitations under the License.
 import asyncio
 import logging
+from pathlib import Path
 
 from testing.certs.paths import CERT_DIR
-from testing.ieds.high_level_model import make_ied_model1
 from ws61850.endpoint.active_endpoint import ActiveEndpoint
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.security.oauth import get_access_token
+
+_MODEL_PATH = Path(__file__).parent.parent.parent.parent / "testing" / "ieds" / "ied_model1.json"
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +41,7 @@ async def main():
 
     endpoint = ActiveEndpoint(oauth_enable=True, try_reconnect=False)
 
-    iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
+    iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     endpoint.add_iec61850_server(iec61850_server)
 
     task = asyncio.create_task(endpoint.start("localhost", 8765, "cp1", access_token=access_token))

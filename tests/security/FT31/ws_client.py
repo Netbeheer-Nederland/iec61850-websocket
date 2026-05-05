@@ -23,6 +23,7 @@ from pathlib import Path
 import jwt
 
 from ws61850.endpoint.active_endpoint import ActiveEndpoint
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.security.oauth import get_access_token
 
@@ -31,8 +32,9 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from testing.certs.paths import CERT_DIR  # noqa: E402
-from testing.ieds.high_level_model import make_ied_model1  # noqa: E402
 from testing.tasks.refresh_token_if_needed import refresh_token_if_needed  # noqa: E402
+
+_MODEL_PATH = _project_root / "testing" / "ieds" / "ied_model1.json"
 
 cafile = CERT_DIR / "ca.pem"
 
@@ -59,7 +61,7 @@ async def main():
 
     endpoint = ActiveEndpoint(oauth_enable=True)
 
-    iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
+    iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     endpoint.add_iec61850_server(iec61850_server)
 
     task = asyncio.create_task(endpoint.start("localhost", 8765, "cp1", access_token=access_token))

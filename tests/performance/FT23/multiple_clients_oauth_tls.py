@@ -24,6 +24,7 @@ import time
 from pathlib import Path
 
 from ws61850.endpoint.active_endpoint import ActiveEndpoint
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.security.oauth import get_access_token
 from ws61850.security.tls import TLSConfiguration
@@ -33,10 +34,11 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from testing.certs.paths import CERT_DIR  # noqa: E402
-from testing.ieds.high_level_model import make_ied_model1  # noqa: E402
 from testing.tasks.refresh_token_if_needed import refresh_token_if_needed  # noqa: E402
 from testing.tasks.runner import run_tasks  # noqa: E402
 from testing.utils.credentials_store import load_credentials  # noqa: E402
+
+_MODEL_PATH = _project_root / "testing" / "ieds" / "ied_model1.json"
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -110,7 +112,7 @@ async def start_client_process(client_config, i, args):
     endpoint = ActiveEndpoint(oauth_enable=True, tls_config=tls_config)
 
     pocc_id = client_config["pocc_id"]
-    iec61850_server = IEC61850Server(make_ied_model1(), pocc_id)
+    iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), pocc_id)
     endpoint.add_iec61850_server(iec61850_server)
 
     task_list = []

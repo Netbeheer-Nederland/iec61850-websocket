@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 from ws61850.endpoint.active_endpoint import ActiveEndpoint
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.control_handling import (
     ControlHandlerResult,
     ControlServiceStatusKind,
@@ -33,7 +34,8 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from testing.certs.paths import CERT_DIR  # noqa: E402
-from testing.ieds.high_level_model import make_ied_model1  # noqa: E402
+
+_MODEL_PATH = _project_root / "testing" / "ieds" / "ied_model1.json"
 
 cafile = CERT_DIR / "ca.pem"
 
@@ -66,7 +68,7 @@ async def main():
 
     endpoint = ActiveEndpoint(tls_config=tls_config)
 
-    iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
+    iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     iec61850_server.set_control_handler(control_handler_for_float, None)
     report_task = asyncio.create_task(iec61850_server.periodic_report_start())
     endpoint.add_iec61850_server(iec61850_server)

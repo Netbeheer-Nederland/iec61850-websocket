@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 from ws61850.endpoint.active_endpoint import ActiveEndpoint
+from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.control_handling import (
     ControlHandlerResult,
     ControlServiceStatusKind,
@@ -27,11 +28,7 @@ from ws61850.iec61850.server.control_handling import (
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.iec61850.server.service_error import ServiceStatusKind
 
-_project_root = Path(__file__).resolve().parents[3]
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
-
-from testing.ieds.high_level_model import make_ied_model1  # noqa: E402
+_MODEL_PATH = Path(__file__).resolve().parents[3] / "testing" / "ieds" / "ied_model1.json"
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -59,7 +56,7 @@ def control_handler_for_float(obj_ref, ctlVal_value, parameter):
 async def main():
     endpoint = ActiveEndpoint()
 
-    iec61850_server = IEC61850Server(make_ied_model1(), "cp1")
+    iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     iec61850_server.set_control_handler(control_handler_for_float, None)
     report_task = asyncio.create_task(iec61850_server.periodic_report_start())
     endpoint.add_iec61850_server(iec61850_server)
