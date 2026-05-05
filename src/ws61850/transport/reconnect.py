@@ -41,13 +41,21 @@ class ReconnectPolicy:
         if not self.enabled:
             return False
         if self.max_retries is not None and self._attempts >= self.max_retries:
+            logger.warning("Max retries reached (%d/%d), not reconnecting", self._attempts, self.max_retries)
             return False
         return True
 
     async def wait(self) -> None:
         self._attempts += 1
-        logger.info("Reconnect attempt %d (delay %.1fs)", self._attempts, self.delay_seconds)
+        logger.info(
+            "Reconnect attempt %d%s (delay %.1fs)",
+            self._attempts,
+            f"/{self.max_retries}" if self.max_retries is not None else "",
+            self.delay_seconds,
+        )
         await asyncio.sleep(self.delay_seconds)
 
     def reset(self) -> None:
+        if self._attempts:
+            logger.debug("Reconnect counter reset after %d attempt(s)", self._attempts)
         self._attempts = 0

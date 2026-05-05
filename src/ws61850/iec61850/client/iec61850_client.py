@@ -98,6 +98,7 @@ class IEC61850Client:
             self.response_received.set()  # Notify waiters that a response arrived
             if decoded_message[0] != "associate":
                 invoke_id = extract_invoke_id(decoded_message)
+                logger.debug("Response queued cp=%r invoke_id=%s msg_type=%r", self.cp, invoke_id, decoded_message[0])
                 return invoke_id
 
         elif decoded_message[0] != "unconfirmed" and decoded_message[0] == "associate":
@@ -116,6 +117,7 @@ class IEC61850Client:
                     websocket_info.associate_id = asc_id
                     self.is_connected = True
                     self.ready_event.set()
+                    logger.info("Association established cp=%r associate_id=%r", self.cp, asc_id)
         elif decoded_message[0] == "response":
             invoke_id = extract_invoke_id(decoded_message)
             outstanding_call = next((call for call in outstanding_calls if call[1]["service"][0] == invoke_id), None)
@@ -150,7 +152,7 @@ class IEC61850Client:
                             if call[1][1][1].get("invokeId") == invoke_id:
                                 return call
             except Exception as e:
-                logger.info("error in await_response: ", e)
+                logger.error("Error scanning outstanding calls cp=%r invoke_id=%s: %s", self.cp, invoke_id, e)
 
             # Wait for next response notification (with short timeout to allow periodic checks)
             try:
@@ -159,13 +161,14 @@ class IEC61850Client:
             except asyncio.TimeoutError:
                 continue  # Check again
         self.response_received.clear()
-        logger.info(f"response not found for invoke_id={invoke_id}!")
+        logger.warning("Response timeout cp=%r invoke_id=%s after %.1fs", self.cp, invoke_id, timeout)
         return None
 
     async def select(self, data, websocket_info: WebSocketInfo, callback, parameter):
         """
         Function used for sending select request and awaiting its response
         """
+        logger.debug("select cp=%r ref=%s invoke_id=%s", self.cp, data, websocket_info.invoke_id)
         tpaa_request = create_tpaa_request_select(websocket_info.invoke_id, websocket_info.associate_id, data)
 
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
@@ -179,15 +182,18 @@ class IEC61850Client:
             service_name = retrieve_service_name(response)
             if service_name[0] != "serviceError":
                 success = retrieve_success(response)
+                logger.debug("select response cp=%r ref=%s success=%s", self.cp, data, success)
                 if callback is not None:
                     callback(success, parameter)
                 websocket_info.invoke_id += 1
                 return success
             else:
+                logger.warning("select serviceError cp=%r ref=%s error=%s", self.cp, data, service_name[1])
                 websocket_info.invoke_id += 1
                 return service_name[1]
 
         else:
+            logger.warning("select no response cp=%r ref=%s", self.cp, data)
             websocket_info.invoke_id += 1
             return None
 
@@ -195,6 +201,7 @@ class IEC61850Client:
         """
         Function used for sending operate request and awaiting its response
         """
+        logger.debug("operate cp=%r ref=%s invoke_id=%s", self.cp, data, websocket_info.invoke_id)
         tpaa_request = create_tpaa_request_operate(websocket_info.invoke_id, websocket_info.associate_id, data)
 
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
@@ -209,18 +216,22 @@ class IEC61850Client:
             if service_name[0] != "serviceError":
                 success = retrieve_success(response)
                 if success == True:
+                    logger.debug("operate success cp=%r ref=%s", self.cp, data)
                     if callback is not None:
                         callback(success, parameter)
                     websocket_info.invoke_id += 1
                     return success
                 else:
+                    logger.warning("operate failed cp=%r ref=%s result=%s", self.cp, data, service_name[1])
                     websocket_info.invoke_id += 1
                     return service_name[1]
             else:
+                logger.warning("operate serviceError cp=%r ref=%s error=%s", self.cp, data, service_name[1])
                 websocket_info.invoke_id += 1
                 return service_name[1]
 
         else:
+            logger.warning("operate no response cp=%r ref=%s", self.cp, data)
             websocket_info.invoke_id += 1
             return None
 
@@ -228,7 +239,7 @@ class IEC61850Client:
         """
         Function used for sending getServerDirectory request and awaiting its response
         """
-
+        logger.debug("getServerDirectory cp=%r invoke_id=%s", self.cp, websocket_info.invoke_id)
         tpaa_request = create_tpaa_request_getServerDirectory(
             websocket_info.invoke_id, websocket_info.associate_id, "logicalDevice"
         )
@@ -244,15 +255,18 @@ class IEC61850Client:
             service_name = retrieve_service_name(response)
             if service_name[0] != "serviceError":
                 ld_list = retrieve_lds(response)
+                logger.debug("getServerDirectory cp=%r returned %d LD(s)", self.cp, len(ld_list) if ld_list else 0)
                 if callback is not None:
                     callback(ld_list, parameter)
                 websocket_info.invoke_id += 1
                 return ld_list
             else:
+                logger.warning("getServerDirectory serviceError cp=%r error=%s", self.cp, service_name[1])
                 websocket_info.invoke_id += 1
                 return service_name[1]
 
         else:
+            logger.warning("getServerDirectory no response cp=%r", self.cp)
             websocket_info.invoke_id += 1
             return None
 

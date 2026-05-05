@@ -135,13 +135,20 @@ class ActiveEndpoint:
                 await self._connect_once(hostname, port, cp, access_token=access_token, protocol=protocol)
                 self._reconnect_policy.reset()
             except (ConnectionRefusedError, OSError) as e:
-                logger.warning("Connection failed: %s", e)
+                logger.warning("Connection failed cp=%r: %s", cp, e)
                 await self._on_connection_closed(cp)
-                await self._reconnect_policy.wait()
+                if self._reconnect_policy.should_reconnect():
+                    await self._reconnect_policy.wait()
+                else:
+                    logger.warning("Reconnection disabled or max retries reached for cp=%r, giving up", cp)
+                    break
             except Exception as e:
-                logger.error("Unexpected error in active endpoint: %s", e)
+                logger.error("Unexpected error in active endpoint cp=%r: %s", cp, e, exc_info=True)
                 await self._on_connection_closed(cp)
-                await self._reconnect_policy.wait()
+                if self._reconnect_policy.should_reconnect():
+                    await self._reconnect_policy.wait()
+                else:
+                    break
 
     async def stop_passive(self) -> None:
         """No-op stub — ActiveEndpoint has no listening server to stop."""
@@ -161,14 +168,16 @@ class ActiveEndpoint:
             compression=None,
         )
 
+        logger.info("Connecting to %s (protocol=%s)", uri, protocol)
         async with websockets.connect(uri, **connect_kwargs) as websocket:
-            logger.info("Started client connection to %s", uri)
+            logger.info("WebSocket connection established to %s", uri)
             websocket_info = None
 
             try:
                 if self._is_direct:
                     selected_client = self._router.find_client(cp)
                     if selected_client is not None:
+                        logger.debug("Dispatching to client cp=%r (direct active mode)", cp)
                         self.websocket_info_list = [
                             ws_info
                             for ws_info in self.websocket_info_list
@@ -177,9 +186,11 @@ class ActiveEndpoint:
                         websocket_info = WebSocketInfo(websocket, "", cp=cp)
                         if protocol and "iec61850-tpaa-ber-v1" in protocol:
                             websocket_info.is_ber_protocol = True
+                            logger.debug("BER encoding selected for cp=%r", cp)
                         self.websocket_info_list.append(websocket_info)
 
                         tpaa_request = create_tpaa_associate_request(selected_client.cp, 65000)
+                        logger.debug("Sending associateRequest cp=%r", cp)
                         request = await asyncio.to_thread(
                             encode_tpaa_message, tpaa_request, websocket_info.is_ber_protocol
                         )
@@ -210,6 +221,12 @@ class ActiveEndpoint:
                                             websocket_info.associate_id = asc_id
                                             selected_client.is_connected = True
                                             selected_client.ready_event.set()
+                                            logger.info(
+                                                "Association established cp=%r associate_id=%r max_outstanding_calls=%s",
+                                                cp,
+                                                asc_id,
+                                                max_calls,
+                                            )
                             else:
                                 if not self._is_report(message, websocket_info.is_ber_protocol):
                                     decoded_message = await asyncio.to_thread(
@@ -217,6 +234,7 @@ class ActiveEndpoint:
                                     )
                                     if decoded_message[0] == "associate":
                                         associate_type = extract_associate_request_type(decoded_message)
+                                        logger.debug("Association control message cp=%r type=%r", cp, associate_type)
                                         action = await self._assoc_handler.handle(
                                             associate_type, decoded_message, websocket, websocket_info
                                         )
@@ -227,7 +245,12 @@ class ActiveEndpoint:
                                         decoded_message, websocket_info.is_ber_protocol
                                     )
                                     if invoke_id and invoke_id > websocket_info.invoke_id:
-                                        logger.info("invoke id invalid, closing the connection ...")
+                                        logger.warning(
+                                            "Invoke ID out of sequence cp=%r invoke_id=%s expected<=%s, closing",
+                                            cp,
+                                            invoke_id,
+                                            websocket_info.invoke_id,
+                                        )
                                         await websocket.close()
                     else:
                         await self._router.send_not_found_response(
@@ -237,6 +260,7 @@ class ActiveEndpoint:
                 else:
                     selected_server = self._router.find_server(cp)
                     if selected_server is not None:
+                        logger.debug("Dispatching to server cp=%r (non-direct active mode)", cp)
                         self.websocket_info_list = [
                             ws_info
                             for ws_info in self.websocket_info_list
@@ -245,6 +269,7 @@ class ActiveEndpoint:
                         websocket_info = WebSocketInfo(websocket, "", cp=cp)
                         if protocol and "iec61850-tpaa-ber-v1" in protocol:
                             websocket_info.is_ber_protocol = True
+                            logger.debug("BER encoding selected for cp=%r", cp)
                         self.websocket_info_list.append(websocket_info)
 
                         async for message in websocket:

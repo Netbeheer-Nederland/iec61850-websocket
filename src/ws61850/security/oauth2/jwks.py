@@ -15,10 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import ssl
 
 import requests
 from jwt import algorithms
+
+logger = logging.getLogger(__name__)
 
 
 class JwksCache:
@@ -37,18 +40,22 @@ class JwksCache:
         self._keys: dict = {}
 
     def _fetch(self) -> None:
+        logger.debug("Fetching JWKS from %s", self._jwks_uri)
         session = requests.Session()
         session.verify = self._cafile or True
         response = session.get(self._jwks_uri)
         response.raise_for_status()
         data = response.json()
         self._keys = {k["kid"]: k for k in data["keys"]}
+        logger.debug("JWKS fetched: %d key(s) cached", len(self._keys))
 
     def get_signing_key(self, kid: str):
         """Return the signing key for the given kid, fetching if not cached."""
         if kid not in self._keys:
+            logger.debug("Cache miss for kid=%r, refreshing JWKS", kid)
             self._fetch()
         jwk = self._keys.get(kid)
         if jwk is None:
+            logger.error("No JWKS key found for kid=%r (available: %s)", kid, list(self._keys))
             raise KeyError(f"No JWKS key found for kid={kid!r}")
         return algorithms.RSAAlgorithm.from_jwk(jwk)

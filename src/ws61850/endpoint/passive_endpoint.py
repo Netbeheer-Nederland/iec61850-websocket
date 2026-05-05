@@ -196,10 +196,18 @@ class PassiveEndpoint:
         clean_path = path.lstrip("/")
         protocol = websocket.subprotocol
 
+        logger.info(
+            "Incoming WebSocket connection cp=%r peer=%s protocol=%s",
+            clean_path,
+            websocket.remote_address,
+            protocol,
+        )
+
         try:
             if self._is_direct:
                 selected_server = self._router.find_server(clean_path)
                 if selected_server is not None:
+                    logger.debug("Dispatching to server cp=%r (direct mode)", clean_path)
                     selected_server.ready_event.set()
                     self.websocket_info_list = [
                         ws_info
@@ -210,6 +218,7 @@ class PassiveEndpoint:
                     websocket_info = WebSocketInfo(websocket, "", cp=clean_path)
                     if protocol and "iec61850-tpaa-ber-v1" in protocol:
                         websocket_info.is_ber_protocol = True
+                        logger.debug("BER encoding selected for cp=%r", clean_path)
                     self.websocket_info_list.append(websocket_info)
 
                     if self._oauth_enable:
@@ -220,6 +229,7 @@ class PassiveEndpoint:
                         websocket_info.expiry_task = asyncio.create_task(
                             self.close_on_expiry(websocket, current_access_token["access_token"]["exp"])
                         )
+                        logger.debug("Token expiry task scheduled for cp=%r", clean_path)
 
                     async for message in websocket:
                         if self.recv_msg_callback is not None:
@@ -230,6 +240,7 @@ class PassiveEndpoint:
 
                         if decoded_message[0] == "associate":
                             associate_type = extract_associate_request_type(decoded_message)
+                            logger.debug("Association control message cp=%r type=%r", clean_path, associate_type)
                             action = await self._assoc_handler.handle(
                                 associate_type, decoded_message, websocket, websocket_info
                             )
@@ -245,6 +256,7 @@ class PassiveEndpoint:
             else:
                 selected_client = self._router.find_client(clean_path)
                 if selected_client is not None:
+                    logger.debug("Dispatching to client cp=%r (passive mode)", clean_path)
                     self.websocket_info_list = [
                         ws_info
                         for ws_info in self.websocket_info_list
@@ -253,6 +265,7 @@ class PassiveEndpoint:
                     websocket_info = WebSocketInfo(websocket, "", cp=clean_path)
                     if protocol and "iec61850-tpaa-ber-v1" == protocol:
                         websocket_info.is_ber_protocol = True
+                        logger.debug("BER encoding selected for cp=%r", clean_path)
                     self.websocket_info_list.append(websocket_info)
 
                     if self._oauth_enable:
@@ -263,8 +276,10 @@ class PassiveEndpoint:
                         websocket_info.expiry_task = asyncio.create_task(
                             self.close_on_expiry(websocket, current_access_token["access_token"]["exp"])
                         )
+                        logger.debug("Token expiry task scheduled for cp=%r", clean_path)
 
                     tpaa_request = create_tpaa_associate_request(selected_client.cp, 65000)
+                    logger.debug("Sending associateRequest to remote server cp=%r", clean_path)
                     request = await asyncio.to_thread(
                         encode_tpaa_message, tpaa_request, websocket_info.is_ber_protocol
                     )
@@ -292,6 +307,12 @@ class PassiveEndpoint:
                                         websocket_info.associate_id = asc_id
                                         selected_client.is_connected = True
                                         selected_client.ready_event.set()
+                                        logger.info(
+                                            "Association established cp=%r associate_id=%r max_outstanding_calls=%s",
+                                            clean_path,
+                                            asc_id,
+                                            max_calls,
+                                        )
                         else:
                             if not self._is_report(message, websocket_info.is_ber_protocol):
                                 decoded_message = await asyncio.to_thread(
@@ -299,6 +320,7 @@ class PassiveEndpoint:
                                 )
                                 if decoded_message[0] == "associate":
                                     associate_type = extract_associate_request_type(decoded_message)
+                                    logger.debug("Association control message cp=%r type=%r", clean_path, associate_type)
                                     action = await self._assoc_handler.handle(
                                         associate_type, decoded_message, websocket, websocket_info
                                     )
@@ -309,7 +331,12 @@ class PassiveEndpoint:
                                     decoded_message, websocket_info.is_ber_protocol
                                 )
                                 if invoke_id and invoke_id > websocket_info.invoke_id:
-                                    logger.info("invoke id invalid, closing the connection ...")
+                                    logger.warning(
+                                        "Invoke ID out of sequence cp=%r invoke_id=%s expected<=%s, closing",
+                                        clean_path,
+                                        invoke_id,
+                                        websocket_info.invoke_id,
+                                    )
                                     await websocket.close()
                 else:
                     await self._router.send_not_found_response(
@@ -317,23 +344,26 @@ class PassiveEndpoint:
                     )
 
         except Exception as e:
-            logger.error("Error in server handler function: %s", e)
+            logger.error("Error in server handler function cp=%r: %s", clean_path, e, exc_info=True)
 
         finally:
             await websocket.wait_closed()
-            logger.info("Client disconnected: %s", websocket.remote_address)
+            logger.info("Client disconnected: %s cp=%r", websocket.remote_address, clean_path)
             await self._on_connection_closed(clean_path)
 
     async def process_request(self, connection, request: Request):
+        cp = connection.request.path.lstrip("/")
         headers = request.headers
         auth_header = headers.get("Authorization")
 
         if not auth_header or not auth_header.startswith("Bearer "):
+            logger.warning("OAuth: missing or malformed Authorization header for cp=%r", cp)
             return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Missing or invalid token\n")
 
         token = auth_header[len("Bearer "):]
 
         if self._jwt_validator is None:
+            logger.error("OAuth: JWT validator not configured but oauth_enable=True for cp=%r", cp)
             return self._http_error_response(
                 HTTPStatus.SERVICE_UNAVAILABLE, b"Token verification unavailable\n"
             )
@@ -341,15 +371,16 @@ class PassiveEndpoint:
         try:
             is_valid, claims = self._jwt_validator.validate(token)
         except (KeyError, Exception) as e:
-            logger.error("JWKS fetch or decode error: %s", e)
+            logger.error("OAuth: JWKS fetch or decode error for cp=%r: %s", cp, e)
             return self._http_error_response(
                 HTTPStatus.SERVICE_UNAVAILABLE, b"Token verification unavailable\n"
             )
 
         if not is_valid or claims is None:
+            logger.warning("OAuth: token rejected (invalid or expired) for cp=%r", cp)
             return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Invalid or expired token\n")
 
-        cp = connection.request.path.lstrip("/")
+        logger.info("OAuth: token accepted for cp=%r expires_at=%s", cp, claims.expiry)
         self.access_token_list.append(
             {"access_token": {"exp": claims.expiry}, "cp": cp, "access_token_raw": token}
         )

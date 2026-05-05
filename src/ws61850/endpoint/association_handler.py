@@ -74,6 +74,12 @@ class AssociationHandler:
 
         Returns ACTION_ABORT, ACTION_RELEASE, or ACTION_CONTINUE.
         """
+        logger.debug(
+            "Handling association message type=%r associate_id=%r",
+            associate_type,
+            websocket_info.associate_id,
+        )
+
         if associate_type == "abortRequest":
             tpaa = create_tpaa_abort_response(
                 websocket_info.invoke_id, websocket_info.associate_id
@@ -83,7 +89,7 @@ class AssociationHandler:
             )
             await websocket.send(encoded)
             websocket.transport.abort()
-            logger.info("Association aborted")
+            logger.info("Association aborted associate_id=%r", websocket_info.associate_id)
             return ACTION_ABORT
 
         if associate_type == "releaseRequest":
@@ -95,7 +101,7 @@ class AssociationHandler:
             )
             await websocket.send(encoded)
             await websocket.close()
-            logger.info("Association released")
+            logger.info("Association released associate_id=%r", websocket_info.associate_id)
             return ACTION_RELEASE
 
         if associate_type == "refreshToken":
@@ -108,6 +114,11 @@ class AssociationHandler:
                 self._token_issuer,
             )
             if validity and expiry is not None and websocket_info.expiry_task is not None:
+                logger.debug(
+                    "Token refresh accepted associate_id=%r new_expiry=%s",
+                    websocket_info.associate_id,
+                    expiry,
+                )
                 websocket_info.expiry_task.cancel()
                 try:
                     await websocket_info.expiry_task
@@ -117,5 +128,12 @@ class AssociationHandler:
                     websocket_info.expiry_task = asyncio.create_task(
                         self._close_on_expiry_fn(websocket, expiry)
                     )
+            else:
+                logger.warning(
+                    "Token refresh rejected validity=%s expiry=%s associate_id=%r",
+                    validity,
+                    expiry,
+                    websocket_info.associate_id,
+                )
 
         return ACTION_CONTINUE

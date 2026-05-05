@@ -15,12 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from dataclasses import dataclass
 
 import jwt
 from jwt import ExpiredSignatureError, InvalidTokenError
 
 from ws61850.security.oauth2.jwks import JwksCache
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -62,8 +65,8 @@ class JwtValidator:
         try:
             header = jwt.get_unverified_header(token)
             kid = header["kid"]
-            signing_key = self._jwks.get_signing_key(kid)
             alg = header.get("alg", "RS256")
+            signing_key = self._jwks.get_signing_key(kid)
 
             decoded = jwt.decode(
                 token,
@@ -73,13 +76,17 @@ class JwtValidator:
                 issuer=self._issuer,
                 leeway=self._leeway,
             )
-            return True, TokenClaims(
+            claims = TokenClaims(
                 expiry=decoded["exp"],
                 subject=decoded.get("sub"),
                 audience=decoded.get("aud"),
             )
+            logger.debug("Token valid kid=%r alg=%r sub=%r exp=%s", kid, alg, claims.subject, claims.expiry)
+            return True, claims
 
         except ExpiredSignatureError:
+            logger.warning("Token expired (kid=%r)", jwt.get_unverified_header(token).get("kid"))
             return False, None
-        except InvalidTokenError:
+        except InvalidTokenError as e:
+            logger.warning("Token invalid: %s", e)
             return False, None

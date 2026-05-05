@@ -405,6 +405,7 @@ class IEC61850Server:
 
         if decoded_message[0] == "associate":
             associate_type = extract_associate_request_type(decoded_message)
+            logger.debug("Association message cp=%r type=%r", cp, associate_type)
             if associate_type == "associateRequest":
                 maxMessageSize_server = extract_max_message_size(decoded_message)
                 maxMessageSize = min(maxMessageSize_client, maxMessageSize_server)
@@ -417,10 +418,16 @@ class IEC61850Server:
                 if self.send_msg_callback is not None:
                     self.send_msg_callback(response, datetime.datetime.now())
                 self.ready_event.set()
+                logger.info(
+                    "Association accepted cp=%r associate_id=%r max_msg_size=%s",
+                    cp,
+                    associate_id,
+                    maxMessageSize,
+                )
 
             elif associate_type == "releaseRequest":
                 invoke_id = decoded_message[1][1][1]["invokeId"]
-
+                logger.info("Release request cp=%r associate_id=%r", cp, associate_id)
                 tpaa_response = create_tpaa_release_response(invoke_id, associate_id)
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
                 await websocket.send(response)
@@ -429,14 +436,15 @@ class IEC61850Server:
                 await websocket.close()
             elif associate_type == "abortRequest":
                 invoke_id = decoded_message[1][1][1]["invokeId"]
-
+                logger.info("Abort request cp=%r associate_id=%r", cp, associate_id)
                 tpaa_response = create_tpaa_abort_response(invoke_id, associate_id)
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
                 await websocket.send(response)
                 websocket.transport.abort()
             elif associate_type == "abortResponse":
-                logger.info("Connection aborted by client")
+                logger.info("Connection aborted by client cp=%r", cp)
             else:
+                logger.warning("Unsupported association type=%r cp=%r", associate_type, cp)
                 try:
                     invoke_id = decoded_message[1][1][1]["invokeId"]
                     tpaa_response = create_tpaa_service_error_response(invoke_id, associate_id, "classNotSupported")
@@ -449,6 +457,7 @@ class IEC61850Server:
             service_name = extract_service_name(decoded_message)
             invoke_id = extract_invoke_id(decoded_message)
             websocket_info.invoke_id = invoke_id + 1
+            logger.debug("Service request cp=%r service=%r invoke_id=%s", cp, service_name, invoke_id)
 
             if service_name == "getServerDirectory":
                 tpaa_response = self._directory_service.get_server_directory(invoke_id, associate_id)
@@ -547,6 +556,7 @@ class IEC61850Server:
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
 
             else:
+                logger.warning("Unsupported service cp=%r service=%r invoke_id=%s", cp, service_name, invoke_id)
                 tpaa_response = create_tpaa_service_error_response(invoke_id, associate_id, "classNotSupported")
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
 

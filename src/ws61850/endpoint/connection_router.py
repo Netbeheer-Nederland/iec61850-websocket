@@ -55,6 +55,7 @@ class ConnectionRouter:
         send_callback=None,
     ) -> None:
         """Encode and send an instanceNotAvailable associateResponse, then close."""
+        logger.warning("Access point not found cp=%r — sending instanceNotAvailable", cp)
         tpaa = create_tpaa_associate_response(
             65000, cp, ServiceStatusKind.instanceNotAvailable.name
         )
