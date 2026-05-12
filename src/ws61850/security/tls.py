@@ -22,10 +22,7 @@ from typing import Literal
 
 @dataclass(frozen=True)
 class TLSConfig:
-    """
-    Immutable TLS configuration.  Pass to TLSContextFactory.build() to get
-    an ssl.SSLContext ready for use by WebSocketTransport.
-    """
+    """Immutable TLS configuration. Pass to build_tls_context() to get an ssl.SSLContext."""
     mode: Literal["client", "server"]
     certfile: str | None = None
     keyfile: str | None = None
@@ -37,66 +34,38 @@ class TLSConfig:
     ciphers: str | None = None
     require_client_cert: bool = False
     alpn_protocols: tuple[str, ...] = field(default_factory=tuple)
+    keylog_file: str | None = None
 
 
-class TLSContextFactory:
-    """Builds ssl.SSLContext from a TLSConfig."""
+def build_tls_context(config: TLSConfig) -> ssl.SSLContext:
+    """Build an ssl.SSLContext from a TLSConfig."""
+    if config.mode == "server":
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        if config.certfile:
+            ctx.load_cert_chain(certfile=config.certfile, keyfile=config.keyfile)
+        if config.cafile:
+            ctx.load_verify_locations(config.cafile)
+        if config.require_client_cert:
+            ctx.verify_mode = ssl.CERT_REQUIRED
+    else:
+        ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=config.cafile)
+        if config.certfile:
+            ctx.load_cert_chain(certfile=config.certfile, keyfile=config.keyfile)
+        if not config.verify_peer:
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+        elif not config.check_hostname:
+            ctx.check_hostname = False
 
-    @staticmethod
-    def build(config: TLSConfig) -> ssl.SSLContext:
-        if config.mode == "server":
-            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            if config.certfile:
-                ctx.load_cert_chain(certfile=config.certfile, keyfile=config.keyfile)
-            if config.cafile:
-                ctx.load_verify_locations(config.cafile)
-            if config.require_client_cert:
-                ctx.verify_mode = ssl.CERT_REQUIRED
-        else:
-            ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=config.cafile)
-            if config.certfile:
-                ctx.load_cert_chain(certfile=config.certfile, keyfile=config.keyfile)
-            if not config.verify_peer:
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-            elif not config.check_hostname:
-                ctx.check_hostname = False
+    if config.min_version is not None:
+        ctx.minimum_version = config.min_version
+    if config.max_version is not None:
+        ctx.maximum_version = config.max_version
+    if config.ciphers:
+        ctx.set_ciphers(config.ciphers)
+    if config.alpn_protocols:
+        ctx.set_alpn_protocols(list(config.alpn_protocols))
+    if config.keylog_file:
+        ctx.keylog_filename = config.keylog_file
 
-        if config.min_version is not None:
-            ctx.minimum_version = config.min_version
-        if config.max_version is not None:
-            ctx.maximum_version = config.max_version
-        if config.ciphers:
-            ctx.set_ciphers(config.ciphers)
-        if config.alpn_protocols:
-            ctx.set_alpn_protocols(list(config.alpn_protocols))
-
-        return ctx
-
-
-# ---------------------------------------------------------------------------
-# Backward-compatible alias — existing callers that construct TLSConfiguration
-# continue to work without changes.
-# ---------------------------------------------------------------------------
-
-class TLSConfiguration:
-    """Deprecated: use TLSConfig + TLSContextFactory instead."""
-
-    def __init__(self, cert_path, key_path, is_ws_server):
-        self.key_path = key_path
-        self.cert_path = cert_path
-        self.is_ws_server = is_ws_server
-
-        config = TLSConfig(
-            mode="server" if is_ws_server else "client",
-            certfile=cert_path,
-            keyfile=key_path if is_ws_server else None,
-            cafile=cert_path if not is_ws_server else None,
-        )
-        self.ssl_context = TLSContextFactory.build(config)
-
-    def set_min_and_max_version(self, min_version=None, max_version=None):
-        if min_version is not None:
-            self.ssl_context.minimum_version = min_version
-        if max_version is not None:
-            self.ssl_context.maximum_version = max_version
+    return ctx

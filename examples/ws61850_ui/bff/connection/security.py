@@ -5,12 +5,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ws61850.security.oauth import get_access_token
-from ws61850.security.tls import TLSConfiguration
+from ws61850.security.tls import TLSConfig
 
 
 @dataclass
 class SecurityContext:
-    tls_config: TLSConfiguration | None = None
+    tls_config: TLSConfig | None = None
     oauth_enable: bool | None = None
     certificate_url: str | None = None
     token_issuer: str | None = None
@@ -47,22 +47,19 @@ class SecurityFactory:
         if profile_security.get("enableTLS"):
             if transport_role == "ws_client":
                 cert_path = self._write_temp_file(context, "ws_server_ca_", ".pem", profile_security.get("tlsCACert", ""))
-                context.tls_config = TLSConfiguration(is_ws_server=False, cert_path=cert_path, key_path=None)
+                context.tls_config = TLSConfig(mode="client", cafile=cert_path)
             else:
                 cert_path = self._write_temp_file(context, "ws_server_cert_", ".pem", profile_security.get("certificate", ""))
                 key_path = self._write_temp_file(context, "ws_server_key_", ".pem", profile_security.get("privateKey", ""))
-                context.tls_config = TLSConfiguration(is_ws_server=True, cert_path=cert_path, key_path=key_path)
-                if profile_security.get("tlsVersion") == "1.2":
-                    context.tls_config.set_min_and_max_version(
-                        min_version=ssl.TLSVersion.TLSv1_2,
-                        max_version=ssl.TLSVersion.TLSv1_2,
-                    )
-                else:
-                    context.tls_config.set_min_and_max_version(
-                        min_version=ssl.TLSVersion.TLSv1_3,
-                        max_version=ssl.TLSVersion.TLSv1_3,
-                    )
-                context.tls_config.ssl_context.keylog_filename = os.path.join(tempfile.gettempdir(), "ws61850_gui_tlskeys.log")
+                v = ssl.TLSVersion.TLSv1_2 if profile_security.get("tlsVersion") == "1.2" else ssl.TLSVersion.TLSv1_3
+                context.tls_config = TLSConfig(
+                    mode="server",
+                    certfile=cert_path,
+                    keyfile=key_path,
+                    min_version=v,
+                    max_version=v,
+                    keylog_file=os.path.join(tempfile.gettempdir(), "ws61850_gui_tlskeys.log"),
+                )
 
         if profile_security.get("enableOAuth"):
             context.kc_cert = self._write_temp_file(context, "kc_root_ca_", ".pem", profile_security.get("oauthCACert", ""))

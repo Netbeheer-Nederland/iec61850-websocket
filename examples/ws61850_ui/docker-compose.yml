@@ -85,12 +85,12 @@ services:
     image: ws61850-rti-so:latest
     environment:
       IEC_HOST: "0.0.0.0"
-      IEC_PORT: "9100"
+      IEC_PORT: "8765"
       IEC_CP: "${RTI_SO_CP:-cp1,cp2}"
       IEC_POLL_INTERVAL: "${RTI_SO_POLL_INTERVAL:-30}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     ports:
-      - "${RTI_SO_PORT:-9100}:9100"
+      - "${RTI_SO_PORT:-8765}:8765"
     restart: unless-stopped
 
   # ── RTI-FSP: Headless ws_client + iec_server ─────────────────────────────────
@@ -103,7 +103,7 @@ services:
     image: ws61850-rti-fsp:latest
     environment:
       FSP_TARGET_HOST: "${FSP_TARGET_HOST:-rti-so}"
-      FSP_TARGET_PORT: "${FSP_TARGET_PORT:-9100}"
+      FSP_TARGET_PORT: "${FSP_TARGET_PORT:-8765}"
       FSP_CP: "${FSP_CP:-cp1}"
       FSP_MODEL: "${FSP_MODEL:-1}"
       FSP_UPDATE_INTERVAL: "${FSP_UPDATE_INTERVAL:-15}"

@@ -36,6 +36,7 @@ from ws61850.shared.extractors import (
     retrieve_associate_id_from_decoded_msg,
     retrieve_max_outstanding_calls_from_decoded_msg,
 )
+from ws61850.security.tls import build_tls_context
 from ws61850.transport.reconnect import ReconnectPolicy
 
 logger = logging.getLogger(__name__)
@@ -162,7 +163,7 @@ class ActiveEndpoint:
         uri = f"{scheme}://{hostname}:{int(port)}/{cp}"
 
         connect_kwargs = dict(
-            ssl=self._tls_config.ssl_context if self._tls_config else None,
+            ssl=build_tls_context(self._tls_config) if self._tls_config else None,
             subprotocols=protocol if protocol is not None else None,
             additional_headers={"Authorization": f"Bearer {access_token}"} if access_token else None,
             compression=None,

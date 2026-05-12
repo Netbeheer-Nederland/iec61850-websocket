@@ -26,6 +26,7 @@ FROM deps AS runtime
 WORKDIR /app
 
 COPY examples/ws61850_ui/simulator/rti_fsp.py ./
+COPY examples/ws61850_ui/simulator/*.json ./
 
 ENV PYTHONUNBUFFERED=1 \
     FSP_TARGET_HOST=rti-so \

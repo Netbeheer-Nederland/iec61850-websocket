@@ -27,7 +27,7 @@ from ws61850.iec61850.server.control_handling import (
 )
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.iec61850.server.service_error import ServiceStatusKind
-from ws61850.security.tls import TLSConfiguration
+from ws61850.security.tls import TLSConfig
 
 _project_root = Path(__file__).resolve().parents[3]
 if str(_project_root) not in sys.path:
@@ -64,7 +64,7 @@ def control_handler_for_float(obj_ref, ctlVal_value, parameter):
 
 async def main():
     logger.info("cafile: %s", cafile)
-    tls_config = TLSConfiguration(cafile, None, False)
+    tls_config = TLSConfig(mode="client", cafile=cafile)
 
     endpoint = ActiveEndpoint(tls_config=tls_config)
 
@@ -77,6 +77,7 @@ async def main():
     task = asyncio.create_task(endpoint.start("localhost", 8765, "cp1"))
 
     await asyncio.gather(task, report_task)
+
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 IEC_HOST = os.environ.get("IEC_HOST", "0.0.0.0")
-IEC_PORT = int(os.environ.get("IEC_PORT", "9100"))
+IEC_PORT = int(os.environ.get("IEC_PORT", "8765"))
 IEC_CPS = [cp.strip() for cp in os.environ.get("IEC_CP", "cp1,cp2").split(",") if cp.strip()]
 POLL_INTERVAL = int(os.environ.get("IEC_POLL_INTERVAL", "30"))
 

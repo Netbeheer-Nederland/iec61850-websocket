@@ -23,7 +23,7 @@ from pathlib import Path
 from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.data_model.helper import get_now_time
-from ws61850.security.tls import TLSConfiguration
+from ws61850.security.tls import TLSConfig
 
 _project_root = Path(__file__).resolve().parents[3]
 if str(_project_root) not in sys.path:
@@ -194,7 +194,7 @@ token_issuer = f"{BASE}/realms/{TARGET_REALM}"
 
 
 async def main():
-    tls_config = TLSConfiguration(cert_path=cert_path, key_path=key_path, is_ws_server=True)
+    tls_config = TLSConfig(mode="server", certfile=cert_path, keyfile=key_path)
 
     endpoint = PassiveEndpoint(
         oauth_enable=True,

@@ -24,7 +24,7 @@ from pathlib import Path
 from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.data_model.helper import get_now_time
-from ws61850.security.tls import TLSConfiguration
+from ws61850.security.tls import TLSConfig
 
 _project_root = Path(__file__).resolve().parents[3]
 if str(_project_root) not in sys.path:
@@ -155,9 +155,14 @@ oper_val = {
 
 
 async def main():
-    tls_config = TLSConfiguration(cert_path, key_path, True)
-    tls_config.set_min_and_max_version(min_version=ssl.TLSVersion.TLSv1_2, max_version=ssl.TLSVersion.TLSv1_2)
-    tls_config.ssl_context.keylog_filename = os.path.join("tlskeys.log")
+    tls_config = TLSConfig(
+        mode="server",
+        certfile=cert_path,
+        keyfile=key_path,
+        min_version=ssl.TLSVersion.TLSv1_2,
+        max_version=ssl.TLSVersion.TLSv1_2,
+        keylog_file=os.path.join("tlskeys.log"),
+    )
 
     endpoint = PassiveEndpoint(tls_config=tls_config)
 

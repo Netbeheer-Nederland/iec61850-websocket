@@ -37,6 +37,7 @@ from ws61850.endpoint.connection_router import ConnectionRouter
 from ws61850.iec61850.client.request_handling import create_tpaa_associate_request
 from ws61850.security.oauth2.jwks import JwksCache
 from ws61850.security.oauth2.validator import JwtValidator
+from ws61850.security.tls import build_tls_context
 from ws61850.shared.extractors import (
     extract_associate_request_type,
     retrieve_associate_id_from_decoded_msg,
@@ -158,7 +159,7 @@ class PassiveEndpoint:
         )
 
     async def start(self, hostname: str, port: int, protocol=None) -> None:
-        ssl_ctx = self._tls_config.ssl_context if self._tls_config else None
+        ssl_ctx = build_tls_context(self._tls_config) if self._tls_config else None
         scheme = "wss" if ssl_ctx else "ws"
 
         serve_kwargs = dict(

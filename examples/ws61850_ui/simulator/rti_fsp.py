@@ -8,7 +8,7 @@ data model, simulating a field service point / field device.
 
 Environment variables:
   FSP_TARGET_HOST     Remote RTI-SO ws_server host     (default: rti-so)
-  FSP_TARGET_PORT     Remote RTI-SO ws_server port     (default: 9100)
+  FSP_TARGET_PORT     Remote RTI-SO ws_server port     (default: 8765)
   FSP_CP              Connection point                  (default: cp1)
   FSP_MODEL           Data model variant (1 or 2)       (default: 1)
   FSP_UPDATE_INTERVAL Simulated value update interval   (default: 15; 0 = off)
@@ -25,8 +25,8 @@ from ws61850.endpoint import ActiveEndpoint
 from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
-_MODEL1_PATH = pathlib.Path(__file__).parent.parent / "ied_model1.json"
-_MODEL2_PATH = pathlib.Path(__file__).parent.parent / "ied_model2.json"
+_MODEL1_PATH = pathlib.Path(__file__).parent / "ied_model1.json"
+_MODEL2_PATH = pathlib.Path(__file__).parent / "ied_model2.json"
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
@@ -35,8 +35,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-FSP_HOST = os.environ.get("FSP_TARGET_HOST", "rti-so")
-FSP_PORT = int(os.environ.get("FSP_TARGET_PORT", "9100"))
+FSP_HOST = os.environ.get("FSP_TARGET_HOST", "localhost")
+FSP_PORT = int(os.environ.get("FSP_TARGET_PORT", "8765"))
 FSP_CP = os.environ.get("FSP_CP", "cp1")
 FSP_MODEL = os.environ.get("FSP_MODEL", "1")
 UPDATE_INTERVAL = int(os.environ.get("FSP_UPDATE_INTERVAL", "15"))

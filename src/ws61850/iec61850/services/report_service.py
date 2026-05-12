@@ -62,7 +62,7 @@ class ReportService:
             service = decoded_message[1]["service"]
             result = assign_brcb_value(brcb, service[1], iec61850_server)
             response = create_tpaa_response_setBRCBValues(invoke_id, associate_id, result)
-            return response, brcb if (brcb.rptEna and brcb.rcb.trgOps.get("gi") and brcb.rcb.gi) else None
+            return response, brcb if (brcb.rptEna and brcb.rcb.trg_ops.get("gi") and brcb.rcb.gi) else None
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable"), None
 
     def get_urcb_values(self, invoke_id, associate_id, decoded_message):
@@ -86,5 +86,5 @@ class ReportService:
             result = assign_urcb_value(urcb, service[1], iec61850_server)
             urcb.rcb.client_connection = websocket_info
             response = create_tpaa_response_setURCBValues(invoke_id, associate_id, result)
-            return response, urcb if (urcb.rptEna and urcb.rcb.trgOps.get("gi") and urcb.rcb.gi) else None
+            return response, urcb if (urcb.rptEna and urcb.rcb.trg_ops.get("gi") and urcb.rcb.gi) else None
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable"), None

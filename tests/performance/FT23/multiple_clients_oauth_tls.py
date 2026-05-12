@@ -27,7 +27,7 @@ from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.security.oauth import get_access_token
-from ws61850.security.tls import TLSConfiguration
+from ws61850.security.tls import TLSConfig
 
 _project_root = Path(__file__).resolve().parents[3]
 if str(_project_root) not in sys.path:
@@ -108,7 +108,7 @@ async def start_client_process(client_config, i, args):
     access_token = await get_access_token(token_endpoint, client_id, client_secret, cafile)
     logger.info("Access-Token: %s", access_token)
 
-    tls_config = TLSConfiguration(cafile, None, False)
+    tls_config = TLSConfig(mode="client", cafile=cafile)
     endpoint = ActiveEndpoint(oauth_enable=True, tls_config=tls_config)
 
     pocc_id = client_config["pocc_id"]
