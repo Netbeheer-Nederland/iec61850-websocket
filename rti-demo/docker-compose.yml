@@ -1,0 +1,114 @@
+services:
+  # RTI IEC61850 Client Server
+#  rti-client:
+#    build:
+#      context: ../../..
+#      dockerfile: demo/src/iec61850/client/Dockerfile
+#    container_name: rti-demo-client
+#    ports:
+#      - "9000:5000"
+#    environment:
+#      - FLASK_ENV=development
+#      - FLASK_APP=app.py
+#      - PYTHONUNBUFFERED=1
+#    volumes:
+#      - ../iec61850:/app/iec61850
+#    networks:
+#      - rti-network
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:5000/api/status"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 20s
+#    labels:
+#      - "rti.service=rti-client"
+#      - "rti.type=RTI-SO"
+#      - "rti.host=rti-client"
+#      - "rti.port=5000"
+
+  # RTI IEC61850 Server
+#  rti-server:
+#    build:
+#      context: ../../..
+#      dockerfile: demo/src/iec61850/server/Dockerfile
+#    container_name: rti-demo-server
+#    ports:
+#      - "9001:5001"
+#    environment:
+#      - PORT=5001
+#      - PYTHONUNBUFFERED=1
+#    volumes:
+#      - ../iec61850:/app/demo/src/iec61850
+#    networks:
+#      - rti-network
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:5001/api/iec61850server/status"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 20s
+#    labels:
+#      - "rti.service=rti-server"
+#      - "rti.type=RTI-SO"
+#      - "rti.host=rti-server"
+#      - "rti.port=5001"
+
+  # BFF Server
+  bff-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rti-demo-bff
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=bff_server.py
+      - RTI_SERVICE_DISCOVERY_ENABLED=true
+      - RTI_DOCKER_ENABLED=true
+      - RTI_CLIENT_URL=http://rti-client:5000
+      - RTI_SERVER_URL=http://rti-server:5001
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./connections.json:/app/connections.json
+      - ./stats.json:/app/stats.json
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - rti-network
+    #depends_on:
+      #rti-client:
+      #  condition: service_healthy
+      #rti-server:
+      #  condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Frontend Web Server
+  frontend:
+    image: node:18-slim
+    container_name: rti-demo-ui
+    working_dir: /app
+    command: npx http-server -p 8080 -c-1
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./front-end:/app
+    depends_on:
+      bff-server:
+        condition: service_healthy
+    networks:
+      - rti-network
+    environment:
+      - REACT_APP_BFF_URL=http://bff-server:5000
+
+networks:
+  rti-network:
+    driver: bridge
+
+volumes:
+  bff-data:
