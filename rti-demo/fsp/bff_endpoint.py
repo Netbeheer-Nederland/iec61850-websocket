@@ -224,11 +224,7 @@ def create_bff_blueprint(
                     },
                 )
 
-    @app.get("/app/iec61850server/")
-    @app.get("/server-app")
-    def index() -> str:
-        """Redirect to server UI."""
-        return redirect("/server")
+
 
     @app.get("/api/iec61850server/status")
     def api_status():
