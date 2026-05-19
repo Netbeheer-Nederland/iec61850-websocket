@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Optional
 
-from ws61850.iec61850.data_model.model_functions import *
+from ws61850.iec61850.data_model import *
 
 
 BTYPE_TO_DA_ENUM_NAME = {'BOOLEAN': 'boolean',

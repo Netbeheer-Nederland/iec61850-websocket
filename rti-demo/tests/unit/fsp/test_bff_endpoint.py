@@ -9,7 +9,7 @@ import pytest
 from flask import Flask
 
 # Allow importing rti-demo/fsp modules as top-level modules.
-FSP_DIR = Path(__file__).resolve().parents[2] / "fsp"
+FSP_DIR = Path(__file__).resolve().parents[3] / "fsp"
 if str(FSP_DIR) not in sys.path:
     sys.path.insert(0, str(FSP_DIR))
 
@@ -110,7 +110,7 @@ def test_stop_returns_stopped_when_already_stopped(client_and_server):
 
 def test_readvalue_requires_objref(client_and_server):
     client, server = client_and_server
-    server.runtime.server_cp1 = object()
+    server.runtime.server_cp = object()
 
     response = client.post("/api/iec61850server/readvalue", json={"fc": "mx"})
 
@@ -120,7 +120,7 @@ def test_readvalue_requires_objref(client_and_server):
 
 def test_readvalue_rejects_when_server_not_running(client_and_server):
     client, server = client_and_server
-    server.runtime.server_cp1 = None
+    server.runtime.server_cp = None
 
     response = client.post("/api/iec61850server/readvalue", json={"objRef": "LD0/LLN0.Mod.stVal"})
 
@@ -130,7 +130,7 @@ def test_readvalue_rejects_when_server_not_running(client_and_server):
 
 def test_readvalue_success_wraps_single_value(client_and_server):
     client, server = client_and_server
-    server.runtime.server_cp1 = object()
+    server.runtime.server_cp = object()
     server.read_value = lambda _obj_ref: {"type": "boolean", "value": True}
 
     response = client.post(
@@ -147,7 +147,7 @@ def test_readvalue_success_wraps_single_value(client_and_server):
 
 def test_writevalue_requires_value(client_and_server):
     client, server = client_and_server
-    server.runtime.server_cp1 = object()
+    server.runtime.server_cp = object()
 
     response = client.post(
         "/api/iec61850server/writevalue",
@@ -160,7 +160,7 @@ def test_writevalue_requires_value(client_and_server):
 
 def test_writevalue_success_response(client_and_server):
     client, server = client_and_server
-    server.runtime.server_cp1 = object()
+    server.runtime.server_cp = object()
 
     def fake_write(obj_ref: str, value, data_type: str = "unknown"):
         return {
