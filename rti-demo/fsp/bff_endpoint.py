@@ -452,7 +452,7 @@ def create_bff_blueprint(
                 server._log_action("Server readvalue rejected: missing objRef", "warn")
                 return jsonify({"ok": False, "error": "objRef is required"}), 400
 
-            if server.runtime.server_cp1 is None:
+            if server.runtime.server_cp is None:
                 server._log_action(
                     "Server readvalue rejected: server not running",
                     "warn",
@@ -543,7 +543,7 @@ def create_bff_blueprint(
                 )
                 return jsonify({"ok": False, "error": "value is required"}), 400
 
-            if server.runtime.server_cp1 is None:
+            if server.runtime.server_cp is None:
                 server._log_action(
                     "Server writevalue rejected: server not running",
                     "warn",
