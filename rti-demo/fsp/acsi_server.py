@@ -38,7 +38,7 @@ class ACSIServerRuntime:
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.thread: Optional[threading.Thread] = None
         self.endpoint: Optional[Any] = None
-        self.server_cp1: Optional[IEC61850Server] = None
+        self.server_cp: Optional[IEC61850Server] = None
         self.tasks: Dict[str, asyncio.Task] = {}
         self.error: Optional[str] = None
         self.actions: deque = deque(maxlen=200)
@@ -251,7 +251,7 @@ class ACSIServer:
 
         self._set_runtime_state(
             endpoint=None,
-            server_cp1=None,
+            server_cp=None,
             tasks={},
             status="stopped",
             error=None,
@@ -317,7 +317,7 @@ class ACSIServer:
 
         self._set_runtime_state(
             endpoint=endpoint,
-            server_cp1=server1,
+            server_cp=server1,
             tasks=tasks,
             error=None,
         )
@@ -404,7 +404,7 @@ class ACSIServer:
         if loop is None or not loop.is_running():
             # If the event loop is already gone, consider the server stopped.
             self._set_runtime_state(
-                status="stopped", endpoint=None, server_cp1=None, tasks={}, error=None
+                status="stopped", endpoint=None, server_cp=None, tasks={}, error=None
             )
             return
 
@@ -463,7 +463,7 @@ class ACSIServer:
 
     def read_value(self, obj_ref: str) -> Dict[str, Any]:
         """Read a value from the server."""
-        server = self.runtime.server_cp1
+        server = self.runtime.server_cp
         if server is None:
             raise RuntimeError("Server is not running")
 
@@ -476,7 +476,7 @@ class ACSIServer:
 
     def write_value(self, obj_ref: str, value: Any, data_type: str = "unknown") -> Dict[str, Any]:
         """Write a value to the server."""
-        server = self.runtime.server_cp1
+        server = self.runtime.server_cp
         if server is None:
             raise RuntimeError("Server is not running")
 
