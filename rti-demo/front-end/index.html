@@ -44,6 +44,11 @@
                     <i class="fas fa-stethoscope"></i>
                     <span>Diagnostics</span>
                 </a>
+
+                <a href="#tools" class="nav-item" data-page="tools">
+                    <i class="fas fa-tools"></i>
+                    <span>Tools</span>
+                </a>
                 <a href="#settings" class="nav-item" data-page="settings">
                     <i class="fas fa-cog"></i>
                     <span>Settings</span>
@@ -235,6 +240,41 @@
                 </div>
             </section>
 
+            <!-- Tools Page -->
+            <section id="page-tools" class="page">
+                <div class="page-header">
+                    <h1>Tools</h1>
+                    <p class="section-description">Utility shortcuts and quick references for this HMI</p>
+                </div>
+                <div class="tools-layout">
+                    <div class="panel">
+                        <h3>Load SCL File (Server Model)</h3>
+                        <div class="panel-content mono">
+                            <div class="control-field">
+                                <label for="tools-sclFile">SCL File:</label>
+                                <input id="tools-sclFile" type="file" accept=".scl,.scd,.cid,.icd,.xml">
+                            </div>
+                            <div class="control-field" style="margin-top: 10px;">
+                                <button id="tools-generateModelBtn" class="secondary-btn" type="button">Generate model.py</button>
+                            </div>
+                            <div class="control-field" id="tools-iedSelectWrap" style="margin-top: 10px; display: none;">
+                                <label for="tools-iedSelect">IED:</label>
+                                <select id="tools-iedSelect"></select>
+                            </div>
+                            <div class="control-field" id="tools-apSelectWrap" style="margin-top: 10px; display: none;">
+                                <label for="tools-apSelect">Access Point:</label>
+                                <select id="tools-apSelect"></select>
+                            </div>
+                            <div id="tools-statusInfo" style="margin-top: 10px;"></div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <h3>Loaded SCL Tree</h3>
+                        <div id="tools-modelPanel" class="panel-content tree"></div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Settings Page -->
             <section id="page-settings" class="page">
                 <div class="page-header">
@@ -313,5 +353,7 @@
     </div>
 
     <script src="app.js"></script>
+    <script type="module" src="./hmi-tools.js"></script>
+    <script type="module" src="./dataModelFactory.js"></script>
 </body>
 </html>
