@@ -84,7 +84,6 @@ class RTIDemoApp {
     navigateToPage(pageName) {
         // Hide all pages
         document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-        
         // Show selected page
         const page = document.getElementById(`page-${pageName}`);
         if (page) {
@@ -96,13 +95,36 @@ class RTIDemoApp {
         if (navItem) {
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
             navItem.classList.add('active');
-            
             const pageName_formatted = pageName.charAt(0).toUpperCase() + pageName.slice(1);
             document.getElementById('breadcrumb-text').textContent = pageName_formatted;
         }
 
         // Load page-specific content
         this.loadPageContent(pageName);
+    }
+
+    // =============================================
+    // Tools Page Logic
+    // =============================================
+    loadTools() {
+        // Reset status/info fields
+        const statusInfo = document.getElementById('tools-statusInfo');
+        if (statusInfo) statusInfo.textContent = '';
+
+        // Reset file input
+        const sclFileInput = document.getElementById('tools-sclFile');
+        if (sclFileInput) sclFileInput.value = '';
+
+        // Hide select wrappers
+        const iedWrap = document.getElementById('tools-iedSelectWrap');
+        const apWrap = document.getElementById('tools-apSelectWrap');
+        if (iedWrap) iedWrap.style.display = 'none';
+        if (apWrap) apWrap.style.display = 'none';
+
+        // Clear SCL tree panel
+        const modelPanel = document.getElementById('tools-modelPanel');
+        if (modelPanel) modelPanel.innerHTML = '';
+
     }
 
     loadPageContent(pageName) {
@@ -121,6 +143,9 @@ class RTIDemoApp {
                 break;
             case 'diagnostics':
                 this.loadDiagnostics();
+                break;
+            case 'tools':
+                this.loadTools();
                 break;
         }
     }
