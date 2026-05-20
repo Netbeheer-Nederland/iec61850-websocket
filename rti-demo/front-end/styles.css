@@ -439,6 +439,158 @@ body {
     margin-bottom: 20px;
 }
 
+/* ==============================================
+   SCL Tree
+   ============================================== */
+
+.tree {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.scl-tree-root,
+.scl-tree-list {
+    list-style: none;
+    margin: 0;
+    padding-left: 22px;
+}
+
+.scl-tree-root {
+    padding-left: 0;
+}
+
+.scl-tree-item {
+    position: relative;
+    margin: 6px 0;
+}
+
+.scl-tree-list .scl-tree-item {
+    border-left: 1px solid var(--border-light);
+    padding-left: 14px;
+}
+
+.scl-tree-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(71, 85, 105, 0.45);
+    transition: var(--transition);
+    cursor: pointer;
+}
+
+.scl-tree-row:hover {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: rgba(59, 130, 246, 0.45);
+}
+
+.scl-tree-list .scl-tree-row::before {
+    content: '';
+    position: absolute;
+    left: -14px;
+    top: 50%;
+    width: 12px;
+    border-top: 1px solid var(--border-light);
+}
+
+.scl-tree-toggle {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.scl-tree-toggle.hidden {
+    visibility: hidden;
+}
+
+.scl-tree-tag.hidden {
+    display: none;
+}
+
+.scl-tree-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 90px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+}
+
+.scl-tree-value {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.scl-node-group .scl-tree-value {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.scl-node-ied .scl-tree-tag {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.5);
+    color: #93c5fd;
+}
+
+.scl-node-accesspoint .scl-tree-tag {
+    background: rgba(14, 165, 233, 0.15);
+    border-color: rgba(14, 165, 233, 0.5);
+    color: #7dd3fc;
+}
+
+.scl-node-ldevice .scl-tree-tag {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.5);
+    color: #6ee7b7;
+}
+
+.scl-node-logicalnode .scl-tree-tag {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(168, 85, 247, 0.5);
+    color: #d8b4fe;
+}
+
+.scl-node-do .scl-tree-tag {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.5);
+    color: #fcd34d;
+}
+
+.scl-node-sdo .scl-tree-tag {
+    background: rgba(251, 146, 60, 0.15);
+    border-color: rgba(251, 146, 60, 0.5);
+    color: #fdba74;
+}
+
+.scl-node-da .scl-tree-tag,
+.scl-node-sda .scl-tree-tag {
+    background: rgba(244, 63, 94, 0.12);
+    border-color: rgba(244, 63, 94, 0.45);
+    color: #fda4af;
+}
+
+.scl-node-dataset .scl-tree-tag,
+.scl-node-reportcontrol .scl-tree-tag,
+.scl-node-group .scl-tree-tag {
+    background: rgba(148, 163, 184, 0.12);
+    border-color: rgba(148, 163, 184, 0.4);
+    color: #cbd5e1;
+}
+
 .action-buttons {
     display: grid;
     grid-template-columns: 1fr;
@@ -467,6 +619,115 @@ body {
 
 .btn-action i {
     font-size: 16px;
+}
+
+/* ==============================================
+   Tools Page
+   ============================================== */
+
+.tools-workspace {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+
+.tools-control-panel,
+.tools-tree-panel {
+    background: linear-gradient(165deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.85));
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+}
+
+.tools-control-panel h3,
+.tools-tree-panel h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.tools-helper-text {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+
+.tools-file-input {
+    display: none;
+}
+
+.tools-action-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.tools-select-wrap {
+    display: none;
+    gap: 6px;
+}
+
+.tools-select-wrap label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.tools-select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+}
+
+.tools-select:focus {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.tools-action-btn {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+}
+
+#tools-browseBtnText {
+    display: inline-block;
+    max-width: 230px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tools-action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tools-status-info {
+    margin-top: 14px;
+    min-height: 42px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(71, 85, 105, 0.55);
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.tools-tree-panel .tree {
+    margin-top: 10px;
+    min-height: 520px;
+    max-height: calc(100vh - 290px);
 }
 
 /* ==============================================
@@ -893,5 +1154,14 @@ body {
 
     .stats-section {
         grid-template-columns: 1fr;
+    }
+
+    .tools-workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .tools-tree-panel .tree {
+        min-height: 400px;
+        max-height: 60vh;
     }
 }

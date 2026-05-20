@@ -1,110 +1,182 @@
 import { generatePythonModelFromScl } from './dataModelFactory.js';
 
+console.log('hmi-tools.js loaded');
+
 (function () {
-  const toolsSclFile = document.getElementById('tools-sclFile');
-  const toolsGenerateModelBtn = document.getElementById('tools-generateModelBtn');
-  const toolsIedSelectWrap = document.getElementById('tools-iedSelectWrap');
-  const toolsIedSelect = document.getElementById('tools-iedSelect');
-  const toolsApSelectWrap = document.getElementById('tools-apSelectWrap');
-  const toolsApSelect = document.getElementById('tools-apSelect');
-  const toolsStatusInfo = document.getElementById('tools-statusInfo');
-  const toolsModel = document.getElementById('tools-modelPanel');
-  let loadedIedNames = [];
-  let loadedApsForCurrentIed = [];
-  let accessPointsByIed = {};
+	const toolsSclFile = document.getElementById('tools-sclFile');
+	const toolsGenerateModelBtn = document.getElementById('tools-generateModelBtn');
+	const toolsStatusInfo = document.getElementById('tools-statusInfo');
+	const toolsModelPanel = document.getElementById('tools-modelPanel');
+	const toolsBrowseBtnText = document.getElementById('tools-browseBtnText');
+	const toolsIedSelectWrap = document.getElementById('tools-iedSelectWrap');
+	const toolsIedSelect = document.getElementById('tools-iedSelect');
+	const toolsApSelectWrap = document.getElementById('tools-apSelectWrap');
+	const toolsApSelect = document.getElementById('tools-apSelect');
 
-  if (!toolsSclFile || !toolsGenerateModelBtn || !toolsIedSelectWrap || !toolsIedSelect || !toolsApSelectWrap || !toolsApSelect || !toolsStatusInfo || !toolsModel) {
-    return;
-  }
+	let loadedTreeData = null;
 
-  function setIedSelector(iedNames) {
-    loadedIedNames = Array.isArray(iedNames) ? iedNames.filter(Boolean) : [];
-    toolsIedSelect.innerHTML = '';
-    loadedApsForCurrentIed = [];
-    accessPointsByIed = {};
-    toolsApSelect.innerHTML = '';
-    toolsApSelectWrap.style.display = 'none';
+	console.log('DOM elements:', { toolsSclFile, toolsGenerateModelBtn, toolsStatusInfo, toolsModelPanel });
 
-    if (loadedIedNames.length <= 1) {
-      toolsIedSelectWrap.style.display = 'none';
-      if (loadedIedNames.length === 1) {
-        const option = document.createElement('option');
-        option.value = loadedIedNames[0];
-        option.textContent = loadedIedNames[0];
-        toolsIedSelect.appendChild(option);
-      }
-      return;
-    }
+	if (!toolsSclFile || !toolsGenerateModelBtn || !toolsStatusInfo || !toolsModelPanel) {
+		console.error('Missing required DOM elements');
+		return;
+	}
 
-    loadedIedNames.forEach(function (name) {
-      const option = document.createElement('option');
-      option.value = name;
-      option.textContent = name;
-      toolsIedSelect.appendChild(option);
-    });
-    toolsIedSelectWrap.style.display = '';
-  }
+	function resetSelectionControls() {
+		if (toolsIedSelectWrap) toolsIedSelectWrap.style.display = 'none';
+		if (toolsApSelectWrap) toolsApSelectWrap.style.display = 'none';
+		if (toolsIedSelect) toolsIedSelect.innerHTML = '';
+		if (toolsApSelect) toolsApSelect.innerHTML = '';
+	}
 
-  async function loadToolsScl(file) {
-    if (!file) {
-      toolsStatusInfo.textContent = 'Select an SCL file first.';
-      return;
-    }
-    toolsStatusInfo.textContent = 'Loading SCL model...';
+	function populateSelect(selectElement, values) {
+		if (!selectElement) return;
+		selectElement.innerHTML = '';
+		values.forEach(function (value) {
+			const option = document.createElement('option');
+			option.value = value;
+			option.textContent = value;
+			selectElement.appendChild(option);
+		});
+	}
 
-    try {
-      const xmlText = await file.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(xmlText, 'application/xml');
-      const parseError = doc.querySelector('parsererror');
-      if (parseError) {
-        throw new Error('Invalid XML/SCL file.');
-      }
+	function getIedsFromTree() {
+		if (!loadedTreeData || !Array.isArray(loadedTreeData.ieds)) {
+			return [];
+		}
+		return loadedTreeData.ieds;
+	}
 
-      const logicalDeviceMap = {};
-      const logicalNodeDetails = {};
-      const apsByIed = {};
+	function updateSelectionControls() {
+		if (!toolsIedSelectWrap || !toolsIedSelect || !toolsApSelectWrap || !toolsApSelect) {
+			return;
+		}
 
-      const iedNodes = Array.from(doc.getElementsByTagNameNS('*', 'IED'));
-      const iedNames = iedNodes.map(function (iedNode) {
-        return iedNode.getAttribute('name');
-      }).filter(Boolean);
-      const iedName = iedNames.length ? iedNames[0] : '';
+		const ieds = getIedsFromTree();
+		if (ieds.length === 0) {
+			resetSelectionControls();
+			return;
+		}
 
-      setIedSelector(iedNames);
-      toolsStatusInfo.textContent = 'SCL model loaded successfully.';
-    } catch (e) {
-      setIedSelector([]);
-      toolsStatusInfo.textContent = 'Load SCL failed: ' + e.message;
-    }
-  }
+		let selectedIedName = toolsIedSelect.value;
+		if (!selectedIedName || !ieds.some(function (ied) { return ied.name === selectedIedName; })) {
+			selectedIedName = ieds[0].name;
+		}
 
-  toolsSclFile.addEventListener('change', async function () {
-    const file = toolsSclFile.files && toolsSclFile.files[0];
-    await loadToolsScl(file);
-  });
+		const needsIedSelection = ieds.length > 1;
+		if (needsIedSelection) {
+			populateSelect(toolsIedSelect, ieds.map(function (ied) { return ied.name; }));
+			toolsIedSelect.value = selectedIedName;
+			toolsIedSelectWrap.style.display = 'grid';
+		} else {
+			toolsIedSelectWrap.style.display = 'none';
+			toolsIedSelect.innerHTML = '';
+		}
 
-  toolsGenerateModelBtn.addEventListener('click', async function () {
-    const file = toolsSclFile.files && toolsSclFile.files[0];
-    if (!file) {
-      toolsStatusInfo.textContent = 'Select an SCL file first.';
-      return;
-    }
+		const selectedIed = ieds.find(function (ied) { return ied.name === selectedIedName; }) || ieds[0];
+		const accessPoints = Array.isArray(selectedIed.accessPoints) ? selectedIed.accessPoints : [];
 
-    toolsStatusInfo.textContent = 'Generating model.py...';
-    toolsGenerateModelBtn.disabled = true;
+		let selectedApName = toolsApSelect.value;
+		if (!selectedApName || !accessPoints.some(function (ap) { return ap.name === selectedApName; })) {
+			selectedApName = accessPoints[0] ? accessPoints[0].name : '';
+		}
 
-    try {
-      const sourceFromLoadedFile = file.path || file.webkitRelativePath || file.name;
-      const selectedIed = toolsIedSelect.value || (loadedIedNames.length === 1 ? loadedIedNames[0] : '');
-      const selectedAp = toolsApSelect.value || (loadedApsForCurrentIed.length === 1 ? loadedApsForCurrentIed[0] : '');
-      await generatePythonModelFromScl(file, sourceFromLoadedFile, selectedIed, selectedAp);
+		const needsApSelection = accessPoints.length > 1;
+		if (needsApSelection) {
+			populateSelect(toolsApSelect, accessPoints.map(function (ap) { return ap.name; }));
+			toolsApSelect.value = selectedApName;
+			toolsApSelectWrap.style.display = 'grid';
+		} else {
+			toolsApSelectWrap.style.display = 'none';
+			toolsApSelect.innerHTML = '';
+		}
+	}
 
-      toolsStatusInfo.textContent = 'model.py generated and downloaded.';
-    } catch (error) {
-      toolsStatusInfo.textContent = 'Generate model.py failed: ' + error.message;
-    } finally {
-      toolsGenerateModelBtn.disabled = false;
-    }
-  });
+	if (toolsIedSelect) {
+		toolsIedSelect.addEventListener('change', function () {
+			updateSelectionControls();
+		});
+	}
+
+	toolsSclFile.addEventListener('change', async function () {
+		console.log('SCL file change event triggered');
+		const file = toolsSclFile.files && toolsSclFile.files[0];
+		if (!file) {
+			loadedTreeData = null;
+			resetSelectionControls();
+			if (toolsBrowseBtnText) {
+				toolsBrowseBtnText.textContent = 'Browse SCL File';
+			}
+			toolsStatusInfo.textContent = 'Select an SCL file first.';
+			return;
+		}
+
+		if (toolsBrowseBtnText) {
+			toolsBrowseBtnText.textContent = file.name;
+		}
+
+		console.log('File selected:', file.name);
+		toolsStatusInfo.textContent = 'Loading SCL model...';
+		try {
+			console.log('window.SCLTree:', window.SCLTree);
+			if (!window.SCLTree || typeof window.SCLTree.loadSclFileAndRender !== 'function') {
+				throw new Error('SCL tree renderer not available.');
+			}
+
+			loadedTreeData = await window.SCLTree.loadSclFileAndRender(file, 'tools-modelPanel');
+			updateSelectionControls();
+			toolsStatusInfo.textContent = 'SCL model loaded successfully.';
+		} catch (error) {
+			console.error('Error loading SCL:', error);
+			loadedTreeData = null;
+			resetSelectionControls();
+			toolsModelPanel.textContent = '';
+			toolsStatusInfo.textContent = 'Load SCL failed: ' + error.message;
+		}
+	});
+
+	toolsGenerateModelBtn.addEventListener('click', async function () {
+		console.log('Generate button clicked');
+		const file = toolsSclFile.files && toolsSclFile.files[0];
+		if (!file) {
+			toolsStatusInfo.textContent = 'Select an SCL file first.';
+			return;
+		}
+
+		toolsStatusInfo.textContent = 'Generating model.py...';
+		toolsGenerateModelBtn.disabled = true;
+
+		try {
+			const sourceFromLoadedFile = file.path || file.webkitRelativePath || file.name;
+			const ieds = getIedsFromTree();
+			let selectedIedName = '';
+			let selectedApName = '';
+
+			const iedFromSelect = toolsIedSelect && toolsIedSelect.value;
+			const selectedIed = ieds.find(function (ied) { return ied.name === iedFromSelect; }) || ieds[0] || null;
+
+			if (selectedIed) {
+				const selectedIedAccessPoints = Array.isArray(selectedIed.accessPoints) ? selectedIed.accessPoints : [];
+
+				if (ieds.length > 1 || selectedIedAccessPoints.length > 1) {
+					selectedIedName = selectedIed.name;
+				}
+
+				if (selectedIedAccessPoints.length > 1) {
+					selectedApName = (toolsApSelect && toolsApSelect.value) || '';
+					if (!selectedApName) {
+						toolsStatusInfo.textContent = 'Select an Access Point before generating.';
+						return;
+					}
+				}
+			}
+
+			await generatePythonModelFromScl(file, sourceFromLoadedFile, selectedIedName, selectedApName);
+			toolsStatusInfo.textContent = 'model.py generated and downloaded.';
+		} catch (error) {
+			toolsStatusInfo.textContent = 'Generate model.py failed: ' + error.message;
+		} finally {
+			toolsGenerateModelBtn.disabled = false;
+		}
+	});
 })();

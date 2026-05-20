@@ -113,6 +113,17 @@ function getDirectChildrenByTagName(node, tagName) {
   return Array.from(node.children || []).filter((child) => child.localName === tagName);
 }
 
+function normalizeRefPath(pathOrParts) {
+  const parts = Array.isArray(pathOrParts)
+    ? pathOrParts
+    : String(pathOrParts || '').split('.');
+
+  return parts
+    .filter((part) => part !== undefined && part !== null && String(part).trim() !== '')
+    .map((part) => String(part).trim().toLowerCase())
+    .join('.');
+}
+
 function parseDataTypeTemplatesFromDoc(doc) {
   const dtt = doc.querySelector('DataTypeTemplates');
   if (!dtt) {
@@ -193,54 +204,6 @@ function parseDataTypeTemplatesFromDoc(doc) {
     };
   });
 
-// Recursively parse DOI/SDOI/DAI/SDAI tree for <Val> in IED section
-export function parseIedValOverrides(iedNode) {
-  const overrides = {};
-  function walk(node, path = []) {
-    // DOI/SDOI/DAI/SDAI
-    const tag = node.localName;
-    let name = getAttribute(node, 'name');
-    if (!name) return;
-    const newPath = [...path, name];
-    // DAI/SDAI may have <Val>
-    if (tag === 'DAI' || tag === 'SDAI') {
-      const valEl = node.querySelector('Val');
-      if (valEl) {
-        overrides[newPath.join('.')]= valEl.textContent.trim();
-      }
-    }
-    // Recurse into SDOI/DAI/SDAI children
-    Array.from(node.children || []).forEach((child) => {
-      if (["SDOI", "DAI", "SDAI"].includes(child.localName)) {
-        walk(child, newPath);
-      }
-    });
-  }
-  // Start from each DOI under LN/LN0
-  const lns = getChildrenByTagName(iedNode, 'LN').concat(getChildrenByTagName(iedNode, 'LN0'));
-  lns.forEach((ln) => {
-    getDirectChildrenByTagName(ln, 'DOI').forEach((doi) => {
-      walk(doi, []);
-    });
-  });
-  return overrides;
-}
-
-// Helper to resolve value for a DA/BDA path
-function resolveDaValue(pathArr, iedOverrides, dttVal) {
-  // pathArr: [DO, SDO..., DA, SDA...]
-  // Try IED override first
-  const pathStr = pathArr.join('.');
-  if (iedOverrides && iedOverrides.hasOwnProperty(pathStr)) {
-    return iedOverrides[pathStr];
-  }
-  // Fallback to DataTypeTemplates <val>
-  if (dttVal !== undefined && dttVal !== null) {
-    return dttVal;
-  }
-  return null;
-}
-
   getChildrenByTagName(dtt, 'LNodeType').forEach((lnTypeEl) => {
     const id = getAttribute(lnTypeEl, 'id');
     if (!id) return;
@@ -257,6 +220,88 @@ function resolveDaValue(pathArr, iedOverrides, dttVal) {
   });
 
   return { enumTypes, daTypes, doTypes, lnTypes };
+}
+
+// Recursively parse DOI/SDOI/DAI/SDAI tree for <Val> in IED section.
+// Keys are stored by DOI/SDOI/... names (e.g., LocKey.stVal) and also by
+// CDC alias (e.g., sps.stVal) so existing generator lookups continue to work.
+function parseIedValOverrides(iedNode, templates) {
+  const overrides = {};
+
+  function addOverride(pathArr, value, doNameToCdc) {
+    const path = normalizeRefPath(pathArr);
+    overrides[path] = value;
+
+    if (pathArr.length < 2) {
+      return;
+    }
+
+    const rootDoName = pathArr[0];
+    const cdc = doNameToCdc[rootDoName];
+    if (!cdc) {
+      return;
+    }
+
+    const cdcPath = normalizeRefPath([cdc, ...pathArr.slice(1)]);
+    if (!Object.prototype.hasOwnProperty.call(overrides, cdcPath)) {
+      overrides[cdcPath] = value;
+    }
+  }
+
+  function walk(node, path = [], doNameToCdc = {}) {
+    const tag = node.localName;
+    const name = getAttribute(node, 'name');
+    if (!name) return;
+
+    const newPath = [...path, name];
+    if (tag === 'DAI' || tag === 'SDAI') {
+      const valEl = node.querySelector('Val');
+      if (valEl) {
+        addOverride(newPath, valEl.textContent.trim(), doNameToCdc);
+      }
+    }
+
+    Array.from(node.children || []).forEach((child) => {
+      if (['SDOI', 'DAI', 'SDAI'].includes(child.localName)) {
+        walk(child, newPath, doNameToCdc);
+      }
+    });
+  }
+
+  const lns = getChildrenByTagName(iedNode, 'LN').concat(getChildrenByTagName(iedNode, 'LN0'));
+  lns.forEach((ln) => {
+    const doNameToCdc = {};
+    const lnType = getAttribute(ln, 'lnType');
+    const lnTypeDef = templates && templates.lnTypes ? templates.lnTypes[lnType] : null;
+    if (lnTypeDef && Array.isArray(lnTypeDef.dos)) {
+      lnTypeDef.dos.forEach((lnDo) => {
+        const doTypeDef = templates.doTypes ? templates.doTypes[lnDo.typeRef] : null;
+        if (lnDo.name && doTypeDef && doTypeDef.cdc) {
+          doNameToCdc[lnDo.name] = doTypeDef.cdc;
+        }
+      });
+    }
+
+    getDirectChildrenByTagName(ln, 'DOI').forEach((doi) => {
+      walk(doi, [], doNameToCdc);
+    });
+  });
+
+  return overrides;
+}
+
+// Resolve DA/BDA value by preferring IED overrides over DataTypeTemplates defaults.
+function resolveDaValue(pathArr, iedOverrides, dttVal) {
+  const pathStr = normalizeRefPath(pathArr);
+  if (iedOverrides && Object.prototype.hasOwnProperty.call(iedOverrides, pathStr)) {
+    return iedOverrides[pathStr];
+  }
+
+  if (dttVal !== undefined && dttVal !== null) {
+    return dttVal;
+  }
+
+  return null;
 }
 
 function buildLogicalNodeName(lnClass, inst, prefix) {
@@ -617,7 +662,7 @@ export async function generatePythonModelFromScl(file, sourceFileText, selectedI
   if (!selectedIed) {
     selectedIed = iedNodes[0] || null;
   }
-  const iedOverrides = selectedIed ? parseIedValOverrides(selectedIed) : {};
+  const iedOverrides = selectedIed ? parseIedValOverrides(selectedIed, templates) : {};
   const runtimeModel = parseRuntimeModelFromDoc(doc, selectedIedName, selectedApName);
 
   const sourceCandidate = sourceFileText
