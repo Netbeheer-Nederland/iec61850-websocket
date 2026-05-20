@@ -10,7 +10,11 @@ from dataclasses import asdict
 from typing import Optional
 
 from ws61850.iec61850.data_model import *
+from ws61850.protocol.types import OptFlds
+from ws61850.iec61850.data_model.helper import *
 
+# Alias for backward compatibility
+OptFldsRCB = OptFlds
 
 BTYPE_TO_DA_ENUM_NAME = {'BOOLEAN': 'boolean',
  'Check': 'check',
@@ -56,152 +60,152 @@ FC_TO_ENUM_NAME = {'BL': 'bl',
 
 
 def _create_da_AnalogueValue_1(name, fc, parent):
-    da = DataAttribute(name, 0, -1, DataAttributeType.structure, fc, 0, [], 0, parent)
-    _bda_f = DataAttribute('f', 0, -1, DataAttributeType.float32, fc, 0, 0.0, 0, da)
-    da.add_dataAttribute(_bda_f)
+    da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
+    _bda_f = DataAttribute('f', DataAttributeType.float32, fc, 0.0, da)
+    da.addDataAttribute(_bda_f)
     return da
 
 def _create_da_Originator_1(name, fc, parent):
-    da = DataAttribute(name, 0, -1, DataAttributeType.structure, fc, 0, [], 0, parent)
-    _bda_orCat = DataAttribute('orCat', 0, -1, DataAttributeType.enumerated, fc, 0, 0, 0, da)
-    da.add_dataAttribute(_bda_orCat)
-    _bda_orIdent = DataAttribute('orIdent', 0, -1, DataAttributeType.octetString, fc, 0, bytes(), 0, da)
-    da.add_dataAttribute(_bda_orIdent)
+    da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
+    _bda_orCat = DataAttribute('orCat', DataAttributeType.enumerated, fc, 0, da)
+    da.addDataAttribute(_bda_orCat)
+    _bda_orIdent = DataAttribute('orIdent', DataAttributeType.octetString, fc, bytes(), da)
+    da.addDataAttribute(_bda_orIdent)
     return da
 
 def _create_da_SPCOperate_1(name, fc, parent):
-    da = DataAttribute(name, 0, -1, DataAttributeType.structure, fc, 0, [], 0, parent)
-    _bda_ctlVal = DataAttribute('ctlVal', 0, -1, DataAttributeType.boolean, fc, 0, False, 0, da)
-    da.add_dataAttribute(_bda_ctlVal)
+    da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
+    _bda_ctlVal = DataAttribute('ctlVal', DataAttributeType.boolean, fc, False, da)
+    da.addDataAttribute(_bda_ctlVal)
     _bda_origin = _create_da_Originator_1('origin', fc, da)
-    da.add_dataAttribute(_bda_origin)
-    _bda_ctlNum = DataAttribute('ctlNum', 0, -1, DataAttributeType.int8u, fc, 0, 0, 0, da)
-    da.add_dataAttribute(_bda_ctlNum)
-    _bda_T = DataAttribute('T', 0, -1, DataAttributeType.timeStamp, fc, 0, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, 0, da)
-    da.add_dataAttribute(_bda_T)
-    _bda_Test = DataAttribute('Test', 0, -1, DataAttributeType.boolean, fc, 0, False, 0, da)
-    da.add_dataAttribute(_bda_Test)
-    _bda_Check = DataAttribute('Check', 0, -1, DataAttributeType.check, fc, 0, {"synchroCheck": False, "interlockCheck": False}, 0, da)
-    da.add_dataAttribute(_bda_Check)
+    da.addDataAttribute(_bda_origin)
+    _bda_ctlNum = DataAttribute('ctlNum', DataAttributeType.int8u, fc, 0, da)
+    da.addDataAttribute(_bda_ctlNum)
+    _bda_T = DataAttribute('T', DataAttributeType.timeStamp, fc, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, da)
+    da.addDataAttribute(_bda_T)
+    _bda_Test = DataAttribute('Test', DataAttributeType.boolean, fc, False, da)
+    da.addDataAttribute(_bda_Test)
+    _bda_Check = DataAttribute('Check', DataAttributeType.check, fc, {"synchroCheck": False, "interlockCheck": False}, da)
+    da.addDataAttribute(_bda_Check)
     return da
 
 
 def _create_do_ENC_1_Mod(name, parent):
-    do = DataObject(name, 0, -1, cdc='enc', parent=parent)
-    _da_stVal = DataAttribute('stVal', 0, -1, DataAttributeType.enumerated, FunctionalConstraint.st, 0, 0, 0, do)
+    do = DataObject(name, 'enc', parent)
+    _da_stVal = DataAttribute('stVal', DataAttributeType.enumerated, FunctionalConstraint.st, 0, do)
     do.add_do_or_da(_da_stVal)
-    _da_q = DataAttribute('q', 0, -1, DataAttributeType.quality, FunctionalConstraint.st, 0, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, 0, do)
+    _da_q = DataAttribute('q', DataAttributeType.quality, FunctionalConstraint.st, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, do)
     do.add_do_or_da(_da_q)
-    _da_t = DataAttribute('t', 0, -1, DataAttributeType.timeStamp, FunctionalConstraint.st, 0, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, 0, do)
+    _da_t = DataAttribute('t', DataAttributeType.timeStamp, FunctionalConstraint.st, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, do)
     do.add_do_or_da(_da_t)
-    _da_ctlModel = DataAttribute('ctlModel', 0, -1, DataAttributeType.enumerated, FunctionalConstraint.cf, 0, 0, 0, do)
+    _da_ctlModel = DataAttribute('ctlModel', DataAttributeType.enumerated, FunctionalConstraint.cf, 0, do)
     do.add_do_or_da(_da_ctlModel)
     return do
 
 def _create_do_ENS_1_Beh(name, parent):
-    do = DataObject(name, 0, -1, cdc='ens', parent=parent)
-    _da_stVal = DataAttribute('stVal', 0, -1, DataAttributeType.enumerated, FunctionalConstraint.st, 0, 0, 0, do)
+    do = DataObject(name, 'ens', parent)
+    _da_stVal = DataAttribute('stVal', DataAttributeType.enumerated, FunctionalConstraint.st, 0, do)
     do.add_do_or_da(_da_stVal)
-    _da_q = DataAttribute('q', 0, -1, DataAttributeType.quality, FunctionalConstraint.st, 0, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, 0, do)
+    _da_q = DataAttribute('q', DataAttributeType.quality, FunctionalConstraint.st, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, do)
     do.add_do_or_da(_da_q)
-    _da_t = DataAttribute('t', 0, -1, DataAttributeType.timeStamp, FunctionalConstraint.st, 0, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, 0, do)
+    _da_t = DataAttribute('t', DataAttributeType.timeStamp, FunctionalConstraint.st, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, do)
     do.add_do_or_da(_da_t)
     return do
 
 def _create_do_ENS_2_Health(name, parent):
-    do = DataObject(name, 0, -1, cdc='ens', parent=parent)
-    _da_stVal = DataAttribute('stVal', 0, -1, DataAttributeType.enumerated, FunctionalConstraint.st, 0, 0, 0, do)
+    do = DataObject(name, 'ens', parent)
+    _da_stVal = DataAttribute('stVal', DataAttributeType.enumerated, FunctionalConstraint.st, 0, do)
     do.add_do_or_da(_da_stVal)
-    _da_q = DataAttribute('q', 0, -1, DataAttributeType.quality, FunctionalConstraint.st, 0, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, 0, do)
+    _da_q = DataAttribute('q', DataAttributeType.quality, FunctionalConstraint.st, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, do)
     do.add_do_or_da(_da_q)
-    _da_t = DataAttribute('t', 0, -1, DataAttributeType.timeStamp, FunctionalConstraint.st, 0, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, 0, do)
+    _da_t = DataAttribute('t', DataAttributeType.timeStamp, FunctionalConstraint.st, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, do)
     do.add_do_or_da(_da_t)
     return do
 
 def _create_do_LPL_1_NamPlt(name, parent):
-    do = DataObject(name, 0, -1, cdc='lpl', parent=parent)
-    _da_vendor = DataAttribute('vendor', 0, -1, DataAttributeType.visString255, FunctionalConstraint.dc, 0, "", 0, do)
+    do = DataObject(name, 'lpl', parent)
+    _da_vendor = DataAttribute('vendor', DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
     do.add_do_or_da(_da_vendor)
-    _da_swRev = DataAttribute('swRev', 0, -1, DataAttributeType.visString255, FunctionalConstraint.dc, 0, "", 0, do)
+    _da_swRev = DataAttribute('swRev', DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
     do.add_do_or_da(_da_swRev)
-    _da_d = DataAttribute('d', 0, -1, DataAttributeType.visString255, FunctionalConstraint.dc, 0, "", 0, do)
+    _da_d = DataAttribute('d', DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
     do.add_do_or_da(_da_d)
-    _da_configRev = DataAttribute('configRev', 0, -1, DataAttributeType.visString255, FunctionalConstraint.dc, 0, "", 0, do)
+    _da_configRev = DataAttribute('configRev', DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
     do.add_do_or_da(_da_configRev)
-    _da_ldNs = DataAttribute('ldNs', 0, -1, DataAttributeType.visString255, FunctionalConstraint.ex, 0, "", 0, do)
+    _da_ldNs = DataAttribute('ldNs', DataAttributeType.visString255, FunctionalConstraint.ex, "", do)
     do.add_do_or_da(_da_ldNs)
     return do
 
 def _create_do_DPL_1_PhyNam(name, parent):
-    do = DataObject(name, 0, -1, cdc='dpl', parent=parent)
-    _da_vendor = DataAttribute('vendor', 0, -1, DataAttributeType.visString255, FunctionalConstraint.dc, 0, "", 0, do)
+    do = DataObject(name, 'dpl', parent)
+    _da_vendor = DataAttribute('vendor', DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
     do.add_do_or_da(_da_vendor)
     return do
 
 def _create_do_SPS_1_Proxy(name, parent):
-    do = DataObject(name, 0, -1, cdc='sps', parent=parent)
-    _da_stVal = DataAttribute('stVal', 0, -1, DataAttributeType.boolean, FunctionalConstraint.st, 0, False, 0, do)
+    do = DataObject(name, 'sps', parent)
+    _da_stVal = DataAttribute('stVal', DataAttributeType.boolean, FunctionalConstraint.st, False, do)
     do.add_do_or_da(_da_stVal)
-    _da_q = DataAttribute('q', 0, -1, DataAttributeType.quality, FunctionalConstraint.st, 0, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, 0, do)
+    _da_q = DataAttribute('q', DataAttributeType.quality, FunctionalConstraint.st, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, do)
     do.add_do_or_da(_da_q)
-    _da_t = DataAttribute('t', 0, -1, DataAttributeType.timeStamp, FunctionalConstraint.st, 0, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, 0, do)
+    _da_t = DataAttribute('t', DataAttributeType.timeStamp, FunctionalConstraint.st, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, do)
     do.add_do_or_da(_da_t)
     return do
 
 def _create_do_LPL_2_NamPlt(name, parent):
-    do = DataObject(name, 0, -1, cdc='lpl', parent=parent)
-    _da_vendor = DataAttribute('vendor', 0, -1, DataAttributeType.visString255, FunctionalConstraint.dc, 0, "", 0, do)
+    do = DataObject(name, 'lpl', parent)
+    _da_vendor = DataAttribute('vendor', DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
     do.add_do_or_da(_da_vendor)
-    _da_swRev = DataAttribute('swRev', 0, -1, DataAttributeType.visString255, FunctionalConstraint.dc, 0, "", 0, do)
+    _da_swRev = DataAttribute('swRev', DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
     do.add_do_or_da(_da_swRev)
-    _da_d = DataAttribute('d', 0, -1, DataAttributeType.visString255, FunctionalConstraint.dc, 0, "", 0, do)
+    _da_d = DataAttribute('d', DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
     do.add_do_or_da(_da_d)
     return do
 
 def _create_do_MV_1_AnIn1(name, parent):
-    do = DataObject(name, 0, -1, cdc='mv', parent=parent)
+    do = DataObject(name, 'mv', parent)
     _da_mag = _create_da_AnalogueValue_1('mag', FunctionalConstraint.mx, do)
     do.add_do_or_da(_da_mag)
-    _da_q = DataAttribute('q', 0, -1, DataAttributeType.quality, FunctionalConstraint.mx, 0, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, 0, do)
+    _da_q = DataAttribute('q', DataAttributeType.quality, FunctionalConstraint.mx, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, do)
     do.add_do_or_da(_da_q)
-    _da_t = DataAttribute('t', 0, -1, DataAttributeType.timeStamp, FunctionalConstraint.mx, 0, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, 0, do)
+    _da_t = DataAttribute('t', DataAttributeType.timeStamp, FunctionalConstraint.mx, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, do)
     do.add_do_or_da(_da_t)
     return do
 
 def _create_do_SPC_1_SPCSO1(name, parent):
-    do = DataObject(name, 0, -1, cdc='spc', parent=parent)
+    do = DataObject(name, 'spc', parent)
     _da_origin = _create_da_Originator_1('origin', FunctionalConstraint.st, do)
     do.add_do_or_da(_da_origin)
-    _da_ctlNum = DataAttribute('ctlNum', 0, -1, DataAttributeType.int8u, FunctionalConstraint.st, 0, 0, 0, do)
+    _da_ctlNum = DataAttribute('ctlNum', DataAttributeType.int8u, FunctionalConstraint.st, 0, do)
     do.add_do_or_da(_da_ctlNum)
-    _da_stVal = DataAttribute('stVal', 0, -1, DataAttributeType.boolean, FunctionalConstraint.st, 0, False, 0, do)
+    _da_stVal = DataAttribute('stVal', DataAttributeType.boolean, FunctionalConstraint.st, False, do)
     do.add_do_or_da(_da_stVal)
-    _da_q = DataAttribute('q', 0, -1, DataAttributeType.quality, FunctionalConstraint.st, 0, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, 0, do)
+    _da_q = DataAttribute('q', DataAttributeType.quality, FunctionalConstraint.st, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, do)
     do.add_do_or_da(_da_q)
-    _da_t = DataAttribute('t', 0, -1, DataAttributeType.timeStamp, FunctionalConstraint.st, 0, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, 0, do)
+    _da_t = DataAttribute('t', DataAttributeType.timeStamp, FunctionalConstraint.st, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, do)
     do.add_do_or_da(_da_t)
-    _da_ctlModel = DataAttribute('ctlModel', 0, -1, DataAttributeType.enumerated, FunctionalConstraint.cf, 0, 0, 0, do)
+    _da_ctlModel = DataAttribute('ctlModel', DataAttributeType.enumerated, FunctionalConstraint.cf, 0, do)
     do.add_do_or_da(_da_ctlModel)
     _da_Oper = _create_da_SPCOperate_1('Oper', FunctionalConstraint.co, do)
     do.add_do_or_da(_da_Oper)
     return do
 
 def _create_do_SPC_2(name, parent):
-    do = DataObject(name, 0, -1, cdc='spc', parent=parent)
-    _da_stVal = DataAttribute('stVal', 0, -1, DataAttributeType.boolean, FunctionalConstraint.st, 0, False, 0, do)
+    do = DataObject(name, 'spc', parent)
+    _da_stVal = DataAttribute('stVal', DataAttributeType.boolean, FunctionalConstraint.st, False, do)
     do.add_do_or_da(_da_stVal)
-    _da_q = DataAttribute('q', 0, -1, DataAttributeType.quality, FunctionalConstraint.st, 0, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, 0, do)
+    _da_q = DataAttribute('q', DataAttributeType.quality, FunctionalConstraint.st, {"validity": "good", "source": "process", "test": False, "operatorBlock": False}, do)
     do.add_do_or_da(_da_q)
     _da_Oper = _create_da_SPCOperate_1('Oper', FunctionalConstraint.co, do)
     do.add_do_or_da(_da_Oper)
-    _da_ctlModel = DataAttribute('ctlModel', 0, -1, DataAttributeType.enumerated, FunctionalConstraint.cf, 0, 0, 0, do)
+    _da_ctlModel = DataAttribute('ctlModel', DataAttributeType.enumerated, FunctionalConstraint.cf, 0, do)
     do.add_do_or_da(_da_ctlModel)
-    _da_t = DataAttribute('t', 0, -1, DataAttributeType.timeStamp, FunctionalConstraint.st, 0, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, 0, do)
+    _da_t = DataAttribute('t', DataAttributeType.timeStamp, FunctionalConstraint.st, {"secondSinceEpoch": 0, "fractionOfSecond": 0, "timeQuality": {"leapSecondsKown": False, "clockFailure": False, "clockNotSynchronized": False, "timeAccuracy": 0}}, do)
     do.add_do_or_da(_da_t)
     return do
 
 
-def _create_do_by_cdc(name: str, cdc: Optional[str], parent):
+def _create_do_by_cdc(name: str, cdc: str, parent):
     cdc_norm = (cdc or '').lower()
     if cdc_norm == 'mv':
         return create_mv_do(name, parent)
@@ -229,7 +233,7 @@ def _create_do_by_cdc(name: str, cdc: Optional[str], parent):
         return create_wye_do(name, parent)
     if cdc_norm == 'del':
         return create_del_do(name, parent)
-    return DataObject(name, 0, -1, cdc=cdc_norm or None, parent=parent)
+    return DataObject(name, cdc_norm or None, parent)
 
 
 def _create_do_by_typeref(name: str, type_ref, cdc, parent):
@@ -265,76 +269,125 @@ def build_ied_model() -> IedModel:
     do_namplt_1 = _create_do_by_typeref('NamPlt', 'LPL_1_NamPlt', 'LPL', ln1)
     ln1.add_dataObject(do_namplt_1)
 
-    dataset_events_1_1 = DataSet(ln1, 'GenericIO', 'Events', 4)
-    data_entry_1 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.SPCSO1.stVal', -1, None, None, FunctionalConstraint.st)
+    dataset_events_1_1 = DataSet(ln1, 'GenericIO', 'Events')
+    data_entry_1 = DataSetEntry('GenericIO', 'GGIO1.SPCSO1.stVal', FunctionalConstraint.st)
     dataset_events_1_1.dataSet_addEntry(data_entry_1)
-    data_entry_2 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.SPCSO2.stVal', -1, None, None, FunctionalConstraint.st)
+    data_entry_2 = DataSetEntry('GenericIO', 'GGIO1.SPCSO2.stVal', FunctionalConstraint.st)
     dataset_events_1_1.dataSet_addEntry(data_entry_2)
-    data_entry_3 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.SPCSO3.stVal', -1, None, None, FunctionalConstraint.st)
+    data_entry_3 = DataSetEntry('GenericIO', 'GGIO1.SPCSO3.stVal', FunctionalConstraint.st)
     dataset_events_1_1.dataSet_addEntry(data_entry_3)
-    data_entry_4 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.SPCSO4.stVal', -1, None, None, FunctionalConstraint.st)
+    data_entry_4 = DataSetEntry('GenericIO', 'GGIO1.SPCSO4.stVal', FunctionalConstraint.st)
     dataset_events_1_1.dataSet_addEntry(data_entry_4)
     ln1.add_dataSet(dataset_events_1_1)
 
-    dataset_events2_1_2 = DataSet(ln1, 'GenericIO', 'Events2', 4)
-    data_entry_1 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.SPCSO1', -1, None, None, FunctionalConstraint.st)
+    dataset_events2_1_2 = DataSet(ln1, 'GenericIO', 'Events2')
+    data_entry_1 = DataSetEntry('GenericIO', 'GGIO1.SPCSO1', FunctionalConstraint.st)
     dataset_events2_1_2.dataSet_addEntry(data_entry_1)
-    data_entry_2 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.SPCSO2', -1, None, None, FunctionalConstraint.st)
+    data_entry_2 = DataSetEntry('GenericIO', 'GGIO1.SPCSO2', FunctionalConstraint.st)
     dataset_events2_1_2.dataSet_addEntry(data_entry_2)
-    data_entry_3 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.SPCSO3', -1, None, None, FunctionalConstraint.st)
+    data_entry_3 = DataSetEntry('GenericIO', 'GGIO1.SPCSO3', FunctionalConstraint.st)
     dataset_events2_1_2.dataSet_addEntry(data_entry_3)
-    data_entry_4 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.SPCSO4', -1, None, None, FunctionalConstraint.st)
+    data_entry_4 = DataSetEntry('GenericIO', 'GGIO1.SPCSO4', FunctionalConstraint.st)
     dataset_events2_1_2.dataSet_addEntry(data_entry_4)
     ln1.add_dataSet(dataset_events2_1_2)
 
-    dataset_measurements_1_3 = DataSet(ln1, 'GenericIO', 'Measurements', 8)
-    data_entry_1 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.AnIn1.mag.f', -1, None, None, FunctionalConstraint.mx)
+    dataset_measurements_1_3 = DataSet(ln1, 'GenericIO', 'Measurements')
+    data_entry_1 = DataSetEntry('GenericIO', 'GGIO1.AnIn1.mag.f', FunctionalConstraint.mx)
     dataset_measurements_1_3.dataSet_addEntry(data_entry_1)
-    data_entry_2 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.AnIn1.q', -1, None, None, FunctionalConstraint.mx)
+    data_entry_2 = DataSetEntry('GenericIO', 'GGIO1.AnIn1.q', FunctionalConstraint.mx)
     dataset_measurements_1_3.dataSet_addEntry(data_entry_2)
-    data_entry_3 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.AnIn2.mag.f', -1, None, None, FunctionalConstraint.mx)
+    data_entry_3 = DataSetEntry('GenericIO', 'GGIO1.AnIn2.mag.f', FunctionalConstraint.mx)
     dataset_measurements_1_3.dataSet_addEntry(data_entry_3)
-    data_entry_4 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.AnIn2.q', -1, None, None, FunctionalConstraint.mx)
+    data_entry_4 = DataSetEntry('GenericIO', 'GGIO1.AnIn2.q', FunctionalConstraint.mx)
     dataset_measurements_1_3.dataSet_addEntry(data_entry_4)
-    data_entry_5 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.AnIn3.mag.f', -1, None, None, FunctionalConstraint.mx)
+    data_entry_5 = DataSetEntry('GenericIO', 'GGIO1.AnIn3.mag.f', FunctionalConstraint.mx)
     dataset_measurements_1_3.dataSet_addEntry(data_entry_5)
-    data_entry_6 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.AnIn3.q', -1, None, None, FunctionalConstraint.mx)
+    data_entry_6 = DataSetEntry('GenericIO', 'GGIO1.AnIn3.q', FunctionalConstraint.mx)
     dataset_measurements_1_3.dataSet_addEntry(data_entry_6)
-    data_entry_7 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.AnIn4.mag.f', -1, None, None, FunctionalConstraint.mx)
+    data_entry_7 = DataSetEntry('GenericIO', 'GGIO1.AnIn4.mag.f', FunctionalConstraint.mx)
     dataset_measurements_1_3.dataSet_addEntry(data_entry_7)
-    data_entry_8 = DataSetEntry('GenericIO', False, 'GenericIO/GGIO1.AnIn4.q', -1, None, None, FunctionalConstraint.mx)
+    data_entry_8 = DataSetEntry('GenericIO', 'GGIO1.AnIn4.q', FunctionalConstraint.mx)
     dataset_measurements_1_3.dataSet_addEntry(data_entry_8)
     ln1.add_dataSet(dataset_measurements_1_3)
 
-    opt_fields_1_1 = asdict(OptFldsRCB(True, True, True, False, True, False, False, True))
-    trg_opts_1_1 = {'dchg': False, 'dupd': False, 'gi': False, 'integrity': True, 'qchg': False}
-    rcb_eventsrcb_1_1 = ReportControl('GenericIO/LLN0.EventsRCB', ln1, 'EventsRCB', 'Events1', False, 'GenericIO/LLN0.Events', 1, trg_opts_1_1, opt_fields_1_1, 50, 1000, None, False)
+    rcb_eventsrcb_1_1 = ReportControl(
+        'EventsRCB',
+        buffered=False,
+        dataset_name='GenericIO/LLN0.Events',
+        rpt_id='Events1',
+        conf_rev=1,
+        trg_ops={'dchg': False, 'dupd': False, 'gi': False, 'integrity': True, 'qchg': False},
+        opt_flds=asdict(OptFlds(True, True, True, False, True, False, False, True)),
+        int_period=1000,
+        indexed=False,
+    )
     ln1.add_reportControl(rcb_eventsrcb_1_1)
 
-    opt_fields_1_2 = asdict(OptFldsRCB(True, True, True, False, True, False, False, True))
-    trg_opts_1_2 = {'dchg': False, 'dupd': False, 'gi': False, 'integrity': True, 'qchg': False}
-    rcb_eventsrcbpreconf_1_2 = ReportControl('GenericIO/LLN0.EventsRCBPreConf', ln1, 'EventsRCBPreConf', 'Events1', False, 'GenericIO/LLN0.Events', 1, trg_opts_1_2, opt_fields_1_2, 50, 1000, None, False)
+    rcb_eventsrcbpreconf_1_2 = ReportControl(
+        'EventsRCBPreConf',
+        buffered=False,
+        dataset_name='GenericIO/LLN0.Events',
+        rpt_id='Events1',
+        conf_rev=1,
+        trg_ops={'dchg': False, 'dupd': False, 'gi': False, 'integrity': True, 'qchg': False},
+        opt_flds=asdict(OptFlds(True, True, True, False, True, False, False, True)),
+        int_period=1000,
+        indexed=False,
+    )
     ln1.add_reportControl(rcb_eventsrcbpreconf_1_2)
 
-    opt_fields_1_3 = asdict(OptFldsRCB(True, True, True, False, True, False, False, True))
-    trg_opts_1_3 = {'dchg': False, 'dupd': False, 'gi': False, 'integrity': True, 'qchg': False}
-    rcb_eventsbrcb_1_3 = ReportControl('GenericIO/LLN0.EventsBRCB', ln1, 'EventsBRCB', 'Events2', True, 'GenericIO/LLN0.Events', 1, trg_opts_1_3, opt_fields_1_3, 50, 1000, None, False)
+    rcb_eventsbrcb_1_3 = ReportControl(
+        'EventsBRCB',
+        buffered=True,
+        dataset_name='GenericIO/LLN0.Events',
+        rpt_id='Events2',
+        conf_rev=1,
+        trg_ops={'dchg': False, 'dupd': False, 'gi': False, 'integrity': True, 'qchg': False},
+        opt_flds=asdict(OptFlds(True, True, True, False, True, False, False, True)),
+        int_period=1000,
+        indexed=False,
+    )
     ln1.add_reportControl(rcb_eventsbrcb_1_3)
 
-    opt_fields_1_4 = asdict(OptFldsRCB(True, True, True, False, True, False, False, True))
-    trg_opts_1_4 = {'dchg': False, 'dupd': False, 'gi': False, 'integrity': True, 'qchg': False}
-    rcb_eventsbrcbpreconf_1_4 = ReportControl('GenericIO/LLN0.EventsBRCBPreConf', ln1, 'EventsBRCBPreConf', 'Events2', True, 'GenericIO/LLN0.Events', 1, trg_opts_1_4, opt_fields_1_4, 50, 1000, None, False)
+    rcb_eventsbrcbpreconf_1_4 = ReportControl(
+        'EventsBRCBPreConf',
+        buffered=True,
+        dataset_name='GenericIO/LLN0.Events',
+        rpt_id='Events2',
+        conf_rev=1,
+        trg_ops={'dchg': False, 'dupd': False, 'gi': False, 'integrity': True, 'qchg': False},
+        opt_flds=asdict(OptFlds(True, True, True, False, True, False, False, True)),
+        int_period=1000,
+        indexed=False,
+    )
     ln1.add_reportControl(rcb_eventsbrcbpreconf_1_4)
 
-    opt_fields_1_5 = asdict(OptFldsRCB(True, True, True, False, True, False, False, True))
-    trg_opts_1_5 = {'dchg': False, 'dupd': False, 'gi': False, 'integrity': True, 'qchg': False}
-    rcb_eventsindexed_1_5 = ReportControl('GenericIO/LLN0.EventsIndexed', ln1, 'EventsIndexed', 'Events2', False, 'GenericIO/LLN0.Events', 1, trg_opts_1_5, opt_fields_1_5, 50, 1000, None, True)
+    rcb_eventsindexed_1_5 = ReportControl(
+        'EventsIndexed',
+        buffered=False,
+        dataset_name='GenericIO/LLN0.Events',
+        rpt_id='Events2',
+        conf_rev=1,
+        trg_ops={'dchg': False, 'dupd': False, 'gi': False, 'integrity': True, 'qchg': False},
+        opt_flds=asdict(OptFlds(True, True, True, False, True, False, False, True)),
+        int_period=1000,
+        indexed=True,
+    )
     ln1.add_reportControl(rcb_eventsindexed_1_5)
 
-    opt_fields_1_6 = asdict(OptFldsRCB(True, True, True, False, True, True, False, True))
-    trg_opts_1_6 = {'dchg': False, 'dupd': False, 'gi': False, 'integrity': False, 'qchg': False}
-    rcb_measurements_1_6 = ReportControl('GenericIO/LLN0.Measurements', ln1, 'Measurements', 'Measurements', True, 'GenericIO/LLN0.Measurements', 1, trg_opts_1_6, opt_fields_1_6, 50, 1000, None, True)
+    rcb_measurements_1_6 = ReportControl(
+        'Measurements',
+        buffered=True,
+        dataset_name='GenericIO/LLN0.Measurements',
+        rpt_id='Measurements',
+        conf_rev=1,
+        trg_ops={'dchg': False, 'dupd': False, 'gi': False, 'integrity': False, 'qchg': False},
+        opt_flds=asdict(OptFlds(True, True, True, False, True, True, False, True)),
+        int_period=1000,
+        indexed=True,
+    )
     ln1.add_reportControl(rcb_measurements_1_6)
+
     ln2 = LogicalNode(name='LPHD1', parent=ld1)
     do_phynam_2 = _create_do_by_typeref('PhyNam', 'DPL_1_PhyNam', 'DPL', ln2)
     ln2.add_dataObject(do_phynam_2)

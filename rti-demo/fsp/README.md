@@ -30,7 +30,9 @@ If your current directory is `rti-demo/fsp`:
 
 ```bash
 docker build -t rti-demo-fsp -f Dockerfile ../..
-docker run --rm -p 5001:5001 rti-demo-fsp
+####docker run --rm -p 5001:5001 rti-demo-fsp
+docker run --rm -p 5001:5001 --network rti-demo_rti-network --name rti-server rti-demo-fsp
+
 ```
 
 ### Common Docker Issue
