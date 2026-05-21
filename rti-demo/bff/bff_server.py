@@ -20,6 +20,7 @@ from typing import Dict, List, Optional
 import requests
 import threading
 import time
+from fspClient import FspClient
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +45,10 @@ CORS(app)
 # Data storage (in production, use a database)
 CONNECTIONS_FILE = 'connections.json'
 STATS_FILE = 'stats.json'
+
+# Initialize FSP client (point to the RTI server container)
+FSP_BASE_URL = os.environ.get('FSP_BASE_URL', 'http://rti-server:5001')
+fsp_client = FspClient(FSP_BASE_URL)
 
 # Service discovery
 class ServiceDiscovery:
@@ -336,10 +341,35 @@ def trigger_discovery():
 @app.route('/api/connections', methods=['GET'])
 def get_connections():
     """Get all connections"""
-    return jsonify({
-        'connections': conn_manager.connections,
-        'count': len(conn_manager.connections)
-    })
+    try:
+        fsp_payload = fsp_client.connections()
+
+        # FSP returned an error envelope
+        if not fsp_payload.get('ok', False):
+            return jsonify({
+                'ok': False,
+                'error': fsp_payload.get('error', 'unknown FSP error'),
+                'local_connections': conn_manager.connections,
+            }), 502
+
+        # Success: forward FSP fields + add BFF-local connections
+        return jsonify({
+            'ok': True,
+            'server_role': fsp_payload.get('server_role'),
+            'ws_mode': fsp_payload.get('ws_mode'),
+            'connected_clients': fsp_payload.get('connected_clients', 0),
+            'connections': fsp_payload.get('connections', []),
+            'local_connections': conn_manager.connections,
+            'timestamp': datetime.now().isoformat(),
+        }), 200
+
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"FSP get connections failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+            'local_connections': conn_manager.connections,
+        }), 502
 
 @app.route('/api/connections', methods=['POST'])
 def create_connection():
@@ -460,35 +490,269 @@ def write_data():
 def get_model_tree():
     """Get IEC 61850 model tree"""
     # Mock model tree - replace with actual model from server
-    mock_tree = {
-        'children': [
-            {
-                'name': 'LD0',
-                'icon': 'folder',
-                'children': [
-                    {
-                        'name': 'LLN0',
-                        'icon': 'folder',
-                        'children': [
-                            {'name': 'Mod', 'icon': 'cube'},
-                            {'name': 'Beh', 'icon': 'cube'},
-                            {'name': 'Health', 'icon': 'cube'}
-                        ]
-                    },
-                    {
-                        'name': 'DWMX1',
-                        'icon': 'folder',
-                        'children': [
-                            {'name': 'WMaxSpt', 'icon': 'cube'},
-                            {'name': 'WMinSpt', 'icon': 'cube'}
-                        ]
-                    }
-                ]
-            }
-        ]
-    }
-    
-    return jsonify({'tree': mock_tree})
+    # mock_tree = {
+    #     'children': [
+    #         {
+    #             'name': 'LD0',
+    #             'icon': 'folder',
+    #             'children': [
+    #                 {
+    #                     'name': 'LLN0',
+    #                     'icon': 'folder',
+    #                     'children': [
+    #                         {'name': 'Mod', 'icon': 'cube'},
+    #                         {'name': 'Beh', 'icon': 'cube'},
+    #                         {'name': 'Health', 'icon': 'cube'}
+    #                     ]
+    #                 },
+    #                 {
+    #                     'name': 'DWMX1',
+    #                     'icon': 'folder',
+    #                     'children': [
+    #                         {'name': 'WMaxSpt', 'icon': 'cube'},
+    #                         {'name': 'WMinSpt', 'icon': 'cube'}
+    #                     ]
+    #                 }
+    #             ]
+    #         }
+    #     ]
+    # }
+    #
+    # return jsonify({'tree': mock_tree})
+
+    try:
+        tree = fsp_client.model()
+        return jsonify({'tree': tree, 'source': 'fsp'})
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"FSP unreachable, returning mock: {e}")
+        #return jsonify({'tree': MOCK_TREE, 'source': 'mock'}), 200
+
+#read value
+@app.route('/api/model/readvalue', methods=['POST'])
+def read_model_value():
+    """Read a value from the model on the FSP (ACSI server)."""
+    data = request.get_json(silent=True) or {}
+
+    if 'objRef' not in data:
+        return jsonify({'ok': False, 'error': 'objRef is required'}), 400
+
+    obj_ref = data['objRef']
+    fc = data.get('fc')
+
+    try:
+        fsp_response = fsp_client.read_value(obj_ref, fc)
+
+        if not fsp_response.get('ok', True):
+            return jsonify({
+                'ok': False,
+                'error': fsp_response.get('error', 'FSP read failed'),
+                'fsp': fsp_response,
+            }), 502
+
+        return jsonify({
+            'ok': True,
+            'value': fsp_response.get('value'),
+            'type': fsp_response.get('type'),
+            'timestamp': datetime.now().isoformat(),
+            'fsp': fsp_response,
+        }), 200
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP read_value failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+        }), 502
+
+#write value
+@app.route('/api/model/writevalue', methods=['POST'])
+def write_model_value():
+    """Write a value to the model on the FSP (ACSI server)."""
+    data = request.get_json(silent=True) or {}
+
+    required_fields = ['objRef', 'value']
+    if not all(field in data for field in required_fields):
+        return jsonify({'ok': False, 'error': 'objRef and value are required'}), 400
+
+    obj_ref = data['objRef']
+    value = data['value']
+
+    try:
+        fsp_response = fsp_client.write(obj_ref, value)
+
+        if not fsp_response.get('ok', True):
+            return jsonify({
+                'ok': False,
+                'error': fsp_response.get('error', 'FSP write failed'),
+                'fsp': fsp_response,
+            }), 502
+
+        return jsonify({
+            'ok': True,
+            'status': 'success',
+            'timestamp': datetime.now().isoformat(),
+            'fsp': fsp_response,
+        }), 200
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP write failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+        }), 502
+
+
+#update model
+@app.route('/api/model/update', methods=['POST'])
+def update_model():
+    """Update the IED model on the FSP (ACSI server)."""
+    data = request.get_json(silent=True) or {}
+
+    if 'modelPy' not in data:
+        return jsonify({'ok': False, 'error': 'modelPy is required'}), 400
+
+    model_py = data['modelPy']
+    if not isinstance(model_py, str) or not model_py.strip():
+        return jsonify({'ok': False, 'error': 'modelPy must be a non-empty string'}), 400
+
+    try:
+        fsp_response = fsp_client.update_model(model_py)
+
+        if not fsp_response.get('ok', True):
+            return jsonify({
+                'ok': False,
+                'error': fsp_response.get('error', 'FSP rejected the model'),
+                'fsp': fsp_response,
+            }), 502
+
+        return jsonify({
+            'ok': True,
+            'status': 'success',
+            'fsp': fsp_response,
+            'timestamp': datetime.now().isoformat(),
+        }), 200
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP update-iedmodel failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+        }), 502
+
+
+
+# overal status
+@app.route('/api/status', methods=['GET'])
+def get_overall_status():
+    """BFF-level status: combines BFF + FSP health for the UI."""
+    fsp_status = None
+    fsp_ok = False
+    try:
+        fsp_status = fsp_client.status()
+        fsp_ok = True
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"FSP status check failed: {e}")
+
+    return jsonify({
+        'bff': {'status': 'ok', 'version': '1.0.0'},
+        'fsp': {'reachable': fsp_ok, 'details': fsp_status},
+        'timestamp': datetime.now().isoformat(),
+    })
+
+@app.route('/api/iec61850server/start', methods=['POST'])
+def start_acsi_server():
+    """Start the ACSI server on the FSP with given parameters."""
+    data = request.get_json(silent=True) or {}
+    host = None
+    port = None
+    mode = None
+    cp = None
+
+    if('host' in data):
+        host = data['host']
+    if('port' in data):
+        port = data['port']
+    if('mode' in data):
+        mode = data['mode']
+    if('cp' in data):
+        cp = data['cp']
+
+    try:
+        result = fsp_client.start_acsi_server(host, port, mode, cp)
+        return jsonify({'ok': True, 'result': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP update-iedmodel failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+        }), 502
+
+@app.route('/api/iec61850server/stop', methods=['POST'])
+def stop_acsi_server():
+    """Stop the ACSI server on the FSP."""
+    try:
+        result = fsp_client.stop_acsi_server()
+        return jsonify({'ok': True, 'result': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP stop_acsi_server failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+        }), 502
+
+@app.route('/api/iec61850server/actions', methods=['GET'])
+def get_server_actions():
+    """Get available actions for the ACSI server."""
+    try:
+        result = fsp_client.actions()
+        return jsonify({'ok': True, 'actions': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP get_server_actions failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+        }), 502
+
+@app.route('/api/iec61850server/actions/clear', methods=['POST'])
+def clear_server_actions():
+    """Clear actions on the ACSI server."""
+    try:
+        # Assuming there's an endpoint to clear actions - this is a placeholder
+        result = fsp_client.clear_actions()
+        return jsonify({'ok': True, 'result': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP clear_server_actions failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+        }), 502
+
+@app.route('/api/iec61850server/messages', methods=['GET'])
+def get_protocol_messages():
+    """Get protocol messages from the ACSI server."""
+    try:
+        result = fsp_client.protocol_messages()
+        return jsonify({'ok': True, 'messages': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP get_protocol_messages failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+        }), 502
+
+@app.route('/api/iec61850server/messages/clear', methods=['POST'])
+def clear_protocol_messages():
+    """Clear protocol messages on the ACSI server."""
+    try:
+        # Assuming there's an endpoint to clear messages - this is a placeholder
+        result = fsp_client.clear_protocol_messages()
+        return jsonify({'ok': True, 'result': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP clear_protocol_messages failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+        }), 502
 
 # =============================================
 # Reports
@@ -549,6 +813,11 @@ def get_stats():
         'totalRequests': 0,
         'uptime': '00:00:00'
     })
+
+@app.route('/api/acsiserver/status', methods=['GET'])
+def get_status():
+    """Get system statistics"""
+
 
 # =============================================
 # Error Handling

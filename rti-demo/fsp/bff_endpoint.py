@@ -365,17 +365,19 @@ def create_bff_blueprint(
 
             # If the frontend explicitly provided a cp, update runtime before starting
             if cp:
-                server._set_runtime_state(cp=cp)
+                try:
+                    server._set_runtime_state(cp=cp)
+                except Exception as exc:
+                    return jsonify({"ok": False, "error": f"Failed to set runtime state: {exc}"}), 400
 
             try:
                 server.start_server(host, port)
-                return jsonify({"ok": True, "status": "starting", "host": host, "port": port})
-            except (ValueError, PermissionError) as exc:
-                server._log_action(f"Start rejected: {exc}", "warn")
-                return jsonify({"ok": False, "error": str(exc)}), 400
+            except Exception as exc:
+                return jsonify({"ok": False, "error": f"Failed to start server: {exc}"}), 400
+
+            return jsonify({"ok": True, "status": "listening", "host": host, "port": port})
         except Exception as exc:
-            server._log_action(f"Start failed: {exc}", "error")
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return jsonify({"ok": False, "error": f"Unexpected error: {exc}"}), 400
 
     @app.post("/api/iec61850server/stop")
     def api_stop():

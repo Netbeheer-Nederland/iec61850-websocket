@@ -23,7 +23,7 @@ from pathlib import Path
 from random import randint
 from typing import Any, Callable, Dict, List, Optional
 
-from ws61850.endpoint import ActiveEndpoint
+from ws61850.endpoint import ActiveEndpoint, PassiveEndpoint
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
@@ -311,7 +311,7 @@ class ACSIServer:
             )
 
         ws_task = asyncio.create_task(
-            endpoint.start("passive", host, port), name="ws-passive"
+            endpoint.start(host, port), name="ws-passive"
         )
         tasks["ws"] = ws_task
 
@@ -329,6 +329,8 @@ class ACSIServer:
         if self.runtime.status != "stopping":
             self._set_runtime_state(status="listening")
             self._log_action("Server listening", detail={"host": host, "port": port, "cps": [cp]})
+            # Allow read/write without needing a connected client
+            server1.ready_event.set()
 
         try:
             await asyncio.gather(*tasks.values())
@@ -341,7 +343,7 @@ class ACSIServer:
 
     def _create_endpoint(self):
         """Create a WebSocket endpoint (can be overridden for testing)."""
-        return ActiveEndpoint(is_direct=True)
+        return PassiveEndpoint()
 
     def _event_loop_thread(self, host: str, port: int) -> None:
         """Run the event loop in a separate thread."""
