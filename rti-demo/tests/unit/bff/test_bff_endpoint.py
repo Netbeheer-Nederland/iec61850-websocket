@@ -14,6 +14,11 @@ import os
 BFF_PORT = 5000  # BFF is exposed on port 5000 (from docker-compose.yml)
 FSP_PORT = 5001  # FSP is running on port 5001
 
+# Base URLs - use these everywhere instead of hardcoding
+BFF_BASE_URL = f"http://localhost:{BFF_PORT}/api"
+FSP_BASE_URL = f"http://localhost:{FSP_PORT}/api"
+
+
 def is_service_available(url, timeout=2):
     """Check if a service is available (quick check)."""
     try:
@@ -21,6 +26,7 @@ def is_service_available(url, timeout=2):
         return r.status_code == 200
     except Exception:
         return False
+
 
 def wait_for_service(url, timeout=30):
     """Wait for a service to be available."""
@@ -37,68 +43,39 @@ def wait_for_service(url, timeout=30):
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not is_service_available(f"http://localhost:{FSP_PORT}/api/iec61850server/status"),
+    not is_service_available(f"{FSP_BASE_URL}/iec61850server/status"),
     reason=f"FSP service not running on port {FSP_PORT}. Start with: docker run --rm -p 5001:5001 rti-demo-fsp"
 )
 def test_fsp_status_endpoint():
-    """
-    Integration test: Directly call FSP status endpoint.
-
-    Requires FSP Docker container to be running.
-    Start with: docker run --rm -p 5001:5001 rti-demo-fsp
-    """
-    fsp_url = f"http://localhost:{FSP_PORT}/api/iec61850server/status"
-
-    response = requests.get(fsp_url, timeout=10)
+    """Integration test: Directly call FSP status endpoint."""
+    response = requests.get(f"{FSP_BASE_URL}/iec61850server/status", timeout=10)
     assert response.status_code == 200
     data = response.json()
-
-    # Verify the response contains expected fields
     assert "status" in data or "ok" in data
     print(f"FSP Response: {data}")
 
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not is_service_available(f"http://localhost:{BFF_PORT}/api/health"),
+    not is_service_available(f"{BFF_BASE_URL}/health"),
     reason=f"BFF service not running on port {BFF_PORT}. Start with: docker compose up -d"
 )
 def test_bff_health_endpoint():
-    """
-    Integration test: Check if BFF health endpoint is working.
-
-    Requires BFF Docker container to be running.
-    Start with: docker compose up -d
-    """
-    bff_health_url = f"http://localhost:{BFF_PORT}/api/health"
-
-    response = requests.get(bff_health_url, timeout=10)
+    """Integration test: Check if BFF health endpoint is working."""
+    response = requests.get(f"{BFF_BASE_URL}/health", timeout=10)
     assert response.status_code == 200
     print(f"BFF Health Response: {response.json()}")
 
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not is_service_available(f"http://localhost:{BFF_PORT}/api/health"),
+    not is_service_available(f"{BFF_BASE_URL}/health"),
     reason=f"BFF service not running on port {BFF_PORT}. Start with: docker compose up -d"
 )
 def test_bff_to_fsp_status():
-    """
-    Integration test: BFF proxies request to FSP and returns status.
+    """Integration test: BFF proxies request to FSP and returns status."""
+    response = requests.get(f"{BFF_BASE_URL}/iec61850server/status", timeout=10)
 
-    Requires both BFF and FSP Docker containers to be running ON THE SAME DOCKER NETWORK.
-
-    NOTE: If you get a 502 error, it means:
-    - BFF is running but cannot reach FSP
-    - FSP needs to be started via docker-compose (not docker run separately)
-
-    Start with: docker compose up -d
-    """
-    bff_url = f"http://localhost:{BFF_PORT}/api/iec61850server/status"
-
-    response = requests.get(bff_url, timeout=10)
-
-    # 502 means BFF is working but can't reach FSP (they're not on same network)
     if response.status_code == 502:
         pytest.skip(
             "BFF returned 502 (Bad Gateway). "
@@ -108,7 +85,6 @@ def test_bff_to_fsp_status():
 
     assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
     data = response.json()
-
     assert "status" in data or "ok" in data
     print(f"BFF->FSP Response: {data}")
 
@@ -126,42 +102,38 @@ def test_update_model_and_check_ied_name():
     with open(updated_model_path, 'r', encoding='utf-8') as f:
         model_py = f.read()
 
-    # Get the initial IED name before update (assuming there is an endpoint to get model info)
-    get_url = f'http://localhost:5000/api/model/tree'
-    get_resp = requests.get(get_url)
+    # Get the initial IED name before update
+    get_resp = requests.get(f"{BFF_BASE_URL}/model/tree")
     assert get_resp.status_code == 200
     model_info = get_resp.json()
     assert model_info['tree']['model']['iedName'] == 'simpleIO'
 
     # Update model via POST
-    url = f'http://localhost:5000/api/model/update'
-    payload = { 'modelPy': model_py }
-    headers = { 'Content-Type': 'application/json' }
-    response = requests.post(url, data=json.dumps(payload), headers=headers)
+    payload = {'modelPy': model_py}
+    headers = {'Content-Type': 'application/json'}
+    response = requests.post(f"{BFF_BASE_URL}/model/update", data=json.dumps(payload), headers=headers)
     assert response.status_code == 200
     resp_json = response.json()
     assert resp_json.get('ok') is True
 
-    # Now check the IED name (assuming there is an endpoint to get model info)
-    get_url = f'http://localhost:5000/api/model/tree'
-    get_resp = requests.get(get_url)
+    # Now check the IED name
+    get_resp = requests.get(f"{BFF_BASE_URL}/model/tree")
     assert get_resp.status_code == 200
     model_info = get_resp.json()
-
     assert model_info['tree']['model']['iedName'] == 'simpleIO_updated'
+
 
 @pytest.mark.integration
 def test_server_start_stop_and_status():
     # Start the server with specific parameters
-    url = f'http://localhost:5000/api/iec61850server/start'
     payload = {
         'host': '127.0.0.1',
-        'port': 1080,  # Use a port above 1024 to avoid permission issues
+        'port': 1080,
         'mode': 'server',
         'cp': 'cp1'
     }
     print(f"Payload sent to BFF: {payload}")
-    response = requests.post(url, json=payload)  # Use json=payload for correct encoding
+    response = requests.post(f"{BFF_BASE_URL}/iec61850server/start", json=payload)
     if response.status_code != 200:
         print(f"Server returned {response.status_code}: {response.text}")
         print(f"Payload was: {payload}")
@@ -170,33 +142,29 @@ def test_server_start_stop_and_status():
     assert resp_json.get('ok') is True
 
     # Check server status
-    status_url = f'http://localhost:5000/api/iec61850server/status'
-    status_resp = requests.get(status_url)
+    status_resp = requests.get(f"{BFF_BASE_URL}/iec61850server/status")
     assert status_resp.status_code == 200
     status_info = status_resp.json()
     print(status_info)
     assert status_info.get('status') == 'listening'
 
     # Stop the server
-    url = f'http://localhost:5000/api/iec61850server/stop'
-    response = requests.post(url)
+    response = requests.post(f"{BFF_BASE_URL}/iec61850server/stop")
     assert response.status_code == 200
     resp_json = response.json()
     assert resp_json.get('ok') is True
 
     # Check server status to confirm it's stopped
-    status_url = f'http://localhost:5000/api/iec61850server/status'
-    status_resp = requests.get(status_url)
+    status_resp = requests.get(f"{BFF_BASE_URL}/iec61850server/status")
     assert status_resp.status_code == 200
     status_info = status_resp.json()
     print(status_info)
-    assert status_info.get('status') == 'stopped' or status_info.get('status') == 'stopping'
+    assert status_info.get('status') in ('stopped', 'stopping')
+
 
 @pytest.mark.integration
 def test_server_actions():
-    # Get available actions
-    url = f'http://localhost:5000/api/iec61850server/actions'
-    response = requests.get(url)
+    response = requests.get(f"{BFF_BASE_URL}/iec61850server/actions")
     assert response.status_code == 200
     actions_info = response.json()
     print(actions_info)
@@ -206,89 +174,74 @@ def test_server_actions():
 
 @pytest.mark.integration
 def test_server_clear_action():
-    # Clear the server
-    url = f'http://localhost:5000/api/iec61850server/actions/clear'
-    response = requests.post(url)
+    response = requests.post(f"{BFF_BASE_URL}/iec61850server/actions/clear")
     assert response.status_code == 200
     resp_json = response.json()
     assert resp_json.get('ok') is True
 
-    url = f'http://localhost:5000/api/iec61850server/actions'
-    response = requests.get(url)
+    response = requests.get(f"{BFF_BASE_URL}/iec61850server/actions")
     assert response.status_code == 200
     actions_info = response.json()
     print(actions_info)
     assert 'actions' in actions_info
-    print( actions_info['actions'])
+    print(actions_info['actions'])
+
 
 @pytest.mark.integration
 def test_server_get_protocol_messages():
-    # Get protocol messages
-    url = f'http://localhost:5000/api/iec61850server/messages'
-    response = requests.get(url)
+    response = requests.get(f"{BFF_BASE_URL}/iec61850server/messages")
     assert response.status_code == 200
     messages_info = response.json()
     print(messages_info)
     assert 'messages' in messages_info
     assert isinstance(messages_info['messages']['messages'], list)
 
+
 @pytest.mark.integration
 def test_server_clear_protocol_messages():
-    # Clear protocol messages
-    url = f'http://localhost:5000/api/iec61850server/messages/clear'
-    response = requests.post(url)
+    response = requests.post(f"{BFF_BASE_URL}/iec61850server/messages/clear")
     assert response.status_code == 200
     resp_json = response.json()
     assert resp_json.get('ok') is True
 
-    # Check messages to confirm they're cleared
-    url = f'http://localhost:5000/api/iec61850server/messages'
-    response = requests.get(url)
+    response = requests.get(f"{BFF_BASE_URL}/iec61850server/messages")
     assert response.status_code == 200
     messages_info = response.json()
     print(messages_info)
     assert 'messages' in messages_info
     assert len(messages_info['messages']['messages']) == 0
 
+
 @pytest.mark.integration
 def test_read_write_value():
-    # Stop any previously running server first
-    # requests.post(f'http://localhost:5000/api/iec61850server/stop')
-    # time.sleep(1)
-
-    #Start the server first
-    start_url = f'http://localhost:5000/api/iec61850server/start'
+    # Start the server first
     start_payload = {'host': '127.0.0.1', 'port': 8765, 'mode': 'server', 'cp': 'cp1'}
-    start_resp = requests.post(start_url, json=start_payload)
+    start_resp = requests.post(f"{BFF_BASE_URL}/iec61850server/start", json=start_payload)
     assert start_resp.status_code == 200, f"Server failed to start: {start_resp.text}"
     print(start_resp)
+
     # Wait until server is listening
-    status_url = f'http://localhost:5000/api/iec61850server/status'
     for _ in range(10):
-        status_resp = requests.get(status_url)
+        status_resp = requests.get(f"{BFF_BASE_URL}/iec61850server/status")
         if status_resp.json().get('status') == 'listening':
             break
         time.sleep(1)
     else:
         pytest.fail(f"Server did not reach 'listening' state: {status_resp.json()}")
 
-    # # Write a value
-    write_url = f'http://localhost:5000/api/iec61850server/writevalue'
+    # Write a value
     payload = {
         'objRef': 'GenericIO/GGIO1.AnIn1.mag.f',
         'value': 42.0
     }
-    response = requests.post(write_url, json=payload)
+    response = requests.post(f"{BFF_BASE_URL}/iec61850server/writevalue", json=payload)
     assert response.status_code == 200, f"Write failed: {response.text}"
     resp_json = response.json()
     assert resp_json.get('ok') is True
 
     # Read the value back
-    read_url = f'http://localhost:5000/api/iec61850server/readvalue'
-    read_payload = {
-        'objRef': 'GenericIO/GGIO1.AnIn1.mag.f'
-    }
-    read_response = requests.post(read_url, json=read_payload)
+    read_payload = {'objRef': 'GenericIO/GGIO1.AnIn1.mag.f'}
+    read_response = requests.post(f"{BFF_BASE_URL}/iec61850server/readvalue", json=read_payload)
     assert read_response.status_code == 200, f"Read failed: {read_response.text}"
     read_resp_json = read_response.json()
     print(read_resp_json)
@@ -297,7 +250,6 @@ def test_read_write_value():
     assert len(values) > 0
     assert values[0].get('value') == 42.0
 
-    #stop the server
-    stop_url = f'http://localhost:5000/api/iec61850server/stop'
-    stop_resp = requests.post(stop_url)
+    # Stop the server
+    stop_resp = requests.post(f"{BFF_BASE_URL}/iec61850server/stop")
     assert stop_resp.status_code == 200, f"Server failed to stop: {stop_resp.text}"
