@@ -160,6 +160,7 @@ class ActiveEndpoint:
 
     async def _connect_once(self, hostname: str, port: int, cp: str, *, access_token=None, protocol=None) -> None:
         scheme = "wss" if self._tls_config else "ws"
+        print(f"Connecting to {scheme}://{hostname}:{port}/{cp} with protocol={protocol}")
         uri = f"{scheme}://{hostname}:{int(port)}/{cp}"
 
         connect_kwargs = dict(
@@ -316,8 +317,8 @@ class ActiveEndpoint:
                 selected_client.is_connected = False
                 selected_client.disconnect_event.set()
 
-            selected_server = self._router.find_server(cp)
-            if selected_server is not None:
-                selected_server.set_quality_to_questionable()
+            #selected_server = self._router.find_server(cp)
+            #if selected_server is not None:
+                #selected_server.set_quality_to_questionable()
         except Exception as e:
             logger.error("Error in on_connection_closed: %s", e)

@@ -365,17 +365,19 @@ def create_bff_blueprint(
 
             # If the frontend explicitly provided a cp, update runtime before starting
             if cp:
-                server._set_runtime_state(cp=cp)
+                try:
+                    server._set_runtime_state(cp=cp)
+                except Exception as exc:
+                    return jsonify({"ok": False, "error": f"Failed to set runtime state: {exc}"}), 400
 
             try:
                 server.start_server(host, port)
-                return jsonify({"ok": True, "status": "starting", "host": host, "port": port})
-            except (ValueError, PermissionError) as exc:
-                server._log_action(f"Start rejected: {exc}", "warn")
-                return jsonify({"ok": False, "error": str(exc)}), 400
+            except Exception as exc:
+                return jsonify({"ok": False, "error": f"Failed to start server: {exc}"}), 400
+
+            return jsonify({"ok": True, "status": "listening", "host": host, "port": port})
         except Exception as exc:
-            server._log_action(f"Start failed: {exc}", "error")
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return jsonify({"ok": False, "error": f"Unexpected error: {exc}"}), 400
 
     @app.post("/api/iec61850server/stop")
     def api_stop():
@@ -471,12 +473,19 @@ def create_bff_blueprint(
                     )
                     return jsonify({"ok": False, "error": "instanceNotAvailable"}), 404
 
+                # Normalize result: read_value may return a primitive (float/int/str/bool)
+                # for leaf DataAttributes, or a dict for structured values.
+                if isinstance(result, dict):
+                    normalized = result
+                else:
+                    normalized = {"type": type(result).__name__, "value": result}
+
                 # Format response to match client API: wrap single value in a list
-                values = [result]
+                values = [normalized]
 
                 print(
                     f"[POST /api/iec61850server/readvalue] SUCCESS objRef={obj_ref!r} "
-                    f"fc={fc!r} type={result.get('type')!r} value={result.get('value')!r}"
+                    f"fc={fc!r} type={normalized.get('type')!r} value={normalized.get('value')!r}"
                 )
 
                 server._log_action(
@@ -484,8 +493,8 @@ def create_bff_blueprint(
                     detail={
                         "objRef": obj_ref,
                         "fc": fc,
-                        "type": result.get("type"),
-                        "value": result.get("value"),
+                        "type": normalized.get("type"),
+                        "value": normalized.get("value"),
                     },
                 )
                 return jsonify(

@@ -256,7 +256,7 @@ def _create_do_by_typeref(name: str, type_ref, cdc, parent):
 
 
 def build_ied_model() -> IedModel:
-    ied = IedModel(name='simpleIO')
+    ied = IedModel(name='simpleIO_updated')
 
     ld1 = LogicalDevice(name='GenericIO', ldName='GenericIO')
     ln1 = LogicalNode(name='LLN0', parent=ld1)

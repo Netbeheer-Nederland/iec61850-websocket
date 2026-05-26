@@ -105,12 +105,21 @@ class IEC61850Server:
     def set_quality_to_questionable(self, obj_ref=None):
         if obj_ref is None:
             quality_item = self.find_object_in_tree("LD0/DWMX1.WMaxSpt.q")
+            if quality_item is None:
+                return
             value = quality_item.mmsValue
             value["validity"] = "questionable"
         else:
             quality_item = self.find_object_in_tree(obj_ref)
+            if quality_item is None:
+                return
             value = quality_item.mmsValue
             value["validity"] = "questionable"
+    async def read_value(self, obj_ref):
+        tree_item = self.find_object_in_tree(obj_ref)
+        if tree_item is None:
+            return None
+        return tree_item.mmsValue
 
     async def set_quality_to_good(self, control_do):
         quality_item = next((da for da in control_do.get_da_from_do_or_da_list() if da.name == "q"), None)
@@ -265,7 +274,7 @@ class IEC61850Server:
         """
         Function used for updating the value of an element
         """
-        await self.ready_event.wait()
+        #await self.ready_event.wait()
         item = self.find_object_in_tree(obj_ref)
         if item.mmsValue != value:
             item.mmsValue = value
