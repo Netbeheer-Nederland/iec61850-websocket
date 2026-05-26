@@ -468,6 +468,7 @@ class ACSIServer:
             raise RuntimeError("Server is not running")
 
         result = self.invoke_on_runtime_loop(server.read_value(obj_ref), timeout=10)
+        #result = server.read_value(obj_ref)
 
         if result is None:
             raise ValueError(f"instanceNotAvailable: {obj_ref}")
@@ -494,6 +495,13 @@ class ACSIServer:
 
         coerced_value = self.coerce_server_write_value(value, resolved_data_type)
         self.invoke_on_runtime_loop(server.update_value(obj_ref, coerced_value), timeout=10)
+        #server.update_value(obj_ref, coerced_value)
+
+        try:
+            server.update_timestamp(item)
+        except Exception:
+            # Not all items have an associated timestamp DA; ignore if missing.
+            pass
 
         return {
             "objRef": obj_ref,

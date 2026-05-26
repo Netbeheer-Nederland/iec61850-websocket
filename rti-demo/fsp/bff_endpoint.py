@@ -473,12 +473,19 @@ def create_bff_blueprint(
                     )
                     return jsonify({"ok": False, "error": "instanceNotAvailable"}), 404
 
+                # Normalize result: read_value may return a primitive (float/int/str/bool)
+                # for leaf DataAttributes, or a dict for structured values.
+                if isinstance(result, dict):
+                    normalized = result
+                else:
+                    normalized = {"type": type(result).__name__, "value": result}
+
                 # Format response to match client API: wrap single value in a list
-                values = [result]
+                values = [normalized]
 
                 print(
                     f"[POST /api/iec61850server/readvalue] SUCCESS objRef={obj_ref!r} "
-                    f"fc={fc!r} type={result.get('type')!r} value={result.get('value')!r}"
+                    f"fc={fc!r} type={normalized.get('type')!r} value={normalized.get('value')!r}"
                 )
 
                 server._log_action(
@@ -486,8 +493,8 @@ def create_bff_blueprint(
                     detail={
                         "objRef": obj_ref,
                         "fc": fc,
-                        "type": result.get("type"),
-                        "value": result.get("value"),
+                        "type": normalized.get("type"),
+                        "value": normalized.get("value"),
                     },
                 )
                 return jsonify(

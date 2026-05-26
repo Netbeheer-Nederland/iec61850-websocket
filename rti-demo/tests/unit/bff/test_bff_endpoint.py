@@ -151,7 +151,7 @@ def test_update_model_and_check_ied_name():
     assert model_info['tree']['model']['iedName'] == 'simpleIO_updated'
 
 @pytest.mark.integration
-def test_server_start_and_status():
+def test_server_start_stop_and_status():
     # Start the server with specific parameters
     url = f'http://localhost:5000/api/iec61850server/start'
     payload = {
@@ -177,8 +177,6 @@ def test_server_start_and_status():
     print(status_info)
     assert status_info.get('status') == 'listening'
 
-@pytest.mark.integration
-def test_server_stop():
     # Stop the server
     url = f'http://localhost:5000/api/iec61850server/stop'
     response = requests.post(url)
@@ -193,7 +191,6 @@ def test_server_stop():
     status_info = status_resp.json()
     print(status_info)
     assert status_info.get('status') == 'stopped' or status_info.get('status') == 'stopping'
-
 
 @pytest.mark.integration
 def test_server_actions():
@@ -276,28 +273,31 @@ def test_read_write_value():
         pytest.fail(f"Server did not reach 'listening' state: {status_resp.json()}")
 
     # # Write a value
-    # write_url = f'http://localhost:5000/api/iec61850server/writevalue'
-    # payload = {
-    #     'objRef': 'GenericIO/GGIO1.AnIn1.mag.f',
-    #     'value': 42.0,
-    #     'fc': 'MX'
-    # }
-    # response = requests.post(write_url, json=payload)
-    # assert response.status_code == 200, f"Write failed: {response.text}"
-    # resp_json = response.json()
-    # assert resp_json.get('ok') is True
-    #
+    write_url = f'http://localhost:5000/api/iec61850server/writevalue'
+    payload = {
+        'objRef': 'GenericIO/GGIO1.AnIn1.mag.f',
+        'value': 42.0
+    }
+    response = requests.post(write_url, json=payload)
+    assert response.status_code == 200, f"Write failed: {response.text}"
+    resp_json = response.json()
+    assert resp_json.get('ok') is True
+
     # Read the value back
     read_url = f'http://localhost:5000/api/iec61850server/readvalue'
     read_payload = {
-        'objRef': 'GenericIO/GGIO1.AnIn1.mag.f',
-        'fc': 'MX'
+        'objRef': 'GenericIO/GGIO1.AnIn1.mag.f'
     }
     read_response = requests.post(read_url, json=read_payload)
     assert read_response.status_code == 200, f"Read failed: {read_response.text}"
     read_resp_json = read_response.json()
     print(read_resp_json)
-    # assert read_resp_json.get('ok') is True
-    # values = read_resp_json.get('values', [])
-    # assert len(values) > 0
-    # assert values[0].get('value') == 42.0
+    assert read_resp_json.get('ok') is True
+    values = read_resp_json.get('values', [])
+    assert len(values) > 0
+    assert values[0].get('value') == 42.0
+
+    #stop the server
+    stop_url = f'http://localhost:5000/api/iec61850server/stop'
+    stop_resp = requests.post(stop_url)
+    assert stop_resp.status_code == 200, f"Server failed to stop: {stop_resp.text}"

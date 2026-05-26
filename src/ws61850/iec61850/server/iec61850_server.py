@@ -115,7 +115,7 @@ class IEC61850Server:
                 return
             value = quality_item.mmsValue
             value["validity"] = "questionable"
-    def read_value(self, obj_ref):
+    async def read_value(self, obj_ref):
         tree_item = self.find_object_in_tree(obj_ref)
         if tree_item is None:
             return None
@@ -274,7 +274,7 @@ class IEC61850Server:
         """
         Function used for updating the value of an element
         """
-        await self.ready_event.wait()
+        #await self.ready_event.wait()
         item = self.find_object_in_tree(obj_ref)
         if item.mmsValue != value:
             item.mmsValue = value

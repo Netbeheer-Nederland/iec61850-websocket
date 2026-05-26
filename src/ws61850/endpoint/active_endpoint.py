@@ -317,8 +317,8 @@ class ActiveEndpoint:
                 selected_client.is_connected = False
                 selected_client.disconnect_event.set()
 
-            selected_server = self._router.find_server(cp)
-            if selected_server is not None:
+            #selected_server = self._router.find_server(cp)
+            #if selected_server is not None:
                 #selected_server.set_quality_to_questionable()
         except Exception as e:
             logger.error("Error in on_connection_closed: %s", e)

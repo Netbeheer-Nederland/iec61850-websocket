@@ -108,7 +108,9 @@ services:
 
   # RTI FSP (IEC61850 Server)
   rti-server:
-    image: rti-demo-fsp
+    build:
+      context: ..
+      dockerfile: rti-demo/fsp/Dockerfile
     container_name: rti-server
     ports:
       - "5001:5001"
