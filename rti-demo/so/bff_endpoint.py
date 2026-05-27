@@ -210,6 +210,7 @@ def create_bff_blueprint() -> tuple[Blueprint, ACSIClient]:
         try:
             data = request.get_json(silent=True) or {}
             obj_ref = data.get("objRef")
+            fc = data.get("fc")
 
             if not obj_ref:
                 client._log_action("Client readvalue rejected: missing objRef", "warn")
@@ -219,20 +220,21 @@ def create_bff_blueprint() -> tuple[Blueprint, ACSIClient]:
                 client._log_action(
                     "Client readvalue rejected: not connected",
                     "warn",
-                    detail={"objRef": obj_ref},
+                    detail={"objRef": obj_ref, "fc": fc},
                 )
                 return jsonify({"ok": False, "error": "Client is not connected"}), 503
 
             try:
                 result = client.invoke_on_runtime_loop(
-                    client.runtime.client.read_value(obj_ref), timeout=10
+                    #client.runtime.client.read_value(obj_ref, fc), timeout=10
+                    client.read_value(obj_ref, fc), timeout=10
                 )
 
                 if result is None:
                     client._log_action(
                         "Client readvalue failed: instanceNotAvailable",
                         "warn",
-                        detail={"objRef": obj_ref},
+                        detail={"objRef": obj_ref, "fc": fc}
                     )
                     return jsonify({"ok": False, "error": "instanceNotAvailable"}), 404
 
@@ -255,7 +257,7 @@ def create_bff_blueprint() -> tuple[Blueprint, ACSIClient]:
                 client._log_action(
                     "Client readvalue timeout",
                     "warn",
-                    detail={"objRef": obj_ref},
+                    detail={"objRef": obj_ref, "fc": fc},
                 )
                 return jsonify({"ok": False, "error": "read timeout"}), 504
             except ValueError as exc:
