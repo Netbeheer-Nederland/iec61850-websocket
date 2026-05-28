@@ -172,7 +172,8 @@ def test_so_writes_value_over_websocket():
     # --- SO writes a value to the FSP over the live WebSocket ---
     write_value = 99.0
     r = requests.post(f"{SO_URL}/writevalue",
-                      json={"objRef": "GenericIO/GGIO1.AnIn1.mag.f", "value": write_value},
+                      json={"objRef": "GenericIO/GGIO1.AnIn1.mag.f", "fc":"mx", "value": write_value,
+                            "value_type": "float32"},
                       timeout=10)
     assert r.status_code == 200, f"Write failed: {r.text}"
     assert r.json().get("ok") is True, f"Write not ok: {r.json()}"
@@ -181,7 +182,7 @@ def test_so_writes_value_over_websocket():
 
     # --- FSP reads back locally to confirm the write arrived ---
     r = requests.post(f"{FSP_URL}/readvalue",
-                      json={"objRef": "GenericIO/GGIO1.AnIn1.mag.f"},
+                      json={"objRef": "GenericIO/GGIO1.AnIn1.mag.f", "fc": "mx"},
                       timeout=10)
 
     # --- teardown ---

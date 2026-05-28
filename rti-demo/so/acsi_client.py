@@ -356,12 +356,13 @@ class ACSIClient:
         result = await client.get_data_values(obj_ref, fc, False, websocket_info, None, None)
         return {"value": result}
 
-    async def write_value(self, obj_ref: str, value: Any) -> Dict[str, Any]:
+    async def write_value(self, obj_ref: str, value: Any, fc: str, data_type: str) -> Dict[str, Any]:
         """Write a value to the server."""
         client = self.runtime.client
         if client is None:
             raise RuntimeError("Client is not connected")
 
         websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
-        await client.set_data_values(obj_ref, None, value, websocket_info, None, None)
+        # dataAttrVal expects [{"data": (type_str, value)}]
+        await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
         return {"objRef": obj_ref, "value": value}
