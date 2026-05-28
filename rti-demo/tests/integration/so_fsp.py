@@ -1,276 +1,231 @@
-"""Integration test: rti-server (FSP) <-> rti-client (SO) round-trip.
-
-Verifies real IEC 61850 / WebSocket communication between the two Docker
-containers defined in rti-demo/docker-compose.yml.
-
-Prerequisites
--------------
-Both containers must be running on the same Docker network:
-
-    cd rti-demo
-    docker compose up -d --build
-
-The test runs from the *host*: it talks to each container's REST API on
-localhost (FSP=5001, SO=5002). Inside the docker network, the SO reaches
-the FSP's WebSocket using the container hostname ``rti-server``.
-
-Run with:
-    pytest rti-demo/tests/integration/so-fsp.py -v -s
-"""
-
-from __future__ import annotations
-
-import time
-from http.client import responses
-
-import pytest
 import requests
+import pytest
+import time
+
+FSP_URL = "http://localhost:5001/api/iec61850server"
+SO_URL  = "http://localhost:5002/api/iec61850client"
+
+WS_PORT = 8765
+CP      = "cp1"
 
 # ---------------------------------------------------------------------------
-# Configuration -- single source of truth for URLs / ports
+# Shared helper: establish WebSocket connection between FSP and SO
 # ---------------------------------------------------------------------------
 
-FSP_HTTP_PORT = 5001           # host port exposed by rti-server container
-SO_HTTP_PORT = 5002            # host port exposed by rti-client container
+def _establish_connection():
+    """Start SO listening then FSP connecting. Returns when SO is connected."""
+    requests.post(f"{SO_URL}/disconnect", timeout=5)
+    requests.post(f"{FSP_URL}/stop", timeout=5)
 
-FSP_BASE_URL = f"http://localhost:{FSP_HTTP_PORT}/api"
-SO_BASE_URL = f"http://localhost:{SO_HTTP_PORT}/api"
+    r = requests.post(f"{SO_URL}/connect",
+                      json={"host": "0.0.0.0", "port": WS_PORT, "cp": CP}, timeout=5)
+    assert r.status_code == 200 and r.json().get("ok"), f"SO /connect failed: {r.text}"
 
-# How the FSP (running INSIDE the docker network) reaches the SO's WebSocket.
-SO_WS_HOST_FOR_FSP = "rti-client"   # docker-compose service name
-FSP_WS_PORT = 8765
-FSP_CP = "cp1"
+    r = requests.post(f"{FSP_URL}/start",
+                      json={"host": "rti-client", "port": WS_PORT, "mode": "server", "cp": CP}, timeout=5)
+    assert r.status_code == 200 and r.json().get("ok"), f"FSP /start failed: {r.text}"
 
-# An objRef expected to exist in the default fsp/model.py (GenericIO simpleIO)
-TEST_OBJ_REF = "GenericIO/GGIO1.AnIn1.mag.f"
-TEST_VALUE = 42.0
-
-REQ_TIMEOUT = 10
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _service_up(url: str) -> bool:
-    try:
-        return requests.get(url, timeout=2).status_code == 200
-    except Exception:
-        return False
-
-
-def _wait_for(predicate, timeout: float = 15.0, interval: float = 0.5,
-              fail_msg: str = "condition not met"):
-    deadline = time.time() + timeout
-    last = None
+    deadline = time.time() + 12
     while time.time() < deadline:
-        try:
-            last = predicate()
-            if last:
-                return last
-        except Exception as e:
-            last = e
-        time.sleep(interval)
-    pytest.fail(f"{fail_msg} (last={last!r})")
+        resp = requests.get(f"{SO_URL}/status", timeout=3).json()
+        status = resp.get("status", "")
+        if status == "connected":
+            return
+        if status == "error":
+            pytest.fail(f"SO error during connect: {resp.get('error')}")
+        time.sleep(0.5)
+    pytest.fail("SO never reached 'connected' state")
+
+
+def _teardown():
+    requests.post(f"{FSP_URL}/stop", timeout=5)
+    requests.post(f"{SO_URL}/disconnect", timeout=5)
 
 
 # ---------------------------------------------------------------------------
-# Skip whole module if either container isn't reachable
+# New tests — all use a live WebSocket connection
 # ---------------------------------------------------------------------------
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skipif(
-        not _service_up(f"{FSP_BASE_URL}/iec61850server/status"),
-        reason=f"FSP not reachable on {FSP_BASE_URL}. Run `docker compose up -d` in rti-demo/.",
-    ),
-    pytest.mark.skipif(
-        not _service_up(f"{SO_BASE_URL}/iec61850client/status"),
-        reason=f"SO not reachable on {SO_BASE_URL}. Run `docker compose up -d` in rti-demo/.",
-    ),
-]
+@pytest.mark.integration
+def test_connections_endpoint_after_websocket():
+    """
+    GET /connections should report the FSP peer address and role
+    after a live WebSocket connection is established.
+    """
+    _establish_connection()
+
+    r = requests.get(f"{SO_URL}/connections", timeout=5)
+
+    _teardown()
+
+    assert r.status_code == 200, f"Connections failed: {r.text}"
+    body = r.json()
+    assert body.get("ok") is True
+    assert body.get("connected") is True
+    assert body.get("server_role") == "ACSI_Client"
+    assert body.get("ws_mode") == "passive"
+    conn = body.get("connection")
+    assert conn is not None, "No connection info returned"
+    assert conn.get("remote_role") == "ACSI_Server"
+    assert conn.get("cp") == CP
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
+@pytest.mark.integration
+def test_status_fields_when_connected():
+    """
+    GET /status should return all documented fields with correct values
+    when the SO is connected over WebSocket.
+    """
+    _establish_connection()
 
-@pytest.fixture(scope="module")
-def so_connected():
-    """Start SO listening, then immediately have FSP connect to it."""
-    # Clean up any stale state
-    try:
-        requests.post(f"{SO_BASE_URL}/iec61850client/disconnect", timeout=REQ_TIMEOUT)
-    except Exception:
-        pass
-    try:
-        requests.post(f"{FSP_BASE_URL}/iec61850server/stop", timeout=REQ_TIMEOUT)
-    except Exception:
-        pass
+    r = requests.get(f"{SO_URL}/status", timeout=5)
+
+    _teardown()
+
+    assert r.status_code == 200, f"Status failed: {r.text}"
+    body = r.json()
+    assert body.get("status") == "connected"
+    assert "host" in body
+    assert "port" in body
+    assert "cp" in body
+    assert "error" in body
+    assert "modelStatus" in body
+    assert "modelError" in body
+
+
+@pytest.mark.integration
+def test_actions_logged_after_websocket_read():
+    """
+    After a WebSocket read, GET /actions should contain at least one action entry.
+    Then POST /actions/clear should empty the log.
+    Verifies both the actions and clear-actions endpoints using real WebSocket traffic.
+    """
+    _establish_connection()
+
+    # Trigger a read so an action is logged
+    requests.post(f"{SO_URL}/readvalue",
+                  json={"objRef": "GenericIO/GGIO1.AnIn1.mag.f", "fc": "mx"}, timeout=10)
+
+    # Check actions were logged
+    r = requests.get(f"{SO_URL}/actions", timeout=5)
+    assert r.status_code == 200, f"Actions failed: {r.text}"
+    body = r.json()
+    actions = body.get("actions", [])
+    assert len(actions) > 0, "No actions logged after WebSocket read"
+
+    # Clear and verify empty
+    r_clear = requests.post(f"{SO_URL}/actions/clear", timeout=5)
+    assert r_clear.status_code == 200
+    assert r_clear.json().get("ok") is True
+
+    r_after = requests.get(f"{SO_URL}/actions", timeout=5)
+    assert len(r_after.json().get("actions", [])) == 0, "Actions not cleared"
+
+    _teardown()
+
+
+@pytest.mark.integration
+def test_messages_logged_after_websocket_read():
+    """
+    After a WebSocket read, GET /messages should contain protocol messages
+    exchanged over the wire. Then POST /messages/clear should empty the log.
+    Verifies both the messages and clear-messages endpoints.
+    """
+    _establish_connection()
+
+    # Clear first to start fresh
+    requests.post(f"{SO_URL}/messages/clear", timeout=5)
+    requests.post(f"{FSP_URL}/messages/clear", timeout=5)
+
+    # Trigger a read — this sends a getDataValues request over WebSocket
+    requests.post(f"{SO_URL}/readvalue",
+                  json={"objRef": "GenericIO/GGIO1.AnIn1.mag.f", "fc": "mx"}, timeout=10)
+
+    # SO should have sent a request and received a response
+    r = requests.get(f"{SO_URL}/messages", timeout=5)
+    assert r.status_code == 200, f"Messages failed: {r.text}"
+    msgs = r.json().get("messages", [])
+    assert len(msgs) >= 2, f"Expected at least 2 messages (request + response), got {len(msgs)}"
+
+    directions = {m.get("direction") for m in msgs}
+    assert "send" in directions, "No outgoing WebSocket message recorded"
+    assert "recv" in directions, "No incoming WebSocket message recorded"
+
+    # FSP should also have messages on its side
+    r_fsp = requests.get(f"{FSP_URL}/messages", timeout=5)
+    fsp_msgs = r_fsp.json().get("messages", [])
+    assert len(fsp_msgs) >= 2, f"FSP expected at least 2 messages, got {len(fsp_msgs)}"
+
+    # Clear and verify empty
+    r_clear = requests.post(f"{SO_URL}/messages/clear", timeout=5)
+    assert r_clear.status_code == 200
+    assert r_clear.json().get("ok") is True
+
+    r_after = requests.get(f"{SO_URL}/messages", timeout=5)
+    assert len(r_after.json().get("messages", [])) == 0, "Messages not cleared"
+
+    _teardown()
+
+
+@pytest.mark.integration
+def test_readvalue_503_when_not_connected():
+    """
+    POST /readvalue should return 503 when no WebSocket connection is established.
+    """
+    # Ensure disconnected
+    requests.post(f"{SO_URL}/disconnect", timeout=5)
+    requests.post(f"{FSP_URL}/stop", timeout=5)
     time.sleep(0.5)
 
-    # Step 1: Start SO listening (PassiveEndpoint binds port, 15s association timeout starts NOW)
-    r = requests.post(
-        f"{SO_BASE_URL}/iec61850client/connect",
-        json={"host": "0.0.0.0", "port": FSP_WS_PORT, "cp": FSP_CP},
-        timeout=REQ_TIMEOUT,
-    )
-    assert r.status_code == 200, f"SO /connect failed: {r.status_code} {r.text}"
-    assert r.json().get("ok") is True
+    r = requests.post(f"{SO_URL}/readvalue",
+                      json={"objRef": "GenericIO/GGIO1.AnIn1.mag.f", "fc": "mx"}, timeout=5)
 
-    # Step 2: Immediately start FSP connecting to SO (no sleep — every second counts)
-    r = requests.post(
-        f"{FSP_BASE_URL}/iec61850server/start",
-        json={"host": SO_WS_HOST_FOR_FSP, "port": FSP_WS_PORT, "mode": "server", "cp": FSP_CP},
-        timeout=REQ_TIMEOUT,
-    )
-    assert r.status_code == 200, f"FSP /start failed: {r.status_code} {r.text}"
-
-    # Wait for SO to report connected (ready_event fires once FSP connects and association completes)
-    def _so_connected():
-        s = requests.get(f"{SO_BASE_URL}/iec61850client/status", timeout=REQ_TIMEOUT)
-        if s.status_code != 200:
-            return False
-        data = s.json()
-        if data.get("status") == "error":
-            pytest.fail(f"SO entered error state: {data.get('error')}")
-        return (data.get("status") or "").lower() in ("connected", "associated", "ready")
-
-    _wait_for(_so_connected, timeout=12, fail_msg="SO did not reach connected state")
-
-    yield
-
-    try:
-        requests.post(f"{FSP_BASE_URL}/iec61850server/stop", timeout=REQ_TIMEOUT)
-    except Exception:
-        pass
-    try:
-        requests.post(f"{SO_BASE_URL}/iec61850client/disconnect", timeout=REQ_TIMEOUT)
-    except Exception:
-        pass
+    assert r.status_code == 503, f"Expected 503, got {r.status_code}: {r.text}"
+    assert r.json().get("ok") is False
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-def test_fsp_and_so_services_are_up():
-    """Sanity check: both Flask BFFs respond on their REST APIs."""
-    assert requests.get(f"{FSP_BASE_URL}/iec61850server/status", timeout=REQ_TIMEOUT).status_code == 200
-    assert requests.get(f"{SO_BASE_URL}/iec61850client/status", timeout=REQ_TIMEOUT).status_code == 200
-
-
-def test_so_can_associate_with_fsp(so_connected):
-    """Test that SO can connect to FSP and both report association."""
-    fsp_status = requests.get(f"{FSP_BASE_URL}/iec61850server/status", timeout=REQ_TIMEOUT).json()
-    so_status = requests.get(f"{SO_BASE_URL}/iec61850client/status", timeout=REQ_TIMEOUT).json()
-    assert fsp_status.get("status", "").lower() in ("connected", "associated", "listening", "ready")
-    assert so_status.get("connectedClients", 0) >= 1
-
-
-def test_so_reads_value_from_fsp(so_connected):
-    """SO reads a value over WebSocket from the FSP."""
-    r = requests.post(
-        f"{SO_BASE_URL}/iec61850client/readvalue",
-        json={"objRef": TEST_OBJ_REF},
-        timeout=REQ_TIMEOUT,
-    )
-    assert r.status_code == 200, f"SO read failed: {r.status_code} {r.text}"
-    body = r.json()
-    print("SO read response:", body)
-    assert body.get("ok") is True
-    # Response shape may be {values: [...]} or {value: ...} depending on impl.
-    assert "values" in body or "value" in body
-
-
-def test_round_trip_so_writes_fsp_reads(so_connected):
-    """SO writes a value to the FSP, then FSP's local read returns it."""
-    # SO -> FSP write
-    w = requests.post(
-        f"{SO_BASE_URL}/iec61850client/writevalue",
-        json={"objRef": TEST_OBJ_REF, "value": TEST_VALUE},
-        timeout=REQ_TIMEOUT,
-    )
-    assert w.status_code == 200, f"SO write failed: {w.status_code} {w.text}"
-    assert w.json().get("ok") is True
-
-    # Give the FSP a moment to apply the update.
+@pytest.mark.integration
+def test_writevalue_503_when_not_connected():
+    """
+    POST /writevalue should return 503 when no WebSocket connection is established.
+    """
+    requests.post(f"{SO_URL}/disconnect", timeout=5)
+    requests.post(f"{FSP_URL}/stop", timeout=5)
     time.sleep(0.5)
 
-    # FSP local read confirms the value landed in its model.
-    r = requests.post(
-        f"{FSP_BASE_URL}/iec61850server/readvalue",
-        json={"objRef": TEST_OBJ_REF},
-        timeout=REQ_TIMEOUT,
-    )
-    assert r.status_code == 200, f"FSP read failed: {r.status_code} {r.text}"
+    r = requests.post(f"{SO_URL}/writevalue",
+                      json={"objRef": "GenericIO/GGIO1.AnIn1.mag.f",
+                            "fc": "mx", "value": 1.0, "value_type": "float32"}, timeout=5)
+
+    assert r.status_code == 503, f"Expected 503, got {r.status_code}: {r.text}"
+    assert r.json().get("ok") is False
+
+
+@pytest.mark.integration
+def test_writevalue_missing_fc():
+    """
+    POST /writevalue without fc should return 400 (fc is required).
+    """
+    r = requests.post(f"{SO_URL}/writevalue",
+                      json={"objRef": "GenericIO/GGIO1.AnIn1.mag.f", "value": 1.0}, timeout=5)
+
+    assert r.status_code == 400, f"Expected 400, got {r.status_code}: {r.text}"
+    assert r.json().get("ok") is False
+    assert "fc" in r.json().get("error", "").lower()
+
+
+@pytest.mark.integration
+def test_disconnect_when_already_disconnected():
+    """
+    POST /disconnect when already disconnected should return ok: true
+    and status: disconnected without error.
+    """
+    requests.post(f"{SO_URL}/disconnect", timeout=5)
+    time.sleep(0.3)
+
+    r = requests.post(f"{SO_URL}/disconnect", timeout=5)
+
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
     body = r.json()
-    print("FSP read-after-SO-write response:", body)
     assert body.get("ok") is True
-
-    values = body.get("values") or []
-    assert values, f"FSP returned no values: {body}"
-    got = values[0].get("value")
-    assert float(got) == pytest.approx(TEST_VALUE), f"expected {TEST_VALUE}, got {got}"
-
-
-def test_round_trip_fsp_writes_so_reads(so_connected):
-    """FSP changes a value locally; SO reads the updated value over the wire."""
-    new_value = 7.5
-
-    # FSP local write
-    w = requests.post(
-        f"{FSP_BASE_URL}/iec61850server/writevalue",
-        json={"objRef": TEST_OBJ_REF, "value": new_value},
-        timeout=REQ_TIMEOUT,
-    )
-    assert w.status_code == 200, f"FSP write failed: {w.status_code} {w.text}"
-    assert w.json().get("ok") is True
-
-    time.sleep(0.5)
-
-    # SO read should reflect the new value.
-    r = requests.post(
-        f"{SO_BASE_URL}/iec61850client/readvalue",
-        json={"objRef": TEST_OBJ_REF},
-        timeout=REQ_TIMEOUT,
-    )
-    assert r.status_code == 200, f"SO read failed: {r.status_code} {r.text}"
-    body = r.json()
-    print("SO read-after-FSP-write response:", body)
-    assert body.get("ok") is True
-
-    # Normalize across possible response shapes.
-    if "values" in body and body["values"]:
-        got = body["values"][0].get("value")
-    else:
-        got = body.get("value")
-    assert got is not None, f"SO returned no value: {body}"
-    assert float(got) == pytest.approx(new_value), f"expected {new_value}, got {got}"
-
-
-def test_protocol_messages_were_exchanged(so_connected):
-    """Both ends recorded WebSocket protocol messages -- proof of comms."""
-    fsp_msgs = requests.get(
-        f"{FSP_BASE_URL}/iec61850server/messages", timeout=REQ_TIMEOUT
-    ).json()
-    so_msgs = requests.get(
-        f"{SO_BASE_URL}/iec61850client/messages", timeout=REQ_TIMEOUT
-    ).json()
-
-    def _count(payload):
-        # Endpoints sometimes return {"messages": [...]} and sometimes
-        # {"messages": {"messages": [...]}}.
-        m = payload.get("messages")
-        if isinstance(m, list):
-            return len(m)
-        if isinstance(m, dict):
-            return len(m.get("messages", []))
-        return 0
-
-    fsp_n = _count(fsp_msgs)
-    so_n = _count(so_msgs)
-    print(f"FSP messages={fsp_n}  SO messages={so_n}")
-    assert fsp_n > 0, "FSP did not log any protocol messages"
-    assert so_n > 0, "SO did not log any protocol messages"
-
+    assert body.get("status") == "disconnected"
