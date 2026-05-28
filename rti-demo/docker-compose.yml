@@ -131,6 +131,31 @@ services:
       - "rti.host=rti-server"
       - "rti.port=5001"
 
+  # RTI SO (IEC61850 Client)
+  rti-client:
+    build:
+      context: ..
+      dockerfile: rti-demo/so/Dockerfile
+    container_name: rti-client
+    ports:
+      - "5002:5002"
+    environment:
+      - PORT=5002
+      - PYTHONUNBUFFERED=1
+    networks:
+      - rti-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5001/api/iec61850client/status" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "rti.service=rti-client"
+      - "rti.type=RTI-SO"
+      - "rti.host=rti-client"
+      - "rti.port=5002"
+
 networks:
   rti-network:
     driver: bridge

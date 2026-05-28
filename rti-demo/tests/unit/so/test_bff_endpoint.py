@@ -154,6 +154,7 @@ class TestConnectEndpoint:
             "/api/iec61850client/connect",
             json={"host": "localhost", "port": 8765}
         )
+        print(response)
         assert "application/json" in response.content_type
 
 

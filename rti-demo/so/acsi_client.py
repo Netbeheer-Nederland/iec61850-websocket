@@ -21,6 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ws61850.endpoint import PassiveEndpoint
 from ws61850.endpoint import ActiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
@@ -44,7 +45,7 @@ class ACSIClientRuntime:
         self.message_seq: int = 0
         self.last_status_log_signature: Optional[tuple] = None
         self.lock: threading.Lock = threading.Lock()
-        
+
         # Model and tree caching
         self.model_status: str = "idle"  # idle|building|ready|error
         self.model_data: Optional[Dict[str, Any]] = None
@@ -157,25 +158,48 @@ class ACSIClient:
             status="connecting",
             error=None,
         )
-        
+
         try:
-            endpoint = ActiveEndpoint(is_direct=True)
+            endpoint = PassiveEndpoint()
             endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
             endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
 
             client = IEC61850Client(cp)
             endpoint.add_iec61850_client(client)
 
-            await endpoint.start("passive", host, port)
-            
+            # endpoint.start() runs a reconnect loop forever, so we must NOT
+            # await it directly. Schedule it as a background task and instead
+            # wait for the client's ready_event, which is set once the IEC 61850
+            # association has been established.
+            start_task = asyncio.create_task(
+                endpoint.start(host, port),
+                name=f"so-active-{cp}",
+            )
+
+            # Remember the task so we can cancel it on disconnect.
             self._set_runtime_state(
                 endpoint=endpoint,
                 client=client,
+                _start_task=start_task,
+            )
+
+            try:
+                await asyncio.wait_for(client.ready_event.wait(), timeout=15)
+            except asyncio.TimeoutError as exc:
+                start_task.cancel()
+                raise RuntimeError(
+                    f"Association with {host}:{port}/{cp} timed out"
+                ) from exc
+
+            self._set_runtime_state(
                 status="connected",
                 error=None,
             )
-            
-            self._log_action("Connected to server", detail={"host": host, "port": port, "cp": cp})
+
+            self._log_action(
+                "Connected to server",
+                detail={"host": host, "port": port, "cp": cp},
+            )
 
         except Exception as exc:
             self._set_runtime_state(status="error", error=str(exc))
@@ -322,20 +346,23 @@ class ACSIClient:
         with self.runtime.lock:
             self.runtime.messages.clear()
 
-    async def read_value(self, obj_ref: str) -> Dict[str, Any]:
+    async def read_value(self, obj_ref: str, fc: str) -> Dict[str, Any]:
         """Read a value from the server."""
         client = self.runtime.client
         if client is None:
             raise RuntimeError("Client is not connected")
-        
-        result = await client.read_value(obj_ref)
-        return result
 
-    async def write_value(self, obj_ref: str, value: Any) -> Dict[str, Any]:
+        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+        result = await client.get_data_values(obj_ref, fc, False, websocket_info, None, None)
+        return {"value": result}
+
+    async def write_value(self, obj_ref: str, value: Any, fc: str, data_type: str) -> Dict[str, Any]:
         """Write a value to the server."""
         client = self.runtime.client
         if client is None:
             raise RuntimeError("Client is not connected")
-        
-        await client.write_value(obj_ref, value)
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+        # dataAttrVal expects [{"data": (type_str, value)}]
+        await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
         return {"objRef": obj_ref, "value": value}
