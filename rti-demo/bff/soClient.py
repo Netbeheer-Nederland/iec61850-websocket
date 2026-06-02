@@ -77,7 +77,7 @@ class SOClient:
         if fc is not None:
             payload['fc'] = fc
         if da_type is not None:
-            payload['dataType'] = da_type
+            payload['value_type'] = da_type
 
         r = self._post('/api/iec61850client/writevalue', json=payload)
         r.raise_for_status()

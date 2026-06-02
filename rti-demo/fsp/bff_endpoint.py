@@ -259,6 +259,17 @@ def create_bff_blueprint(
             server._log_action(f"Get connections failed: {exc}", "error")
             return jsonify({"ok": False, "error": str(exc)}), 500
 
+    @app.get("/api/iec61850server/properties")
+    def api_roles():
+        """Get property information for all connected clients."""
+        return jsonify(
+            {
+                "ok": True,
+                "server_role": "ACSI_Server",
+                "ws_mode": "passive",
+            }
+        )
+
     @app.get("/api/iec61850server/model")
     def api_model():
         """Return current loaded model descriptor for UI rendering."""

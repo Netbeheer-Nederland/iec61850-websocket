@@ -985,6 +985,21 @@ def write_asci_client_value():
     try:
         result = so_client.write_value(obj_ref, value, fc, da_type)
         return jsonify({'ok': True, 'result': result})
+    except requests.exceptions.HTTPError as e:
+        # Forward the SO's actual error body so it's not hidden behind a generic 502.
+        upstream_status = e.response.status_code if e.response is not None else 502
+        try:
+            upstream_body = e.response.json() if e.response is not None else {'error': str(e)}
+        except Exception:
+            upstream_body = {'error': e.response.text if e.response is not None else str(e)}
+        logger.error(f"SO client write value failed: upstream={upstream_status} body={upstream_body}")
+        return jsonify({
+            'ok': False,
+            'error': f'SO write failed (upstream {upstream_status})',
+            'upstream_status': upstream_status,
+            'upstream': upstream_body,
+            'sent_payload': {'objRef': obj_ref, 'value': value, 'fc': fc, 'dataType': da_type},
+        }), 502
     except requests.exceptions.RequestException as e:
         logger.error(f"SO client write value failed: {e}")
         return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
