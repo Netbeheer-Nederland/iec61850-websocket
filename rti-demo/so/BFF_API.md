@@ -110,7 +110,7 @@ This document lists all REST API endpoints exposed by `bff_endpoint.py` in the `
     ```bash
     curl -X POST http://localhost:5002/api/iec61850client/readvalue \
       -H "Content-Type: application/json" \
-      -d '{"objRef": "LD0.LLN0.Mod.stVal"}'
+      -d '{"objRef": "LD0.LLN0.Mod.stVal", "fc": "ST"}'
     ```
   - **Body:** JSON `{ "objRef": <str> }`
   - **Returns:**

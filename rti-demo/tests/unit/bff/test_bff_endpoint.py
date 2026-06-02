@@ -13,10 +13,12 @@ import os
 # Update these ports to match your docker-compose setup
 BFF_PORT = 5000  # BFF is exposed on port 5000 (from docker-compose.yml)
 FSP_PORT = 5001  # FSP is running on port 5001
+SO_PORT = 5002  # SO is running on port 5002
 
 # Base URLs - use these everywhere instead of hardcoding
 BFF_BASE_URL = f"http://localhost:{BFF_PORT}/api"
 FSP_BASE_URL = f"http://localhost:{FSP_PORT}/api"
+SO_BASE_URL = f"http://localhost:{SO_PORT}/api"
 
 
 def is_service_available(url, timeout=2):
@@ -253,3 +255,166 @@ def test_read_write_value():
     # Stop the server
     stop_resp = requests.post(f"{BFF_BASE_URL}/iec61850server/stop")
     assert stop_resp.status_code == 200, f"Server failed to stop: {stop_resp.text}"
+
+
+@pytest.mark.integration
+def test_so_status_from_bff():
+    response = requests.get(f"{BFF_BASE_URL}/iec61850client/status")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert "status" in data or "ok" in data
+    print(f"BFF->SO Response: {data}")
+
+@pytest.mark.integration
+def test_so_actions_from_bff():
+    response = requests.get(f"{BFF_BASE_URL}/iec61850client/actions")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert "actions" in data
+    print(f"BFF->SO Actions Response: {data}")
+
+@pytest.mark.integration
+def test_so_clear_actions_from_bff():
+    response = requests.post(f"{BFF_BASE_URL}/iec61850client/actions/clear")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    resp_json = response.json()
+    assert resp_json.get('ok') is True
+
+    response = requests.get(f"{BFF_BASE_URL}/iec61850client/actions")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert "actions" in data
+    print(f"BFF->SO Actions after clear: {data}")
+
+@pytest.mark.integration
+def test_so_protocol_messages_from_bff():
+    response = requests.get(f"{BFF_BASE_URL}/iec61850client/messages")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert "messages" in data
+    print(f"BFF->SO Messages Response: {data}")
+
+@pytest.mark.integration
+def test_so_clear_protocol_messages_from_bff():
+    response = requests.post(f"{BFF_BASE_URL}/iec61850client/messages/clear")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    resp_json = response.json()
+    assert resp_json.get('ok') is True
+
+    response = requests.get(f"{BFF_BASE_URL}/iec61850client/messages")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert "messages" in data
+    assert len(data['messages']['messages']) == 0
+    print(f"BFF->SO Messages after clear: {data}")
+
+@pytest.mark.integration
+def test_so_connections_from_bff():
+    response = requests.get(f"{BFF_BASE_URL}/iec61850client/connections")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert "connections" in data
+    print(f"BFF->SO Connections Response: {data}")
+
+import time
+
+def wait_for_connected_status(timeout=10):
+    """Polls the status endpoint until status is 'connected' or timeout."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        resp = requests.get(f"{BFF_BASE_URL}/iec61850client/status")
+        assert resp.status_code == 200
+        status = resp.json()['status']['status']
+        if status == 'connected':
+            return True
+        time.sleep(0.5)
+    raise RuntimeError("Timed out waiting for 'connected' status")
+
+
+@pytest.mark.integration
+def test_so_connect_and_disconnect_from_bff():
+    connect_payload = {
+        'host': '127.0.0.1',
+        'port': 8765,
+        'cp': 'cp1'
+    }
+    connect_response = requests.post(f"{BFF_BASE_URL}/iec61850client/connect", json=connect_payload)
+    assert connect_response.status_code == 200, f"Connect failed: {connect_response.text}"
+    connect_resp_json = connect_response.json()
+    assert connect_resp_json.get('ok') is True
+    print(connect_resp_json)
+    assert connect_resp_json['result']['status'] in ('connected', 'connecting')
+
+    disconnect_response = requests.post(f"{BFF_BASE_URL}/iec61850client/disconnect")
+    assert disconnect_response.status_code == 200, f"Disconnect failed: {disconnect_response.text}"
+    disconnect_resp_json = disconnect_response.json()
+    assert disconnect_resp_json.get('ok') is True
+
+    # Check status to confirm disconnected
+    status_resp = requests.get(f"{BFF_BASE_URL}/iec61850client/status")
+    assert status_resp.status_code == 200, f"Status check failed: {status_resp.text}"
+    status_info = status_resp.json()
+    print(status_info)
+    assert status_info['status']['status'] in ('disconnected', 'disconnecting')
+
+@pytest.mark.integration
+def test_so_connect_to_fsp_and_check_status():
+    # Start the server with specific parameters
+    payload = {
+        'host': '127.0.0.1',
+        'port': 1080,
+        'mode': 'server',
+        'cp': 'cp1'
+    }
+    print(f"Payload sent to BFF: {payload}")
+    response = requests.post(f"{BFF_BASE_URL}/iec61850server/start", json=payload)
+    if response.status_code != 200:
+        print(f"Server returned {response.status_code}: {response.text}")
+        print(f"Payload was: {payload}")
+    assert response.status_code == 200
+    resp_json = response.json()
+    assert resp_json.get('ok') is True
+
+    # Check server status
+    status_resp = requests.get(f"{BFF_BASE_URL}/iec61850server/status")
+    assert status_resp.status_code == 200
+    status_info = status_resp.json()
+    print(status_info)
+    assert status_info.get('status') == 'listening'
+
+
+
+    # Connect SO to FSP
+    connect_payload = {
+        'host': '127.0.0.1',
+        'port': 1080,
+        'cp': 'cp1'
+    }
+    connect_response = requests.post(f"{BFF_BASE_URL}/iec61850client/connect", json=connect_payload)
+    assert connect_response.status_code == 200, f"Connect failed: {connect_response.text}"
+    connect_resp_json = connect_response.json()
+    assert connect_resp_json.get('ok') is True
+    print(connect_resp_json)
+
+    wait_for_connected_status()
+
+    # Now disconnect
+    disconnect_response = requests.post(f"{BFF_BASE_URL}/iec61850client/disconnect")
+    assert disconnect_response.status_code == 200, f"Disconnect failed: {disconnect_response.text}"
+    disconnect_resp_json = disconnect_response.json()
+    assert disconnect_resp_json.get('ok') is True
+
+
+    # Stop the server
+    response = requests.post(f"{BFF_BASE_URL}/iec61850server/stop")
+    assert response.status_code == 200
+    resp_json = response.json()
+    assert resp_json.get('ok') is True
+
+    # Check server status to confirm it's stopped
+    status_resp = requests.get(f"{BFF_BASE_URL}/iec61850server/status")
+    assert status_resp.status_code == 200
+    status_info = status_resp.json()
+    print(status_info)
+    assert status_info.get('status') in ('stopped', 'stopping')
+
