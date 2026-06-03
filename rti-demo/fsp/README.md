@@ -30,9 +30,14 @@ If your current directory is `rti-demo/fsp`:
 
 ```bash
 docker build -t rti-demo-fsp -f Dockerfile ../..
-####docker run --rm -p 5001:5001 rti-demo-fsp
-docker run --rm -p 5001:5001 --network rti-demo_rti-network --name rti-server rti-demo-fsp
+docker run --rm -p 5001:5001 --network rti-network --name rti-server rti-demo-fsp
 
+```
+
+If `rti-network` does not exist yet, create it once:
+
+```bash
+docker network create rti-network
 ```
 
 ### Common Docker Issue
@@ -58,6 +63,51 @@ curl http://localhost:5001/api/iec61850server/status
 ```
 
 Expected startup logs include messages from `bff_endpoint.py` indicating app initialization and startup port.
+
+## FSP Startup Without Docker
+
+You can run the FSP API directly on your machine.
+
+### Prerequisites
+
+1. Python 3.11+ is installed.
+2. You are in the `iec61850-websocket` repository root.
+
+### Install Dependencies (once)
+
+From repo root:
+
+```bash
+python -m pip install -e .
+python -m pip install Flask==3.0.0 Flask-CORS==4.0.0
+```
+
+### Run FSP API (without Docker)
+
+From `rti-demo/fsp`:
+
+```bash
+python bff_endpoint.py
+```
+
+Optional custom port (Bash/WSL/Git Bash):
+
+```bash
+PORT=5001 python bff_endpoint.py
+```
+
+On Windows PowerShell (use this instead of `PORT=5001 ...`):
+
+```powershell
+$env:PORT="5001"
+python .\bff_endpoint.py
+```
+
+### Health Check
+
+```bash
+curl http://localhost:5001/api/iec61850server/status
+```
 
 ## FSP Unit Tests
 

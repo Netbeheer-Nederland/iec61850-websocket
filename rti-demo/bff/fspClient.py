@@ -20,6 +20,11 @@ class FspClient:
         r.raise_for_status()
         return r.json()
 
+    def health(self) -> dict:
+        r = self._get('/api/health')
+        r.raise_for_status()
+        return r.json()
+
     def model(self) -> dict:
         r = self._get('/api/iec61850server/model')
         r.raise_for_status()
