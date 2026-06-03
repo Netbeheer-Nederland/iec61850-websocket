@@ -361,6 +361,11 @@ class RTIDemoApp {
             '<span style="display: inline-block; margin-left: 8px; padding: 2px 8px; background: var(--info-color); color: white; border-radius: 4px; font-size: 10px; font-weight: 600;">Auto-discovered</span>' 
             : '';
         
+        // Extract properties from properties_info
+        const props = endpoint.properties_info.properties || {};
+        const serverRole = props['server-role'] || props['server_role'] || 'N/A';
+        const wsMode = props['ws_mode'] || 'N/A';
+        
         card.innerHTML = `
             <div class="endpoint-card-icon">
                 <i class="fas fa-${typeIcon}"></i>
@@ -373,6 +378,14 @@ class RTIDemoApp {
                     <small style="color: var(--text-muted); margin-left: 8px; font-size: 11px;">
                         ${endpoint.type}
                     </small>
+                </div>
+                <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border-color); font-size: 12px;">
+                    <div style="margin-bottom: 4px;">
+                        <strong>Server Role:</strong> <span style="color: var(--text-muted);">${serverRole}</span>
+                    </div>
+                    <div>
+                        <strong>WS Mode:</strong> <span style="color: var(--text-muted);">${wsMode}</span>
+                    </div>
                 </div>
             </div>
         `;

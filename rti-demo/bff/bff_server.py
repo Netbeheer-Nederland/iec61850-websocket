@@ -453,6 +453,60 @@ def _upsert_discovered_cache(discovered: Dict[str, Dict]):
             discovery.discovered_services[key] = service_info
     save_discovered_endpoints(discovery.discovered_services)
 
+
+def _fetch_endpoint_properties(endpoint: Dict) -> Dict:
+    """Fetch endpoint properties from server/client properties APIs when available."""
+    host = endpoint.get('host')
+    port = endpoint.get('port')
+    endpoint_type = str(endpoint.get('type', '')).upper()
+
+    if not host or not port:
+        return {'available': False, 'error': 'missing host or port'}
+
+    # Prefer a probe order based on type, but try both paths for compatibility.
+    if 'SO' in endpoint_type or 'CLIENT' in endpoint_type:
+        paths = ['/api/iec61850client/properties', '/api/iec61850server/properties']
+    elif 'FSP' in endpoint_type or 'SERVER' in endpoint_type:
+        paths = ['/api/iec61850server/properties', '/api/iec61850client/properties']
+    else:
+        paths = ['/api/iec61850server/properties', '/api/iec61850client/properties']
+
+    last_error = None
+    for path in paths:
+        url = f"http://{host}:{port}{path}"
+        try:
+            response = requests.get(url, timeout=2)
+            if response.status_code >= 400:
+                last_error = f"{path} returned {response.status_code}"
+                continue
+
+            payload = response.json()
+            if isinstance(payload, dict):
+                if 'properties' in payload:
+                    return {
+                        'available': True,
+                        'source': path,
+                        'properties': payload.get('properties')
+                    }
+                return {
+                    'available': True,
+                    'source': path,
+                    'properties': payload
+                }
+
+            return {
+                'available': True,
+                'source': path,
+                'properties': payload
+            }
+        except Exception as e:
+            last_error = str(e)
+
+    return {
+        'available': False,
+        'error': last_error or 'properties endpoint not reachable'
+    }
+
 @app.route('/api/endpoints', methods=['GET'])
 def get_endpoints():
     """Get all configured endpoints (including cached auto-discovered)."""
@@ -468,6 +522,10 @@ def get_endpoints():
         exists = any(e['host'] == service_info['host'] and e['port'] == service_info['port'] for e in endpoints)
         if not exists:
             endpoints.append(service_info)
+
+    # Enrich every endpoint with its own server/client properties payload when reachable.
+    for endpoint in endpoints:
+        endpoint['properties_info'] = _fetch_endpoint_properties(endpoint)
 
     return jsonify({
         'endpoints': endpoints,
