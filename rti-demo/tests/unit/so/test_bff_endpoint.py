@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from flask import Flask
+import requests
 
 # Allow importing rti-demo/so modules as top-level modules.
 SO_DIR = Path(__file__).resolve().parents[3] / "so"
@@ -332,3 +333,14 @@ class TestErrorHandling:
         )
         body = response.get_json()
         assert "error" in body or "ok" in body
+
+
+def test_so_properties():
+    """GET /api/iec61850server/properties via BFF should return FSP role/ws_mode."""
+    response = requests.get("http://127.0.0.1:5002/api/iec61850client/properties", timeout=10)
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    print(f"BFF->FSP Properties Response: {data}")
+    assert data.get('ok') is True
+    assert data.get('server_role') == 'ACSI_Client'
+    assert data.get('ws_mode') == 'passive'

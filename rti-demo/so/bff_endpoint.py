@@ -119,6 +119,15 @@ def create_bff_blueprint() -> tuple[Blueprint, ACSIClient]:
             client._log_action(f"Get connections failed: {exc}", "error")
             return jsonify({"ok": False, "error": str(exc)}), 500
 
+    @app.get("/api/iec61850client/properties")
+    def api_properties():
+        """Get connection information."""
+        return jsonify({
+            "ok": True,
+            "server_role": "ACSI_Client",
+            "ws_mode": "passive",
+        })
+
     @app.post("/api/iec61850client/connect")
     def api_connect():
         """Connect to an IEC 61850 WebSocket server."""

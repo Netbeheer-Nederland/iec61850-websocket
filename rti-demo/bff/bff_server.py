@@ -21,6 +21,7 @@ import requests
 import threading
 import time
 from fspClient import FspClient
+from soClient import SOClient
 
 # Configure logging
 logging.basicConfig(
@@ -49,6 +50,9 @@ STATS_FILE = 'stats.json'
 # Initialize FSP client (point to the RTI server container)
 FSP_BASE_URL = os.environ.get('FSP_BASE_URL', 'http://rti-server:5001')
 fsp_client = FspClient(FSP_BASE_URL)
+
+SO_BASE_URL = os.environ.get('SO_BASE_URL', 'http://rti-client:5002')
+so_client = SOClient(SO_BASE_URL)
 
 # Service discovery
 class ServiceDiscovery:
@@ -713,6 +717,19 @@ def get_server_actions():
             'error': f'FSP unreachable: {e}',
         }), 502
 
+@app.route('/api/iec61850server/properties', methods=['GET'])
+def get_server_properties():
+    """Get available actions for the ACSI server."""
+    try:
+        result = fsp_client.properties()
+        return jsonify({'ok': True, 'properties': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP get_server_properties failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+        }), 502
+
 @app.route('/api/iec61850server/actions/clear', methods=['POST'])
 def clear_server_actions():
     """Clear actions on the ACSI server."""
@@ -830,10 +847,6 @@ def not_found(error):
 # Passthrough proxy to RTI backends
 # =============================================
 
-RTI_CLIENT_URL = os.environ.get('RTI_CLIENT_URL', 'http://rti-client:5000')
-RTI_SERVER_URL = os.environ.get('RTI_SERVER_URL', 'http://rti-server:5001')
-
-
 def _proxy_request(base_url: str, prefix: str, path: str):
     target = f"{base_url}{prefix}{path}"
     try:
@@ -859,14 +872,163 @@ def _proxy_request(base_url: str, prefix: str, path: str):
 @app.route('/api/iec61850client/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def proxy_iec61850client(path):
     """Forward /api/iec61850client/* requests directly to the RTI client container."""
-    return _proxy_request(RTI_CLIENT_URL, '/api/iec61850client/', path)
+    return _proxy_request(SO_BASE_URL, '/api/iec61850client/', path)
 
 
 @app.route('/api/iec61850server/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def proxy_iec61850server(path):
     """Forward /api/iec61850server/* requests directly to the RTI server container."""
-    return _proxy_request(RTI_SERVER_URL, '/api/iec61850server/', path)
+    return _proxy_request(FSP_BASE_URL, '/api/iec61850server/', path)
 
+@app.route('/api/iec61850client/status', methods=['GET'])
+def get_asci_client_status():
+    """Get status of the IEC 61850 client (SO)."""
+    try:
+        status = so_client.status()
+        return jsonify({'ok': True, 'status': status})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SO client status failed: {e}")
+        return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
+
+@app.route('/api/iec61850client/connections', methods=['GET'])
+def get_asci_client_connections():
+    """Get connections of the IEC 61850 client (SO)."""
+    try:
+        connections = so_client.connections()
+        return jsonify({'ok': True, 'connections': connections})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SO client connections failed: {e}")
+        return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
+
+@app.route('/api/iec61850client/connect', methods=['post'])
+def connect_asci_client():
+    """Connect the IEC 61850 client (SO) to a server."""
+    data = request.get_json(silent=True) or {}
+    host = data.get('host')
+    port = data.get('port')
+    cp = data.get('cp')
+
+    try:
+        result = so_client.connect(host, port, cp)
+        return jsonify({'ok': True, 'result': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SO client connect failed: {e}")
+        return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
+
+@app.route('/api/iec61850client/disconnect', methods=['post'])
+def disconnect_asci_client():
+    """Disconnect the IEC 61850 client (SO) from the server."""
+    try:
+        result = so_client.disconnect()
+        return jsonify({'ok': True, 'result': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SO client disconnect failed: {e}")
+        return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
+
+
+@app.route('/api/iec61850client/actions', methods=['GET'])
+def get_asci_client_actions():
+    """Get actions from the IEC 61850 client (SO)."""
+    try:
+        actions = so_client.actions()
+        return jsonify({'ok': True, 'actions': actions})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SO client actions failed: {e}")
+        return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
+
+@app.route('/api/iec61850client/properties', methods=['GET'])
+def get_client_properties():
+    """Get available actions for the ACSI server."""
+    try:
+        result = so_client.properties()
+        return jsonify({'ok': True, 'properties': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP get_client_properties failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'SO unreachable: {e}',
+        }), 502
+
+@app.route('/api/iec61850client/actions/clear', methods=['POST'])
+def clear_asci_client_actions():
+    """Clear actions on the IEC 61850 client (SO)."""
+    try:
+        result = so_client.clear_actions()
+        return jsonify({'ok': True, 'result': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SO client clear actions failed: {e}")
+        return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
+
+@app.route('/api/iec61850client/messages', methods=['GET'])
+def get_asci_client_messages():
+    """Get protocol messages from the IEC 61850 client (SO)."""
+    try:
+        messages = so_client.protocol_messages()
+        return jsonify({'ok': True, 'messages': messages})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SO client protocol messages failed: {e}")
+        return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
+
+@app.route('/api/iec61850client/messages/clear', methods=['POST'])
+def clear_asci_client_messages():
+    """Clear protocol messages on the IEC 61850 client (SO)."""
+    try:
+        result = so_client.clear_protocol_messages()
+        return jsonify({'ok': True, 'result': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SO client clear protocol messages failed: {e}")
+        return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
+
+@app.route('/api/iec61850client/readvalue', methods=['post'])
+def read_asci_client_value():
+    """Read a value using the IEC 61850 client (SO)."""
+    data = request.get_json(silent=True) or {}
+    obj_ref = data.get('objRef')
+    fc = data.get('fc')
+
+    if not obj_ref:
+        return jsonify({'ok': False, 'error': 'objRef is required'}), 400
+
+    try:
+        result = so_client.read_value(obj_ref, fc)
+        return jsonify({'ok': True, 'result': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SO client read value failed: {e}")
+        return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
+
+@app.route('/api/iec61850client/writevalue', methods=['post'])
+def write_asci_client_value():
+    """Write a value using the IEC 61850 client (SO)."""
+    data = request.get_json(silent=True) or {}
+    obj_ref = data.get('objRef')
+    value = data.get('value')
+    fc = data.get('fc')
+    da_type = data.get('dataType')
+
+    if not obj_ref or value is None:
+        return jsonify({'ok': False, 'error': 'objRef and value are required'}), 400
+
+    try:
+        result = so_client.write_value(obj_ref, value, fc, da_type)
+        return jsonify({'ok': True, 'result': result})
+    except requests.exceptions.HTTPError as e:
+        # Forward the SO's actual error body so it's not hidden behind a generic 502.
+        upstream_status = e.response.status_code if e.response is not None else 502
+        try:
+            upstream_body = e.response.json() if e.response is not None else {'error': str(e)}
+        except Exception:
+            upstream_body = {'error': e.response.text if e.response is not None else str(e)}
+        logger.error(f"SO client write value failed: upstream={upstream_status} body={upstream_body}")
+        return jsonify({
+            'ok': False,
+            'error': f'SO write failed (upstream {upstream_status})',
+            'upstream_status': upstream_status,
+            'upstream': upstream_body,
+            'sent_payload': {'objRef': obj_ref, 'value': value, 'fc': fc, 'dataType': da_type},
+        }), 502
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SO client write value failed: {e}")
+        return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
 
 @app.errorhandler(500)
 def internal_error(error):
