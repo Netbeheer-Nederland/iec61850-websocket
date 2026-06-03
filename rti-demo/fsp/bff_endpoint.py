@@ -250,7 +250,7 @@ def create_bff_blueprint(
                 {
                     "ok": True,
                     "server_role": "ACSI_Server",
-                    "ws_mode": "passive",
+                    "ws_mode": "active",
                     "connected_clients": len(connections),
                     "connections": connections,
                 }
@@ -266,7 +266,7 @@ def create_bff_blueprint(
             {
                 "ok": True,
                 "server_role": "ACSI_Server",
-                "ws_mode": "passive",
+                "ws_mode": "active",
             }
         )
 

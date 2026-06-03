@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from flask import Flask
+import requests
 
 # Allow importing rti-demo/fsp modules as top-level modules.
 FSP_DIR = Path(__file__).resolve().parents[3] / "fsp"
@@ -289,3 +290,13 @@ def test_connections_marks_disconnected_clients(client_and_server):
 
     assert body["connections"][0]["status"] == "active"
     assert body["connections"][1]["status"] == "disconnected"
+
+def test_fsp_properties():
+    """GET /api/iec61850server/properties via BFF should return FSP role/ws_mode."""
+    response = requests.get("http://127.0.0.1:5001/api/iec61850server/properties", timeout=10)
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    print(f"BFF->FSP Properties Response: {data}")
+    assert data.get('ok') is True
+    assert data.get('server_role') == 'ACSI_Server'
+    assert data.get('ws_mode') == 'active'
