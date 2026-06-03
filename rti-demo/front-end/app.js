@@ -6,10 +6,13 @@ class RTIDemoApp {
     constructor() {
         this.bffHost = localStorage.getItem('bffHost') || 'localhost';
         this.bffPort = localStorage.getItem('bffPort') || '5000';
+        this.scanHost = localStorage.getItem('scanHost') || 'localhost';
+        this.scanPorts = localStorage.getItem('scanPorts') || '5001,5002';
         this.bffBaseUrl = `http://${this.bffHost}:${this.bffPort}`;
         
         this.connections = [];
         this.endpoints = [];
+        this.isBffConnected = false;
         this.autoRefreshInterval = null;
         this.messageHistory = [];
         
@@ -21,8 +24,6 @@ class RTIDemoApp {
         this.loadSettings();
         this.checkBFFConnection();
         this.startAutoRefresh();
-        // Initial endpoint discovery
-        this.discoverEndpoints();
     }
 
     // =============================================
@@ -55,7 +56,7 @@ class RTIDemoApp {
         document.getElementById('auto-refresh-toggle').addEventListener('change', (e) => this.toggleAutoRefresh(e));
 
         // Header
-        document.getElementById('refresh-btn').addEventListener('click', () => this.refreshDashboard());
+        document.getElementById('refresh-btn').addEventListener('click', () => this.handleManualRefresh());
         document.getElementById('discovery-btn').addEventListener('click', () => this.discoverEndpoints());
 
         // Modal
@@ -183,18 +184,30 @@ class RTIDemoApp {
 
     async checkBFFConnection() {
         const result = await this.callBFF('/api/health');
-        const statusIndicator = document.getElementById('connection-status');
-        const statusText = document.getElementById('connection-text');
+        const statusDot = document.getElementById('bff-status-dot');
+        const statusText = document.getElementById('bff-status-text');
+        const isConnected = !!(result && ((result.bff && result.bff.connected) || result.status === 'ok'));
+        this.isBffConnected = isConnected;
 
-        if (result && result.status === 'ok') {
-            statusIndicator.classList.add('connected');
-            statusText.textContent = 'connected';
+        if (isConnected) {
+            if (statusDot) {
+                statusDot.classList.add('connected');
+            }
+            if (statusText) {
+                statusText.textContent = 'BFF connected';
+            }
             this.addDiagnosticMessage('Connected to BFF server', 'success');
         } else {
-            statusIndicator.classList.remove('connected');
-            statusText.textContent = 'not connected';
+            if (statusDot) {
+                statusDot.classList.remove('connected');
+            }
+            if (statusText) {
+                statusText.textContent = 'BFF disconnected';
+            }
             this.addDiagnosticMessage('Failed to connect to BFF server', 'warning');
         }
+
+        return isConnected;
     }
 
     // =============================================
@@ -202,8 +215,17 @@ class RTIDemoApp {
     // =============================================
 
     async refreshDashboard() {
-        await this.loadEndpoints();
-        await this.updateStats();
+        this.renderEndpoints();
+    }
+
+    async handleManualRefresh() {
+        // Always re-apply current Settings values before trying to reconnect/refresh.
+        if (!this.updateBffConfigFromSettingsInputs(false)) {
+            return;
+        }
+
+        await this.checkBFFConnection();
+        await this.refreshDashboard();
     }
 
     // =============================================
@@ -211,7 +233,26 @@ class RTIDemoApp {
     // =============================================
 
     async discoverEndpoints() {
-        const result = await this.callBFF('/api/endpoints/discover', 'POST');
+        if (!this.updateScanConfigFromSettingsInputs(false)) {
+            return;
+        }
+
+        const ports = this.parsePortList(this.scanPorts);
+        if (ports.length === 0) {
+            this.addDiagnosticMessage('Discovery ports are required (for example: 5001,5002).', 'error');
+            return;
+        }
+
+        const connected = await this.checkBFFConnection();
+        if (!connected) {
+            this.addDiagnosticMessage('Discovery requires an active BFF connection (health check failed).', 'warning');
+            return;
+        }
+
+        const result = await this.callBFF('/api/endpoints/discover', 'POST', {
+            host: this.scanHost,
+            ports,
+        });
         
         if (result) {
             this.addDiagnosticMessage(
@@ -224,6 +265,11 @@ class RTIDemoApp {
     }
 
     async loadEndpoints() {
+        if (!this.isBffConnected) {
+            this.addDiagnosticMessage('Skipping /api/endpoints: BFF is not connected.', 'warning');
+            return;
+        }
+
         const result = await this.callBFF('/api/endpoints');
         
         if (!result) {
@@ -245,9 +291,6 @@ class RTIDemoApp {
         }
         
         this.renderEndpoints();
-        
-        // Update stats
-        document.getElementById('stat-targets').textContent = this.endpoints.length;
     }
 
     renderEndpoints() {
@@ -336,15 +379,6 @@ class RTIDemoApp {
 
         card.addEventListener('click', () => this.configureEndpoint(endpoint));
         return card;
-    }
-
-    async updateStats() {
-        const result = await this.callBFF('/api/stats');
-        
-        if (result) {
-            document.getElementById('stat-reports').textContent = result.reportUpdates || 0;
-            document.getElementById('stat-targets').textContent = result.bffTargets || this.endpoints.length;
-        }
     }
 
     configureEndpoint(endpoint) {
@@ -679,6 +713,15 @@ class RTIDemoApp {
     loadSettings() {
         document.getElementById('bff-host').value = this.bffHost;
         document.getElementById('bff-port').value = this.bffPort;
+
+        const scanHostInput = document.getElementById('scan-host');
+        const scanPortsInput = document.getElementById('scan-ports');
+        if (scanHostInput) {
+            scanHostInput.value = this.scanHost;
+        }
+        if (scanPortsInput) {
+            scanPortsInput.value = this.scanPorts;
+        }
         
         const darkMode = localStorage.getItem('darkMode') !== 'false';
         document.getElementById('dark-mode-toggle').checked = darkMode;
@@ -688,16 +731,78 @@ class RTIDemoApp {
     }
 
     saveSettings() {
-        this.bffHost = document.getElementById('bff-host').value;
-        this.bffPort = document.getElementById('bff-port').value;
-        
-        localStorage.setItem('bffHost', this.bffHost);
-        localStorage.setItem('bffPort', this.bffPort);
-        
-        this.bffBaseUrl = `http://${this.bffHost}:${this.bffPort}`;
-        
+        if (!this.updateBffConfigFromSettingsInputs(true)) {
+            return;
+        }
+
+        if (!this.updateScanConfigFromSettingsInputs(true)) {
+            return;
+        }
+
         this.addDiagnosticMessage('Settings saved', 'success');
         this.checkBFFConnection();
+    }
+
+    updateBffConfigFromSettingsInputs(persist = false) {
+        const hostInput = document.getElementById('bff-host');
+        const portInput = document.getElementById('bff-port');
+
+        const host = hostInput.value.trim();
+        const port = portInput.value.trim();
+        const isPortValid = /^\d+$/.test(port) && Number(port) > 0 && Number(port) <= 65535;
+
+        if (!host || !isPortValid) {
+            this.addDiagnosticMessage('Invalid BFF settings. Provide a host and a valid port (1-65535).', 'error');
+            return false;
+        }
+
+        this.bffHost = host;
+        this.bffPort = port;
+        this.bffBaseUrl = `http://${this.bffHost}:${this.bffPort}`;
+
+        if (persist) {
+            localStorage.setItem('bffHost', this.bffHost);
+            localStorage.setItem('bffPort', this.bffPort);
+        }
+
+        return true;
+    }
+
+    updateScanConfigFromSettingsInputs(persist = false) {
+        const hostInput = document.getElementById('scan-host');
+        const portsInput = document.getElementById('scan-ports');
+
+        const host = hostInput ? hostInput.value.trim() : this.scanHost;
+        const portsRaw = portsInput ? portsInput.value.trim() : this.scanPorts;
+        const parsedPorts = this.parsePortList(portsRaw);
+
+        if (!host || parsedPorts.length === 0) {
+            this.addDiagnosticMessage('Invalid discovery settings. Provide a host and at least one valid port.', 'error');
+            return false;
+        }
+
+        this.scanHost = host;
+        this.scanPorts = parsedPorts.join(',');
+
+        if (persist) {
+            localStorage.setItem('scanHost', this.scanHost);
+            localStorage.setItem('scanPorts', this.scanPorts);
+        }
+
+        if (portsInput) {
+            portsInput.value = this.scanPorts;
+        }
+
+        return true;
+    }
+
+    parsePortList(raw) {
+        return [...new Set(
+            (raw || '')
+                .split(',')
+                .map(v => Number(v.trim()))
+                .filter(v => Number.isInteger(v) && v >= 1 && v <= 65535)
+        )];
     }
 
     toggleDarkMode() {

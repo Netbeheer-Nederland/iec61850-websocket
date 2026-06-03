@@ -242,37 +242,6 @@ body {
     font-weight: 700;
 }
 
-.connection-status {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 16px;
-    background: var(--bg-hover);
-    border-radius: 8px;
-}
-
-.status-indicator {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--danger-color);
-    animation: pulse 2s ease-in-out infinite;
-}
-
-.status-indicator.connected {
-    background: var(--success-color);
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-#connection-text {
-    font-size: 12px;
-    color: var(--text-muted);
-}
-
 /* ==============================================
    Pages
    ============================================== */
@@ -326,8 +295,7 @@ body {
 }
 
 .endpoints-section,
-.quick-actions-section,
-.stats-section {
+.quick-actions-section {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 12px;
@@ -345,21 +313,36 @@ body {
     grid-row: 1 / 3;
 }
 
-.stats-section {
-    grid-column: 1 / 2;
-    grid-row: 2 / 3;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    padding: 16px;
-}
-
 .endpoints-section h2,
 .quick-actions-section h2 {
     font-size: 18px;
     font-weight: 600;
     margin-bottom: 20px;
     color: var(--text-primary);
+}
+
+.bff-connection-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.bff-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--danger-color);
+}
+
+.bff-status-dot.connected {
+    background: var(--success-color);
+}
+
+.bff-status-text {
+    font-weight: 600;
 }
 
 .cards-grid {
@@ -731,54 +714,6 @@ body {
 }
 
 /* ==============================================
-   Stats Cards
-   ============================================== */
-
-.stat-card {
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-    border-radius: 10px;
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    color: white;
-}
-
-.stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    flex-shrink: 0;
-}
-
-.stat-content {
-    flex: 1;
-}
-
-.stat-content h3 {
-    font-size: 12px;
-    font-weight: 600;
-    opacity: 0.9;
-    margin-bottom: 4px;
-}
-
-.stat-value {
-    font-size: 28px;
-    font-weight: 700;
-    margin-bottom: 4px;
-}
-
-.stat-label {
-    font-size: 12px;
-    opacity: 0.8;
-}
-
-/* ==============================================
    Buttons
    ============================================== */
 
@@ -1119,11 +1054,6 @@ body {
         grid-column: 1;
         grid-row: auto;
     }
-
-    .stats-section {
-        grid-column: 1;
-        grid-row: auto;
-    }
 }
 
 @media (max-width: 768px) {
@@ -1150,10 +1080,6 @@ body {
 
     .header {
         padding: 0 16px;
-    }
-
-    .stats-section {
-        grid-template-columns: 1fr;
     }
 
     .tools-workspace {

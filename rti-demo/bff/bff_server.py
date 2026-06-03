@@ -45,6 +45,49 @@ CORS(app)
 # Data storage (in production, use a database)
 CONNECTIONS_FILE = 'connections.json'
 STATS_FILE = 'stats.json'
+DISCOVERED_FILE = 'discovered_endpoints.json'
+
+
+def _endpoint_key(endpoint: Dict) -> Optional[str]:
+    host = endpoint.get('host')
+    port = endpoint.get('port')
+    if host is None or port is None:
+        return None
+    return f"{host}:{port}"
+
+
+def load_discovered_endpoints() -> Dict[str, Dict]:
+    if not os.path.exists(DISCOVERED_FILE):
+        return {}
+
+    try:
+        with open(DISCOVERED_FILE, 'r') as f:
+            data = json.load(f)
+    except Exception as e:
+        logger.warning(f"Failed to load discovered endpoints: {e}")
+        return {}
+
+    if isinstance(data, dict):
+        return data
+
+    # Backward compatibility: accept list format and normalize to keyed dict.
+    normalized: Dict[str, Dict] = {}
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                key = _endpoint_key(item)
+                if key:
+                    normalized[key] = item
+    return normalized
+
+
+def save_discovered_endpoints(discovered: Dict[str, Dict]):
+    try:
+        with open(DISCOVERED_FILE, 'w') as f:
+            json.dump(discovered, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Failed to save discovered endpoints: {e}")
+
 
 # Initialize FSP client (point to the RTI server container)
 FSP_BASE_URL = os.environ.get('FSP_BASE_URL', 'http://rti-server:5001')
@@ -57,7 +100,7 @@ class ServiceDiscovery:
     def __init__(self):
         self.docker_enabled = os.getenv('RTI_DOCKER_ENABLED', 'false').lower() == 'true'
         self.client = None
-        self.discovered_services = {}
+        self.discovered_services = load_discovered_endpoints()
         self.last_discovery = None
         
         if self.docker_enabled and DOCKER_AVAILABLE:
@@ -111,8 +154,13 @@ class ServiceDiscovery:
                         'created_at': datetime.now().isoformat()
                     }
             
-            self.discovered_services = services
+            for service_info in services.values():
+                key = _endpoint_key(service_info)
+                if key:
+                    self.discovered_services[key] = service_info
+
             self.last_discovery = datetime.now().isoformat()
+            save_discovered_endpoints(self.discovered_services)
             logger.info(f"Discovered {len(services)} RTI services")
             return services
         
@@ -279,9 +327,29 @@ data_manager = DataManager(conn_manager)
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
+    """Health check endpoint that also reports downstream FSP health when available."""
+    fsp_reachable = False
+    fsp_details = None
+    fsp_error = None
+
+    try:
+        fsp_details = fsp_client.health()
+        fsp_reachable = True
+    except requests.exceptions.RequestException as e:
+        fsp_error = str(e)
+
     return jsonify({
         'status': 'ok',
+        'bff': {
+            'status': 'ok',
+            'connected': True,
+            'version': '1.0.0'
+        },
+        'fsp': {
+            'reachable': fsp_reachable,
+            'details': fsp_details,
+            'error': fsp_error,
+        },
         'timestamp': datetime.now().isoformat(),
         'version': '1.0.0'
     })
@@ -290,22 +358,113 @@ def health_check():
 # Endpoints Management
 # =============================================
 
+def _discover_service_on_host_port(host: str, port: int) -> Optional[Dict]:
+    """Probe a host:port using known health endpoints and return endpoint metadata if reachable."""
+    candidates = [
+        ('/api/health', 'BFF'),
+        ('/', 'RTI-SERVICE'),
+    ]
+
+    for path, service_type in candidates:
+        url = f"http://{host}:{port}{path}"
+        try:
+            response = requests.get(url, timeout=1.0)
+            if response.status_code >= 400:
+                continue
+
+            detected_type = service_type
+            if path == '/api/health':
+                try:
+                    payload = response.json()
+                    declared_service = str(payload.get('service', '')).upper()
+                    if declared_service == 'FSP':
+                        detected_type = 'RTI-FSP'
+                    elif declared_service == 'BFF':
+                        detected_type = 'BFF'
+                except ValueError:
+                    pass
+
+            return {
+                'id': f"scan_{host}_{port}",
+                'name': f"{detected_type}-{host}:{port}",
+                'type': detected_type,
+                'host': host,
+                'port': port,
+                'status': 'connected',
+                'auto_discovered': True,
+                'discovery_method': 'network_scan',
+                'health_path': path,
+                'created_at': datetime.now().isoformat(),
+            }
+        except Exception:
+            continue
+
+    return None
+
+
+def discover_services_by_network(host: str, ports: List[int]) -> Dict[str, Dict]:
+    """Discover reachable services on a specific host across selected ports."""
+    services: Dict[str, Dict] = {}
+    for port in ports:
+        service = _discover_service_on_host_port(host, port)
+        if service:
+            services[f"{host}:{port}"] = service
+    return services
+
+
+def _extract_scan_params(payload: Dict) -> tuple[str, List[int]]:
+    host = str((payload or {}).get('host', '')).strip()
+
+    ports: List[int] = []
+    provided_ports = (payload or {}).get('ports')
+    if isinstance(provided_ports, list):
+        for value in provided_ports:
+            try:
+                port = int(value)
+                if 1 <= port <= 65535:
+                    ports.append(port)
+            except (TypeError, ValueError):
+                continue
+    else:
+        start = (payload or {}).get('startPort')
+        end = (payload or {}).get('endPort')
+        if start is not None and end is not None:
+            try:
+                start_port = int(start)
+                end_port = int(end)
+                if start_port > end_port:
+                    start_port, end_port = end_port, start_port
+                if end_port - start_port <= 200:
+                    ports = [p for p in range(start_port, end_port + 1) if 1 <= p <= 65535]
+            except (TypeError, ValueError):
+                ports = []
+
+    return host, sorted(set(ports))
+
+
+def _upsert_discovered_cache(discovered: Dict[str, Dict]):
+    for service_info in discovered.values():
+        key = _endpoint_key(service_info)
+        if key:
+            discovery.discovered_services[key] = service_info
+    save_discovered_endpoints(discovery.discovered_services)
+
 @app.route('/api/endpoints', methods=['GET'])
 def get_endpoints():
-    """Get all configured endpoints (including auto-discovered)"""
-    # Get user-configured connections
+    """Get all configured endpoints (including cached auto-discovered)."""
+    # Keep Docker-discovery cache fresh when enabled.
+    if discovery.docker_enabled:
+        discovery.discover_services()
+
     endpoints = list(conn_manager.connections)
-    
-    # Add auto-discovered services
-    discovered = discovery.discover_services()
-    
-    # Check if discovered service already in connections
-    for service_name, service_info in discovered.items():
-        exists = any(e['host'] == service_info['host'] and e['port'] == service_info['port'] 
-                    for e in endpoints)
+    discovered = dict(discovery.discovered_services)
+
+    # Add discovered services not already present in manual connections.
+    for service_info in discovered.values():
+        exists = any(e['host'] == service_info['host'] and e['port'] == service_info['port'] for e in endpoints)
         if not exists:
             endpoints.append(service_info)
-    
+
     return jsonify({
         'endpoints': endpoints,
         'count': len(endpoints),
@@ -316,8 +475,11 @@ def get_endpoints():
 
 @app.route('/api/endpoints/discovered', methods=['GET'])
 def get_discovered_endpoints():
-    """Get only auto-discovered endpoints"""
-    discovered = discovery.discover_services()
+    """Get only cached auto-discovered endpoints."""
+    if discovery.docker_enabled:
+        discovery.discover_services()
+
+    discovered = dict(discovery.discovered_services)
     return jsonify({
         'discovered': discovered,
         'count': len(discovered),
@@ -326,12 +488,50 @@ def get_discovered_endpoints():
 
 @app.route('/api/endpoints/discover', methods=['POST'])
 def trigger_discovery():
-    """Manually trigger service discovery"""
+    """Manually trigger service discovery (Docker and/or network scan)."""
+    payload = request.get_json(silent=True) or {}
     discovered = discovery.discover_services()
+
+    # Optionally scan using host/ports provided by HMI payload.
+    host, ports = _extract_scan_params(payload)
+    if host and ports:
+        network_discovered = discover_services_by_network(host, ports)
+        discovered.update(network_discovered)
+
+    if discovered:
+        _upsert_discovered_cache(discovered)
+
     return jsonify({
         'status': 'success',
         'discovered': discovered,
         'count': len(discovered)
+    })
+
+
+@app.route('/api/endpoints/discover-network', methods=['POST'])
+def trigger_network_discovery():
+    """Discover endpoints on a given host and list/range of ports supplied by HMI."""
+    payload = request.get_json(silent=True) or {}
+    host, ports = _extract_scan_params(payload)
+
+    if not host:
+        return jsonify({'ok': False, 'error': 'host is required.'}), 400
+    if not ports:
+        return jsonify({'ok': False, 'error': 'Provide ports or startPort/endPort.'}), 400
+
+    discovered = discover_services_by_network(host, ports)
+    if discovered:
+        _upsert_discovered_cache(discovered)
+
+    return jsonify({
+        'ok': True,
+        'status': 'success',
+        'discovery_method': 'network_scan',
+        'host': host,
+        'ports': ports,
+        'discovered': discovered,
+        'count': len(discovered),
+        'timestamp': datetime.now().isoformat(),
     })
 
 # =============================================

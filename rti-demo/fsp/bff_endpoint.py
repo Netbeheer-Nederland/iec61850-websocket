@@ -234,6 +234,25 @@ def create_bff_blueprint(
         except Exception as exc:
             return jsonify({"ok": False, "error": str(exc)}), 500
 
+    @app.get("/api/health")
+    def api_health():
+        """Generic health endpoint used by external discovery (for example BFF network scan)."""
+        try:
+            status = server.get_status()
+            return jsonify(
+                {
+                    "status": "ok",
+                    "service": "FSP",
+                    "server": {
+                        "status": status.get("status"),
+                        "host": status.get("host"),
+                        "port": status.get("port"),
+                    },
+                }
+            )
+        except Exception as exc:
+            return jsonify({"status": "degraded", "service": "FSP", "error": str(exc)}), 500
+
     @app.get("/api/iec61850server/connections")
     def api_connections():
         """Get TPA information for all connected clients."""
