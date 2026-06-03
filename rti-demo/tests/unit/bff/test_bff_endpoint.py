@@ -698,3 +698,19 @@ def test_so_read_write_value_via_bff():
 
     print("\n✓ Test completed successfully")
     print("="*70)
+
+@pytest.mark.integration
+def test_server_properties_bff():
+    response = requests.get(f"{BFF_BASE_URL}/iec61850server/properties")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert "properties" in data
+    print(f"BFF->Server Properties Response: {data}")
+
+@pytest.mark.integration
+def test_client_properties_bff():
+    response = requests.get(f"{BFF_BASE_URL}/iec61850client/properties")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert "properties" in data
+    print(f"BFF->Client Properties Response: {data}")

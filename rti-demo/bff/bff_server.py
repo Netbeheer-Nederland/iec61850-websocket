@@ -717,6 +717,19 @@ def get_server_actions():
             'error': f'FSP unreachable: {e}',
         }), 502
 
+@app.route('/api/iec61850server/properties', methods=['GET'])
+def get_server_properties():
+    """Get available actions for the ACSI server."""
+    try:
+        result = fsp_client.properties()
+        return jsonify({'ok': True, 'properties': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP get_server_properties failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'FSP unreachable: {e}',
+        }), 502
+
 @app.route('/api/iec61850server/actions/clear', methods=['POST'])
 def clear_server_actions():
     """Clear actions on the ACSI server."""
@@ -922,6 +935,19 @@ def get_asci_client_actions():
     except requests.exceptions.RequestException as e:
         logger.error(f"SO client actions failed: {e}")
         return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
+
+@app.route('/api/iec61850client/properties', methods=['GET'])
+def get_client_properties():
+    """Get available actions for the ACSI server."""
+    try:
+        result = so_client.properties()
+        return jsonify({'ok': True, 'properties': result})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FSP get_client_properties failed: {e}")
+        return jsonify({
+            'ok': False,
+            'error': f'SO unreachable: {e}',
+        }), 502
 
 @app.route('/api/iec61850client/actions/clear', methods=['POST'])
 def clear_asci_client_actions():

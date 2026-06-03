@@ -43,6 +43,11 @@ class SOClient:
         r.raise_for_status()
         return r.json()
 
+    def properties(self) -> dict:
+        r = self._get('/api/iec61850client/properties')
+        r.raise_for_status()
+        return r.json()
+
     def actions(self) -> dict:
         r = self._get('/api/iec61850client/actions')
         r.raise_for_status()
