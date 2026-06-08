@@ -17,6 +17,18 @@ class RTIDemoApp {
         this.autoRefreshInterval = null;
         this.messageHistory = [];
         
+        this.selectedEndpoint = null;
+
+        // ACSI state
+        this._acsiDataTarget   = 'fsp';   // 'fsp' | 'so'
+        this._acsiModelTarget  = 'fsp';
+        this._acsiMonitorTarget = 'fsp';
+        this._monitorTimer     = null;
+        this._modelLds         = [];
+        this._modelLns         = [];
+        this._selectedLd       = null;
+        this._selectedLn       = null;
+
         this.init();
     }
 
@@ -68,6 +80,9 @@ class RTIDemoApp {
         // Reports
         document.getElementById('btn-export-reports').addEventListener('click', () => this.exportReports());
         document.getElementById('btn-clear-diagnostics').addEventListener('click', () => this.clearDiagnostics());
+
+        //acsi client
+        document.getElementById('acsi-connect-btn').addEventListener('click', () => this.connectACSIClient());
     }
 
     // =============================================
@@ -151,6 +166,9 @@ class RTIDemoApp {
                 break;
             case 'acsi-server':
                 this.loadAcsiServerPage();
+                break;
+            case 'acsi':
+                this.loadACSI();
                 break;
         }
     }
@@ -380,8 +398,8 @@ class RTIDemoApp {
             : '';
         
         // Extract properties from properties_info
-        const props = endpoint.properties_info?.properties || {};
-        const serverRole = props['server-role'] || props['server_role'] || 'N/A';
+        const props = endpoint.properties_info.properties || {};
+        const serverRole = props['acsi-role'] || props['acsi_role'] || 'N/A';
         const wsMode = props['ws_mode'] || 'N/A';
         
         card.innerHTML = `
@@ -425,10 +443,20 @@ class RTIDemoApp {
 
         // Default behavior for non-ACSI server endpoints.
         this.navigateToPage('connections');
+        this.selectedEndpoint = endpoint;
+
+        // Show badge with endpoint name/host:port
+        const badge = document.getElementById('acsi-endpoint-badge');
+        if (badge && endpoint) {
+            badge.textContent = `${endpoint.name || ''} · ${endpoint.host}:${endpoint.port}`;
+            badge.style.display = 'inline-block';
+        }
+
+        this.navigateToPage('acsi');
     }
 
     // =============================================
-    // Connections Management
+    // ACSI Page
     // =============================================
 
     async loadConnections() {
@@ -442,7 +470,33 @@ class RTIDemoApp {
         this.connections = result.connections || [];
         this.renderConnectionsTable();
     }
+  async connectACSIClient(){
+        const host = document.getElementById('acsi-client-host').value.trim();
+        const port = parseInt(document.getElementById('acsi-client-port').value.trim());
+        const cp   = document.getElementById('acsi-client-cp').value.trim() || 'cp1';
 
+        // Validate inputs
+        if (!host || !port) {
+            this.addDiagnosticMessage('Please enter both host and port', 'error');
+            return;
+        }
+
+        if (isNaN(port) || port < 1 || port > 65535) {
+            this.addDiagnosticMessage('Invalid port number', 'error');
+            return;
+        }
+
+        // Call the ACSI client connect endpoint
+        const result = await this.callBFF('/api/iec61850client/connect', 'POST', { host, port, cp });
+
+        if (result && result.ok) {
+            this.addDiagnosticMessage(`Connected to ACSI server at ${host}:${port}`, 'success');
+            this._connectedACSIClient = { host, port };
+        } else {
+            const errorMsg = result?.error || 'Unknown error';
+            this.addDiagnosticMessage(`Failed to connect to ACSI server: ${errorMsg}`, 'error');
+        }
+    }
     renderConnectionsTable() {
         const container = document.getElementById('connections-container');
         
@@ -556,8 +610,23 @@ class RTIDemoApp {
     // =============================================
     // Model Management
     // =============================================
-
     async loadModel() {
+        const container = document.getElementById('model-tree-container');
+        if (!container) return;
+        container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Loading model…</p>';
+
+        const result = await this.callBFF('/api/model/tree');
+        if (!result) {
+            container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Failed to load model. Is the FSP connected?</p>';
+            return;
+        }
+
+        container.innerHTML = `
+            <pre style="padding:20px; font-size:12px; color:var(--text-secondary);
+                white-space:pre-wrap; word-break:break-all;">
+${JSON.stringify(result, null, 2)}</pre>`;
+    }
+    async loadModelClient() {
         const result = await this.callBFF('/api/model/tree');
         
         if (!result) {

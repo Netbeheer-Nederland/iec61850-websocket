@@ -495,6 +495,118 @@ async function loadSclFileAndRender(file, containerOrId) {
   return treeData;
 }
 
+function renderLiveModelTree(data, containerOrId, onNodeClick) {
+  var container = typeof containerOrId === 'string'
+    ? document.getElementById(containerOrId)
+    : containerOrId;
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  // Normalise: { logical_devices:[…] } | { tree:{ logical_devices:[…] } } | Array
+  var lds = [];
+  if (data && data.logical_devices) {
+    lds = data.logical_devices;
+  } else if (data && data.tree && data.tree.logical_devices) {
+    lds = data.tree.logical_devices;
+  } else if (Array.isArray(data)) {
+    lds = data;
+  }
+
+  if (!lds.length) {
+    container.innerHTML = '<p style="padding:12px;color:var(--text-muted);font-style:italic;">No model data. Connect FSP/SO first.</p>';
+    return;
+  }
+
+  var root = document.createElement('ul');
+  root.className = 'scl-tree-root';
+
+  function makeClickable(li, ref, fc, nodeType) {
+    var row = li.querySelector(':scope > .scl-tree-row');
+    if (!row) return;
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', function (e) {
+      if (e.target && e.target.classList.contains('scl-tree-toggle')) return;
+      e.stopPropagation();
+      container.querySelectorAll('.scl-tree-row.lm-selected').forEach(function (r) {
+        r.classList.remove('lm-selected');
+      });
+      row.classList.add('lm-selected');
+      if (onNodeClick) onNodeClick({ ref: ref, fc: fc, nodeType: nodeType });
+    });
+  }
+
+  lds.forEach(function (ld) {
+    var ldName = (typeof ld === 'object' ? ld.name : ld) || 'LD';
+    var ldLi = createTreeNode('LDevice', ldName);
+    var lnUl = document.createElement('ul');
+    lnUl.className = 'scl-tree-list';
+
+    var lns = ld.logical_nodes || ld.lnodes || ld.ln || [];
+    lns.forEach(function (ln) {
+      var lnName = (typeof ln === 'object' ? (ln.name || ln.ln_class) : ln) || 'LN';
+      var lnRef  = ldName + '/' + lnName;
+      var lnLi   = createTreeNode('LogicalNode', lnName);
+      makeClickable(lnLi, lnRef, null, 'LN');
+
+      var dos = ln.data_objects || ln.dataObjects || ln.do || [];
+      if (dos.length > 0) {
+        var doUl = document.createElement('ul');
+        doUl.className = 'scl-tree-list';
+
+        dos.forEach(function (doObj) {
+          var doName  = (typeof doObj === 'object' ? doObj.name : doObj) || 'DO';
+          var doFc    = (doObj && doObj.fc) || null;
+          var cdcTxt  = (doObj && doObj.cdc) ? ' [' + doObj.cdc + ']' : '';
+          var doRef   = lnRef + '.' + doName;
+          var doLi    = createTreeNode('DO', doName + cdcTxt);
+          makeClickable(doLi, doRef, doFc, 'DO');
+
+          var das = (doObj && (doObj.data_attributes || doObj.dataAttributes || doObj.da)) || [];
+          if (das.length > 0) {
+            var daUl = document.createElement('ul');
+            daUl.className = 'scl-tree-list';
+
+            das.forEach(function (da) {
+              var daName   = (typeof da === 'object' ? da.name : da) || 'DA';
+              var daFc     = (da && (da.fc || doFc)) || null;
+              var bTypeTxt = (da && da.bType) ? ' [' + da.bType + ']' : '';
+              var daRef    = doRef + '.' + daName;
+              var daLi     = createTreeNode('DA', daName + bTypeTxt);
+              makeClickable(daLi, daRef, daFc, 'DA');
+
+              var subDas = (da && (da.sub_attributes || da.subDataAttributes || da.sda)) || [];
+              if (subDas.length > 0) {
+                var sdaUl = document.createElement('ul');
+                sdaUl.className = 'scl-tree-list';
+                subDas.forEach(function (sda) {
+                  var sdaName = (typeof sda === 'object' ? sda.name : sda) || 'SDA';
+                  var sdaRef  = daRef + '.' + sdaName;
+                  var sdaLi   = createTreeNode('SDA', sdaName);
+                  makeClickable(sdaLi, sdaRef, daFc, 'SDA');
+                  sdaUl.appendChild(sdaLi);
+                });
+                daLi.appendChild(sdaUl);
+              }
+              daUl.appendChild(daLi);
+            });
+            doLi.appendChild(daUl);
+          }
+          doUl.appendChild(doLi);
+        });
+        lnLi.appendChild(doUl);
+      }
+      lnUl.appendChild(lnLi);
+    });
+
+    ldLi.appendChild(lnUl);
+    root.appendChild(ldLi);
+  });
+
+  container.appendChild(root);
+  setupCollapsibleTree(container);
+}
+
 window.SCLTree = {
   buildSclTreeFromText,
   renderSclTree,
