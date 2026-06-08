@@ -49,6 +49,10 @@ class FspClient:
         r.raise_for_status()
         return r.json()
 
+    def write(self, obj_ref: str, value, fc: str = None, da_type = None) -> dict:
+        """Backward-compatible alias used by existing BFF handlers."""
+        return self.write_value(obj_ref, value, fc, da_type)
+
     def connections(self) -> dict:
         r = self._get('/api/iec61850server/connections')
         r.raise_for_status()
