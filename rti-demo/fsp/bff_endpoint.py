@@ -284,7 +284,7 @@ def create_bff_blueprint(
         return jsonify(
             {
                 "ok": True,
-                "server_role": "ACSI_Server",
+                "acsi_role": "ACSI_Server",
                 "ws_mode": "active",
             }
         )
