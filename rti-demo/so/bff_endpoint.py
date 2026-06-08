@@ -124,7 +124,7 @@ def create_bff_blueprint() -> tuple[Blueprint, ACSIClient]:
         """Get connection information."""
         return jsonify({
             "ok": True,
-            "server_role": "ACSI_Client",
+            "acsi_role": "ACSI_Client",
             "ws_mode": "passive",
         })
 
