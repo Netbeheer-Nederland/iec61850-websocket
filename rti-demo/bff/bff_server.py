@@ -1370,6 +1370,16 @@ def get_asci_client_actions():
         logger.error(f"SO client actions failed: {e}")
         return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
 
+@app.route('/api/iec61850client/model/tree', methods=['GET'])
+def get_asci_client_actions():
+    """Get actions from the IEC 61850 client (SO)."""
+    try:
+        actions = so_client.actions()
+        return jsonify({'ok': True, 'actions': actions})
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SO client actions failed: {e}")
+        return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
+
 @app.route('/api/iec61850client/properties', methods=['GET'])
 def get_client_properties():
     """Get available actions for the ACSI server."""

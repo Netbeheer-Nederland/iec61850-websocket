@@ -335,14 +335,19 @@
                     </button>
                 </div>
                 <div>
-                    <button id="acsi-read-data-btn" onclick="readData()" class="btn-primary" disabled>
+                    <button id="acsi-read-data-btn" onclick="loadClientTree()" class="btn-primary" disabled>
                         Fetch Model
                     </button>
+                </div>
+                <div id="acsi-client-tree-container" class="model-tree" style="margin-top:24px;">
+                    <!-- ACSI client model tree will be generated here -->
                 </div>
 
             </section>
         </main>
     </div>
+
+
 
     <!-- Modal for Connection Details -->
     <div class="modal" id="modal-connection">
