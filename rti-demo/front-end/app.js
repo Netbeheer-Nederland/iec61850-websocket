@@ -461,6 +461,14 @@ class RTIDemoApp {
             this.addDiagnosticMessage(`Failed to connect to ACSI server: ${errorMsg}`, 'error');
         }
     }
+
+    async loadClientTree()
+    {
+        const container = document.getElementById('acsi-client-tree-container');
+
+
+    }
+
     // =============================================
     // Model Page (legacy stand-alone page)
     // =============================================
