@@ -81,6 +81,12 @@ class RTIDemoApp {
         document.getElementById('btn-export-reports').addEventListener('click', () => this.exportReports());
         document.getElementById('btn-clear-diagnostics').addEventListener('click', () => this.clearDiagnostics());
 
+        // ACSI Client
+        const acsiConnectBtn = document.getElementById('acsi-connect-btn');
+        if (acsiConnectBtn) {
+            acsiConnectBtn.addEventListener('click', () => this.connectACSIClient());
+        }
+
         //acsi client
         document.getElementById('acsi-connect-btn').addEventListener('click', () => this.connectACSIClient());
     }
@@ -187,6 +193,25 @@ class RTIDemoApp {
         root.innerHTML = '<p style="color: var(--text-muted);">ACSI Server page is unavailable.</p>';
     }
 
+    loadAcsiClientPage() {
+        const root = document.getElementById('acsi-client-page-root');
+        if (!root) {
+            return;
+        }
+
+        if (window.ACSIClientPage && typeof window.ACSIClientPage.render === 'function') {
+            window.ACSIClientPage.render(root, this.selectedAcsiEndpoint);
+            return;
+        }
+
+        root.innerHTML = '<p style="color: var(--text-muted);">ACSI Client page is unavailable.</p>';
+    }
+
+    loadACSI() {
+        // Simply show the page-acsi section
+        // The page-acsi HTML is already in index.html with the ACSI client connection form
+        // No dynamic loading needed - the form is static HTML
+    }
     // =============================================
     // BFF Communication
     // =============================================
@@ -432,12 +457,17 @@ class RTIDemoApp {
 
     configureEndpoint(endpoint) {
         const props = endpoint.properties_info?.properties || {};
-        const serverRoleRaw = props['server-role'] || props['server_role'] || '';
-        const serverRole = String(serverRoleRaw).trim().toLowerCase();
+        const acsiRoleRaw = props['acsi-role'] || props['acsi_role'] || '';
+        const acsiRole = String(acsiRoleRaw).trim().toLowerCase();
 
-        if (serverRole === 'acsi_server') {
+        if (acsiRole === 'acsi_server') {
             this.selectedAcsiEndpoint = endpoint;
             this.navigateToPage('acsi-server');
+            return;
+        }
+        if (acsiRole === 'acsi_client') {
+            this.selectedAcsiEndpoint = endpoint;
+            this.navigateToPage('acsi-client');
             return;
         }
 
@@ -470,7 +500,8 @@ class RTIDemoApp {
         this.connections = result.connections || [];
         this.renderConnectionsTable();
     }
-  async connectACSIClient(){
+
+    async connectACSIClient(){
         const host = document.getElementById('acsi-client-host').value.trim();
         const port = parseInt(document.getElementById('acsi-client-port').value.trim());
         const cp   = document.getElementById('acsi-client-cp').value.trim() || 'cp1';
@@ -608,7 +639,7 @@ class RTIDemoApp {
     }
 
     // =============================================
-    // Model Page (legacy stand-alone page)
+    // Model Management
     // =============================================
 
     async loadModel() {
@@ -617,8 +648,9 @@ class RTIDemoApp {
         container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Loading model…</p>';
 
         const result = await this.callBFF('/api/model/tree');
+        
         if (!result) {
-            container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Failed to load model. Is the FSP connected?</p>';
+            this.addDiagnosticMessage('Failed to load model tree', 'error');
             return;
         }
 
@@ -675,38 +707,22 @@ ${JSON.stringify(result, null, 2)}</pre>`;
     // =============================================
 
     async readData() {
-        const objRef = document.getElementById('data-ref').value;
+        const objRef  = document.getElementById('data-ref').value.trim();
+        const output  = document.getElementById('data-output');
+        if (!objRef) { output.textContent = 'Enter a data reference first.'; return; }
 
-        if (!objRef) {
-            alert('Please enter a data reference');
-            return;
-        }
-
-        const result = await this.callBFF('/api/data/read', 'POST', { objRef });
-
-        if (result) {
-            const output = document.getElementById('data-output');
-            output.textContent = JSON.stringify(result, null, 2);
-            document.getElementById('data-value').value = result.value || '';
-        }
+        const result = await this.callBFF('/api/iec61850server/readvalue', 'POST', { objRef });
+        output.textContent = result ? JSON.stringify(result, null, 2) : 'Read failed.';
     }
 
     async writeData() {
-        const objRef = document.getElementById('data-ref').value;
-        const value = document.getElementById('data-value').value;
+        const objRef = document.getElementById('data-ref').value.trim();
+        const value  = document.getElementById('data-value').value.trim();
+        const output = document.getElementById('data-output');
+        if (!objRef || !value) { output.textContent = 'Enter both a reference and a value.'; return; }
 
-        if (!objRef || !value) {
-            alert('Please enter both reference and value');
-            return;
-        }
-
-        const result = await this.callBFF('/api/data/write', 'POST', { objRef, value });
-
-        if (result) {
-            const output = document.getElementById('data-output');
-            output.textContent = JSON.stringify(result, null, 2);
-            this.addDiagnosticMessage(`Data written to ${objRef}`, 'success');
-        }
+        const result = await this.callBFF('/api/iec61850server/writevalue', 'POST', { objRef, value });
+        output.textContent = result ? JSON.stringify(result, null, 2) : 'Write failed.';
     }
 
     // =============================================
@@ -714,6 +730,17 @@ ${JSON.stringify(result, null, 2)}</pre>`;
     // =============================================
 
     async loadReports() {
+        const result = await this.callBFF('/api/reports');
+        
+        if (!result) {
+            this.addDiagnosticMessage('Failed to load reports', 'error');
+            return;
+        }
+
+        this.renderReports(result.reports);
+    }
+
+    renderReports(reports) {
         const container = document.getElementById('reports-container');
         if (!container) return;
         const result = await this.callBFF('/api/reports');
@@ -721,34 +748,23 @@ ${JSON.stringify(result, null, 2)}</pre>`;
             container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">No reports available.</p>';
             return;
         }
-
-        let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">';
-
-        reports.forEach(report => {
-            html += `
-                <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;">
-                    <h3 style="margin-bottom: 12px;">${report.name}</h3>
-                    <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">${report.timestamp}</p>
-                    <p>${report.description}</p>
-                </div>
-            `;
-        });
-
-        html += '</div>';
-        container.innerHTML = html;
+        container.innerHTML = result.reports.map(r => `
+            <div style="padding:16px; border-bottom:1px solid var(--border-color);">
+                <strong>${r.name}</strong>
+                <p style="color:var(--text-muted); font-size:13px; margin-top:4px;">${r.description || ''}</p>
+                <small style="color:var(--text-muted);">${r.timestamp || ''}</small>
+            </div>`).join('');
     }
 
     async exportReports() {
         const result = await this.callBFF('/api/reports/export', 'POST');
-
-        if (result && result.data) {
+        if (result) {
             const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `reports-${new Date().toISOString()}.json`;
-            a.click();
-            this.addDiagnosticMessage('Reports exported', 'success');
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href = url; a.download = 'reports_export.json'; a.click();
+            URL.revokeObjectURL(url);
+            this.addDiagnosticMessage('Reports exported.', 'success');
         }
     }
 
