@@ -461,7 +461,7 @@ class RTIDemoApp {
 
     async loadConnections() {
         const result = await this.callBFF('/api/connections');
-        
+
         if (!result) {
             this.addDiagnosticMessage('Failed to load connections', 'error');
             return;
@@ -499,7 +499,7 @@ class RTIDemoApp {
     }
     renderConnectionsTable() {
         const container = document.getElementById('connections-container');
-        
+
         if (this.connections.length === 0) {
             container.innerHTML = '<p style="padding: 20px; color: var(--text-muted);">No connections</p>';
             return;
@@ -578,7 +578,7 @@ class RTIDemoApp {
         }
 
         const result = await this.callBFF('/api/connections', 'POST', connection);
-        
+
         if (result) {
             this.closeConnectionModal();
             this.loadConnections();
@@ -608,8 +608,9 @@ class RTIDemoApp {
     }
 
     // =============================================
-    // Model Management
+    // Model Page (legacy stand-alone page)
     // =============================================
+
     async loadModel() {
         const container = document.getElementById('model-tree-container');
         if (!container) return;
@@ -628,7 +629,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
     }
     async loadModelClient() {
         const result = await this.callBFF('/api/model/tree');
-        
+
         if (!result) {
             this.addDiagnosticMessage('Failed to load model tree', 'error');
             return;
@@ -644,7 +645,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
 
     buildTreeHTML(node, level = 0) {
         let html = '';
-        
+
         if (Array.isArray(node)) {
             node.forEach(item => {
                 html += this.buildTreeHTML(item, level);
@@ -652,7 +653,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
         } else if (typeof node === 'object' && node !== null) {
             const indent = `${level * 20}px`;
             const isExpandable = node.children && node.children.length > 0;
-            
+
             html += `
                 <div style="padding-left: ${indent}; margin: 4px 0;">
                     ${isExpandable ? '<i class="fas fa-chevron-right" style="cursor: pointer; width: 16px;"></i>' : '<i style="width: 16px;"></i>'}
@@ -660,29 +661,29 @@ ${JSON.stringify(result, null, 2)}</pre>`;
                     <span style="margin-left: 8px;">${node.name || 'Unknown'}</span>
                 </div>
             `;
-            
+
             if (isExpandable) {
                 html += this.buildTreeHTML(node.children, level + 1);
             }
         }
-        
+
         return html;
     }
 
     // =============================================
-    // Data Read/Write
+    // Data Page
     // =============================================
 
     async readData() {
         const objRef = document.getElementById('data-ref').value;
-        
+
         if (!objRef) {
             alert('Please enter a data reference');
             return;
         }
 
         const result = await this.callBFF('/api/data/read', 'POST', { objRef });
-        
+
         if (result) {
             const output = document.getElementById('data-output');
             output.textContent = JSON.stringify(result, null, 2);
@@ -693,14 +694,14 @@ ${JSON.stringify(result, null, 2)}</pre>`;
     async writeData() {
         const objRef = document.getElementById('data-ref').value;
         const value = document.getElementById('data-value').value;
-        
+
         if (!objRef || !value) {
             alert('Please enter both reference and value');
             return;
         }
 
         const result = await this.callBFF('/api/data/write', 'POST', { objRef, value });
-        
+
         if (result) {
             const output = document.getElementById('data-output');
             output.textContent = JSON.stringify(result, null, 2);
@@ -709,30 +710,20 @@ ${JSON.stringify(result, null, 2)}</pre>`;
     }
 
     // =============================================
-    // Reports
+    // Reports Page
     // =============================================
 
     async loadReports() {
-        const result = await this.callBFF('/api/reports');
-        
-        if (!result) {
-            this.addDiagnosticMessage('Failed to load reports', 'error');
-            return;
-        }
-
-        this.renderReports(result.reports);
-    }
-
-    renderReports(reports) {
         const container = document.getElementById('reports-container');
-        
-        if (!reports || reports.length === 0) {
-            container.innerHTML = '<p style="padding: 20px; color: var(--text-muted);">No reports available</p>';
+        if (!container) return;
+        const result = await this.callBFF('/api/reports');
+        if (!result || !result.reports) {
+            container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">No reports available.</p>';
             return;
         }
 
         let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">';
-        
+
         reports.forEach(report => {
             html += `
                 <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;">
@@ -742,14 +733,14 @@ ${JSON.stringify(result, null, 2)}</pre>`;
                 </div>
             `;
         });
-        
+
         html += '</div>';
         container.innerHTML = html;
     }
 
     async exportReports() {
         const result = await this.callBFF('/api/reports/export', 'POST');
-        
+
         if (result && result.data) {
             const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -771,49 +762,35 @@ ${JSON.stringify(result, null, 2)}</pre>`;
 
     renderDiagnostics() {
         const container = document.getElementById('diagnostics-container');
-        
-        if (this.messageHistory.length === 0) {
-            container.innerHTML = '<p style="padding: 20px; color: var(--text-muted);">No diagnostic messages</p>';
+        if (!container) return;
+        if (!this.messageHistory.length) {
+            container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">No diagnostic messages.</p>';
             return;
         }
-
-        let html = '<div style="max-height: 600px; overflow-y: auto;">';
-        
-        this.messageHistory.forEach(msg => {
-            const iconClass = msg.type === 'success' ? 'check-circle' : msg.type === 'error' ? 'exclamation-circle' : 'info-circle';
-            const color = msg.type === 'success' ? 'var(--success-color)' : msg.type === 'error' ? 'var(--danger-color)' : 'var(--info-color)';
-            
-            html += `
-                <div style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; gap: 12px;">
-                    <i class="fas fa-${iconClass}" style="color: ${color}; width: 16px; flex-shrink: 0;"></i>
+        container.innerHTML = '<div style="max-height:600px; overflow-y:auto;">' +
+            this.messageHistory.map(msg => {
+                const iconMap  = { success: 'check-circle', error: 'exclamation-circle', warning: 'exclamation-triangle', info: 'info-circle' };
+                const colorMap = { success: 'var(--success-color)', error: 'var(--danger-color)', warning: 'var(--warning-color)', info: 'var(--info-color)' };
+                return `<div style="padding:12px; border-bottom:1px solid var(--border-color); display:flex; gap:12px;">
+                    <i class="fas fa-${iconMap[msg.type] || 'info-circle'}" style="color:${colorMap[msg.type] || 'var(--info-color)'}; width:16px; flex-shrink:0; margin-top:3px;"></i>
                     <div>
-                        <div style="font-size: 12px; color: var(--text-muted);">${msg.timestamp}</div>
-                        <div>${msg.message}</div>
+                        <div style="font-size:12px; color:var(--text-muted);">${msg.timestamp}</div>
+                        <div>${this._escHtml(msg.message)}</div>
                     </div>
-                </div>
-            `;
-        });
-        
-        html += '</div>';
-        container.innerHTML = html;
+                </div>`;
+            }).join('') + '</div>';
     }
 
     addDiagnosticMessage(message, type = 'info') {
-        const timestamp = new Date().toLocaleTimeString();
-        this.messageHistory.unshift({ message, type, timestamp });
-        
-        // Keep only last 100 messages
-        if (this.messageHistory.length > 100) {
-            this.messageHistory.pop();
-        }
+        this.messageHistory.unshift({ message, type, timestamp: new Date().toLocaleTimeString() });
+        if (this.messageHistory.length > 100) this.messageHistory.pop();
     }
 
     async clearDiagnostics() {
-        if (confirm('Clear all diagnostic messages?')) {
-            this.messageHistory = [];
-            this.renderDiagnostics();
-            this.addDiagnosticMessage('Diagnostic messages cleared', 'success');
-        }
+        if (!confirm('Clear all diagnostic messages?')) return;
+        this.messageHistory = [];
+        this.renderDiagnostics();
+        this.addDiagnosticMessage('Diagnostic messages cleared.', 'success');
     }
 
     // =============================================
@@ -821,48 +798,33 @@ ${JSON.stringify(result, null, 2)}</pre>`;
     // =============================================
 
     loadSettings() {
-        document.getElementById('bff-host').value = this.bffHost;
-        document.getElementById('bff-port').value = this.bffPort;
+        const bffHostEl   = document.getElementById('bff-host');
+        const bffPortEl   = document.getElementById('bff-port');
+        const scanHostEl  = document.getElementById('scan-host');
+        const scanPortsEl = document.getElementById('scan-ports');
+        if (bffHostEl)   bffHostEl.value   = this.bffHost;
+        if (bffPortEl)   bffPortEl.value   = this.bffPort;
+        if (scanHostEl)  scanHostEl.value  = this.scanHost;
+        if (scanPortsEl) scanPortsEl.value = this.scanPorts;
 
-        const scanHostInput = document.getElementById('scan-host');
-        const scanPortsInput = document.getElementById('scan-ports');
-        if (scanHostInput) {
-            scanHostInput.value = this.scanHost;
-        }
-        if (scanPortsInput) {
-            scanPortsInput.value = this.scanPorts;
-        }
-        
-        const darkMode = localStorage.getItem('darkMode') !== 'false';
-        document.getElementById('dark-mode-toggle').checked = darkMode;
-        
-        const autoRefresh = localStorage.getItem('autoRefresh') !== 'false';
-        document.getElementById('auto-refresh-toggle').checked = autoRefresh;
+        const darkToggle  = document.getElementById('dark-mode-toggle');
+        const autoToggle  = document.getElementById('auto-refresh-toggle');
+        if (darkToggle)  darkToggle.checked  = localStorage.getItem('darkMode')    !== 'false';
+        if (autoToggle)  autoToggle.checked  = localStorage.getItem('autoRefresh') !== 'false';
     }
 
     saveSettings() {
-        if (!this.updateBffConfigFromSettingsInputs(true)) {
-            return;
-        }
-
-        if (!this.updateScanConfigFromSettingsInputs(true)) {
-            return;
-        }
-
-        this.addDiagnosticMessage('Settings saved', 'success');
+        if (!this.updateBffConfigFromSettingsInputs(true)) return;
+        if (!this.updateScanConfigFromSettingsInputs(true)) return;
+        this.addDiagnosticMessage('Settings saved.', 'success');
         this.checkBFFConnection();
     }
 
     updateBffConfigFromSettingsInputs(persist = false) {
-        const hostInput = document.getElementById('bff-host');
-        const portInput = document.getElementById('bff-port');
-
-        const host = hostInput.value.trim();
-        const port = portInput.value.trim();
-        const isPortValid = /^\d+$/.test(port) && Number(port) > 0 && Number(port) <= 65535;
-
-        if (!host || !isPortValid) {
-            this.addDiagnosticMessage('Invalid BFF settings. Provide a host and a valid port (1-65535).', 'error');
+        const host = (document.getElementById('bff-host')?.value || '').trim();
+        const port = (document.getElementById('bff-port')?.value || '').trim();
+        if (!host || !/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
+            this.addDiagnosticMessage('Invalid BFF settings — provide a valid host and port (1–65535).', 'error');
             return false;
         }
 
@@ -923,7 +885,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
 
     toggleAutoRefresh(e) {
         localStorage.setItem('autoRefresh', e.target.checked);
-        
+
         if (e.target.checked) {
             this.startAutoRefresh();
         } else {

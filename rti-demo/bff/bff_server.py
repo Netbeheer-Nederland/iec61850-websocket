@@ -10,13 +10,13 @@ It provides endpoints for the frontend to:
 - Auto-discover Docker containers with RTI services
 """
 
-from flask import Flask, request, jsonify, Response, has_request_context
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from datetime import datetime
 import json
 import os
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 import requests
 import threading
 import time
