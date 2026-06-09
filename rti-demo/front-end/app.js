@@ -67,6 +67,12 @@ class RTIDemoApp {
         // Reports
         document.getElementById('btn-export-reports').addEventListener('click', () => this.exportReports());
         document.getElementById('btn-clear-diagnostics').addEventListener('click', () => this.clearDiagnostics());
+
+        // ACSI Client
+        const acsiConnectBtn = document.getElementById('acsi-connect-btn');
+        if (acsiConnectBtn) {
+            acsiConnectBtn.addEventListener('click', () => this.connectACSIClient());
+        }
     }
 
     // =============================================
@@ -151,6 +157,9 @@ class RTIDemoApp {
             case 'acsi-server':
                 this.loadAcsiServerPage();
                 break;
+            case 'acsi-client':
+                this.loadAcsiClientPage();
+                break;
             case 'acsi':
                 this.loadACSI();
                 break;
@@ -171,6 +180,25 @@ class RTIDemoApp {
         root.innerHTML = '<p style="color: var(--text-muted);">ACSI Server page is unavailable.</p>';
     }
 
+    loadAcsiClientPage() {
+        const root = document.getElementById('acsi-client-page-root');
+        if (!root) {
+            return;
+        }
+
+        if (window.ACSIClientPage && typeof window.ACSIClientPage.render === 'function') {
+            window.ACSIClientPage.render(root, this.selectedAcsiEndpoint);
+            return;
+        }
+
+        root.innerHTML = '<p style="color: var(--text-muted);">ACSI Client page is unavailable.</p>';
+    }
+
+    loadACSI() {
+        // Simply show the page-acsi section
+        // The page-acsi HTML is already in index.html with the ACSI client connection form
+        // No dynamic loading needed - the form is static HTML
+    }
     // =============================================
     // BFF Communication
     // =============================================
@@ -416,12 +444,17 @@ class RTIDemoApp {
 
     configureEndpoint(endpoint) {
         const props = endpoint.properties_info?.properties || {};
-        const serverRoleRaw = props['server-role'] || props['server_role'] || '';
-        const serverRole = String(serverRoleRaw).trim().toLowerCase();
+        const acsiRoleRaw = props['acsi-role'] || props['acsi_role'] || '';
+        const acsiRole = String(acsiRoleRaw).trim().toLowerCase();
 
-        if (serverRole === 'acsi_server') {
+        if (acsiRole === 'acsi_server') {
             this.selectedAcsiEndpoint = endpoint;
             this.navigateToPage('acsi-server');
+            return;
+        }
+        if (acsiRole === 'acsi_client') {
+            this.selectedAcsiEndpoint = endpoint;
+            this.navigateToPage('acsi-client');
             return;
         }
 
@@ -473,6 +506,96 @@ class RTIDemoApp {
         }
     }
 
+    renderConnectionsTable() {
+        const container = document.getElementById('connections-container');
+
+        if (this.connections.length === 0) {
+            container.innerHTML = '<p style="padding: 20px; color: var(--text-muted);">No connections</p>';
+            return;
+        }
+
+        let html = `
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Host</th>
+                        <th>Port</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        this.connections.forEach(conn => {
+            html += `
+                <tr>
+                    <td>${conn.name}</td>
+                    <td>${conn.type}</td>
+                    <td>${conn.host}</td>
+                    <td>${conn.port}</td>
+                    <td>
+                        <span style="display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; background: ${conn.status === 'connected' ? 'var(--success-color)' : 'var(--danger-color)'}; color: white;">
+                            ${conn.status}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="app.editConnection(${conn.id})">
+                            Edit
+                        </button>
+                        <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="app.deleteConnection(${conn.id})">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                </tbody>
+            </table>
+        `;
+
+        container.innerHTML = html;
+    }
+
+    openConnectionModal() {
+        document.getElementById('modal-connection').classList.add('active');
+        document.getElementById('conn-name').value = '';
+        document.getElementById('conn-host').value = '';
+        document.getElementById('conn-port').value = '5000';
+        document.getElementById('conn-type').value = 'RTI-SO';
+    }
+
+    closeConnectionModal() {
+        document.getElementById('modal-connection').classList.remove('active');
+    }
+
+    async saveConnection() {
+        const connection = {
+            name: document.getElementById('conn-name').value,
+            host: document.getElementById('conn-host').value,
+            port: parseInt(document.getElementById('conn-port').value),
+            type: document.getElementById('conn-type').value,
+        };
+
+        if (!connection.name || !connection.host) {
+            alert('Name and host are required');
+            return;
+        }
+
+        const result = await this.callBFF('/api/connections', 'POST', connection);
+
+        if (result) {
+            this.closeConnectionModal();
+            this.loadConnections();
+            this.addDiagnosticMessage(`Connection '${connection.name}' saved`, 'success');
+        }
+    }
+
+
     async deleteConnection(id) {
         if (confirm('Are you sure?')) {
             const result = await this.callBFF(`/api/connections/${id}`, 'DELETE');
@@ -498,22 +621,20 @@ class RTIDemoApp {
     // Model Management
     // =============================================
 
-    async loadModel() {
-        const container = document.getElementById('model-tree-container');
-        if (!container) return;
-        container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Loading model…</p>';
-
+        async loadModel() {
         const result = await this.callBFF('/api/model/tree');
-        
+
         if (!result) {
             this.addDiagnosticMessage('Failed to load model tree', 'error');
             return;
         }
 
-        container.innerHTML = `
-            <pre style="padding:20px; font-size:12px; color:var(--text-secondary);
-                white-space:pre-wrap; word-break:break-all;">
-${JSON.stringify(result, null, 2)}</pre>`;
+        this.renderModelTree(result.tree);
+    }
+
+    renderModelTree(tree) {
+        const container = document.getElementById('model-tree-container');
+        container.innerHTML = this.buildTreeHTML(tree);
     }
 
     // =============================================
@@ -554,7 +675,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
         this.renderReports(result.reports);
     }
 
-    renderReports(reports) {
+    async renderReports(reports) {
         const container = document.getElementById('reports-container');
         if (!container) return;
         const result = await this.callBFF('/api/reports');
