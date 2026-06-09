@@ -1371,7 +1371,7 @@ def get_asci_client_actions():
         return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
 
 @app.route('/api/iec61850client/model/tree', methods=['GET'])
-def get_asci_client_actions():
+def get_tree_from_acsi_client():
     """Get actions from the IEC 61850 client (SO)."""
     try:
         actions = so_client.actions()
