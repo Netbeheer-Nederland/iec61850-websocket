@@ -1,0 +1,910 @@
+/* ==============================================
+   ACSI Server - IEC 61850 Server Page
+   ============================================== */
+
+(function initACSIServerPage() {
+    let templateCache = null;
+    let logs = [];
+    let protocolMessages = [];
+    let fspTargets = [];
+    let activeLogsTab = 'api';
+
+    const apiDefinitions = [
+        { id: 'status', label: 'GET /api/iec61850server/status', method: 'GET', path: '/api/iec61850server/status', sampleBody: '' },
+        { id: 'connections', label: 'GET /api/iec61850server/connections', method: 'GET', path: '/api/iec61850server/connections', sampleBody: '' },
+        { id: 'model', label: 'GET /api/iec61850server/model', method: 'GET', path: '/api/iec61850server/model', sampleBody: '' },
+        { id: 'update-iedmodel', label: 'POST /api/iec61850server/update-iedmodel', method: 'POST', path: '/api/iec61850server/update-iedmodel', sampleBody: '{\n  "modelPy": "# python code"\n}' },
+        { id: 'start', label: 'POST /api/iec61850server/start', method: 'POST', path: '/api/iec61850server/start', sampleBody: '{\n  "host": "0.0.0.0",\n  "port": 8765,\n  "mode": "server",\n  "cp": "cp1"\n}' },
+        { id: 'stop', label: 'POST /api/iec61850server/stop', method: 'POST', path: '/api/iec61850server/stop', sampleBody: '' },
+        { id: 'actions', label: 'GET /api/iec61850server/actions', method: 'GET', path: '/api/iec61850server/actions', sampleBody: '' },
+        { id: 'actions-clear', label: 'POST /api/iec61850server/actions/clear', method: 'POST', path: '/api/iec61850server/actions/clear', sampleBody: '' },
+        { id: 'messages', label: 'GET /api/iec61850server/messages', method: 'GET', path: '/api/iec61850server/messages', sampleBody: '' },
+        { id: 'messages-clear', label: 'POST /api/iec61850server/messages/clear', method: 'POST', path: '/api/iec61850server/messages/clear', sampleBody: '' },
+        { id: 'readvalue', label: 'POST /api/iec61850server/readvalue', method: 'POST', path: '/api/iec61850server/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
+        { id: 'writevalue', label: 'POST /api/iec61850server/writevalue', method: 'POST', path: '/api/iec61850server/writevalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "value": "on",\n  "fc": "ST",\n  "dataType": "BOOLEAN"\n}' }
+    ];
+
+    function readEndpointProperty(endpoint, key) {
+        const props = endpoint && endpoint.properties_info && endpoint.properties_info.properties
+            ? endpoint.properties_info.properties
+            : {};
+        return props[key];
+    }
+
+    function resolveServerRole(endpoint) {
+        return readEndpointProperty(endpoint, 'server-role')
+            || readEndpointProperty(endpoint, 'server_role')
+            || 'N/A';
+    }
+
+    function resolveWsMode(endpoint) {
+        return readEndpointProperty(endpoint, 'ws_mode') || 'N/A';
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function interpolateTemplate(template, values) {
+        return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (match, key) => {
+            return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match;
+        });
+    }
+
+    function logEntry(type, message, details) {
+        logs.unshift({
+            timestamp: new Date().toLocaleTimeString(),
+            type,
+            message,
+            details,
+        });
+        if (logs.length > 60) {
+            logs = logs.slice(0, 60);
+        }
+    }
+
+    function escapeForHtml(value) {
+        return escapeHtml(value);
+    }
+
+    function renderLogs() {
+        const logsEl = document.getElementById('acsi-api-logs');
+        if (!logsEl) {
+            return;
+        }
+
+        if (logs.length === 0) {
+            logsEl.innerHTML = '<div class="acsi-log-empty">No logs yet. Run an API from the panel.</div>';
+            return;
+        }
+
+        logsEl.innerHTML = logs.map((entry) => {
+            const details = entry.details
+                ? `<pre class="acsi-log-details">${escapeForHtml(entry.details)}</pre>`
+                : '';
+            return `
+                <div class="acsi-log-item acsi-log-${entry.type}">
+                    <div class="acsi-log-head">
+                        <span class="acsi-log-time">${escapeForHtml(entry.timestamp)}</span>
+                        <span class="acsi-log-message">${escapeForHtml(entry.message)}</span>
+                    </div>
+                    ${details}
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderProtocolMessages() {
+        const messagesEl = document.getElementById('acsi-protocol-messages');
+        if (!messagesEl) {
+            return;
+        }
+
+        if (protocolMessages.length === 0) {
+            messagesEl.innerHTML = '<div class="acsi-log-empty">No protocol messages yet. Run GET /api/iec61850server/messages.</div>';
+            return;
+        }
+
+        messagesEl.innerHTML = protocolMessages.map((entry) => {
+            const formatted = JSON.stringify(entry.payload, null, 2);
+            return `
+                <div class="acsi-log-item acsi-log-info">
+                    <div class="acsi-log-head">
+                        <span class="acsi-log-time">${escapeForHtml(entry.timestamp)}</span>
+                        <span class="acsi-log-message">GET /api/iec61850server/messages</span>
+                    </div>
+                    <pre class="acsi-log-details">${escapeForHtml(formatted)}</pre>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function addProtocolMessagesEntry(payload) {
+        protocolMessages.unshift({
+            timestamp: new Date().toLocaleTimeString(),
+            payload,
+        });
+        if (protocolMessages.length > 30) {
+            protocolMessages = protocolMessages.slice(0, 30);
+        }
+    }
+
+    function setActiveLogsTab(tab) {
+        activeLogsTab = tab === 'messages' ? 'messages' : 'api';
+
+        const apiBtn = document.getElementById('acsi-log-tab-api-btn');
+        const msgBtn = document.getElementById('acsi-log-tab-messages-btn');
+        const apiPanel = document.getElementById('acsi-log-tab-api');
+        const msgPanel = document.getElementById('acsi-log-tab-messages');
+
+        if (apiBtn && msgBtn) {
+            const apiActive = activeLogsTab === 'api';
+            apiBtn.classList.toggle('active', apiActive);
+            msgBtn.classList.toggle('active', !apiActive);
+            apiBtn.setAttribute('aria-selected', apiActive ? 'true' : 'false');
+            msgBtn.setAttribute('aria-selected', apiActive ? 'false' : 'true');
+        }
+
+        if (apiPanel && msgPanel) {
+            const apiActive = activeLogsTab === 'api';
+            apiPanel.classList.toggle('active', apiActive);
+            msgPanel.classList.toggle('active', !apiActive);
+            apiPanel.hidden = !apiActive;
+            msgPanel.hidden = apiActive;
+        }
+    }
+
+    function wireLogTabs() {
+        const apiBtn = document.getElementById('acsi-log-tab-api-btn');
+        const msgBtn = document.getElementById('acsi-log-tab-messages-btn');
+        if (!apiBtn || !msgBtn) {
+            return;
+        }
+
+        apiBtn.addEventListener('click', () => setActiveLogsTab('api'));
+        msgBtn.addEventListener('click', () => setActiveLogsTab('messages'));
+        setActiveLogsTab(activeLogsTab);
+    }
+
+    function getBffBaseUrl() {
+        if (window.app && window.app.bffBaseUrl) {
+            return window.app.bffBaseUrl;
+        }
+
+        const storedHost = localStorage.getItem('bffHost');
+        const storedPort = localStorage.getItem('bffPort');
+        if (storedHost && /^\d+$/.test(String(storedPort || ''))) {
+            const portNum = Number(storedPort);
+            if (portNum > 0 && portNum <= 65535) {
+                return `http://${storedHost}:${storedPort}`;
+            }
+        }
+
+        if (window.location && window.location.origin && window.location.origin !== 'null') {
+            return window.location.origin;
+        }
+        return '';
+    }
+
+    function buildBffApiUrl(path, targetValue) {
+        const baseUrl = getBffBaseUrl();
+        if (!baseUrl) {
+            throw new Error('BFF base URL is not configured. API calls are blocked to avoid direct endpoint access.');
+        }
+
+        if (!String(path || '').startsWith('/api/')) {
+            throw new Error(`Blocked non-BFF API path: ${path}`);
+        }
+
+        const requestUrl = new URL(`${baseUrl}${path}`, window.location.origin);
+        if (targetValue) {
+            requestUrl.searchParams.set('fspTarget', targetValue);
+        }
+        return requestUrl.toString();
+    }
+
+    async function ensureBffHealthy() {
+        const healthUrl = buildBffApiUrl('/api/health');
+        const response = await fetch(healthUrl, { method: 'GET' });
+        if (!response.ok) {
+            throw new Error(`BFF health check failed with HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const bffStatus = payload && payload.bff && payload.bff.status;
+        if (String(bffStatus || '').toLowerCase() !== 'ok') {
+            throw new Error('BFF health check returned non-ok status');
+        }
+    }
+
+    function extractModelTree(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return null;
+        }
+
+        if (payload.model && payload.model.tree) {
+            return payload.model.tree;
+        }
+
+        if (payload.tree && payload.tree.model && payload.tree.model.tree) {
+            return payload.tree.model.tree;
+        }
+
+        if (payload.tree && payload.tree.kind) {
+            return payload.tree;
+        }
+
+        if (payload.kind === 'IED') {
+            return payload;
+        }
+
+        return null;
+    }
+
+    function toDataAttributeNode(node, parentPath) {
+        const name = node.name || 'DA';
+        const objRef = parentPath ? `${parentPath}.${name}` : name;
+        return {
+            name,
+            bType: node.type || '',
+            fc: node.fc || '',
+            type: '',
+            objRef,
+            subDataAttributes: (node.children || [])
+                .filter((child) => child && child.kind === 'DA')
+                .map((child) => toDataAttributeNode(child, objRef)),
+        };
+    }
+
+    function toDataObjectNode(node, parentPath) {
+        const doName = node.name || 'DO';
+        const doPath = parentPath ? `${parentPath}.${doName}` : doName;
+        return {
+            name: doName,
+            type: '',
+            cdc: node.cdc || '',
+            dataAttributes: (node.children || [])
+                .filter((child) => child && child.kind === 'DA')
+                .map((child) => toDataAttributeNode(child, doPath)),
+            subDataObjects: (node.children || [])
+                .filter((child) => child && child.kind === 'DO')
+                .map((child) => toDataObjectNode(child, doPath)),
+        };
+    }
+
+    function toSclTreeData(payload) {
+        const sourceTree = extractModelTree(payload);
+        if (!sourceTree || sourceTree.kind !== 'IED') {
+            return null;
+        }
+
+        const iedName = sourceTree.name || (payload && payload.model && payload.model.iedName) || 'IED';
+        const accessPointNames = (payload && Array.isArray(payload.accessPoints) && payload.accessPoints.length > 0)
+            ? payload.accessPoints
+            : [
+                (payload && payload.model && payload.model.server && payload.model.server.name) || 'Server',
+            ];
+
+        const ldevices = (sourceTree.children || [])
+            .filter((child) => child && child.kind === 'LD')
+            .map((ld) => {
+                const ldName = ld.ldName || ld.name || 'LDevice';
+                const lnodes = (ld.children || [])
+                    .filter((child) => child && child.kind === 'LN')
+                    .map((ln) => {
+                        const lnName = ln.name || 'LN';
+                        const lnPath = `${ldName}.${lnName}`;
+                        return {
+                            name: lnName,
+                            lnType: '',
+                            dataSets: [],
+                            reportControls: [],
+                            dataObjects: (ln.children || [])
+                                .filter((child) => child && child.kind === 'DO')
+                                .map((dobj) => toDataObjectNode(dobj, lnPath)),
+                        };
+                    });
+
+                return {
+                    name: ldName,
+                    lnodes,
+                };
+            });
+
+        return {
+            ieds: [
+                {
+                    name: iedName,
+                    accessPoints: accessPointNames.map((name) => ({
+                        name,
+                        ldevices,
+                    })),
+                },
+            ],
+        };
+    }
+
+    function setModelPanelMessage(message, isError = false) {
+        const modelPanel = document.getElementById('acsi-modelPanel');
+        if (!modelPanel) {
+            return;
+        }
+
+        const cssClass = isError ? 'acsi-model-state acsi-model-error' : 'acsi-model-state';
+        modelPanel.innerHTML = `<div class="${cssClass}">${escapeForHtml(message)}</div>`;
+    }
+
+    function renderModelFromPayload(payload) {
+        const modelPanel = document.getElementById('acsi-modelPanel');
+        if (!modelPanel) {
+            return;
+        }
+
+        const sclTreeData = toSclTreeData(payload);
+        if (sclTreeData && window.SCLTree && typeof window.SCLTree.renderSclTree === 'function') {
+            window.SCLTree.renderSclTree(sclTreeData, modelPanel);
+            return;
+        }
+
+        const fallbackTree = extractModelTree(payload) || payload;
+        const modelJson = JSON.stringify(fallbackTree, null, 2);
+        modelPanel.innerHTML = `<pre class="acsi-model-json">${escapeForHtml(modelJson)}</pre>`;
+    }
+
+    function buildTargetValue(host, port) {
+        if (!host || port === undefined || port === null) {
+            return '';
+        }
+        return `${host}:${port}`;
+    }
+
+    function getDefaultTargetFromEndpoint(endpoint) {
+        if (!endpoint) {
+            return '';
+        }
+        return buildTargetValue(endpoint.host, endpoint.port);
+    }
+
+    function upsertTarget(target) {
+        if (!target || !target.id) {
+            return;
+        }
+        const existingIndex = fspTargets.findIndex((item) => item.id === target.id);
+        if (existingIndex >= 0) {
+            fspTargets[existingIndex] = target;
+            return;
+        }
+        fspTargets.push(target);
+    }
+
+    async function loadFspTargets(preferredTarget) {
+        const baseUrl = getBffBaseUrl();
+        if (!baseUrl) {
+            fspTargets = [];
+            return preferredTarget || '';
+        }
+        const encodedTarget = preferredTarget ? encodeURIComponent(preferredTarget) : '';
+        const targetQuery = encodedTarget ? `?fspTarget=${encodedTarget}` : '';
+        const url = `${baseUrl}/api/fsp/targets${targetQuery}`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const payload = await response.json();
+            const loadedTargets = Array.isArray(payload.targets) ? payload.targets : [];
+            fspTargets = loadedTargets.map((target) => {
+                const hostPort = buildTargetValue(target.host, target.port);
+                return {
+                    id: target.id || hostPort || target.base_url,
+                    label: `${target.name || 'FSP'} (${hostPort || target.base_url || 'unknown'})`,
+                    value: target.id || hostPort || target.base_url,
+                    host: target.host,
+                    port: target.port,
+                    baseUrl: target.base_url,
+                };
+            });
+
+            const selected = payload.selected || {};
+            const selectedValue = selected.id || buildTargetValue(selected.host, selected.port) || selected.base_url || preferredTarget;
+            return selectedValue || '';
+        } catch (error) {
+            fspTargets = [];
+            logEntry('error', 'Failed to load FSP targets', String(error && error.message ? error.message : error));
+            return preferredTarget || '';
+        }
+    }
+
+    function ensureFallbackTarget(targetValue) {
+        if (!targetValue) {
+            return;
+        }
+
+        upsertTarget({
+            id: targetValue,
+            label: `FSP (${targetValue})`,
+            value: targetValue,
+        });
+    }
+
+    function populateFspTargetSelect(selectEl, preferredTarget, selectedTarget) {
+        if (!selectEl) {
+            return '';
+        }
+
+        ensureFallbackTarget(preferredTarget);
+        ensureFallbackTarget(selectedTarget);
+
+        if (fspTargets.length === 0) {
+            selectEl.innerHTML = '<option value="">No FSP targets found</option>';
+            selectEl.value = '';
+            return '';
+        }
+
+        selectEl.innerHTML = fspTargets.map((target) => `
+            <option value="${escapeHtml(target.value)}">${escapeHtml(target.label)}</option>
+        `).join('');
+
+        const desired = selectedTarget || preferredTarget || fspTargets[0].value;
+        selectEl.value = desired;
+        if (!selectEl.value && fspTargets[0]) {
+            selectEl.value = fspTargets[0].value;
+        }
+        return selectEl.value;
+    }
+
+    async function wireApiTester(endpoint) {
+        const selectEl = document.getElementById('acsi-api-select');
+        const bodyEl = document.getElementById('acsi-api-body');
+        const runEl = document.getElementById('acsi-api-run');
+        const reloadStatusBtn = document.getElementById('acsi-reload-status-btn');
+        const updatedStatusEl = document.getElementById('acsi-endpoint-updated-status');
+        const daModalEl = document.getElementById('acsi-da-modal');
+        const daModalCloseEl = document.getElementById('acsi-da-modal-close');
+        const daModalObjRefEl = document.getElementById('acsi-da-modal-objref');
+        const daModalFcEl = document.getElementById('acsi-da-modal-fc');
+        const daModalValueEl = document.getElementById('acsi-da-modal-value');
+        const daModalReadEl = document.getElementById('acsi-da-modal-read');
+        const daModalWriteEl = document.getElementById('acsi-da-modal-write');
+        const daModalResultEl = document.getElementById('acsi-da-modal-result');
+        const startBtn = document.getElementById('acsi-start-btn');
+        const stopBtn = document.getElementById('acsi-stop-btn');
+        const loadModelBtn = document.getElementById('acsi-load-model-btn');
+
+        if (!selectEl || !bodyEl || !runEl) {
+            return;
+        }
+
+        const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
+        let activeDaSelection = null;
+
+        if (daModalEl) {
+            daModalEl.hidden = true;
+        }
+
+        setModelPanelMessage('Run GET /api/iec61850server/model to load the model tree.');
+
+        selectEl.innerHTML = apiDefinitions.map((api) => `
+            <option value="${api.id}">${api.label}</option>
+        `).join('');
+
+        function syncBodyPlaceholder() {
+            const selected = apiDefinitions.find((api) => api.id === selectEl.value) || apiDefinitions[0];
+            bodyEl.placeholder = selected.sampleBody || 'No body required for this endpoint.';
+            if (!bodyEl.value.trim()) {
+                bodyEl.value = selected.sampleBody || '';
+            }
+        }
+
+        selectEl.addEventListener('change', () => {
+            bodyEl.value = '';
+            syncBodyPlaceholder();
+        });
+
+        syncBodyPlaceholder();
+        wireLogTabs();
+        renderLogs();
+        renderProtocolMessages();
+
+        const selectedApiById = (id) => apiDefinitions.find((api) => api.id === id);
+
+        function setUpdatedStatusText(text, isError = false) {
+            if (!updatedStatusEl) {
+                return;
+            }
+            updatedStatusEl.textContent = text;
+            updatedStatusEl.classList.toggle('acsi-model-error', !!isError);
+        }
+
+        function formatStatusSummary(payload) {
+            const status = payload && payload.status ? payload.status : 'unknown';
+            const host = payload && payload.host ? payload.host : 'N/A';
+            const port = payload && payload.port !== undefined ? payload.port : 'N/A';
+            const clients = payload && payload.connectedClients !== undefined ? payload.connectedClients : 'N/A';
+            const aps = payload && Array.isArray(payload.accessPoints) ? payload.accessPoints.join(', ') : 'N/A';
+            return `Updated status: ${status} | host ${host}:${port} | clients ${clients} | accessPoints ${aps}`;
+        }
+
+        function setDaModalResult(value) {
+            if (!daModalResultEl) {
+                return;
+            }
+            daModalResultEl.textContent = value;
+        }
+
+        function closeDaModal() {
+            if (!daModalEl) {
+                return;
+            }
+            daModalEl.hidden = true;
+        }
+
+        function openDaModal(selection) {
+            if (!daModalEl || !selection || !selection.objRef) {
+                return;
+            }
+
+            activeDaSelection = selection;
+            if (daModalObjRefEl) {
+                daModalObjRefEl.value = selection.objRef;
+            }
+            if (daModalFcEl) {
+                daModalFcEl.value = selection.fc || '';
+            }
+            if (daModalValueEl) {
+                daModalValueEl.value = '';
+            }
+            setDaModalResult('Select Read or Write to execute API call for this DA.');
+            daModalEl.hidden = false;
+        }
+
+        async function executeApiCall(selected, targetValue, bodyOverride) {
+            if (!selected) {
+                return null;
+            }
+
+            let url;
+            try {
+                url = buildBffApiUrl(selected.path, targetValue);
+            } catch (error) {
+                logEntry('error', `Blocked ${selected.label}`, String(error && error.message ? error.message : error));
+                renderLogs();
+                return null;
+            }
+
+            const options = {
+                method: selected.method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            };
+
+            if (targetValue) {
+                options.headers['X-FSP-Target'] = targetValue;
+            }
+
+            if (selected.method === 'POST') {
+                let payloadToSend = null;
+
+                if (bodyOverride !== undefined) {
+                    if (bodyOverride && typeof bodyOverride === 'object' && !Array.isArray(bodyOverride)) {
+                        payloadToSend = { ...bodyOverride };
+                    }
+                } else {
+                    const raw = bodyEl.value.trim();
+                    if (raw) {
+                        try {
+                            payloadToSend = JSON.parse(raw);
+                        } catch (error) {
+                            logEntry('error', `Invalid JSON body for ${selected.label}`, String(error && error.message ? error.message : error));
+                            renderLogs();
+                            return null;
+                        }
+                    }
+                }
+
+                if (!payloadToSend) {
+                    payloadToSend = {};
+                }
+
+                if (targetValue && typeof payloadToSend === 'object' && !Array.isArray(payloadToSend) && !payloadToSend.fspTarget) {
+                    payloadToSend.fspTarget = targetValue;
+                }
+
+                options.body = JSON.stringify(payloadToSend);
+            }
+
+            try {
+                runEl.disabled = true;
+                if (startBtn) startBtn.disabled = true;
+                if (stopBtn) stopBtn.disabled = true;
+                if (loadModelBtn) loadModelBtn.disabled = true;
+
+                logEntry('info', 'Checking BFF health', `URL: ${buildBffApiUrl('/api/health')}`);
+                renderLogs();
+
+                await ensureBffHealthy();
+
+                logEntry('info', `Calling ${selected.label}`, `FSP target: ${targetValue || 'default'}\nURL: ${url}`);
+                renderLogs();
+
+                const response = await fetch(url, options);
+                const rawText = await response.text();
+                let formatted = rawText;
+                let parsedPayload = null;
+
+                try {
+                    parsedPayload = JSON.parse(rawText);
+                    formatted = JSON.stringify(parsedPayload, null, 2);
+                } catch (error) {
+                    // keep raw text for non-JSON responses
+                }
+
+                if (selected.id === 'model') {
+                    if (response.ok && parsedPayload) {
+                        renderModelFromPayload(parsedPayload);
+                    } else if (!response.ok) {
+                        setModelPanelMessage(`Model request failed with HTTP ${response.status}`, true);
+                    } else {
+                        setModelPanelMessage('Model response is not valid JSON.', true);
+                    }
+                }
+
+                if (selected.id === 'messages') {
+                    if (response.ok && parsedPayload) {
+                        const messagesPayload = Object.prototype.hasOwnProperty.call(parsedPayload, 'messages')
+                            ? parsedPayload.messages
+                            : parsedPayload;
+                        addProtocolMessagesEntry(messagesPayload);
+                        renderProtocolMessages();
+                    }
+                }
+
+                const messagePrefix = response.ok ? 'success' : 'error';
+                logEntry(
+                    messagePrefix,
+                    `${selected.label} -> HTTP ${response.status}`,
+                    formatted
+                );
+
+                return {
+                    ok: response.ok,
+                    status: response.status,
+                    payload: parsedPayload,
+                    rawText,
+                };
+            } catch (error) {
+                logEntry('error', `Request failed for ${selected.label}`, String(error && error.message ? error.message : error));
+                return null;
+            } finally {
+                runEl.disabled = false;
+                if (startBtn) startBtn.disabled = false;
+                if (stopBtn) stopBtn.disabled = false;
+                if (loadModelBtn) loadModelBtn.disabled = false;
+                renderLogs();
+            }
+        }
+
+        async function runDaAction(actionId) {
+            if (!activeDaSelection || !activeDaSelection.objRef) {
+                setDaModalResult('No DA selected.');
+                return;
+            }
+
+            if (!endpointTarget) {
+                setDaModalResult('Missing selected endpoint address (fspTarget).');
+                return;
+            }
+
+            const api = selectedApiById(actionId);
+            if (!api) {
+                setDaModalResult(`Missing API definition for ${actionId}.`);
+                return;
+            }
+
+            const body = {
+                objRef: activeDaSelection.objRef,
+            };
+
+            if (activeDaSelection.fc) {
+                body.fc = activeDaSelection.fc;
+            }
+
+            if (actionId === 'writevalue') {
+                body.value = daModalValueEl ? daModalValueEl.value : '';
+            }
+
+            setDaModalResult('Loading...');
+            const result = await executeApiCall(api, endpointTarget, body);
+            if (!result) {
+                setDaModalResult('Request failed. See API Logs for details.');
+                return;
+            }
+
+            if (result.payload && typeof result.payload === 'object') {
+                setDaModalResult(JSON.stringify(result.payload, null, 2));
+                return;
+            }
+
+            setDaModalResult(String(result.rawText || 'No response body'));
+        }
+
+        runEl.addEventListener('click', async () => {
+            const selected = apiDefinitions.find((api) => api.id === selectEl.value);
+            if (!selected) {
+                return;
+            }
+
+            if (!endpointTarget) {
+                logEntry('error', 'Run API blocked', 'No selected endpoint address available to resolve fspTarget.');
+                renderLogs();
+                return;
+            }
+
+            await executeApiCall(selected, endpointTarget);
+        });
+
+        if (startBtn) {
+            startBtn.addEventListener('click', async () => {
+                if (!endpointTarget) {
+                    logEntry('error', 'Start blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    renderLogs();
+                    return;
+                }
+                await executeApiCall(selectedApiById('start'), endpointTarget, {});
+            });
+        }
+
+        if (stopBtn) {
+            stopBtn.addEventListener('click', async () => {
+                if (!endpointTarget) {
+                    logEntry('error', 'Stop blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    renderLogs();
+                    return;
+                }
+                await executeApiCall(selectedApiById('stop'), endpointTarget, {});
+            });
+        }
+
+        if (loadModelBtn) {
+            loadModelBtn.addEventListener('click', async () => {
+                if (!endpointTarget) {
+                    logEntry('error', 'Load model blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    renderLogs();
+                    return;
+                }
+                await executeApiCall(selectedApiById('model'), endpointTarget);
+            });
+        }
+
+        if (reloadStatusBtn) {
+            reloadStatusBtn.addEventListener('click', async () => {
+                if (!endpointTarget) {
+                    setUpdatedStatusText('Updated status: blocked (missing selected endpoint address).', true);
+                    return;
+                }
+
+                try {
+                    reloadStatusBtn.disabled = true;
+                    setUpdatedStatusText('Updated status: loading...');
+                    await ensureBffHealthy();
+
+                    const url = buildBffApiUrl('/api/iec61850server/status', endpointTarget);
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-FSP-Target': endpointTarget,
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    const payload = await response.json();
+                    setUpdatedStatusText(formatStatusSummary(payload));
+                    logEntry('success', 'GET /api/iec61850server/status -> HTTP 200', JSON.stringify(payload, null, 2));
+                    renderLogs();
+                } catch (error) {
+                    const message = String(error && error.message ? error.message : error);
+                    setUpdatedStatusText(`Updated status: failed (${message})`, true);
+                    logEntry('error', 'GET /api/iec61850server/status failed', message);
+                    renderLogs();
+                } finally {
+                    reloadStatusBtn.disabled = false;
+                }
+            });
+        }
+
+        if (window.SCLTree && typeof window.SCLTree.setDataAttributeClickHandler === 'function') {
+            window.SCLTree.setDataAttributeClickHandler((selection) => {
+                openDaModal(selection);
+            });
+        }
+
+        if (daModalCloseEl) {
+            daModalCloseEl.addEventListener('click', closeDaModal);
+        }
+
+        if (daModalEl) {
+            daModalEl.addEventListener('click', (event) => {
+                const target = event.target;
+                if (target && target.getAttribute && target.getAttribute('data-da-modal-close') === 'true') {
+                    closeDaModal();
+                }
+            });
+        }
+
+        if (daModalReadEl) {
+            daModalReadEl.addEventListener('click', async () => {
+                await runDaAction('readvalue');
+            });
+        }
+
+        if (daModalWriteEl) {
+            daModalWriteEl.addEventListener('click', async () => {
+                await runDaAction('writevalue');
+            });
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && daModalEl && !daModalEl.hidden) {
+                closeDaModal();
+            }
+        });
+    }
+
+    async function loadTemplate() {
+        if (templateCache) {
+            return templateCache;
+        }
+
+        const response = await fetch('./acsi-server-page.html', { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error('Unable to load acsi-server-page.html');
+        }
+
+        templateCache = await response.text();
+        return templateCache;
+    }
+
+    async function render(root, endpoint) {
+        const hasEndpoint = !!endpoint;
+        const endpointName = hasEndpoint ? escapeHtml(endpoint.name || 'Unnamed endpoint') : 'No endpoint selected';
+        const endpointHost = hasEndpoint ? escapeHtml(endpoint.host || 'N/A') : 'N/A';
+        const endpointPort = hasEndpoint ? escapeHtml(endpoint.port || 'N/A') : 'N/A';
+        const endpointType = hasEndpoint ? escapeHtml(endpoint.type || 'N/A') : 'N/A';
+        const endpointStatus = hasEndpoint ? escapeHtml(endpoint.status || 'unknown') : 'unknown';
+        const endpointRole = hasEndpoint ? escapeHtml(resolveServerRole(endpoint)) : 'N/A';
+        const endpointWsMode = hasEndpoint ? escapeHtml(resolveWsMode(endpoint)) : 'N/A';
+
+        try {
+            const template = await loadTemplate();
+            root.innerHTML = interpolateTemplate(template, {
+                endpointName,
+                endpointHost,
+                endpointPort,
+                endpointType,
+                endpointStatus,
+                endpointRole,
+                endpointWsMode,
+            });
+            await wireApiTester(endpoint);
+        } catch (error) {
+            root.innerHTML = '<p style="color: var(--text-muted);">Failed to load ACSI Server page template.</p>';
+            console.error(error);
+        }
+    }
+
+    window.ACSIServerPage = {
+        render,
+    };
+})();

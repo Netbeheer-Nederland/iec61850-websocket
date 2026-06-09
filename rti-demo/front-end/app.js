@@ -12,6 +12,7 @@ class RTIDemoApp {
         
         this.connections = [];
         this.endpoints = [];
+        this.selectedAcsiEndpoint = null;
         this.isBffConnected = false;
         this.autoRefreshInterval = null;
         this.messageHistory = [];
@@ -148,7 +149,24 @@ class RTIDemoApp {
             case 'tools':
                 this.loadTools();
                 break;
+            case 'acsi-server':
+                this.loadAcsiServerPage();
+                break;
         }
+    }
+
+    loadAcsiServerPage() {
+        const root = document.getElementById('acsi-server-page-root');
+        if (!root) {
+            return;
+        }
+
+        if (window.ACSIServerPage && typeof window.ACSIServerPage.render === 'function') {
+            window.ACSIServerPage.render(root, this.selectedAcsiEndpoint);
+            return;
+        }
+
+        root.innerHTML = '<p style="color: var(--text-muted);">ACSI Server page is unavailable.</p>';
     }
 
     // =============================================
@@ -362,7 +380,7 @@ class RTIDemoApp {
             : '';
         
         // Extract properties from properties_info
-        const props = endpoint.properties_info.properties || {};
+        const props = endpoint.properties_info?.properties || {};
         const serverRole = props['server-role'] || props['server_role'] || 'N/A';
         const wsMode = props['ws_mode'] || 'N/A';
         
@@ -381,7 +399,7 @@ class RTIDemoApp {
                 </div>
                 <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border-color); font-size: 12px;">
                     <div style="margin-bottom: 4px;">
-                        <strong>Server Role:</strong> <span style="color: var(--text-muted);">${serverRole}</span>
+                        <strong>ACSI Role:</strong> <span style="color: var(--text-muted);">${serverRole}</span>
                     </div>
                     <div>
                         <strong>WS Mode:</strong> <span style="color: var(--text-muted);">${wsMode}</span>
@@ -395,7 +413,17 @@ class RTIDemoApp {
     }
 
     configureEndpoint(endpoint) {
-        // Open configuration modal or page
+        const props = endpoint.properties_info?.properties || {};
+        const serverRoleRaw = props['server-role'] || props['server_role'] || '';
+        const serverRole = String(serverRoleRaw).trim().toLowerCase();
+
+        if (serverRole === 'acsi_server') {
+            this.selectedAcsiEndpoint = endpoint;
+            this.navigateToPage('acsi-server');
+            return;
+        }
+
+        // Default behavior for non-ACSI server endpoints.
         this.navigateToPage('connections');
     }
 

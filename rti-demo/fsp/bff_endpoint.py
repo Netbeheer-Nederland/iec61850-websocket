@@ -296,6 +296,7 @@ def create_bff_blueprint(
             ied_model: Optional[IedModel] = server.runtime.ied_model
             source = server.runtime.model_source
             selected_ied = server.runtime.model_ied_name
+            access_points = [server.runtime.cp or "cp1"]
 
             logical_devices: List[str] = []
             if ied_model is not None:
@@ -306,6 +307,7 @@ def create_bff_blueprint(
 
             result = {
                 "status": "ready",
+                "accessPoints": access_points,
                 "model": {
                     "server": {
                         "name": "IEC61850 WS Server",

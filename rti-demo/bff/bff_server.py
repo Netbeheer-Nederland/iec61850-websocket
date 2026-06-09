@@ -10,16 +10,17 @@ It provides endpoints for the frontend to:
 - Auto-discover Docker containers with RTI services
 """
 
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, has_request_context
 from flask_cors import CORS
 from datetime import datetime
 import json
 import os
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import requests
 import threading
 import time
+from urllib.parse import urlparse
 from fspClient import FspClient
 from soClient import SOClient
 
@@ -92,7 +93,169 @@ def save_discovered_endpoints(discovered: Dict[str, Dict]):
 
 # Initialize FSP client (point to the RTI server container)
 FSP_BASE_URL = os.environ.get('FSP_BASE_URL', 'http://rti-server:5001')
-fsp_client = FspClient(FSP_BASE_URL)
+_fsp_client_cache: Dict[str, FspClient] = {}
+
+
+def _normalize_base_url(base_url: str) -> str:
+    return str(base_url or '').strip().rstrip('/')
+
+
+def _base_url_to_host_port(base_url: str) -> Tuple[Optional[str], Optional[int]]:
+    parsed = urlparse(base_url)
+    if not parsed.scheme or not parsed.hostname:
+        return None, None
+
+    port = parsed.port
+    if port is None:
+        port = 443 if parsed.scheme == 'https' else 80
+    return parsed.hostname, port
+
+
+def _is_fsp_endpoint(endpoint: Dict) -> bool:
+    endpoint_type = str(endpoint.get('type', '')).upper()
+    endpoint_name = str(endpoint.get('name', '')).upper()
+    return (
+        'FSP' in endpoint_type
+        or 'SERVER' in endpoint_type
+        or 'RTI-FSP' in endpoint_name
+        or 'SERVER' in endpoint_name
+    )
+
+
+def _collect_fsp_targets() -> List[Dict]:
+    targets: Dict[str, Dict] = {}
+
+    default_base = _normalize_base_url(FSP_BASE_URL)
+    default_host, default_port = _base_url_to_host_port(default_base)
+    if default_host is not None and default_port is not None:
+        key = f"{default_host}:{default_port}"
+        targets[key] = {
+            'id': key,
+            'name': f"Default FSP ({key})",
+            'host': default_host,
+            'port': default_port,
+            'base_url': default_base,
+            'source': 'env',
+        }
+
+    conn_manager_instance = globals().get('conn_manager')
+    if conn_manager_instance is not None:
+        for endpoint in getattr(conn_manager_instance, 'connections', []):
+            if not isinstance(endpoint, dict) or not _is_fsp_endpoint(endpoint):
+                continue
+
+            host = endpoint.get('host')
+            port = endpoint.get('port')
+            if host is None or port is None:
+                continue
+
+            key = f"{host}:{port}"
+            targets[key] = {
+                'id': key,
+                'name': endpoint.get('name') or f"FSP ({key})",
+                'host': host,
+                'port': int(port),
+                'base_url': f"http://{host}:{int(port)}",
+                'source': 'connections',
+                'type': endpoint.get('type'),
+                'status': endpoint.get('status'),
+            }
+
+    discovery_instance = globals().get('discovery')
+    if discovery_instance is not None:
+        for endpoint in getattr(discovery_instance, 'discovered_services', {}).values():
+            if not isinstance(endpoint, dict) or not _is_fsp_endpoint(endpoint):
+                continue
+
+            host = endpoint.get('host')
+            port = endpoint.get('port')
+            if host is None or port is None:
+                continue
+
+            key = f"{host}:{port}"
+            existing = targets.get(key, {})
+            targets[key] = {
+                'id': key,
+                'name': endpoint.get('name') or existing.get('name') or f"FSP ({key})",
+                'host': host,
+                'port': int(port),
+                'base_url': f"http://{host}:{int(port)}",
+                'source': existing.get('source', 'discovery'),
+                'type': endpoint.get('type', existing.get('type')),
+                'status': endpoint.get('status', existing.get('status')),
+            }
+
+    return list(targets.values())
+
+
+def _extract_fsp_selector() -> Optional[str]:
+    if not has_request_context():
+        return None
+
+    selector = request.args.get('fspTarget') or request.headers.get('X-FSP-Target')
+    if selector:
+        return str(selector).strip()
+
+    payload = request.get_json(silent=True) or {}
+    if isinstance(payload, dict) and payload.get('fspTarget'):
+        return str(payload.get('fspTarget')).strip()
+
+    return None
+
+
+def _resolve_fsp_target(selector: Optional[str]) -> Dict:
+    targets = _collect_fsp_targets()
+    if not targets:
+        return {
+            'id': 'default',
+            'name': 'Default FSP',
+            'base_url': _normalize_base_url(FSP_BASE_URL),
+            'source': 'env',
+        }
+
+    if not selector:
+        return targets[0]
+
+    selector_norm = selector.strip().lower()
+    for target in targets:
+        if selector_norm in {
+            str(target.get('id', '')).lower(),
+            str(target.get('base_url', '')).lower(),
+            f"{target.get('host')}:{target.get('port')}".lower(),
+        }:
+            return target
+
+    return targets[0]
+
+
+def _get_fsp_client_for_target(base_url: str) -> FspClient:
+    normalized = _normalize_base_url(base_url)
+    cached = _fsp_client_cache.get(normalized)
+    if cached is None:
+        cached = FspClient(normalized)
+        _fsp_client_cache[normalized] = cached
+    return cached
+
+
+class RequestScopedFspClient:
+    """Dispatches FSP calls to a selected target from request context when provided."""
+
+    def selected_target(self) -> Dict:
+        selector = _extract_fsp_selector()
+        return _resolve_fsp_target(selector)
+
+    def selected_base_url(self) -> str:
+        target = self.selected_target()
+        return str(target.get('base_url') or _normalize_base_url(FSP_BASE_URL))
+
+    def _selected_client(self) -> FspClient:
+        return _get_fsp_client_for_target(self.selected_base_url())
+
+    def __getattr__(self, item):
+        return getattr(self._selected_client(), item)
+
+
+fsp_client = RequestScopedFspClient()
 
 SO_BASE_URL = os.environ.get('SO_BASE_URL', 'http://rti-client:5002')
 so_client = SOClient(SO_BASE_URL)
@@ -594,6 +757,19 @@ def trigger_network_discovery():
         'discovered': discovered,
         'count': len(discovered),
         'timestamp': datetime.now().isoformat(),
+    })
+
+
+@app.route('/api/fsp/targets', methods=['GET'])
+def list_fsp_targets():
+    """List available FSP targets and which one is currently selected for this request."""
+    targets = _collect_fsp_targets()
+    selected = _resolve_fsp_target(_extract_fsp_selector())
+    return jsonify({
+        'ok': True,
+        'targets': targets,
+        'count': len(targets),
+        'selected': selected,
     })
 
 # =============================================
@@ -1136,7 +1312,7 @@ def proxy_iec61850client(path):
 @app.route('/api/iec61850server/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def proxy_iec61850server(path):
     """Forward /api/iec61850server/* requests directly to the RTI server container."""
-    return _proxy_request(FSP_BASE_URL, '/api/iec61850server/', path)
+    return _proxy_request(fsp_client.selected_base_url(), '/api/iec61850server/', path)
 
 @app.route('/api/iec61850client/status', methods=['GET'])
 def get_asci_client_status():
