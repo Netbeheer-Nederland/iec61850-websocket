@@ -17,23 +17,66 @@ window.initializeToolsPage = function () {
 	const bodyEl = document.getElementById('acsi-api-body');
 	const runEl = document.getElementById('acsi-api-run');
     let logs = [];
+let activeTab = 'sclModelFactory';
 
-	let activeTab = 'sclModelFactory';
+const apiDefinitions = [
 
-	    const apiDefinitions = [
-        { id: 'status', label: 'GET /api/iec61850server/status', method: 'GET', path: '/api/iec61850server/status', sampleBody: '' },
-        { id: 'connections', label: 'GET /api/iec61850server/connections', method: 'GET', path: '/api/iec61850server/connections', sampleBody: '' },
-        { id: 'model', label: 'GET /api/iec61850server/model', method: 'GET', path: '/api/iec61850server/model', sampleBody: '' },
-        { id: 'update-iedmodel', label: 'POST /api/iec61850server/update-iedmodel', method: 'POST', path: '/api/iec61850server/update-iedmodel', sampleBody: '{\n  "modelPy": "# python code"\n}' },
-        { id: 'start', label: 'POST /api/iec61850server/start', method: 'POST', path: '/api/iec61850server/start', sampleBody: '{\n  "host": "0.0.0.0",\n  "port": 8765,\n  "mode": "server",\n  "cp": "cp1"\n}' },
-        { id: 'stop', label: 'POST /api/iec61850server/stop', method: 'POST', path: '/api/iec61850server/stop', sampleBody: '' },
-        { id: 'actions', label: 'GET /api/iec61850server/actions', method: 'GET', path: '/api/iec61850server/actions', sampleBody: '' },
-        { id: 'actions-clear', label: 'POST /api/iec61850server/actions/clear', method: 'POST', path: '/api/iec61850server/actions/clear', sampleBody: '' },
-        { id: 'messages', label: 'GET /api/iec61850server/messages', method: 'GET', path: '/api/iec61850server/messages', sampleBody: '' },
-        { id: 'messages-clear', label: 'POST /api/iec61850server/messages/clear', method: 'POST', path: '/api/iec61850server/messages/clear', sampleBody: '' },
-        { id: 'readvalue', label: 'POST /api/iec61850server/readvalue', method: 'POST', path: '/api/iec61850server/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
-        { id: 'writevalue', label: 'POST /api/iec61850server/writevalue', method: 'POST', path: '/api/iec61850server/writevalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "value": "on",\n  "fc": "ST",\n  "dataType": "BOOLEAN"\n}' }
-    ];
+    // =========================
+    // IEC61850 SERVER APIs
+    // =========================
+
+    { id: 'status', label: 'GET /api/iec61850server/status', method: 'GET', path: '/api/iec61850server/status', sampleBody: '' },
+
+    { id: 'connections', label: 'GET /api/iec61850server/connections', method: 'GET', path: '/api/iec61850server/connections', sampleBody: '' },
+
+    { id: 'model', label: 'GET /api/iec61850server/model', method: 'GET', path: '/api/iec61850server/model', sampleBody: '' },
+
+    { id: 'update-iedmodel', label: 'POST /api/iec61850server/update-iedmodel', method: 'POST', path: '/api/iec61850server/update-iedmodel', sampleBody: '{\n  "modelPy": "# python code"\n}' },
+
+    { id: 'start', label: 'POST /api/iec61850server/start', method: 'POST', path: '/api/iec61850server/start', sampleBody: '{\n  "host": "0.0.0.0",\n  "port": 8765,\n  "mode": "server",\n  "cp": "cp1"\n}' },
+
+    { id: 'stop', label: 'POST /api/iec61850server/stop', method: 'POST', path: '/api/iec61850server/stop', sampleBody: '' },
+
+    { id: 'actions', label: 'GET /api/iec61850server/actions', method: 'GET', path: '/api/iec61850server/actions', sampleBody: '' },
+
+    { id: 'actions-clear', label: 'POST /api/iec61850server/actions/clear', method: 'POST', path: '/api/iec61850server/actions/clear', sampleBody: '' },
+
+    { id: 'messages', label: 'GET /api/iec61850server/messages', method: 'GET', path: '/api/iec61850server/messages', sampleBody: '' },
+
+    { id: 'messages-clear', label: 'POST /api/iec61850server/messages/clear', method: 'POST', path: '/api/iec61850server/messages/clear', sampleBody: '' },
+
+    { id: 'readvalue', label: 'POST /api/iec61850server/readvalue', method: 'POST', path: '/api/iec61850server/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
+
+    { id: 'writevalue', label: 'POST /api/iec61850server/writevalue', method: 'POST', path: '/api/iec61850server/writevalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "value": "on",\n  "fc": "ST",\n  "dataType": "BOOLEAN"\n}' },
+
+
+    // =========================
+    // IEC61850 CLIENT APIs
+    // =========================
+
+    { id: 'client-status', label: 'GET /api/iec61850client/status', method: 'GET', path: '/api/iec61850client/status', sampleBody: '' },
+
+    { id: 'client-connections', label: 'GET /api/iec61850client/connections', method: 'GET', path: '/api/iec61850client/connections', sampleBody: '' },
+
+    { id: 'client-properties', label: 'GET /api/iec61850client/properties', method: 'GET', path: '/api/iec61850client/properties', sampleBody: '' },
+
+    { id: 'client-connect', label: 'POST /api/iec61850client/connect', method: 'POST', path: '/api/iec61850client/connect', sampleBody: '{\n  "host": "localhost",\n  "port": 8765,\n  "cp": "cp1"\n}' },
+
+    { id: 'client-disconnect', label: 'POST /api/iec61850client/disconnect', method: 'POST', path: '/api/iec61850client/disconnect', sampleBody: '' },
+
+    { id: 'client-actions', label: 'GET /api/iec61850client/actions', method: 'GET', path: '/api/iec61850client/actions', sampleBody: '' },
+
+    { id: 'client-actions-clear', label: 'POST /api/iec61850client/actions/clear', method: 'POST', path: '/api/iec61850client/actions/clear', sampleBody: '' },
+
+    { id: 'client-messages', label: 'GET /api/iec61850client/messages', method: 'GET', path: '/api/iec61850client/messages', sampleBody: '' },
+
+    { id: 'client-messages-clear', label: 'POST /api/iec61850client/messages/clear', method: 'POST', path: '/api/iec61850client/messages/clear', sampleBody: '' },
+
+    { id: 'client-readvalue', label: 'POST /api/iec61850client/readvalue', method: 'POST', path: '/api/iec61850client/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
+
+    { id: 'client-writevalue', label: 'POST /api/iec61850client/writevalue', method: 'POST', path: '/api/iec61850client/writevalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "value": true,\n  "fc": "ST",\n  "value_type": "BOOLEAN"\n}' }
+
+];
 
 	    function escapeForHtml(value) {
         return escapeHtml(value);
@@ -91,11 +134,6 @@ window.initializeToolsPage = function () {
 
 	let endpoints = window.app.getEndpoints();
 
-	if(endpoints.length > 0)
-	{
-		endpointTarget = endpoints[0];
-	}
-
 	selectEndpoint.innerHTML = endpoints.map((api) => `
 
     <option value="${api.name}/${api.port}">
@@ -106,6 +144,36 @@ window.initializeToolsPage = function () {
 	selectEl.innerHTML = apiDefinitions.map((api) => `
             <option value="${api.id}">${api.label}</option>
         `).join('');
+
+	if(endpoints.length > 0)
+	{
+		endpointTarget = endpoints[0];
+
+		 // --------------------------------
+    // FILTER APIs
+    // --------------------------------
+
+    	let filteredApis = apiDefinitions;
+
+		if (endpointTarget) {
+
+			const endpointName = endpointTarget.name.toLowerCase();
+
+			if (endpointName.includes('client')) {
+
+				filteredApis = apiDefinitions.filter(api =>
+					api.path.includes('/iec61850client/')
+				);
+
+			} else if (endpointName.includes('server')) {
+
+				filteredApis = apiDefinitions.filter(api =>
+					api.path.includes('/iec61850server/')
+				);
+			}
+		}
+	}
+
 
 	function syncBodyPlaceholder() {
 
@@ -160,18 +228,52 @@ window.initializeToolsPage = function () {
         return requestUrl.toString();
     }
 
-	selectEndpoint.addEventListener('change', () => {
+selectEndpoint.addEventListener('change', () => {
 
-		const selectedValue = selectEndpoint.value;
+    const selectedValue = selectEndpoint.value;
 
-			let selectedEndpoint = endpoints.find(
-				(ep) => `${ep.name}/${ep.port}` === selectedValue
-			);
+    let selectedEndpoint = endpoints.find(
+        (ep) => `${ep.name}/${ep.port}` === selectedValue
+    );
 
-			console.log(selectedEndpoint);
-			endpointTarget = selectedEndpoint ? `${selectedEndpoint.name}:${selectedEndpoint.port}` : null;
+    console.log(selectedEndpoint);
 
-	});
+    endpointTarget = selectedEndpoint
+        ? `${selectedEndpoint.name}:${selectedEndpoint.port}`
+        : null;
+
+    // --------------------------------
+    // FILTER APIs
+    // --------------------------------
+
+    let filteredApis = apiDefinitions;
+
+    if (selectedEndpoint) {
+
+        const endpointName = selectedEndpoint.name.toLowerCase();
+
+        if (endpointName.includes('client')) {
+
+            filteredApis = apiDefinitions.filter(api =>
+                api.path.includes('/iec61850client/')
+            );
+
+        } else if (endpointName.includes('server')) {
+
+            filteredApis = apiDefinitions.filter(api =>
+                api.path.includes('/iec61850server/')
+            );
+        }
+    }
+
+    // Reload select options
+    selectEl.innerHTML = filteredApis.map((api) => `
+        <option value="${api.id}">
+            ${api.label}
+        </option>
+    `).join('');
+
+});
 
 	const selectedApiById = (id) => apiDefinitions.find((api) => api.id === id);
 
