@@ -1374,8 +1374,8 @@ def get_asci_client_actions():
 def get_tree_from_acsi_client():
     """Get actions from the IEC 61850 client (SO)."""
     try:
-        actions = so_client.actions()
-        return jsonify({'ok': True, 'actions': actions})
+        model = so_client.model()
+        return jsonify({'ok': True, 'model': model})
     except requests.exceptions.RequestException as e:
         logger.error(f"SO client actions failed: {e}")
         return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502

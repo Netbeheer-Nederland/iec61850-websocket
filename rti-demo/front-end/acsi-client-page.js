@@ -146,7 +146,7 @@ window.ACSIClientPage = {
     handleFetchModel: function(rootElement) {
         this.showStatus(rootElement, 'Fetching model...', 'info');
 
-        this.callBFF('/api/iec61850client/readvalue', 'POST', { objRef: 'LD0/LLN0.Mod' })
+        this.callBFF('/api/iec61850client/model/tree', 'GET', null)
             .then(result => {
                 if (result && result.ok) {
                     const treeContainer = rootElement.querySelector('#acsi-client-tree-container-page');

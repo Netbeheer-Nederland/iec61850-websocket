@@ -175,6 +175,29 @@ def create_bff_blueprint() -> tuple[Blueprint, ACSIClient]:
         except Exception as exc:
             return jsonify({"ok": False, "error": str(exc)}), 500
 
+    @app.get("/api/iec61850client/model/tree")
+    def api_model():
+        """Get the IED model tree from the connected server."""
+        try:
+            # Ensure runtime loop is running (client must be connected)
+            loop = client.runtime.loop
+            if loop is None or not getattr(loop, "is_running", lambda: False)():
+                return jsonify({"ok": False, "error": "client-not-connected"}), 503
+
+            # Execute the coroutine on the runtime loop and return its raw result
+            try:
+                result = client.invoke_on_runtime_loop(client.get_model(), timeout=10)
+                return jsonify(result)
+            except FuturesTimeoutError:
+                client._log_action("Get model timeout", "warn")
+                return jsonify({"ok": False, "error": "get_model timeout"}), 504
+            except Exception as exc:
+                client._log_action(f"Get model failed: {exc}", "error")
+                return jsonify({"ok": False, "error": str(exc)}), 500
+        except Exception as exc:
+            client._log_action(f"Get model failed (outer): {exc}", "error")
+            return jsonify({"ok": False, "error": str(exc)}), 500
+
     @app.get("/api/iec61850client/actions")
     def api_actions():
         """Get logged client actions."""

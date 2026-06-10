@@ -10,6 +10,8 @@ This module handles:
 from __future__ import annotations
 
 import asyncio
+import logging
+logger = logging.getLogger(__name__)
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 import json
 import os
@@ -366,3 +368,19 @@ class ACSIClient:
         # dataAttrVal expects [{"data": (type_str, value)}]
         await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
         return {"objRef": obj_ref, "value": value}
+
+    async def get_model(self) -> Dict[str, Any]:
+        """Read a value from the server."""
+        client = self.runtime.client
+        if client is None:
+            raise RuntimeError("Client is not connected")
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+        #result = await client.get_data_values(obj_ref, fc, False, websocket_info, None, None)
+        result = {"objRef": "mock_objRef", "value": "mock_value"}
+        # Use logger.debug/info instead of logging.log(msg) because
+        # logging.log(level, msg) expects the first arg to be an int level.
+        # Calling logging.log(f"...") will raise TypeError: level must be an int.
+        logger.debug(f"the result: {result}")
+        return result
+
