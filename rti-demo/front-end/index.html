@@ -207,47 +207,7 @@
 
             <!-- Tools Page -->
             <section id="page-tools" class="page">
-                <div class="page-header">
-                    <h1>SCL Model Loader</h1>
-                    <p class="section-description">Load an SCL file to view and analyze the IEC 61850 model structure</p>
-                </div>
-                <div class="tools-workspace">
-                    <div class="tools-control-panel">
-                        <h3>Actions</h3>
-                        <p class="tools-helper-text">Select an SCL file, inspect the parsed tree, and generate the Python model.</p>
-
-                        <input id="tools-sclFile" class="tools-file-input" type="file" accept=".scl,.scd,.cid,.icd,.xml">
-
-                        <div class="tools-action-buttons">
-                            <label for="tools-sclFile" class="btn-action tools-action-btn" role="button" tabindex="0">
-                                <i class="fas fa-folder-open"></i>
-                                <span id="tools-browseBtnText">Browse SCL File</span>
-                            </label>
-
-                            <div id="tools-iedSelectWrap" class="tools-select-wrap">
-                                <label for="tools-iedSelect">IED</label>
-                                <select id="tools-iedSelect" class="tools-select"></select>
-                            </div>
-
-                            <div id="tools-apSelectWrap" class="tools-select-wrap">
-                                <label for="tools-apSelect">Access Point</label>
-                                <select id="tools-apSelect" class="tools-select"></select>
-                            </div>
-
-                            <button id="tools-generateModelBtn" class="btn-action tools-action-btn" type="button">
-                                <i class="fas fa-file-code"></i>
-                                <span>Generate model.py</span>
-                            </button>
-                        </div>
-
-                        <div id="tools-statusInfo" class="tools-status-info"></div>
-                    </div>
-
-                    <div class="tools-tree-panel">
-                        <h3>SCL Model Structure</h3>
-                        <div id="tools-modelPanel" class="panel-content tree"></div>
-                    </div>
-                </div>
+            <div id="tool-page-root"></div>
             </section>
 
             <!-- ACSI Server Page -->
@@ -343,6 +303,6 @@
     <script src="acsi-server-page.js"></script>
     <script src="app.js"></script>
     <script src="tree.js"></script>
-    <script type="module" src="./hmi-tools.js"></script>
+    <script type="module" src="hmi-tools.js"></script>
 </body>
 </html>
