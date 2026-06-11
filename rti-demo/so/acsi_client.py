@@ -370,17 +370,22 @@ class ACSIClient:
         return {"objRef": obj_ref, "value": value}
 
     async def get_model(self) -> Dict[str, Any]:
-        """Read a value from the server."""
+        """Read the server directory / model and return a JSON-serializable structure."""
         client = self.runtime.client
         if client is None:
             raise RuntimeError("Client is not connected")
 
-        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
-        #result = await client.get_data_values(obj_ref, fc, False, websocket_info, None, None)
-        result = {"objRef": "mock_objRef", "value": "mock_value"}
-        # Use logger.debug/info instead of logging.log(msg) because
-        # logging.log(level, msg) expects the first arg to be an int level.
-        # Calling logging.log(f"...") will raise TypeError: level must be an int.
-        logger.debug(f"the result: {result}")
-        return result
-
+        try:
+            websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+            raw = await client.get_server_directory(websocket_info, None, None)
+            serial = _make_serializable(raw)
+            # Ensure we return a mapping (compatible with callers expecting dict)
+            if isinstance(serial, dict):
+                return serial
+            return {"result": serial}
+        except Exception as exc:
+            # Record model error and present a serializable error mapping
+            self.runtime.model_error = str(exc)
+            self.runtime.model_status = 'error'
+            logger.exception("get_model failed")
+            return {"ok": False, "error": str(exc)}
