@@ -3,7 +3,7 @@ console.log('hmi-tools.js loaded');
 
 window.initializeToolsPage = function () {	
 	
-	 const toolsSclFile = document.getElementById('tools-sclFile');
+	const toolsSclFile = document.getElementById('tools-sclFile');
 	const toolsGenerateModelBtn = document.getElementById('tools-generateModelBtn');
 	const toolsStatusInfo = document.getElementById('tools-statusInfo');
 	const toolsModelPanel = document.getElementById('tools-modelPanel');

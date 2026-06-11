@@ -45,32 +45,16 @@
             </div>
         </section>
 
-
-        <section class="acsi-panel acsi-panel-main" id="acsi-api-tester">
-            <h2>API Tester</h2>
-            <div class="acsi-api-controls">
-                <label class="acsi-label" for="acsi-api-select">API</label>
-                <select id="acsi-api-select" class="acsi-select"></select>
-
-                <label class="acsi-label" for="acsi-api-body">Request Body (JSON, optional)</label>
-                <textarea id="acsi-api-body" class="acsi-textarea" rows="6" placeholder="{\n  \"objRef\": \"LD0.LLN0.Mod.stVal\",\n  \"fc\": \"ST\"\n}"></textarea>
-
-                <button id="acsi-api-run" class="btn-primary" type="button">
-                    <i class="fas fa-play"></i>
-                    Run API
-                </button>
-            </div>
-        </section>
-
         <section class="acsi-panel acsi-panel-main" id="acsi-api-logs-panel">
-            <h2>Log Messages</h2>
-            <div class="acsi-log-tabs" role="tablist" aria-label="Log tabs">
-                <button id="acsi-log-tab-api-btn" class="acsi-log-tab active" type="button" role="tab" aria-selected="true">API Logs</button>
-                <button id="acsi-log-tab-messages-btn" class="acsi-log-tab" type="button" role="tab" aria-selected="false">Protocol Messages</button>
-            </div>
-            <div id="acsi-log-tab-api" class="acsi-log-tab-panel active" role="tabpanel">
-                <div id="acsi-api-logs" class="acsi-log-list"></div>
-            </div>
+            
+<div class="protocol-header">
+    <button id="reloadMessagesBtn" title="Reload Messages"  class="btn-primary" type="button" aria-label="Reload status" >
+                                <i class="fas fa-rotate-right" aria-hidden="true"></i>
+
+    </button>
+    <span>Protocol Message</span>
+</div>
+
             <div id="acsi-log-tab-messages" class="acsi-log-tab-panel" role="tabpanel" hidden>
                 <div id="acsi-protocol-messages" class="acsi-log-list"></div>
             </div>
