@@ -224,7 +224,37 @@ def create_bff_blueprint(
                     },
                 )
 
+@app.get("/api/iec61850server/apis")
+def api_list_all_endpoints():
+    """Return all registered API endpoints."""
+    try:
+        routes = []
 
+        for rule in app.url_map.iter_rules():
+            # Only include API endpoints
+            if str(rule).startswith("/api/"):
+                methods = sorted(
+                    method for method in rule.methods if method not in ("HEAD", "OPTIONS")
+                )
+
+                routes.append(
+                    {
+                        "endpoint": rule.endpoint,
+                        "path": str(rule),
+                        "methods": methods,
+                    }
+                )
+
+        return jsonify(
+            {
+                "ok": True,
+                "count": len(routes),
+                "endpoints": sorted(routes, key=lambda x: x["path"]),
+            }
+        )
+
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
 
     @app.get("/api/iec61850server/status")
     def api_status():

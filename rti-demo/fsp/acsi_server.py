@@ -311,7 +311,7 @@ class ACSIServer:
             )
 
         ws_task = asyncio.create_task(
-            endpoint.start(host, port, cp), name="ws-passive"
+            endpoint.start(host, port, cp), name="ws-active"
         )
         tasks["ws"] = ws_task
 
