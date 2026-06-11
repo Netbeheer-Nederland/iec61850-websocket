@@ -1,5 +1,6 @@
 import logging
 import requests
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -10,10 +11,10 @@ class SOClient:
         self.base_url = base_url.rstrip('/')
 
     def _get(self, path: str, **kwargs):
-        return requests.get(f"{self.base_url}{path}", timeout=5, **kwargs)
+        return requests.get(f"{self.base_url}{path}", timeout=10, **kwargs)
 
     def _post(self, path: str, json=None, **kwargs):
-        return requests.post(f"{self.base_url}{path}", json=json, timeout=5, **kwargs)
+        return requests.post(f"{self.base_url}{path}", json=json, timeout=10, **kwargs)
 
     def status(self) -> dict:
         r = self._get('/api/iec61850client/status')
@@ -49,9 +50,69 @@ class SOClient:
         return r.json()
 
     def model(self) -> dict:
-        r = self._get('/api/iec61850client/model/tree')
-        r.raise_for_status()
-        return r.json()
+        """Request model with longer timeout and simple retries because building the model can take longer.
+
+        Strategy:
+        - Query the SO internal diagnostic endpoint first; if it reports 'building' or 'error', return that status immediately.
+        - Otherwise, attempt to GET the model tree with a longer timeout and a few retries on read timeouts.
+        """
+        status_url = f"{self.base_url}/internal/model/status"
+        try:
+            sr = requests.get(status_url, timeout=2)
+            if sr.ok:
+                payload = sr.json()
+                if isinstance(payload, dict) and payload.get('ok'):
+                    model_status = payload.get('model_status')
+                    progress = payload.get('model_progress')
+                    model_error = payload.get('model_error')
+                    if model_status == 'building':
+                        logger.info("SOClient.model: SO reports building via diagnostic endpoint")
+                        return {'status': 'building', 'progress': progress}
+                    if model_status == 'error':
+                        logger.warning(f"SOClient.model: SO reports error via diagnostic endpoint: {model_error}")
+                        return {'status': 'error', 'error': model_error}
+        except Exception:
+            # Diagnostic probe failed — continue to attempt the model GET
+            logger.debug("SOClient.model: diagnostic probe failed or not available; will attempt model GET")
+
+        # Fall back to direct GET with retries
+        attempts = 3
+        timeout = 30
+        path = '/api/iec61850client/model/tree'
+        url = f"{self.base_url}{path}"
+        last_exc = None
+        for attempt in range(1, attempts + 1):
+            try:
+                r = requests.get(url, timeout=timeout)
+                r.raise_for_status()
+                return r.json()
+            except requests.exceptions.ReadTimeout as e:
+                logger.warning(f"SOClient.model read timeout attempt {attempt}/{attempts}: {e}")
+                last_exc = e
+                # On read timeout, re-check the diagnostic endpoint once quickly
+                try:
+                    sr = requests.get(status_url, timeout=2)
+                    if sr.ok:
+                        payload = sr.json()
+                        if isinstance(payload, dict) and payload.get('ok'):
+                            model_status = payload.get('model_status')
+                            progress = payload.get('model_progress')
+                            model_error = payload.get('model_error')
+                            if model_status == 'building':
+                                return {'status': 'building', 'progress': progress}
+                            if model_status == 'error':
+                                return {'status': 'error', 'error': model_error}
+                except Exception:
+                    pass
+                if attempt < attempts:
+                    time.sleep(1)
+                    continue
+                # final attempt exhausted: return a building envelope rather than raising an exception
+                logger.warning("SOClient.model: all read-timeout attempts exhausted; returning building envelope")
+                return {'status': 'building', 'progress': None, 'note': 'read-timeout'}
+            except requests.exceptions.RequestException:
+                # propagate other request errors directly
+                raise
 
     def actions(self) -> dict:
         r = self._get('/api/iec61850client/actions')

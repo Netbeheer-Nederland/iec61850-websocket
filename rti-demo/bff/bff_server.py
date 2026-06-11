@@ -1374,8 +1374,28 @@ def get_asci_client_actions():
 def get_tree_from_acsi_client():
     """Get actions from the IEC 61850 client (SO)."""
     try:
+        # First check the SO's internal diagnostic endpoint to avoid long blocking calls
+        try:
+            status_resp = requests.get(f"{SO_BASE_URL}/internal/model/status", timeout=2)
+            if status_resp.ok:
+                status_payload = status_resp.json()
+                if isinstance(status_payload, dict) and status_payload.get('ok'):
+                    model_status = status_payload.get('model_status')
+                    progress = status_payload.get('model_progress')
+                    model_error = status_payload.get('model_error')
+                    if model_status == 'building':
+                        return jsonify({'ok': True, 'model': {'status': 'building', 'progress': progress}})
+                    if model_status == 'error':
+                        return jsonify({'ok': False, 'error': model_error}), 500
+        except Exception:
+            # If diagnostic endpoint isn't reachable, fall back to attempting the model GET
+            pass
+
         model = so_client.model()
         return jsonify({'ok': True, 'model': model})
+    except requests.exceptions.ReadTimeout as e:
+        logger.warning(f"SO client model read timed out: {e}")
+        return jsonify({'ok': False, 'error': 'SO client read timeout', 'detail': str(e)}), 504
     except requests.exceptions.RequestException as e:
         logger.error(f"SO client actions failed: {e}")
         return jsonify({'ok': False, 'error': f'SO client unreachable: {e}'}), 502
