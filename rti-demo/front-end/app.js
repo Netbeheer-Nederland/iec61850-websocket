@@ -237,7 +237,7 @@ class RTIDemoApp {
         const result = await this.callBFF('/api/health');
         const statusDot = document.getElementById('bff-status-dot');
         const statusText = document.getElementById('bff-status-text');
-        const isConnected = !!(result && ((result.bff && result.bff.connected) || result.status === 'ok'));
+        const isConnected = !!(result && ((result.bff && result.bff.status)));
         this.isBffConnected = isConnected;
 
         if (isConnected) {

@@ -10,7 +10,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from flask import Blueprint, Flask, jsonify, request
+from flask import Blueprint, Flask, app, jsonify, redirect, request, current_app
 
 from acsi_client import ACSIClient
 
@@ -277,6 +277,54 @@ def create_bff_blueprint() -> tuple[Blueprint, ACSIClient]:
                 return jsonify({"ok": False, "error": str(exc)}), 500
         except Exception as exc:
             return jsonify({"ok": False, "error": str(exc)}), 500
+
+    @app.get("/api/iec61850client/apis")
+    def api_list_all_endpoints():
+        routes = []
+
+        print("Enumerating routes:", len(current_app.url_map._rules))
+
+        for rule in current_app.url_map.iter_rules():
+            path = str(rule)
+
+            if path.startswith("/api/iec61850client/"):
+
+                methods = [
+                    m for m in rule.methods
+                    if m not in ("HEAD", "OPTIONS")
+                ]
+
+                routes.append({
+                    "path": path,
+                    "methods": methods,
+                    "endpoint": rule.endpoint,
+                })
+
+        return {
+            "ok": True,
+            "count": len(routes),
+            "endpoints": sorted(routes, key=lambda x: x["path"]),
+        }
+
+            
+    @app.get("/api/health")
+    def api_health():
+        """Generic health endpoint used by external discovery (for example BFF network scan)."""
+        try:
+            return jsonify(
+                {
+                    "status": "ok",
+                    "service": "SO",
+                    "server": {
+                        "status": "ok",
+                        "host": "localhost",
+                        "port": 8080,
+                    },
+                }
+            )
+        except Exception as exc:
+            return jsonify({"status": "degraded", "service": "SO", "error": str(exc)}), 500
+  
 
     @app.post("/api/iec61850client/writevalue")
     def api_write_value():

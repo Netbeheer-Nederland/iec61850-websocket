@@ -74,6 +74,7 @@ services:
       - ./connections.json:/app/connections.json
       - ./stats.json:/app/stats.json
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./bff:/app/bff
     networks:
       - rti-network
     #depends_on:
@@ -127,9 +128,12 @@ services:
       start_period: 20s
     labels:
       - "rti.service=rti-server"
-      - "rti.type=RTI-SO"
+      - "rti.type=RTI-FSP"
       - "rti.host=rti-server"
       - "rti.port=5001"
+    volumes:
+        - ./fsp:/app/fsp
+
 
   # RTI SO (IEC61850 Client)
   rti-client:
@@ -145,7 +149,7 @@ services:
     networks:
       - rti-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5001/api/iec61850client/status" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:5002/api/iec61850client/status" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -155,6 +159,8 @@ services:
       - "rti.type=RTI-SO"
       - "rti.host=rti-client"
       - "rti.port=5002"
+    volumes:
+        - ./so:/app/so
 
 networks:
   rti-network:

@@ -16,79 +16,24 @@ window.initializeToolsPage = function () {
 	const selectEndpoint = document.getElementById('endpoint-api-select');
 	const bodyEl = document.getElementById('acsi-api-body');
 	const runEl = document.getElementById('acsi-api-run');
+	const loadApisBtn = document.getElementById('load-apis-btn');
     let logs = [];
-let activeTab = 'sclModelFactory';
+	let activeTab = 'sclModelFactory';
 
-const apiDefinitions = [
+	let apiDefinitions = [];
 
-    // =========================
-    // IEC61850 SERVER APIs
-    // =========================
-
-    { id: 'status', label: 'GET /api/iec61850server/status', method: 'GET', path: '/api/iec61850server/status', sampleBody: '' },
-
-    { id: 'connections', label: 'GET /api/iec61850server/connections', method: 'GET', path: '/api/iec61850server/connections', sampleBody: '' },
-
-    { id: 'model', label: 'GET /api/iec61850server/model', method: 'GET', path: '/api/iec61850server/model', sampleBody: '' },
-
-    { id: 'update-iedmodel', label: 'POST /api/iec61850server/update-iedmodel', method: 'POST', path: '/api/iec61850server/update-iedmodel', sampleBody: '{\n  "modelPy": "# python code"\n}' },
-
-    { id: 'start', label: 'POST /api/iec61850server/start', method: 'POST', path: '/api/iec61850server/start', sampleBody: '{\n  "host": "0.0.0.0",\n  "port": 8765,\n  "mode": "server",\n  "cp": "cp1"\n}' },
-
-    { id: 'stop', label: 'POST /api/iec61850server/stop', method: 'POST', path: '/api/iec61850server/stop', sampleBody: '' },
-
-    { id: 'actions', label: 'GET /api/iec61850server/actions', method: 'GET', path: '/api/iec61850server/actions', sampleBody: '' },
-
-    { id: 'actions-clear', label: 'POST /api/iec61850server/actions/clear', method: 'POST', path: '/api/iec61850server/actions/clear', sampleBody: '' },
-
-    { id: 'messages', label: 'GET /api/iec61850server/messages', method: 'GET', path: '/api/iec61850server/messages', sampleBody: '' },
-
-    { id: 'messages-clear', label: 'POST /api/iec61850server/messages/clear', method: 'POST', path: '/api/iec61850server/messages/clear', sampleBody: '' },
-
-    { id: 'readvalue', label: 'POST /api/iec61850server/readvalue', method: 'POST', path: '/api/iec61850server/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
-
-    { id: 'writevalue', label: 'POST /api/iec61850server/writevalue', method: 'POST', path: '/api/iec61850server/writevalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "value": "on",\n  "fc": "ST",\n  "dataType": "BOOLEAN"\n}' },
-
-
-    // =========================
-    // IEC61850 CLIENT APIs
-    // =========================
-
-    { id: 'client-status', label: 'GET /api/iec61850client/status', method: 'GET', path: '/api/iec61850client/status', sampleBody: '' },
-
-    { id: 'client-connections', label: 'GET /api/iec61850client/connections', method: 'GET', path: '/api/iec61850client/connections', sampleBody: '' },
-
-    { id: 'client-properties', label: 'GET /api/iec61850client/properties', method: 'GET', path: '/api/iec61850client/properties', sampleBody: '' },
-
-    { id: 'client-connect', label: 'POST /api/iec61850client/connect', method: 'POST', path: '/api/iec61850client/connect', sampleBody: '{\n  "host": "localhost",\n  "port": 8765,\n  "cp": "cp1"\n}' },
-
-    { id: 'client-disconnect', label: 'POST /api/iec61850client/disconnect', method: 'POST', path: '/api/iec61850client/disconnect', sampleBody: '' },
-
-    { id: 'client-actions', label: 'GET /api/iec61850client/actions', method: 'GET', path: '/api/iec61850client/actions', sampleBody: '' },
-
-    { id: 'client-actions-clear', label: 'POST /api/iec61850client/actions/clear', method: 'POST', path: '/api/iec61850client/actions/clear', sampleBody: '' },
-
-    { id: 'client-messages', label: 'GET /api/iec61850client/messages', method: 'GET', path: '/api/iec61850client/messages', sampleBody: '' },
-
-    { id: 'client-messages-clear', label: 'POST /api/iec61850client/messages/clear', method: 'POST', path: '/api/iec61850client/messages/clear', sampleBody: '' },
-
-    { id: 'client-readvalue', label: 'POST /api/iec61850client/readvalue', method: 'POST', path: '/api/iec61850client/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
-
-    { id: 'client-writevalue', label: 'POST /api/iec61850client/writevalue', method: 'POST', path: '/api/iec61850client/writevalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "value": true,\n  "fc": "ST",\n  "value_type": "BOOLEAN"\n}' }
-
-];
-
-	    function escapeForHtml(value) {
-        return escapeHtml(value);
+	
+	function escapeForHtml(value) {
+	return escapeHtml(value);
     }
 
-	    function escapeHtml(value) {
-        return String(value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+	function escapeHtml(value) {
+	return String(value)
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
     }
 
     function renderLogs() {
@@ -147,7 +92,11 @@ const apiDefinitions = [
 
 	if(endpoints.length > 0)
 	{
-		endpointTarget = endpoints[0];
+		
+		endpointTarget = endpoints.length > 0
+			? `${endpoints[0].name}:${endpoints[0].port}`
+			: null;
+
 
 		 // --------------------------------
     // FILTER APIs
@@ -157,7 +106,7 @@ const apiDefinitions = [
 
 		if (endpointTarget) {
 
-			const endpointName = endpointTarget.name.toLowerCase();
+			const endpointName = endpointTarget.toLowerCase();
 
 			if (endpointName.includes('client')) {
 
@@ -174,6 +123,97 @@ const apiDefinitions = [
 		}
 	}
 
+	if(loadApisBtn)
+	{
+		loadApisBtn.addEventListener('click', async () => {
+
+			for(const ep of endpoints)
+			{
+				const targetValue = `${ep.host}:${ep.port}`;
+				await bootstrapApiDefinitions(targetValue);
+			}
+		});
+	}
+
+	async function bootstrapApiDefinitions(targetValue) {
+
+		let endpointsToCall = null;
+		const baseUrl = getBffBaseUrl();
+
+		if(targetValue.includes('server'))
+		{
+			endpointsToCall = {
+				id: 'apis-server',
+				method: 'GET',
+				path: '/api/iec61850server/apis'
+			};
+		}
+		else if(targetValue.includes('client'))
+		{
+			endpointsToCall = {
+				id: 'apis-client',
+				method: 'GET',
+				path: '/api/iec61850client/apis'
+			};
+		}
+		else
+			return;
+
+		let allApis = [];
+
+		const result = await executeApiCall(endpointsToCall, targetValue);
+
+		if (!result || !result.ok || !result.payload) return;
+
+		
+		const apiPayload = result.payload?.result || result.payload;
+		const endpoints = apiPayload?.endpoints || [];
+
+		allApis = allApis.concat(endpoints);
+
+		// ✅ transform to UI model
+		
+		const newApis = allApis.map((ep) => {
+			const method = (ep.methods && ep.methods[0]) || 'GET';
+			const path = ep.path;
+
+			const id = path
+				.replace('/api/', '')
+				.replace(/\//g, '-')
+				.replace(/^-/, '');
+
+			return {
+				id,
+				label: `${method} ${path}`,
+				method,
+				path,
+				sampleBody: method === 'POST' ? '{}' : ''
+			};
+		});
+
+		// ✅ append WITHOUT duplicates
+		newApis.forEach((newApi) => {
+			const exists = apiDefinitions.some(api =>
+				api.method === newApi.method &&
+				api.path === newApi.path
+			);
+
+			if (!exists && !newApi.path.endsWith('/apis')) {  // <-- optional filter
+				apiDefinitions.push(newApi);
+			}
+		});
+
+
+		// ✅ update dropdown
+		selectEl.innerHTML = apiDefinitions.map((api) => `
+			<option value="${api.id}">
+				${api.label}
+			</option>
+		`).join('');
+
+		console.log("✅ Bootstrap API loaded:", apiDefinitions);
+	}
+``
 
 	function syncBodyPlaceholder() {
 
@@ -222,9 +262,19 @@ const apiDefinitions = [
         }
 
         const requestUrl = new URL(`${baseUrl}${path}`, window.location.origin);
-        if (targetValue) {
-            requestUrl.searchParams.set('fspTarget', targetValue);
-        }
+
+		console.log("fspTarget:", targetValue, typeof targetValue);
+
+		
+		if (targetValue && typeof targetValue !== 'string') {
+			console.error("Invalid fspTarget, fixing:", targetValue);
+			targetValue = `${targetValue.name}:${targetValue.port}`;
+		}
+
+
+        //if (targetValue) {
+          //  requestUrl.searchParams.set('fspTarget', targetValue);
+        //}
         return requestUrl.toString();
     }
 
@@ -287,117 +337,146 @@ selectEndpoint.addEventListener('change', () => {
 
             let url;
             try {
-                url = buildBffApiUrl(selected.path, targetValue);
+				url = buildBffApiUrl('/api/execute');
+                //url = buildBffApiUrl(selected.path, targetValue);
             } catch (error) {
                 logEntry('error', `Blocked ${selected.label}`, String(error && error.message ? error.message : error));
                 renderLogs();
                 return null;
             }
 
-            const options = {
-                method: selected.method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            };
+            
+			const options = {
+				method: 'POST',  // ✅ always POST to /execute
+				headers: {
+					'Content-Type': 'application/json',
+				},
+			};
 
-            if (targetValue) {
-                options.headers['X-FSP-Target'] = targetValue;
-            }
 
-            if (selected.method === 'POST') {
-                let payloadToSend = null;
+            // ✅ build generic execute payload
+			let payloadToSend = {
+				target: targetValue,
+				method: selected.method,
+				path: selected.path
+			};
 
-                if (bodyOverride !== undefined) {
-                    if (bodyOverride && typeof bodyOverride === 'object' && !Array.isArray(bodyOverride)) {
-                        payloadToSend = { ...bodyOverride };
-                    }
-                } else {
-                    const raw = bodyEl.value.trim();
-                    if (raw) {
-                        try {
-                            payloadToSend = JSON.parse(raw);
-                        } catch (error) {
-                            logEntry('error', `Invalid JSON body for ${selected.label}`, String(error && error.message ? error.message : error));
-                            renderLogs();
-                            return null;
-                        }
-                    }
-                }
+			// ✅ attach body only if POST
+			if (selected.method === 'POST') {
+				const raw = bodyEl.value.trim();
+				if (raw) {
+					try {
+						payloadToSend.body = JSON.parse(raw);
+					} catch (error) {
+						logEntry('error', `Invalid JSON body`, error.message);
+						renderLogs();
+						return null;
+					}
+				}
+			}
 
-                if (!payloadToSend) {
-                    payloadToSend = {};
-                }
+			options.body = JSON.stringify(payloadToSend);
 
-                if (targetValue && typeof payloadToSend === 'object' && !Array.isArray(payloadToSend) && !payloadToSend.fspTarget) {
-                    payloadToSend.fspTarget = targetValue;
-                }
+				try {
+					runEl.disabled = true;
+					logEntry('info', 'Checking BFF health', `URL: ${buildBffApiUrl('/api/health')}`);
+					renderLogs();
 
-                options.body = JSON.stringify(payloadToSend);
-            }
+					await ensureBffHealthy();
 
-            try {
-                runEl.disabled = true;
-                logEntry('info', 'Checking BFF health', `URL: ${buildBffApiUrl('/api/health')}`);
-                renderLogs();
+					logEntry('info', `Calling ${selected.label}`, `FSP target: ${targetValue || 'default'}\nURL: ${url}`);
+					renderLogs();
 
-                await ensureBffHealthy();
+					const response = await fetch(url, options);
+					const rawText = await response.text();
+					let formatted = rawText;
+					let parsedPayload = null;
 
-                logEntry('info', `Calling ${selected.label}`, `FSP target: ${targetValue || 'default'}\nURL: ${url}`);
-                renderLogs();
+					try {
+						
+						parsedPayload = JSON.parse(rawText);
 
-                const response = await fetch(url, options);
-                const rawText = await response.text();
-                let formatted = rawText;
-                let parsedPayload = null;
+						// ✅ unwrap /api/execute response
+						const realPayload = parsedPayload.result || parsedPayload;
 
-                try {
-                    parsedPayload = JSON.parse(rawText);
-                    formatted = JSON.stringify(parsedPayload, null, 2);
-                } catch (error) {
-                    // keep raw text for non-JSON responses
-                }
+						formatted = JSON.stringify(realPayload, null, 2);
 
-                if (selected.id === 'model') {
-                    if (!response.ok) {
-                        setModelPanelMessage(`Model request failed with HTTP ${response.status}`, true);
-                    } else {
-                        setModelPanelMessage('Model response is not valid JSON.', true);
-                    }
-                }
+					} catch (error) {
+						// keep raw text for non-JSON responses
+					}
 
-                if (selected.id === 'messages') {
-                    if (response.ok && parsedPayload) {
-                        const messagesPayload = Object.prototype.hasOwnProperty.call(parsedPayload, 'messages')
-                            ? parsedPayload.messages
-                            : parsedPayload;
-                        addProtocolMessagesEntry(messagesPayload);
-                        renderProtocolMessages();
-                    }
-                }
+					if (selected.id === 'model') {
+						if (!response.ok) {
+							setModelPanelMessage(`Model request failed with HTTP ${response.status}`, true);
+						} else {
+							setModelPanelMessage('Model response is not valid JSON.', true);
+						}
+					}
 
-                const messagePrefix = response.ok ? 'success' : 'error';
-                logEntry(
-                    messagePrefix,
-                    `${selected.label} -> HTTP ${response.status}`,
-                    formatted
-                );
+					if (selected.id === 'apis' && response.ok && parsedPayload) {
 
-                return {
-                    ok: response.ok,
-                    status: response.status,
-                    payload: parsedPayload,
-                    rawText,
-                };
-            } catch (error) {
-                logEntry('error', `Request failed for ${selected.label}`, String(error && error.message ? error.message : error));
-                return null;
-            } finally {
-                runEl.disabled = false;
-               
-                renderLogs();
-            }
+						const endpoints = parsedPayload?.apis?.endpoints || [];
+
+						apiDefinitions = endpoints.map((ep) => {
+							const method = (ep.methods && ep.methods[0]) || 'GET';
+							const path = ep.path;
+
+							const id = path
+								.replace('/api/', '')
+								.replace(/\//g, '-')
+								.replace(/^-/, '');
+
+							return {
+								id,
+								label: `${method} ${path}`,
+								method,
+								path,
+								sampleBody: method === 'POST' ? '{}' : ''
+							};
+		});
+
+		// ✅ refresh dropdown
+		selectEl.innerHTML = apiDefinitions.map((api) => `
+			<option value="${api.id}">
+				${api.label}
+			</option>
+		`).join('');
+
+		logEntry('success', 'API list updated dynamically', JSON.stringify(apiDefinitions, null, 2));
 	}
+
+					if (selected.id === 'messages') {
+						if (response.ok && parsedPayload) {
+							const messagesPayload = Object.prototype.hasOwnProperty.call(parsedPayload, 'messages')
+								? parsedPayload.messages
+								: parsedPayload;
+							addProtocolMessagesEntry(messagesPayload);
+							renderProtocolMessages();
+						}
+					}
+
+					const messagePrefix = response.ok ? 'success' : 'error';
+					logEntry(
+						messagePrefix,
+						`${selected.label} -> HTTP ${response.status}`,
+						formatted
+					);
+
+					return {
+						ok: response.ok,
+						status: response.status,
+						payload: parsedPayload,
+						rawText,
+					};
+				} catch (error) {
+					logEntry('error', `Request failed for ${selected.label}`, String(error && error.message ? error.message : error));
+					return null;
+				} finally {
+					runEl.disabled = false;
+				
+					renderLogs();
+				}
+			}
 
 	    function setModelPanelMessage(message, isError = false) {
         const modelPanel = document.getElementById('acsi-modelPanel');

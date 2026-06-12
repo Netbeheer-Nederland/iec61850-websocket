@@ -10,7 +10,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from flask import Blueprint, Flask, jsonify, redirect, request
+from flask import Blueprint, Flask, app, jsonify, redirect, request, current_app
 
 from acsi_server import ACSIServer
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
@@ -224,38 +224,6 @@ def create_bff_blueprint(
                     },
                 )
 
-@app.get("/api/iec61850server/apis")
-def api_list_all_endpoints():
-    """Return all registered API endpoints."""
-    try:
-        routes = []
-
-        for rule in app.url_map.iter_rules():
-            # Only include API endpoints
-            if str(rule).startswith("/api/"):
-                methods = sorted(
-                    method for method in rule.methods if method not in ("HEAD", "OPTIONS")
-                )
-
-                routes.append(
-                    {
-                        "endpoint": rule.endpoint,
-                        "path": str(rule),
-                        "methods": methods,
-                    }
-                )
-
-        return jsonify(
-            {
-                "ok": True,
-                "count": len(routes),
-                "endpoints": sorted(routes, key=lambda x: x["path"]),
-            }
-        )
-
-    except Exception as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 500
-
     @app.get("/api/iec61850server/status")
     def api_status():
         """Get current server status."""
@@ -264,6 +232,34 @@ def api_list_all_endpoints():
         except Exception as exc:
             return jsonify({"ok": False, "error": str(exc)}), 500
 
+    @app.get("/api/iec61850server/apis")
+    def api_list_all_endpoints():
+        routes = []
+
+        print("Enumerating routes:", len(current_app.url_map._rules))
+
+        for rule in current_app.url_map.iter_rules():
+            path = str(rule)
+
+            if path.startswith("/api/iec61850server/"):
+
+                methods = [
+                    m for m in rule.methods
+                    if m not in ("HEAD", "OPTIONS")
+                ]
+
+                routes.append({
+                    "path": path,
+                    "methods": methods,
+                    "endpoint": rule.endpoint,
+                })
+
+        return {
+            "ok": True,
+            "count": len(routes),
+            "endpoints": sorted(routes, key=lambda x: x["path"]),
+        }
+        
     @app.get("/api/health")
     def api_health():
         """Generic health endpoint used by external discovery (for example BFF network scan)."""
@@ -655,6 +651,7 @@ def api_list_all_endpoints():
 
 def create_flask_app(factory_dir: Optional[Path] = None) -> Flask:
     """Create Flask app and register BFF blueprint."""
+    print("✅ BFF Blueprint registered with /apis endpoint", flush=True)
     resolved_factory_dir = factory_dir or Path(__file__).parent
     app = Flask(__name__, template_folder="templates", static_folder="static")
     blueprint, _server = create_bff_blueprint(resolved_factory_dir, scl_default_path=None)
