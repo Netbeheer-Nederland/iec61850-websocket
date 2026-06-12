@@ -16,6 +16,10 @@ class RTIDemoApp {
         this.isBffConnected = false;
         this.autoRefreshInterval = null;
         this.messageHistory = [];
+
+        this.getEndpoints = () => {
+            return [...this.endpoints];
+        };
         
         this.selectedEndpoint = null;
 
@@ -38,6 +42,7 @@ class RTIDemoApp {
         this.checkBFFConnection();
         this.startAutoRefresh();
     }
+
 
     // =============================================
     // Event Listeners Setup
@@ -126,8 +131,36 @@ class RTIDemoApp {
     // =============================================
     // Tools Page Logic
     // =============================================
-    loadTools() {
+    async  loadTools() {
         // Reset status/info fields
+ 
+        const toolsPage = document.getElementById('page-tools');
+
+        if (!toolsPage) {
+            return;
+        }
+
+        try {
+            const response = await fetch('./tools-page.html');
+            const html = await response.text();
+
+            toolsPage.innerHTML = html;
+
+            // Initialize tools page AFTER HTML exists
+            if (window.initializeToolsPage) {
+                window.initializeToolsPage();
+            }
+
+        } catch (error) {
+            console.error(error);
+
+            toolsPage.innerHTML = `
+                <div style="padding:20px;color:red;">
+                    Failed to load tools page
+                </div>
+            `;
+        }
+
         const statusInfo = document.getElementById('tools-statusInfo');
         if (statusInfo) statusInfo.textContent = '';
 
@@ -940,6 +973,6 @@ ${JSON.stringify(result, null, 2)}</pre>`;
 // Initialize application
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    app = new RTIDemoApp();
+    window.app = new RTIDemoApp();
     console.log('RTI Demo UI initialized');
 });

@@ -4,25 +4,40 @@
 
 (function initACSIServerPage() {
     let templateCache = null;
-    let logs = [];
     let protocolMessages = [];
     let fspTargets = [];
-    let activeLogsTab = 'api';
 
     const apiDefinitions = [
-        { id: 'status', label: 'GET /api/iec61850server/status', method: 'GET', path: '/api/iec61850server/status', sampleBody: '' },
-        { id: 'connections', label: 'GET /api/iec61850server/connections', method: 'GET', path: '/api/iec61850server/connections', sampleBody: '' },
-        { id: 'model', label: 'GET /api/iec61850server/model', method: 'GET', path: '/api/iec61850server/model', sampleBody: '' },
-        { id: 'update-iedmodel', label: 'POST /api/iec61850server/update-iedmodel', method: 'POST', path: '/api/iec61850server/update-iedmodel', sampleBody: '{\n  "modelPy": "# python code"\n}' },
-        { id: 'start', label: 'POST /api/iec61850server/start', method: 'POST', path: '/api/iec61850server/start', sampleBody: '{\n  "host": "0.0.0.0",\n  "port": 8765,\n  "mode": "server",\n  "cp": "cp1"\n}' },
-        { id: 'stop', label: 'POST /api/iec61850server/stop', method: 'POST', path: '/api/iec61850server/stop', sampleBody: '' },
-        { id: 'actions', label: 'GET /api/iec61850server/actions', method: 'GET', path: '/api/iec61850server/actions', sampleBody: '' },
-        { id: 'actions-clear', label: 'POST /api/iec61850server/actions/clear', method: 'POST', path: '/api/iec61850server/actions/clear', sampleBody: '' },
-        { id: 'messages', label: 'GET /api/iec61850server/messages', method: 'GET', path: '/api/iec61850server/messages', sampleBody: '' },
-        { id: 'messages-clear', label: 'POST /api/iec61850server/messages/clear', method: 'POST', path: '/api/iec61850server/messages/clear', sampleBody: '' },
-        { id: 'readvalue', label: 'POST /api/iec61850server/readvalue', method: 'POST', path: '/api/iec61850server/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
-        { id: 'writevalue', label: 'POST /api/iec61850server/writevalue', method: 'POST', path: '/api/iec61850server/writevalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "value": "on",\n  "fc": "ST",\n  "dataType": "BOOLEAN"\n}' }
-    ];
+
+    // =========================
+    // IEC61850 SERVER APIs
+    // =========================
+
+    { id: 'status', label: 'GET /api/iec61850server/status', method: 'GET', path: '/api/iec61850server/status', sampleBody: '' },
+
+    { id: 'connections', label: 'GET /api/iec61850server/connections', method: 'GET', path: '/api/iec61850server/connections', sampleBody: '' },
+
+    { id: 'model', label: 'GET /api/iec61850server/model', method: 'GET', path: '/api/iec61850server/model', sampleBody: '' },
+
+    { id: 'update-iedmodel', label: 'POST /api/iec61850server/update-iedmodel', method: 'POST', path: '/api/iec61850server/update-iedmodel', sampleBody: '{\n  "modelPy": "# python code"\n}' },
+
+    { id: 'start', label: 'POST /api/iec61850server/start', method: 'POST', path: '/api/iec61850server/start', sampleBody: '{\n  "host": "0.0.0.0",\n  "port": 8765,\n  "mode": "server",\n  "cp": "cp1"\n}' },
+
+    { id: 'stop', label: 'POST /api/iec61850server/stop', method: 'POST', path: '/api/iec61850server/stop', sampleBody: '' },
+
+    { id: 'actions', label: 'GET /api/iec61850server/actions', method: 'GET', path: '/api/iec61850server/actions', sampleBody: '' },
+
+    { id: 'actions-clear', label: 'POST /api/iec61850server/actions/clear', method: 'POST', path: '/api/iec61850server/actions/clear', sampleBody: '' },
+
+    { id: 'messages', label: 'GET /api/iec61850server/messages', method: 'GET', path: '/api/iec61850server/messages', sampleBody: '' },
+
+    { id: 'messages-clear', label: 'POST /api/iec61850server/messages/clear', method: 'POST', path: '/api/iec61850server/messages/clear', sampleBody: '' },
+
+    { id: 'readvalue', label: 'POST /api/iec61850server/readvalue', method: 'POST', path: '/api/iec61850server/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
+
+    { id: 'writevalue', label: 'POST /api/iec61850server/writevalue', method: 'POST', path: '/api/iec61850server/writevalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "value": "on",\n  "fc": "ST",\n  "dataType": "BOOLEAN"\n}' },
+
+];
 
     function readEndpointProperty(endpoint, key) {
         const props = endpoint && endpoint.properties_info && endpoint.properties_info.properties
@@ -56,47 +71,8 @@
         });
     }
 
-    function logEntry(type, message, details) {
-        logs.unshift({
-            timestamp: new Date().toLocaleTimeString(),
-            type,
-            message,
-            details,
-        });
-        if (logs.length > 60) {
-            logs = logs.slice(0, 60);
-        }
-    }
-
     function escapeForHtml(value) {
         return escapeHtml(value);
-    }
-
-    function renderLogs() {
-        const logsEl = document.getElementById('acsi-api-logs');
-        if (!logsEl) {
-            return;
-        }
-
-        if (logs.length === 0) {
-            logsEl.innerHTML = '<div class="acsi-log-empty">No logs yet. Run an API from the panel.</div>';
-            return;
-        }
-
-        logsEl.innerHTML = logs.map((entry) => {
-            const details = entry.details
-                ? `<pre class="acsi-log-details">${escapeForHtml(entry.details)}</pre>`
-                : '';
-            return `
-                <div class="acsi-log-item acsi-log-${entry.type}">
-                    <div class="acsi-log-head">
-                        <span class="acsi-log-time">${escapeForHtml(entry.timestamp)}</span>
-                        <span class="acsi-log-message">${escapeForHtml(entry.message)}</span>
-                    </div>
-                    ${details}
-                </div>
-            `;
-        }).join('');
     }
 
     function renderProtocolMessages() {
@@ -132,43 +108,6 @@
         if (protocolMessages.length > 30) {
             protocolMessages = protocolMessages.slice(0, 30);
         }
-    }
-
-    function setActiveLogsTab(tab) {
-        activeLogsTab = tab === 'messages' ? 'messages' : 'api';
-
-        const apiBtn = document.getElementById('acsi-log-tab-api-btn');
-        const msgBtn = document.getElementById('acsi-log-tab-messages-btn');
-        const apiPanel = document.getElementById('acsi-log-tab-api');
-        const msgPanel = document.getElementById('acsi-log-tab-messages');
-
-        if (apiBtn && msgBtn) {
-            const apiActive = activeLogsTab === 'api';
-            apiBtn.classList.toggle('active', apiActive);
-            msgBtn.classList.toggle('active', !apiActive);
-            apiBtn.setAttribute('aria-selected', apiActive ? 'true' : 'false');
-            msgBtn.setAttribute('aria-selected', apiActive ? 'false' : 'true');
-        }
-
-        if (apiPanel && msgPanel) {
-            const apiActive = activeLogsTab === 'api';
-            apiPanel.classList.toggle('active', apiActive);
-            msgPanel.classList.toggle('active', !apiActive);
-            apiPanel.hidden = !apiActive;
-            msgPanel.hidden = apiActive;
-        }
-    }
-
-    function wireLogTabs() {
-        const apiBtn = document.getElementById('acsi-log-tab-api-btn');
-        const msgBtn = document.getElementById('acsi-log-tab-messages-btn');
-        if (!apiBtn || !msgBtn) {
-            return;
-        }
-
-        apiBtn.addEventListener('click', () => setActiveLogsTab('api'));
-        msgBtn.addEventListener('click', () => setActiveLogsTab('messages'));
-        setActiveLogsTab(activeLogsTab);
     }
 
     function getBffBaseUrl() {
@@ -417,7 +356,7 @@
             return selectedValue || '';
         } catch (error) {
             fspTargets = [];
-            logEntry('error', 'Failed to load FSP targets', String(error && error.message ? error.message : error));
+            console.log('error', 'Failed to load FSP targets', String(error && error.message ? error.message : error));
             return preferredTarget || '';
         }
     }
@@ -434,36 +373,8 @@
         });
     }
 
-    function populateFspTargetSelect(selectEl, preferredTarget, selectedTarget) {
-        if (!selectEl) {
-            return '';
-        }
-
-        ensureFallbackTarget(preferredTarget);
-        ensureFallbackTarget(selectedTarget);
-
-        if (fspTargets.length === 0) {
-            selectEl.innerHTML = '<option value="">No FSP targets found</option>';
-            selectEl.value = '';
-            return '';
-        }
-
-        selectEl.innerHTML = fspTargets.map((target) => `
-            <option value="${escapeHtml(target.value)}">${escapeHtml(target.label)}</option>
-        `).join('');
-
-        const desired = selectedTarget || preferredTarget || fspTargets[0].value;
-        selectEl.value = desired;
-        if (!selectEl.value && fspTargets[0]) {
-            selectEl.value = fspTargets[0].value;
-        }
-        return selectEl.value;
-    }
 
     async function wireApiTester(endpoint) {
-        const selectEl = document.getElementById('acsi-api-select');
-        const bodyEl = document.getElementById('acsi-api-body');
-        const runEl = document.getElementById('acsi-api-run');
         const reloadStatusBtn = document.getElementById('acsi-reload-status-btn');
         const updatedStatusEl = document.getElementById('acsi-endpoint-updated-status');
         const daModalEl = document.getElementById('acsi-da-modal');
@@ -477,10 +388,8 @@
         const startBtn = document.getElementById('acsi-start-btn');
         const stopBtn = document.getElementById('acsi-stop-btn');
         const loadModelBtn = document.getElementById('acsi-load-model-btn');
+        const reloadBtn = document.getElementById("reloadMessagesBtn");
 
-        if (!selectEl || !bodyEl || !runEl) {
-            return;
-        }
 
         const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
         let activeDaSelection = null;
@@ -491,29 +400,7 @@
 
         setModelPanelMessage('Run GET /api/iec61850server/model to load the model tree.');
 
-        selectEl.innerHTML = apiDefinitions.map((api) => `
-            <option value="${api.id}">${api.label}</option>
-        `).join('');
-
-        function syncBodyPlaceholder() {
-            const selected = apiDefinitions.find((api) => api.id === selectEl.value) || apiDefinitions[0];
-            bodyEl.placeholder = selected.sampleBody || 'No body required for this endpoint.';
-            if (!bodyEl.value.trim()) {
-                bodyEl.value = selected.sampleBody || '';
-            }
-        }
-
-        selectEl.addEventListener('change', () => {
-            bodyEl.value = '';
-            syncBodyPlaceholder();
-        });
-
-        syncBodyPlaceholder();
-        wireLogTabs();
-        renderLogs();
         renderProtocolMessages();
-
-        const selectedApiById = (id) => apiDefinitions.find((api) => api.id === id);
 
         function setUpdatedStatusText(text, isError = false) {
             if (!updatedStatusEl) {
@@ -574,8 +461,7 @@
             try {
                 url = buildBffApiUrl(selected.path, targetValue);
             } catch (error) {
-                logEntry('error', `Blocked ${selected.label}`, String(error && error.message ? error.message : error));
-                renderLogs();
+                console.log('error', `Blocked ${selected.label}`, String(error && error.message ? error.message : error));
                 return null;
             }
 
@@ -603,8 +489,7 @@
                         try {
                             payloadToSend = JSON.parse(raw);
                         } catch (error) {
-                            logEntry('error', `Invalid JSON body for ${selected.label}`, String(error && error.message ? error.message : error));
-                            renderLogs();
+                            console.log('error', `Invalid JSON body for ${selected.label}`, String(error && error.message ? error.message : error));
                             return null;
                         }
                     }
@@ -622,18 +507,11 @@
             }
 
             try {
-                runEl.disabled = true;
-                if (startBtn) startBtn.disabled = true;
-                if (stopBtn) stopBtn.disabled = true;
-                if (loadModelBtn) loadModelBtn.disabled = true;
-
-                logEntry('info', 'Checking BFF health', `URL: ${buildBffApiUrl('/api/health')}`);
-                renderLogs();
+                console.log('info', 'Checking BFF health', `URL: ${buildBffApiUrl('/api/health')}`);
 
                 await ensureBffHealthy();
 
-                logEntry('info', `Calling ${selected.label}`, `FSP target: ${targetValue || 'default'}\nURL: ${url}`);
-                renderLogs();
+                console.log('info', `Calling ${selected.label}`, `FSP target: ${targetValue || 'default'}\nURL: ${url}`);
 
                 const response = await fetch(url, options);
                 const rawText = await response.text();
@@ -668,11 +546,6 @@
                 }
 
                 const messagePrefix = response.ok ? 'success' : 'error';
-                logEntry(
-                    messagePrefix,
-                    `${selected.label} -> HTTP ${response.status}`,
-                    formatted
-                );
 
                 return {
                     ok: response.ok,
@@ -681,16 +554,12 @@
                     rawText,
                 };
             } catch (error) {
-                logEntry('error', `Request failed for ${selected.label}`, String(error && error.message ? error.message : error));
+                console.log('error', `Request failed for ${selected.label}`, String(error && error.message ? error.message : error));
                 return null;
-            } finally {
-                runEl.disabled = false;
-                if (startBtn) startBtn.disabled = false;
-                if (stopBtn) stopBtn.disabled = false;
-                if (loadModelBtn) loadModelBtn.disabled = false;
-                renderLogs();
             }
         }
+
+        	const selectedApiById = (id) => apiDefinitions.find((api) => api.id === id);
 
         async function runDaAction(actionId) {
             if (!activeDaSelection || !activeDaSelection.objRef) {
@@ -700,12 +569,6 @@
 
             if (!endpointTarget) {
                 setDaModalResult('Missing selected endpoint address (fspTarget).');
-                return;
-            }
-
-            const api = selectedApiById(actionId);
-            if (!api) {
-                setDaModalResult(`Missing API definition for ${actionId}.`);
                 return;
             }
 
@@ -736,37 +599,31 @@
             setDaModalResult(String(result.rawText || 'No response body'));
         }
 
-        runEl.addEventListener('click', async () => {
-            const selected = apiDefinitions.find((api) => api.id === selectEl.value);
-            if (!selected) {
-                return;
-            }
-
-            if (!endpointTarget) {
-                logEntry('error', 'Run API blocked', 'No selected endpoint address available to resolve fspTarget.');
-                renderLogs();
-                return;
-            }
-
-            await executeApiCall(selected, endpointTarget);
-        });
-
         if (startBtn) {
             startBtn.addEventListener('click', async () => {
                 if (!endpointTarget) {
-                    logEntry('error', 'Start blocked', 'No selected endpoint address available to resolve fspTarget.');
-                    renderLogs();
+                    console.log('error', 'Start blocked', 'No selected endpoint address available to resolve fspTarget.');
                     return;
                 }
                 await executeApiCall(selectedApiById('start'), endpointTarget, {});
             });
         }
 
+        if (reloadBtn) {
+            reloadBtn.addEventListener('click', async () => {
+                if (!endpointTarget) {
+                    console.log('error', 'Reload blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    return;
+                }
+                await executeApiCall(selectedApiById('messages'), endpointTarget, {});
+            });
+        }
+
+
         if (stopBtn) {
             stopBtn.addEventListener('click', async () => {
                 if (!endpointTarget) {
-                    logEntry('error', 'Stop blocked', 'No selected endpoint address available to resolve fspTarget.');
-                    renderLogs();
+                    console.log('error', 'Stop blocked', 'No selected endpoint address available to resolve fspTarget.');
                     return;
                 }
                 await executeApiCall(selectedApiById('stop'), endpointTarget, {});
@@ -776,8 +633,7 @@
         if (loadModelBtn) {
             loadModelBtn.addEventListener('click', async () => {
                 if (!endpointTarget) {
-                    logEntry('error', 'Load model blocked', 'No selected endpoint address available to resolve fspTarget.');
-                    renderLogs();
+                    console.log('error', 'Load model blocked', 'No selected endpoint address available to resolve fspTarget.');
                     return;
                 }
                 await executeApiCall(selectedApiById('model'), endpointTarget);
@@ -811,13 +667,11 @@
 
                     const payload = await response.json();
                     setUpdatedStatusText(formatStatusSummary(payload));
-                    logEntry('success', 'GET /api/iec61850server/status -> HTTP 200', JSON.stringify(payload, null, 2));
-                    renderLogs();
+                    console.log('success', 'GET /api/iec61850server/status -> HTTP 200', JSON.stringify(payload, null, 2));
                 } catch (error) {
                     const message = String(error && error.message ? error.message : error);
                     setUpdatedStatusText(`Updated status: failed (${message})`, true);
-                    logEntry('error', 'GET /api/iec61850server/status failed', message);
-                    renderLogs();
+                    console.log('error', 'GET /api/iec61850server/status failed', message);
                 } finally {
                     reloadStatusBtn.disabled = false;
                 }
