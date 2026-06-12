@@ -86,9 +86,6 @@ class RTIDemoApp {
         if (acsiConnectBtn) {
             acsiConnectBtn.addEventListener('click', () => this.connectACSIClient());
         }
-
-        //acsi client
-        document.getElementById('acsi-connect-btn').addEventListener('click', () => this.connectACSIClient());
     }
 
     // =============================================
@@ -175,6 +172,9 @@ class RTIDemoApp {
                 break;
             case 'acsi-client':
                 this.loadAcsiClientPage();
+                break;
+            case 'acsi':
+                this.loadACSI();
                 break;
         }
     }
@@ -491,7 +491,7 @@ class RTIDemoApp {
 
     async loadConnections() {
         const result = await this.callBFF('/api/connections');
-
+        
         if (!result) {
             this.addDiagnosticMessage('Failed to load connections', 'error');
             return;
@@ -501,36 +501,9 @@ class RTIDemoApp {
         this.renderConnectionsTable();
     }
 
-    async connectACSIClient(){
-        const host = document.getElementById('acsi-client-host').value.trim();
-        const port = parseInt(document.getElementById('acsi-client-port').value.trim());
-        const cp   = document.getElementById('acsi-client-cp').value.trim() || 'cp1';
-
-        // Validate inputs
-        if (!host || !port) {
-            this.addDiagnosticMessage('Please enter both host and port', 'error');
-            return;
-        }
-
-        if (isNaN(port) || port < 1 || port > 65535) {
-            this.addDiagnosticMessage('Invalid port number', 'error');
-            return;
-        }
-
-        // Call the ACSI client connect endpoint
-        const result = await this.callBFF('/api/iec61850client/connect', 'POST', { host, port, cp });
-
-        if (result && result.ok) {
-            this.addDiagnosticMessage(`Connected to ACSI server at ${host}:${port}`, 'success');
-            this._connectedACSIClient = { host, port };
-        } else {
-            const errorMsg = result?.error || 'Unknown error';
-            this.addDiagnosticMessage(`Failed to connect to ACSI server: ${errorMsg}`, 'error');
-        }
-    }
     renderConnectionsTable() {
         const container = document.getElementById('connections-container');
-
+        
         if (this.connections.length === 0) {
             container.innerHTML = '<p style="padding: 20px; color: var(--text-muted);">No connections</p>';
             return;
@@ -609,7 +582,7 @@ class RTIDemoApp {
         }
 
         const result = await this.callBFF('/api/connections', 'POST', connection);
-
+        
         if (result) {
             this.closeConnectionModal();
             this.loadConnections();
@@ -648,7 +621,7 @@ class RTIDemoApp {
         container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Loading model…</p>';
 
         const result = await this.callBFF('/api/model/tree');
-        
+
         if (!result) {
             this.addDiagnosticMessage('Failed to load model tree', 'error');
             return;
@@ -661,7 +634,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
     }
     async loadModelClient() {
         const result = await this.callBFF('/api/model/tree');
-
+        
         if (!result) {
             this.addDiagnosticMessage('Failed to load model tree', 'error');
             return;
@@ -677,7 +650,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
 
     buildTreeHTML(node, level = 0) {
         let html = '';
-
+        
         if (Array.isArray(node)) {
             node.forEach(item => {
                 html += this.buildTreeHTML(item, level);
@@ -685,7 +658,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
         } else if (typeof node === 'object' && node !== null) {
             const indent = `${level * 20}px`;
             const isExpandable = node.children && node.children.length > 0;
-
+            
             html += `
                 <div style="padding-left: ${indent}; margin: 4px 0;">
                     ${isExpandable ? '<i class="fas fa-chevron-right" style="cursor: pointer; width: 16px;"></i>' : '<i style="width: 16px;"></i>'}
@@ -693,40 +666,56 @@ ${JSON.stringify(result, null, 2)}</pre>`;
                     <span style="margin-left: 8px;">${node.name || 'Unknown'}</span>
                 </div>
             `;
-
+            
             if (isExpandable) {
                 html += this.buildTreeHTML(node.children, level + 1);
             }
         }
-
+        
         return html;
     }
 
     // =============================================
-    // Data Page
+    // Data Read/Write
     // =============================================
 
     async readData() {
-        const objRef  = document.getElementById('data-ref').value.trim();
-        const output  = document.getElementById('data-output');
-        if (!objRef) { output.textContent = 'Enter a data reference first.'; return; }
+        const objRef = document.getElementById('data-ref').value;
+        
+        if (!objRef) {
+            alert('Please enter a data reference');
+            return;
+        }
 
-        const result = await this.callBFF('/api/iec61850server/readvalue', 'POST', { objRef });
-        output.textContent = result ? JSON.stringify(result, null, 2) : 'Read failed.';
+        const result = await this.callBFF('/api/data/read', 'POST', { objRef });
+        
+        if (result) {
+            const output = document.getElementById('data-output');
+            output.textContent = JSON.stringify(result, null, 2);
+            document.getElementById('data-value').value = result.value || '';
+        }
     }
 
     async writeData() {
-        const objRef = document.getElementById('data-ref').value.trim();
-        const value  = document.getElementById('data-value').value.trim();
-        const output = document.getElementById('data-output');
-        if (!objRef || !value) { output.textContent = 'Enter both a reference and a value.'; return; }
+        const objRef = document.getElementById('data-ref').value;
+        const value = document.getElementById('data-value').value;
+        
+        if (!objRef || !value) {
+            alert('Please enter both reference and value');
+            return;
+        }
 
-        const result = await this.callBFF('/api/iec61850server/writevalue', 'POST', { objRef, value });
-        output.textContent = result ? JSON.stringify(result, null, 2) : 'Write failed.';
+        const result = await this.callBFF('/api/data/write', 'POST', { objRef, value });
+        
+        if (result) {
+            const output = document.getElementById('data-output');
+            output.textContent = JSON.stringify(result, null, 2);
+            this.addDiagnosticMessage(`Data written to ${objRef}`, 'success');
+        }
     }
 
     // =============================================
-    // Reports Page
+    // Reports
     // =============================================
 
     async loadReports() {
@@ -742,29 +731,39 @@ ${JSON.stringify(result, null, 2)}</pre>`;
 
     async renderReports(reports) {
         const container = document.getElementById('reports-container');
-        if (!container) return;
-        const result = await this.callBFF('/api/reports');
-        if (!result || !result.reports) {
-            container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">No reports available.</p>';
+        
+        if (!reports || reports.length === 0) {
+            container.innerHTML = '<p style="padding: 20px; color: var(--text-muted);">No reports available</p>';
             return;
         }
-        container.innerHTML = result.reports.map(r => `
-            <div style="padding:16px; border-bottom:1px solid var(--border-color);">
-                <strong>${r.name}</strong>
-                <p style="color:var(--text-muted); font-size:13px; margin-top:4px;">${r.description || ''}</p>
-                <small style="color:var(--text-muted);">${r.timestamp || ''}</small>
-            </div>`).join('');
+
+        let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">';
+        
+        reports.forEach(report => {
+            html += `
+                <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;">
+                    <h3 style="margin-bottom: 12px;">${report.name}</h3>
+                    <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">${report.timestamp}</p>
+                    <p>${report.description}</p>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
     }
 
     async exportReports() {
         const result = await this.callBFF('/api/reports/export', 'POST');
-        if (result) {
+        
+        if (result && result.data) {
             const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
-            const url  = URL.createObjectURL(blob);
-            const a    = document.createElement('a');
-            a.href = url; a.download = 'reports_export.json'; a.click();
-            URL.revokeObjectURL(url);
-            this.addDiagnosticMessage('Reports exported.', 'success');
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `reports-${new Date().toISOString()}.json`;
+            a.click();
+            this.addDiagnosticMessage('Reports exported', 'success');
         }
     }
 
@@ -783,30 +782,44 @@ ${JSON.stringify(result, null, 2)}</pre>`;
             container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">No diagnostic messages.</p>';
             return;
         }
-        container.innerHTML = '<div style="max-height:600px; overflow-y:auto;">' +
-            this.messageHistory.map(msg => {
-                const iconMap  = { success: 'check-circle', error: 'exclamation-circle', warning: 'exclamation-triangle', info: 'info-circle' };
-                const colorMap = { success: 'var(--success-color)', error: 'var(--danger-color)', warning: 'var(--warning-color)', info: 'var(--info-color)' };
-                return `<div style="padding:12px; border-bottom:1px solid var(--border-color); display:flex; gap:12px;">
-                    <i class="fas fa-${iconMap[msg.type] || 'info-circle'}" style="color:${colorMap[msg.type] || 'var(--info-color)'}; width:16px; flex-shrink:0; margin-top:3px;"></i>
+
+        let html = '<div style="max-height: 600px; overflow-y: auto;">';
+        
+        this.messageHistory.forEach(msg => {
+            const iconClass = msg.type === 'success' ? 'check-circle' : msg.type === 'error' ? 'exclamation-circle' : 'info-circle';
+            const color = msg.type === 'success' ? 'var(--success-color)' : msg.type === 'error' ? 'var(--danger-color)' : 'var(--info-color)';
+            
+            html += `
+                <div style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; gap: 12px;">
+                    <i class="fas fa-${iconClass}" style="color: ${color}; width: 16px; flex-shrink: 0;"></i>
                     <div>
-                        <div style="font-size:12px; color:var(--text-muted);">${msg.timestamp}</div>
-                        <div>${this._escHtml(msg.message)}</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">${msg.timestamp}</div>
+                        <div>${msg.message}</div>
                     </div>
-                </div>`;
-            }).join('') + '</div>';
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
     }
 
     addDiagnosticMessage(message, type = 'info') {
-        this.messageHistory.unshift({ message, type, timestamp: new Date().toLocaleTimeString() });
-        if (this.messageHistory.length > 100) this.messageHistory.pop();
+        const timestamp = new Date().toLocaleTimeString();
+        this.messageHistory.unshift({ message, type, timestamp });
+        
+        // Keep only last 100 messages
+        if (this.messageHistory.length > 100) {
+            this.messageHistory.pop();
+        }
     }
 
     async clearDiagnostics() {
-        if (!confirm('Clear all diagnostic messages?')) return;
-        this.messageHistory = [];
-        this.renderDiagnostics();
-        this.addDiagnosticMessage('Diagnostic messages cleared.', 'success');
+        if (confirm('Clear all diagnostic messages?')) {
+            this.messageHistory = [];
+            this.renderDiagnostics();
+            this.addDiagnosticMessage('Diagnostic messages cleared', 'success');
+        }
     }
 
     // =============================================
@@ -843,16 +856,10 @@ ${JSON.stringify(result, null, 2)}</pre>`;
             this.addDiagnosticMessage('Invalid BFF settings — provide a valid host and port (1–65535).', 'error');
             return false;
         }
-
-        this.bffHost = host;
-        this.bffPort = port;
-        this.bffBaseUrl = `http://${this.bffHost}:${this.bffPort}`;
-
-        if (persist) {
-            localStorage.setItem('bffHost', this.bffHost);
-            localStorage.setItem('bffPort', this.bffPort);
-        }
-
+        this.bffHost   = host;
+        this.bffPort   = port;
+        this.bffBaseUrl = `http://${host}:${port}`;
+        if (persist) { localStorage.setItem('bffHost', host); localStorage.setItem('bffPort', port); }
         return true;
     }
 
@@ -901,7 +908,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
 
     toggleAutoRefresh(e) {
         localStorage.setItem('autoRefresh', e.target.checked);
-
+        
         if (e.target.checked) {
             this.startAutoRefresh();
         } else {

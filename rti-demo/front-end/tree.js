@@ -1,7 +1,5 @@
 console.log('tree.js loading...');
 
-let dataAttributeClickHandler = null;
-
 function parseSclXml(xmlText) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, 'application/xml');
@@ -308,27 +306,7 @@ function appendDataAttributeNodes(parentLi, attributes, nodeLabel) {
 
   attributes.forEach(function (da) {
     const typeSuffix = da.bType ? ` [${da.bType}]` : '';
-    const fcSuffix = da.fc ? ` (FC: ${da.fc})` : '';
-    const daLi = createTreeNode(nodeLabel, `${da.name}${typeSuffix}${fcSuffix}`);
-
-    if (da && da.objRef) {
-      const row = daLi.querySelector(':scope > .scl-tree-row');
-      if (row) {
-        row.classList.add('scl-da-clickable');
-        row.title = da.fc ? `${da.objRef} (FC: ${da.fc})` : da.objRef;
-        row.addEventListener('click', function (event) {
-          event.stopPropagation();
-          if (typeof dataAttributeClickHandler === 'function') {
-            dataAttributeClickHandler({
-              name: da.name || '',
-              objRef: da.objRef,
-              fc: da.fc || ''
-            });
-          }
-        });
-      }
-    }
-
+    const daLi = createTreeNode(nodeLabel, `${da.name}${typeSuffix}`);
     appendDataAttributeNodes(daLi, da.subDataAttributes || [], 'SDA');
     ul.appendChild(daLi);
   });
@@ -479,10 +457,6 @@ function renderSclTree(treeData, containerOrId) {
   setupCollapsibleTree(container);
 }
 
-function setDataAttributeClickHandler(handler) {
-  dataAttributeClickHandler = typeof handler === 'function' ? handler : null;
-}
-
 async function loadSclFileAndRender(file, containerOrId) {
   if (!file) {
     throw new Error('No SCL file provided.');
@@ -610,8 +584,7 @@ function renderLiveModelTree(data, containerOrId, onNodeClick) {
 window.SCLTree = {
   buildSclTreeFromText,
   renderSclTree,
-  loadSclFileAndRender,
-  setDataAttributeClickHandler
+  loadSclFileAndRender
 };
 
 console.log('tree.js loaded. window.SCLTree:', window.SCLTree);
