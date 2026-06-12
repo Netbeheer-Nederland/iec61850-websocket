@@ -143,6 +143,7 @@ services:
     container_name: rti-client
     ports:
       - "5002:5002"
+      - "8765:8765"    # WebSocket port - MUST ADD
     environment:
       - PORT=5002
       - PYTHONUNBUFFERED=1

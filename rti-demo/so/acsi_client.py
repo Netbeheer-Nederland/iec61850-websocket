@@ -184,7 +184,7 @@ class ACSIClient:
             )
 
             try:
-                await asyncio.wait_for(client.ready_event.wait(), timeout=15)
+                await asyncio.wait_for(client.ready_event.wait(), None)
             except asyncio.TimeoutError as exc:
                 start_task.cancel()
                 raise RuntimeError(
