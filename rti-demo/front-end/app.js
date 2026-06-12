@@ -173,8 +173,8 @@ class RTIDemoApp {
             case 'acsi-server':
                 this.loadAcsiServerPage();
                 break;
-            case 'acsi':
-                this.loadACSI();
+            case 'acsi-client':
+                this.loadAcsiClientPage();
                 break;
         }
     }
@@ -740,7 +740,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
         this.renderReports(result.reports);
     }
 
-    renderReports(reports) {
+    async renderReports(reports) {
         const container = document.getElementById('reports-container');
         if (!container) return;
         const result = await this.callBFF('/api/reports');
