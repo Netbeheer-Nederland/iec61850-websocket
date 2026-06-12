@@ -184,7 +184,7 @@ window.ACSIClientPage = {
     },
 
     callBFF: function(endpoint, method = 'GET', data = null) {
-        const bffBaseUrl = app.bffBaseUrl || 'http://localhost:5000';
+        const bffBaseUrl = window.app?.bffBaseUrl || 'http://localhost:5000';
 
         const options = {
             method,
