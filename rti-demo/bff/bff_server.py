@@ -932,7 +932,7 @@ if __name__ == '__main__':
     logger.info("  GET    /api/health")
     logger.info("  GET    /api/endpoints")
     logger.info("  GET    /api/connections")
-    logger.info("  POST   /api/connections")
+    logger.info("  POST   /api/connect")
     logger.info("  DELETE /api/connections/<id>")
     logger.info("  POST   /api/data/read")
     logger.info("  POST   /api/data/write")

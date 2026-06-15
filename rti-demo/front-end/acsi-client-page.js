@@ -24,17 +24,17 @@ window.ACSIClientPage = {
             <div style="margin-top:24px;">
                 <h2>Connection Settings</h2>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top:16px;">
-                    <div class="setting-item">
+                    <div class="form-group">
                         <label for="acsi-client-host-page">Host</label>
                         <input type="text" id="acsi-client-host-page" value="${host}" placeholder="127.0.0.1">
                     </div>
 
-                    <div class="setting-item">
+                    <div class="form-group">
                         <label for="acsi-client-port-page">Port</label>
                         <input type="number" id="acsi-client-port-page" value="${port}" placeholder="102">
                     </div>
 
-                    <div class="setting-item">
+                    <div class="form-group">
                         <label for="acsi-client-cp-page">Connection Point (CP)</label>
                         <input type="text" id="acsi-client-cp-page" value="cp1" placeholder="cp1">
                     </div>

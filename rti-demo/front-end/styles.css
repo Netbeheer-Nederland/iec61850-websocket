@@ -1092,35 +1092,45 @@ body {
     }
 }
 
+/* ===== Form Group - Works Inside Flex Containers ===== */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 0;  /* Parent handles bottom margin */
+    min-width: 180px;  /* Prevents squishing in flex container */
+}
+
+.form-group label {
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.form-group input {
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+}
+
+/* ===== Fix Parent Container Alignment ===== */
+.acsi-connection-section {
+    align-items: flex-start !important;  /* Override inline style */
+    flex-wrap: wrap;
+}
 /* ==============================================
    ACSI Page
    ============================================== */
 
 
 
-.acsi-action-section-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.acsi-connection-section .setting-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* make inputs and the button the same height and box-sizing */
-.acsi-connection-section input,
-.acsi-connection-section button {
-  height: 36px;
-  box-sizing: border-box;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--text-muted);
-}
