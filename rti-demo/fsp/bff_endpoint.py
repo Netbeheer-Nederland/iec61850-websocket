@@ -10,7 +10,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from flask import Blueprint, Flask, jsonify, redirect, request
+from flask import Blueprint, Flask, jsonify, redirect, request, current_app
 
 from acsi_server import ACSIServer
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
@@ -230,7 +230,7 @@ def create_bff_blueprint(
         try:
             routes = []
 
-            for rule in app.url_map.iter_rules():
+            for rule in current_app.url_map.iter_rules():
                 # Only include API endpoints
                 if str(rule).startswith("/api/"):
                     methods = sorted(
