@@ -10,7 +10,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from flask import Blueprint, Flask, app, jsonify, redirect, request, current_app
+from flask import Blueprint, Flask, jsonify, redirect, request
 
 from acsi_server import ACSIServer
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
@@ -224,6 +224,38 @@ def create_bff_blueprint(
                     },
                 )
 
+    @app.get("/api/iec61850server/apis")
+    def api_list_all_endpoints():
+        """Return all registered API endpoints."""
+        try:
+            routes = []
+
+            for rule in app.url_map.iter_rules():
+                # Only include API endpoints
+                if str(rule).startswith("/api/"):
+                    methods = sorted(
+                        method for method in rule.methods if method not in ("HEAD", "OPTIONS")
+                    )
+
+                    routes.append(
+                        {
+                            "endpoint": rule.endpoint,
+                            "path": str(rule),
+                            "methods": methods,
+                        }
+                    )
+
+            return jsonify(
+                {
+                    "ok": True,
+                    "count": len(routes),
+                    "endpoints": sorted(routes, key=lambda x: x["path"]),
+                }
+            )
+
+        except Exception as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 500
+
     @app.get("/api/iec61850server/status")
     def api_status():
         """Get current server status."""
@@ -232,34 +264,6 @@ def create_bff_blueprint(
         except Exception as exc:
             return jsonify({"ok": False, "error": str(exc)}), 500
 
-    @app.get("/api/iec61850server/apis")
-    def api_list_all_endpoints():
-        routes = []
-
-        print("Enumerating routes:", len(current_app.url_map._rules))
-
-        for rule in current_app.url_map.iter_rules():
-            path = str(rule)
-
-            if path.startswith("/api/iec61850server/"):
-
-                methods = [
-                    m for m in rule.methods
-                    if m not in ("HEAD", "OPTIONS")
-                ]
-
-                routes.append({
-                    "path": path,
-                    "methods": methods,
-                    "endpoint": rule.endpoint,
-                })
-
-        return {
-            "ok": True,
-            "count": len(routes),
-            "endpoints": sorted(routes, key=lambda x: x["path"]),
-        }
-        
     @app.get("/api/health")
     def api_health():
         """Generic health endpoint used by external discovery (for example BFF network scan)."""
@@ -310,7 +314,7 @@ def create_bff_blueprint(
         return jsonify(
             {
                 "ok": True,
-                "server_role": "ACSI_Server",
+                "acsi_role": "ACSI_Server",
                 "ws_mode": "active",
             }
         )

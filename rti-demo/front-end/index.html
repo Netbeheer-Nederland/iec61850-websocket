@@ -215,6 +215,11 @@
                 <div id="acsi-server-page-root"></div>
             </section>
 
+            <!-- ACSI Client Page -->
+            <section id="page-acsi-client" class="page">
+                <div id="acsi-client-page-root"></div>
+            </section>
+
             <!-- Settings Page -->
             <section id="page-settings" class="page">
                 <div class="page-header">
@@ -262,8 +267,52 @@
                     </div>
                 </div>
             </section>
+
+            <!-- ACSI Page -->
+            <section id="page-acsi" class="page">
+                <div class="page-header">
+                    <div style="display:flex; align-items:center; gap:16px;">
+                        <h1><i class="fas fa-microchip" style="margin-right:10px; color:var(--primary-light);"></i>ACSI Interface</h1>
+                        <span id="acsi-endpoint-badge" class="acsi-endpoint-badge" style="display:none;"></span>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:left; gap:16px; margin-bottom:24px;">
+                    <h2><i style="margin-right:10px; color:var(--primary-light);"></i>ACSI Client</h2>
+                </div>
+                <div class="acsi-connection-section" style="display:flex; align-items:flex-end; gap:16px; margin-bottom:24px; margin-top:10ptx;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <label style="margin-right: 10px;">Host</label>
+                        <input type="text" id="acsi-client-host" placeholder="127.0.0.1">
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <label style="margin-right: 10px;">Port</label>
+                        <input type="number" id="acsi-client-port" placeholder="102">
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <label style="margin-right: 10px;">CP</label>
+                        <input type="text" id="acsi-client-cp" placeholder="cp1">
+                    </div>
+
+                    <button id="acsi-connect-btn" class="btn-secondary" style="align-self:center;">
+                        Connect
+                    </button>
+                </div>
+                <div>
+                    <button id="acsi-read-data-btn" onclick="loadClientTree()" class="btn-primary" disabled>
+                        Fetch Model
+                    </button>
+                </div>
+                <div id="acsi-client-tree-container" class="model-tree" style="margin-top:24px;">
+                    <!-- ACSI client model tree will be generated here -->
+                </div>
+
+            </section>
         </main>
     </div>
+
+
 
     <!-- Modal for Connection Details -->
     <div class="modal" id="modal-connection">
@@ -301,6 +350,7 @@
     </div>
 
     <script src="acsi-server-page.js"></script>
+    <script src="acsi-client-page.js"></script>
     <script src="app.js"></script>
     <script src="tree.js"></script>
     <script type="module" src="hmi-tools.js"></script>

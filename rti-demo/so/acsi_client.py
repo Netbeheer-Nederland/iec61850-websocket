@@ -10,6 +10,8 @@ This module handles:
 from __future__ import annotations
 
 import asyncio
+import logging
+logger = logging.getLogger(__name__)
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 import json
 import os
@@ -366,3 +368,24 @@ class ACSIClient:
         # dataAttrVal expects [{"data": (type_str, value)}]
         await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
         return {"objRef": obj_ref, "value": value}
+
+    async def get_model(self) -> Dict[str, Any]:
+        """Read the server directory / model and return a JSON-serializable structure."""
+        client = self.runtime.client
+        if client is None:
+            raise RuntimeError("Client is not connected")
+
+        try:
+            websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+            raw = await client.get_server_directory(websocket_info, None, None)
+            serial = _make_serializable(raw)
+            # Ensure we return a mapping (compatible with callers expecting dict)
+            if isinstance(serial, dict):
+                return serial
+            return {"result": serial}
+        except Exception as exc:
+            # Record model error and present a serializable error mapping
+            self.runtime.model_error = str(exc)
+            self.runtime.model_status = 'error'
+            logger.exception("get_model failed")
+            return {"ok": False, "error": str(exc)}

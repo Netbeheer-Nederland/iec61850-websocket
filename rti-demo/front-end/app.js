@@ -21,6 +21,18 @@ class RTIDemoApp {
             return [...this.endpoints];
         };
         
+        this.selectedEndpoint = null;
+
+        // ACSI state
+        this._acsiDataTarget   = 'fsp';   // 'fsp' | 'so'
+        this._acsiModelTarget  = 'fsp';
+        this._acsiMonitorTarget = 'fsp';
+        this._monitorTimer     = null;
+        this._modelLds         = [];
+        this._modelLns         = [];
+        this._selectedLd       = null;
+        this._selectedLn       = null;
+
         this.init();
     }
 
@@ -73,6 +85,12 @@ class RTIDemoApp {
         // Reports
         document.getElementById('btn-export-reports').addEventListener('click', () => this.exportReports());
         document.getElementById('btn-clear-diagnostics').addEventListener('click', () => this.clearDiagnostics());
+
+        // ACSI Client
+        const acsiConnectBtn = document.getElementById('acsi-connect-btn');
+        if (acsiConnectBtn) {
+            acsiConnectBtn.addEventListener('click', () => this.connectACSIClient());
+        }
     }
 
     // =============================================
@@ -185,6 +203,12 @@ class RTIDemoApp {
             case 'acsi-server':
                 this.loadAcsiServerPage();
                 break;
+            case 'acsi-client':
+                this.loadAcsiClientPage();
+                break;
+            case 'acsi':
+                this.loadACSI();
+                break;
         }
     }
 
@@ -202,6 +226,25 @@ class RTIDemoApp {
         root.innerHTML = '<p style="color: var(--text-muted);">ACSI Server page is unavailable.</p>';
     }
 
+    loadAcsiClientPage() {
+        const root = document.getElementById('acsi-client-page-root');
+        if (!root) {
+            return;
+        }
+
+        if (window.ACSIClientPage && typeof window.ACSIClientPage.render === 'function') {
+            window.ACSIClientPage.render(root, this.selectedAcsiEndpoint);
+            return;
+        }
+
+        root.innerHTML = '<p style="color: var(--text-muted);">ACSI Client page is unavailable.</p>';
+    }
+
+    loadACSI() {
+        // Simply show the page-acsi section
+        // The page-acsi HTML is already in index.html with the ACSI client connection form
+        // No dynamic loading needed - the form is static HTML
+    }
     // =============================================
     // BFF Communication
     // =============================================
@@ -413,8 +456,8 @@ class RTIDemoApp {
             : '';
         
         // Extract properties from properties_info
-        const props = endpoint.properties_info?.properties || {};
-        const serverRole = props['server-role'] || props['server_role'] || 'N/A';
+        const props = endpoint.properties_info.properties || {};
+        const serverRole = props['acsi-role'] || props['acsi_role'] || 'N/A';
         const wsMode = props['ws_mode'] || 'N/A';
         
         card.innerHTML = `
@@ -447,21 +490,36 @@ class RTIDemoApp {
 
     configureEndpoint(endpoint) {
         const props = endpoint.properties_info?.properties || {};
-        const serverRoleRaw = props['server-role'] || props['server_role'] || '';
-        const serverRole = String(serverRoleRaw).trim().toLowerCase();
+        const acsiRoleRaw = props['acsi-role'] || props['acsi_role'] || '';
+        const acsiRole = String(acsiRoleRaw).trim().toLowerCase();
 
-        if (serverRole === 'acsi_server') {
+        if (acsiRole === 'acsi_server') {
             this.selectedAcsiEndpoint = endpoint;
             this.navigateToPage('acsi-server');
+            return;
+        }
+        if (acsiRole === 'acsi_client') {
+            this.selectedAcsiEndpoint = endpoint;
+            this.navigateToPage('acsi-client');
             return;
         }
 
         // Default behavior for non-ACSI server endpoints.
         this.navigateToPage('connections');
+        this.selectedEndpoint = endpoint;
+
+        // Show badge with endpoint name/host:port
+        const badge = document.getElementById('acsi-endpoint-badge');
+        if (badge && endpoint) {
+            badge.textContent = `${endpoint.name || ''} · ${endpoint.host}:${endpoint.port}`;
+            badge.style.display = 'inline-block';
+        }
+
+        this.navigateToPage('acsi');
     }
 
     // =============================================
-    // Connections Management
+    // ACSI Page
     // =============================================
 
     async loadConnections() {
@@ -591,6 +649,23 @@ class RTIDemoApp {
     // =============================================
 
     async loadModel() {
+        const container = document.getElementById('model-tree-container');
+        if (!container) return;
+        container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Loading model…</p>';
+
+        const result = await this.callBFF('/api/model/tree');
+
+        if (!result) {
+            this.addDiagnosticMessage('Failed to load model tree', 'error');
+            return;
+        }
+
+        container.innerHTML = `
+            <pre style="padding:20px; font-size:12px; color:var(--text-secondary);
+                white-space:pre-wrap; word-break:break-all;">
+${JSON.stringify(result, null, 2)}</pre>`;
+    }
+    async loadModelClient() {
         const result = await this.callBFF('/api/model/tree');
         
         if (!result) {
@@ -687,7 +762,7 @@ class RTIDemoApp {
         this.renderReports(result.reports);
     }
 
-    renderReports(reports) {
+    async renderReports(reports) {
         const container = document.getElementById('reports-container');
         
         if (!reports || reports.length === 0) {
@@ -735,9 +810,9 @@ class RTIDemoApp {
 
     renderDiagnostics() {
         const container = document.getElementById('diagnostics-container');
-        
-        if (this.messageHistory.length === 0) {
-            container.innerHTML = '<p style="padding: 20px; color: var(--text-muted);">No diagnostic messages</p>';
+        if (!container) return;
+        if (!this.messageHistory.length) {
+            container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">No diagnostic messages.</p>';
             return;
         }
 
@@ -785,60 +860,39 @@ class RTIDemoApp {
     // =============================================
 
     loadSettings() {
-        document.getElementById('bff-host').value = this.bffHost;
-        document.getElementById('bff-port').value = this.bffPort;
+        const bffHostEl   = document.getElementById('bff-host');
+        const bffPortEl   = document.getElementById('bff-port');
+        const scanHostEl  = document.getElementById('scan-host');
+        const scanPortsEl = document.getElementById('scan-ports');
+        if (bffHostEl)   bffHostEl.value   = this.bffHost;
+        if (bffPortEl)   bffPortEl.value   = this.bffPort;
+        if (scanHostEl)  scanHostEl.value  = this.scanHost;
+        if (scanPortsEl) scanPortsEl.value = this.scanPorts;
 
-        const scanHostInput = document.getElementById('scan-host');
-        const scanPortsInput = document.getElementById('scan-ports');
-        if (scanHostInput) {
-            scanHostInput.value = this.scanHost;
-        }
-        if (scanPortsInput) {
-            scanPortsInput.value = this.scanPorts;
-        }
-        
-        const darkMode = localStorage.getItem('darkMode') !== 'false';
-        document.getElementById('dark-mode-toggle').checked = darkMode;
-        
-        const autoRefresh = localStorage.getItem('autoRefresh') !== 'false';
-        document.getElementById('auto-refresh-toggle').checked = autoRefresh;
+        const darkToggle  = document.getElementById('dark-mode-toggle');
+        const autoToggle  = document.getElementById('auto-refresh-toggle');
+        if (darkToggle)  darkToggle.checked  = localStorage.getItem('darkMode')    !== 'false';
+        if (autoToggle)  autoToggle.checked  = localStorage.getItem('autoRefresh') !== 'false';
     }
 
     saveSettings() {
-        if (!this.updateBffConfigFromSettingsInputs(true)) {
-            return;
-        }
-
-        if (!this.updateScanConfigFromSettingsInputs(true)) {
-            return;
-        }
-
-        this.addDiagnosticMessage('Settings saved', 'success');
+        if (!this.updateBffConfigFromSettingsInputs(true)) return;
+        if (!this.updateScanConfigFromSettingsInputs(true)) return;
+        this.addDiagnosticMessage('Settings saved.', 'success');
         this.checkBFFConnection();
     }
 
     updateBffConfigFromSettingsInputs(persist = false) {
-        const hostInput = document.getElementById('bff-host');
-        const portInput = document.getElementById('bff-port');
-
-        const host = hostInput.value.trim();
-        const port = portInput.value.trim();
-        const isPortValid = /^\d+$/.test(port) && Number(port) > 0 && Number(port) <= 65535;
-
-        if (!host || !isPortValid) {
-            this.addDiagnosticMessage('Invalid BFF settings. Provide a host and a valid port (1-65535).', 'error');
+        const host = (document.getElementById('bff-host')?.value || '').trim();
+        const port = (document.getElementById('bff-port')?.value || '').trim();
+        if (!host || !/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
+            this.addDiagnosticMessage('Invalid BFF settings — provide a valid host and port (1–65535).', 'error');
             return false;
         }
-
-        this.bffHost = host;
-        this.bffPort = port;
-        this.bffBaseUrl = `http://${this.bffHost}:${this.bffPort}`;
-
-        if (persist) {
-            localStorage.setItem('bffHost', this.bffHost);
-            localStorage.setItem('bffPort', this.bffPort);
-        }
-
+        this.bffHost   = host;
+        this.bffPort   = port;
+        this.bffBaseUrl = `http://${host}:${port}`;
+        if (persist) { localStorage.setItem('bffHost', host); localStorage.setItem('bffPort', port); }
         return true;
     }
 
