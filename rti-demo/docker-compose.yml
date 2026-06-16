@@ -163,6 +163,34 @@ services:
     volumes:
         - ./so:/app/so
 
+  # RTI SO (IEC61850 Client)
+  rti-ws-client:
+    build:
+      context: ..
+      dockerfile: rti-demo/acsi_ws_client/Dockerfile
+    container_name: rti-ws-client
+    ports:
+      - "5003:5003"
+      - "8765:8765"    # WebSocket port - MUST ADD
+    environment:
+      - PORT=5003
+      - PYTHONUNBUFFERED=1
+    networks:
+      - rti-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5003/api/iec61850client/status" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "rti.service=rti-ws-client"
+      - "rti.type=RTI-SO"
+      - "rti.host=rti-ws-client"
+      - "rti.port=5003"
+    volumes:
+      - ./acsi_ws_client:/app/acsi_ws_client
+
 networks:
   rti-network:
     driver: bridge
