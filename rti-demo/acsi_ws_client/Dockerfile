@@ -23,7 +23,7 @@ RUN pip install /app/repo
 COPY rti-demo/acsi_ws_client/ /app/acsi_ws_client/
 
 # Install Flask and Flask-CORS dependencies
-RUN pip install fastapi
+RUN pip install fastapi uvicorn
 
 EXPOSE 5003
 
