@@ -22,6 +22,23 @@ from acsi_client import ACSIClient
 
 logger = logging.getLogger(__name__)
 
+class ConnectRequest(BaseModel):
+    """Request body for connect endpoint"""
+    host: str = Field(default="localhost", description="Server hostname")
+    port: int = Field(default=8765, description="Server port")
+    cp: str = Field(default="cp1", description="Communication point")
+
+class ReadvalueRequest(BaseModel):
+    """Request body for read value endpoint"""
+    objRef: str = Field(..., description="Object reference")
+    fc: Optional[str] = Field(default=None, description="Functional constraint")
+
+class WritevalueRequest(BaseModel):
+    """Request body for write value endpoint"""
+    objRef: str = Field(..., description="Object reference")
+    fc: str = Field(..., description="Functional constraint")
+    value: Any = Field(..., description="Value to write")
+    value_type: Optional[str] = Field(default=None, description="Value type")
 
 def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     router = APIRouter(prefix="/api/iec61850client", tags=["IEC61850-WS Client"])
@@ -92,11 +109,6 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
             "acsi_role": "ACSI_Client",
             "ws_mode": "passive",
         }
-
-    class ConnectRequest(BaseModel):
-        host: str = "localhost"
-        port: int = 8765
-        cp: str = Field(default="cp1", description="Communication point")
 
     @router.post("/connect")
     def api_connect(request: ConnectRequest):
@@ -599,10 +611,6 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
                 status_code=500
             )
 
-    class ReadvalueRequest(BaseModel):
-        objRef: str
-        fc: str
-
     @router.post("/readvalue")
     def api_read_value(request: ReadvalueRequest):
         """Read a value from the connected server.
@@ -739,12 +747,6 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
                 content={"ok": False, "error": str(exc)},
                 status_code=500
             )
-
-    class WritevalueRequest(BaseModel):
-        objRef: str
-        fc: str
-        value: str
-        value_type: str
 
     @router.post("/writevalue")
     def api_write_value(request: WritevalueRequest):
