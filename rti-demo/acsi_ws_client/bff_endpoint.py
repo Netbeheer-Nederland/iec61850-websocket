@@ -33,7 +33,7 @@ class ReadvalueRequest(BaseModel):
     objRef: str = Field(..., description="Object reference")
     fc: Optional[str] = Field(default=None, description="Functional constraint")
 
-class WritevalueRequest(BaseModel):
+class WriteValueRequest(BaseModel):
     """Request body for write value endpoint"""
     objRef: str = Field(..., description="Object reference")
     fc: str = Field(..., description="Functional constraint")
@@ -747,6 +747,12 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
                 content={"ok": False, "error": str(exc)},
                 status_code=500
             )
+
+    class WritevalueRequest(BaseModel):
+        objRef: str
+        fc: str
+        value: str
+        value_type: str
 
     @router.post("/writevalue")
     def api_write_value(request: WritevalueRequest):

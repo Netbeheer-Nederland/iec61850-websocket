@@ -14,16 +14,12 @@ import logging
 logger = logging.getLogger(__name__)
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 import json
-import os
-import sys
 import threading
 import time
 from collections import deque
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from ws61850.endpoint import PassiveEndpoint
 from ws61850.endpoint import ActiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
@@ -162,7 +158,7 @@ class ACSIClient:
         )
 
         try:
-            endpoint = PassiveEndpoint()
+            endpoint = ActiveEndpoint(is_direct=True)
             endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
             endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
 
@@ -174,8 +170,7 @@ class ACSIClient:
             # wait for the client's ready_event, which is set once the IEC 61850
             # association has been established.
             start_task = asyncio.create_task(
-                endpoint.start(host, port),
-                name=f"so-active-{cp}",
+                endpoint.start(host, port, cp)
             )
 
             # Remember the task so we can cancel it on disconnect.
