@@ -321,7 +321,7 @@ class ACSIServer:
             )
 
         ws_task = asyncio.create_task(
-            endpoint.start(host, port, cp), name="ws-active"
+            endpoint.start(host, port)
         )
         tasks["ws"] = ws_task
 
@@ -351,7 +351,7 @@ class ACSIServer:
 
     def _create_endpoint(self):
         """Create a WebSocket endpoint (can be overridden for testing)."""
-        return PassiveEndpoint()
+        return PassiveEndpoint(is_direct=True)
 
     def _event_loop_thread(self, host: str, port: int) -> None:
         """Run the event loop in a separate thread."""
