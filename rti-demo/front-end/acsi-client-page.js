@@ -56,7 +56,7 @@
         }
         const requestUrl = new URL(`${baseUrl}${path}`, window.location.origin);
         if (targetValue) {
-            requestUrl.searchParams.set('fspTarget', targetValue);
+            requestUrl.searchParams.set('soTarget', targetValue);
         }
         return requestUrl.toString();
     }
@@ -75,16 +75,16 @@
     }
 
     // ==================== Core API Call Function ====================
-           async function executeApiCall(selected, targetValue, bodyOverride) {
+       async function executeApiCall(selected, targetValue, bodyOverride) {
             if (!selected) {
                 return null;
             }
 
             let url;
             try {
-                url = buildBffApiUrl(selected.path, targetValue);
+                url = url = buildBffApiUrl('/api/execute');
             } catch (error) {
-                console.log('error', `Blocked ${selected.label}`, String(error && error.message ? error.message : error));
+                console.error(`Blocked ${selected.label}:`, error && error.message ? error.message : error);
                 return null;
             }
 
@@ -95,80 +95,39 @@
                 },
             };
 
-            if (targetValue) {
-                //options.headers['X-FSP-Target'] = targetValue;
+            const payload = {
+                target: targetValue,
+                method: selected.method,
+                path: selected.path,
+            };
+
+            if (bodyOverride) {
+                payload.body = bodyOverride;
             }
 
-            if (selected.method === 'POST') {
-                let payloadToSend = null;
+            options.body = JSON.stringify(payload);
 
-                if (bodyOverride !== undefined) {
-                    if (bodyOverride && typeof bodyOverride === 'object' && !Array.isArray(bodyOverride)) {
-                        payloadToSend = { ...bodyOverride };
-                    }
-                } else {
-                    const raw = bodyEl.value.trim();
-                    if (raw) {
-                        try {
-                            payloadToSend = JSON.parse(raw);
-                        } catch (error) {
-                            console.log('error', `Invalid JSON body for ${selected.label}`, String(error && error.message ? error.message : error));
-                            return null;
-                        }
-                    }
-                }
+            //let payloadToSend = bodyOverride || {};
 
-                if (!payloadToSend) {
-                    payloadToSend = {};
-                }
-
-                if (targetValue && typeof payloadToSend === 'object' && !Array.isArray(payloadToSend) && !payloadToSend.fspTarget) {
-                    payloadToSend.fspTarget = targetValue;
-                }
-
-                options.body = JSON.stringify(payloadToSend);
-            }
+            //if (selected.method === 'POST') {
+            //    if (targetValue && typeof payloadToSend === 'object' && !Array.isArray(payloadToSend)) {
+            //        payloadToSend.soTarget = targetValue;
+            //    }
+            //    options.body = JSON.stringify(payloadToSend);
+            //}
 
             try {
-                console.log('info', 'Checking BFF health', `URL: ${buildBffApiUrl('/api/health')}`);
-
                 await ensureBffHealthy();
-
-                console.log('info', `Calling ${selected.label}`, `FSP target: ${targetValue || 'default'}\nURL: ${url}`);
 
                 const response = await fetch(url, options);
                 const rawText = await response.text();
-                let formatted = rawText;
                 let parsedPayload = null;
 
                 try {
                     parsedPayload = JSON.parse(rawText);
-                    formatted = JSON.stringify(parsedPayload, null, 2);
                 } catch (error) {
                     // keep raw text for non-JSON responses
                 }
-
-                if (selected.id === 'model') {
-                    if (response.ok && parsedPayload) {
-                        renderModelFromPayload(parsedPayload);
-                    } else if (!response.ok) {
-                        setModelPanelMessage(`Model request failed with HTTP ${response.status}`, true);
-                    } else {
-                        setModelPanelMessage('Model response is not valid JSON.', true);
-                    }
-                }
-
-                if (selected.id === 'messages') {
-                    if (response.ok && parsedPayload) {
-                        const messagesPayload = Object.prototype.hasOwnProperty.call(parsedPayload, 'messages')
-                            ? parsedPayload.messages
-                            : parsedPayload;
-                        addProtocolMessagesEntry(messagesPayload);
-                        renderProtocolMessages();
-                    }
-                }
-
-                const messagePrefix = response.ok ? 'success' : 'error';
 
                 return {
                     ok: response.ok,
@@ -177,10 +136,10 @@
                     rawText,
                 };
             } catch (error) {
-                console.log('error', `Request failed for ${selected.label}`, String(error && error.message ? error.message : error));
+                console.error(`Request failed for ${selected.label}:`, error && error.message ? error.message : error);
                 return null;
             }
-        }
+       }
 
     // ==================== UI Functions ====================
     function showStatus(rootElement, message, type = 'info') {
