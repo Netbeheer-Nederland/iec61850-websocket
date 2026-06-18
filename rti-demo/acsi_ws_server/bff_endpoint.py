@@ -100,7 +100,7 @@ def create_bff_router(
         Tuple of (APIRouter, ACSIServer instance)
     """
     router = APIRouter(
-        prefix="/api/iec61850server",
+        prefix="/api",
         tags=["IEC61850-WS Server"],
         responses={404: {"description": "Not found"}, 500: {"description": "Internal server error"}}
     )
@@ -267,7 +267,7 @@ def create_bff_router(
         """List all API endpoints with their schemas and metadata.
 
         This endpoint provides introspection capabilities, returning:
-        - All available routes under /api/iec61850server/
+        - All available routes under /api/
         - HTTP methods supported by each endpoint
         - Request body schemas (when applicable)
         - Endpoint names for programmatic access
@@ -290,7 +290,7 @@ def create_bff_router(
 
         routes = []
         for route in router.routes:
-            path = f"/api/iec61850server{route.path}"
+            path = f"/api{route.path}"
             methods = list(route.methods)
 
             body_schema = None
@@ -530,7 +530,7 @@ def create_bff_router(
             }
             has_tree = tree_data is not None
             print(
-                f"[GET /api/iec61850server/model] "
+                f"[GET /ap/model] "
                 f"ied_model={ied_model is not None} "
                 f"has_tree={has_tree} "
                 f"source={source!r} "
@@ -917,7 +917,7 @@ def create_bff_router(
                 values = [normalized]
 
                 print(
-                    f"[POST /api/iec61850server/readvalue] SUCCESS objRef={obj_ref!r} "
+                    f"[POST /ap/readvalue] SUCCESS objRef={obj_ref!r} "
                     f"fc={fc!r} type={normalized.get('type')!r} value={normalized.get('value')!r}"
                 )
 

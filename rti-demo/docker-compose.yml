@@ -57,37 +57,31 @@ services:
   # BFF Server
   bff-server:
     build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: rti-demo-bff
+      context: ..
+      dockerfile: rti-demo/bff/Dockerfile
+    container_name: bff-server
     ports:
       - "5000:5000"
     environment:
-      - FLASK_ENV=development
-      - FLASK_APP=bff_server.py
       - RTI_SERVICE_DISCOVERY_ENABLED=true
-      - RTI_DOCKER_ENABLED=true
-      #- RTI_CLIENT_URL=http://rti-client:5000
-      - RTI_SERVER_URL=http://rti-server:5001
+      - PORT=5000
       - PYTHONUNBUFFERED=1
     volumes:
-      - ./connections.json:/app/connections.json
-      - ./stats.json:/app/stats.json
-      - /var/run/docker.sock:/var/run/docker.sock
       - ./bff:/app/bff
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - rti-network
-    #depends_on:
-      #rti-client:
-      #  condition: service_healthy
-      #rti-server:
-      #  condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+    labels:
+      - "rti.service=bff-server"
+      - "rti.type=RTI-BFF"
+      - "rti.host=bff-server"
+      - "rti.port=5000"
 
   # Frontend Web Server
   frontend:
@@ -177,7 +171,7 @@ services:
     networks:
       - rti-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5003/api/iec61850client/status" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:5003/api/status" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -204,7 +198,7 @@ services:
     networks:
       - rti-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5004/api/iec61850server/status" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:5004/api/status" ]
       interval: 30s
       timeout: 10s
       retries: 3

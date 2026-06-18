@@ -27,6 +27,6 @@ RUN pip install fastapi uvicorn
 EXPOSE 5001
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:5004/api/iec61850server/status || exit 1
+    CMD curl -f http://localhost:5004/api/status || exit 1
 
 CMD ["python", "-u", "acsi_ws_server/bff_endpoint.py"]

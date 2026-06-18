@@ -301,22 +301,23 @@ class ACSIServer:
         )
 
         endpoint = self._create_endpoint()
-        endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
-        endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
-
+        
         cp = self.runtime.cp or "cp1"
-        server1 = IEC61850Server(ied_model, cp)
+        server = IEC61850Server(ied_model, cp)
 
-        endpoint.add_iec61850_server(server1)
+        server.send_msg_callback = endpoint.send_msg_callback
+        server.recv_msg_callback = endpoint.recv_msg_callback
+
+        endpoint.add_iec61850_server(server)
 
         report_task = asyncio.create_task(
-            server1.periodic_report_start(), name=f"{cp}-periodic-report"
+            server.periodic_report_start(), name=f"{cp}-periodic-report"
         )
         tasks: Dict[str, asyncio.Task] = {"report": report_task}
 
-        if server1.find_object_in_tree("LD0/DGEN1.DEROpSt.stVal") is not None:
+        if server.find_object_in_tree("LD0/DGEN1.DEROpSt.stVal") is not None:
             tasks["toggle"] = asyncio.create_task(
-                self._toggle_custom_value(server1, "LD0/DGEN1.DEROpSt.stVal"),
+                self._toggle_custom_value(server, "LD0/DGEN1.DEROpSt.stVal"),
                 name="toggle-value",
             )
 
@@ -327,7 +328,7 @@ class ACSIServer:
 
         self._set_runtime_state(
             endpoint=endpoint,
-            server_cp=server1,
+            server_cp=server,
             tasks=tasks,
             error=None,
         )

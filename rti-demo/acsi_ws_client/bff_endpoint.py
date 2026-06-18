@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class ConnectRequest(BaseModel):
     """Request body for connecting to an IEC61850 WebSocket server.
 
-    Used by: POST /api/iec61850client/connect
+    Used by: POST /api/connect
     """
     host: str = Field(
         default="localhost",
@@ -48,7 +48,7 @@ class ConnectRequest(BaseModel):
 class ReadvalueRequest(BaseModel):
     """Request body for reading a value from the connected server.
 
-    Used by: POST /api/iec61850client/readvalue
+    Used by: POST /api/readvalue
     """
     objRef: str = Field(
         ...,
@@ -64,7 +64,7 @@ class ReadvalueRequest(BaseModel):
 class WriteValueRequest(BaseModel):
     """Request body for writing a value to the connected server.
 
-    Used by: POST /api/iec61850client/writevalue
+    Used by: POST /api/writevalue
     """
     objRef: str = Field(
         ...,
@@ -103,7 +103,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
         Tuple of (APIRouter, ACSIClient instance)
     """
     router = APIRouter(
-        prefix="/api/iec61850client",
+        prefix="/api",
         tags=["IEC61850-WS Client"],
         responses={404: {"description": "Not found"}, 500: {"description": "Internal server error"}}
     )
@@ -1089,7 +1089,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
         """List all API endpoints with their schemas and metadata.
 
         This endpoint provides introspection capabilities, returning:
-        - All available routes under /api/iec61850client/
+        - All available routes under /api/
         - HTTP methods supported by each endpoint
         - Request body schemas (when applicable)
         - Endpoint names for programmatic access
@@ -1112,7 +1112,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
 
         routes = []
         for route in router.routes:
-            path = f"/api/iec61850client{route.path}"
+            path = f"/api{route.path}"
             methods = list(route.methods)
 
             body_schema = None
