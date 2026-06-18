@@ -43,7 +43,48 @@ except ImportError:
     logger.warning("Docker Python SDK not available. Container auto-discovery disabled.")
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://127.0.0.1:8080", "http://localhost:8080"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "X-FSP-Target", "x-fsp-target"]  # ✅ Added headers
+    }
+})
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,X-FSP-Target,x-fsp-target'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
+    return response
+
+@app.route('/api/iec61850client/<path:subpath>', methods=['GET', 'POST', 'OPTIONS'])
+def handle_client_requests(subpath):
+    """Handle all /api/iec61850client/* requests"""
+    # For OPTIONS, just return 200 - no processing needed
+    if request.method == 'OPTIONS':
+        return jsonify({"ok": True}), 200
+
+    # Get target from query param
+    target = request.args.get('fspTarget') or request.args.get('soTarget')
+    if not target:
+        return jsonify({"ok": False, "error": "Target parameter required"}), 400
+
+    # Get client from registry
+    client = _bff_clients.get(target)
+    if not client:
+        return jsonify({"ok": False, "error": f"Unknown target: {target}"}), 404
+
+    # Forward request
+    try:
+        result = client.request(
+            method=request.method,
+            path=f'/api/iec61850client/{subpath}',
+            json=request.get_json(silent=True)
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Client request failed: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 # Data storage (in production, use a database)
 CONNECTIONS_FILE = 'connections.json'
