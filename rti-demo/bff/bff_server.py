@@ -50,7 +50,6 @@ try:
 except ImportError:
     logger.warning("Docker Python SDK not available. Container auto-discovery disabled.")
 
-# Data storage (in production, use a database)
 CONNECTIONS_FILE = 'connections.json'
 STATS_FILE = 'stats.json'
 DISCOVERED_FILE = 'discovered_endpoints.json'
