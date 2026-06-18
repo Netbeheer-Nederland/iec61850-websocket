@@ -137,7 +137,7 @@ def create_bff_blueprint() -> tuple[Blueprint, ACSIClient]:
         """Connect to an IEC 61850 WebSocket server."""
         try:
             body = request.get_json(silent=True) or {}
-            host = str(body.get("host", "localhost"))
+            host = str(body.get("host", "0.0.0.0"))
             raw_port = body.get("port", 8765)
             cp = str(body.get("cp", "cp1")).lower()
 

@@ -216,9 +216,13 @@ class ACSIClient:
         self._log_action("Disconnecting...")
         self._set_runtime_state(status="disconnecting")
 
+        # ✅ Cancel the background task first
+        if hasattr(self.runtime, '_start_task') and self.runtime._start_task:
+            self.runtime._start_task.cancel()
+
         if endpoint is not None:
             try:
-                await endpoint.stop_active()
+                await endpoint.stop_passive()
             except Exception as exc:
                 self._log_action(f"stop_active error: {exc}", "warn")
 
