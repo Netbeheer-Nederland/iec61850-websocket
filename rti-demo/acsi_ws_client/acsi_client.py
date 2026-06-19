@@ -166,6 +166,9 @@ class ACSIClient:
 
         try:
             endpoint = ActiveEndpoint(is_direct=True)
+            endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
+            endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
+
             client = IEC61850Client(cp)
             client.send_msg_callback = endpoint.send_msg_callback
             client.recv_msg_callback = endpoint.recv_msg_callback
