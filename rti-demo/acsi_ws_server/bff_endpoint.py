@@ -219,7 +219,7 @@ def create_bff_router(
         info = {
             "peer_address": None,
             "peer_port": None,
-            "server_role": "ACSI_Server",
+            "role": "ACSI-Server",
             "ws_mode": "passive",
             "remote_role": None,
             "tpa": None,
@@ -364,7 +364,7 @@ def create_bff_router(
         Returns:
             dict: {
                 "status": "ok",
-                "service": "FSP",
+                "service": "ACSI-Server",
                 "server": {
                     "status": str | None,
                     "host": str | None,
@@ -376,7 +376,7 @@ def create_bff_router(
             status = server.get_status()
             return {
                 "status": "ok",
-                "service": "FSP",
+                "service": "ACSI-Server",
                 "server": {
                     "status": status.get("status"),
                     "host": status.get("host"),
@@ -406,8 +406,8 @@ def create_bff_router(
         Returns:
             dict: {
                 "ok": True,
-                "server_role": "ACSI_Server",
-                "ws_mode": "active",
+                "role": "ACSI-Server",
+                "ws_mode": "passive",
                 "connected_servers": int,
                 "connections": list[dict]  # Each containing peer_address, peer_port, tpa, status
             }
@@ -423,8 +423,8 @@ def create_bff_router(
 
             return {
                 "ok": True,
-                "server_role": "ACSI_Server",
-                "ws_mode": "active",
+                "role": "ACSI-Server",
+                "ws_mode": "passive",
                 "connected_servers": len(connections),
                 "connections": connections,
             }
@@ -448,13 +448,13 @@ def create_bff_router(
         Returns:
             dict: {
                 "ok": True,
-                "acsi_role": "ACSI_Server",
+                "acsi_role": "ACSI-Server",
                 "ws_mode": "Passive"
             }
         """
         return {
             "ok": True,
-            "acsi_role": "ACSI_Server",
+            "acsi_role": "ACSI-Server",
             "ws_mode": "Passive",
         }
 
@@ -547,7 +547,7 @@ def create_bff_router(
     @router.post(
         "/update-iedmodel",
         summary="Update IED Model",
-        description="Updates the model.py file in the FSP directory and reloads the IED model. The server must be stopped before updating the model.",
+        description="Updates the model.py file in the ACSI-Server directory and reloads the IED model. The server must be stopped before updating the model.",
         response_description="Model update confirmation",
         responses={
             200: {"description": "Model updated successfully"},
@@ -735,7 +735,7 @@ def create_bff_router(
             )
 
     @router.get(
-        "/actions",
+        "/actions_logs",
         summary="Get Action Log",
         description="Retrieves the logged server actions for debugging and auditing purposes.",
         response_description="List of logged actions",

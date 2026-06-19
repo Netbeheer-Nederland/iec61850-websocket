@@ -486,14 +486,13 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
                 "ok": True,
                 "status": str,
                 "connected": bool,
-                "server_role": "ACSI_Client",
-                "ws_mode": "passive",
+                "server_role": "ACSI-Client",
+                "ws_mode": "active",
                 "connection": {
                     "peer_address": str | None,
                     "peer_port": int | None,
-                    "local_role": "ACSI_Client",
-                    "ws_mode": "passive",
-                    "remote_role": "ACSI_Server",
+                    "local_role": "ACSI-Client",
+                    "ws_mode": "active",
                     "cp": str
                 } | None
             }
@@ -504,8 +503,8 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
                 "ok": True,
                 "status": client.runtime.status,
                 "connected": client.runtime.status == "connected",
-                "server_role": "ACSI_Client",
-                "ws_mode": "passive",
+                "server_role": "ACSI-Client",
+                "ws_mode": "active",
                 "connection": None,
             }
 
@@ -531,9 +530,8 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
                     connection_info["connection"] = {
                         "peer_address": peer_address,
                         "peer_port": peer_port,
-                        "local_role": "ACSI_Client",
-                        "ws_mode": "passive",
-                        "remote_role": "ACSI_Server",
+                        "local_role": "ACSI-Client",
+                        "ws_mode": "active",
                         "cp": client.runtime.cp,
                     }
 
@@ -558,14 +556,14 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
         Returns:
             dict: {
                 "ok": True,
-                "acsi_role": "ACSI_Client",
-                "ws_mode": "passive"
+                "acsi_role": "ACSI-Client",
+                "ws_mode": "active"
             }
         """
         return {
             "ok": True,
-            "acsi_role": "ACSI_Client",
-            "ws_mode": "passive",
+            "acsi_role": "ACSI-Client",
+            "ws_mode": "active",
         }
 
     @router.post(
@@ -1157,7 +1155,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
         Returns:
             dict: {
                 "status": "ok",
-                "service": "SO",
+                "service": "ACSI-Client",
                 "server": {
                     "status": "ok",
                     "host": "localhost",
@@ -1168,7 +1166,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
         try:
             return {
                 "status": "ok",
-                "service": "SO",
+                "service": "ACSI-Client",
                 "server": {
                     "status": "ok",
                     "host": "localhost",
@@ -1177,7 +1175,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
             }
         except Exception as exc:
             return JSONResponse(
-                content={"status": "degraded", "service": "SO", "error": str(exc)},
+                content={"status": "degraded", "service": "ACSI-Client", "error": str(exc)},
                 status_code=500
             )
 

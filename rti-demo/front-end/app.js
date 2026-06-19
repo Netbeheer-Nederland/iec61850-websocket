@@ -343,7 +343,7 @@ class RTIDemoApp {
             return;
         }
 
-        const result = await this.callBFF('/api/endpoints/discover', 'POST', {
+        const result = await this.callBFF('/api/endpoints/discover-network', 'POST', {
             host: this.scanHost,
             ports,
         });
@@ -493,12 +493,12 @@ class RTIDemoApp {
         const acsiRoleRaw = props['acsi-role'] || props['acsi_role'] || '';
         const acsiRole = String(acsiRoleRaw).trim().toLowerCase();
 
-        if (acsiRole === 'acsi_server') {
+        if (acsiRole === 'acsi-server') {
             this.selectedAcsiEndpoint = endpoint;
             this.navigateToPage('acsi-server');
             return;
         }
-        if (acsiRole === 'acsi_client') {
+        if (acsiRole === 'acsi-client') {
             this.selectedAcsiEndpoint = endpoint;
             this.navigateToPage('acsi-client');
             return;

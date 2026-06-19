@@ -13,29 +13,29 @@
     // IEC61850 SERVER APIs
     // =========================
 
-    { id: 'status', label: 'GET /api/iec61850server/status', method: 'GET', path: '/api/iec61850server/status', sampleBody: '' },
+    { id: 'status', label: 'GET /api/status', method: 'GET', path: '/api/status', sampleBody: '' },
 
-    { id: 'connections', label: 'GET /api/iec61850server/connections', method: 'GET', path: '/api/iec61850server/connections', sampleBody: '' },
+    { id: 'connections', label: 'GET /api/connections', method: 'GET', path: '/api/connections', sampleBody: '' },
 
-    { id: 'model', label: 'GET /api/iec61850server/model', method: 'GET', path: '/api/iec61850server/model', sampleBody: '' },
+    { id: 'model', label: 'GET /api/model', method: 'GET', path: '/api/model', sampleBody: '' },
 
-    { id: 'update-iedmodel', label: 'POST /api/iec61850server/update-iedmodel', method: 'POST', path: '/api/iec61850server/update-iedmodel', sampleBody: '{\n  "modelPy": "# python code"\n}' },
+    { id: 'update-iedmodel', label: 'POST /api/update-iedmodel', method: 'POST', path: '/api/update-iedmodel', sampleBody: '{\n  "modelPy": "# python code"\n}' },
 
-    { id: 'start', label: 'POST /api/iec61850server/start', method: 'POST', path: '/api/iec61850server/start', sampleBody: '{\n  "host": "0.0.0.0",\n  "port": 8765,\n  "mode": "server",\n  "cp": "cp1"\n}' },
+    { id: 'start', label: 'POST /api/start', method: 'POST', path: '/api/start', sampleBody: '{\n  "host": "0.0.0.0",\n  "port": 8765,\n  "mode": "server",\n  "cp": "cp1"\n}' },
 
-    { id: 'stop', label: 'POST /api/iec61850server/stop', method: 'POST', path: '/api/iec61850server/stop', sampleBody: '' },
+    { id: 'stop', label: 'POST /api/stop', method: 'POST', path: '/api/stop', sampleBody: '' },
 
-    { id: 'actions', label: 'GET /api/iec61850server/actions', method: 'GET', path: '/api/iec61850server/actions', sampleBody: '' },
+    { id: 'actions', label: 'GET /api/actions', method: 'GET', path: '/api/actions', sampleBody: '' },
 
-    { id: 'actions-clear', label: 'POST /api/iec61850server/actions/clear', method: 'POST', path: '/api/iec61850server/actions/clear', sampleBody: '' },
+    { id: 'actions-clear', label: 'POST /api/actions/clear', method: 'POST', path: '/api/actions/clear', sampleBody: '' },
 
-    { id: 'messages', label: 'GET /api/iec61850server/messages', method: 'GET', path: '/api/iec61850server/messages', sampleBody: '' },
+    { id: 'messages', label: 'GET /api/messages', method: 'GET', path: '/api/messages', sampleBody: '' },
 
-    { id: 'messages-clear', label: 'POST /api/iec61850server/messages/clear', method: 'POST', path: '/api/iec61850server/messages/clear', sampleBody: '' },
+    { id: 'messages-clear', label: 'POST /api/messages/clear', method: 'POST', path: '/api/messages/clear', sampleBody: '' },
 
-    { id: 'readvalue', label: 'POST /api/iec61850server/readvalue', method: 'POST', path: '/api/iec61850server/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
+    { id: 'readvalue', label: 'POST /api/readvalue', method: 'POST', path: '/api/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
 
-    { id: 'writevalue', label: 'POST /api/iec61850server/writevalue', method: 'POST', path: '/api/iec61850server/writevalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "value": "on",\n  "fc": "ST",\n  "dataType": "BOOLEAN"\n}' },
+    { id: 'writevalue', label: 'POST /api/writevalue', method: 'POST', path: '/api/writevalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "value": "on",\n  "fc": "ST",\n  "dataType": "BOOLEAN"\n}' },
 
 ];
 
@@ -82,7 +82,7 @@
         }
 
         if (protocolMessages.length === 0) {
-            messagesEl.innerHTML = '<div class="acsi-log-empty">No protocol messages yet. Run GET /api/iec61850server/messages.</div>';
+            messagesEl.innerHTML = '<div class="acsi-log-empty">No protocol messages yet. Run GET /api/messages.</div>';
             return;
         }
 
@@ -92,7 +92,7 @@
                 <div class="acsi-log-item acsi-log-info">
                     <div class="acsi-log-head">
                         <span class="acsi-log-time">${escapeForHtml(entry.timestamp)}</span>
-                        <span class="acsi-log-message">GET /api/iec61850server/messages</span>
+                        <span class="acsi-log-message">GET /api/messages</span>
                     </div>
                     <pre class="acsi-log-details">${escapeForHtml(formatted)}</pre>
                 </div>
@@ -398,7 +398,7 @@
             daModalEl.hidden = true;
         }
 
-        setModelPanelMessage('Run GET /api/iec61850server/model to load the model tree.');
+        setModelPanelMessage('Run GET /api/model to load the model tree.');
 
         renderProtocolMessages();
 
@@ -652,7 +652,7 @@
                     setUpdatedStatusText('Updated status: loading...');
                     await ensureBffHealthy();
 
-                    const url = buildBffApiUrl('/api/iec61850server/status', endpointTarget);
+                    const url = buildBffApiUrl('/api/status', endpointTarget);
                     const response = await fetch(url, {
                         method: 'GET',
                         headers: {
@@ -667,11 +667,11 @@
 
                     const payload = await response.json();
                     setUpdatedStatusText(formatStatusSummary(payload));
-                    console.log('success', 'GET /api/iec61850server/status -> HTTP 200', JSON.stringify(payload, null, 2));
+                    console.log('success', 'GET /api/status -> HTTP 200', JSON.stringify(payload, null, 2));
                 } catch (error) {
                     const message = String(error && error.message ? error.message : error);
                     setUpdatedStatusText(`Updated status: failed (${message})`, true);
-                    console.log('error', 'GET /api/iec61850server/status failed', message);
+                    console.log('error', 'GET /api/status failed', message);
                 } finally {
                     reloadStatusBtn.disabled = false;
                 }
