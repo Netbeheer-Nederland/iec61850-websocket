@@ -115,7 +115,7 @@ services:
     networks:
       - rti-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5001/api/iec61850server/status" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:5001/api/status" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -143,7 +143,7 @@ services:
     networks:
       - rti-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5002/api/iec61850client/status" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:5002/api/status" ]
       interval: 30s
       timeout: 10s
       retries: 3
