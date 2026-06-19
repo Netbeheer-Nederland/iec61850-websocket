@@ -4,3 +4,5 @@ Werkzeug==3.0.1
 requests==2.31.0
 docker==6.1.0
 python-dotenv==1.0.0
+fastapi
+uvicorn

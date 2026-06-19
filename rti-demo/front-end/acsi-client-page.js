@@ -5,9 +5,9 @@
 (function initACSIClientPage() {
     // ==================== API Definitions ====================
     const apiDefinitions = [
-        { id: 'connect', label: 'POST /api/iec61850client/connect', method: 'POST', path: '/api/iec61850client/connect' },
-        { id: 'disconnect', label: 'POST /api/iec61850client/disconnect', method: 'POST', path: '/api/iec61850client/disconnect' },
-        { id: 'model-tree', label: 'GET /api/iec61850client/model/tree', method: 'GET', path: '/api/iec61850client/model/tree' },
+        { id: 'connect', label: 'POST /api/connect', method: 'POST', path: '/api/connect' },
+        { id: 'disconnect', label: 'POST /api/disconnect', method: 'POST', path: '/api/disconnect' },
+        { id: 'model-tree', label: 'GET /api/model/tree', method: 'GET', path: '/api/model/tree' },
     ];
 
     function getApiById(id) {

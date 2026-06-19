@@ -23,7 +23,7 @@ RUN pip install /app/repo
 COPY rti-demo/so/ /app/so/
 
 # Install Flask and Flask-CORS dependencies
-RUN pip install Flask==3.0.0 Flask-CORS==4.0.0
+RUN pip install fastapi uvicorn
 
 EXPOSE 5002
 
