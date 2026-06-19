@@ -6,18 +6,94 @@ handling connection management and value operations.
 
 from __future__ import annotations
 
-from concurrent.futures import TimeoutError as FuturesTimeoutError
-from typing import Any, Dict
+import os
 import logging
 import traceback
 import asyncio
-
+from concurrent.futures import TimeoutError as FuturesTimeoutError
+from typing import Any, Dict, Optional
 from fastapi import FastAPI, APIRouter, Request, HTTPException, status
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, ConfigDict
 
 from acsi_client import ACSIClient
 
 logger = logging.getLogger(__name__)
+
+# ==================== Pydantic Models ====================
+class ConnectRequest(BaseModel):
+    """Request body for connecting to an IEC61850 WebSocket server.
+
+    Used by: POST /api/connect
+    """
+    host: str = Field(
+        default="localhost",
+        description="Server hostname or IP address to connect to",
+        json_schema_extra={"example": "localhost"}
+    )
+    port: int = Field(
+        default=8765,
+        description="Server port number (1-65535)",
+        ge=1,
+        le=65535,
+        json_schema_extra={"example": 8765}
+    )
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
+class ReadvalueRequest(BaseModel):
+    """Request body for reading a value from the connected server.
+
+    Used by: POST /api/readvalue
+    """
+    objRef: str = Field(
+        ...,
+        description="Object reference in IEC61850 format (e.g., 'LD0/LLN0$ST$Mod')",
+        json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
+    )
+    fc: Optional[str] = Field(
+        default=None,
+        description="Functional constraint (ST, MX, CO, etc.) - optional",
+        json_schema_extra={"example": "ST"}
+    )
+
+class WriteValueRequest(BaseModel):
+    """Request body for writing a value to the connected server.
+
+    Used by: POST /api/writevalue
+    """
+    objRef: str = Field(
+        ...,
+        description="Object reference in IEC61850 format",
+        json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
+    )
+    fc: str = Field(
+        ...,
+        description="Functional constraint (ST, MX, CO, etc.)",
+        json_schema_extra={"example": "ST"}
+    )
+    value: Any = Field(
+        ...,
+        description="Value to write (will be converted to appropriate type)",
+        json_schema_extra={"example": "ON"}
+    )
+    value_type: Optional[str] = Field(
+        default=None,
+        description="Optional value type hint for coercion",
+        json_schema_extra={"example": "BOOLEAN"}
+    )
+
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "objRef": "LD0/LLN0$ST$Mod",
+            "fc": "ST",
+            "value": "ON",
+            "value_type": "BOOLEAN"
+        }
+    })
 
 def create_fastapi_app() -> FastAPI:
     """Create and configure the FastAPI application for IEC61850 client BFF."""
@@ -494,28 +570,49 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         },
         tags=["Connection Management"]
     )
-    async def api_connect(request: Request):
-        """Connect to an IEC 61850 WebSocket server."""
-        try:
-            body = await request.json()
-            host = str(body.get("host", "0.0.0.0"))
-            raw_port = body.get("port", 8765)
-            cp = str(body.get("cp", "cp1")).lower()
+    async def api_connect(request: ConnectRequest):
+        """Start a WS Passive Endpoint.
 
-            try:
-                port = int(raw_port)
-            except (TypeError, ValueError):
-                raise HTTPException(status_code=400, detail=f"Invalid port value: {raw_port!r}")
+        Request Body:
+            ConnectRequest: {
+                "host": str,  # Server hostname/IP
+                "port": int,  # Server port (1-65535)
+                "cp": str      # Communication point
+            }
+
+        Returns:
+            dict: {
+                "ok": True,
+                "status": "connecting",
+                "host": str,
+                "port": int,
+                "cp": str
+            }
+
+        Raises:
+            HTTPException 400: If port is not a valid integer
+            HTTPException 500: If connection fails
+        """
+        try:
+            host = request.host
+            port = request.port
+            cp = request.cp.lower()
 
             try:
                 client.connect(host, port, cp)
                 return {"ok": True, "status": "connecting", "host": host, "port": port, "cp": cp}
             except (ValueError, RuntimeError) as exc:
                 client._log_action(f"Connect rejected: {exc}", "warn")
-                raise HTTPException(status_code=400, detail=str(exc))
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
         except Exception as exc:
             client._log_action(f"Connect failed: {exc}", "error")
-            raise HTTPException(status_code=400, detail=str(exc))
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
 
     @router.post(
         "/disconnect",
@@ -681,41 +778,107 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         },
         tags=["Data Access"]
     )
-    async def api_read_value(request: Request):
-        """Read a value from the connected server."""
+    async def api_read_value(request: ReadvalueRequest):
+        """Read a value from the connected server.
+
+        Request Body:
+            ReadvalueRequest: {
+                "objRef": str,  # Required - Object reference in IEC61850 format
+                "fc": str       # Optional - Functional constraint
+            }
+
+        Returns:
+            dict: {
+                "ok": True,
+                "success": True,
+                "objRef": str,
+                "value": any  # The read value
+            }
+
+        Raises:
+            HTTPException 400: If objRef is missing
+            HTTPException 403: If client is not connected
+            HTTPException 404: If instance not available or timeout
+        """
         try:
-            data = await request.json() or {}
-            obj_ref = data.get("objRef")
-            fc = data.get("fc")
+            obj_ref = request.objRef
+            fc = request.fc
 
             if not obj_ref:
                 client._log_action("Client readvalue rejected: missing objRef", "warn")
-                raise HTTPException(status_code=400, detail="objRef is required")
+                return JSONResponse(
+                    content={"ok": False, "error": "objRef is required"},
+                    status_code=400
+                )
 
             if client.runtime.client is None:
-                client._log_action("Client readvalue rejected: not connected", "warn", detail={"objRef": obj_ref, "fc": fc})
-                raise HTTPException(status_code=503, detail="Client is not connected")
+                client._log_action(
+                    "Client readvalue rejected: not connected",
+                    "warn",
+                    detail={"objRef": obj_ref, "fc": fc},
+                )
+                return JSONResponse(
+                    content={"ok": False, "error": "Client is not connected"},
+                    status_code=503
+                )
 
             try:
-                result = client.invoke_on_runtime_loop(client.read_value(obj_ref, fc), timeout=10)
+                result = client.invoke_on_runtime_loop(
+                    client.read_value(obj_ref, fc), timeout=10
+                )
 
                 if result is None:
-                    client._log_action("Client readvalue failed: instanceNotAvailable", "warn", detail={"objRef": obj_ref, "fc": fc})
-                    raise HTTPException(status_code=404, detail="instanceNotAvailable")
+                    client._log_action(
+                        "Client readvalue failed: instanceNotAvailable",
+                        "warn",
+                        detail={"objRef": obj_ref, "fc": fc}
+                    )
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
 
-                client._log_action("Client readvalue", detail={"objRef": obj_ref, "value": result.get("value")})
-                return {"ok": True, "success": True, "objRef": obj_ref, "value": result.get("value")}
+                client._log_action(
+                    "Client readvalue",
+                    detail={
+                        "objRef": obj_ref,
+                        "value": result.get("value"),
+                    },
+                )
+                return {
+                    "ok": True,
+                    "success": True,
+                    "objRef": obj_ref,
+                    "value": result.get("value"),
+                }
+
             except FuturesTimeoutError:
-                client._log_action("Client readvalue timeout", "warn", detail={"objRef": obj_ref, "fc": fc})
-                raise HTTPException(status_code=504, detail="read timeout")
+                client._log_action(
+                    "Client readvalue timeout",
+                    "warn",
+                    detail={"objRef": obj_ref, "fc": fc},
+                )
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
             except ValueError as exc:
                 client._log_action(f"Client readvalue failed: {exc}", "warn")
-                raise HTTPException(status_code=404, detail=str(exc))
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
             except Exception as exc:
                 client._log_action(f"Client readvalue failed: {exc}", "error")
-                raise HTTPException(status_code=500, detail=str(exc))
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
         except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
 
     @router.get(
         "/apis",
@@ -769,42 +932,111 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         },
         tags=["Data Access"]
     )
-    async def api_write_value(request: Request):
-        """Write a value to the connected server."""
+    async def api_write_value(request: WriteValueRequest):
+        """Write a value to the connected server.
+
+                Request Body:
+                    WriteValueRequest: {
+                        "objRef": str,     # Required - Object reference
+                        "fc": str,        # Required - Functional constraint
+                        "value": any,     # Required - Value to write
+                        "value_type": str # Optional - Value type hint
+                    }
+
+                Returns:
+                    dict: {
+                        "ok": True,
+                        "success": True,
+                        "objRef": str,
+                        "fc": str,
+                        "value": any  # The written value
+                    }
+
+                Raises:
+                    HTTPException 400: If objRef, fc, or value is missing
+                    HTTPException 403: If client is not connected
+                    HTTPException 500: If write operation fails
+                """
         try:
-            data = await request.json() or {}
-            obj_ref = data.get("objRef")
-            fc = data.get("fc")
-            value = data.get("value")
-            value_type = data.get("value_type")
+            obj_ref = request.objRef
+            fc = request.fc
+            value = request.value
+            value_type = request.value_type
 
             if not obj_ref:
                 client._log_action("Client writevalue rejected: missing objRef", "warn")
-                raise HTTPException(status_code=400, detail="objRef is required")
+                return JSONResponse(
+                    content={"ok": False, "error": "objRef is required"},
+                    status_code=400
+                )
+
             if not fc:
                 client._log_action("Client writevalue rejected: missing fc", "warn")
-                raise HTTPException(status_code=400, detail="fc is required")
+                return JSONResponse(
+                    content={"ok": False, "error": "fc is required"},
+                    status_code=400
+                )
+
             if value is None:
-                client._log_action("Client writevalue rejected: missing value", "warn", detail={"objRef": obj_ref, "fc": fc})
-                raise HTTPException(status_code=400, detail="value is required")
+                client._log_action(
+                    "Client writevalue rejected: missing value",
+                    "warn",
+                    detail={"objRef": obj_ref, "fc": fc}
+                )
+                return JSONResponse(
+                    content={"ok": False, "error": "value is required"},
+                    status_code=400
+                )
+
             if client.runtime.client is None:
-                client._log_action("Client writevalue rejected: not connected", "warn", detail={"objRef": obj_ref, "fc": fc, "value": value})
-                raise HTTPException(status_code=503, detail="Client is not connected")
+                client._log_action(
+                    "Client writevalue rejected: not connected",
+                    "warn",
+                    detail={"objRef": obj_ref, "fc": fc, "value": value},
+                )
+                return JSONResponse(
+                    content={"ok": False, "error": "Client is not connected"},
+                    status_code=503
+                )
 
             try:
-                result = client.invoke_on_runtime_loop(client.write_value(obj_ref, value, fc, value_type), timeout=10)
-                return {"ok": True, "success": True, "objRef": obj_ref, "fc": fc, "value": result.get("value")}
+                result = client.invoke_on_runtime_loop(
+                    client.write_value(obj_ref, value, fc, value_type), timeout=10
+                )
+                return {
+                    "ok": True,
+                    "success": True,
+                    "objRef": obj_ref,
+                    "fc": fc,
+                    "value": result.get("value"),
+                }
             except FuturesTimeoutError:
-                client._log_action("Client writevalue timeout", "warn", detail={"objRef": obj_ref})
-                raise HTTPException(status_code=504, detail="write timeout")
+                client._log_action(
+                    "Client writevalue timeout",
+                    "warn",
+                    detail={"objRef": obj_ref},
+                )
+                return JSONResponse(
+                    content={"ok": False, "error": "write timeout"},
+                    status_code=504
+                )
             except ValueError as exc:
                 client._log_action(f"Client writevalue failed: {exc}", "warn")
-                raise HTTPException(status_code=404, detail=str(exc))
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
             except Exception as exc:
                 client._log_action(f"Client writevalue failed: {exc}", "error")
-                raise HTTPException(status_code=500, detail=str(exc))
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
         except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
 
     @router.get(
         "/internal/model/status",
