@@ -279,6 +279,9 @@
         const port = escapeHtml(endpoint.port || '');
         const name = escapeHtml(endpoint.name || '');
 
+        const defaultWsIP = "0.0.0.0";
+        const defaultWsPort = "8765"
+
         rootElement.innerHTML = `
             <div class="page-header">
                 <div style="display:flex; align-items:center; gap:16px;">
@@ -294,12 +297,12 @@
                 <div style="display:flex; gap:16px; margin-top:16px;">
                     <div class="form-group">
                         <label for="acsi-client-host-page">Host</label>
-                        <input type="text" id="acsi-client-host-page" value="${host}" placeholder="127.0.0.1">
+                        <input type="text" id="acsi-client-host-page" value="${defaultWsIP}" placeholder="127.0.0.1">
                     </div>
 
                     <div class="form-group">
                         <label for="acsi-client-port-page">Port</label>
-                        <input type="number" id="acsi-client-port-page" value="${port}" placeholder="102">
+                        <input type="number" id="acsi-client-port-page" value="${defaultWsPort}" placeholder="102">
                     </div>
 
                     <div class="form-group">
