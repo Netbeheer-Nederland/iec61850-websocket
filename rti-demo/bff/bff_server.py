@@ -452,9 +452,9 @@ class DataManager:
         
         try:
             if method == 'GET':
-                response = requests.get(url, timeout=5)
+                response = requests.get(url, timeout=20)
             elif method == 'POST':
-                response = requests.post(url, json=data, timeout=5)
+                response = requests.post(url, json=data, timeout=20)
             else:
                 return None
             

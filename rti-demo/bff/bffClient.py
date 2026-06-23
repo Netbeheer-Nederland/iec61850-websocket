@@ -13,7 +13,7 @@ class BffClient:
             json=json,
             params=params,
             headers=headers or {},
-            timeout=5
+            timeout=15
         )
 
         response.raise_for_status()

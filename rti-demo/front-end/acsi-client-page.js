@@ -7,7 +7,7 @@
     const apiDefinitions = [
         { id: 'connect', label: 'POST /api/connect', method: 'POST', path: '/api/connect' },
         { id: 'disconnect', label: 'POST /api/disconnect', method: 'POST', path: '/api/disconnect' },
-        { id: 'model-tree', label: 'GET /api/model/tree', method: 'GET', path: '/api/model/tree' },
+        { id: 'model-tree', label: 'GET /api/model/tree', method: 'POST', path: '/api/model/tree' },
     ];
 
     function getApiById(id) {
@@ -105,7 +105,9 @@
                 payload.body = bodyOverride;
             }
 
-            options.body = JSON.stringify(payload);
+            if (selected.method === 'POST') {
+                options.body = JSON.stringify(payload);
+            }
 
             //let payloadToSend = bodyOverride || {};
 
@@ -132,7 +134,7 @@
                 return {
                     ok: response.ok,
                     status: response.status,
-                    payload: parsedPayload,
+                    payload: selected.method === 'POST' ? parsedPayload : null,
                     rawText,
                 };
             } catch (error) {

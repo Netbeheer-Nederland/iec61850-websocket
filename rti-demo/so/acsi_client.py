@@ -53,6 +53,7 @@ class ACSIClientRuntime:
         self.model_data: Optional[Dict[str, Any]] = None
         self.model_error: Optional[str] = None
         self.model_progress: Optional[Dict[str, Any]] = None
+        self.model_ready_event = asyncio.Event()
         
         # Callbacks for message logging
         self.recv_msg_callback: Optional[Callable] = None
@@ -254,20 +255,23 @@ class ACSIClient:
             except Exception as exc:
                 self._set_runtime_state(status="error", error=str(exc))
                 self._log_action(f"Connect failed: {exc}", "error")
-                loop.call_soon_threadsafe(loop.stop)
+                #loop.call_soon_threadsafe(loop.stop)
 
         connect_task.add_done_callback(_on_connect_done)
 
         try:
             loop.run_forever()
-        finally:
-            pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
-            for task in pending:
-                task.cancel()
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-            loop.close()
-            self._set_runtime_state(loop=None, thread=None)
+        except Exception as exc:
+            print(f"Event loop error: {exc}")
+            self._log_action(f"Event loop error: {exc}", "error")
+        #finally:
+        #    pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+        #    for task in pending:
+        #        task.cancel()
+        #    if pending:
+        #        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        #    loop.close()
+        #    self._set_runtime_state(loop=None, thread=None)
 
     def connect(self, host: str, port: int, cp: str = "cp1") -> None:
         """Connect to the server in a background thread."""
