@@ -301,6 +301,8 @@ class ACSIServer:
         )
 
         endpoint = self._create_endpoint()
+        endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
+        endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
         
         cp = self.runtime.cp or "cp1"
         server = IEC61850Server(ied_model, cp)

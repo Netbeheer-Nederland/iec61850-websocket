@@ -169,25 +169,25 @@
     }
 
     // ==================== Event Handlers ====================
-    function setupEventListeners(rootElement) {
+    function setupEventListeners(rootElement, endpoint) {
         const connectBtn = rootElement.querySelector('#acsi-client-connect-page-btn');
         const disconnectBtn = rootElement.querySelector('#acsi-client-disconnect-page-btn');
         const fetchModelBtn = rootElement.querySelector('#acsi-client-fetch-model-btn');
 
         if (connectBtn) {
-            connectBtn.addEventListener('click', () => handleConnect(rootElement));
+            connectBtn.addEventListener('click', () => handleConnect(rootElement, endpoint));
         }
 
         if (disconnectBtn) {
-            disconnectBtn.addEventListener('click', () => handleDisconnect(rootElement));
+            disconnectBtn.addEventListener('click', () => handleDisconnect(rootElement, endpoint));
         }
 
         if (fetchModelBtn) {
-            fetchModelBtn.addEventListener('click', () => handleFetchModel(rootElement));
+            fetchModelBtn.addEventListener('click', () => handleFetchModel(rootElement, endpoint));
         }
     }
 
-    async function handleConnect(rootElement) {
+    async function handleConnect(rootElement, endpoint) {
         const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
         const port = parseInt(rootElement.querySelector('#acsi-client-port-page').value.trim());
         const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
@@ -203,7 +203,7 @@
         }
 
         showStatus(rootElement, 'Connecting...', 'info');
-        const targetValue = buildTargetValue(host, port);
+        const targetValue = buildTargetValue(endpoint.host, endpoint.port);
         const result = await executeApiCall(
             getApiById('connect'),
             targetValue,
@@ -221,13 +221,13 @@
         }
     }
 
-    async function handleDisconnect(rootElement) {
+    async function handleDisconnect(rootElement, endpoint) {
         const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
         const port = parseInt(rootElement.querySelector('#acsi-client-port-page').value.trim());
         const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
 
         showStatus(rootElement, 'Disconnecting...', 'info');
-        const targetValue = buildTargetValue(host, port);
+        const targetValue = buildTargetValue(endpoint.host, endpoint.port);
         const result = await executeApiCall(
             getApiById('disconnect'),
             targetValue,
@@ -246,10 +246,10 @@
         }
     }
 
-    async function handleFetchModel(rootElement) {
+    async function handleFetchModel(rootElement, endpoint) {
         const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
         const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
-        const targetValue = buildTargetValue(host, port);
+        const targetValue = buildTargetValue(endpoint.host, endpoint.port);
 
         showStatus(rootElement, 'Fetching model...', 'info');
         const result = await executeApiCall(
@@ -279,6 +279,9 @@
         const port = escapeHtml(endpoint.port || '');
         const name = escapeHtml(endpoint.name || '');
 
+        const defaultWsIP = "0.0.0.0";
+        const defaultWsPort = "8765"
+
         rootElement.innerHTML = `
             <div class="page-header">
                 <div style="display:flex; align-items:center; gap:16px;">
@@ -294,12 +297,12 @@
                 <div style="display:flex; gap:16px; margin-top:16px;">
                     <div class="form-group">
                         <label for="acsi-client-host-page">Host</label>
-                        <input type="text" id="acsi-client-host-page" value="${host}" placeholder="127.0.0.1">
+                        <input type="text" id="acsi-client-host-page" value="${defaultWsIP}" placeholder="127.0.0.1">
                     </div>
 
                     <div class="form-group">
                         <label for="acsi-client-port-page">Port</label>
-                        <input type="number" id="acsi-client-port-page" value="${port}" placeholder="102">
+                        <input type="number" id="acsi-client-port-page" value="${defaultWsPort}" placeholder="102">
                     </div>
 
                     <div class="form-group">
@@ -337,7 +340,7 @@
             </div>
         `;
 
-        setupEventListeners(rootElement);
+        setupEventListeners(rootElement, endpoint);
     }
 
     window.ACSIClientPage = {
