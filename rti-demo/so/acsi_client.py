@@ -264,14 +264,14 @@ class ACSIClient:
         except Exception as exc:
             print(f"Event loop error: {exc}")
             self._log_action(f"Event loop error: {exc}", "error")
-        #finally:
-        #    pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
-        #    for task in pending:
-        #        task.cancel()
-        #    if pending:
-        #        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        #    loop.close()
-        #    self._set_runtime_state(loop=None, thread=None)
+        finally:
+            pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+            for task in pending:
+                task.cancel()
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            loop.close()
+            self._set_runtime_state(loop=None, thread=None)
 
     def connect(self, host: str, port: int, cp: str = "cp1") -> None:
         """Connect to the server in a background thread."""
