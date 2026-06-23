@@ -263,16 +263,94 @@
         if (result && result.ok) {
             const treeContainer = rootElement.querySelector('#acsi-client-tree-container-page');
             const treeContent = rootElement.querySelector('#acsi-client-tree-content');
-            treeContent.innerHTML = `<pre>${JSON.stringify(result.payload || {}, null, 2)}</pre>`;
+            renderLiveModelTree(result.payload || {}, treeContent, (node) => {});
+            //treeContent.innerHTML = `<pre>${JSON.stringify(result.payload || {}, null, 2)}</pre>`;
             treeContainer.style.display = 'block';
             showStatus(rootElement, 'Model fetched successfully', 'success');
-        } else {
+        }
+         else {
             const error = result?.payload?.error || result?.rawText || 'Failed to fetch model';
             showStatus(rootElement, error, 'error');
         }
     }
 
     // ==================== Render Function ====================
+    function renderLiveModelTree(data, containerOrId, onNodeClick) {
+      var container = typeof containerOrId === 'string'
+        ? document.getElementById(containerOrId)
+        : containerOrId;
+
+      if (!container) return;
+
+      container.innerHTML = '';
+
+      var lds = [];
+      lds = data.result.model.server.logicalDevices;
+
+      if (!lds.length) {
+        container.innerHTML =
+          '<p style="padding:12px;color:var(--text-muted);font-style:italic;">No model data. Connect FSP/SO first.</p>';
+        return;
+      }
+
+      var root = document.createElement('ul');
+      root.className = 'scl-tree-root';
+
+      function makeClickable(li, ref, fc, nodeType) {
+        var row = li.querySelector(':scope > .scl-tree-row');
+        if (!row) return;
+
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', function (e) {
+          if (e.target && e.target.classList.contains('scl-tree-toggle')) return;
+
+          e.stopPropagation();
+
+          container.querySelectorAll('.scl-tree-row.lm-selected').forEach(function (r) {
+            r.classList.remove('lm-selected');
+          });
+
+          row.classList.add('lm-selected');
+
+          if (onNodeClick) {
+            onNodeClick({ ref: ref, fc: fc, nodeType: nodeType });
+          }
+        });
+      }
+
+      lds.forEach(function (ld) {
+        var ldName = (typeof ld === 'object' ? ld.name : ld) || 'LD';
+        var ldLi = createTreeNode('LDevice', ldName);
+
+        var lnUl = document.createElement('ul');
+        lnUl.className = 'scl-tree-list';
+
+        var lns = data.result.model.logicalDeviceMap[ldName] || [];
+
+        lns.forEach(function (ln) {
+          var lnName = (typeof ln === 'object' ? (ln.name || ln.ln_class) : ln) || 'LN';
+          var lnRef = ldName + '/' + lnName;
+
+          var lnLi = createTreeNode('LogicalNode', lnName);
+          makeClickable(lnLi, lnRef, null, 'LN');
+
+          lnUl.appendChild(lnLi);
+        });
+
+        ldLi.appendChild(lnUl);
+        root.appendChild(ldLi);
+      });
+
+      container.appendChild(root);
+      setupCollapsibleTree(container);
+
+      window.SCLTree = {
+        buildSclTreeFromText,
+        renderSclTree,
+        loadSclFileAndRender
+      };
+    }
+
     function render(rootElement, selectedEndpoint) {
         if (!rootElement) return;
 
