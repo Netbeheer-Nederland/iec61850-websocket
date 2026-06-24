@@ -270,9 +270,17 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         """Build full model sequentially with progress updates."""
         endpoint = client.runtime.endpoint
         loop = client.runtime.loop
-        if not client or not endpoint or not loop or not client.runtime.client.is_connected:
+        iec61850_client = client.runtime.client
+        if not client or not endpoint or not loop or not iec61850_client.is_connected:
             raise RuntimeError('not-connected')
-        ws_info = endpoint.get_websocket_info(client)
+        try:
+            print("Calling get_websocket_info...")
+            ws_info = endpoint.get_websocket_info(iec61850_client)
+            print(f"ws_info: {ws_info}")
+        except Exception as e:
+            print(f"CRASHED in get_websocket_info: {type(e).__name__}: {e}")
+            raise
+
         if ws_info is None:
             raise RuntimeError('no-websocket-info')
 
@@ -361,8 +369,11 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             }
             with client.runtime.lock:
                 client.runtime.model_data = model
-                client.runtime.model_status = 'ready'
                 client.runtime.model_error = None
+                client.runtime.model_status = 'ready'
+                client.runtime.model_ready_event.set()
+
+
         except Exception as e:
             with client.runtime.lock:
                 client.runtime.model_status = 'error'
@@ -372,9 +383,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     def _start_model_build_if_needed():
         """Schedule background model build if idle or error."""
         with client.runtime.lock:
-            status = client.runtime.model_status
-            if status in ('ready', 'building'):
-                return status
+            model_status = client.runtime.model_status
+            if model_status in ('ready', 'building'):
+                return model_status
             client.runtime.model_data = None
             client.runtime.model_error = None
             client.runtime.model_status = 'building'
@@ -387,20 +398,22 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             return 'error'
 
         try:
-            client._log_action("Scheduling model build", "info")
+            #client._log_action("Scheduling model build", "info")
             fut = asyncio.run_coroutine_threadsafe(_abuild_full_model(), loop)
-            client._log_action("Model build scheduled", "info")
+            #client._log_action("Model build scheduled", "info")
         except Exception as e:
             with client.runtime.lock:
                 client.runtime.model_status = 'error'
                 client.runtime.model_error = str(e)
-            client._log_action(f"Failed to schedule model build: {e}", "error")
+            #client._log_action(f"Failed to schedule model build: {e}", "error")
             return 'error'
 
         with client.runtime.lock:
             client.runtime.model_task = fut
 
         def _on_model_task_done(future):
+            print("Model build task completed callback invoked")
+            print("the model is: ", client.runtime.model_data)
             try:
                 exc = future.exception()
             except Exception:
@@ -413,17 +426,18 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 if exc is not None:
                     client.runtime.model_status = 'error'
                     client.runtime.model_error = str(exc)
-                    client._log_action(f"Model build failed: {exc}", "error")
+                    #client._log_action(f"Model build failed: {exc}", "error")
                 else:
                     if client.runtime.model_status != 'ready':
                         client.runtime.model_status = 'ready'
                         client.runtime.model_error = None
-                    client._log_action("Model build completed", "info")
+                    #client._log_action("Model build completed", "info")
 
         try:
             fut.add_done_callback(_on_model_task_done)
         except Exception as e:
-            client._log_action(f"Failed to attach model task callback: {e}", "warn")
+            print(f"Failed to attach model task callback: {e}")
+           # client._log_action(f"Failed to attach model task callback: {e}", "warn")
 
         return 'building'
 
@@ -647,7 +661,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
 
-    @router.get(
+    @router.post(
         "/model/tree",
         summary="Get IED Model Tree",
         description="Retrieves the complete IED model tree from the connected server. This includes logical devices, logical nodes, data objects, and data attributes.",
@@ -667,21 +681,24 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 raise HTTPException(status_code=503, detail="client-not-connected")
 
             with client.runtime.lock:
-                status = client.runtime.model_status
+                model_status = client.runtime.model_status
                 data = client.runtime.model_data
                 error = client.runtime.model_error
-            if status == 'ready' and data:
+            if model_status == 'ready' and data:
                 return {'status': 'ready', 'model': data}
-            if status == 'error':
+            if model_status == 'error':
                 raise HTTPException(status_code=500, detail=error)
-            if status == 'idle':
+            if model_status == 'idle':
                 start_result = _start_model_build_if_needed()
                 if start_result == 'error':
                     client._log_action('Model build scheduling failed', 'error')
                     raise HTTPException(status_code=503, detail=client.runtime.model_error)
-            with client.runtime.lock:
-                progress = client.runtime.model_progress
-            return {'status': 'building', 'progress': progress}
+                else:
+                    await client.runtime.model_ready_event.wait()
+                    data = client.runtime.model_data
+                    return {"status": "ready", "model": data}
+
+            return {'status': 'error', 'model': None}
         except Exception as exc:
             client._log_action(f"Get model failed (outer): {exc}", "error")
             logger.exception("Unhandled outer exception in api_model")
