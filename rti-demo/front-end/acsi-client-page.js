@@ -302,6 +302,7 @@
       li.appendChild(row);
       return li;
     }
+
     function renderLiveModelTree(data, containerOrId, onNodeClick) {
       var container = typeof containerOrId === 'string'
         ? document.getElementById(containerOrId)
@@ -361,6 +362,53 @@
           var lnLi = createTreeNode('LogicalNode', lnName);
           makeClickable(lnLi, lnRef, null, 'LN');
 
+          var dos = data.result.model.logicalNodeDetails[ldName + '/' + lnName].dataObjects || ln.dataObjects || ln.do || [];
+          if (dos.length > 0) {
+            var doUl = document.createElement('ul');
+            doUl.className = 'scl-tree-list';
+
+            dos.forEach(function (doObj) {
+              var doName  = (typeof doObj === 'object' ? doObj.name : doObj) || 'DO';
+              var doFc    = (doObj && doObj.fc) || null;
+              var cdcTxt  = (doObj && doObj.cdc) ? ' [' + doObj.cdc + ']' : '';
+              var doRef   = lnRef + '.' + doName;
+              var doLi    = createTreeNode('DO', doName + cdcTxt);
+              makeClickable(doLi, doRef, doFc, 'DO');
+
+              var das = (doObj && (doObj.data_attributes || doObj.dataAttributes || doObj.da)) || [];
+              if (das.length > 0) {
+                var daUl = document.createElement('ul');
+                daUl.className = 'scl-tree-list';
+
+                das.forEach(function (da) {
+                  var daName   = (typeof da === 'object' ? da.name : da) || 'DA';
+                  var daFc     = (da && (da.fc || doFc)) || null;
+                  var bTypeTxt = (da && da.bType) ? ' [' + da.bType + ']' : '';
+                  var daRef    = doRef + '.' + daName;
+                  var daLi     = createTreeNode('DA', daName + bTypeTxt);
+                  makeClickable(daLi, daRef, daFc, 'DA');
+
+                  var subDas = (da && (da.sub_attributes || da.subDataAttributes || da.sda)) || [];
+                  if (subDas.length > 0) {
+                    var sdaUl = document.createElement('ul');
+                    sdaUl.className = 'scl-tree-list';
+                    subDas.forEach(function (sda) {
+                      var sdaName = (typeof sda === 'object' ? sda.name : sda) || 'SDA';
+                      var sdaRef  = daRef + '.' + sdaName;
+                      var sdaLi   = createTreeNode('SDA', sdaName);
+                      makeClickable(sdaLi, sdaRef, daFc, 'SDA');
+                      sdaUl.appendChild(sdaLi);
+                    });
+                    daLi.appendChild(sdaUl);
+                  }
+                  daUl.appendChild(daLi);
+                });
+                doLi.appendChild(daUl);
+              }
+              doUl.appendChild(doLi);
+            });
+            lnLi.appendChild(doUl);
+          }
           lnUl.appendChild(lnLi);
         });
 
