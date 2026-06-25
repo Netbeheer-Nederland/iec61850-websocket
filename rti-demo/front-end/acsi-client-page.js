@@ -275,6 +275,33 @@
     }
 
     // ==================== Render Function ====================
+    function createTreeNode(nodeType, value) {
+      const li = document.createElement('li');
+      li.className = `scl-tree-item scl-node-${normalizeNodeType(nodeType)}`;
+
+      const row = document.createElement('div');
+      row.className = 'scl-tree-row';
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'scl-tree-toggle';
+      toggle.textContent = '';
+
+      const isGroupNode = String(nodeType || '').toLowerCase() === 'group';
+      const tag = document.createElement('span');
+      tag.className = `scl-tree-tag${isGroupNode ? ' hidden' : ''}`;
+      tag.textContent = isGroupNode ? '' : nodeTypeLabel(nodeType);
+
+      const valueEl = document.createElement('span');
+      valueEl.className = 'scl-tree-value';
+      valueEl.textContent = value || '';
+
+      row.appendChild(toggle);
+      row.appendChild(tag);
+      row.appendChild(valueEl);
+      li.appendChild(row);
+      return li;
+    }
     function renderLiveModelTree(data, containerOrId, onNodeClick) {
       var container = typeof containerOrId === 'string'
         ? document.getElementById(containerOrId)

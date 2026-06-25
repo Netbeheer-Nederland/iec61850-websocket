@@ -47,6 +47,7 @@ class ACSIClientRuntime:
         self.message_seq: int = 0
         self.last_status_log_signature: Optional[tuple] = None
         self.lock: threading.Lock = threading.Lock()
+        self.invoke_lock: asyncio.Lock = asyncio.Lock()
 
         # Model and tree caching
         self.model_status: str = "idle"  # idle|building|ready|error
