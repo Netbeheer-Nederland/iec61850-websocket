@@ -303,6 +303,20 @@
       return li;
     }
 
+    function appendChildrenTree(parentLi, childrenLabels, childType) {
+      if (!childrenLabels || childrenLabels.length === 0) {
+        return;
+      }
+
+      const ul = document.createElement('ul');
+      ul.className = 'scl-tree-list';
+      childrenLabels.forEach(function (label) {
+        ul.appendChild(createTreeNode(childType, label));
+      });
+      parentLi.appendChild(ul);
+    }
+
+
     function renderLiveModelTree(data, containerOrId, onNodeClick) {
       var container = typeof containerOrId === 'string'
         ? document.getElementById(containerOrId)
@@ -362,6 +376,12 @@
           var lnLi = createTreeNode('LogicalNode', lnName);
           makeClickable(lnLi, lnRef, null, 'LN');
 
+          const dsLi = createTreeNode('Group', 'DataSets');
+          appendChildrenTree(dsLi, data.result.model.logicalNodeDetails[ldName + '/' + lnName].dataSets || [], 'DataSet');
+
+          const rcLi = createTreeNode('Group', 'Report Controls');
+          appendChildrenTree(rcLi, data.result.model.logicalNodeDetails[ldName + '/' + lnName].reportControlBlocks.map(rcb => rcb.name) || [], 'ReportControl');
+
           var dos = data.result.model.logicalNodeDetails[ldName + '/' + lnName].dataObjects || ln.dataObjects || ln.do || [];
           if (dos.length > 0) {
             var doUl = document.createElement('ul');
@@ -407,8 +427,14 @@
               }
               doUl.appendChild(doLi);
             });
+
+
             lnLi.appendChild(doUl);
           }
+
+            lnLi.appendChild(dsLi);
+            lnLi.appendChild(rcLi);
+
           lnUl.appendChild(lnLi);
         });
 
