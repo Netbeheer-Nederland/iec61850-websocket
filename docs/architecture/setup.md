@@ -21,12 +21,12 @@ Covers **Ubuntu 24.04 LTS** and **Fedora 41**.
 
 ## 1. System requirements
 
-| Component | Minimum | Recommended |
-|---|---|---|
-| OS | Ubuntu 22.04 / Fedora 38 | Ubuntu 24.04 LTS / Fedora 41 |
-| CPU | x86-64, 2 cores | x86-64, 4+ cores |
-| RAM | 2 GB | 4 GB |
-| Disk | 2 GB free | 5 GB free |
+| Component | Minimum                  | Recommended                  |
+|-----------|--------------------------|------------------------------|
+| OS        | Ubuntu 22.04 / Fedora 38 | Ubuntu 24.04 LTS / Fedora 41 |
+| CPU       | x86-64, 2 cores          | x86-64, 4+ cores             |
+| RAM       | 2 GB                     | 4 GB                         |
+| Disk      | 2 GB free                | 5 GB free                    |
 
 ---
 
@@ -332,11 +332,11 @@ If both sides connect and exchange messages without errors, the installation is 
 
 ## Troubleshooting
 
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| `uv: command not found` | Shell env not reloaded after UV install | Run `source "$HOME/.local/bin/env"` or open a new terminal |
-| `python3.12: command not found` on Ubuntu 22.04 | deadsnakes PPA not added | Follow the Ubuntu 22.04 path in [section 3](#3-python-312) |
-| `cfssl: command not found` | Binary not on `PATH` | Confirm `/usr/local/bin` is on `PATH`; re-run the `sudo mv` step |
-| `permission denied` running Docker | User not in `docker` group | Run `sudo usermod -aG docker "$USER"` then log out and back in |
-| `uv sync` fails on a C extension | Python headers missing | Install `python3.12-dev` (Ubuntu) or `python3.12-devel` (Fedora) |
-| TLS test failures | Certificates not generated | Follow the certificate-generation steps in the relevant test markdown file under `tests/` |
+| Symptom                                         | Likely cause                            | Fix                                                                                       |
+|-------------------------------------------------|-----------------------------------------|-------------------------------------------------------------------------------------------|
+| `uv: command not found`                         | Shell env not reloaded after UV install | Run `source "$HOME/.local/bin/env"` or open a new terminal                                |
+| `python3.12: command not found` on Ubuntu 22.04 | deadsnakes PPA not added                | Follow the Ubuntu 22.04 path in [section 3](#3-python-312)                                |
+| `cfssl: command not found`                      | Binary not on `PATH`                    | Confirm `/usr/local/bin` is on `PATH`; re-run the `sudo mv` step                          |
+| `permission denied` running Docker              | User not in `docker` group              | Run `sudo usermod -aG docker "$USER"` then log out and back in                            |
+| `uv sync` fails on a C extension                | Python headers missing                  | Install `python3.12-dev` (Ubuntu) or `python3.12-devel` (Fedora)                          |
+| TLS test failures                               | Certificates not generated              | Follow the certificate-generation steps in the relevant test markdown file under `tests/` |
