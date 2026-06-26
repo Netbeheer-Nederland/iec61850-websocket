@@ -99,7 +99,8 @@ iec61850-websocket/
 ### Prerequisites
 
 - **UV** - [Install UV](https://docs.astral.sh/uv/getting-started/installation/)
-- **Python 3.10-3.12** (3.12 recommended) - [Download Python](https://www.python.org/downloads/)
+- **Python 3.10-3.12** (3.12 recommended) - [Download Python](https://www.python.org/downloads/), or use a package
+  manager like `apt`, `brew`, or `chocolatey`. including the libraries python3-dev, python3-bitstruct.
 - **Git** - [Install Git](https://git-scm.com/downloads)
 - **Docker** - [Install Docker](https://docs.docker.com/get-docker/)
 - **Docker Compose** - [Install Docker Compose](https://docs.docker.com/compose/install/)
