@@ -10,7 +10,7 @@
     const apiDefinitions = [
 
     // =========================
-    // IEC61850 SERVER APIs
+    // Acsi-Server APIs
     // =========================
 
     { id: 'status', label: 'GET /api/status', method: 'GET', path: '/api/status', sampleBody: '' },
