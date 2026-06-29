@@ -8,6 +8,7 @@
         { id: 'connect', label: 'POST /api/connect', method: 'POST', path: '/api/connect' },
         { id: 'disconnect', label: 'POST /api/disconnect', method: 'POST', path: '/api/disconnect' },
         { id: 'model-tree', label: 'GET /api/model/tree', method: 'POST', path: '/api/model/tree' },
+        { id: 'data-definition', label: 'POST /api/getDataDefinition', method: 'POST', path: '/api/getDataDefinition' },
     ];
 
     function getApiById(id) {
@@ -248,10 +249,157 @@
         }
     }
 
+    function appendDataAttributeNodes(parentLi, attributes, nodeLabel) {
+      if (!attributes || attributes.length === 0) {
+        return;
+      }
+
+      const ul = document.createElement('ul');
+      ul.className = 'scl-tree-list';
+
+      attributes.forEach((da) => {
+      const typeSuffix = da.bType ? ` [${da.bType}]` : '';
+      const daLi = createTreeNode(nodeLabel, `${da.daRef}${typeSuffix}`);
+
+      appendDataAttributeNodes(daLi, da.subDataAttributes || [], 'SDA');
+      ul.appendChild(daLi);
+
+    });
+
+      parentLi.appendChild(ul);
+    }
+
+    function appendSubDataObjectNodes(parentLi, subDataObjects) {
+      if (!subDataObjects || subDataObjects.length === 0) {
+        return;
+      }
+
+      const ul = document.createElement('ul');
+      ul.className = 'scl-tree-list';
+
+      subDataObjects.forEach(function (sdo) {
+        const cdcSuffix = sdo.cdc ? ` [${sdo.cdc}]` : '';
+        const sdoLi = createTreeNode('SDO', `${sdo.name}${cdcSuffix}`);
+        appendDataAttributeNodes(sdoLi, sdo.dataAttributes || [], 'DA');
+        appendSubDataObjectNodes(sdoLi, sdo.subDataObjects || []);
+        ul.appendChild(sdoLi);
+      });
+
+      parentLi.appendChild(ul);
+    }
+
     async function handleFetchModel(rootElement, endpoint) {
         const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
         const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
         const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+
+
+        const handleNodeClick = async (node) => {
+            if (node.nodeType === 'DO') {
+                //showStatus(rootElement, `Fetching data definition for ${node.ref}...`, 'info');
+
+                const existingUl = node.li.querySelector(':scope > ul');
+
+                if (existingUl) {
+                    return;
+                }
+                const ldName = node.ref.split('/')[0];
+                const lnName = node.ref.split('/')[1].split('.')[0];
+                const doPath = node.ref.split('/')[1].split('.').slice(1).join('.');
+
+                const defResult = await executeApiCall(
+                    getApiById('data-definition'),
+                    targetValue,
+                    {ld_inst: ldName, ln_inst: lnName, do_path: doPath}
+                );
+                if (defResult && defResult.ok) {
+                    //showStatus(rootElement, `Data definition fetched for ${node.ref}`, 'success');
+                    console.log('Data definition:', defResult.payload);
+                    const dataAttributes = defResult.payload.result.value?.dataAttributeDefinition || [];
+                    const subDataObjects = defResult.payload.result.value?.subDataDefinition || [];
+
+                    const ul = document.createElement('ul');
+                    ul.className = 'scl-tree-list';
+
+                    // Add DAs to the single UL
+                    dataAttributes.forEach((da) => {
+                        const typeSuffix = da.bType ? ` [${da.bType}]` : '';
+                        const daName = da.name || da.daRef.split('.').pop() || 'DA';
+                        const daLi = createTreeNode('DA', `${daName}${typeSuffix}`);
+
+                        // Add SDAs under this DA (if any)
+                        const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
+                        if (subDas.length > 0) {
+                            const daUl = document.createElement('ul');
+                            daUl.className = 'scl-tree-list';
+                            subDas.forEach((sda) => {
+                                const sdaTypeSuffix = sda.bType ? ` [${sda.bType}]` : '';
+                                const sdaName = sda.name || sda.daRef.split('.').pop() || 'SDA';
+                                daUl.appendChild(createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`));
+                            });
+                            daLi.appendChild(daUl);
+                        }
+                        ul.appendChild(daLi);
+                    });
+
+                    // Add SDOs to the same UL
+                    subDataObjects.forEach((sdo) => {
+                        const cdcSuffix = sdo.cdc ? ` [${sdo.cdc}]` : '';
+                        const sdoLi = createTreeNode('SDO', `${sdo.name}${cdcSuffix}`);
+
+                        // Add children under this SDO (if any)
+                        const sdoDas = sdo.dataAttributes || sdo.data_attributes || sdo.da || [];
+                        const sdoSubSdos = sdo.subDataObjects || sdo.sub_data_objects || [];
+                        if (sdoDas.length > 0 || sdoSubSdos.length > 0) {
+                            const sdoUl = document.createElement('ul');
+                            sdoUl.className = 'scl-tree-list';
+                            sdoDas.forEach((da) => {
+                                const typeSuffix = da.bType ? ` [${da.bType}]` : '';
+                                const daName = da.name || da.daRef.split('.').pop() || 'DA';
+                                sdoUl.appendChild(createTreeNode('DA', `${daName}${typeSuffix}`));
+                            });
+                            sdoSubSdos.forEach((nestedSdo) => {
+                                const nestedCdc = nestedSdo.cdc ? ` [${nestedSdo.cdc}]` : '';
+                                sdoUl.appendChild(createTreeNode('SDO', `${nestedSdo.name}${nestedCdc}`));
+                            });
+                            sdoLi.appendChild(sdoUl);
+                        }
+                        ul.appendChild(sdoLi);
+                    });
+
+                   node.li.appendChild(ul);
+
+                    if (ul.children.length > 0) {
+                        const row = node.li.querySelector(':scope > .scl-tree-row');
+                        const toggle = row.querySelector('.scl-tree-toggle');
+
+                        toggle.classList.remove('hidden');
+                        node.li.classList.add('has-children', 'expanded');
+                        toggle.textContent = '▾';
+                        ul.style.display = '';
+
+                        const onToggle = () => {
+                            const expanded = node.li.classList.toggle('expanded');
+                            toggle.textContent = expanded ? '▾' : '▸';
+                            ul.style.display = expanded ? '' : 'none';
+                        };
+
+                        toggle.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            onToggle();
+                        });
+                    }
+                }
+                else
+                {
+                    const error = defResult?.payload?.error || defResult?.rawText || 'Failed to fetch data definition';
+                    console.log(`Error fetching data definition for ${node.ref}:`, error);
+                    //showStatus(rootElement, error, 'error');
+                }
+            }
+        };
+
+
 
         showStatus(rootElement, 'Fetching model...', 'info');
         const result = await executeApiCall(
@@ -263,7 +411,7 @@
         if (result && result.ok) {
             const treeContainer = rootElement.querySelector('#acsi-client-tree-container-page');
             const treeContent = rootElement.querySelector('#acsi-client-tree-content');
-            renderLiveModelTree(result.payload || {}, treeContent, (node) => {});
+            renderLiveModelTree(result.payload || {}, treeContent, handleNodeClick);
             //treeContent.innerHTML = `<pre>${JSON.stringify(result.payload || {}, null, 2)}</pre>`;
             treeContainer.style.display = 'block';
             showStatus(rootElement, 'Model fetched successfully', 'success');
@@ -275,6 +423,46 @@
     }
 
     // ==================== Render Function ====================
+    function setupCollapsibleTree(container) {
+      const treeItems = container.querySelectorAll('.scl-tree-item');
+
+      treeItems.forEach(function (item) {
+        const row = item.querySelector(':scope > .scl-tree-row');
+        const toggle = row ? row.querySelector('.scl-tree-toggle') : null;
+        const childList = item.querySelector(':scope > .scl-tree-list');
+
+        if (!row || !toggle) {
+          return;
+        }
+
+        if (!childList || childList.children.length === 0) {
+          toggle.classList.add('hidden');
+          return;
+        }
+
+        item.classList.add('has-children', 'expanded');
+        toggle.textContent = '▾';
+
+
+        // 👇 CRITICAL: Remove 'hidden' when children exist
+        toggle.classList.remove('hidden');
+        item.classList.add('has-children', 'expanded');
+        toggle.textContent = '▾';
+
+        const onToggle = function () {
+          const isExpanded = item.classList.toggle('expanded');
+          toggle.textContent = isExpanded ? '▾' : '▸';
+          childList.style.display = isExpanded ? '' : 'none';
+        };
+
+        toggle.addEventListener('click', function (event) {
+          event.stopPropagation();
+          onToggle();
+        });
+      });
+    }
+
+
     function createTreeNode(nodeType, value) {
       const li = document.createElement('li');
       li.className = `scl-tree-item scl-node-${normalizeNodeType(nodeType)}`;
@@ -338,7 +526,7 @@
       var root = document.createElement('ul');
       root.className = 'scl-tree-root';
 
-      function makeClickable(li, ref, fc, nodeType) {
+    function makeClickable(li, ref, fc, nodeType) {
         var row = li.querySelector(':scope > .scl-tree-row');
         if (!row) return;
 
@@ -355,10 +543,20 @@
           row.classList.add('lm-selected');
 
           if (onNodeClick) {
-            onNodeClick({ ref: ref, fc: fc, nodeType: nodeType });
+            onNodeClick({ ref: ref, fc: fc, nodeType: nodeType, li});
           }
+
+            const childList = li.querySelector(':scope > .scl-tree-list');
+            const toggle = row.querySelector('.scl-tree-toggle');
+
+            if (childList && !toggle.classList.contains('hidden')) {
+                const expanded = li.classList.toggle('expanded');
+                toggle.textContent = expanded ? '▾' : '▸';
+                childList.style.display = expanded ? '' : 'none';
+            }
         });
       }
+
 
       lds.forEach(function (ld) {
         var ldName = (typeof ld === 'object' ? ld.name : ld) || 'LD';
