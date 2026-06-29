@@ -3,12 +3,23 @@
    ============================================== */
 
 (function initACSIClientPage() {
+
+    // Put this at the top of initACSIClientPage(), outside all other functions
+    document.addEventListener('click', () => hideContextMenu());
+    document.addEventListener('contextmenu', (e) => {
+        // Hide if clicking outside the menu
+        if (contextMenu && !contextMenu.contains(e.target)) {
+            hideContextMenu();
+        }
+    });
     // ==================== API Definitions ====================
     const apiDefinitions = [
         { id: 'connect', label: 'POST /api/connect', method: 'POST', path: '/api/connect' },
         { id: 'disconnect', label: 'POST /api/disconnect', method: 'POST', path: '/api/disconnect' },
         { id: 'model-tree', label: 'GET /api/model/tree', method: 'POST', path: '/api/model/tree' },
         { id: 'data-definition', label: 'POST /api/getDataDefinition', method: 'POST', path: '/api/getDataDefinition' },
+        { id: 'read', label: 'POST /api/readvalue', method: 'POST', path: '/api/readvalue' },
+        { id: 'write', label: 'POST /api/writevalue', method: 'POST', path: '/api/writevalue' },
     ];
 
     function getApiById(id) {
@@ -249,6 +260,86 @@
         }
     }
 
+    // Context menu for reading data values
+    let contextMenu = null;
+    let contextMenuTarget = null;
+
+    function createContextMenu(items) {
+        if (contextMenu) {
+            contextMenu.remove();
+            contextMenu = null;
+        }
+
+        const menu = document.createElement('div');
+        menu.id = 'contextMenu';
+        menu.className = 'context-menu';
+
+        items.forEach(item => {
+            if (item.divider) {
+                const divider = document.createElement('div');
+                divider.className = 'context-menu-divider';
+                menu.appendChild(divider);
+                return;
+            }
+            const menuItem = document.createElement('div');
+            menuItem.className = `context-menu-item${item.danger ? ' danger' : ''}`;
+            if (item.icon) {
+                const icon = document.createElement('i');
+                icon.className = `fas ${item.icon}`;
+                menuItem.appendChild(icon);
+            }
+            const label = document.createElement('span');
+            label.textContent = item.label;
+            menuItem.appendChild(label);
+            menuItem.addEventListener('click', () => {
+                if (typeof item.action === 'function') item.action();
+                hideContextMenu();
+            });
+            menu.appendChild(menuItem);
+        });
+
+        document.body.appendChild(menu);
+        contextMenu = menu;
+        return menu;
+    }
+
+    function hideContextMenu() {
+      if (contextMenu) {
+        contextMenu.style.display = 'none';
+      }
+      contextMenuTarget = null;
+    }
+
+    async function showContextMenuForDataAttribute(e, objRef, fc) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const menuItems = [
+            {
+                label: `Read Value [${fc.toUpperCase()}]`,
+                icon: 'fa-eye',
+                action: () => console.log('Read', objRef, fc)
+            },
+            {
+                label: `Write Value [${fc.toUpperCase()}]`,
+                icon: 'fa-pen',
+                action: () => console.log('Write', objRef, fc)
+            }
+        ];
+
+        const menu = createContextMenu(menuItems);
+        menu.style.left = e.clientX + 'px';
+        menu.style.top  = e.clientY + 'px';
+        menu.style.display = 'block';
+
+        // Nudge back if it overflows the viewport
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth)  menu.style.left = (e.clientX - rect.width) + 'px';
+            if (rect.bottom > window.innerHeight) menu.style.top = (e.clientY - rect.height) + 'px';
+        });
+    }
+
     function appendDataAttributeNodes(parentLi, attributes, nodeLabel) {
       if (!attributes || attributes.length === 0) {
         return;
@@ -323,9 +414,21 @@
 
                     // Add DAs to the single UL
                     dataAttributes.forEach((da) => {
-                        const typeSuffix = da.bType ? ` [${da.bType}]` : '';
+                        const typeSuffix = da.daType[0] ? ` [${da.daType[0]}]` : '';
                         const daName = da.name || da.daRef.split('.').pop() || 'DA';
                         const daLi = createTreeNode('DA', `${daName}${typeSuffix}`);
+
+                        const daRef = `${node.ref}.${daName}`;   // ← construct it explicitly
+
+
+                        const row = daLi.querySelector(':scope > .scl-tree-row');
+                        row.style.cursor = 'context-menu';
+
+                        row.addEventListener('contextmenu', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            showContextMenuForDataAttribute(e, daRef, 'mx');
+                        });
 
                         // Add SDAs under this DA (if any)
                         const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
@@ -333,7 +436,7 @@
                             const daUl = document.createElement('ul');
                             daUl.className = 'scl-tree-list';
                             subDas.forEach((sda) => {
-                                const sdaTypeSuffix = sda.bType ? ` [${sda.bType}]` : '';
+                                const sdaTypeSuffix = sda.daType[0] ? ` [${daType[0].bType}]` : '';
                                 const sdaName = sda.name || sda.daRef.split('.').pop() || 'SDA';
                                 daUl.appendChild(createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`));
                             });
@@ -397,6 +500,7 @@
                     //showStatus(rootElement, error, 'error');
                 }
             }
+
         };
 
 
