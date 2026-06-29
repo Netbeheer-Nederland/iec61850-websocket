@@ -1,5 +1,5 @@
 services:
-  # RTI IEC61850 Client Server
+  # RTI Acsi-Client Server
 #  rti-client:
 #    build:
 #      context: ../../..
@@ -27,7 +27,7 @@ services:
 #      - "rti.host=rti-client"
 #      - "rti.port=5000"
 
-  # RTI IEC61850 Server
+  # RTI Acsi-Server
 #  rti-server:
 #    build:
 #      context: ../../..
@@ -102,7 +102,7 @@ services:
     environment:
       - REACT_APP_BFF_URL=http://bff-server:5000
 
-  # RTI FSP (IEC61850 Server)
+  # RTI-FSP (Acsi-Server)
   rti-server:
     build:
       context: ..
@@ -129,7 +129,7 @@ services:
     volumes:
         - ./fsp:/app/fsp
 
-  # RTI SO (IEC61850 Client)
+  # RTI SO (Acsi-Client)
   rti-client:
     build:
       context: ..
@@ -157,12 +157,12 @@ services:
     volumes:
         - ./so:/app/so
 
-  # RTI WS Client (IEC61850 Client)
-  rti-ws-client:
+  # RTI WS Client (Acsi-Client)
+  rti-ActiveWebSocket:
     build:
       context: ..
       dockerfile: rti-demo/acsi_ws_client/Dockerfile
-    container_name: rti-ws-client
+    container_name: rti-ActiveWebSocket
     ports:
       - "5003:5003"
       - "8766:8765"    # WebSocket port - MUST ADD
@@ -178,19 +178,19 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      - "rti.service=rti-ws-client"
+      - "rti.service=rti-ActiveWebSocket"
       - "rti.type=RTI-SO"
-      - "rti.host=rti-ws-client"
+      - "rti.host=rti-ActiveWebSocket"
       - "rti.port=5003"
     volumes:
       - ./acsi_ws_client:/app/acsi_ws_client
 
-  # RTI WS Server (IEC61850 Server)
-  rti-ws-server:
+  # RTI WS Server (Acsi-Server)
+  rti-PassiveWebSocket:
     build:
       context: ..
       dockerfile: rti-demo/acsi_ws_server/Dockerfile
-    container_name: rti-ws-server
+    container_name: rti-PassiveWebSocket
     ports:
       - "5004:5004"
     environment:
@@ -205,9 +205,9 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      - "rti.service=rti-ws-server"
+      - "rti.service=rti-PassiveWebSocket"
       - "rti.type=RTI"
-      - "rti.host=rti--ws-server"
+      - "rti.host=rti--PassiveWebSocket"
       - "rti.port=5004"
     volumes:
         - ./acsi_ws_server:/app/acsi_ws_server

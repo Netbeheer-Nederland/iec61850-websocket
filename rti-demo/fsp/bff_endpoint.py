@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 # ==================== Pydantic Models ====================
 class WritevalueRequest(BaseModel):
-    """Request body for writing a value to the IEC61850 server model."""
+    """Request body for writing a value to the Acsi-Server model."""
     obj_ref: str = Field(
         ...,
         description="Object reference in IEC61850 format (e.g., 'LD0/LLN0$ST$Mod')",
@@ -74,7 +74,7 @@ class StartRequest(BaseModel):
     )
 
 class ReadvalueRequest(BaseModel):
-    """Request body for reading a value from the IEC61850 server model."""
+    """Request body for reading a value from the Acsi-Server model."""
     obj_ref: str = Field(
         ...,
         description="Object reference in IEC61850 format",
@@ -101,7 +101,7 @@ def create_bff_router(
     """
     router = APIRouter(
         prefix="/api",
-        tags=["IEC61850-Server"],
+        tags=["acsi-server"],
         responses={404: {"description": "Not found"}, 500: {"description": "Internal server error"}}
     )
 
@@ -1083,9 +1083,9 @@ def create_bff_router(
     return router, server
 
 def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
-    """Create and configure the FastAPI application for IEC61850 server BFF."""
+    """Create and configure the FastAPI application for Acsi-Server BFF."""
     app = FastAPI(
-        title="IEC61850 Server WS Active",
+        title="Acsi-Server WS Active",
         description="Backend for Frontend (BFF) endpoint providing REST API for ACSI Server control. "
                     "This service manages IEC61850 WebSocket server lifecycle, IED models, data access, "
                     "and provides comprehensive monitoring capabilities.",

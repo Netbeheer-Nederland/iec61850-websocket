@@ -441,7 +441,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     @router.get(
         "/status",
         summary="Get Client Status",
-        description="Returns the current operational status of the IEC61850 client.",
+        description="Returns the current operational status of the Acsi-Client.",
         response_description="Client status information",
         responses={
             200: {"description": "Client status returned successfully"},
@@ -569,7 +569,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     @router.post(
         "/connect",
         summary="Connect to Server",
-        description="Establishes a WebSocket connection to an IEC61850 server. Must be called before any data operations.",
+        description="Establishes a WebSocket connection to an Acsi-Server. Must be called before any data operations.",
         response_description="Connection confirmation",
         responses={
             200: {"description": "Connection initiated successfully"},
@@ -625,7 +625,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     @router.post(
         "/disconnect",
         summary="Disconnect from Server",
-        description="Closes the current WebSocket connection to the IEC61850 server.",
+        description="Closes the current WebSocket connection to the Acsi-Server.",
         response_description="Disconnection confirmation",
         responses={
             200: {"description": "Disconnection status"},
@@ -844,7 +844,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     @router.post(
         "/readvalue",
         summary="Read Value",
-        description="Reads a value from the connected IEC61850 server. The client must be connected before calling this endpoint.",
+        description="Reads a value from the connected Acsi-Server. The client must be connected before calling this endpoint.",
         response_description="Read value result",
         responses={
             200: {"description": "Value read successfully"},
@@ -960,7 +960,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     @router.post(
         "/writevalue",
         summary="Write Value",
-        description="Writes a value to the connected IEC61850 server. The client must be connected before calling this endpoint.",
+        description="Writes a value to the connected Acsi-Server. The client must be connected before calling this endpoint.",
         response_description="Write value confirmation",
         responses={
             200: {"description": "Value written successfully"},
@@ -1244,9 +1244,9 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     return router, client
 
 def create_fastapi_app() -> FastAPI:
-    """Create and configure the FastAPI application for IEC61850 client BFF."""
+    """Create and configure the FastAPI application for Acsi-Client BFF."""
     app = FastAPI(
-        title="IEC61850 Client WS Client",
+        title="Acsi-Client WS Client",
         description="Backend for Frontend (BFF) endpoint providing REST API for ACSI client control. "
                     "This service manages IEC61850 WebSocket client connections, data access, "
                     "model retrieval, and provides comprehensive monitoring capabilities.",
@@ -1261,7 +1261,7 @@ def create_fastapi_app() -> FastAPI:
             },
             {
                 "name": "Connection Management",
-                "description": "Connect to and disconnect from IEC61850 servers"
+                "description": "Connect to and disconnect from Acsi-Servers"
             },
             {
                 "name": "Model Access",
