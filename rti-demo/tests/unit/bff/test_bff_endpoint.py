@@ -384,7 +384,7 @@ def test_so_connect_and_disconnect_from_bff():
 @pytest.mark.integration
 def test_so_connect_to_fsp_and_check_status():
     """
-    Test FSP server-mode connection to SO (passive) listening.
+    Test FSP ACSI-Server_WebsocketActive-mode connection to SO (passive) listening.
     Flow: SO listens -> FSP connects to SO -> verify connected -> disconnect
     """
     print("\n" + "="*70)
@@ -422,7 +422,7 @@ def test_so_connect_to_fsp_and_check_status():
     # Give SO time to start listening
     time.sleep(1)
 
-    # Start FSP server to connect to SO
+    # Start FSP ACSI-Server_WebsocketActive to connect to SO
     # Note: host='rti-client' resolves to the SO container inside docker network
     fsp_connect_payload = {
         'host': 'rti-client',  # SO hostname in docker network

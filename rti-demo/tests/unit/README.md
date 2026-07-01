@@ -6,10 +6,10 @@ This directory contains organized unit tests for the RTI 2.0 demo applications.
 
 ```
 tests/unit/
-├── fsp/                              # FSP Server tests
+├── fsp/                              # FSP ACSI-Server_WebsocketActive tests
 │   ├── __init__.py
 │   └── test_bff_endpoint.py          # Server API tests
-├── so/                               # SO Client tests
+├── so/                               # SO ACSI-Client_WebsocketPassive tests
 │   ├── __init__.py
 │   └── test_bff_endpoint.py          # Client API tests
 └── README.md                         # This file
@@ -24,13 +24,13 @@ cd rti-demo
 pytest tests/unit -v
 ```
 
-### FSP Server Tests Only
+### FSP ACSI-Server_WebsocketActive Tests Only
 
 ```bash
 pytest tests/unit/fsp -v
 ```
 
-### SO Client Tests Only
+### SO ACSI-Client_WebsocketPassive Tests Only
 
 ```bash
 pytest tests/unit/so -v
@@ -50,7 +50,7 @@ pytest tests/unit --cov=rti_demo --cov-report=html
 
 ## Test Files
 
-### FSP Server Tests (`fsp/test_bff_endpoint.py`)
+### FSP ACSI-Server_WebsocketActive Tests (`fsp/test_bff_endpoint.py`)
 
 Tests for the FSP (server) BFF endpoint routes:
 - Status endpoint
@@ -61,7 +61,7 @@ Tests for the FSP (server) BFF endpoint routes:
 - HTTP method validation
 - Error handling
 
-### SO Client Tests (`so/test_bff_endpoint.py`)
+### SO ACSI-Client_WebsocketPassive Tests (`so/test_bff_endpoint.py`)
 
 Tests for the SO (client) BFF endpoint routes:
 - Status endpoint
