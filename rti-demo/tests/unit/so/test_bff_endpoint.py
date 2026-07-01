@@ -1,4 +1,4 @@
-"""Unit tests for SO client BFF endpoint routes."""
+"""Unit tests for SO ACSI-Client_WebsocketPassive BFF endpoint routes."""
 
 from __future__ import annotations
 

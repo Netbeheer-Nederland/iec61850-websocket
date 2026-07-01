@@ -1,1 +1,1 @@
-"""Tests for SO client module."""
+"""Tests for SO ACSI-Client_WebsocketPassive module."""

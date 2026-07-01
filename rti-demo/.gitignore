@@ -1,0 +1,47 @@
+# RTI Demo - Local configuration and generated files
+
+# Local configuration files
+launch_config.json
+*.local.json
+
+# Generated files
+*.log
+*.pid
+.pytest_cache/
+
+# Local environment
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Docker
+.docker/
+
+# Service state files
+connections.json
+stats.json
+discovered_endpoints.json
+
+# Temporary files
+*.tmp
+*.bak
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Local overrides
+launch.py.local
+config.local.py
