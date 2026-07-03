@@ -310,7 +310,266 @@
       contextMenuTarget = null;
     }
 
-    async function showContextMenuForDataAttribute(e, objRef, fc) {
+    // Context menu for reading data values
+    function updateTreeValueDisplay(objRef, valueData, isError = false) {
+      console.log('[updateTreeValueDisplay] Called for:', objRef, 'isError:', isError, 'valueData:', valueData);
+
+      // Find the tree value display span by objRef
+      const treeValueSpan = document.querySelector(`.tree-value-display[data-obj-ref="${objRef}"]`);
+
+      if (!treeValueSpan) {
+        console.log('[updateTreeValueDisplay] Span not found for:', objRef);
+        return;
+      }
+
+      console.log('[updateTreeValueDisplay] Found span for:', objRef);
+
+      if (isError) {
+        treeValueSpan.textContent = ` ✗ Error`;
+        treeValueSpan.style.color = '#c62828';
+        console.log('[updateTreeValueDisplay] Set error display');
+        return;
+      }
+
+      // Helper to extract actual value from wrapped structure
+      function extractActualValue(val) {
+        // Handle wrapped format: [{data: {...}}]
+        if (Array.isArray(val) && val.length > 0 && val[0] && val[0].data) {
+          const dataObj = val[0].data;
+          // If data is an object with a single key (the type), extract that value
+          if (typeof dataObj === 'object' && !Array.isArray(dataObj)) {
+            const keys = Object.keys(dataObj);
+            if (keys.length === 1) {
+              return dataObj[keys[0]];
+            }
+          }
+          return dataObj;
+        }
+        return val;
+      }
+
+      // Check if this is a structured value
+      if (Array.isArray(valueData) && valueData.length > 0) {
+        const firstItem = valueData[0];
+
+        if (firstItem && firstItem.data && Array.isArray(firstItem.data)) {
+          if (firstItem.data.length === 2 &&
+              typeof firstItem.data[0] === 'string' &&
+              firstItem.data[0] === 'structure') {
+            // This is a structured attribute - show dash
+            treeValueSpan.textContent = '—';
+            treeValueSpan.style.color = '#4caf50'; // Green
+            return;
+          }
+
+          // Simple value - extract and display
+          if (firstItem.data.length === 2 && typeof firstItem.data[0] === 'string') {
+            const value = firstItem.data[1];
+            // If ASN.1 TimeStamp object, convert to ISO
+            let displayValue = value;
+            if (value && typeof value === 'object' && typeof value.secondSinceEpoch === 'number') {
+              displayValue = asn1TimeStampToISOString(value) || JSON.stringify(value);
+            } else if (typeof value === 'number') {
+              displayValue = value.toFixed(2);
+            } else if (typeof value === 'boolean') {
+              displayValue = value ? 'true' : 'false';
+            } else if (typeof value === 'object') {
+              // For complex objects (like quality), show clean JSON
+              displayValue = JSON.stringify(value);
+            }
+            treeValueSpan.textContent = displayValue;
+            treeValueSpan.style.color = '#4caf50'; // Green for successful read
+            return;
+          }
+        }
+      }
+
+      // Default display - extract actual value if wrapped
+      const actualValue = extractActualValue(valueData);
+      treeValueSpan.textContent = JSON.stringify(actualValue);
+      treeValueSpan.style.color = '#4caf50'; // Green
+    }
+
+
+    async function readDataValue(objRef, fc, endpoint) {
+      console.log('[readDataValue] Reading:', objRef, 'FC:', fc);
+      const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+      //const statusEl = document.getElementById('actionText');
+      //statusEl.textContent = `Reading ${objRef} [${fc}]...`;
+      //statusEl.className = 'info fetching';
+
+      // Ensure the tree node exists in the DOM before reading
+      // This is needed for nested attributes that might not be expanded yet
+      //await ensureTreeNodeExists(objRef);
+
+      // For nested DA sub-attributes (e.g., "mag.f" in "LD0/MMXU1.PhV.phsA.cVal.mag.f"),
+      // we need to ensure the parent DA tree node is expanded so the span exists
+      //await ensureDaTreeNodeExpanded(objRef);
+
+      try {
+        const res = await executeApiCall(
+            getApiById('read'),
+            targetValue,
+            { objRef, fc }
+        );
+
+        //const data = await res.json();
+        const data = res?.payload || { error: 'No response payload' };
+        console.log('[readDataValue] Response:', data);
+
+        if (data.error) {
+          //statusEl.textContent = `Error reading ${objRef}: ${data.error}`;
+          //statusEl.className = 'error';
+          console.log('[readDataValue] Error reading:', objRef, data.error);
+          updateTreeValueDisplay(objRef, data.error, true);
+        } else {
+          // Format the values for display
+          //const valueStr =
+          //statusEl.textContent = `${objRef} [${fc}]: ${valueStr}`;
+          //statusEl.className = 'info';
+          console.log('[readDataValue] Updating tree display for:', objRef, data.values);
+          updateTreeValueDisplay(objRef, data.result.value, false);
+        }
+      } catch (e) {
+        console.error('[readDataValue] Exception:', e);
+        //statusEl.textContent = `Exception reading ${objRef}: ${e.message}`;
+        //statusEl.className = 'error';
+        updateTreeValueDisplay(objRef, e.message, true);
+      }
+    }
+
+    async function writeDataValue(objRef, fc, endpoint, value, value_type) {
+      console.log('[writeDataValue] Writing:', objRef, 'FC:', fc, 'Value:', value);
+      const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+
+      try {
+        const res = await executeApiCall(
+            getApiById('write'),
+            targetValue,
+            { objRef, fc, value, value_type }  // ✅ Include value in payload
+        );
+
+        const data = res?.payload || { error: 'No response payload' };
+        console.log('[writeDataValue] Response:', data);
+
+        if (data.error) {
+          console.error('[writeDataValue] Error:', data.error);
+          throw new Error(data.error);
+        }
+
+        // Update UI to show the new value
+        updateTreeValueDisplay(objRef, data.result?.value || value, false);
+        return data;
+      } catch (e) {
+        console.error('[writeDataValue] Exception:', e);
+        updateTreeValueDisplay(objRef, e.message, true);
+        throw e;
+      }
+    }
+    // ===== Write Data Value Dialog Functions =====
+    async function showWriteValueDialog(objRef, fc, endpoint) {
+      const modal = document.getElementById('writeValueModal');
+      const titleEl = document.getElementById('writeValueTitle');
+      const objRefEl = document.getElementById('writeValueObjRef');
+      const typeEl = document.getElementById('writeValueType');
+      const currentValueEl = document.getElementById('writeValueCurrent');
+      const inputEl = document.getElementById('writeValueInput');
+      const validationEl = document.getElementById('writeValueValidation');
+      const resultDiv = document.getElementById('writeValueResult');
+      const submitBtn = document.getElementById('writeValueSubmit');
+      const cancelBtn = document.getElementById('writeValueCancel');
+
+      // Reset state
+      titleEl.textContent = 'Write Data Value';
+      objRefEl.textContent = objRef;
+      typeEl.textContent = 'Reading...';
+      currentValueEl.textContent = 'Reading...';
+      inputEl.value = '';
+      inputEl.disabled = false;
+      inputEl.readOnly = false;
+      inputEl.placeholder = 'Enter new value';
+      validationEl.textContent = '';
+      resultDiv.classList.add('hidden');
+
+      // Show modal
+      modal.classList.remove('hidden');
+      inputEl.focus();  // ✅ Focus the input immediately
+
+      // Use executeApiCall
+      const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+      try {
+        const res = await executeApiCall(
+            getApiById('read'),
+            targetValue,
+            { objRef, fc }
+        );
+
+        if (res?.ok && res.payload?.result?.value) {
+          const values = Array.isArray(res.payload.result.value)
+            ? res.payload.result.value
+            : [res.payload.result.value];
+
+          if (values.length > 0 && values[0]?.data) {
+            const firstValue = values[0];
+            if (Array.isArray(firstValue.data) && firstValue.data.length >= 2) {
+              typeEl.textContent = firstValue.data[0];
+              currentValueEl.textContent = JSON.stringify(firstValue.data[1]);
+            } else if (typeof firstValue.data === 'object') {
+              const typeKeys = Object.keys(firstValue.data).filter(k => !['name', 'elementName'].includes(k));
+              if (typeKeys.length > 0) {
+                typeEl.textContent = typeKeys[0];
+                currentValueEl.textContent = JSON.stringify(firstValue.data[typeKeys[0]]);
+              }
+            }
+          }
+        } else {
+          typeEl.textContent = 'Unknown';
+          currentValueEl.textContent = res?.payload?.error || 'N/A';
+        }
+      } catch (e) {
+        typeEl.textContent = 'Error';
+        currentValueEl.textContent = e.message;
+      }
+
+      // Button handlers
+      submitBtn.onclick = async () => {
+        const newValue = inputEl.value.trim();
+        if (!newValue) {
+          validationEl.textContent = 'Please enter a value';
+          return;
+        }
+        validationEl.textContent = '';
+        submitBtn.disabled = true;
+
+        try {
+          await writeDataValue(objRef, fc, endpoint, newValue, typeEl.textContent);
+          resultDiv.textContent = '✓ Write successful!';
+          resultDiv.style.background = '#2e7d32';
+          resultDiv.style.color = '#fff';
+          resultDiv.classList.remove('hidden');
+          setTimeout(() => {
+            modal.classList.add('hidden');
+            submitBtn.disabled = false;
+          }, 1500);
+        } catch (e) {
+          resultDiv.textContent = `✗ Error: ${e.message}`;
+          resultDiv.style.background = '#c62828';
+          resultDiv.style.color = '#fff';
+          resultDiv.classList.remove('hidden');
+          submitBtn.disabled = false;
+        }
+      };
+
+      cancelBtn.onclick = () => modal.classList.add('hidden');
+      inputEl.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            submitBtn.click();
+          }
+        });
+      //inputEl.onkeypress = (e) => e.key === 'Enter' && submitBtn.onclick();
+    }
+    async function showContextMenuForDataAttribute(e, objRef, fc, endpoint) {
         e.preventDefault();
         e.stopPropagation();
 
@@ -318,12 +577,12 @@
             {
                 label: `Read Value [${fc.toUpperCase()}]`,
                 icon: 'fa-eye',
-                action: () => console.log('Read', objRef, fc)
+                action: () => readDataValue(objRef, fc, endpoint)
             },
             {
                 label: `Write Value [${fc.toUpperCase()}]`,
                 icon: 'fa-pen',
-                action: () => console.log('Write', objRef, fc)
+                action: () => showWriteValueDialog(objRef, fc, endpoint)
             }
         ];
 
@@ -416,6 +675,7 @@
                     dataAttributes.forEach((da) => {
                         const typeSuffix = da.daType[0] ? ` [${da.daType[0]}]` : '';
                         const daName = da.name || da.daRef.split('.').pop() || 'DA';
+                        const fc = da.fc || 'mx';  // Default to 'mx' if not provided
                         const daLi = createTreeNode('DA', `${daName}${typeSuffix}`);
 
                         const daRef = `${node.ref}.${daName}`;   // ← construct it explicitly
@@ -424,10 +684,16 @@
                         const row = daLi.querySelector(':scope > .scl-tree-row');
                         row.style.cursor = 'context-menu';
 
+                        //Create the tree-value-display span
+                        const valueDisplaySpan = document.createElement('span');
+                        valueDisplaySpan.className = 'tree-value-display';
+                        valueDisplaySpan.setAttribute('data-obj-ref', daRef);
+                        row.appendChild(valueDisplaySpan);
+
                         row.addEventListener('contextmenu', (e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            showContextMenuForDataAttribute(e, daRef, 'mx');
+                            showContextMenuForDataAttribute(e, daRef, fc, endpoint);
                         });
 
                         // Add SDAs under this DA (if any)
@@ -438,6 +704,15 @@
                             subDas.forEach((sda) => {
                                 const sdaTypeSuffix = sda.daType[0] ? ` [${daType[0].bType}]` : '';
                                 const sdaName = sda.name || sda.daRef.split('.').pop() || 'SDA';
+
+                                //Create the tree-value-display span for SDAs
+                                const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
+                                const sdaValueDisplaySpan = document.createElement('span');
+                                sdaValueDisplaySpan.className = 'tree-value-display';
+                                sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
+                                sdaRow.appendChild(sdaValueDisplaySpan);
+
+
                                 daUl.appendChild(createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`));
                             });
                             daLi.appendChild(daUl);
@@ -710,6 +985,12 @@
                   var daLi     = createTreeNode('DA', daName + bTypeTxt);
                   makeClickable(daLi, daRef, daFc, 'DA');
 
+                  const row = daLi.querySelector(':scope > .scl-tree-row');
+                  const valueDisplaySpan = document.createElement('span');
+                  valueDisplaySpan.className = 'tree-value-display';
+                  valueDisplaySpan.setAttribute('data-obj-ref', daRef);
+                  row.appendChild(valueDisplaySpan);
+
                   var subDas = (da && (da.sub_attributes || da.subDataAttributes || da.sda)) || [];
                   if (subDas.length > 0) {
                     var sdaUl = document.createElement('ul');
@@ -718,6 +999,13 @@
                       var sdaName = (typeof sda === 'object' ? sda.name : sda) || 'SDA';
                       var sdaRef  = daRef + '.' + sdaName;
                       var sdaLi   = createTreeNode('SDA', sdaName);
+
+                      const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
+                      const sdaValueDisplaySpan = document.createElement('span');
+                      sdaValueDisplaySpan.className = 'tree-value-display';
+                      sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
+                      sdaRow.appendChild(sdaValueDisplaySpan);
+
                       makeClickable(sdaLi, sdaRef, daFc, 'SDA');
                       sdaUl.appendChild(sdaLi);
                     });
@@ -819,8 +1107,56 @@
                 </button>
                 <div id="acsi-client-tree-container-page" style="margin-top:16px; padding:16px; background:var(--bg-secondary); border-radius:8px; display:none;">
                     <div id="acsi-client-tree-content" style="max-height:600px; overflow-y:auto; color:var(--text-secondary);"></div>
-                </div>
             </div>
+            <div id="writeValueModal" class="modal hidden" style="
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;">
+              <div class="modal-content" style="
+                  background: #1e1e1e;
+                  color: #e0e0e0;
+                  padding: 24px;
+                  border-radius: 8px;
+                  width: 500px;
+                  max-width: 90%;
+                  max-height: 80vh;
+                  overflow-y: auto;
+                  box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+                <h2 id="writeValueTitle" style="margin-top: 0; color: #fff;">Write Data Value</h2>
+                <div style="margin-bottom: 16px; color: #ccc;">
+                  <div><strong>Reference:</strong> <span id="writeValueObjRef" style="color: #4fc3f7;"></span></div>
+                  <div><strong>Type:</strong> <span id="writeValueType" style="color: #ffc107;"></span></div>
+                  <div><strong>Current:</strong> <span id="writeValueCurrent" style="color: #8bc34a;"></span></div>
+                </div>
+                <input type="text" id="writeValueInput" style="
+                    width: 100%;
+                    padding: 10px;
+                    box-sizing: border-box;
+                    margin-bottom: 12px;
+                    background: #2d2d2d;
+                    color: #e0e0e0;
+                    border: 1px solid #444;
+                    border-radius: 4px;
+                    font-size: 14px;"
+                   placeholder="Enter new value">
+                <div id="writeValueValidation" style="color: #f44336; margin-bottom: 16px; min-height: 20px;"></div>
+                <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                  <button id="writeValueCancel" class="btn-secondary" style="padding: 8px 16px;">Cancel</button>
+                  <button id="writeValueSubmit" class="btn-primary" style="padding: 8px 16px;">Write</button>
+                </div>
+                <div id="writeValueResult" class="hidden" style="
+                    margin-top: 16px;
+                    padding: 12px;
+                    border-radius: 4px;
+                    text-align: center;"></div>
+              </div>
+            </div>
+
+        </div>
         `;
 
         setupEventListeners(rootElement, endpoint);

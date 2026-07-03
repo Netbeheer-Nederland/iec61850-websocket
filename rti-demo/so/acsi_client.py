@@ -385,7 +385,11 @@ class ACSIClient:
 
         websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
         # dataAttrVal expects [{"data": (type_str, value)}]
-        await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
+        result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
+        print(result)
+        print("Write operation completed successfully.")
+        print("new value:", value)
+        print("obj_ref:", obj_ref)
         return {"objRef": obj_ref, "value": value}
 
     async def get_model(self) -> Dict[str, Any]:

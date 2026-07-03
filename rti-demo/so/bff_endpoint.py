@@ -1131,36 +1131,36 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             value_type = request.value_type
 
             if not obj_ref:
-                client._log_action("Client writevalue rejected: missing objRef", "warn")
+                #client._log_action("Client writevalue rejected: missing objRef", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
                 )
 
             if not fc:
-                client._log_action("Client writevalue rejected: missing fc", "warn")
+                #client._log_action("Client writevalue rejected: missing fc", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "fc is required"},
                     status_code=400
                 )
 
             if value is None:
-                client._log_action(
-                    "Client writevalue rejected: missing value",
-                    "warn",
-                    detail={"objRef": obj_ref, "fc": fc}
-                )
+                #client._log_action(
+                #    "Client writevalue rejected: missing value",
+                #    "warn",
+                #    detail={"objRef": obj_ref, "fc": fc}
+                #)
                 return JSONResponse(
                     content={"ok": False, "error": "value is required"},
                     status_code=400
                 )
 
             if client.runtime.client is None:
-                client._log_action(
-                    "Client writevalue rejected: not connected",
-                    "warn",
-                    detail={"objRef": obj_ref, "fc": fc, "value": value},
-                )
+                #client._log_action(
+                #    "Client writevalue rejected: not connected",
+                #    "warn",
+                #   detail={"objRef": obj_ref, "fc": fc, "value": value},
+                #)
                 return JSONResponse(
                     content={"ok": False, "error": "Client is not connected"},
                     status_code=503
@@ -1170,31 +1170,42 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 result = client.invoke_on_runtime_loop(
                     client.write_value(obj_ref, value, fc, value_type), timeout=10
                 )
-                return {
-                    "ok": True,
-                    "success": True,
-                    "objRef": obj_ref,
-                    "fc": fc,
-                    "value": result.get("value"),
-                }
+                if result is None:
+                    #client._log_action(
+                    #    "Client writevalue failed: instanceNotAvailable",
+                    #    "warn",
+                    #    detail={"objRef": obj_ref, "fc": fc, "value": value},
+                    #)
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+                else:
+                    return {
+                        "ok": True,
+                        "success": True,
+                        "objRef": obj_ref,
+                        "fc": fc,
+                        "value": result.get("value"),
+                    }
             except FuturesTimeoutError:
-                client._log_action(
-                    "Client writevalue timeout",
-                    "warn",
-                    detail={"objRef": obj_ref},
-                )
+                #client._log_action(
+                #    "Client writevalue timeout",
+                #    "warn",
+                #    detail={"objRef": obj_ref},
+                #)
                 return JSONResponse(
                     content={"ok": False, "error": "write timeout"},
                     status_code=504
                 )
             except ValueError as exc:
-                client._log_action(f"Client writevalue failed: {exc}", "warn")
+                #client._log_action(f"Client writevalue failed: {exc}", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=404
                 )
             except Exception as exc:
-                client._log_action(f"Client writevalue failed: {exc}", "error")
+                #client._log_action(f"Client writevalue failed: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
