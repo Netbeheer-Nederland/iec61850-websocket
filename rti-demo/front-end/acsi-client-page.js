@@ -20,6 +20,7 @@
         { id: 'data-definition', label: 'POST /api/getDataDefinition', method: 'POST', path: '/api/getDataDefinition' },
         { id: 'read', label: 'POST /api/readvalue', method: 'POST', path: '/api/readvalue' },
         { id: 'write', label: 'POST /api/writevalue', method: 'POST', path: '/api/writevalue' },
+        { id: 'dataset-directory', label: 'POST /api/getDataSetDirectory', method: 'POST', path: '/api/getDataSetDirectory' },
     ];
 
     function getApiById(id) {
@@ -645,139 +646,197 @@
 
 
         const handleNodeClick = async (node) => {
-            if (node.nodeType === 'DO') {
-                //showStatus(rootElement, `Fetching data definition for ${node.ref}...`, 'info');
+                if (node.nodeType === 'DO') {
+                    //showStatus(rootElement, `Fetching data definition for ${node.ref}...`, 'info');
 
-                const existingUl = node.li.querySelector(':scope > ul');
+                    const existingUl = node.li.querySelector(':scope > ul');
 
-                if (existingUl) {
-                    return;
-                }
-                const ldName = node.ref.split('/')[0];
-                const lnName = node.ref.split('/')[1].split('.')[0];
-                const doPath = node.ref.split('/')[1].split('.').slice(1).join('.');
+                    if (existingUl) {
+                        return;
+                    }
+                    const ldName = node.ref.split('/')[0];
+                    const lnName = node.ref.split('/')[1].split('.')[0];
+                    const doPath = node.ref.split('/')[1].split('.').slice(1).join('.');
 
-                const defResult = await executeApiCall(
-                    getApiById('data-definition'),
-                    targetValue,
-                    {ld_inst: ldName, ln_inst: lnName, do_path: doPath}
-                );
-                if (defResult && defResult.ok) {
-                    //showStatus(rootElement, `Data definition fetched for ${node.ref}`, 'success');
-                    console.log('Data definition:', defResult.payload);
-                    const dataAttributes = defResult.payload.result.value?.dataAttributeDefinition || [];
-                    const subDataObjects = defResult.payload.result.value?.subDataDefinition || [];
+                    const defResult = await executeApiCall(
+                        getApiById('data-definition'),
+                        targetValue,
+                        {ld_inst: ldName, ln_inst: lnName, do_path: doPath}
+                    );
+                    if (defResult && defResult.ok) {
+                        //showStatus(rootElement, `Data definition fetched for ${node.ref}`, 'success');
+                        console.log('Data definition:', defResult.payload);
+                        const dataAttributes = defResult.payload.result.value?.dataAttributeDefinition || [];
+                        const subDataObjects = defResult.payload.result.value?.subDataDefinition || [];
 
-                    const ul = document.createElement('ul');
-                    ul.className = 'scl-tree-list';
+                        const ul = document.createElement('ul');
+                        ul.className = 'scl-tree-list';
 
-                    // Add DAs to the single UL
-                    dataAttributes.forEach((da) => {
-                        const typeSuffix = da.daType[0] ? ` [${da.daType[0]}]` : '';
-                        const daName = da.name || da.daRef.split('.').pop() || 'DA';
-                        const fc = da.fc || 'mx';  // Default to 'mx' if not provided
-                        const daLi = createTreeNode('DA', `${daName}${typeSuffix}`);
+                        // Add DAs to the single UL
+                        dataAttributes.forEach((da) => {
+                            const typeSuffix = da.daType[0] ? ` [${da.daType[0]}]` : '';
+                            const daName = da.name || da.daRef.split('.').pop() || 'DA';
+                            const fc = da.fc || 'mx';  // Default to 'mx' if not provided
+                            const daLi = createTreeNode('DA', `${daName}${typeSuffix}`);
 
-                        const daRef = `${node.ref}.${daName}`;   // ← construct it explicitly
+                            const daRef = `${node.ref}.${daName}`;   // ← construct it explicitly
 
 
-                        const row = daLi.querySelector(':scope > .scl-tree-row');
-                        row.style.cursor = 'context-menu';
+                            const row = daLi.querySelector(':scope > .scl-tree-row');
+                            row.style.cursor = 'context-menu';
 
-                        //Create the tree-value-display span
-                        const valueDisplaySpan = document.createElement('span');
-                        valueDisplaySpan.className = 'tree-value-display';
-                        valueDisplaySpan.setAttribute('data-obj-ref', daRef);
-                        row.appendChild(valueDisplaySpan);
+                            //Create the tree-value-display span
+                            const valueDisplaySpan = document.createElement('span');
+                            valueDisplaySpan.className = 'tree-value-display';
+                            valueDisplaySpan.setAttribute('data-obj-ref', daRef);
+                            row.appendChild(valueDisplaySpan);
 
-                        row.addEventListener('contextmenu', (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            showContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                            row.addEventListener('contextmenu', (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                showContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                            });
+
+                            // Add SDAs under this DA (if any)
+                            const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
+                            if (subDas.length > 0) {
+                                const daUl = document.createElement('ul');
+                                daUl.className = 'scl-tree-list';
+                                subDas.forEach((sda) => {
+                                    const sdaTypeSuffix = sda.daType[0] ? ` [${daType[0].bType}]` : '';
+                                    const sdaName = sda.name || sda.daRef.split('.').pop() || 'SDA';
+
+                                    //Create the tree-value-display span for SDAs
+                                    const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
+                                    const sdaValueDisplaySpan = document.createElement('span');
+                                    sdaValueDisplaySpan.className = 'tree-value-display';
+                                    sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
+                                    sdaRow.appendChild(sdaValueDisplaySpan);
+
+
+                                    daUl.appendChild(createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`));
+                                });
+                                daLi.appendChild(daUl);
+                            }
+                            ul.appendChild(daLi);
                         });
 
-                        // Add SDAs under this DA (if any)
-                        const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
-                        if (subDas.length > 0) {
-                            const daUl = document.createElement('ul');
-                            daUl.className = 'scl-tree-list';
-                            subDas.forEach((sda) => {
-                                const sdaTypeSuffix = sda.daType[0] ? ` [${daType[0].bType}]` : '';
-                                const sdaName = sda.name || sda.daRef.split('.').pop() || 'SDA';
+                        // Add SDOs to the same UL
+                        subDataObjects.forEach((sdo) => {
+                            const cdcSuffix = sdo.cdc ? ` [${sdo.cdc}]` : '';
+                            const sdoLi = createTreeNode('SDO', `${sdo.name}${cdcSuffix}`);
 
-                                //Create the tree-value-display span for SDAs
-                                const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
-                                const sdaValueDisplaySpan = document.createElement('span');
-                                sdaValueDisplaySpan.className = 'tree-value-display';
-                                sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
-                                sdaRow.appendChild(sdaValueDisplaySpan);
-
-
-                                daUl.appendChild(createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`));
-                            });
-                            daLi.appendChild(daUl);
-                        }
-                        ul.appendChild(daLi);
-                    });
-
-                    // Add SDOs to the same UL
-                    subDataObjects.forEach((sdo) => {
-                        const cdcSuffix = sdo.cdc ? ` [${sdo.cdc}]` : '';
-                        const sdoLi = createTreeNode('SDO', `${sdo.name}${cdcSuffix}`);
-
-                        // Add children under this SDO (if any)
-                        const sdoDas = sdo.dataAttributes || sdo.data_attributes || sdo.da || [];
-                        const sdoSubSdos = sdo.subDataObjects || sdo.sub_data_objects || [];
-                        if (sdoDas.length > 0 || sdoSubSdos.length > 0) {
-                            const sdoUl = document.createElement('ul');
-                            sdoUl.className = 'scl-tree-list';
-                            sdoDas.forEach((da) => {
-                                const typeSuffix = da.bType ? ` [${da.bType}]` : '';
-                                const daName = da.name || da.daRef.split('.').pop() || 'DA';
-                                sdoUl.appendChild(createTreeNode('DA', `${daName}${typeSuffix}`));
-                            });
-                            sdoSubSdos.forEach((nestedSdo) => {
-                                const nestedCdc = nestedSdo.cdc ? ` [${nestedSdo.cdc}]` : '';
-                                sdoUl.appendChild(createTreeNode('SDO', `${nestedSdo.name}${nestedCdc}`));
-                            });
-                            sdoLi.appendChild(sdoUl);
-                        }
-                        ul.appendChild(sdoLi);
-                    });
-
-                   node.li.appendChild(ul);
-
-                    if (ul.children.length > 0) {
-                        const row = node.li.querySelector(':scope > .scl-tree-row');
-                        const toggle = row.querySelector('.scl-tree-toggle');
-
-                        toggle.classList.remove('hidden');
-                        node.li.classList.add('has-children', 'expanded');
-                        toggle.textContent = '▾';
-                        ul.style.display = '';
-
-                        const onToggle = () => {
-                            const expanded = node.li.classList.toggle('expanded');
-                            toggle.textContent = expanded ? '▾' : '▸';
-                            ul.style.display = expanded ? '' : 'none';
-                        };
-
-                        toggle.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            onToggle();
+                            // Add children under this SDO (if any)
+                            const sdoDas = sdo.dataAttributes || sdo.data_attributes || sdo.da || [];
+                            const sdoSubSdos = sdo.subDataObjects || sdo.sub_data_objects || [];
+                            if (sdoDas.length > 0 || sdoSubSdos.length > 0) {
+                                const sdoUl = document.createElement('ul');
+                                sdoUl.className = 'scl-tree-list';
+                                sdoDas.forEach((da) => {
+                                    const typeSuffix = da.bType ? ` [${da.bType}]` : '';
+                                    const daName = da.name || da.daRef.split('.').pop() || 'DA';
+                                    sdoUl.appendChild(createTreeNode('DA', `${daName}${typeSuffix}`));
+                                });
+                                sdoSubSdos.forEach((nestedSdo) => {
+                                    const nestedCdc = nestedSdo.cdc ? ` [${nestedSdo.cdc}]` : '';
+                                    sdoUl.appendChild(createTreeNode('SDO', `${nestedSdo.name}${nestedCdc}`));
+                                });
+                                sdoLi.appendChild(sdoUl);
+                            }
+                            ul.appendChild(sdoLi);
                         });
+
+                       node.li.appendChild(ul);
+
+                        if (ul.children.length > 0) {
+                            const row = node.li.querySelector(':scope > .scl-tree-row');
+                            const toggle = row.querySelector('.scl-tree-toggle');
+
+                            toggle.classList.remove('hidden');
+                            node.li.classList.add('has-children', 'expanded');
+                            toggle.textContent = '▾';
+                            ul.style.display = '';
+
+                            const onToggle = () => {
+                                const expanded = node.li.classList.toggle('expanded');
+                                toggle.textContent = expanded ? '▾' : '▸';
+                                ul.style.display = expanded ? '' : 'none';
+                            };
+
+                            toggle.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                onToggle();
+                            });
+                        }
+                    }
+                    else
+                    {
+                        const error = defResult?.payload?.error || defResult?.rawText || 'Failed to fetch data definition';
+                        console.log(`Error fetching data definition for ${node.ref}:`, error);
+                        //showStatus(rootElement, error, 'error');
                     }
                 }
-                else
-                {
-                    const error = defResult?.payload?.error || defResult?.rawText || 'Failed to fetch data definition';
-                    console.log(`Error fetching data definition for ${node.ref}:`, error);
-                    //showStatus(rootElement, error, 'error');
+                else if (node.nodeType == "DataSet") {
+                    const existingUl = node.li.querySelector(':scope > ul');
+                     if (existingUl) {
+                        return;
+                    }
+                    console.log('[handleNodeClick] DataSet node clicked:', node.ref, 'Existing UL:', existingUl);
+                    const ld_name = node.ref.split('/')[0];
+                    const ln_inst = node.ref.split('/')[1].split('.')[0];
+                    const dsName = node.ref.split('/')[1].split('.')[1];
+
+                    const defResult = await executeApiCall(
+                        getApiById('dataset-directory'),
+                        targetValue,
+                        {ld_inst: ld_name, ln_inst: ln_inst, ds_inst: dsName}
+                    );
+                    if (defResult && defResult.ok) {
+                        console.log('DataSet definition:', defResult.payload);
+                        const dataAttributes = defResult.payload.result.value;
+
+                         // ✅ Create UL for DAs
+                        const ul = document.createElement('ul');
+                        ul.className = 'scl-tree-list';
+
+                        for(const da of dataAttributes) {
+                            const objRef = da.ref;
+                            const fc = da.fc;
+
+                            const typeSuffix = da.bType ? ` [${da.bType}]` : '';
+                            const daLi = createTreeNode('FCDA', objRef + ` [${fc}]`);
+                            const row = daLi.querySelector(':scope > .scl-tree-row');
+                            row.style.cursor = 'context-menu';
+
+                            //Create the tree-value-display span
+                            const valueDisplaySpan = document.createElement('span');
+                            valueDisplaySpan.className = 'tree-value-display';
+                            valueDisplaySpan.setAttribute('data-obj-ref', `${node.ref}.${da.daRef}`);
+                            row.appendChild(valueDisplaySpan);
+
+                            ul.appendChild(daLi);
+                        }
+                        node.li.appendChild(ul);
+
+                        if (ul.children.length > 0) {
+                            const row = node.li.querySelector(':scope > .scl-tree-row');
+                            const toggle = row.querySelector('.scl-tree-toggle');
+
+                            toggle.classList.remove('hidden');
+                            node.li.classList.add('has-children', 'expanded');
+                            toggle.textContent = '▾';
+                            ul.style.display = '';
+
+                            toggle.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const expanded = node.li.classList.toggle('expanded');
+                                toggle.textContent = expanded ? '▾' : '▸';
+                                ul.style.display = expanded ? '' : 'none';
+                            });
+                        }
+                    }
                 }
-            }
-
-        };
-
+        }
 
 
         showStatus(rootElement, 'Fetching model...', 'info');
@@ -953,9 +1012,19 @@
           var lnLi = createTreeNode('LogicalNode', lnName);
           makeClickable(lnLi, lnRef, null, 'LN');
 
-          const dsLi = createTreeNode('Group', 'DataSets');
-          appendChildrenTree(dsLi, data.result.model.logicalNodeDetails[ldName + '/' + lnName].dataSets || [], 'DataSet');
-
+          // Create DataSets group with clickable items
+            const dsLi = createTreeNode('Group', 'DataSets');
+            const dsUl = document.createElement('ul');
+            dsUl.className = 'scl-tree-list';
+            const dataSets = data.result.model.logicalNodeDetails[ldName + '/' + lnName].dataSets || [];
+            dataSets.forEach(function(ds) {
+                const dsName = (typeof ds === 'object' ? ds.name : ds) || 'DataSet';
+                const dsRef = lnRef + '.' + dsName;
+                const dsNode = createTreeNode('DataSet', dsName);
+                makeClickable(dsNode, dsRef, null, 'DataSet');
+                dsUl.appendChild(dsNode);
+            });
+            dsLi.appendChild(dsUl);
           const rcLi = createTreeNode('Group', 'Report Controls');
           appendChildrenTree(rcLi, data.result.model.logicalNodeDetails[ldName + '/' + lnName].reportControlBlocks.map(rcb => rcb.name) || [], 'ReportControl');
 

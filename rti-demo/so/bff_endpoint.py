@@ -81,6 +81,28 @@ class GetDataDefinitionRequest(BaseModel):
         json_schema_extra={"example": "Mod"}
     )
 
+class GetDataSetDirectory(BaseModel):
+    """Request body for reading a value from the connected server.
+
+    Used by: POST /api/readvalue
+    """
+    ld_inst: str = Field(
+        ...,
+        description="LD name (e.g., 'LD0')",
+        json_schema_extra={"example": "LD0"}
+    )
+    ln_inst: Optional[str] = Field(
+        ...,
+        description="LN name (e.g., 'LLN0')",
+        json_schema_extra={"example": "LLN0"}
+    )
+    ds_inst: Optional[str] = Field(
+        ...,
+        description="DataSet name (e.g., 'Event1')",
+        json_schema_extra={"example": "Event1"}
+    )
+
+
 
 class WriteValueRequest(BaseModel):
     """Request body for writing a value to the connected server.
@@ -1037,6 +1059,112 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
             except Exception as exc:
                 #client._log_action(f"Client readvalue failed: {exc}", "error")
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/getDataSetDirectory",
+        summary="Get Data Set directory",
+        description="Retrieves the data definition for a specified object reference from the connected IEC61850 server. The client must be connected before calling this endpoint.",
+        response_description="Data set directory",
+        responses={
+            200: {"description": "Data definition retrieved successfully"},
+            400: {"description": "Missing objRef parameter"},
+            403: {"description": "Client is not connected"},
+            404: {"description": "Instance not available or retrieval timeout"},
+            500: {"description": "Error retrieving data definition"}
+        },
+        tags=["Data Access"]
+    )
+    async def api_get_dataset_directory(request: GetDataSetDirectory):
+
+        try:
+            ld_inst = request.ld_inst
+            ln_inst = request.ln_inst
+            ds_inst = request.ds_inst
+
+            obj_ref = f"{ld_inst}/{ln_inst}.{ds_inst}"
+
+            print("ds obj_ref: ", obj_ref)
+
+            # obj_ref = request.objRef
+            # fc = request.fc
+
+            if not obj_ref:
+                # client._log_action("Client readvalue rejected: missing objRef", "warn")
+                return JSONResponse(
+                    content={"ok": False, "error": "objRef is required"},
+                    status_code=400
+                )
+
+            if client.runtime.client is None:
+                # client._log_action(
+                #    "Client readvalue rejected: not connected",
+                #    "warn",
+                #    detail={"objRef": obj_ref, "fc": fc},
+                # )
+                return JSONResponse(
+                    content={"ok": False, "error": "Client is not connected"},
+                    status_code=503
+                )
+
+            try:
+                result = client.invoke_on_runtime_loop(
+                    client.get_dataset_directory(ld_inst, ln_inst, ds_inst), timeout=10
+                )
+
+                print("get ds result: ", result)
+
+                if result is None:
+                    # client._log_action(
+                    #    "Client readvalue failed: instanceNotAvailable",
+                    #    "warn",
+                    #   detail={"objRef": obj_ref, "fc": fc}
+                    # )
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                # client._log_action(
+                #    "Client readvalue",
+                #    detail={
+                #       "objRef": obj_ref,
+                #        "value": result.get("value"),
+                #    },
+                # )
+                return {
+                    "ok": True,
+                    "success": True,
+                    "objRef": obj_ref,
+                    "value": result.get("value"),
+                }
+
+            except FuturesTimeoutError:
+                # client._log_action(
+                #    "Client readvalue timeout",
+                #    "warn",
+                #    detail={"objRef": obj_ref},
+                # )
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                # client._log_action(f"Client readvalue failed: {exc}", "warn")
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                # client._log_action(f"Client readvalue failed: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
