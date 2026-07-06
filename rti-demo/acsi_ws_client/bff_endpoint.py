@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # ==================== Pydantic Models ====================
 class ConnectRequest(BaseModel):
-    """Request body for connecting to an IEC61850 WebSocket server.
+    """Request body for connecting to an ACSI websocket active.
 
     Used by: POST /api/connect
     """
@@ -52,7 +52,7 @@ class ReadvalueRequest(BaseModel):
     """
     objRef: str = Field(
         ...,
-        description="Object reference in IEC61850 format (e.g., 'LD0/LLN0$ST$Mod')",
+        description="Object reference in ACSI format (e.g., 'LD0/LLN0$ST$Mod')",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
     )
     fc: Optional[str] = Field(
@@ -68,7 +68,7 @@ class WriteValueRequest(BaseModel):
     """
     objRef: str = Field(
         ...,
-        description="Object reference in IEC61850 format",
+        description="Object reference in ACSI format",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
     )
     fc: str = Field(
@@ -104,7 +104,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     """
     router = APIRouter(
         prefix="/api",
-        tags=["IEC61850-WS Client"],
+        tags=["ACSI Client-WS Active"],
         responses={404: {"description": "Not found"}, 500: {"description": "Internal server error"}}
     )
     client = ACSIClient()
@@ -441,7 +441,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     @router.get(
         "/status",
         summary="Get Client Status",
-        description="Returns the current operational status of the Acsi-Client.",
+        description="Returns the current operational status of the ACSI client.",
         response_description="Client status information",
         responses={
             200: {"description": "Client status returned successfully"},
@@ -569,7 +569,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     @router.post(
         "/connect",
         summary="Connect to Server",
-        description="Establishes a WebSocket connection to an Acsi-Server. Must be called before any data operations.",
+        description="Establishes a WebSocket connection to an ACSI server. Must be called before any data operations.",
         response_description="Connection confirmation",
         responses={
             200: {"description": "Connection initiated successfully"},
@@ -579,7 +579,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
         tags=["Connection Management"]
     )
     def api_connect(request: ConnectRequest):
-        """Connect to an IEC61850 WebSocket server.
+        """Connect to an ACSI websocket passive.
 
         Request Body:
             ConnectRequest: {
@@ -625,7 +625,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     @router.post(
         "/disconnect",
         summary="Disconnect from Server",
-        description="Closes the current WebSocket connection to the Acsi-Server.",
+        description="Closes the current WebSocket connection to the ACSI server.",
         response_description="Disconnection confirmation",
         responses={
             200: {"description": "Disconnection status"},
@@ -634,7 +634,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
         tags=["Connection Management"]
     )
     def api_disconnect():
-        """Disconnect from the IEC61850 WebSocket server.
+        """Disconnect from the ACSI websocket passive.
 
         Returns:
             dict: {
@@ -844,7 +844,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     @router.post(
         "/readvalue",
         summary="Read Value",
-        description="Reads a value from the connected Acsi-Server. The client must be connected before calling this endpoint.",
+        description="Reads a value from the connected ACSI server. The client must be connected before calling this endpoint.",
         response_description="Read value result",
         responses={
             200: {"description": "Value read successfully"},
@@ -860,7 +860,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
 
         Request Body:
             ReadvalueRequest: {
-                "objRef": str,  # Required - Object reference in IEC61850 format
+                "objRef": str,  # Required - Object reference in ACSI format
                 "fc": str       # Optional - Functional constraint
             }
 
@@ -960,7 +960,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     @router.post(
         "/writevalue",
         summary="Write Value",
-        description="Writes a value to the connected Acsi-Server. The client must be connected before calling this endpoint.",
+        description="Writes a value to the connected ACSI server. The client must be connected before calling this endpoint.",
         response_description="Write value confirmation",
         responses={
             200: {"description": "Value written successfully"},
@@ -1244,11 +1244,11 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     return router, client
 
 def create_fastapi_app() -> FastAPI:
-    """Create and configure the FastAPI application for Acsi-Client BFF."""
+    """Create and configure the FastAPI application for ACSI client BFF."""
     app = FastAPI(
-        title="Acsi-Client WS Client",
+        title="ACSI Client websocket activeve",
         description="Backend for Frontend (BFF) endpoint providing REST API for ACSI client control. "
-                    "This service manages IEC61850 WebSocket client connections, data access, "
+                    "This service manages ACSI websocket active connections, data access, "
                     "model retrieval, and provides comprehensive monitoring capabilities.",
         version="1.0.0",
         docs_url="/docs",
@@ -1261,7 +1261,7 @@ def create_fastapi_app() -> FastAPI:
             },
             {
                 "name": "Connection Management",
-                "description": "Connect to and disconnect from Acsi-Servers"
+                "description": "Connect to and disconnect from ACSI servers"
             },
             {
                 "name": "Model Access",

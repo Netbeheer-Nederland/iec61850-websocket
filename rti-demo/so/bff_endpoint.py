@@ -193,7 +193,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         else:
             return obj
 
-    async def _aget_ln_details(ld_inst: str, ln_inst: str, iec61850_client: Any, ws_info) -> Dict[str, Any]:
+    async def _aget_ln_details(ld_inst: str, ln_inst: str, acsi_client: Any, ws_info) -> Dict[str, Any]:
         """Async variant used internally for concurrent model assembly."""
         async def _safe(coro):
             try:
@@ -201,10 +201,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             except Exception:
                 return None
 
-        do_items =  await _invoke_ln_directory_async(iec61850_client, ws_info, ld_inst, ln_inst, 'dataObject')
-        brcb_items =  await _invoke_ln_directory_async(iec61850_client, ws_info, ld_inst, ln_inst, 'brcb')
-        urcb_items =  await _invoke_ln_directory_async(iec61850_client, ws_info, ld_inst, ln_inst, 'urcb')
-        dataset_items =  await _invoke_ln_directory_async(iec61850_client, ws_info, ld_inst, ln_inst, 'dataset')
+        do_items =  await _invoke_ln_directory_async(acsi_client, ws_info, ld_inst, ln_inst, 'dataObject')
+        brcb_items =  await _invoke_ln_directory_async(acsi_client, ws_info, ld_inst, ln_inst, 'brcb')
+        urcb_items =  await _invoke_ln_directory_async(acsi_client, ws_info, ld_inst, ln_inst, 'urcb')
+        dataset_items =  await _invoke_ln_directory_async(acsi_client, ws_info, ld_inst, ln_inst, 'dataset')
 
         data_objects = []
         data_attributes = []
@@ -222,10 +222,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 try:
                     obj_ref = f"{ld_inst}/{ln_inst}.{do_name}"
                     if lock is None:
-                        defn = await iec61850_client.get_data_definition(obj_ref, ws_info, None, None)
+                        defn = await acsi_client.get_data_definition(obj_ref, ws_info, None, None)
                     else:
                         async with lock:
-                            defn = await iec61850_client.get_data_definition(obj_ref, ws_info, None, None)
+                            defn = await acsi_client.get_data_definition(obj_ref, ws_info, None, None)
 
                     cdc = None
                     if isinstance(defn, dict):
@@ -252,10 +252,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             rcb_values = None
             try:
                 if lock is None:
-                    rcb_values = await iec61850_client.get_BRCB_values(rcb_ref, ws_info, None, None)
+                    rcb_values = await acsi_client.get_BRCB_values(rcb_ref, ws_info, None, None)
                 else:
                     async with lock:
-                        rcb_values = await iec61850_client.get_BRCB_values(rcb_ref, ws_info, None, None)
+                        rcb_values = await acsi_client.get_BRCB_values(rcb_ref, ws_info, None, None)
                 rpt_ena = False
                 if isinstance(rcb_values, dict):
                     rpt_ena = rcb_values.get('RptEna', False)
@@ -271,10 +271,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             rcb_values = None
             try:
                 if lock is None:
-                    rcb_values = await iec61850_client.get_URCB_values(rcb_ref, ws_info, None, None)
+                    rcb_values = await acsi_client.get_URCB_values(rcb_ref, ws_info, None, None)
                 else:
                     async with lock:
-                        rcb_values = await iec61850_client.get_URCB_values(rcb_ref, ws_info, None, None)
+                        rcb_values = await acsi_client.get_URCB_values(rcb_ref, ws_info, None, None)
                 rpt_ena = False
                 if isinstance(rcb_values, dict):
                     rpt_ena = rcb_values.get('RptEna', False)
@@ -296,31 +296,31 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             'dataSets': datasets,
         }
 
-    def _invoke_ln_directory(iec61850_client, ws_info, ld_inst, ln_inst, mode):
+    def _invoke_ln_directory(acsi_client, ws_info, ld_inst, ln_inst, mode):
         """Return coroutine that performs directory call under a lock."""
         async def _coro():
             lock = client.runtime.invoke_lock
             if lock is None:
-                items = await iec61850_client.get_logical_node_directory(ld_inst, ln_inst, mode, ws_info, None, None)
+                items = await acsi_client.get_logical_node_directory(ld_inst, ln_inst, mode, ws_info, None, None)
                 return items
             async with lock:
-                items = await iec61850_client.get_logical_node_directory(ld_inst, ln_inst, mode, ws_info, None, None)
+                items = await acsi_client.get_logical_node_directory(ld_inst, ln_inst, mode, ws_info, None, None)
                 return items
         return _coro()
 
-    async def _invoke_ln_directory_async(iec61850_client, ws_info, ld_inst, ln_inst, mode):
-        return await _invoke_ln_directory(iec61850_client, ws_info, ld_inst, ln_inst, mode)
+    async def _invoke_ln_directory_async(acsi_client, ws_info, ld_inst, ln_inst, mode):
+        return await _invoke_ln_directory(acsi_client, ws_info, ld_inst, ln_inst, mode)
 
     # ================ Background Model Build ================
     async def _abuild_full_model() -> None:
         """Build full model sequentially with progress updates."""
         endpoint = client.runtime.endpoint
         loop = client.runtime.loop
-        iec61850_client = client.runtime.client
-        if not client or not endpoint or not loop or not iec61850_client.is_connected:
+        acsi_client = client.runtime.client
+        if not client or not endpoint or not loop or not acsi_client.is_connected:
             raise RuntimeError('not-connected')
         try:
-            ws_info = endpoint.get_websocket_info(iec61850_client)
+            ws_info = endpoint.get_websocket_info(acsi_client)
         except Exception as e:
             print(f"CRASHED in get_websocket_info: {type(e).__name__}: {e}")
             raise
