@@ -47,6 +47,7 @@ class ACSIClientRuntime:
         self.message_seq: int = 0
         self.last_status_log_signature: Optional[tuple] = None
         self.lock: threading.Lock = threading.Lock()
+        self.invoke_lock: asyncio.Lock = asyncio.Lock()
 
         # Model and tree caching
         self.model_status: str = "idle"  # idle|building|ready|error
@@ -366,6 +367,26 @@ class ACSIClient:
         result = await client.get_data_values(obj_ref, fc, False, websocket_info, None, None)
         return {"value": result}
 
+    async def get_dataset_directory(self, ld_inst: str, ln_inst: str, ds_inst) -> Dict[str, Any]:
+        """Read a value from the server."""
+        client = self.runtime.client
+        if client is None:
+            raise RuntimeError("Client is not connected")
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+        result = await client.get_dataset_directory(ld_inst, ln_inst, ds_inst, websocket_info, None, None)
+        return {"value": result}
+
+    async def get_data_definition(self, obj_ref: str) -> Dict[str, Any]:
+        """Read a value from the server."""
+        client = self.runtime.client
+        if client is None:
+            raise RuntimeError("Client is not connected")
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+        result = await client.get_data_definition(obj_ref, websocket_info, None, None)
+        return {"dataDefinition": result}
+
     async def write_value(self, obj_ref: str, value: Any, fc: str, data_type: str) -> Dict[str, Any]:
         """Write a value to the server."""
         client = self.runtime.client
@@ -374,7 +395,11 @@ class ACSIClient:
 
         websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
         # dataAttrVal expects [{"data": (type_str, value)}]
-        await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
+        result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
+        print(result)
+        print("Write operation completed successfully.")
+        print("new value:", value)
+        print("obj_ref:", obj_ref)
         return {"objRef": obj_ref, "value": value}
 
     async def get_model(self) -> Dict[str, Any]:

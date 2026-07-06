@@ -1240,6 +1240,9 @@ async def execute_dynamic_api(request: ExecuteRequest):
         }
 
     except Exception as e:
+
+        print("failed to execute dynamic API call:", e)
+        print("target:", target, "method:", method, "path:", path, "body:", body)
         logger.error(f"Dynamic API call failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

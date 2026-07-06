@@ -1131,6 +1131,78 @@ body {
 /* ==============================================
    ACSI Page
    ============================================== */
+/* ==============================================
+   Context Menu
+   ============================================== */
 
+.context-menu {
+    position: fixed;
+    z-index: 99999;
+    min-width: 200px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+    padding: 6px;
+    display: none;
+    overflow: hidden;
+    animation: fadeIn 0.15s ease-in-out;
+}
 
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
 
+.context-menu-item:hover {
+    background: var(--bg-hover);
+    color: var(--primary-light);
+}
+
+.context-menu-item.danger {
+    color: var(--danger-color);
+}
+
+.context-menu-item.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger-color);
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0;
+}
+
+.tree-value-display {
+    margin-left: 8px;
+    font-family: monospace;
+    font-size: 0.9em;
+    color: #4caf50; /* Default: green for success */
+}
+.tree-value-display.error {
+    color: #c62828; /* Red for errors */
+}
+
+.modal.hidden {
+  display: none !important;
+}
+.control-result.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+.control-result.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
