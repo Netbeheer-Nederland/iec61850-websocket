@@ -688,7 +688,7 @@ app = FastAPI(
         },
         {
             "name": "Data",
-            "description": "Read and write data to IEC61850 endpoints"
+            "description": "Read and write data to ACSI endpoints"
         },
         {
             "name": "Reports",
