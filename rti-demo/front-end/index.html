@@ -25,11 +25,11 @@
                     <i class="fas fa-chart-line"></i>
                     <span>Dashboard</span>
                 </a>
-                <a href="#reports" class="nav-item" data-page="reports">
+                <a href="#reports" class="nav-item" data-page="reports" hidden>
                     <i class="fas fa-file-pdf"></i>
                     <span>Reports</span>
                 </a>
-                <a href="#diagnostics" class="nav-item" data-page="diagnostics">
+                <a href="#diagnostics" class="nav-item" data-page="diagnostics" hidden>
                     <i class="fas fa-stethoscope"></i>
                     <span>Diagnostics</span>
                 </a>
@@ -44,7 +44,7 @@
                 </a>
             </nav>
 
-            <div class="sidebar-footer">
+            <div class="sidebar-footer" hidden>
                 <a href="#" class="sidebar-footer-item">
                     <i class="fas fa-question-circle"></i>
                     <span>Help</span>
@@ -64,13 +64,13 @@
                     <span id="breadcrumb-text">Dashboard</span>
                 </div>
                 <div class="header-actions">
-                    <button class="btn-icon" id="discovery-btn" title="Discover Endpoints">
+                    <button class="btn-icon" id="discovery-btn" title="Discover Endpoints" hidden>
                         <i class="fas fa-magnifying-glass"></i>
                     </button>
                     <button class="btn-icon" id="refresh-btn" title="Refresh">
                         <i class="fas fa-sync-alt"></i>
                     </button>
-                    <button class="btn-icon" id="notification-btn" title="Notifications">
+                    <button class="btn-icon" id="notification-btn" title="Notifications" hidden>
                         <i class="fas fa-bell"></i>
                         <span class="badge">2</span>
                     </button>
@@ -105,15 +105,15 @@
                                 <i class="fas fa-sitemap"></i>
                                 Model
                             </button>
-                            <button class="btn-action" id="btn-data">
+                            <button class="btn-action" id="btn-data" hidden>
                                 <i class="fas fa-edit"></i>
                                 Data
                             </button>
-                            <button class="btn-action" id="btn-reports">
+                            <button class="btn-action" id="btn-reports" hidden>
                                 <i class="fas fa-chart-bar"></i>
                                 Reports
                             </button>
-                            <button class="btn-action" id="btn-diagnostics">
+                            <button class="btn-action" id="btn-diagnostics" hidden>
                                 <i class="fas fa-tools"></i>
                                 Diagnostics
                             </button>
