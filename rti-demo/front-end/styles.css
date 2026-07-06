@@ -220,6 +220,10 @@ body {
     position: relative;
     font-size: 18px;
 }
+.btn-icon[hidden],
+[hidden] {
+    display: none !important;
+}
 
 .btn-icon:hover {
     background: var(--primary-color);
