@@ -50,7 +50,7 @@ try:
 except ImportError:
     logger.warning("Docker Python SDK not available. Container auto-discovery disabled.")
 
-CONNECTIONS_FILE = 'connections.json'
+CONNECTIONS_FILE = '/app/connections.json'
 STATS_FILE = 'stats.json'
 DISCOVERED_FILE = 'discovered_endpoints.json'
 
@@ -329,8 +329,11 @@ class ConnectionManager:
     def save_connections(self) -> None:
         """Save connections to file."""
         try:
+            print("Writing connections:", self.connections)
+
             with open(CONNECTIONS_FILE, 'w') as f:
                 json.dump(self.connections, f, indent=2)
+            print("Finished writing")
         except Exception as e:
             logger.error(f"Error saving connections: {e}")
     
@@ -950,6 +953,27 @@ async def trigger_network_discovery(request: DiscoveryRequest):
 
 # -------------------- Connections Management --------------------
 
+@app.get(
+    "/api/connections",
+    summary="Get All Connections",
+    description="Get all configured connections to remote endpoints.",
+    response_description="List of all connections",
+    responses={
+        200: {"description": "Connections retrieved successfully"}
+    },
+    tags=["Connections"]
+)
+async def get_connections():
+    """Retrieve all configured connections.
+
+    Returns:
+        JSON with list of connections and their count.
+    """
+    return {
+        'connections': conn_manager.connections,
+        'count': len(conn_manager.connections)
+    }
+
 @app.post(
     "/api/connections",
     summary="Create Connection",
@@ -973,6 +997,11 @@ async def create_connection(request: ConnectionCreateRequest):
     Raises:
         HTTPException 400: If required fields are missing.
     """
+    if not request.name or not request.host or not request.port or not request.type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Missing required fields: name, host, port, type'
+        )
     connection = conn_manager.add_connection(
         name=request.name,
         host=request.host,
@@ -980,6 +1009,10 @@ async def create_connection(request: ConnectionCreateRequest):
         conn_type=request.type,
         auto_discovered=request.auto_discovered
     )
+    conn_manager.save_connections()
+    print("Connection created:", connection)
+    print("len connections:", len(conn_manager.connections))
+
     
     return JSONResponse(content=connection, status_code=status.HTTP_201_CREATED)
 

@@ -615,8 +615,25 @@ class RTIDemoApp {
         }
 
         const result = await this.callBFF('/api/connections', 'POST', connection);
-        
+
         if (result) {
+
+            const connections = JSON.parse(localStorage.getItem('connections') || '[]');
+
+            const exists = connections.some(c =>
+                c.name === connection.name &&
+                c.host === connection.host &&
+                c.port === connection.port &&
+                c.type === connection.type
+            );
+
+            if (!exists) {
+                connections.push(connection);
+                localStorage.setItem('connections', JSON.stringify(connections));
+            }
+            this.addDiagnosticMessage(`Connection '${connection.name}' saved to local stroage`, 'success');
+
+
             this.closeConnectionModal();
             this.loadConnections();
             this.addDiagnosticMessage(`Connection '${connection.name}' saved`, 'success');
