@@ -20,10 +20,10 @@ from pydantic import BaseModel, Field, ConfigDict
 
 # ==================== Pydantic Models ====================
 class WritevalueRequest(BaseModel):
-    """Request body for writing a value to the IEC61850 server model."""
+    """Request body for writing a value to the ACSI server model."""
     obj_ref: str = Field(
         ...,
-        description="Object reference in IEC61850 format (e.g., 'LD0/LLN0$ST$Mod')",
+        description="Object reference in ACSI format (e.g., 'LD0/LLN0$ST$Mod')",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
     )
     fc: str = Field(
@@ -51,7 +51,7 @@ class UpdateIedmodelRequest(BaseModel):
     )
 
 class StartRequest(BaseModel):
-    """Request body for starting the IEC61850 WebSocket server."""
+    """Request body for starting the ACSI WebSocket Passive."""
     host: str = Field(
         default="0.0.0.0",
         description="Hostname or IP address to bind to",
@@ -74,10 +74,10 @@ class StartRequest(BaseModel):
     )
 
 class ReadvalueRequest(BaseModel):
-    """Request body for reading a value from the IEC61850 server model."""
+    """Request body for reading a value from the ACSI server model."""
     obj_ref: str = Field(
         ...,
-        description="Object reference in IEC61850 format",
+        description="Object reference in ACSI format",
         json_schema_extra={"example": "LD0/MMXU1$MX$volA"}
     )
     fc: str = Field(
@@ -101,7 +101,7 @@ def create_bff_router(
     """
     router = APIRouter(
         prefix="/api",
-        tags=["IEC61850-Server"],
+        tags=["ACSI-Server"],
         responses={404: {"description": "Not found"}, 500: {"description": "Internal server error"}}
     )
 
@@ -319,7 +319,7 @@ def create_bff_router(
     @router.get(
         "/status",
         summary="Get Server Status",
-        description="Retrieves the current operational status of the IEC61850 WebSocket server.",
+        description="Retrieves the current operational status of the ACSI WebSocket.",
         response_description="Server status information",
         responses={
             200: {"description": "Server status returned successfully"},
@@ -392,7 +392,7 @@ def create_bff_router(
     @router.get(
         "/connections",
         summary="List Active Connections",
-        description="Returns information about all currently connected WebSocket clients, including peer addresses and connection status.",
+        description="Returns information about all currently connected active WebSockets, including peer addresses and connection status.",
         response_description="List of active WebSocket connections",
         responses={
             200: {"description": "List of connections returned successfully"},
@@ -510,7 +510,7 @@ def create_bff_router(
                 "accessPoints": access_points,
                 "model": {
                     "server": {
-                        "name": "IEC61850 WS Active",
+                        "name": "ACSI Server WS Active",
                         "mode": "active",
                         "logicalDevices": logical_devices,
                         "iedName": selected_ied,
@@ -611,7 +611,7 @@ def create_bff_router(
     @router.post(
         "/start",
         summary="Start Server",
-        description="Starts the IEC61850 WebSocket server on the specified host and port. Only 'server' mode is supported.",
+        description="Starts the ACSI server - Active WebSocket on the specified host and port. Only 'server' mode is supported.",
         response_description="Server start confirmation",
         responses={
             200: {"description": "Server started successfully"},
@@ -620,7 +620,7 @@ def create_bff_router(
         tags=["Server Control"]
     )
     def api_start(request: StartRequest):
-        """Start the IEC61850 WebSocket server.
+        """Start the ACSI WebSocket server.
 
         Request Body:
             StartRequest: {
@@ -688,7 +688,7 @@ def create_bff_router(
     @router.post(
         "/stop",
         summary="Stop Server",
-        description="Stops the currently running IEC61850 WebSocket server.",
+        description="Stops the currently running ACSI WebSocket.",
         response_description="Server stop confirmation",
         responses={
             200: {"description": "Server stopped or stopping"},
@@ -697,7 +697,7 @@ def create_bff_router(
         tags=["Server Control"]
     )
     def api_stop():
-        """Stop the IEC61850 WebSocket server.
+        """Stop the ACSI WebSocket Active.
 
         Returns:
             dict: {
@@ -855,7 +855,7 @@ def create_bff_router(
 
         Request Body:
             ReadvalueRequest: {
-                "objRef": str,  # Required - Object reference in IEC61850 format
+                "objRef": str,  # Required - Object reference in ACSI format
                 "fc": str        # Optional - Functional constraint
             }
 
@@ -1083,11 +1083,11 @@ def create_bff_router(
     return router, server
 
 def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
-    """Create and configure the FastAPI application for IEC61850 server BFF."""
+    """Create and configure the FastAPI application for ACSI server BFF."""
     app = FastAPI(
-        title="IEC61850 Server WS Active",
+        title="ACSI Server WS Active",
         description="Backend for Frontend (BFF) endpoint providing REST API for ACSI Server control. "
-                    "This service manages IEC61850 WebSocket server lifecycle, IED models, data access, "
+                    "This service manages ACSI Server WebSocket Active lifecycle, IED models, data access, "
                     "and provides comprehensive monitoring capabilities.",
         version="1.0.0",
         docs_url="/docs",
@@ -1096,7 +1096,7 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
         openapi_tags=[
             {
                 "name": "Server Control",
-                "description": "Start, stop, and manage the IEC61850 WebSocket server lifecycle"
+                "description": "Start, stop, and manage the ACSI Server WebSocket Active lifecycle"
             },
             {
                 "name": "Model",
