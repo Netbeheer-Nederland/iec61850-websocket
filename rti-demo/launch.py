@@ -19,6 +19,10 @@ Usage:
     # Launch with custom port
     python launch.py bff --port 5005
     
+    # Launch all services with console kept alive
+    python launch.py all --foreground
+    python launch.py all -f
+    
     # Get help
     python launch.py --help
     python launch.py bff --help
@@ -36,6 +40,7 @@ import asyncio
 import json
 import logging
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -189,6 +194,11 @@ class RTILauncher:
             help='Run services in background (non-blocking)'
         )
         parser.add_argument(
+            '--foreground', '-f',
+            action='store_true',
+            help='Keep console alive (do not auto-background multiple services)'
+        )
+        parser.add_argument(
             '--verbose', '-v',
             action='store_true',
             help='Show detailed logging'
@@ -236,6 +246,7 @@ class RTILauncher:
             'port': args.port,
             'docker': args.docker,
             'background': args.background,
+            'foreground': args.foreground,
             'verbose': args.verbose or args.verbose,
             'stop': args.stop,
             'status': args.status,
@@ -265,6 +276,10 @@ class RTILauncher:
             "-" * 60,
             "  # Launch all services",
             "  python launch.py all",
+            "",
+            "  # Launch all services with console kept alive",
+            "  python launch.py all --foreground",
+            "  python launch.py all -f",
             "",
             "  # Launch BFF server on port 5000",
             "  python launch.py bff",
@@ -329,81 +344,107 @@ class RTILauncher:
         
         return config
     
-    def _launch_python_service(self, svc_type: ServiceType, config: ServiceConfig, 
-                               background: bool = False) -> subprocess.Popen:
+    def _launch_python_service(self, svc_type: ServiceType, config: ServiceConfig,
+                           background: bool = False) -> subprocess.Popen:
         """Launch a Python-based service."""
         entry_path = self.base_dir / config.entry_point
-        
+
         if not entry_path.exists():
             logger.error(f"Entry point not found: {entry_path}")
             raise FileNotFoundError(f"Cannot find {config.entry_point}")
-        
-        # Build command
-        cmd = [sys.executable, str(entry_path)]
-        
+
+        # Build command with -u for unbuffered output
+        cmd = [sys.executable, "-u", str(entry_path)]
+
         # Add environment variables
         env = os.environ.copy()
         env.update(config.env_vars)
-        
+        env["PYTHONUNBUFFERED"] = "1"  # Force unbuffered output
+
         logger.info(f"Starting {config.name} on port {config.default_port}")
         logger.info(f"  Command: {' '.join(cmd)}")
         logger.info(f"  Working directory: {self.base_dir}")
-        
+
+        # Always capture both stdout and stderr
+        # Use start_new_session to create process group (works on Windows and Unix)
         process = subprocess.Popen(
             cmd,
             cwd=self.base_dir,
             env=env,
-            stdout=subprocess.PIPE if not self.verbose else None,
-            stderr=subprocess.PIPE if not self.verbose else None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Merge stderr into stdout
             text=True,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == 'win32' else 0
+            bufsize=1,  # Line buffering
+            start_new_session=True  # Creates process group on all platforms
         )
-        
+
         self.running_services[svc_type] = process
         self.service_ports[svc_type] = config.default_port
-        
-        if not background:
-            # Wait for process to complete (only for single foreground service)
+
+        # Always start a thread to read and prefix output
+        service_name = config.name
+
+        def log_reader():
             try:
-                process.wait()
-            except KeyboardInterrupt:
-                self.stop_service(svc_type)
-        
+                for line in process.stdout:
+                    if line.strip():
+                        print(f"[{service_name}] {line.strip()}", flush=True)
+            except:
+                pass
+
+        reader_thread = threading.Thread(target=log_reader, daemon=True)
+        reader_thread.start()
+
         return process
-    
+
     def _launch_frontend(self, config: ServiceConfig, background: bool = False) -> subprocess.Popen:
         """Launch the frontend service."""
         frontend_dir = self.base_dir / "front-end"
-        
+
         if not frontend_dir.exists():
             logger.error(f"Frontend directory not found: {frontend_dir}")
             raise FileNotFoundError(f"Cannot find front-end directory")
-        
-        # Use Python's http.server for simple serving
-        # Note: --directory flag was added in Python 3.7+, fallback for older versions
+
         port = config.default_port
         try:
-            # Try with --directory flag (Python 3.7+)
-            cmd = [sys.executable, "-m", "http.server", str(port), "--directory", str(frontend_dir)]
+            # Use -u for unbuffered output
+            cmd = [sys.executable, "-u", "-m", "http.server", str(port), "--directory", str(frontend_dir)]
         except:
-            # Fallback to changing directory
-            cmd = [sys.executable, "-m", "http.server", str(port)]
-        
+            cmd = [sys.executable, "-u", "-m", "http.server", str(port)]
+
         logger.info(f"Starting {config.name} on port {config.default_port}")
         logger.info(f"  Command: {' '.join(cmd)}")
-        
+
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+
         process = subprocess.Popen(
             cmd,
             cwd=str(frontend_dir),
-            stdout=subprocess.PIPE if not self.verbose else None,
-            stderr=subprocess.PIPE if not self.verbose else None,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == 'win32' else 0
+            bufsize=1,
+            start_new_session=True  # Creates process group on all platforms
         )
-        
+
         self.running_services[ServiceType.FRONTEND] = process
         self.service_ports[ServiceType.FRONTEND] = config.default_port
-        
+
+        # Start thread to prefix frontend output
+        service_name = config.name
+        def log_reader():
+            try:
+                for line in process.stdout:
+                    if line.strip():
+                        print(f"[{service_name}] {line.strip()}", flush=True)
+            except:
+                pass
+
+        reader_thread = threading.Thread(target=log_reader, daemon=True)
+        reader_thread.start()
+
         return process
     
     def launch_service(self, svc_type: ServiceType, port: Optional[int] = None,
@@ -461,22 +502,32 @@ class RTILauncher:
         
         logger.info(f"Starting Docker container: {' '.join(cmd)}")
         
+        # Always capture output to prefix with service name
         process = subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE if not self.verbose else None,
-            stderr=subprocess.PIPE if not self.verbose else None,
-            text=True
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            start_new_session=True  # Creates process group on all platforms
         )
         
         self.running_services[config.service_type] = process
         self.service_ports[config.service_type] = port
         
-        if not background:
+        # Start thread to prefix Docker output
+        service_name = config.name
+        def log_reader():
             try:
-                process.wait()
-            except KeyboardInterrupt:
-                self.stop_service(config.service_type)
+                for line in process.stdout:
+                    if line.strip():
+                        print(f"[{service_name}] {line.strip()}", flush=True)
+            except:
+                pass
         
+        reader_thread = threading.Thread(target=log_reader, daemon=True)
+        reader_thread.start()
+
         return process
     
     def launch_services(self, services: List[ServiceType], port: Optional[int] = None,
@@ -539,9 +590,27 @@ class RTILauncher:
                     capture_output=True
                 )
             else:
-                # Unix: send SIGTERM
-                process.terminate()
-                process.wait(timeout=5)
+                # Unix/Linux/WSL: send SIGTERM to entire process group
+                try:
+                    # Send SIGTERM to process group
+                    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                except (ProcessLookupError, PermissionError, OSError):
+                    # Fallback: terminate just the process
+                    process.terminate()
+                
+                # Wait for process to exit
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    # Force kill with SIGKILL
+                    try:
+                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                    except (ProcessLookupError, PermissionError, OSError):
+                        process.kill()
+                    try:
+                        process.wait(timeout=5)
+                    except:
+                        pass
             
             del self.running_services[svc_type]
             del self.service_ports[svc_type]
@@ -701,8 +770,9 @@ def main():
         sys.exit(1)
     
     try:
-        # Auto-enable background mode for multiple services
-        use_background = options.get('background', False) or len(services) > 1
+        # Auto-enable background mode for multiple services, unless --foreground is specified
+        use_background = options.get('background', False) or (len(services) > 1 and not options.get('foreground', False))
+        
         processes = launcher.launch_services(
             services,
             port=options.get('port'),
@@ -730,13 +800,31 @@ def main():
         
         print("=" * 60)
         
-        if not use_background and len(launcher.running_services) == 1:
-            # Single service in foreground - already handled by launch_service
-            pass
-        elif not use_background:
-            # Multiple services - wait for all
-            for process in processes:
-                process.wait()
+        if not use_background:
+            # Foreground mode - wait for all services
+            if len(launcher.running_services) == 1:
+                # Single service: wait for it
+                print("\nPress Ctrl+C to stop the service...")
+                try:
+                    # Get the single process and wait
+                    process = list(launcher.running_services.values())[0]
+                    process.wait()
+                except KeyboardInterrupt:
+                    print("\nShutting down service...")
+                    launcher.stop_all_services()
+                    print("Service stopped.")
+                    sys.exit(0)
+            else:
+                # Multiple services: wait for Ctrl+C
+                print("\nPress Ctrl+C to stop all services...")
+                try:
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    print("\nShutting down services...")
+                    launcher.stop_all_services()
+                    print("All services stopped.")
+                    sys.exit(0)
         else:
             # Background mode
             print("\nServices running in background. Use 'python launch.py --status' to check.")
