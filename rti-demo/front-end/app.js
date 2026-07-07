@@ -974,6 +974,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
 // Initialize application
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new RTIDemoApp();
+    app = new RTIDemoApp();
+    window.app = app;
     console.log('RTI Demo UI initialized');
 });
