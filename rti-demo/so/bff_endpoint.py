@@ -60,6 +60,50 @@ class ReadvalueRequest(BaseModel):
         json_schema_extra={"example": "ST"}
     )
 
+class GetDataDefinitionRequest(BaseModel):
+    """Request body for reading a value from the connected server.
+
+    Used by: POST /api/readvalue
+    """
+    ld_inst: str = Field(
+        ...,
+        description="LD name (e.g., 'LD0')",
+        json_schema_extra={"example": "LD0"}
+    )
+    ln_inst: Optional[str] = Field(
+        ...,
+        description="LN name (e.g., 'LLN0')",
+        json_schema_extra={"example": "LLN0"}
+    )
+    do_path: Optional[str] = Field(
+        ...,
+        description="Data Object path (e.g., 'Mod')",
+        json_schema_extra={"example": "Mod"}
+    )
+
+class GetDataSetDirectory(BaseModel):
+    """Request body for reading a value from the connected server.
+
+    Used by: POST /api/readvalue
+    """
+    ld_inst: str = Field(
+        ...,
+        description="LD name (e.g., 'LD0')",
+        json_schema_extra={"example": "LD0"}
+    )
+    ln_inst: Optional[str] = Field(
+        ...,
+        description="LN name (e.g., 'LLN0')",
+        json_schema_extra={"example": "LLN0"}
+    )
+    ds_inst: Optional[str] = Field(
+        ...,
+        description="DataSet name (e.g., 'Event1')",
+        json_schema_extra={"example": "Event1"}
+    )
+
+
+
 class WriteValueRequest(BaseModel):
     """Request body for writing a value to the connected server.
 
@@ -149,7 +193,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         else:
             return obj
 
-    async def _aget_ln_details(ld_inst: str, ln_inst: str, client: Any, ws_info) -> Dict[str, Any]:
+    async def _aget_ln_details(ld_inst: str, ln_inst: str, acsi_client: Any, ws_info) -> Dict[str, Any]:
         """Async variant used internally for concurrent model assembly."""
         async def _safe(coro):
             try:
@@ -157,10 +201,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             except Exception:
                 return None
 
-        do_items = await _safe(_invoke_ln_directory_async(client, ws_info, ld_inst, ln_inst, 'dataObject'))
-        brcb_items = await _safe(_invoke_ln_directory_async(client, ws_info, ld_inst, ln_inst, 'brcb'))
-        urcb_items = await _safe(_invoke_ln_directory_async(client, ws_info, ld_inst, ln_inst, 'urcb'))
-        dataset_items = await _safe(_invoke_ln_directory_async(client, ws_info, ld_inst, ln_inst, 'dataset'))
+        do_items =  await _invoke_ln_directory_async(acsi_client, ws_info, ld_inst, ln_inst, 'dataObject')
+        brcb_items =  await _invoke_ln_directory_async(acsi_client, ws_info, ld_inst, ln_inst, 'brcb')
+        urcb_items =  await _invoke_ln_directory_async(acsi_client, ws_info, ld_inst, ln_inst, 'urcb')
+        dataset_items =  await _invoke_ln_directory_async(acsi_client, ws_info, ld_inst, ln_inst, 'dataset')
 
         data_objects = []
         data_attributes = []
@@ -171,7 +215,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             data_attributes = do_items.get('dataAttributes', []) or []
         elif isinstance(do_items, list):
             do_list = do_items
-
         if do_list:
             lock = client.runtime.invoke_lock
             for do_name in do_list:
@@ -179,10 +222,11 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 try:
                     obj_ref = f"{ld_inst}/{ln_inst}.{do_name}"
                     if lock is None:
-                        defn = await client.get_data_definition(obj_ref, ws_info, None, None)
+                        defn = await acsi_client.get_data_definition(obj_ref, ws_info, None, None)
                     else:
                         async with lock:
-                            defn = await client.get_data_definition(obj_ref, ws_info, None, None)
+                            defn = await acsi_client.get_data_definition(obj_ref, ws_info, None, None)
+
                     cdc = None
                     if isinstance(defn, dict):
                         cdc = defn.get('cdc')
@@ -208,10 +252,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             rcb_values = None
             try:
                 if lock is None:
-                    rcb_values = await client.get_BRCB_values(rcb_ref, ws_info, None, None)
+                    rcb_values = await acsi_client.get_BRCB_values(rcb_ref, ws_info, None, None)
                 else:
                     async with lock:
-                        rcb_values = await client.get_BRCB_values(rcb_ref, ws_info, None, None)
+                        rcb_values = await acsi_client.get_BRCB_values(rcb_ref, ws_info, None, None)
                 rpt_ena = False
                 if isinstance(rcb_values, dict):
                     rpt_ena = rcb_values.get('RptEna', False)
@@ -227,10 +271,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             rcb_values = None
             try:
                 if lock is None:
-                    rcb_values = await client.get_URCB_values(rcb_ref, ws_info, None, None)
+                    rcb_values = await acsi_client.get_URCB_values(rcb_ref, ws_info, None, None)
                 else:
                     async with lock:
-                        rcb_values = await client.get_URCB_values(rcb_ref, ws_info, None, None)
+                        rcb_values = await acsi_client.get_URCB_values(rcb_ref, ws_info, None, None)
                 rpt_ena = False
                 if isinstance(rcb_values, dict):
                     rpt_ena = rcb_values.get('RptEna', False)
@@ -252,31 +296,31 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             'dataSets': datasets,
         }
 
-    def _invoke_ln_directory(client, ws_info, ld_inst, ln_inst, mode):
+    def _invoke_ln_directory(acsi_client, ws_info, ld_inst, ln_inst, mode):
         """Return coroutine that performs directory call under a lock."""
         async def _coro():
             lock = client.runtime.invoke_lock
             if lock is None:
-                return await client.get_logical_node_directory(ld_inst, ln_inst, mode, ws_info, None, None)
+                items = await acsi_client.get_logical_node_directory(ld_inst, ln_inst, mode, ws_info, None, None)
+                return items
             async with lock:
-                return await client.get_logical_node_directory(ld_inst, ln_inst, mode, ws_info, None, None)
+                items = await acsi_client.get_logical_node_directory(ld_inst, ln_inst, mode, ws_info, None, None)
+                return items
         return _coro()
 
-    def _invoke_ln_directory_async(client, ws_info, ld_inst, ln_inst, mode):
-        return _invoke_ln_directory(client, ws_info, ld_inst, ln_inst, mode)
+    async def _invoke_ln_directory_async(acsi_client, ws_info, ld_inst, ln_inst, mode):
+        return await _invoke_ln_directory(acsi_client, ws_info, ld_inst, ln_inst, mode)
 
     # ================ Background Model Build ================
     async def _abuild_full_model() -> None:
         """Build full model sequentially with progress updates."""
         endpoint = client.runtime.endpoint
         loop = client.runtime.loop
-        iec61850_client = client.runtime.client
-        if not client or not endpoint or not loop or not iec61850_client.is_connected:
+        acsi_client = client.runtime.client
+        if not client or not endpoint or not loop or not acsi_client.is_connected:
             raise RuntimeError('not-connected')
         try:
-            print("Calling get_websocket_info...")
-            ws_info = endpoint.get_websocket_info(iec61850_client)
-            print(f"ws_info: {ws_info}")
+            ws_info = endpoint.get_websocket_info(acsi_client)
         except Exception as e:
             print(f"CRASHED in get_websocket_info: {type(e).__name__}: {e}")
             raise
@@ -341,13 +385,16 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         ln_inst = ln_full
                     _set_current_ln(ln_inst)
                     try:
-                        details = await _aget_ln_details(ld, ln_inst, client, ws_info)
+                        details = await _aget_ln_details(ld, ln_inst, client.runtime.client, ws_info)
                         logical_node_details[f"{ld}/{ln_inst}"] = details
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"Failed to get details for {ld}/{ln_inst}: {e}")
+                        #pass
                     finally:
                         _inc_ln_done()
-            except Exception:
+            except Exception as e:
+                logger.error(f"Failed to get directory for {ld}: {e}")
+
                 logical_device_map[ld] = []
                 logical_device_status[ld] = 'error'
             finally:
@@ -412,8 +459,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             client.runtime.model_task = fut
 
         def _on_model_task_done(future):
-            print("Model build task completed callback invoked")
-            print("the model is: ", client.runtime.model_data)
             try:
                 exc = future.exception()
             except Exception:
@@ -897,6 +942,239 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 status_code=500
             )
 
+    @router.post(
+        "/getDataDefinition",
+        summary="Get Data Definition",
+        description="Retrieves the data definition for a specified object reference from the connected IEC61850 server. The client must be connected before calling this endpoint.",
+        response_description="Data definition result",
+        responses={
+            200: {"description": "Data definition retrieved successfully"},
+            400: {"description": "Missing objRef parameter"},
+            403: {"description": "Client is not connected"},
+            404: {"description": "Instance not available or retrieval timeout"},
+            500: {"description": "Error retrieving data definition"}
+        },
+        tags=["Data Access"]
+    )
+    async def api_get_data_definition(request: GetDataDefinitionRequest):
+        """Read a value from the connected server.
+
+        Request Body:
+            ReadvalueRequest: {
+                "objRef": str,  # Required - Object reference in IEC61850 format
+                "fc": str       # Optional - Functional constraint
+            }
+
+        Returns:
+            dict: {
+                "ok": True,
+                "success": True,
+                "objRef": str,
+                "value": any  # The read value
+            }
+
+        Raises:
+            HTTPException 400: If objRef is missing
+            HTTPException 403: If client is not connected
+            HTTPException 404: If instance not available or timeout
+        """
+        print("entered api_get_data_definition")
+        try:
+            ld_inst = request.ld_inst
+            ln_inst = request.ln_inst
+            do_path = request.do_path
+            print("ld_inst: ", ld_inst, "ln_inst: ", ln_inst, "do_path: ", do_path)
+            obj_ref = f"{ld_inst}/{ln_inst}.{do_path}" if do_path else f"{ld_inst}/{ln_inst}"
+
+            print("obj_ref: ", obj_ref)
+
+            #obj_ref = request.objRef
+            #fc = request.fc
+
+            if not obj_ref:
+                #client._log_action("Client readvalue rejected: missing objRef", "warn")
+                return JSONResponse(
+                    content={"ok": False, "error": "objRef is required"},
+                    status_code=400
+                )
+
+            if client.runtime.client is None:
+                #client._log_action(
+                #    "Client readvalue rejected: not connected",
+                #    "warn",
+                #    detail={"objRef": obj_ref, "fc": fc},
+                #)
+                return JSONResponse(
+                    content={"ok": False, "error": "Client is not connected"},
+                    status_code=503
+                )
+
+            try:
+                result = client.invoke_on_runtime_loop(
+                    client.get_data_definition(obj_ref), timeout=10
+                )
+
+                print("result: ", result)
+
+                if result is None:
+                    #client._log_action(
+                    #    "Client readvalue failed: instanceNotAvailable",
+                    #    "warn",
+                    #   detail={"objRef": obj_ref, "fc": fc}
+                    #)
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                #client._log_action(
+                #    "Client readvalue",
+                #    detail={
+                #       "objRef": obj_ref,
+                #        "value": result.get("value"),
+                #    },
+                #)
+                return {
+                    "ok": True,
+                    "success": True,
+                    "objRef": obj_ref,
+                    "value": result.get("dataDefinition"),
+                }
+
+            except FuturesTimeoutError:
+                #client._log_action(
+                #    "Client readvalue timeout",
+                #    "warn",
+                #    detail={"objRef": obj_ref},
+                #)
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                #client._log_action(f"Client readvalue failed: {exc}", "warn")
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                #client._log_action(f"Client readvalue failed: {exc}", "error")
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/getDataSetDirectory",
+        summary="Get Data Set directory",
+        description="Retrieves the data definition for a specified object reference from the connected IEC61850 server. The client must be connected before calling this endpoint.",
+        response_description="Data set directory",
+        responses={
+            200: {"description": "Data definition retrieved successfully"},
+            400: {"description": "Missing objRef parameter"},
+            403: {"description": "Client is not connected"},
+            404: {"description": "Instance not available or retrieval timeout"},
+            500: {"description": "Error retrieving data definition"}
+        },
+        tags=["Data Access"]
+    )
+    async def api_get_dataset_directory(request: GetDataSetDirectory):
+
+        try:
+            ld_inst = request.ld_inst
+            ln_inst = request.ln_inst
+            ds_inst = request.ds_inst
+
+            obj_ref = f"{ld_inst}/{ln_inst}.{ds_inst}"
+
+            print("ds obj_ref: ", obj_ref)
+
+            # obj_ref = request.objRef
+            # fc = request.fc
+
+            if not obj_ref:
+                # client._log_action("Client readvalue rejected: missing objRef", "warn")
+                return JSONResponse(
+                    content={"ok": False, "error": "objRef is required"},
+                    status_code=400
+                )
+
+            if client.runtime.client is None:
+                # client._log_action(
+                #    "Client readvalue rejected: not connected",
+                #    "warn",
+                #    detail={"objRef": obj_ref, "fc": fc},
+                # )
+                return JSONResponse(
+                    content={"ok": False, "error": "Client is not connected"},
+                    status_code=503
+                )
+
+            try:
+                result = client.invoke_on_runtime_loop(
+                    client.get_dataset_directory(ld_inst, ln_inst, ds_inst), timeout=10
+                )
+
+                print("get ds result: ", result)
+
+                if result is None:
+                    # client._log_action(
+                    #    "Client readvalue failed: instanceNotAvailable",
+                    #    "warn",
+                    #   detail={"objRef": obj_ref, "fc": fc}
+                    # )
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                # client._log_action(
+                #    "Client readvalue",
+                #    detail={
+                #       "objRef": obj_ref,
+                #        "value": result.get("value"),
+                #    },
+                # )
+                return {
+                    "ok": True,
+                    "success": True,
+                    "objRef": obj_ref,
+                    "value": result.get("value"),
+                }
+
+            except FuturesTimeoutError:
+                # client._log_action(
+                #    "Client readvalue timeout",
+                #    "warn",
+                #    detail={"objRef": obj_ref},
+                # )
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                # client._log_action(f"Client readvalue failed: {exc}", "warn")
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                # client._log_action(f"Client readvalue failed: {exc}", "error")
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
     @router.get(
         "/apis",
         summary="List All API Endpoints",
@@ -981,36 +1259,36 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             value_type = request.value_type
 
             if not obj_ref:
-                client._log_action("Client writevalue rejected: missing objRef", "warn")
+                #client._log_action("Client writevalue rejected: missing objRef", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
                 )
 
             if not fc:
-                client._log_action("Client writevalue rejected: missing fc", "warn")
+                #client._log_action("Client writevalue rejected: missing fc", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "fc is required"},
                     status_code=400
                 )
 
             if value is None:
-                client._log_action(
-                    "Client writevalue rejected: missing value",
-                    "warn",
-                    detail={"objRef": obj_ref, "fc": fc}
-                )
+                #client._log_action(
+                #    "Client writevalue rejected: missing value",
+                #    "warn",
+                #    detail={"objRef": obj_ref, "fc": fc}
+                #)
                 return JSONResponse(
                     content={"ok": False, "error": "value is required"},
                     status_code=400
                 )
 
             if client.runtime.client is None:
-                client._log_action(
-                    "Client writevalue rejected: not connected",
-                    "warn",
-                    detail={"objRef": obj_ref, "fc": fc, "value": value},
-                )
+                #client._log_action(
+                #    "Client writevalue rejected: not connected",
+                #    "warn",
+                #   detail={"objRef": obj_ref, "fc": fc, "value": value},
+                #)
                 return JSONResponse(
                     content={"ok": False, "error": "Client is not connected"},
                     status_code=503
@@ -1020,31 +1298,42 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 result = client.invoke_on_runtime_loop(
                     client.write_value(obj_ref, value, fc, value_type), timeout=10
                 )
-                return {
-                    "ok": True,
-                    "success": True,
-                    "objRef": obj_ref,
-                    "fc": fc,
-                    "value": result.get("value"),
-                }
+                if result is None:
+                    #client._log_action(
+                    #    "Client writevalue failed: instanceNotAvailable",
+                    #    "warn",
+                    #    detail={"objRef": obj_ref, "fc": fc, "value": value},
+                    #)
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+                else:
+                    return {
+                        "ok": True,
+                        "success": True,
+                        "objRef": obj_ref,
+                        "fc": fc,
+                        "value": result.get("value"),
+                    }
             except FuturesTimeoutError:
-                client._log_action(
-                    "Client writevalue timeout",
-                    "warn",
-                    detail={"objRef": obj_ref},
-                )
+                #client._log_action(
+                #    "Client writevalue timeout",
+                #    "warn",
+                #    detail={"objRef": obj_ref},
+                #)
                 return JSONResponse(
                     content={"ok": False, "error": "write timeout"},
                     status_code=504
                 )
             except ValueError as exc:
-                client._log_action(f"Client writevalue failed: {exc}", "warn")
+                #client._log_action(f"Client writevalue failed: {exc}", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=404
                 )
             except Exception as exc:
-                client._log_action(f"Client writevalue failed: {exc}", "error")
+                #client._log_action(f"Client writevalue failed: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
