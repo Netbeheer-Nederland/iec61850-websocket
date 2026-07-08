@@ -441,6 +441,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     @router.get(
         "/status",
         summary="Get Client Status",
+
         description="Returns the current operational status of the ACSI client.",
         response_description="Client status information",
         responses={
@@ -1244,6 +1245,7 @@ def create_bff_router() -> tuple[APIRouter, ACSIClient]:
     return router, client
 
 def create_fastapi_app() -> FastAPI:
+
     """Create and configure the FastAPI application for ACSI client BFF."""
     app = FastAPI(
         title="ACSI Client websocket activeve",
@@ -1261,6 +1263,7 @@ def create_fastapi_app() -> FastAPI:
             },
             {
                 "name": "Connection Management",
+
                 "description": "Connect to and disconnect from ACSI servers"
             },
             {

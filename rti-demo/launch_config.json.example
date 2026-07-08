@@ -1,0 +1,74 @@
+{
+  "description": "Example configuration file for RTI Demo Launcher",
+  "usage": "Copy this file to launch_config.json and modify as needed",
+  
+  "services": {
+    "bff": {
+      "port": 5000,
+      "docker": false,
+      "env": {
+        "RTI_DOCKER_ENABLED": "true",
+        "RTI_SERVICE_DISCOVERY_ENABLED": "true",
+        "LOG_LEVEL": "INFO"
+      },
+      "health_check_path": "/api/health",
+      "labels": {
+        "rti.service": "bff-server",
+        "rti.type": "RTI-BFF",
+        "rti.host": "bff-server",
+        "rti.port": "5000"
+      }
+    },
+    
+    "fsp": {
+      "port": 5001,
+      "docker": false,
+      "env": {
+        "PORT": "5001",
+        "LOG_LEVEL": "INFO"
+      },
+      "health_check_path": "/api/status",
+      "labels": {
+        "rti.service": "rti-server",
+        "rti.type": "RTI-FSP",
+        "rti.host": "rti-server",
+        "rti.port": "5001"
+      }
+    },
+    
+    "so": {
+      "port": 5002,
+      "docker": false,
+      "env": {
+        "PORT": "5002",
+        "LOG_LEVEL": "INFO"
+      },
+      "health_check_path": "/api/status",
+      "labels": {
+        "rti.service": "rti-client",
+        "rti.type": "RTI-SO",
+        "rti.host": "rti-client",
+        "rti.port": "5002"
+      }
+    },
+    
+    "frontend": {
+      "port": 8080,
+      "docker": false,
+      "health_check_path": "/"
+    }
+  },
+  
+  "global": {
+    "docker": {
+      "network": "rti-network",
+      "volumes": [
+        "/var/run/docker.sock:/var/run/docker.sock"
+      ]
+    },
+    "logging": {
+      "level": "INFO",
+      "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    }
+  }
+}

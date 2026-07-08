@@ -217,5 +217,5 @@ Test coverage includes:
 
 ## See Also
 
-- [FSP Server Documentation](../fsp/README.md)
+- [FSP ACSI-Server_WebsocketActive Documentation](../fsp/README.md)
 - [BFF API Documentation](./BFF_API.md)
