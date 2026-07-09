@@ -36,6 +36,8 @@ class RTIDemoApp {
         this.init();
 
         this.currentConnectionId = null;
+        this.connectionStatusTimeout = null;
+
     }
 
     init() {
@@ -124,6 +126,10 @@ class RTIDemoApp {
             navItem.classList.add('active');
             const pageName_formatted = pageName.charAt(0).toUpperCase() + pageName.slice(1);
             document.getElementById('breadcrumb-text').textContent = pageName_formatted;
+        }
+
+         if (pageName !== 'connections') {
+            this.stopConnectionStatusPolling();
         }
 
         // Load page-specific content
@@ -523,6 +529,61 @@ class RTIDemoApp {
     // =============================================
     // ACSI Page
     // =============================================
+    // ========== POLLING FUNCTION ==========
+    async refreshConnectionStatuses() {
+        try {
+            const result = await this.callBFF('/api/endpoints');
+            if (!result?.endpoints) return;
+
+            // Create a map: "host:port" -> status for fast lookup
+            const statusMap = new Map();
+            result.endpoints.forEach(ep => {
+                statusMap.set(`${ep.host}:${ep.port}`, ep.status);
+            });
+
+            // Update statuses in our connections array
+            let updated = false;
+            this.connections.forEach(conn => {
+                const key = `${conn.host}:${conn.port}`;
+                const newStatus = statusMap.get(key);
+                if (newStatus && newStatus !== conn.status) {
+                    conn.status = newStatus;
+                    connField = document.getElementById(`status-button-${conn.name}`);
+                    if (connField)
+                        connField.textContent = newStatus;
+                    updated = true;
+                }
+            });
+
+            // Re-render table only if we're on the connections page and something changed
+            if (updated && document.querySelector('.page.active')?.id === 'page-connections') {
+                this.renderConnectionsTable();
+            }
+        } catch (error) {
+            this.addDiagnosticMessage(`Status poll error: ${error.message}`, 'error');
+        }
+    }
+
+    // ========== START/STOP POLLING ==========
+    startConnectionStatusPolling() {
+        this.stopConnectionStatusPolling(); // Clear any existing poller
+
+        const poll = async () => {
+            await this.refreshConnectionStatuses();
+            this.connectionStatusTimeout = setTimeout(poll, 10000);
+        };
+
+        poll(); // Start immediately
+    }
+
+    stopConnectionStatusPolling() {
+        if (this.connectionStatusTimeout) {
+            clearTimeout(this.connectionStatusTimeout);
+            this.connectionStatusTimeout = null;
+        }
+    }
+
+
 
     async loadConnections() {
         const result = await this.callBFF('/api/connections');
@@ -534,8 +595,8 @@ class RTIDemoApp {
 
         this.connections = result.connections || [];
         this.renderConnectionsTable();
+        this.startConnectionStatusPolling(); // Start polling
     }
-
     renderConnectionsTable() {
         const container = document.getElementById('connections-container');
         
@@ -567,7 +628,7 @@ class RTIDemoApp {
                     <td>${conn.host}</td>
                     <td>${conn.port}</td>
                     <td>
-                        <span style="display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; background: ${conn.status === 'connected' ? 'var(--success-color)' : 'var(--danger-color)'}; color: white;">
+                        <span id='status-button-${conn.name}' style="display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; background: ${conn.status === 'connected' ? 'var(--success-color)' : 'var(--danger-color)'}; color: white;">
                             ${conn.status}
                         </span>
                     </td>
@@ -632,6 +693,7 @@ class RTIDemoApp {
             this.closeConnectionModal();
             this.loadConnections();
             this.addDiagnosticMessage(`Connection '${connection.name}' saved`, 'success');
+            this.renderConnectionsTable();
         }
     }
 

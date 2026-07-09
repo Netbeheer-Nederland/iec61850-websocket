@@ -329,11 +329,8 @@ class ConnectionManager:
     def save_connections(self) -> None:
         """Save connections to file."""
         try:
-            print("Writing connections:", self.connections)
-
             with open(CONNECTIONS_FILE, 'w') as f:
                 json.dump(self.connections, f, indent=2)
-            print("Finished writing")
         except Exception as e:
             logger.error(f"Error saving connections: {e}")
     
@@ -360,11 +357,9 @@ class ConnectionManager:
 
         connection_in_file = next((c for c in self.connections
                          if c['name'] == name), None)
-        print("connection_in_file:", connection_in_file)
         if connection_in_file:
             connection_in_file['host'] = host
             connection_in_file['port'] = port
-            print("connection in file updated:", connection_in_file)
             return connection_in_file
         
         connection = {
@@ -373,7 +368,6 @@ class ConnectionManager:
             'host': host,
             'port': port,
             'type': conn_type,
-            'status': 'disconnected',
             'auto_discovered': auto_discovered,
             'created_at': datetime.now().isoformat()
         }
@@ -814,6 +808,19 @@ async def get_endpoints():
         discovery.discover_services()
         _register_bff_clients(discovery.discovered_services)
 
+    for con in conn_manager.connections:
+        status = 'disconnected'
+        try:
+            response = requests.get(
+                f"http://{con['host']}:{con['port']}",
+                timeout=1
+            )
+            if response.status_code < 500:
+                status = 'connected'
+        except Exception:
+            status = 'disconnected'
+        con["status"] = status
+
     endpoints = list(conn_manager.connections)
     discovered = dict(discovery.discovered_services)
 
@@ -1011,8 +1018,6 @@ async def create_connection(request: ConnectionCreateRequest):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Missing required fields: name, host, port, type'
         )
-
-    print("request parameters: ", request.name, request.host, request.port, request.type)
     connection = conn_manager.add_connection(
         name=request.name,
         host=request.host,
@@ -1021,8 +1026,6 @@ async def create_connection(request: ConnectionCreateRequest):
         auto_discovered=request.auto_discovered
     )
     conn_manager.save_connections()
-    print("Connection created:", connection)
-    print("len connections:", len(conn_manager.connections))
 
     
     return JSONResponse(content=connection, status_code=status.HTTP_201_CREATED)
