@@ -354,19 +354,20 @@ class RTIDemoApp {
             return;
         }
 
-        const result = await this.callBFF('/api/endpoints/discover-network', 'POST', {
-            host: this.scanHost,
-            ports,
-        });
+        await this.loadEndpoints();
+        //const result = await this.callBFF('/api/endpoints/discover-network', 'POST', {
+        //    host: this.scanHost,
+        //    ports,
+        //});
         
-        if (result) {
-            this.addDiagnosticMessage(
-                `Discovery complete: Found ${result.count} endpoint(s)`,
-                'success'
-            );
+        //if (result) {
+        //    this.addDiagnosticMessage(
+        //        `Discovery complete: Found ${result.count} endpoint(s)`,
+        //        'success'
+        //    );
             // Reload endpoints to show any newly discovered ones
-            await this.loadEndpoints();
-        }
+        //    await this.loadEndpoints();
+        //}
     }
 
     async loadEndpoints() {
