@@ -2,21 +2,31 @@
   {
     "id": 1,
     "name": "rti-client",
-    "host": "rti-client",
-    "port": 5000,
+    "host": "rti2-gg4",
+    "port": 5002,
     "type": "RTI-SO",
     "status": "disconnected",
     "auto_discovered": false,
-    "created_at": "2026-07-07T14:16:56.170375"
+    "created_at": "2026-07-09T09:29:48.837888"
   },
   {
     "id": 2,
-    "name": "rti-2",
-    "host": "rti2",
+    "name": "rt-3",
+    "host": "3333dd",
     "port": 5000,
     "type": "RTI-SO",
     "status": "disconnected",
     "auto_discovered": false,
-    "created_at": "2026-07-07T14:17:14.944274"
+    "created_at": "2026-07-09T09:35:31.187449"
+  },
+  {
+    "id": 3,
+    "name": "rt-32",
+    "host": "ffff",
+    "port": 5000,
+    "type": "RTI-SO",
+    "status": "disconnected",
+    "auto_discovered": false,
+    "created_at": "2026-07-09T09:35:50.827497"
   }
 ]

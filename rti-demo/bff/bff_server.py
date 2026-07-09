@@ -353,10 +353,19 @@ class ConnectionManager:
         """
         # Check if connection already exists
         existing = next((c for c in self.connections 
-                        if c['host'] == host and c['port'] == port), None)
+                        if c['host'] == host and c['port'] == port and c['name'] == name), None)
         if existing:
             logger.warning(f"Connection already exists: {host}:{port}")
             return existing
+
+        connection_in_file = next((c for c in self.connections
+                         if c['name'] == name), None)
+        print("connection_in_file:", connection_in_file)
+        if connection_in_file:
+            connection_in_file['host'] = host
+            connection_in_file['port'] = port
+            print("connection in file updated:", connection_in_file)
+            return connection_in_file
         
         connection = {
             'id': len(self.connections) + 1,
@@ -1002,6 +1011,8 @@ async def create_connection(request: ConnectionCreateRequest):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Missing required fields: name, host, port, type'
         )
+
+    print("request parameters: ", request.name, request.host, request.port, request.type)
     connection = conn_manager.add_connection(
         name=request.name,
         host=request.host,

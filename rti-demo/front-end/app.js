@@ -34,6 +34,8 @@ class RTIDemoApp {
         this._selectedLn       = null;
 
         this.init();
+
+        this.currentConnectionId = null;
     }
 
     init() {
@@ -595,6 +597,9 @@ class RTIDemoApp {
         document.getElementById('conn-host').value = '';
         document.getElementById('conn-port').value = '5000';
         document.getElementById('conn-type').value = 'RTI-SO';
+        this.currentConnectionId = null;  // ← Mark as NEW
+        document.getElementById('conn-name').readOnly = false;
+
     }
 
     closeConnectionModal() {
@@ -602,6 +607,7 @@ class RTIDemoApp {
     }
 
     async saveConnection() {
+        const isEdit = this.currentConnectionId !== null;
         const connection = {
             name: document.getElementById('conn-name').value,
             host: document.getElementById('conn-host').value,
@@ -611,6 +617,11 @@ class RTIDemoApp {
 
         if (!connection.name || !connection.host) {
             alert('Name and host are required');
+            return;
+        }
+
+        if(!isEdit && this.connections.map(c => c.name).includes(connection.name)) {
+            alert('Connection name must be unique');
             return;
         }
 
@@ -638,10 +649,12 @@ class RTIDemoApp {
         const conn = this.connections.find(c => c.id === id);
         if (conn) {
             document.getElementById('conn-name').value = conn.name;
+            document.getElementById('conn-name').readOnly = true;
             document.getElementById('conn-host').value = conn.host;
             document.getElementById('conn-port').value = conn.port;
             document.getElementById('conn-type').value = conn.type;
             document.getElementById('modal-connection').classList.add('active');
+            this.currentConnectionId = id;  // ← Mark as EDIT
         }
     }
 
