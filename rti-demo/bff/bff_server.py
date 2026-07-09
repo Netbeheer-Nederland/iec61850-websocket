@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from bffClient import BffClient
 
 from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 
 # Global state
@@ -318,6 +319,7 @@ class ConnectionManager:
     
     def __init__(self) -> None:
         self.connections: List[Dict] = self.load_connections()
+        self.status_task = None
     
     def load_connections(self) -> List[Dict]:
         """Load connections from file."""
@@ -1005,11 +1007,14 @@ async def get_connections():
     Returns:
         JSON with list of connections and their count.
     """
-    connections = await conn_manager.get_all_connections_with_status()
-    print("returned connections: ", connections)
+    if conn_manager.status_task is None or conn_manager.status_task.done():
+        conn_manager.status_task = asyncio.create_task(
+            conn_manager.get_all_connections_with_status()
+        )
+
     return {
-        'connections': connections,
-        'count': len(conn_manager.connections)
+        "connections": conn_manager.connections,
+        "count": len(conn_manager.connections)
     }
 
 @app.post(

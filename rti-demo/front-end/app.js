@@ -86,6 +86,9 @@ class RTIDemoApp {
         document.getElementById('btn-modal-close').addEventListener('click', () => this.closeConnectionModal());
         document.getElementById('btn-modal-save').addEventListener('click', () => this.saveConnection());
 
+        // Connections Table
+        document.getElementById('refresh-cons-btn').addEventListener('click', () => this.loadEndpoints());
+
         // Reports
         document.getElementById('btn-export-reports').addEventListener('click', () => this.exportReports());
         document.getElementById('btn-clear-diagnostics').addEventListener('click', () => this.clearDiagnostics());
@@ -621,6 +624,15 @@ class RTIDemoApp {
         `;
 
         this.connections.forEach(conn => {
+
+            const statusColor =
+                conn.status === 'connected'
+                    ? 'var(--success-color)'
+                    : conn.status === 'disconnected'
+                        ? 'var(--danger-color)'
+                        : '#eab308';
+
+            const statusText = conn.status || '⏳ checking...';
             html += `
                 <tr>
                     <td>${conn.name}</td>
@@ -628,8 +640,8 @@ class RTIDemoApp {
                     <td>${conn.host}</td>
                     <td>${conn.port}</td>
                     <td>
-                        <span id='status-button-${conn.name}' style="display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; background: ${conn.status === 'connected' ? 'var(--success-color)' : 'var(--danger-color)'}; color: white;">
-                            ${conn.status}
+                        <span id='status-button-${conn.name}' style="display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; background: ${statusColor}; color: white;">
+                            ${statusText}
                         </span>
                     </td>
                     <td>
