@@ -31,6 +31,9 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from bffClient import BffClient
 
+from concurrent.futures import ThreadPoolExecutor
+
+
 # Global state
 _bff_clients: Dict[str, BffClient] = {}
 
@@ -432,6 +435,23 @@ class ConnectionManager:
                 )
                 registered += 1
         return registered
+
+    def check_connection(self, con):
+        try:
+            response = requests.get(
+                f"http://{con['host']}:{con['port']}",
+                timeout=1
+            )
+            con["status"] = "connected" if response.status_code < 500 else "disconnected"
+        except requests.RequestException:
+            con["status"] = "disconnected"
+
+    async def get_all_connections_with_status(self):
+        max_workers = min(32, len(conn_manager.connections))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            list(executor.map(self.check_connection, conn_manager.connections))
+
+        return self.connections
 
 
 # ==================== Data Management ====================
@@ -985,8 +1005,10 @@ async def get_connections():
     Returns:
         JSON with list of connections and their count.
     """
+    connections = await conn_manager.get_all_connections_with_status()
+    print("returned connections: ", connections)
     return {
-        'connections': conn_manager.connections,
+        'connections': connections,
         'count': len(conn_manager.connections)
     }
 
