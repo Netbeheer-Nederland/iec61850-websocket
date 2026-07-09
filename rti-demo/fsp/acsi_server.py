@@ -32,7 +32,7 @@ class ACSIServerRuntime:
     """Manages IEC 61850 WebSocket server runtime state and lifecycle."""
 
     def __init__(self):
-        self.status: str = "stopped"  # stopped|starting|listening|stopping|error
+        self.status: str = "stopped"  # stopped|starting|listening|stopping|error|reloading
         self.host: str = "localhost"
         self.port: int = 8765
         self.loop: Optional[asyncio.AbstractEventLoop] = None
@@ -51,6 +51,13 @@ class ACSIServerRuntime:
         self.cp: str = "cp1"
         self.last_status_log_signature: Optional[tuple] = None
         self.lock: threading.Lock = threading.Lock()
+        self.model_lock: threading.Lock = threading.Lock()  # Separate lock for model operations
+        
+        # Dynamic model reloading state
+        self.model_version: int = 0  # Incremented on each model update
+        self.pending_model: Optional[IedModel] = None  # New model waiting to be applied
+        self.model_reload_in_progress: bool = False
+        self.old_server_cp: Optional[IEC61850Server] = None  # For cleanup after hot-swap
         
         # Callbacks for message logging
         self.recv_msg_callback: Optional[Callable] = None
@@ -102,8 +109,21 @@ class ACSIServer:
             raise RuntimeError("Runtime model is not an IedModel instance")
         return ied
 
-    def update_model_file(self, model_source: str) -> IedModel:
-        """Update model.py and reload runtime model. Reverts on validation failure."""
+    def update_model_file(self, model_source: str, apply_dynamically: bool = True) -> IedModel:
+        """Update model.py and reload runtime model. Reverts on validation failure.
+        
+        Args:
+            model_source: Complete Python code for model.py
+            apply_dynamically: If True and server is running, apply model hot-swap.
+                            If False, only update the model file and runtime state.
+        
+        Returns:
+            IedModel: The newly loaded model
+        
+        Raises:
+            ValueError: If model_source is invalid
+            Exception: If model validation fails
+        """
         if not isinstance(model_source, str) or not model_source.strip():
             raise ValueError("modelPy must be a non-empty string")
 
@@ -117,12 +137,91 @@ class ACSIServer:
                 self.model_file.write_text(previous_content, encoding="utf-8")
             raise
 
-        self._set_runtime_state(
-            ied_model=ied_model,
-            model_source=str(self.model_file),
-            model_ied_name=ied_model.name,
-        )
+        # Increment model version and set as pending
+        # Note: runtime.ied_model is NOT updated here - it will be updated
+        # after hot-swap completes to avoid race conditions
+        with self.runtime.model_lock:
+            self.runtime.model_version += 1
+            self.runtime.pending_model = ied_model
+            self.runtime.model_source = str(self.model_file)
+            self.runtime.model_ied_name = ied_model.name
+
+        # If server is running and dynamic application is requested, trigger hot-swap
+        if apply_dynamically and self.runtime.status == "listening":
+            self._apply_model_hot_swap()
+        else:
+            # Server not running - just update runtime model reference directly
+            # No hot-swap needed, model will be loaded when server starts
+            with self.runtime.model_lock:
+                self.runtime.ied_model = ied_model
+
         return ied_model
+
+    def _apply_model_hot_swap(self) -> bool:
+        """Apply pending model to running server via hot-swap.
+        
+        This method updates the existing IEC61850Server instance with the new model
+        by calling update_ied_model(), preserving WebSocket connections.
+        
+        Returns:
+            bool: True if hot-swap was successful, False otherwise
+        """
+        with self.runtime.model_lock:
+            if self.runtime.status != "listening":
+                self._log_action("Hot-swap aborted: server not in listening state", "warn")
+                return False
+                
+            if self.runtime.model_reload_in_progress:
+                self._log_action("Hot-swap aborted: reload already in progress", "warn")
+                return False
+                
+            if self.runtime.pending_model is None:
+                self._log_action("Hot-swap aborted: no pending model", "warn")
+                return False
+                
+            self.runtime.model_reload_in_progress = True
+            pending_model = self.runtime.pending_model
+            old_server = self.runtime.server_cp
+            
+            # Set reload status
+            self._set_runtime_state(status="reloading")
+
+        try:
+            # Execute hot-swap on the event loop
+            loop = self.runtime.loop
+            if loop is None or not loop.is_running():
+                raise RuntimeError("Event loop not available for hot-swap")
+                
+            # Use run_coroutine_threadsafe to execute on the server's event loop
+            future = asyncio.run_coroutine_threadsafe(
+                self._perform_hot_swap_async(pending_model, old_server),
+                loop
+            )
+            result = future.result(timeout=30)
+            
+            with self.runtime.model_lock:
+                self.runtime.model_reload_in_progress = False
+                if result:
+                    self.runtime.pending_model = None
+                    self._set_runtime_state(status="listening")
+                    self._log_action(
+                        "Model hot-swap completed successfully",
+                        detail={"ied": pending_model.name, "version": self.runtime.model_version}
+                    )
+                else:
+                    self._set_runtime_state(status="listening")
+                    self._log_action("Model hot-swap completed with warnings", "warn")
+                
+            return result
+            
+        except Exception as exc:
+            with self.runtime.model_lock:
+                self.runtime.model_reload_in_progress = False
+                self._set_runtime_state(status="listening")
+            self._log_action(f"Model hot-swap failed: {exc}", "error")
+            # No server restoration needed - we updated in-place
+            # The old server instance is still valid with its original model
+            return False
 
     def _log_action(
         self, message: str, level: str = "info", detail: Optional[Dict[str, Any]] = None
@@ -204,6 +303,85 @@ class ACSIServer:
                 }
             )
 
+    async def _perform_hot_swap_async(
+        self, new_model: IedModel, old_server: Optional[IEC61850Server]
+    ) -> bool:
+        """Perform the actual hot-swap operation on the event loop.
+        
+        This coroutine updates the existing IEC61850Server instance with the new model
+        by calling update_ied_model(), preserving WebSocket connections.
+        
+        Args:
+            new_model: The new IedModel to use
+            old_server: The current IEC61850Server instance to update
+            
+        Returns:
+            bool: True if swap was successful
+        """
+        try:
+            endpoint = self.runtime.endpoint
+            if endpoint is None:
+                self._log_action("Hot-swap failed: endpoint is None", "error")
+                return False
+            
+            cp = self.runtime.cp or "cp1"
+            
+            # Update the existing server in-place with new model
+            if old_server is not None:
+                # Call the new update_ied_model method to refresh services
+                old_server.update_ied_model(new_model)
+                
+                # Cancel periodic reporting from old server (will be restarted below)
+                try:
+                    for task_name, task in list(self.runtime.tasks.items()):
+                        if task_name.startswith(f"{cp}-periodic-report") and not task.done():
+                            task.cancel()
+                            try:
+                                await task
+                            except asyncio.CancelledError:
+                                pass
+                except Exception as cancel_exc:
+                    self._log_action(f"Warning: Failed to cancel old tasks: {cancel_exc}", "warn")
+                
+                # Update runtime state references (server instance stays the same)
+                # Use lock to ensure atomic update
+                with self.runtime.model_lock:
+                    self.runtime.ied_model = new_model
+                    self.runtime.model_ied_name = new_model.name
+                
+                # Restart periodic reporting with updated server
+                report_task = asyncio.create_task(
+                    old_server.periodic_report_start(), 
+                    name=f"{cp}-periodic-report"
+                )
+                self.runtime.tasks["report"] = report_task
+                
+                # Restart custom demo tasks if the new model has the required objects
+                if old_server.find_object_in_tree("LD0/DGEN1.DEROpSt.stVal") is not None:
+                    toggle_task = asyncio.create_task(
+                        self._toggle_custom_value(old_server, "LD0/DGEN1.DEROpSt.stVal"),
+                        name="toggle-value"
+                    )
+                    self.runtime.tasks["toggle"] = toggle_task
+                
+                self._log_action(
+                    "Server services updated with new model",
+                    detail={
+                        "server": str(old_server),
+                        "model": new_model.name
+                    }
+                )
+            else:
+                # No existing server, this shouldn't happen but handle it
+                self._log_action("Hot-swap failed: no existing server to update", "error")
+                return False
+            
+            return True
+            
+        except Exception as exc:
+            self._log_action(f"Hot-swap async execution failed: {exc}", "error")
+            return False
+
     async def _toggle_custom_value(self, server: IEC61850Server, obj_ref: str) -> None:
         """Periodically update a value for demo purposes."""
         while True:
@@ -243,11 +421,26 @@ class ACSIServer:
         if tasks:
             await asyncio.gather(*tasks.values(), return_exceptions=True)
 
+        # Cleanup old server instance from hot-swap
+        if self.runtime.old_server_cp is not None:
+            try:
+                # The old server should be cleaned up, but we don't need to explicitly stop it
+                # as it's been replaced in the endpoint
+                self.runtime.old_server_cp = None
+            except Exception as exc:
+                self._log_action(f"Cleanup old server error: {exc}", "warn")
+
         if endpoint is not None:
             try:
                 await endpoint.stop_passive()
             except Exception as exc:
                 self._log_action(f"stop_passive error: {exc}", "warn")
+
+        # Reset model reloading state
+        with self.runtime.model_lock:
+            self.runtime.pending_model = None
+            self.runtime.model_reload_in_progress = False
+            self.runtime.old_server_cp = None
 
         self._set_runtime_state(
             endpoint=None,
@@ -510,12 +703,12 @@ class ACSIServer:
         }
 
     def get_status(self) -> Dict[str, Any]:
-        """Get current server status."""
+        """Get current server status including model versioning information."""
         endpoint = self.runtime.endpoint
         connected = len(endpoint.websocket_info_list) if endpoint is not None else 0
         tasks = self.runtime.tasks or {}
 
-        return {
+        status_info = {
             "status": self.runtime.status,
             "host": self.runtime.host,
             "port": self.runtime.port,
@@ -523,7 +716,19 @@ class ACSIServer:
             "connectedClients": connected,
             "tasks": {k: (not v.done()) for k, v in tasks.items()},
             "accessPoints": [self.runtime.cp or "cp1"],
+            # Model versioning information
+            "modelVersion": self.runtime.model_version,
+            "modelReloadInProgress": self.runtime.model_reload_in_progress,
+            "pendingModel": self.runtime.pending_model is not None,
+            "modelName": self.runtime.model_ied_name,
+            "modelSource": self.runtime.model_source,
         }
+        
+        # Add model reload progress if in reloading state
+        if self.runtime.status == "reloading":
+            status_info["reloadProgress"] = "swapping_server_instances"
+        
+        return status_info
 
     def get_actions(self) -> List[Dict[str, Any]]:
         """Get logged actions."""
@@ -544,3 +749,63 @@ class ACSIServer:
         """Clear message log."""
         with self.runtime.lock:
             self.runtime.messages.clear()
+
+    def reload_model_dynamically(self) -> bool:
+        """Reload the model from model.py file and apply it to the running server.
+        
+        This method loads the current model from the model.py file and performs
+        a hot-swap if the server is running.
+        
+        Returns:
+            bool: True if model was reloaded successfully, False otherwise
+        
+        Raises:
+            RuntimeError: If model file doesn't exist or model loading fails
+        """
+        if not self.model_file.exists():
+            raise RuntimeError(f"Model file not found: {self.model_file}")
+        
+        try:
+            # Load the current model from file
+            ied_model = self.load_current_runtime_model()
+            
+            # Update runtime state with new model
+            with self.runtime.model_lock:
+                self.runtime.model_version += 1
+                self.runtime.pending_model = ied_model
+                self.runtime.model_source = str(self.model_file)
+                self.runtime.model_ied_name = ied_model.name
+                self.runtime.ied_model = ied_model
+            
+            # Apply hot-swap if server is running
+            if self.runtime.status == "listening":
+                return self._apply_model_hot_swap()
+            else:
+                # Server not running, just update the model
+                with self.runtime.model_lock:
+                    self.runtime.pending_model = None
+                self._log_action(
+                    "Model reloaded (server not running)",
+                    detail={"source": str(self.model_file), "ied": ied_model.name}
+                )
+                return True
+                
+        except Exception as exc:
+            self._log_action(f"Dynamic model reload failed: {exc}", "error")
+            raise RuntimeError(f"Failed to reload model: {exc}")
+
+    def get_model_version_info(self) -> Dict[str, Any]:
+        """Get information about current and pending models.
+        
+        Returns:
+            dict: Model versioning information
+        """
+        with self.runtime.model_lock:
+            return {
+                "currentModelVersion": self.runtime.model_version,
+                "currentModelName": self.runtime.model_ied_name,
+                "currentModelSource": self.runtime.model_source,
+                "pendingModelAvailable": self.runtime.pending_model is not None,
+                "pendingModelName": self.runtime.pending_model.name if self.runtime.pending_model else None,
+                "reloadInProgress": self.runtime.model_reload_in_progress,
+            }

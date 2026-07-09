@@ -13,7 +13,7 @@ from acsi_server import ACSIServer
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
 import os
 from typing import Any, Dict
-from fastapi import FastAPI, APIRouter, Request, HTTPException, status
+from fastapi import FastAPI, APIRouter, Request, HTTPException, status, UploadFile, File
 from fastapi.responses import JSONResponse, RedirectResponse
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
@@ -549,11 +549,12 @@ def create_bff_router(
     @router.post(
         "/update-iedmodel",
         summary="Update IED Model",
-        description="Updates the model.py file in the ACSI-Server directory and reloads the IED model. The server must be stopped before updating the model.",
+        description="Updates the model.py file in the ACSI-Server directory and reloads the IED model. Supports dynamic hot-swap while server is running.",
         response_description="Model update confirmation",
         responses={
             200: {"description": "Model updated successfully"},
-            400: {"description": "Invalid request or server is running"},
+            202: {"description": "Model update accepted, hot-swap in progress"},
+            400: {"description": "Invalid request"},
             500: {"description": "Error updating model"}
         },
         tags=["Model"]
@@ -561,7 +562,9 @@ def create_bff_router(
     def api_update_iedmodel(request: UpdateIedmodelRequest):
         """Update model.py in fsp directory and reload IED model.
 
-        **Note**: The server must be stopped before updating the model.
+        Supports dynamic model updates while the server is running (hot-swap).
+        The new model will be applied immediately if the server is running,
+        or loaded when the server starts.
 
         Request Body:
             UpdateIedmodelRequest: { "modelPy": str }
@@ -570,21 +573,13 @@ def create_bff_router(
             dict: {
                 "ok": True,
                 "source": str,  # Path to the updated model file
-                "ied": str      # Name of the IED model
+                "ied": str,     # Name of the IED model
+                "modelVersion": int,  # New model version number
+                "dynamicReload": bool, # Whether hot-swap was performed
+                "status": str   # "loaded" or "reloading"
             }
-
-        Raises:
-            HTTPException 400: If modelPy is missing or empty, or server is running
-            HTTPException 400: If model update fails
         """
         try:
-            with server.runtime.lock:
-                if server.runtime.status in ("starting", "listening", "stopping"):
-                    return JSONResponse(
-                        content={"ok": False, "error": "Stop server before updating model.py."},
-                        status_code=500
-                    )
-
             model_py = request.modelPy
 
             if not isinstance(model_py, str) or not model_py.strip():
@@ -593,18 +588,138 @@ def create_bff_router(
                     status_code=400
                 )
 
-            ied_model = server.update_model_file(model_py)
+            # Check server status
+            server_status = server.get_status()
+            is_running = server_status.get("status") == "listening"
+
+            # Always apply dynamically if server is running
+            ied_model = server.update_model_file(model_py, apply_dynamically=True)
+
             server._log_action(
                 "IED model updated",
-                detail={"source": str(server.model_file), "ied": ied_model.name},
+                detail={
+                    "source": str(server.model_file),
+                    "ied": ied_model.name,
+                    "dynamic": is_running,
+                    "version": server.runtime.model_version
+                },
             )
-            return {
-                "ok": True,
-                "source": str(server.model_file),
-                "ied": ied_model.name,
-            }
+
+            # Check if hot-swap is in progress
+            if is_running and server.runtime.model_reload_in_progress:
+                return JSONResponse(
+                    content={
+                        "ok": True,
+                        "source": str(server.model_file),
+                        "ied": ied_model.name,
+                        "modelVersion": server.runtime.model_version,
+                        "dynamicReload": True,
+                        "status": "reloading"
+                    },
+                    status_code=202  # Accepted - hot-swap in progress
+                )
+            else:
+                return {
+                    "ok": True,
+                    "source": str(server.model_file),
+                    "ied": ied_model.name,
+                    "modelVersion": server.runtime.model_version,
+                    "dynamicReload": is_running,
+                    "status": "loaded"
+                }
+
         except Exception as exc:
             server._log_action(f"IED model update failed: {exc}", "error")
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=400
+            )
+
+    @router.post(
+        "/update-iedmodel-file",
+        summary="Update IED Model from File",
+        description="Upload a model.py file directly. Supports dynamic hot-swap while server is running.",
+        response_description="Model update confirmation",
+        responses={
+            200: {"description": "Model updated successfully"},
+            202: {"description": "Model update accepted, hot-swap in progress"},
+            400: {"description": "Invalid request"},
+            500: {"description": "Error updating model"}
+        },
+        tags=["Model"]
+    )
+    async def api_update_iedmodel_file(file: UploadFile = File(...)):
+        """Upload model.py file directly for update.
+
+        Accepts multipart/form-data with a 'file' field containing the model.py content.
+        Supports the same hot-swap behavior as the JSON endpoint.
+
+        Args:
+            file: UploadFile - The model.py file to upload
+
+        Returns:
+            dict: {
+                "ok": True,
+                "source": str,  # Path to the updated model file
+                "ied": str,     # Name of the IED model
+                "modelVersion": int,  # New model version number
+                "dynamicReload": bool, # Whether hot-swap was performed
+                "status": str   # "loaded" or "reloading"
+            }
+        """
+        try:
+            # Read file content as string
+            model_py = await file.read()
+            model_py = model_py.decode('utf-8')
+
+            if not model_py.strip():
+                return JSONResponse(
+                    content={"ok": False, "error": "Uploaded file is empty."},
+                    status_code=400
+                )
+
+            # Reuse existing logic
+            server_status = server.get_status()
+            is_running = server_status.get("status") == "listening"
+
+            ied_model = server.update_model_file(model_py, apply_dynamically=True)
+
+            server._log_action(
+                "IED model updated from file",
+                detail={
+                    "source": str(server.model_file),
+                    "ied": ied_model.name,
+                    "dynamic": is_running,
+                    "version": server.runtime.model_version,
+                    "filename": file.filename
+                },
+            )
+
+            # Check if hot-swap is in progress
+            if is_running and server.runtime.model_reload_in_progress:
+                return JSONResponse(
+                    content={
+                        "ok": True,
+                        "source": str(server.model_file),
+                        "ied": ied_model.name,
+                        "modelVersion": server.runtime.model_version,
+                        "dynamicReload": True,
+                        "status": "reloading"
+                    },
+                    status_code=202  # Accepted - hot-swap in progress
+                )
+            else:
+                return {
+                    "ok": True,
+                    "source": str(server.model_file),
+                    "ied": ied_model.name,
+                    "modelVersion": server.runtime.model_version,
+                    "dynamicReload": is_running,
+                    "status": "loaded"
+                }
+
+        except Exception as exc:
+            server._log_action(f"IED model file update failed: {exc}", "error")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
                 status_code=400
