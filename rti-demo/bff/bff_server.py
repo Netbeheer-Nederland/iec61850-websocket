@@ -472,8 +472,7 @@ class ConnectionManager:
                 if response.status_code < 500
                 else "disconnected"
             )
-        except httpx.RequestError as e:
-            logger.warning(f"Health check failed for {con}: {e}")
+        except httpx.RequestError:
             con["status"] = "disconnected"
 
     async def get_all_connections_with_status(self):
@@ -1085,7 +1084,10 @@ async def create_connection(request: ConnectionCreateRequest):
     )
     conn_manager.save_connections()
 
-    
+    # Immediately probe the connection so its status is fresh right away instead
+    # of showing "checking" until the background monitor runs.
+    await conn_manager.check_connection(connection, conn_manager.get_client())
+
     return JSONResponse(content=connection, status_code=status.HTTP_201_CREATED)
 
 

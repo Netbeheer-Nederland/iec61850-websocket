@@ -735,7 +735,9 @@ class RTIDemoApp {
             this.loadConnections();
             this.addDiagnosticMessage(`Connection '${connection.name}' saved`, 'success');
             this.renderConnectionsTable();
-            this.renderEndpoints();
+            // Re-fetch endpoints from the BFF so the dashboard cards reflect the
+            // edit immediately, instead of re-rendering stale in-memory data.
+            await this.loadEndpoints();
         }
     }
 
