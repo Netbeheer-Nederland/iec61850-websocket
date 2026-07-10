@@ -31,6 +31,10 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from bffClient import BffClient
 
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
+
+
 # Global state
 _bff_clients: Dict[str, BffClient] = {}
 
@@ -50,7 +54,7 @@ try:
 except ImportError:
     logger.warning("Docker Python SDK not available. Container auto-discovery disabled.")
 
-CONNECTIONS_FILE = 'connections.json'
+CONNECTIONS_FILE = '/app/connections.json'
 STATS_FILE = 'stats.json'
 DISCOVERED_FILE = 'discovered_endpoints.json'
 
@@ -315,6 +319,7 @@ class ConnectionManager:
     
     def __init__(self) -> None:
         self.connections: List[Dict] = self.load_connections()
+        self.status_task = None
     
     def load_connections(self) -> List[Dict]:
         """Load connections from file."""
@@ -350,10 +355,17 @@ class ConnectionManager:
         """
         # Check if connection already exists
         existing = next((c for c in self.connections 
-                        if c['host'] == host and c['port'] == port), None)
+                        if c['host'] == host and c['port'] == port and c['name'] == name), None)
         if existing:
             logger.warning(f"Connection already exists: {host}:{port}")
             return existing
+
+        connection_in_file = next((c for c in self.connections
+                         if c['name'] == name), None)
+        if connection_in_file:
+            connection_in_file['host'] = host
+            connection_in_file['port'] = port
+            return connection_in_file
         
         connection = {
             'id': len(self.connections) + 1,
@@ -361,7 +373,6 @@ class ConnectionManager:
             'host': host,
             'port': port,
             'type': conn_type,
-            'status': 'disconnected',
             'auto_discovered': auto_discovered,
             'created_at': datetime.now().isoformat()
         }
@@ -426,6 +437,23 @@ class ConnectionManager:
                 )
                 registered += 1
         return registered
+
+    def check_connection(self, con):
+        try:
+            response = requests.get(
+                f"http://{con['host']}:{con['port']}",
+                timeout=1
+            )
+            con["status"] = "connected" if response.status_code < 500 else "disconnected"
+        except requests.RequestException:
+            con["status"] = "disconnected"
+
+    async def get_all_connections_with_status(self):
+        max_workers = min(32, len(conn_manager.connections))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            list(executor.map(self.check_connection, conn_manager.connections))
+
+        return self.connections
 
 
 # ==================== Data Management ====================
@@ -802,6 +830,19 @@ async def get_endpoints():
         discovery.discover_services()
         _register_bff_clients(discovery.discovered_services)
 
+    for con in conn_manager.connections:
+        status = 'disconnected'
+        try:
+            response = requests.get(
+                f"http://{con['host']}:{con['port']}",
+                timeout=1
+            )
+            if response.status_code < 500:
+                status = 'connected'
+        except Exception:
+            status = 'disconnected'
+        con["status"] = status
+
     endpoints = list(conn_manager.connections)
     discovered = dict(discovery.discovered_services)
 
@@ -950,6 +991,32 @@ async def trigger_network_discovery(request: DiscoveryRequest):
 
 # -------------------- Connections Management --------------------
 
+@app.get(
+    "/api/connections",
+    summary="Get All Connections",
+    description="Get all configured connections to remote endpoints.",
+    response_description="List of all connections",
+    responses={
+        200: {"description": "Connections retrieved successfully"}
+    },
+    tags=["Connections"]
+)
+async def get_connections():
+    """Retrieve all configured connections.
+
+    Returns:
+        JSON with list of connections and their count.
+    """
+    if conn_manager.status_task is None or conn_manager.status_task.done():
+        conn_manager.status_task = asyncio.create_task(
+            conn_manager.get_all_connections_with_status()
+        )
+
+    return {
+        "connections": conn_manager.connections,
+        "count": len(conn_manager.connections)
+    }
+
 @app.post(
     "/api/connections",
     summary="Create Connection",
@@ -973,6 +1040,11 @@ async def create_connection(request: ConnectionCreateRequest):
     Raises:
         HTTPException 400: If required fields are missing.
     """
+    if not request.name or not request.host or not request.port or not request.type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Missing required fields: name, host, port, type'
+        )
     connection = conn_manager.add_connection(
         name=request.name,
         host=request.host,
@@ -980,6 +1052,8 @@ async def create_connection(request: ConnectionCreateRequest):
         conn_type=request.type,
         auto_discovered=request.auto_discovered
     )
+    conn_manager.save_connections()
+
     
     return JSONResponse(content=connection, status_code=status.HTTP_201_CREATED)
 
