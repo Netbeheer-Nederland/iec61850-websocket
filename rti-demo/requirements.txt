@@ -6,3 +6,4 @@ docker==6.1.0
 python-dotenv==1.0.0
 fastapi
 uvicorn
+httpx

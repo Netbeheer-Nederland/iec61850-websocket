@@ -79,7 +79,7 @@ class RTIDemoApp {
 
         // Header
         document.getElementById('refresh-btn').addEventListener('click', () => this.handleManualRefresh());
-        document.getElementById('discovery-btn').addEventListener('click', () => this.discoverEndpoints());
+        document.getElementById('refresh-endpoints-btn').addEventListener('click', () => this.discoverEndpoints());
 
         // Modal
         document.querySelector('.btn-close').addEventListener('click', () => this.closeConnectionModal());
@@ -320,7 +320,10 @@ class RTIDemoApp {
     // =============================================
 
     async refreshDashboard() {
-        this.renderEndpoints();
+        // Fetch the latest endpoints from the BFF (which also renders them).
+        // Previously this only re-rendered stale in-memory data, so on first
+        // load the cards were empty until another code path called loadEndpoints.
+        await this.loadEndpoints();
     }
 
     async handleManualRefresh() {
@@ -354,19 +357,20 @@ class RTIDemoApp {
             return;
         }
 
-        const result = await this.callBFF('/api/endpoints/discover-network', 'POST', {
-            host: this.scanHost,
-            ports,
-        });
+        await this.loadEndpoints();
+        //const result = await this.callBFF('/api/endpoints/discover-network', 'POST', {
+        //    host: this.scanHost,
+        //    ports,
+        //});
         
-        if (result) {
-            this.addDiagnosticMessage(
-                `Discovery complete: Found ${result.count} endpoint(s)`,
-                'success'
-            );
+        //if (result) {
+        //    this.addDiagnosticMessage(
+        //        `Discovery complete: Found ${result.count} endpoint(s)`,
+        //        'success'
+        //    );
             // Reload endpoints to show any newly discovered ones
-            await this.loadEndpoints();
-        }
+        //    await this.loadEndpoints();
+        //}
     }
 
     async loadEndpoints() {
@@ -374,6 +378,9 @@ class RTIDemoApp {
             this.addDiagnosticMessage('Skipping /api/endpoints: BFF is not connected.', 'warning');
             return;
         }
+
+        // Show a loading indicator while the endpoints are being fetched.
+        this.showEndpointsLoading();
 
         const result = await this.callBFF('/api/endpoints');
         
@@ -397,6 +404,18 @@ class RTIDemoApp {
         
         this.renderEndpoints();
     }
+    showEndpointsLoading() {
+        const container = document.getElementById('endpoints-container');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="endpoints-loading">
+                <span class="spinner"></span>
+                <span>Loading connections...</span>
+            </div>
+        `;
+    }
+
 
     renderEndpoints() {
         const container = document.getElementById('endpoints-container');
@@ -406,7 +425,7 @@ class RTIDemoApp {
             container.innerHTML = `
                 <div style="padding: 20px; text-align: center; color: var(--text-muted);">
                     <p>No endpoints configured or discovered</p>
-                    <button class="btn-primary" id="btn-discover-now" style="margin-top: 10px;">
+                    <button class="btn-primary" id="btn-discover-now" style="margin-top: 10px;" hidden>
                         <i class="fas fa-search"></i>
                         Search for Endpoints
                     </button>
@@ -586,9 +605,21 @@ class RTIDemoApp {
         }
     }
 
+    showConnectionsLoading() {
+        const tbody = document.getElementById('connections-container');
 
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align:center;">
+                    <span class="spinner"></span>
+                    Loading connections...
+                </td>
+            </tr>
+        `;
+    }
 
     async loadConnections() {
+        this.showConnectionsLoading();
         const result = await this.callBFF('/api/connections');
         
         if (!result) {
@@ -706,6 +737,9 @@ class RTIDemoApp {
             this.loadConnections();
             this.addDiagnosticMessage(`Connection '${connection.name}' saved`, 'success');
             this.renderConnectionsTable();
+            // Re-fetch endpoints from the BFF so the dashboard cards reflect the
+            // edit immediately, instead of re-rendering stale in-memory data.
+            await this.loadEndpoints();
         }
     }
 
@@ -715,6 +749,7 @@ class RTIDemoApp {
             if (result) {
                 this.loadConnections();
                 this.addDiagnosticMessage('Connection deleted', 'success');
+                this.loadEndpoints();
             }
         }
     }

@@ -67,7 +67,7 @@
                     <button class="btn-icon" id="discovery-btn" title="Discover Endpoints" hidden>
                         <i class="fas fa-magnifying-glass"></i>
                     </button>
-                    <button class="btn-icon" id="refresh-btn" title="Refresh">
+                    <button class="btn-icon" id="refresh-btn" title="Refresh" hidden>
                         <i class="fas fa-sync-alt"></i>
                     </button>
                     <button class="btn-icon" id="notification-btn" title="Notifications" hidden>
@@ -85,6 +85,11 @@
                         <div class="bff-connection-indicator" aria-live="polite">
                             <span class="bff-status-dot" id="bff-status-dot"></span>
                             <span class="bff-status-text" id="bff-status-text">BFF disconnected</span>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+                            <button class="btn-icon" id="refresh-endpoints-btn" title="Refresh" >
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
                         </div>
                         <h2>Active Endpoints</h2>
                         <div class="cards-grid" id="endpoints-container">

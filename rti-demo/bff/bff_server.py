@@ -33,7 +33,7 @@ from bffClient import BffClient
 
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
-
+import httpx
 
 # Global state
 _bff_clients: Dict[str, BffClient] = {}
@@ -320,7 +320,31 @@ class ConnectionManager:
     def __init__(self) -> None:
         self.connections: List[Dict] = self.load_connections()
         self.status_task = None
-    
+        # Reusable HTTP client (connection pooling + keep-alive) for health checks.
+        self._client: Optional[httpx.AsyncClient] = None
+        # Give every connection an initial status so the UI can render instantly.
+        for con in self.connections:
+            con.setdefault("status", "checking")
+
+    def get_client(self) -> httpx.AsyncClient:
+        """Return a shared AsyncClient, creating it lazily."""
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=0.5)
+        return self._client
+
+    async def aclose(self) -> None:
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
+
+    async def status_monitor(self, interval=10):
+        # Run an immediate check so cards populate on startup instead of
+        # waiting for the first interval to elapse.
+        await self.get_all_connections_with_status()
+        while True:
+            await asyncio.sleep(interval)
+            await self.get_all_connections_with_status()
+
     def load_connections(self) -> List[Dict]:
         """Load connections from file."""
         if os.path.exists(CONNECTIONS_FILE):
@@ -438,21 +462,24 @@ class ConnectionManager:
                 registered += 1
         return registered
 
-    def check_connection(self, con):
+    async def check_connection(self, con, client):
         try:
-            response = requests.get(
+            response = await client.get(
                 f"http://{con['host']}:{con['port']}",
-                timeout=1
             )
-            con["status"] = "connected" if response.status_code < 500 else "disconnected"
-        except requests.RequestException:
+            con["status"] = (
+                "connected"
+                if response.status_code < 500
+                else "disconnected"
+            )
+        except httpx.RequestError:
             con["status"] = "disconnected"
 
     async def get_all_connections_with_status(self):
-        max_workers = min(32, len(conn_manager.connections))
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            list(executor.map(self.check_connection, conn_manager.connections))
-
+        client = self.get_client()
+        await asyncio.gather(
+            *(self.check_connection(con, client) for con in self.connections)
+        )
         return self.connections
 
 
@@ -692,6 +719,19 @@ def _fetch_endpoint_properties(endpoint: Dict) -> Dict:
 
 
 # ==================== FastAPI Application Setup ====================
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    asyncio.create_task(
+        conn_manager.status_monitor(interval=10)
+    )
+
+    yield
+
+    # Close the shared health-check client on shutdown.
+    await conn_manager.aclose()
+
 
 # Create FastAPI application
 app = FastAPI(
@@ -701,6 +741,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
     openapi_tags=[
         {
             "name": "Health",
@@ -830,19 +871,8 @@ async def get_endpoints():
         discovery.discover_services()
         _register_bff_clients(discovery.discovered_services)
 
-    for con in conn_manager.connections:
-        status = 'disconnected'
-        try:
-            response = requests.get(
-                f"http://{con['host']}:{con['port']}",
-                timeout=1
-            )
-            if response.status_code < 500:
-                status = 'connected'
-        except Exception:
-            status = 'disconnected'
-        con["status"] = status
-
+    # Use statuses already kept fresh by the background status_monitor instead
+    # of blocking this request on a live health-check scan.
     endpoints = list(conn_manager.connections)
     discovered = dict(discovery.discovered_services)
 
@@ -852,9 +882,13 @@ async def get_endpoints():
         if not exists:
             endpoints.append(service_info)
 
-    # Enrich every endpoint with its own server/client properties payload when reachable.
-    for endpoint in endpoints:
-        endpoint['properties_info'] = _fetch_endpoint_properties(endpoint)
+    # Enrich every endpoint with its properties payload in parallel, off the
+    # event loop (the underlying call uses blocking `requests`).
+    properties = await asyncio.gather(
+        *(asyncio.to_thread(_fetch_endpoint_properties, endpoint) for endpoint in endpoints)
+    )
+    for endpoint, props in zip(endpoints, properties):
+        endpoint['properties_info'] = props
 
     return {
         'endpoints': endpoints,
@@ -1007,10 +1041,6 @@ async def get_connections():
     Returns:
         JSON with list of connections and their count.
     """
-    if conn_manager.status_task is None or conn_manager.status_task.done():
-        conn_manager.status_task = asyncio.create_task(
-            conn_manager.get_all_connections_with_status()
-        )
 
     return {
         "connections": conn_manager.connections,
@@ -1054,7 +1084,10 @@ async def create_connection(request: ConnectionCreateRequest):
     )
     conn_manager.save_connections()
 
-    
+    # Immediately probe the connection so its status is fresh right away instead
+    # of showing "checking" until the background monitor runs.
+    await conn_manager.check_connection(connection, conn_manager.get_client())
+
     return JSONResponse(content=connection, status_code=status.HTTP_201_CREATED)
 
 
