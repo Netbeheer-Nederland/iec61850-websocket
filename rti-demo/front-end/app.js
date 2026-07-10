@@ -320,8 +320,10 @@ class RTIDemoApp {
     // =============================================
 
     async refreshDashboard() {
-        this.showEndpointsLoading()
-        this.renderEndpoints();
+        // Fetch the latest endpoints from the BFF (which also renders them).
+        // Previously this only re-rendered stale in-memory data, so on first
+        // load the cards were empty until another code path called loadEndpoints.
+        await this.loadEndpoints();
     }
 
     async handleManualRefresh() {
