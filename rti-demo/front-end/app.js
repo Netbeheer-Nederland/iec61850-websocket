@@ -735,6 +735,7 @@ class RTIDemoApp {
             this.loadConnections();
             this.addDiagnosticMessage(`Connection '${connection.name}' saved`, 'success');
             this.renderConnectionsTable();
+            this.renderEndpoints();
         }
     }
 
@@ -744,6 +745,7 @@ class RTIDemoApp {
             if (result) {
                 this.loadConnections();
                 this.addDiagnosticMessage('Connection deleted', 'success');
+                this.loadEndpoints();
             }
         }
     }
