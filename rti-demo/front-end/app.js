@@ -320,6 +320,7 @@ class RTIDemoApp {
     // =============================================
 
     async refreshDashboard() {
+        this.showEndpointsLoading()
         this.renderEndpoints();
     }
 
@@ -376,6 +377,9 @@ class RTIDemoApp {
             return;
         }
 
+        // Show a loading indicator while the endpoints are being fetched.
+        this.showEndpointsLoading();
+
         const result = await this.callBFF('/api/endpoints');
         
         if (!result) {
@@ -398,6 +402,18 @@ class RTIDemoApp {
         
         this.renderEndpoints();
     }
+    showEndpointsLoading() {
+        const container = document.getElementById('endpoints-container');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="endpoints-loading">
+                <span class="spinner"></span>
+                <span>Loading connections...</span>
+            </div>
+        `;
+    }
+
 
     renderEndpoints() {
         const container = document.getElementById('endpoints-container');
@@ -587,9 +603,21 @@ class RTIDemoApp {
         }
     }
 
+    showConnectionsLoading() {
+        const tbody = document.getElementById('connections-container');
 
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align:center;">
+                    <span class="spinner"></span>
+                    Loading connections...
+                </td>
+            </tr>
+        `;
+    }
 
     async loadConnections() {
+        this.showConnectionsLoading();
         const result = await this.callBFF('/api/connections');
         
         if (!result) {

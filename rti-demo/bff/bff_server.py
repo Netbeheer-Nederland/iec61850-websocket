@@ -320,12 +320,31 @@ class ConnectionManager:
     def __init__(self) -> None:
         self.connections: List[Dict] = self.load_connections()
         self.status_task = None
+        # Reusable HTTP client (connection pooling + keep-alive) for health checks.
+        self._client: Optional[httpx.AsyncClient] = None
+        # Give every connection an initial status so the UI can render instantly.
+        for con in self.connections:
+            con.setdefault("status", "checking")
+
+    def get_client(self) -> httpx.AsyncClient:
+        """Return a shared AsyncClient, creating it lazily."""
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=0.5)
+        return self._client
+
+    async def aclose(self) -> None:
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
 
     async def status_monitor(self, interval=10):
+        # Run an immediate check so cards populate on startup instead of
+        # waiting for the first interval to elapse.
+        await self.get_all_connections_with_status()
         while True:
-            await self.get_all_connections_with_status()
             await asyncio.sleep(interval)
-    
+            await self.get_all_connections_with_status()
+
     def load_connections(self) -> List[Dict]:
         """Load connections from file."""
         if os.path.exists(CONNECTIONS_FILE):
@@ -447,7 +466,6 @@ class ConnectionManager:
         try:
             response = await client.get(
                 f"http://{con['host']}:{con['port']}",
-                timeout=1.0,
             )
             con["status"] = (
                 "connected"
@@ -459,11 +477,10 @@ class ConnectionManager:
             con["status"] = "disconnected"
 
     async def get_all_connections_with_status(self):
-        async with httpx.AsyncClient() as client:
-            await asyncio.gather(
-                *(self.check_connection(con, client) for con in self.connections)
-            )
-
+        client = self.get_client()
+        await asyncio.gather(
+            *(self.check_connection(con, client) for con in self.connections)
+        )
         return self.connections
 
 
@@ -713,6 +730,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # Close the shared health-check client on shutdown.
+    await conn_manager.aclose()
 
 
 # Create FastAPI application
@@ -853,7 +872,9 @@ async def get_endpoints():
         discovery.discover_services()
         _register_bff_clients(discovery.discovered_services)
 
-    endpoints = await conn_manager.get_all_connections_with_status()
+    # Use statuses already kept fresh by the background status_monitor instead
+    # of blocking this request on a live health-check scan.
+    endpoints = list(conn_manager.connections)
     discovered = dict(discovery.discovered_services)
 
     # Add discovered services not already present in manual connections.
@@ -862,9 +883,13 @@ async def get_endpoints():
         if not exists:
             endpoints.append(service_info)
 
-    # Enrich every endpoint with its own server/client properties payload when reachable.
-    for endpoint in endpoints:
-        endpoint['properties_info'] = _fetch_endpoint_properties(endpoint)
+    # Enrich every endpoint with its properties payload in parallel, off the
+    # event loop (the underlying call uses blocking `requests`).
+    properties = await asyncio.gather(
+        *(asyncio.to_thread(_fetch_endpoint_properties, endpoint) for endpoint in endpoints)
+    )
+    for endpoint, props in zip(endpoints, properties):
+        endpoint['properties_info'] = props
 
     return {
         'endpoints': endpoints,
