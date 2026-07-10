@@ -33,7 +33,7 @@ from bffClient import BffClient
 
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
-
+import httpx
 
 # Global state
 _bff_clients: Dict[str, BffClient] = {}
@@ -320,6 +320,11 @@ class ConnectionManager:
     def __init__(self) -> None:
         self.connections: List[Dict] = self.load_connections()
         self.status_task = None
+
+    async def status_monitor(self, interval=10):
+        while True:
+            await self.get_all_connections_with_status()
+            await asyncio.sleep(interval)
     
     def load_connections(self) -> List[Dict]:
         """Load connections from file."""
@@ -438,20 +443,26 @@ class ConnectionManager:
                 registered += 1
         return registered
 
-    def check_connection(self, con):
+    async def check_connection(self, con, client):
         try:
-            response = requests.get(
+            response = await client.get(
                 f"http://{con['host']}:{con['port']}",
-                timeout=1
+                timeout=1.0,
             )
-            con["status"] = "connected" if response.status_code < 500 else "disconnected"
-        except requests.RequestException:
+            con["status"] = (
+                "connected"
+                if response.status_code < 500
+                else "disconnected"
+            )
+        except httpx.RequestError as e:
+            logger.warning(f"Health check failed for {con}: {e}")
             con["status"] = "disconnected"
 
     async def get_all_connections_with_status(self):
-        max_workers = min(32, len(conn_manager.connections))
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            list(executor.map(self.check_connection, conn_manager.connections))
+        async with httpx.AsyncClient() as client:
+            await asyncio.gather(
+                *(self.check_connection(con, client) for con in self.connections)
+            )
 
         return self.connections
 
@@ -692,6 +703,17 @@ def _fetch_endpoint_properties(endpoint: Dict) -> Dict:
 
 
 # ==================== FastAPI Application Setup ====================
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    asyncio.create_task(
+        conn_manager.status_monitor(interval=10)
+    )
+
+    yield
+
+
 
 # Create FastAPI application
 app = FastAPI(
@@ -701,6 +723,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
     openapi_tags=[
         {
             "name": "Health",
@@ -830,20 +853,7 @@ async def get_endpoints():
         discovery.discover_services()
         _register_bff_clients(discovery.discovered_services)
 
-    for con in conn_manager.connections:
-        status = 'disconnected'
-        try:
-            response = requests.get(
-                f"http://{con['host']}:{con['port']}",
-                timeout=1
-            )
-            if response.status_code < 500:
-                status = 'connected'
-        except Exception:
-            status = 'disconnected'
-        con["status"] = status
-
-    endpoints = list(conn_manager.connections)
+    endpoints = await conn_manager.get_all_connections_with_status()
     discovered = dict(discovery.discovered_services)
 
     # Add discovered services not already present in manual connections.
@@ -1007,10 +1017,6 @@ async def get_connections():
     Returns:
         JSON with list of connections and their count.
     """
-    if conn_manager.status_task is None or conn_manager.status_task.done():
-        conn_manager.status_task = asyncio.create_task(
-            conn_manager.get_all_connections_with_status()
-        )
 
     return {
         "connections": conn_manager.connections,

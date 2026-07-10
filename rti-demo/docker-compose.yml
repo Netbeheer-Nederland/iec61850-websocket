@@ -158,11 +158,11 @@ services:
         - ./so:/app/so
 
   # RTI WS Client (Acsi-Client)
-  rti-ActiveWebSocket:
+  rti-active-websocket:
     build:
       context: ..
       dockerfile: rti-demo/acsi_ws_client/Dockerfile
-    container_name: rti-ActiveWebSocket
+    container_name: rti-active-websocket
     ports:
       - "5003:5003"
       - "8766:8765"    # WebSocket port - MUST ADD
@@ -178,19 +178,19 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      - "rti.service=rti-ActiveWebSocket"
+      - "rti.service=rti-active-websocket"
       - "rti.type=RTI-SO"
-      - "rti.host=rti-ActiveWebSocket"
+      - "rti.host=rti-active-websocket"
       - "rti.port=5003"
     volumes:
       - ./acsi_ws_client:/app/acsi_ws_client
 
   # RTI WS Server (Acsi-Server)
-  rti-PassiveWebSocket:
+  rti-passive-websocket:
     build:
       context: ..
       dockerfile: rti-demo/acsi_ws_server/Dockerfile
-    container_name: rti-PassiveWebSocket
+    container_name: rti-passive-websocket
     ports:
       - "5004:5004"
     environment:
@@ -205,9 +205,9 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      - "rti.service=rti-PassiveWebSocket"
+      - "rti.service=rti-passive-websocket"
       - "rti.type=RTI"
-      - "rti.host=rti--PassiveWebSocket"
+      - "rti.host=rti-passive-websocket"
       - "rti.port=5004"
     volumes:
         - ./acsi_ws_server:/app/acsi_ws_server

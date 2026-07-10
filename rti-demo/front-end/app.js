@@ -79,7 +79,7 @@ class RTIDemoApp {
 
         // Header
         document.getElementById('refresh-btn').addEventListener('click', () => this.handleManualRefresh());
-        document.getElementById('discovery-btn').addEventListener('click', () => this.discoverEndpoints());
+        document.getElementById('refresh-endpoints-btn').addEventListener('click', () => this.discoverEndpoints());
 
         // Modal
         document.querySelector('.btn-close').addEventListener('click', () => this.closeConnectionModal());
@@ -407,7 +407,7 @@ class RTIDemoApp {
             container.innerHTML = `
                 <div style="padding: 20px; text-align: center; color: var(--text-muted);">
                     <p>No endpoints configured or discovered</p>
-                    <button class="btn-primary" id="btn-discover-now" style="margin-top: 10px;">
+                    <button class="btn-primary" id="btn-discover-now" style="margin-top: 10px;" hidden>
                         <i class="fas fa-search"></i>
                         Search for Endpoints
                     </button>
