@@ -123,7 +123,15 @@ class PassiveEndpoint:
     # ------------------------------------------------------------------
     # Public interface (EndpointProtocol)
     # ------------------------------------------------------------------
-
+    def get_websocket_info(self, iec61850_client) -> WebSocketInfo | None:
+        return next(
+            (
+                ws_info
+                for ws_info in self.websocket_info_list
+                if ws_info.websocket.request.path.lstrip("/") == iec61850_client.cp
+            ),
+            None,
+        )
     def add_iec61850_client(self, client) -> None:
         self.client_list.append(client)
         if self.send_msg_callback is not None:
