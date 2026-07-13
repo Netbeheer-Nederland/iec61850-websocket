@@ -306,10 +306,10 @@ class ServiceDiscovery:
 
 
 # Initialize service discovery
-discovery = ServiceDiscovery()
-discovery.discover_services()
-_register_bff_clients(discovery.discovered_services)
-discovery.start_periodic_discovery()
+#discovery = ServiceDiscovery()
+#discovery.discover_services()
+#_register_bff_clients(discovery.discovered_services)
+#discovery.start_periodic_discovery()
 
 
 # ==================== Connection Management ====================
@@ -874,13 +874,13 @@ async def get_endpoints():
     # Use statuses already kept fresh by the background status_monitor instead
     # of blocking this request on a live health-check scan.
     endpoints = list(conn_manager.connections)
-    discovered = dict(discovery.discovered_services)
+    #discovered = dict(discovery.discovered_services)
 
     # Add discovered services not already present in manual connections.
-    for service_info in discovered.values():
-        exists = any(e['host'] == service_info['host'] and e['port'] == service_info['port'] for e in endpoints)
-        if not exists:
-            endpoints.append(service_info)
+    #for service_info in discovered.values():
+    #    exists = any(e['host'] == service_info['host'] and e['port'] == service_info['port'] for e in endpoints)
+    #    if not exists:
+    #        endpoints.append(service_info)
 
     # Enrich every endpoint with its properties payload in parallel, off the
     # event loop (the underlying call uses blocking `requests`).
@@ -893,9 +893,9 @@ async def get_endpoints():
     return {
         'endpoints': endpoints,
         'count': len(endpoints),
-        'discovered_count': len(discovered),
-        'last_discovery': discovery.last_discovery,
-        'docker_enabled': discovery.docker_enabled
+        #'discovered_count': len(discovered),
+        #'last_discovery': discovery.last_discovery,
+        #'docker_enabled': discovery.docker_enabled
     }
 
 
@@ -915,16 +915,16 @@ async def get_discovered_endpoints():
     Returns:
         JSON with discovered endpoints, count, and last discovery timestamp.
     """
-    if discovery.docker_enabled:
-        discovery.discover_services()
-        _register_bff_clients(discovery.discovered_services)
+    #if discovery.docker_enabled:
+    #    discovery.discover_services()
+    #    _register_bff_clients(discovery.discovered_services)
 
-    discovered = dict(discovery.discovered_services)
-    return {
-        'discovered': discovered,
-        'count': len(discovered),
-        'last_discovery': discovery.last_discovery
-    }
+    #discovered = dict(discovery.discovered_services)
+    #return {
+    #    'discovered': discovered,
+    #    'count': len(discovered),
+    #    'last_discovery': discovery.last_discovery
+    #}
 
 
 @app.post(
@@ -949,24 +949,24 @@ async def trigger_discovery(request: DiscoveryRequest):
     Returns:
         JSON with discovery status, discovered services, and count.
     """
-    payload = request.model_dump()
-    discovered = discovery.discover_services()
-    _register_bff_clients(discovery.discovered_services)
+    #payload = request.model_dump()
+    #discovered = discovery.discover_services()
+    #_register_bff_clients(discovery.discovered_services)
 
     # Optionally scan using host/ports provided by HMI payload.
-    host, ports = _extract_scan_params(payload)
-    if host and ports:
-        network_discovered = discover_services_by_network(host, ports)
-        discovered.update(network_discovered)
+    #host, ports = _extract_scan_params(payload)
+    #if host and ports:
+    #    network_discovered = discover_services_by_network(host, ports)
+    #    discovered.update(network_discovered)
 
-    if discovered:
-        _upsert_discovered_cache(discovered)
+    #if discovered:
+    #    _upsert_discovered_cache(discovered)
 
-    return {
-        'status': 'success',
-        'discovered': discovered,
-        'count': len(discovered)
-    }
+    #return {
+    #    'status': 'success',
+    #    'discovered': discovered,
+    #    'count': len(discovered)
+    #}
 
 
 @app.post(
