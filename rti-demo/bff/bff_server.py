@@ -31,6 +31,10 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from bffClient import BffClient
 
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
+import httpx
+
 # Global state
 _bff_clients: Dict[str, BffClient] = {}
 
@@ -50,7 +54,7 @@ try:
 except ImportError:
     logger.warning("Docker Python SDK not available. Container auto-discovery disabled.")
 
-CONNECTIONS_FILE = 'connections.json'
+CONNECTIONS_FILE = '/app/connections.json'
 STATS_FILE = 'stats.json'
 DISCOVERED_FILE = 'discovered_endpoints.json'
 
@@ -302,10 +306,10 @@ class ServiceDiscovery:
 
 
 # Initialize service discovery
-discovery = ServiceDiscovery()
-discovery.discover_services()
-_register_bff_clients(discovery.discovered_services)
-discovery.start_periodic_discovery()
+#discovery = ServiceDiscovery()
+#discovery.discover_services()
+#_register_bff_clients(discovery.discovered_services)
+#discovery.start_periodic_discovery()
 
 
 # ==================== Connection Management ====================
@@ -315,7 +319,44 @@ class ConnectionManager:
     
     def __init__(self) -> None:
         self.connections: List[Dict] = self.load_connections()
-    
+        self.status_task = None
+        # Reusable HTTP client (connection pooling + keep-alive) for health checks.
+        self._client: Optional[httpx.AsyncClient] = None
+        # Give every connection an initial status so the UI can render instantly.
+        for con in self.connections:
+            con.setdefault("status", "checking")
+
+        self._register_connections_as_clients()
+
+    def _register_connections_as_clients(self) -> None:
+        """Register BFF clients for all current connections."""
+        for con in self.connections:
+            host = con.get('host')
+            port = con.get('port')
+            if host and port:
+                key = f"{host}:{port}"
+                if key not in _bff_clients:
+                    _bff_clients[key] = BffClient(f"http://{host}:{port}")
+
+    def get_client(self) -> httpx.AsyncClient:
+        """Return a shared AsyncClient, creating it lazily."""
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=0.5)
+        return self._client
+
+    async def aclose(self) -> None:
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
+
+    async def status_monitor(self, interval=10):
+        # Run an immediate check so cards populate on startup instead of
+        # waiting for the first interval to elapse.
+        await self.get_all_connections_with_status()
+        while True:
+            await asyncio.sleep(interval)
+            await self.get_all_connections_with_status()
+
     def load_connections(self) -> List[Dict]:
         """Load connections from file."""
         if os.path.exists(CONNECTIONS_FILE):
@@ -350,10 +391,17 @@ class ConnectionManager:
         """
         # Check if connection already exists
         existing = next((c for c in self.connections 
-                        if c['host'] == host and c['port'] == port), None)
+                        if c['host'] == host and c['port'] == port and c['name'] == name), None)
         if existing:
             logger.warning(f"Connection already exists: {host}:{port}")
             return existing
+
+        connection_in_file = next((c for c in self.connections
+                         if c['name'] == name), None)
+        if connection_in_file:
+            connection_in_file['host'] = host
+            connection_in_file['port'] = port
+            return connection_in_file
         
         connection = {
             'id': len(self.connections) + 1,
@@ -361,12 +409,16 @@ class ConnectionManager:
             'host': host,
             'port': port,
             'type': conn_type,
-            'status': 'disconnected',
             'auto_discovered': auto_discovered,
             'created_at': datetime.now().isoformat()
         }
         self.connections.append(connection)
         self.save_connections()
+
+        key = f"{host}:{port}"
+        if key not in _bff_clients:
+            _bff_clients[key] = BffClient(f"http://{host}:{port}")
+
         logger.info(f"Connection added: {name} ({host}:{port})")
         return connection
     
@@ -426,6 +478,26 @@ class ConnectionManager:
                 )
                 registered += 1
         return registered
+
+    async def check_connection(self, con, client):
+        try:
+            response = await client.get(
+                f"http://{con['host']}:{con['port']}",
+            )
+            con["status"] = (
+                "connected"
+                if response.status_code < 500
+                else "disconnected"
+            )
+        except httpx.RequestError:
+            con["status"] = "disconnected"
+
+    async def get_all_connections_with_status(self):
+        client = self.get_client()
+        await asyncio.gather(
+            *(self.check_connection(con, client) for con in self.connections)
+        )
+        return self.connections
 
 
 # ==================== Data Management ====================
@@ -664,6 +736,19 @@ def _fetch_endpoint_properties(endpoint: Dict) -> Dict:
 
 
 # ==================== FastAPI Application Setup ====================
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    asyncio.create_task(
+        conn_manager.status_monitor(interval=10)
+    )
+
+    yield
+
+    # Close the shared health-check client on shutdown.
+    await conn_manager.aclose()
+
 
 # Create FastAPI application
 app = FastAPI(
@@ -673,6 +758,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
     openapi_tags=[
         {
             "name": "Health",
@@ -798,29 +884,35 @@ async def get_endpoints():
         JSON with endpoints list, counts, and discovery metadata.
     """
     # Keep Docker-discovery cache fresh when enabled.
-    if discovery.docker_enabled:
-        discovery.discover_services()
-        _register_bff_clients(discovery.discovered_services)
+    #if discovery.docker_enabled:
+    #    discovery.discover_services()
+    #    _register_bff_clients(discovery.discovered_services)
 
+    # Use statuses already kept fresh by the background status_monitor instead
+    # of blocking this request on a live health-check scan.
     endpoints = list(conn_manager.connections)
-    discovered = dict(discovery.discovered_services)
+    #discovered = dict(discovery.discovered_services)
 
     # Add discovered services not already present in manual connections.
-    for service_info in discovered.values():
-        exists = any(e['host'] == service_info['host'] and e['port'] == service_info['port'] for e in endpoints)
-        if not exists:
-            endpoints.append(service_info)
+    #for service_info in discovered.values():
+    #    exists = any(e['host'] == service_info['host'] and e['port'] == service_info['port'] for e in endpoints)
+    #    if not exists:
+    #        endpoints.append(service_info)
 
-    # Enrich every endpoint with its own server/client properties payload when reachable.
-    for endpoint in endpoints:
-        endpoint['properties_info'] = _fetch_endpoint_properties(endpoint)
+    # Enrich every endpoint with its properties payload in parallel, off the
+    # event loop (the underlying call uses blocking `requests`).
+    properties = await asyncio.gather(
+        *(asyncio.to_thread(_fetch_endpoint_properties, endpoint) for endpoint in endpoints)
+    )
+    for endpoint, props in zip(endpoints, properties):
+        endpoint['properties_info'] = props
 
     return {
         'endpoints': endpoints,
         'count': len(endpoints),
-        'discovered_count': len(discovered),
-        'last_discovery': discovery.last_discovery,
-        'docker_enabled': discovery.docker_enabled
+        #'discovered_count': len(discovered),
+        #'last_discovery': discovery.last_discovery,
+        #'docker_enabled': discovery.docker_enabled
     }
 
 
@@ -840,16 +932,16 @@ async def get_discovered_endpoints():
     Returns:
         JSON with discovered endpoints, count, and last discovery timestamp.
     """
-    if discovery.docker_enabled:
-        discovery.discover_services()
-        _register_bff_clients(discovery.discovered_services)
+    #if discovery.docker_enabled:
+    #    discovery.discover_services()
+    #    _register_bff_clients(discovery.discovered_services)
 
-    discovered = dict(discovery.discovered_services)
-    return {
-        'discovered': discovered,
-        'count': len(discovered),
-        'last_discovery': discovery.last_discovery
-    }
+    #discovered = dict(discovery.discovered_services)
+    #return {
+    #    'discovered': discovered,
+    #    'count': len(discovered),
+    #    'last_discovery': discovery.last_discovery
+    #}
 
 
 @app.post(
@@ -874,24 +966,24 @@ async def trigger_discovery(request: DiscoveryRequest):
     Returns:
         JSON with discovery status, discovered services, and count.
     """
-    payload = request.model_dump()
-    discovered = discovery.discover_services()
-    _register_bff_clients(discovery.discovered_services)
+    #payload = request.model_dump()
+    #discovered = discovery.discover_services()
+    #_register_bff_clients(discovery.discovered_services)
 
     # Optionally scan using host/ports provided by HMI payload.
-    host, ports = _extract_scan_params(payload)
-    if host and ports:
-        network_discovered = discover_services_by_network(host, ports)
-        discovered.update(network_discovered)
+    #host, ports = _extract_scan_params(payload)
+    #if host and ports:
+    #    network_discovered = discover_services_by_network(host, ports)
+    #    discovered.update(network_discovered)
 
-    if discovered:
-        _upsert_discovered_cache(discovered)
+    #if discovered:
+    #    _upsert_discovered_cache(discovered)
 
-    return {
-        'status': 'success',
-        'discovered': discovered,
-        'count': len(discovered)
-    }
+    #return {
+    #    'status': 'success',
+    #    'discovered': discovered,
+    #    'count': len(discovered)
+    #}
 
 
 @app.post(
@@ -950,6 +1042,28 @@ async def trigger_network_discovery(request: DiscoveryRequest):
 
 # -------------------- Connections Management --------------------
 
+@app.get(
+    "/api/connections",
+    summary="Get All Connections",
+    description="Get all configured connections to remote endpoints.",
+    response_description="List of all connections",
+    responses={
+        200: {"description": "Connections retrieved successfully"}
+    },
+    tags=["Connections"]
+)
+async def get_connections():
+    """Retrieve all configured connections.
+
+    Returns:
+        JSON with list of connections and their count.
+    """
+
+    return {
+        "connections": conn_manager.connections,
+        "count": len(conn_manager.connections)
+    }
+
 @app.post(
     "/api/connections",
     summary="Create Connection",
@@ -973,6 +1087,11 @@ async def create_connection(request: ConnectionCreateRequest):
     Raises:
         HTTPException 400: If required fields are missing.
     """
+    if not request.name or not request.host or not request.port or not request.type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Missing required fields: name, host, port, type'
+        )
     connection = conn_manager.add_connection(
         name=request.name,
         host=request.host,
@@ -980,7 +1099,11 @@ async def create_connection(request: ConnectionCreateRequest):
         conn_type=request.type,
         auto_discovered=request.auto_discovered
     )
-    
+    conn_manager.save_connections()
+    # Immediately probe the connection so its status is fresh right away instead
+    # of showing "checking" until the background monitor runs.
+    await conn_manager.check_connection(connection, conn_manager.get_client())
+
     return JSONResponse(content=connection, status_code=status.HTTP_201_CREATED)
 
 

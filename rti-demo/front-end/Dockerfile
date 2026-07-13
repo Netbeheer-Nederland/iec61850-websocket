@@ -8,7 +8,8 @@ WORKDIR /app
 COPY . .
 
 # Install dependencies (if package.json exists)
-RUN if [ -f package.json ]; then npm install; fi
+RUN if [ -f package.json ]; then npm install -g http-server; fi
+COPY ./front-end /app
 
 # Expose port
 EXPOSE 8080

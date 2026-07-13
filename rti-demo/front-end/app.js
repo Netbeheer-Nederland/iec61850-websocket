@@ -34,6 +34,10 @@ class RTIDemoApp {
         this._selectedLn       = null;
 
         this.init();
+
+        this.currentConnectionId = null;
+        this.connectionStatusTimeout = null;
+
     }
 
     init() {
@@ -75,12 +79,15 @@ class RTIDemoApp {
 
         // Header
         document.getElementById('refresh-btn').addEventListener('click', () => this.handleManualRefresh());
-        document.getElementById('discovery-btn').addEventListener('click', () => this.discoverEndpoints());
+        document.getElementById('refresh-endpoints-btn').addEventListener('click', () => this.discoverEndpoints());
 
         // Modal
         document.querySelector('.btn-close').addEventListener('click', () => this.closeConnectionModal());
         document.getElementById('btn-modal-close').addEventListener('click', () => this.closeConnectionModal());
         document.getElementById('btn-modal-save').addEventListener('click', () => this.saveConnection());
+
+        // Connections Table
+        document.getElementById('refresh-cons-btn').addEventListener('click', () => this.loadEndpoints());
 
         // Reports
         document.getElementById('btn-export-reports').addEventListener('click', () => this.exportReports());
@@ -122,6 +129,10 @@ class RTIDemoApp {
             navItem.classList.add('active');
             const pageName_formatted = pageName.charAt(0).toUpperCase() + pageName.slice(1);
             document.getElementById('breadcrumb-text').textContent = pageName_formatted;
+        }
+
+         if (pageName !== 'connections') {
+            this.stopConnectionStatusPolling();
         }
 
         // Load page-specific content
@@ -309,7 +320,10 @@ class RTIDemoApp {
     // =============================================
 
     async refreshDashboard() {
-        this.renderEndpoints();
+        // Fetch the latest endpoints from the BFF (which also renders them).
+        // Previously this only re-rendered stale in-memory data, so on first
+        // load the cards were empty until another code path called loadEndpoints.
+        await this.loadEndpoints();
     }
 
     async handleManualRefresh() {
@@ -327,15 +341,15 @@ class RTIDemoApp {
     // =============================================
 
     async discoverEndpoints() {
-        if (!this.updateScanConfigFromSettingsInputs(false)) {
-            return;
-        }
+        //if (!this.updateScanConfigFromSettingsInputs(false)) {
+        //    return;
+        //}
 
-        const ports = this.parsePortList(this.scanPorts);
-        if (ports.length === 0) {
-            this.addDiagnosticMessage('Discovery ports are required (for example: 5001,5002).', 'error');
-            return;
-        }
+        //const ports = this.parsePortList(this.scanPorts);
+        //if (ports.length === 0) {
+        //    this.addDiagnosticMessage('Discovery ports are required (for example: 5001,5002).', 'error');
+        //    return;
+        //}
 
         const connected = await this.checkBFFConnection();
         if (!connected) {
@@ -343,25 +357,33 @@ class RTIDemoApp {
             return;
         }
 
-        const result = await this.callBFF('/api/endpoints/discover-network', 'POST', {
-            host: this.scanHost,
-            ports,
-        });
+        await this.loadEndpoints();
+        //const result = await this.callBFF('/api/endpoints/discover-network', 'POST', {
+        //    host: this.scanHost,
+        //    ports,
+        //});
         
-        if (result) {
-            this.addDiagnosticMessage(
-                `Discovery complete: Found ${result.count} endpoint(s)`,
-                'success'
-            );
+        //if (result) {
+        //    this.addDiagnosticMessage(
+        //        `Discovery complete: Found ${result.count} endpoint(s)`,
+        //        'success'
+        //    );
             // Reload endpoints to show any newly discovered ones
-            await this.loadEndpoints();
-        }
+        //    await this.loadEndpoints();
+        //}
     }
 
     async loadEndpoints() {
         if (!this.isBffConnected) {
             this.addDiagnosticMessage('Skipping /api/endpoints: BFF is not connected.', 'warning');
             return;
+        }
+
+        // Only show the loading spinner on the very first load, when there is
+        // nothing on screen yet. Background auto-refreshes should swap the data
+        // in silently to avoid the cards flickering/disappearing every cycle.
+        if (this.endpoints.length === 0) {
+            this.showEndpointsLoading();
         }
 
         const result = await this.callBFF('/api/endpoints');
@@ -386,6 +408,18 @@ class RTIDemoApp {
         
         this.renderEndpoints();
     }
+    showEndpointsLoading() {
+        const container = document.getElementById('endpoints-container');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="endpoints-loading">
+                <span class="spinner"></span>
+                <span>Loading connections...</span>
+            </div>
+        `;
+    }
+
 
     renderEndpoints() {
         const container = document.getElementById('endpoints-container');
@@ -395,7 +429,7 @@ class RTIDemoApp {
             container.innerHTML = `
                 <div style="padding: 20px; text-align: center; color: var(--text-muted);">
                     <p>No endpoints configured or discovered</p>
-                    <button class="btn-primary" id="btn-discover-now" style="margin-top: 10px;">
+                    <button class="btn-primary" id="btn-discover-now" style="margin-top: 10px;" hidden>
                         <i class="fas fa-search"></i>
                         Search for Endpoints
                     </button>
@@ -521,8 +555,75 @@ class RTIDemoApp {
     // =============================================
     // ACSI Page
     // =============================================
+    // ========== POLLING FUNCTION ==========
+    async refreshConnectionStatuses() {
+        try {
+            const result = await this.callBFF('/api/endpoints');
+            if (!result?.endpoints) return;
+
+            // Create a map: "host:port" -> status for fast lookup
+            const statusMap = new Map();
+            result.endpoints.forEach(ep => {
+                statusMap.set(`${ep.host}:${ep.port}`, ep.status);
+            });
+
+            // Update statuses in our connections array
+            let updated = false;
+            this.connections.forEach(conn => {
+                const key = `${conn.host}:${conn.port}`;
+                const newStatus = statusMap.get(key);
+                if (newStatus && newStatus !== conn.status) {
+                    conn.status = newStatus;
+                    connField = document.getElementById(`status-button-${conn.name}`);
+                    if (connField)
+                        connField.textContent = newStatus;
+                    updated = true;
+                }
+            });
+
+            // Re-render table only if we're on the connections page and something changed
+            if (updated && document.querySelector('.page.active')?.id === 'page-connections') {
+                this.renderConnectionsTable();
+            }
+        } catch (error) {
+            this.addDiagnosticMessage(`Status poll error: ${error.message}`, 'error');
+        }
+    }
+
+    // ========== START/STOP POLLING ==========
+    startConnectionStatusPolling() {
+        this.stopConnectionStatusPolling(); // Clear any existing poller
+
+        const poll = async () => {
+            await this.refreshConnectionStatuses();
+            this.connectionStatusTimeout = setTimeout(poll, 10000);
+        };
+
+        poll(); // Start immediately
+    }
+
+    stopConnectionStatusPolling() {
+        if (this.connectionStatusTimeout) {
+            clearTimeout(this.connectionStatusTimeout);
+            this.connectionStatusTimeout = null;
+        }
+    }
+
+    showConnectionsLoading() {
+        const tbody = document.getElementById('connections-container');
+
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align:center;">
+                    <span class="spinner"></span>
+                    Loading connections...
+                </td>
+            </tr>
+        `;
+    }
 
     async loadConnections() {
+        this.showConnectionsLoading();
         const result = await this.callBFF('/api/connections');
         
         if (!result) {
@@ -532,8 +633,8 @@ class RTIDemoApp {
 
         this.connections = result.connections || [];
         this.renderConnectionsTable();
+        this.startConnectionStatusPolling(); // Start polling
     }
-
     renderConnectionsTable() {
         const container = document.getElementById('connections-container');
         
@@ -558,6 +659,15 @@ class RTIDemoApp {
         `;
 
         this.connections.forEach(conn => {
+
+            const statusColor =
+                conn.status === 'connected'
+                    ? 'var(--success-color)'
+                    : conn.status === 'disconnected'
+                        ? 'var(--danger-color)'
+                        : '#eab308';
+
+            const statusText = conn.status || '⏳ checking...';
             html += `
                 <tr>
                     <td>${conn.name}</td>
@@ -565,8 +675,8 @@ class RTIDemoApp {
                     <td>${conn.host}</td>
                     <td>${conn.port}</td>
                     <td>
-                        <span style="display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; background: ${conn.status === 'connected' ? 'var(--success-color)' : 'var(--danger-color)'}; color: white;">
-                            ${conn.status}
+                        <span id='status-button-${conn.name}' style="display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; background: ${statusColor}; color: white;">
+                            ${statusText}
                         </span>
                     </td>
                     <td>
@@ -595,6 +705,9 @@ class RTIDemoApp {
         document.getElementById('conn-host').value = '';
         document.getElementById('conn-port').value = '5000';
         document.getElementById('conn-type').value = 'RTI-SO';
+        this.currentConnectionId = null;  // ← Mark as NEW
+        document.getElementById('conn-name').readOnly = false;
+
     }
 
     closeConnectionModal() {
@@ -602,6 +715,7 @@ class RTIDemoApp {
     }
 
     async saveConnection() {
+        const isEdit = this.currentConnectionId !== null;
         const connection = {
             name: document.getElementById('conn-name').value,
             host: document.getElementById('conn-host').value,
@@ -614,12 +728,22 @@ class RTIDemoApp {
             return;
         }
 
+        if(!isEdit && this.connections.map(c => c.name).includes(connection.name)) {
+            alert('Connection name must be unique');
+            return;
+        }
+
         const result = await this.callBFF('/api/connections', 'POST', connection);
-        
+
         if (result) {
+
             this.closeConnectionModal();
             this.loadConnections();
             this.addDiagnosticMessage(`Connection '${connection.name}' saved`, 'success');
+            this.renderConnectionsTable();
+            // Re-fetch endpoints from the BFF so the dashboard cards reflect the
+            // edit immediately, instead of re-rendering stale in-memory data.
+            await this.loadEndpoints();
         }
     }
 
@@ -629,6 +753,7 @@ class RTIDemoApp {
             if (result) {
                 this.loadConnections();
                 this.addDiagnosticMessage('Connection deleted', 'success');
+                this.loadEndpoints();
             }
         }
     }
@@ -637,10 +762,12 @@ class RTIDemoApp {
         const conn = this.connections.find(c => c.id === id);
         if (conn) {
             document.getElementById('conn-name').value = conn.name;
+            document.getElementById('conn-name').readOnly = true;
             document.getElementById('conn-host').value = conn.host;
             document.getElementById('conn-port').value = conn.port;
             document.getElementById('conn-type').value = conn.type;
             document.getElementById('modal-connection').classList.add('active');
+            this.currentConnectionId = id;  // ← Mark as EDIT
         }
     }
 
@@ -973,6 +1100,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
 // Initialize application
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new RTIDemoApp();
+    app = new RTIDemoApp();
+    window.app = app;
     console.log('RTI Demo UI initialized');
 });

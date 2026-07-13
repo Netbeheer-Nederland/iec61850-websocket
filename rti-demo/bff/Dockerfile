@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY rti-demo/bff/ /app/bff/
 
-RUN pip install fastapi uvicorn docker
+RUN pip install fastapi uvicorn docker httpx
 
 EXPOSE 5000
 
