@@ -14,19 +14,13 @@ import logging
 logger = logging.getLogger(__name__)
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 import json
-import os
-import sys
 import threading
 import time
 from collections import deque
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
-
+from typing import Any, Callable, Dict, List, Optional
 from ws61850.endpoint import PassiveEndpoint
-from ws61850.endpoint import ActiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
-
 
 class ACSIClientRuntime:
     """Manages IEC 61850 WebSocket client runtime state and lifecycle."""
@@ -38,8 +32,8 @@ class ACSIClientRuntime:
         self.cp: str = "cp1"
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.thread: Optional[threading.Thread] = None
-        self.endpoint: Optional[Any] = None
-        self.client: Optional[IEC61850Client] = None
+        self.client = None
+        self.endpoint = None
         self.error: Optional[str] = None
         self.actions: deque = deque(maxlen=200)
         self.messages: deque = deque(maxlen=500)
@@ -66,6 +60,11 @@ class ACSIClient:
 
     def __init__(self):
         self.runtime = ACSIClientRuntime()
+        self.runtime.endpoint = PassiveEndpoint()
+        self.runtime.endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
+        self.runtime.endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
+        self.runtime.client = IEC61850Client(self.runtime.cp)
+        self.runtime.endpoint.add_iec61850_client(self.runtime.client)
 
     def _log_action(
         self, message: str, level: str = "info", detail: Optional[Dict[str, Any]] = None
@@ -164,31 +163,26 @@ class ACSIClient:
         )
 
         try:
-            endpoint = PassiveEndpoint()
-            endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
-            endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
-
-            client = IEC61850Client(cp)
-            endpoint.add_iec61850_client(client)
-
+            
+            # Now client gets callbacks automatically
             # endpoint.start() runs a reconnect loop forever, so we must NOT
             # await it directly. Schedule it as a background task and instead
             # wait for the client's ready_event, which is set once the IEC 61850
             # association has been established.
             start_task = asyncio.create_task(
-                endpoint.start(host, port),
-                name=f"so-active-{cp}",
+                self.runtime.endpoint.start(host, port),
+                name="so-active"
             )
 
             # Remember the task so we can cancel it on disconnect.
             self._set_runtime_state(
-                endpoint=endpoint,
-                client=client,
+                endpoint=self.runtime.endpoint,
+                client=self.runtime.client,
                 _start_task=start_task,
             )
 
             try:
-                await asyncio.wait_for(client.ready_event.wait(), None)
+                await asyncio.wait_for(self.runtime.client.ready_event.wait(), None)
             except asyncio.TimeoutError as exc:
                 start_task.cancel()
                 raise RuntimeError(
@@ -256,7 +250,7 @@ class ACSIClient:
             except Exception as exc:
                 self._set_runtime_state(status="error", error=str(exc))
                 self._log_action(f"Connect failed: {exc}", "error")
-                #loop.call_soon_threadsafe(loop.stop)
+                loop.call_soon_threadsafe(loop.stop)
 
         connect_task.add_done_callback(_on_connect_done)
 
@@ -403,24 +397,3 @@ class ACSIClient:
         print("new value:", value)
         print("obj_ref:", obj_ref)
         return {"objRef": obj_ref, "value": value}
-
-    async def get_model(self) -> Dict[str, Any]:
-        """Read the server directory / model and return a JSON-serializable structure."""
-        client = self.runtime.client
-        if client is None:
-            raise RuntimeError("Client is not connected")
-
-        try:
-            websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
-            raw = await client.get_server_directory(websocket_info, None, None)
-            serial = _make_serializable(raw)
-            # Ensure we return a mapping (compatible with callers expecting dict)
-            if isinstance(serial, dict):
-                return serial
-            return {"result": serial}
-        except Exception as exc:
-            # Record model error and present a serializable error mapping
-            self.runtime.model_error = str(exc)
-            self.runtime.model_status = 'error'
-            logger.exception("get_model failed")
-            return {"ok": False, "error": str(exc)}
