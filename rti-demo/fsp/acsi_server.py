@@ -24,7 +24,7 @@ from random import randint
 from typing import Any, Callable, Dict, List, Optional
 
 from ws61850.endpoint import ActiveEndpoint
-from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
+from ws61850.iec61850.data_model.ied_model import DataAttribute, IedModel
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
 
@@ -32,13 +32,13 @@ class ACSIServerRuntime:
     """Manages IEC 61850 WebSocket server runtime state and lifecycle."""
 
     def __init__(self):
+        self.endpoint = None
+        self.server = None
         self.status: str = "stopped"  # stopped|starting|listening|stopping|error|reloading
         self.host: str = "localhost"
         self.port: int = 8765
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.thread: Optional[threading.Thread] = None
-        self.endpoint: Optional[Any] = None
-        self.server_cp: Optional[IEC61850Server] = None
         self.tasks: Dict[str, asyncio.Task] = {}
         self.error: Optional[str] = None
         self.actions: deque = deque(maxlen=200)
@@ -69,6 +69,12 @@ class ACSIServer:
 
     def __init__(self, factory_dir: Path):
         self.runtime = ACSIServerRuntime()
+        self.runtime.endpoint = ActiveEndpoint()
+        self.runtime.endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
+        self.runtime.endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
+
+        # Prefer the model already in runtime (freshly loaded from SCL/model.py)
+        # Only reload from file as fallback if runtime model is missing
         self.factory_dir = factory_dir
         self.model_file = factory_dir / "model.py"
 
@@ -82,12 +88,31 @@ class ACSIServer:
                 "Create model.py in the fsp directory before starting the server."
             )
 
-        ied_model = self.load_current_runtime_model()
+
+        if self.runtime.ied_model is None:
+            try:
+                print("[_start_server_async] No model in runtime, loading from file...")
+                self.runtime.ied_model = self.load_current_runtime_model()
+            except FileNotFoundError:
+                print("[_start_server_async] Model file not found")
+                raise RuntimeError("No model loaded. Create fsp/model.py first.")
+        else:
+            print(
+                f"[_start_server_async] Using model from runtime: "
+                f"ied_model.name={self.runtime.ied_model.name!r} "
+                f"model_ied_name={self.runtime.model_ied_name!r}"
+            )
+
+        if self.runtime.ied_model is None:
+            raise RuntimeError("No model loaded. Create fsp/model.py first.")
+
         self._set_runtime_state(
-            ied_model=ied_model,
             model_source=str(self.model_file),
-            model_ied_name=ied_model.name,
+            model_ied_name=self.runtime.ied_model.name,
         )
+
+        self.runtime.server = IEC61850Server(self.runtime.ied_model, self.runtime.cp)
+        self.runtime.endpoint.add_iec61850_server(self.runtime.server)
 
     def load_current_runtime_model(self) -> IedModel:
         """Load the current runtime model from model.py."""
@@ -181,7 +206,7 @@ class ACSIServer:
                 
             self.runtime.model_reload_in_progress = True
             pending_model = self.runtime.pending_model
-            old_server = self.runtime.server_cp
+            old_server = self.runtime.server
             
             # Set reload status
             self._set_runtime_state(status="reloading")
@@ -455,62 +480,28 @@ class ACSIServer:
 
     async def _start_server_async(self, host: str, port: int) -> None:
         """Start the server asynchronously."""
-        # Prefer the model already in runtime (freshly loaded from SCL/model.py)
-        # Only reload from file as fallback if runtime model is missing
-        ied_model = self.runtime.ied_model
-
-        if ied_model is None:
-            try:
-                print("[_start_server_async] No model in runtime, loading from file...")
-                ied_model = self.load_current_runtime_model()
-            except FileNotFoundError:
-                print("[_start_server_async] Model file not found")
-                raise RuntimeError("No model loaded. Create fsp/model.py first.")
-        else:
-            print(
-                f"[_start_server_async] Using model from runtime: "
-                f"ied_model.name={ied_model.name!r} "
-                f"model_ied_name={self.runtime.model_ied_name!r}"
-            )
-
-        if ied_model is None:
-            raise RuntimeError("No model loaded. Create fsp/model.py first.")
-
-        self._set_runtime_state(
-            ied_model=ied_model,
-            model_source=self.runtime.model_source or str(self.model_file),
-            model_ied_name=ied_model.name,
-            cp=self.runtime.cp or "cp1",
-        )
-
-        endpoint = self._create_endpoint()
-        endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
-        endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
 
         cp = self.runtime.cp or "cp1"
-        server1 = IEC61850Server(ied_model, cp)
-
-        endpoint.add_iec61850_server(server1)
 
         report_task = asyncio.create_task(
-            server1.periodic_report_start(), name=f"{cp}-periodic-report"
+            self.runtime.server.periodic_report_start(), name=f"{cp}-periodic-report"
         )
         tasks: Dict[str, asyncio.Task] = {"report": report_task}
 
-        if server1.find_object_in_tree("LD0/DGEN1.DEROpSt.stVal") is not None:
+        if self.runtime.server.find_object_in_tree("LD0/DGEN1.DEROpSt.stVal") is not None:
             tasks["toggle"] = asyncio.create_task(
-                self._toggle_custom_value(server1, "LD0/DGEN1.DEROpSt.stVal"),
+                self._toggle_custom_value(self.runtime.server, "LD0/DGEN1.DEROpSt.stVal"),
                 name="toggle-value",
             )
 
         ws_task = asyncio.create_task(
-            endpoint.start(host, port, cp), name="ws-active"
+            self.runtime.endpoint.start(host, port, cp), name="ws-active"
         )
         tasks["ws"] = ws_task
 
         self._set_runtime_state(
-            endpoint=endpoint,
-            server_cp=server1,
+            endpoint=self.runtime.endpoint,
+            server_cp=self.runtime.server,
             tasks=tasks,
             error=None,
         )
@@ -531,10 +522,6 @@ class ACSIServer:
             self._set_runtime_state(status="error", error=str(exc))
             self._log_action(f"Server runtime error: {exc}", "error")
             raise
-
-    def _create_endpoint(self):
-        """Create a WebSocket endpoint (can be overridden for testing)."""
-        return ActiveEndpoint()
 
     def _event_loop_thread(self, host: str, port: int) -> None:
         """Run the event loop in a separate thread."""
@@ -656,7 +643,7 @@ class ACSIServer:
 
     def read_value(self, obj_ref: str) -> Dict[str, Any]:
         """Read a value from the server."""
-        server = self.runtime.server_cp
+        server = self.runtime.server
         if server is None:
             raise RuntimeError("Server is not running")
 
@@ -670,7 +657,7 @@ class ACSIServer:
 
     def write_value(self, obj_ref: str, value: Any, data_type: str = "unknown") -> Dict[str, Any]:
         """Write a value to the server."""
-        server = self.runtime.server_cp
+        server = self.runtime.server
         if server is None:
             raise RuntimeError("Server is not running")
 
