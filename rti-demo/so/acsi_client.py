@@ -395,6 +395,8 @@ class ACSIClient:
 
         websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
         # dataAttrVal expects [{"data": (type_str, value)}]
+        if data_type == "boolean":
+            value = bool(value)
         result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
         print(result)
         print("Write operation completed successfully.")

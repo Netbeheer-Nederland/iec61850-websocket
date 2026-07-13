@@ -332,6 +332,21 @@
         return;
       }
 
+      function asn1TimeStampToISOString(ts) {
+          if (!ts || typeof ts.secondSinceEpoch !== 'number') return '';
+          // ASN.1 TimeStamp: seconds since epoch (UTC), fractionOfSecond is optional (microseconds)
+          const seconds = ts.secondSinceEpoch;
+          let ms = 0;
+          if (typeof ts.fractionOfSecond === 'number') {
+            // fractionOfSecond is usually in microseconds (0..16777215)
+            // Convert to milliseconds (3 digits)
+            ms = Math.floor(ts.fractionOfSecond / 1000);
+          }
+          // Create JS Date from seconds and ms
+          const date = new Date((seconds * 1000) + ms);
+          return date.toISOString();
+      }
+
       // Helper to extract actual value from wrapped structure
       function extractActualValue(val) {
         // Handle wrapped format: [{data: {...}}]
