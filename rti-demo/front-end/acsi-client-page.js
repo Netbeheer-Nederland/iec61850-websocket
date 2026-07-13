@@ -132,7 +132,7 @@
             //}
 
             try {
-                await ensureBffHealthy();
+                //await ensureBffHealthy();
 
                 const response = await fetch(url, options);
                 const rawText = await response.text();
