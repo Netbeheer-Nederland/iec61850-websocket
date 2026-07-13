@@ -867,9 +867,9 @@ async def get_endpoints():
         JSON with endpoints list, counts, and discovery metadata.
     """
     # Keep Docker-discovery cache fresh when enabled.
-    if discovery.docker_enabled:
-        discovery.discover_services()
-        _register_bff_clients(discovery.discovered_services)
+    #if discovery.docker_enabled:
+    #    discovery.discover_services()
+    #    _register_bff_clients(discovery.discovered_services)
 
     # Use statuses already kept fresh by the background status_monitor instead
     # of blocking this request on a live health-check scan.

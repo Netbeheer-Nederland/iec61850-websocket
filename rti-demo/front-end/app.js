@@ -341,15 +341,15 @@ class RTIDemoApp {
     // =============================================
 
     async discoverEndpoints() {
-        if (!this.updateScanConfigFromSettingsInputs(false)) {
-            return;
-        }
+        //if (!this.updateScanConfigFromSettingsInputs(false)) {
+        //    return;
+        //}
 
-        const ports = this.parsePortList(this.scanPorts);
-        if (ports.length === 0) {
-            this.addDiagnosticMessage('Discovery ports are required (for example: 5001,5002).', 'error');
-            return;
-        }
+        //const ports = this.parsePortList(this.scanPorts);
+        //if (ports.length === 0) {
+        //    this.addDiagnosticMessage('Discovery ports are required (for example: 5001,5002).', 'error');
+        //    return;
+        //}
 
         const connected = await this.checkBFFConnection();
         if (!connected) {
@@ -379,8 +379,12 @@ class RTIDemoApp {
             return;
         }
 
-        // Show a loading indicator while the endpoints are being fetched.
-        this.showEndpointsLoading();
+        // Only show the loading spinner on the very first load, when there is
+        // nothing on screen yet. Background auto-refreshes should swap the data
+        // in silently to avoid the cards flickering/disappearing every cycle.
+        if (this.endpoints.length === 0) {
+            this.showEndpointsLoading();
+        }
 
         const result = await this.callBFF('/api/endpoints');
         
