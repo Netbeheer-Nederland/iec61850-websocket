@@ -326,6 +326,18 @@ class ConnectionManager:
         for con in self.connections:
             con.setdefault("status", "checking")
 
+        self._register_connections_as_clients()
+
+    def _register_connections_as_clients(self) -> None:
+        """Register BFF clients for all current connections."""
+        for con in self.connections:
+            host = con.get('host')
+            port = con.get('port')
+            if host and port:
+                key = f"{host}:{port}"
+                if key not in _bff_clients:
+                    _bff_clients[key] = BffClient(f"http://{host}:{port}")
+
     def get_client(self) -> httpx.AsyncClient:
         """Return a shared AsyncClient, creating it lazily."""
         if self._client is None:
@@ -402,6 +414,11 @@ class ConnectionManager:
         }
         self.connections.append(connection)
         self.save_connections()
+
+        key = f"{host}:{port}"
+        if key not in _bff_clients:
+            _bff_clients[key] = BffClient(f"http://{host}:{port}")
+
         logger.info(f"Connection added: {name} ({host}:{port})")
         return connection
     
@@ -1083,7 +1100,7 @@ async def create_connection(request: ConnectionCreateRequest):
         auto_discovered=request.auto_discovered
     )
     conn_manager.save_connections()
-
+    _register_bff_clients()
     # Immediately probe the connection so its status is fresh right away instead
     # of showing "checking" until the background monitor runs.
     await conn_manager.check_connection(connection, conn_manager.get_client())
