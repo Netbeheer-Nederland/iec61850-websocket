@@ -63,21 +63,22 @@ services:
     ports:
       - "5000:5000"
     environment:
+      - RTI_DOCKER_ENABLED=true
       - RTI_SERVICE_DISCOVERY_ENABLED=true
       - PORT=5000
       - PYTHONUNBUFFERED=1
     volumes:
       - ./bff:/app/bff
       - ./connections.json:/app/connections.json
-      - /var/run/docker.sock:/var/run/docker.sock
+      - //var/run/docker.sock:/var/run/docker.sock
     networks:
       - rti-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
     labels:
       - "rti.service=bff-server"
       - "rti.type=RTI-BFF"
@@ -86,10 +87,11 @@ services:
 
   # Frontend Web Server
   frontend:
-    image: node:18-slim
+    build:
+      context: .
+      dockerfile: ./front-end/Dockerfile  # or Dockerfile.front-end
     container_name: rti-demo-ui
     working_dir: /app
-    command: npx http-server -p 8080 -c-1
     ports:
       - "8080:8080"
     volumes:
