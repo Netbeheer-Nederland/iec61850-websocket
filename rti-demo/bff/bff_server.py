@@ -1100,7 +1100,6 @@ async def create_connection(request: ConnectionCreateRequest):
         auto_discovered=request.auto_discovered
     )
     conn_manager.save_connections()
-    _register_bff_clients()
     # Immediately probe the connection so its status is fresh right away instead
     # of showing "checking" until the background monitor runs.
     await conn_manager.check_connection(connection, conn_manager.get_client())
