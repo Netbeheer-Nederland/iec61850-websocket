@@ -1,6 +1,6 @@
 <div class="acsi-server-page">
     <div class="acsi-server-page-header">
-        <h1>ACSI Server - IEC 61850 Server</h1>
+        <h1>ACSI Server</h1>
         <span class="acsi-page-pill">Preview</span>
     </div>
     <p class="acsi-server-subtitle">
@@ -13,11 +13,12 @@
             <div class="acsi-endpoint-card">
                 <div class="acsi-endpoint-row">
                     <span class="acsi-endpoint-item"><span class="acsi-label">Name</span><span class="acsi-value">{{endpointName}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">Address</span><span class="acsi-value">{{endpointHost}}:{{endpointPort}}</span></span>
+                    <span class="acsi-endpoint-item"><span class="acsi-label">Address</span><span id="acsi-address-field" class="acsi-value"></span></span>
+                    <span class="acsi-endpoint-item"><span class="acsi-label">AP</span><span id="acsi-ap-field" class="acsi-value"></span></span>
                     <span class="acsi-endpoint-item"><span class="acsi-label">Type</span><span class="acsi-value">{{endpointType}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">Status</span><span class="acsi-value acsi-status">{{endpointStatus}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">ACSI Role</span><span class="acsi-value">{{endpointRole}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">WS Mode</span><span class="acsi-value">{{endpointWsMode}}</span></span>
+                    <span class="acsi-endpoint-item"><span class="acsi-label">Status</span><span id="acsi-status-field" class="acsi-value acsi-status"></span></span>
+                    <span class="acsi-endpoint-item"><span class="acsi-label">ACSI Role</span><span id="acsi-role-field" class="acsi-value">Server</span></span>
+                    <span class="acsi-endpoint-item"><span class="acsi-label">WS Mode</span><span id="acsi-wsmode-field" class="acsi-value"></span></span>
                 </div>
                 <div class="acsi-endpoint-status-row">
                     <button id="acsi-reload-status-btn" class="btn-primary" type="button" aria-label="Reload status" title="Reload status">

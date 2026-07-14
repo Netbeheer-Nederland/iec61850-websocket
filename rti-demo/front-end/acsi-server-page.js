@@ -393,6 +393,11 @@
 
 
     async function wireApiTester(endpoint) {
+        const addressEl = document.getElementById('acsi-address-field');
+        const apEl = document.getElementById('acsi-ap-field');
+        const statusEl = document.getElementById('acsi-status-field');
+        const roleEl = document.getElementById('acsi-role-field');
+        const awsmodeEl = document.getElementById('acsi-wsmode-field');
         const reloadStatusBtn = document.getElementById('acsi-reload-status-btn');
         const updatedStatusEl = document.getElementById('acsi-endpoint-updated-status');
         const daModalEl = document.getElementById('acsi-da-modal');
@@ -428,26 +433,52 @@
             updatedStatusEl.classList.toggle('acsi-model-error', !!isError);
         }
 
+        function parsePythonDictString(pythonStr) {
+            if (!pythonStr || typeof pythonStr !== 'string') {
+                return pythonStr;
+            }
+            try {
+                const jsonStr = pythonStr
+                    .replace(/'/g, '"')
+                    .replace(/True/g, 'true')
+                    .replace(/False/g, 'false')
+                    .replace(/None/g, 'null');
+                return JSON.parse(jsonStr);
+            } catch (e) {
+                console.log('Warning: Could not parse Python dict string as JSON:', e);
+                return pythonStr;
+            }
+        }
+
+        function formatPayloadForDisplay(payload) {
+            if (!payload || typeof payload !== 'object') {
+                return payload;
+            }
+            const formatted = JSON.parse(JSON.stringify(payload));
+            
+            // Parse any stringified Python dicts in the result
+            if (formatted.result && typeof formatted.result === 'object') {
+                if (formatted.result.status && typeof formatted.result.status === 'string') {
+                    formatted.result.status = parsePythonDictString(formatted.result.status);
+                }
+                if (formatted.result.message && typeof formatted.result.message === 'string') {
+                    formatted.result.message = parsePythonDictString(formatted.result.message);
+                }
+            }
+            
+            // Also check at top level
+            if (formatted.status && typeof formatted.status === 'string') {
+                formatted.status = parsePythonDictString(formatted.status);
+            }
+            
+            return formatted;
+        }
+
         function formatStatusSummary(payload) {
             // Handle case where status is a stringified Python dict
             let statusObj = payload;
             if (payload && payload.status && typeof payload.status === 'string') {
-                // Try to parse Python dict string representation
-                try {
-                    // Replace Python dict string format to JSON format
-                    const pythonDictStr = payload.status;
-                    // Convert {'key': 'value'} to {"key": "value"}
-                    const jsonStr = pythonDictStr
-                        .replace(/'/g, '"')
-                        .replace(/True/g, 'true')
-                        .replace(/False/g, 'false')
-                        .replace(/None/g, 'null');
-                    statusObj = JSON.parse(jsonStr);
-                } catch (e) {
-                    // If parsing fails, use the original payload
-                    console.log('Warning: Could not parse status string as JSON:', e);
-                    statusObj = payload;
-                }
+                statusObj = parsePythonDictString(payload.status);
             }
             
             const status = statusObj && statusObj.status ? statusObj.status : (payload && payload.status ? payload.status : 'unknown');
@@ -574,7 +605,28 @@
             }
         }
 
+        async function updateStatus()
+        {
+            setUpdatedStatusText('Loading status...');
+            await ensureBffHealthy();
 
+            const api = getApiById('status');
+            const result = await executeApiCall(api, endpointTarget, {});
+            
+            if (result && result.ok && result.payload) {
+                const formattedPayload = formatPayloadForDisplay(result.payload);
+                const text = `Connected clients: ${formattedPayload.result.status.connectedClients} - IED: ${formattedPayload.result.status.modelName} - Model source: ${formattedPayload.result.status.modelSource}`
+                setUpdatedStatusText(text);
+                addressEl.textContent = `${formattedPayload.result.status.host}:${formattedPayload.result.status.port}`
+                statusEl.textContent = `${formattedPayload.result.status.status}`
+                apEl.textContent = `${formattedPayload.result.status.accessPoints}`
+                console.log('success', 'GET /api/status -> HTTP 200', JSON.stringify(formattedPayload, null, 2));
+            } else {
+                const message = result ? `HTTP ${result.status}` : 'Unknown error';
+                setUpdatedStatusText(`Updated status: failed (${message})`, true);
+                console.log('error', 'GET /api/status failed', message);
+            }
+        }
 
         async function runDaAction(actionId) {
             if (!activeDaSelection || !activeDaSelection.objRef) {
@@ -676,20 +728,7 @@
 
                 try {
                     reloadStatusBtn.disabled = true;
-                    setUpdatedStatusText('Updated status: loading...');
-                    await ensureBffHealthy();
-
-                    const api = getApiById('status');
-                    const result = await executeApiCall(api, endpointTarget, {});
-                    
-                    if (result && result.ok && result.payload) {
-                        setUpdatedStatusText(formatStatusSummary(result.payload));
-                        console.log('success', 'GET /api/status -> HTTP 200', JSON.stringify(result.payload, null, 2));
-                    } else {
-                        const message = result ? `HTTP ${result.status}` : 'Unknown error';
-                        setUpdatedStatusText(`Updated status: failed (${message})`, true);
-                        console.log('error', 'GET /api/status failed', message);
-                    }
+                    updateStatus();
                 } catch (error) {
                     const message = String(error && error.message ? error.message : error);
                     setUpdatedStatusText(`Updated status: failed (${message})`, true);
@@ -764,21 +803,12 @@
             }
             
             if (targetToUse) {
-                try {
-                    await ensureBffHealthy();
-                    
+                try {                    
                     // Load status automatically
-                    const statusApi = getApiById('status');
-                    setUpdatedStatusText('Loading status...');
-                    const statusResult = await executeApiCall(statusApi, targetToUse, {});
-                    if (statusResult && statusResult.ok && statusResult.payload) {
-                        setUpdatedStatusText(formatStatusSummary(statusResult.payload));
-                    } else {
-                        const message = statusResult ? `HTTP ${statusResult.status}` : 'Unknown error';
-                        setUpdatedStatusText(`Updated status: failed (${message})`, true);
-                    }
+                    updateStatus();
 
                     // Load model automatically
+                    await ensureBffHealthy();
                     setModelPanelMessage('Loading model...');
                     const modelApi = getApiById('model');
                     await executeApiCall(modelApi, targetToUse);
