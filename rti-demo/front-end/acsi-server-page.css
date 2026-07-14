@@ -78,6 +78,45 @@
     color: var(--text-primary);
 }
 
+.protocol-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.protocol-header h2 {
+    margin: 0;
+    font-size: 16px;
+    color: var(--text-primary);
+}
+
+.message-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.message-controls .btn-primary {
+    min-width: auto;
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+#messages-interval {
+    flex: none;
+    min-width: 100px;
+    width: auto;
+}
+
+.monitor-status {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+}
+
 .acsi-endpoint-card {
     background: rgba(15, 23, 42, 0.55);
     border: 1px solid rgba(71, 85, 105, 0.45);

@@ -6,6 +6,8 @@
     let templateCache = null;
     let protocolMessages = [];
     let fspTargets = [];
+    let isMonitoring = false;
+    let monitorInterval = null;
 
     const apiDefinitions = [
 
@@ -31,13 +33,13 @@
 
     { id: 'stop', label: 'POST /api/stop', method: 'POST', path: '/api/stop', sampleBody: '' },
 
-    { id: 'actions', label: 'GET /api/actions_logs', method: 'GET', path: '/api/actions_logs', sampleBody: '' },
-
-    { id: 'actions-clear', label: 'POST /api/clear_logs', method: 'POST', path: '/api/clear_logs', sampleBody: '' },
-
     { id: 'messages', label: 'GET /api/messages', method: 'GET', path: '/api/messages', sampleBody: '' },
 
     { id: 'messages-clear', label: 'POST /api/clear_messages', method: 'POST', path: '/api/clear_messages', sampleBody: '' },
+
+    { id: 'actions-logs', label: 'GET /api/actions_logs', method: 'GET', path: '/api/actions_logs', sampleBody: '' },
+   
+    { id: 'clear-logs', label: 'POST /api/clear_logs', method: 'POST', path: '/api/clear_logs', sampleBody: '' },
 
     { id: 'readvalue', label: 'POST /api/readvalue', method: 'POST', path: '/api/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
 
@@ -88,33 +90,29 @@
         }
 
         if (protocolMessages.length === 0) {
-            messagesEl.innerHTML = '<div class="acsi-log-empty">No protocol messages yet. Run GET /api/messages.</div>';
+            messagesEl.innerHTML = '<div class="acsi-log-empty">No log messages yet. Click Start to begin monitoring.</div>';
             return;
         }
 
         messagesEl.innerHTML = protocolMessages.map((entry) => {
-            const formatted = JSON.stringify(entry.payload, null, 2);
+            const action = entry.payload;
+            const hasDetail = action.detail && Object.keys(action.detail).length > 0;
+            const detailJson = hasDetail ? JSON.stringify(action.detail, null, 2).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+            const levelClass = action.level === 'error' ? 'message-direction recv' : action.level === 'warning' ? 'message-direction send' : '';
+            
             return `
-                <div class="acsi-log-item acsi-log-info">
+                <div class="acsi-log-item acsi-log-${action.level}">
                     <div class="acsi-log-head">
-                        <span class="acsi-log-time">${escapeForHtml(entry.timestamp)}</span>
-                        <span class="acsi-log-message">GET /api/messages</span>
+                        <span class="acsi-log-time">#${action.id} - ${action.time}</span>
+                        <span class="acsi-log-message ${levelClass}">${escapeForHtml(action.message)}</span>
                     </div>
-                    <pre class="acsi-log-details">${escapeForHtml(formatted)}</pre>
+                    ${hasDetail ? `<pre class="acsi-log-details">${detailJson}</pre>` : ''}
                 </div>
             `;
         }).join('');
     }
 
-    function addProtocolMessagesEntry(payload) {
-        protocolMessages.unshift({
-            timestamp: new Date().toLocaleTimeString(),
-            payload,
-        });
-        if (protocolMessages.length > 30) {
-            protocolMessages = protocolMessages.slice(0, 30);
-        }
-    }
+
 
     function getBffBaseUrl() {
         if (window.app && window.app.bffBaseUrl) {
@@ -412,13 +410,129 @@
         const stopBtn = document.getElementById('acsi-stop-btn');
         const loadModelBtn = document.getElementById('acsi-load-model-btn');
         const reloadBtn = document.getElementById("reloadMessagesBtn");
+        const messagesStartBtn = document.getElementById('messages-start-btn');
+        const messagesStopBtn = document.getElementById('messages-stop-btn');
+        const messagesClearBtn = document.getElementById('messages-clear-btn');
 
 
         const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
         let activeDaSelection = null;
+        let messagesIntervalSelect = document.getElementById('messages-interval');
 
         if (daModalEl) {
             daModalEl.hidden = true;
+        }
+
+        function addProtocolMessagesEntry(messagesArray) {
+            const existingIds = new Set(protocolMessages.map(entry => entry.payload.id));
+            
+            if (Array.isArray(messagesArray)) {
+                messagesArray.forEach(msg => {
+                    if (msg && msg.id && !existingIds.has(msg.id)) {
+                        protocolMessages.unshift({
+                            timestamp: new Date().toLocaleTimeString(),
+                            payload: msg,
+                        });
+                        existingIds.add(msg.id);
+                    }
+                });
+            } else if (messagesArray && messagesArray.id && !existingIds.has(messagesArray.id)) {
+                protocolMessages.unshift({
+                    timestamp: new Date().toLocaleTimeString(),
+                    payload: messagesArray,
+                });
+            }
+            if (protocolMessages.length > 30) {
+                protocolMessages = protocolMessages.slice(0, 30);
+            }
+        }
+
+        function stopMonitoring() {
+            isMonitoring = false;
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                monitorInterval = null;
+            }
+        }
+
+        function updateMessagesStatus(statusText) {
+            const statusEl = document.getElementById('messages-status');
+            if (statusEl) {
+                statusEl.textContent = statusText;
+            }
+        }
+
+        async function fetchActionLogs(targetValue) {
+            const api = getApiById('actions-logs');
+            const result = await executeApiCall(api, targetValue, {});
+            
+            if (result && result.ok && result.payload) {
+                const actions = result.payload.result?.actions || result.payload.actions || [];
+                if (Array.isArray(actions) && actions.length > 0) {
+                    addProtocolMessagesEntry(actions);
+                    renderProtocolMessages();
+                    const statusText = `Last updated: ${new Date().toLocaleTimeString()} - ${targetValue} (${protocolMessages.length} logs)`;
+                    updateMessagesStatus(statusText);
+                }
+            }
+        }
+
+        async function startMonitoring(targetValue) {
+            if (isMonitoring) {
+                return;
+            }
+
+            if (!targetValue) {
+                updateMessagesStatus('Please select an endpoint first');
+                return;
+            }
+
+            stopMonitoring();
+            isMonitoring = true;
+            
+            const startBtn = document.getElementById('messages-start-btn');
+            const stopBtn = document.getElementById('messages-stop-btn');
+            const reloadBtn = document.getElementById('reloadMessagesBtn');
+            
+            if (startBtn) startBtn.disabled = true;
+            if (stopBtn) stopBtn.disabled = false;
+            if (reloadBtn) reloadBtn.disabled = false;
+            
+            updateMessagesStatus(`Monitoring ${targetValue}...`);
+            
+            await fetchActionLogs(targetValue);
+            
+            const interval = messagesIntervalSelect ? parseInt(messagesIntervalSelect.value) : 5000;
+            monitorInterval = setInterval(() => {
+                fetchActionLogs(targetValue);
+            }, interval);
+        }
+
+        async function clearMessages(targetValue) {
+            if (!targetValue) {
+                updateMessagesStatus('Please select an endpoint first');
+                return;
+            }
+
+            const clearApi = getApiById('clear-logs');
+            const result = await executeApiCall(clearApi, targetValue, {});
+            
+            if (result && result.ok) {
+                protocolMessages = [];
+                renderProtocolMessages();
+                updateMessagesStatus('Messages cleared');
+            } else {
+                const message = result ? `HTTP ${result.status}` : 'Unknown error';
+                updateMessagesStatus(`Error clearing messages: ${message}`);
+            }
+            
+            setTimeout(() => {
+                if (isMonitoring) {
+                    updateMessagesStatus(`Monitoring ${targetValue}...`);
+                } else {
+                    updateMessagesStatus(`Ready to monitor ${targetValue}`);
+                }
+            }, 2000);
         }
 
         setModelPanelMessage('Run GET /api/model to load the model tree.');
@@ -567,7 +681,7 @@
                     // keep raw text for non-JSON responses
                 }
 
-                // Handle special cases for model and messages
+                // Handle special cases for model
                 if (selected.id === 'model') {
                     if (response.ok && parsedPayload) {
                         // The BFF wraps the response in a 'result' field
@@ -577,19 +691,6 @@
                         setModelPanelMessage(`Model request failed with HTTP ${response.status}`, true);
                     } else {
                         setModelPanelMessage('Model response is not valid JSON.', true);
-                    }
-                }
-
-                if (selected.id === 'messages') {
-                    if (response.ok && parsedPayload) {
-                        // The BFF wraps the response in a 'result' field
-                        const messagesPayload = (parsedPayload.result && Object.prototype.hasOwnProperty.call(parsedPayload.result, 'messages')
-                            ? parsedPayload.result.messages
-                            : (Object.prototype.hasOwnProperty.call(parsedPayload, 'messages')
-                                ? parsedPayload.messages
-                                : parsedPayload));
-                        addProtocolMessagesEntry(messagesPayload);
-                        renderProtocolMessages();
                     }
                 }
 
@@ -694,7 +795,30 @@
                     console.log('error', 'Reload blocked', 'No selected endpoint address available to resolve target.');
                     return;
                 }
-                await executeApiCall(getApiById('messages'), endpointTarget, {});
+                await fetchActionLogs(endpointTarget);
+            });
+        }
+
+        if (messagesStartBtn) {
+            messagesStartBtn.addEventListener('click', () => {
+                startMonitoring(endpointTarget);
+            });
+        }
+
+        if (messagesStopBtn) {
+            messagesStopBtn.addEventListener('click', () => {
+                stopMonitoring();
+                const startBtn = document.getElementById('messages-start-btn');
+                const stopBtn = document.getElementById('messages-stop-btn');
+                if (startBtn) startBtn.disabled = false;
+                if (stopBtn) stopBtn.disabled = true;
+                updateMessagesStatus(`Ready to monitor ${endpointTarget || 'endpoint'}`);
+            });
+        }
+
+        if (messagesClearBtn) {
+            messagesClearBtn.addEventListener('click', () => {
+                clearMessages(endpointTarget);
             });
         }
 
@@ -775,6 +899,29 @@
                 closeDaModal();
             }
         });
+
+        // Event delegation for message card expand/collapse
+        document.addEventListener('click', (e) => {
+            const header = e.target.closest('.message-header');
+            if (header) {
+                const card = header.closest('.message-card');
+                const body = card.querySelector('.message-body');
+                const icon = header.querySelector('.message-toggle-icon');
+                
+                if (body.style.display === 'none') {
+                    body.style.display = 'block';
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                } else {
+                    body.style.display = 'none';
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+            }
+        });
+
+        // Initialize messages status
+        updateMessagesStatus('Select an endpoint and click Start');
 
         // Auto-load status and model on page load
         (async () => {

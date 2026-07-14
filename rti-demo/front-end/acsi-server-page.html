@@ -65,18 +65,30 @@
         </section>
 
         <section class="acsi-panel acsi-panel-main" id="acsi-api-logs-panel">
-            
-<div class="protocol-header">
-    <button id="reloadMessagesBtn" title="Reload Messages"  class="btn-primary" type="button" aria-label="Reload status" >
-                                <i class="fas fa-rotate-right" aria-hidden="true"></i>
-
-    </button>
-    <span>Protocol Message</span>
-</div>
-
-            <div id="acsi-log-tab-messages" class="acsi-log-tab-panel" role="tabpanel" hidden>
-                <div id="acsi-protocol-messages" class="acsi-log-list"></div>
+            <div class="protocol-header">
+                <h2>Protocol Messages</h2>
+                <div class="monitor-controls">
+                    <select class="monitor-interval-select" id="messages-interval">
+                        <option value="1000">1s</option>
+                        <option value="2000">2s</option>
+                        <option value="5000" selected>5s</option>
+                        <option value="10000">10s</option>
+                    </select>
+                    <button class="btn-icon monitor-control-btn" id="messages-start-btn" title="Start">
+                    <i class="fas fa-play"></i>
+                </button>
+                    <button id="reloadMessagesBtn" title="Reload Messages" class="btn-icon monitor-control-btn">
+                        <i class="fas fa-rotate-right"></i>
+                    </button>
+                    <button class="btn-icon monitor-control-btn" id="messages-stop-btn" title="Pause" disabled>
+                    <i class="fas fa-pause"></i>
+                </button>
+                     <button class=" btn-icon messages-clear-btn" id="monitor1-clear" title="Clear">
+                    <i class="fas fa-trash"></i>
+                </button>
+                </div>
             </div>
+            <div id="acsi-protocol-messages" class="acsi-log-list"></div>
         </section>
     </div>
 
