@@ -3,6 +3,11 @@
    ============================================== */
 
 (function initACSIClientPage() {
+    // Guard against double-loading
+    if (window.__acsiClientPageLoaded) {
+        return;
+    }
+    window.__acsiClientPageLoaded = true;
     // Protocol Messages state
     let protocolMessages = [];
     let isMonitoring = false;
@@ -94,18 +99,6 @@
     }
 
     // ==================== Protocol Messages Helper Functions ====================
-    function escapeHtml(value) {
-        return String(value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    function getApiById(id) {
-        return apiDefinitions.find(api => api.id === id);
-    }
 
     function renderProtocolMessages(rootElement) {
         const messagesEl = rootElement.querySelector('#acsi-protocol-messages');
@@ -284,18 +277,7 @@
                 options.body = JSON.stringify(payload);
             }
 
-            //let payloadToSend = bodyOverride || {};
-
-            //if (selected.method === 'POST') {
-            //    if (targetValue && typeof payloadToSend === 'object' && !Array.isArray(payloadToSend)) {
-            //        payloadToSend.soTarget = targetValue;
-            //    }
-            //    options.body = JSON.stringify(payloadToSend);
-            //}
-
             try {
-                //await ensureBffHealthy();
-
                 const response = await fetch(url, options);
                 const rawText = await response.text();
                 let parsedPayload = null;
@@ -345,6 +327,16 @@
         return `${host}:${port}`;
     }
 
+    function updateEndpointBadge(host, port, name = '') {
+        const nameEl = document.getElementById('endpoint-name');
+        const hostEl = document.getElementById('endpoint-host');
+        const portEl = document.getElementById('endpoint-port');
+        
+        if (nameEl) nameEl.textContent = name || 'Endpoint';
+        if (hostEl) hostEl.textContent = host || 'host';
+        if (portEl) portEl.textContent = port || 'port';
+    }
+
     // ==================== Event Handlers ====================
     function setupEventListeners(rootElement, endpoint) {
         const connectBtn = rootElement.querySelector('#acsi-client-connect-page-btn');
@@ -372,7 +364,10 @@
         // Protocol Messages event listeners
         if (messagesStartBtn) {
             messagesStartBtn.addEventListener('click', () => {
-                startMonitoring(rootElement, endpointTarget);
+                const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
+                const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
+                const target = buildTargetValue(host, port);
+                startMonitoring(rootElement, target);
             });
         }
 
@@ -383,23 +378,32 @@
                 const stopBtn = rootElement.querySelector('#messages-stop-btn');
                 if (startBtn) startBtn.disabled = false;
                 if (stopBtn) stopBtn.disabled = true;
-                updateMessagesStatus(rootElement, `Ready to monitor ${endpointTarget || 'endpoint'}`);
+                const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
+                const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
+                const target = buildTargetValue(host, port);
+                updateMessagesStatus(rootElement, `Ready to monitor ${target || 'endpoint'}`);
             });
         }
 
         if (reloadMessagesBtn) {
             reloadMessagesBtn.addEventListener('click', async () => {
-                if (!endpointTarget) {
+                const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
+                const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
+                const target = buildTargetValue(host, port);
+                if (!target) {
                     console.log('error', 'Reload blocked', 'No selected endpoint address available to resolve target.');
                     return;
                 }
-                await fetchActionLogs(rootElement, endpointTarget);
+                await fetchActionLogs(rootElement, target);
             });
         }
 
         if (messagesClearBtn) {
             messagesClearBtn.addEventListener('click', () => {
-                clearMessages(rootElement, endpointTarget);
+                const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
+                const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
+                const target = buildTargetValue(host, port);
+                clearMessages(rootElement, target);
             });
         }
 
@@ -423,7 +427,7 @@
         }
 
         showStatus(rootElement, 'Connecting...', 'info');
-        const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+        const targetValue = buildTargetValue(host, port);
         const result = await executeApiCall(
             getApiById('connect'),
             targetValue,
@@ -435,6 +439,11 @@
             rootElement.querySelector('#acsi-client-connect-page-btn').disabled = true;
             rootElement.querySelector('#acsi-client-disconnect-page-btn').disabled = false;
             rootElement.querySelector('#acsi-client-fetch-model-btn').disabled = false;
+            updateEndpointBadge(host, port, '');
+            
+            // Enable message monitoring buttons
+            const startBtn = rootElement.querySelector('#messages-start-btn');
+            if (startBtn) startBtn.disabled = false;
         } else {
             const error = result?.payload?.error || result?.rawText || 'Unknown error';
             showStatus(rootElement, `Connection failed: ${error}`, 'error');
@@ -447,7 +456,7 @@
         const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
 
         showStatus(rootElement, 'Disconnecting...', 'info');
-        const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+        const targetValue = buildTargetValue(host, port);
         const result = await executeApiCall(
             getApiById('disconnect'),
             targetValue,
@@ -460,6 +469,14 @@
             rootElement.querySelector('#acsi-client-disconnect-page-btn').disabled = true;
             rootElement.querySelector('#acsi-client-fetch-model-btn').disabled = true;
             rootElement.querySelector('#acsi-client-tree-container-page').style.display = 'none';
+            updateEndpointBadge('', '', '');
+            
+            // Disable message monitoring buttons
+            const startBtn = rootElement.querySelector('#messages-start-btn');
+            const stopBtn = rootElement.querySelector('#messages-stop-btn');
+            if (startBtn) startBtn.disabled = true;
+            if (stopBtn) stopBtn.disabled = true;
+            stopMonitoring();
         } else {
             const error = result?.payload?.error || result?.rawText || 'Unknown error';
             showStatus(rootElement, `Disconnect failed: ${error}`, 'error');
@@ -539,25 +556,18 @@
 
       function asn1TimeStampToISOString(ts) {
           if (!ts || typeof ts.secondSinceEpoch !== 'number') return '';
-          // ASN.1 TimeStamp: seconds since epoch (UTC), fractionOfSecond is optional (microseconds)
           const seconds = ts.secondSinceEpoch;
           let ms = 0;
           if (typeof ts.fractionOfSecond === 'number') {
-            // fractionOfSecond is usually in microseconds (0..16777215)
-            // Convert to milliseconds (3 digits)
             ms = Math.floor(ts.fractionOfSecond / 1000);
           }
-          // Create JS Date from seconds and ms
           const date = new Date((seconds * 1000) + ms);
           return date.toISOString();
       }
 
-      // Helper to extract actual value from wrapped structure
       function extractActualValue(val) {
-        // Handle wrapped format: [{data: {...}}]
         if (Array.isArray(val) && val.length > 0 && val[0] && val[0].data) {
           const dataObj = val[0].data;
-          // If data is an object with a single key (the type), extract that value
           if (typeof dataObj === 'object' && !Array.isArray(dataObj)) {
             const keys = Object.keys(dataObj);
             if (keys.length === 1) {
@@ -569,7 +579,6 @@
         return val;
       }
 
-      // Check if this is a structured value
       if (Array.isArray(valueData) && valueData.length > 0) {
         const firstItem = valueData[0];
 
@@ -577,16 +586,13 @@
           if (firstItem.data.length === 2 &&
               typeof firstItem.data[0] === 'string' &&
               firstItem.data[0] === 'structure') {
-            // This is a structured attribute - show dash
             treeValueSpan.textContent = '—';
-            treeValueSpan.style.color = '#4caf50'; // Green
+            treeValueSpan.style.color = '#4caf50';
             return;
           }
 
-          // Simple value - extract and display
           if (firstItem.data.length === 2 && typeof firstItem.data[0] === 'string') {
             const value = firstItem.data[1];
-            // If ASN.1 TimeStamp object, convert to ISO
             let displayValue = value;
             if (value && typeof value === 'object' && typeof value.secondSinceEpoch === 'number') {
               displayValue = asn1TimeStampToISOString(value) || JSON.stringify(value);
@@ -595,37 +601,25 @@
             } else if (typeof value === 'boolean') {
               displayValue = value ? 'true' : 'false';
             } else if (typeof value === 'object') {
-              // For complex objects (like quality), show clean JSON
               displayValue = JSON.stringify(value);
             }
             treeValueSpan.textContent = displayValue;
-            treeValueSpan.style.color = '#4caf50'; // Green for successful read
+            treeValueSpan.style.color = '#4caf50';
             return;
           }
         }
       }
 
-      // Default display - extract actual value if wrapped
       const actualValue = extractActualValue(valueData);
       treeValueSpan.textContent = JSON.stringify(actualValue);
-      treeValueSpan.style.color = '#4caf50'; // Green
+      treeValueSpan.style.color = '#4caf50';
     }
-
 
     async function readDataValue(objRef, fc, endpoint) {
       console.log('[readDataValue] Reading:', objRef, 'FC:', fc);
-      const targetValue = buildTargetValue(endpoint.host, endpoint.port);
-      //const statusEl = document.getElementById('actionText');
-      //statusEl.textContent = `Reading ${objRef} [${fc}]...`;
-      //statusEl.className = 'info fetching';
-
-      // Ensure the tree node exists in the DOM before reading
-      // This is needed for nested attributes that might not be expanded yet
-      //await ensureTreeNodeExists(objRef);
-
-      // For nested DA sub-attributes (e.g., "mag.f" in "LD0/MMXU1.PhV.phsA.cVal.mag.f"),
-      // we need to ensure the parent DA tree node is expanded so the span exists
-      //await ensureDaTreeNodeExpanded(objRef);
+      const host = document.getElementById('acsi-client-host-page').value.trim();
+      const port = document.getElementById('acsi-client-port-page').value.trim();
+      const targetValue = buildTargetValue(host, port);
 
       try {
         const res = await executeApiCall(
@@ -634,40 +628,33 @@
             { objRef, fc }
         );
 
-        //const data = await res.json();
         const data = res?.payload || { error: 'No response payload' };
         console.log('[readDataValue] Response:', data);
 
         if (data.error) {
-          //statusEl.textContent = `Error reading ${objRef}: ${data.error}`;
-          //statusEl.className = 'error';
           console.log('[readDataValue] Error reading:', objRef, data.error);
           updateTreeValueDisplay(objRef, data.error, true);
         } else {
-          // Format the values for display
-          //const valueStr =
-          //statusEl.textContent = `${objRef} [${fc}]: ${valueStr}`;
-          //statusEl.className = 'info';
-          console.log('[readDataValue] Updating tree display for:', objRef, data.values);
-          updateTreeValueDisplay(objRef, data.result.value, false);
+          console.log('[readDataValue] Updating tree display for:', objRef, data.result?.value);
+          updateTreeValueDisplay(objRef, data.result?.value, false);
         }
       } catch (e) {
         console.error('[readDataValue] Exception:', e);
-        //statusEl.textContent = `Exception reading ${objRef}: ${e.message}`;
-        //statusEl.className = 'error';
         updateTreeValueDisplay(objRef, e.message, true);
       }
     }
 
     async function writeDataValue(objRef, fc, endpoint, value, value_type) {
       console.log('[writeDataValue] Writing:', objRef, 'FC:', fc, 'Value:', value);
-      const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+      const host = document.getElementById('acsi-client-host-page').value.trim();
+      const port = document.getElementById('acsi-client-port-page').value.trim();
+      const targetValue = buildTargetValue(host, port);
 
       try {
         const res = await executeApiCall(
             getApiById('write'),
             targetValue,
-            { objRef, fc, value, value_type }  // ✅ Include value in payload
+            { objRef, fc, value, value_type }
         );
 
         const data = res?.payload || { error: 'No response payload' };
@@ -678,7 +665,6 @@
           throw new Error(data.error);
         }
 
-        // Update UI to show the new value
         updateTreeValueDisplay(objRef, data.result?.value || value, false);
         return data;
       } catch (e) {
@@ -687,7 +673,7 @@
         throw e;
       }
     }
-    // ===== Write Data Value Dialog Functions =====
+
     async function showWriteValueDialog(objRef, fc, endpoint) {
       const modal = document.getElementById('writeValueModal');
       const titleEl = document.getElementById('writeValueTitle');
@@ -700,7 +686,6 @@
       const submitBtn = document.getElementById('writeValueSubmit');
       const cancelBtn = document.getElementById('writeValueCancel');
 
-      // Reset state
       titleEl.textContent = 'Write Data Value';
       objRefEl.textContent = objRef;
       typeEl.textContent = 'Reading...';
@@ -712,12 +697,13 @@
       validationEl.textContent = '';
       resultDiv.classList.add('hidden');
 
-      // Show modal
-      modal.classList.remove('hidden');
-      inputEl.focus();  // ✅ Focus the input immediately
+      modal.classList.add('active');
+      inputEl.focus();
 
-      // Use executeApiCall
-      const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+      const host = document.getElementById('acsi-client-host-page').value.trim();
+      const port = document.getElementById('acsi-client-port-page').value.trim();
+      const targetValue = buildTargetValue(host, port);
+      
       try {
         const res = await executeApiCall(
             getApiById('read'),
@@ -752,7 +738,6 @@
         currentValueEl.textContent = e.message;
       }
 
-      // Button handlers
       submitBtn.onclick = async () => {
         const newValue = inputEl.value.trim();
         if (!newValue) {
@@ -769,7 +754,7 @@
           resultDiv.style.color = '#fff';
           resultDiv.classList.remove('hidden');
           setTimeout(() => {
-            modal.classList.add('hidden');
+            modal.classList.remove('active');
             submitBtn.disabled = false;
           }, 1500);
         } catch (e) {
@@ -781,15 +766,15 @@
         }
       };
 
-      cancelBtn.onclick = () => modal.classList.add('hidden');
+      cancelBtn.onclick = () => modal.classList.remove('active');
       inputEl.addEventListener('keypress', (e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
             submitBtn.click();
           }
         });
-      //inputEl.onkeypress = (e) => e.key === 'Enter' && submitBtn.onclick();
     }
+
     async function showContextMenuForDataAttribute(e, objRef, fc, endpoint) {
         e.preventDefault();
         e.stopPropagation();
@@ -812,7 +797,6 @@
         menu.style.top  = e.clientY + 'px';
         menu.style.display = 'block';
 
-        // Nudge back if it overflows the viewport
         requestAnimationFrame(() => {
             const rect = menu.getBoundingClientRect();
             if (rect.right > window.innerWidth)  menu.style.left = (e.clientX - rect.width) + 'px';
@@ -859,267 +843,25 @@
       parentLi.appendChild(ul);
     }
 
-    async function handleFetchModel(rootElement, endpoint) {
-        const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
-        const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
-        const targetValue = buildTargetValue(endpoint.host, endpoint.port);
-
-
-        const handleNodeClick = async (node) => {
-                if (node.nodeType === 'DO') {
-                    //showStatus(rootElement, `Fetching data definition for ${node.ref}...`, 'info');
-
-                    const existingUl = node.li.querySelector(':scope > ul');
-
-                    if (existingUl) {
-                        return;
-                    }
-                    const ldName = node.ref.split('/')[0];
-                    const lnName = node.ref.split('/')[1].split('.')[0];
-                    const doPath = node.ref.split('/')[1].split('.').slice(1).join('.');
-
-                    const defResult = await executeApiCall(
-                        getApiById('data-definition'),
-                        targetValue,
-                        {ld_inst: ldName, ln_inst: lnName, do_path: doPath}
-                    );
-                    if (defResult && defResult.ok) {
-                        //showStatus(rootElement, `Data definition fetched for ${node.ref}`, 'success');
-                        console.log('Data definition:', defResult.payload);
-                        const dataAttributes = defResult.payload.result.value?.dataAttributeDefinition || [];
-                        const subDataObjects = defResult.payload.result.value?.subDataDefinition || [];
-
-                        const ul = document.createElement('ul');
-                        ul.className = 'scl-tree-list';
-
-                        // Add DAs to the single UL
-                        dataAttributes.forEach((da) => {
-                            const typeSuffix = da.daType[0] ? ` [${da.daType[0]}]` : '';
-                            const daName = da.name || da.daRef.split('.').pop() || 'DA';
-                            const fc = da.fc || 'mx';  // Default to 'mx' if not provided
-                            const daLi = createTreeNode('DA', `${daName}${typeSuffix}`);
-
-                            const daRef = `${node.ref}.${daName}`;   // ← construct it explicitly
-
-
-                            const row = daLi.querySelector(':scope > .scl-tree-row');
-                            row.style.cursor = 'context-menu';
-
-                            //Create the tree-value-display span
-                            const valueDisplaySpan = document.createElement('span');
-                            valueDisplaySpan.className = 'tree-value-display';
-                            valueDisplaySpan.setAttribute('data-obj-ref', daRef);
-                            row.appendChild(valueDisplaySpan);
-
-                            row.addEventListener('contextmenu', (e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                showContextMenuForDataAttribute(e, daRef, fc, endpoint);
-                            });
-
-                            // Add SDAs under this DA (if any)
-                            const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
-                            if (subDas.length > 0) {
-                                const daUl = document.createElement('ul');
-                                daUl.className = 'scl-tree-list';
-                                subDas.forEach((sda) => {
-                                    const sdaTypeSuffix = sda.daType[0] ? ` [${daType[0].bType}]` : '';
-                                    const sdaName = sda.name || sda.daRef.split('.').pop() || 'SDA';
-
-                                    //Create the tree-value-display span for SDAs
-                                    const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
-                                    const sdaValueDisplaySpan = document.createElement('span');
-                                    sdaValueDisplaySpan.className = 'tree-value-display';
-                                    sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
-                                    sdaRow.appendChild(sdaValueDisplaySpan);
-
-
-                                    daUl.appendChild(createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`));
-                                });
-                                daLi.appendChild(daUl);
-                            }
-                            ul.appendChild(daLi);
-                        });
-
-                        // Add SDOs to the same UL
-                        subDataObjects.forEach((sdo) => {
-                            const cdcSuffix = sdo.cdc ? ` [${sdo.cdc}]` : '';
-                            const sdoLi = createTreeNode('SDO', `${sdo.name}${cdcSuffix}`);
-
-                            // Add children under this SDO (if any)
-                            const sdoDas = sdo.dataAttributes || sdo.data_attributes || sdo.da || [];
-                            const sdoSubSdos = sdo.subDataObjects || sdo.sub_data_objects || [];
-                            if (sdoDas.length > 0 || sdoSubSdos.length > 0) {
-                                const sdoUl = document.createElement('ul');
-                                sdoUl.className = 'scl-tree-list';
-                                sdoDas.forEach((da) => {
-                                    const typeSuffix = da.bType ? ` [${da.bType}]` : '';
-                                    const daName = da.name || da.daRef.split('.').pop() || 'DA';
-                                    sdoUl.appendChild(createTreeNode('DA', `${daName}${typeSuffix}`));
-                                });
-                                sdoSubSdos.forEach((nestedSdo) => {
-                                    const nestedCdc = nestedSdo.cdc ? ` [${nestedSdo.cdc}]` : '';
-                                    sdoUl.appendChild(createTreeNode('SDO', `${nestedSdo.name}${nestedCdc}`));
-                                });
-                                sdoLi.appendChild(sdoUl);
-                            }
-                            ul.appendChild(sdoLi);
-                        });
-
-                       node.li.appendChild(ul);
-
-                        if (ul.children.length > 0) {
-                            const row = node.li.querySelector(':scope > .scl-tree-row');
-                            const toggle = row.querySelector('.scl-tree-toggle');
-
-                            toggle.classList.remove('hidden');
-                            node.li.classList.add('has-children', 'expanded');
-                            toggle.textContent = '▾';
-                            ul.style.display = '';
-
-                            const onToggle = () => {
-                                const expanded = node.li.classList.toggle('expanded');
-                                toggle.textContent = expanded ? '▾' : '▸';
-                                ul.style.display = expanded ? '' : 'none';
-                            };
-
-                            toggle.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                onToggle();
-                            });
-                        }
-                    }
-                    else
-                    {
-                        const error = defResult?.payload?.error || defResult?.rawText || 'Failed to fetch data definition';
-                        console.log(`Error fetching data definition for ${node.ref}:`, error);
-                        //showStatus(rootElement, error, 'error');
-                    }
-                }
-                else if (node.nodeType == "DataSet") {
-                    const existingUl = node.li.querySelector(':scope > ul');
-                     if (existingUl) {
-                        return;
-                    }
-                    console.log('[handleNodeClick] DataSet node clicked:', node.ref, 'Existing UL:', existingUl);
-                    const ld_name = node.ref.split('/')[0];
-                    const ln_inst = node.ref.split('/')[1].split('.')[0];
-                    const dsName = node.ref.split('/')[1].split('.')[1];
-
-                    const defResult = await executeApiCall(
-                        getApiById('dataset-directory'),
-                        targetValue,
-                        {ld_inst: ld_name, ln_inst: ln_inst, ds_inst: dsName}
-                    );
-                    if (defResult && defResult.ok) {
-                        console.log('DataSet definition:', defResult.payload);
-                        const dataAttributes = defResult.payload.result.value;
-
-                         // ✅ Create UL for DAs
-                        const ul = document.createElement('ul');
-                        ul.className = 'scl-tree-list';
-
-                        for(const da of dataAttributes) {
-                            const objRef = da.ref;
-                            const fc = da.fc;
-
-                            const typeSuffix = da.bType ? ` [${da.bType}]` : '';
-                            const daLi = createTreeNode('FCDA', objRef + ` [${fc}]`);
-                            const row = daLi.querySelector(':scope > .scl-tree-row');
-                            row.style.cursor = 'context-menu';
-
-                            //Create the tree-value-display span
-                            const valueDisplaySpan = document.createElement('span');
-                            valueDisplaySpan.className = 'tree-value-display';
-                            valueDisplaySpan.setAttribute('data-obj-ref', `${node.ref}.${da.daRef}`);
-                            row.appendChild(valueDisplaySpan);
-
-                            ul.appendChild(daLi);
-                        }
-                        node.li.appendChild(ul);
-
-                        if (ul.children.length > 0) {
-                            const row = node.li.querySelector(':scope > .scl-tree-row');
-                            const toggle = row.querySelector('.scl-tree-toggle');
-
-                            toggle.classList.remove('hidden');
-                            node.li.classList.add('has-children', 'expanded');
-                            toggle.textContent = '▾';
-                            ul.style.display = '';
-
-                            toggle.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                const expanded = node.li.classList.toggle('expanded');
-                                toggle.textContent = expanded ? '▾' : '▸';
-                                ul.style.display = expanded ? '' : 'none';
-                            });
-                        }
-                    }
-                }
-        }
-
-
-        showStatus(rootElement, 'Fetching model...', 'info');
-        const result = await executeApiCall(
-            getApiById('model-tree'),
-            targetValue,
-            null
-        );
-
-        if (result && result.ok) {
-            const treeContainer = rootElement.querySelector('#acsi-client-tree-container-page');
-            const treeContent = rootElement.querySelector('#acsi-client-tree-content');
-            renderLiveModelTree(result.payload || {}, treeContent, handleNodeClick);
-            //treeContent.innerHTML = `<pre>${JSON.stringify(result.payload || {}, null, 2)}</pre>`;
-            treeContainer.style.display = 'block';
-            showStatus(rootElement, 'Model fetched successfully', 'success');
-        }
-         else {
-            const error = result?.payload?.error || result?.rawText || 'Failed to fetch model';
-            showStatus(rootElement, error, 'error');
-        }
-    }
-
-    // ==================== Render Function ====================
-    function setupCollapsibleTree(container) {
-      const treeItems = container.querySelectorAll('.scl-tree-item');
-
-      treeItems.forEach(function (item) {
-        const row = item.querySelector(':scope > .scl-tree-row');
-        const toggle = row ? row.querySelector('.scl-tree-toggle') : null;
-        const childList = item.querySelector(':scope > .scl-tree-list');
-
-        if (!row || !toggle) {
-          return;
-        }
-
-        if (!childList || childList.children.length === 0) {
-          toggle.classList.add('hidden');
-          return;
-        }
-
-        item.classList.add('has-children', 'expanded');
-        toggle.textContent = '▾';
-
-
-        // 👇 CRITICAL: Remove 'hidden' when children exist
-        toggle.classList.remove('hidden');
-        item.classList.add('has-children', 'expanded');
-        toggle.textContent = '▾';
-
-        const onToggle = function () {
-          const isExpanded = item.classList.toggle('expanded');
-          toggle.textContent = isExpanded ? '▾' : '▸';
-          childList.style.display = isExpanded ? '' : 'none';
+    function nodeTypeLabel(type) {
+        const labels = {
+            'LDevice': 'LD',
+            'LogicalNode': 'LN',
+            'DO': 'DO',
+            'DA': 'DA',
+            'SDA': 'SDA',
+            'SDO': 'SDO',
+            'DataSet': 'DataSet',
+            'ReportControl': 'RC',
+            'Group': '',
+            'FCDA': 'FCDA'
         };
-
-        toggle.addEventListener('click', function (event) {
-          event.stopPropagation();
-          onToggle();
-        });
-      });
+        return labels[type] || type || '';
     }
 
+    function normalizeNodeType(type) {
+        return (type || '').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    }
 
     function createTreeNode(nodeType, value) {
       const li = document.createElement('li');
@@ -1162,6 +904,276 @@
       parentLi.appendChild(ul);
     }
 
+    async function handleFetchModel(rootElement, endpoint) {
+        const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
+        const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
+        const targetValue = buildTargetValue(host, port);
+
+        const handleNodeClick = async (node) => {
+                if (node.nodeType === 'DO') {
+                    const existingUl = node.li.querySelector(':scope > ul');
+
+                    if (existingUl) {
+                        return;
+                    }
+                    const ldName = node.ref.split('/')[0];
+                    const lnName = node.ref.split('/')[1].split('.')[0];
+                    const doPath = node.ref.split('/')[1].split('.').slice(1).join('.');
+
+                    const defResult = await executeApiCall(
+                        getApiById('data-definition'),
+                        targetValue,
+                        {ld_inst: ldName, ln_inst: lnName, do_path: doPath}
+                    );
+                    if (defResult && defResult.ok) {
+                        console.log('Data definition:', defResult.payload);
+                        const dataAttributes = defResult.payload.result.value?.dataAttributeDefinition || [];
+                        const subDataObjects = defResult.payload.result.value?.subDataDefinition || [];
+
+                        const ul = document.createElement('ul');
+                        ul.className = 'scl-tree-list';
+
+                        dataAttributes.forEach((da) => {
+                            const typeSuffix = da.daType[0] ? ` [${da.daType[0]}]` : '';
+                            const daName = da.name || da.daRef.split('.').pop() || 'DA';
+                            const fc = da.fc || 'mx';
+                            const daLi = createTreeNode('DA', `${daName}${typeSuffix}`);
+
+                            const daRef = `${node.ref}.${daName}`;
+
+                            const row = daLi.querySelector(':scope > .scl-tree-row');
+                            row.style.cursor = 'context-menu';
+
+                            const valueDisplaySpan = document.createElement('span');
+                            valueDisplaySpan.className = 'tree-value-display';
+                            valueDisplaySpan.setAttribute('data-obj-ref', daRef);
+                            row.appendChild(valueDisplaySpan);
+
+                            row.addEventListener('contextmenu', (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                showContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                            });
+
+                            const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
+                            if (subDas.length > 0) {
+                                const daUl = document.createElement('ul');
+                                daUl.className = 'scl-tree-list';
+                                subDas.forEach((sda) => {
+                                    const sdaTypeSuffix = sda.daType[0] ? ` [${sda.daType[0].bType}]` : '';
+                                    const sdaName = sda.name || sda.daRef.split('.').pop() || 'SDA';
+                                    const sdaRef = `${daRef}.${sdaName}`;
+
+                                    const sdaLi = createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`);
+                                    const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
+                                    const sdaValueDisplaySpan = document.createElement('span');
+                                    sdaValueDisplaySpan.className = 'tree-value-display';
+                                    sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
+                                    sdaRow.appendChild(sdaValueDisplaySpan);
+
+                                    sdaRow.style.cursor = 'context-menu';
+                                    sdaRow.addEventListener('contextmenu', (e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        showContextMenuForDataAttribute(e, sdaRef, fc, endpoint);
+                                    });
+
+                                    daUl.appendChild(sdaLi);
+                                });
+                                daLi.appendChild(daUl);
+                            }
+                            ul.appendChild(daLi);
+                        });
+
+                        subDataObjects.forEach((sdo) => {
+                            const cdcSuffix = sdo.cdc ? ` [${sdo.cdc}]` : '';
+                            const sdoLi = createTreeNode('SDO', `${sdo.name}${cdcSuffix}`);
+
+                            const sdoDas = sdo.dataAttributes || sdo.data_attributes || sdo.da || [];
+                            const sdoSubSdos = sdo.subDataObjects || sdo.sub_data_objects || [];
+                            if (sdoDas.length > 0 || sdoSubSdos.length > 0) {
+                                const sdoUl = document.createElement('ul');
+                                sdoUl.className = 'scl-tree-list';
+                                sdoDas.forEach((da) => {
+                                    const typeSuffix = da.bType ? ` [${da.bType}]` : '';
+                                    const daName = da.name || da.daRef.split('.').pop() || 'DA';
+                                    const daRef = `${node.ref}.${sdo.name}.${daName}`;
+                                    const daLi = createTreeNode('DA', `${daName}${typeSuffix}`);
+                                    
+                                    const daRow = daLi.querySelector(':scope > .scl-tree-row');
+                                    const valueDisplaySpan = document.createElement('span');
+                                    valueDisplaySpan.className = 'tree-value-display';
+                                    valueDisplaySpan.setAttribute('data-obj-ref', daRef);
+                                    daRow.appendChild(valueDisplaySpan);
+                                    daRow.style.cursor = 'context-menu';
+                                    daRow.addEventListener('contextmenu', (e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        showContextMenuForDataAttribute(e, daRef, da.fc || 'mx', endpoint);
+                                    });
+                                    
+                                    sdoUl.appendChild(daLi);
+                                });
+                                sdoSubSdos.forEach((nestedSdo) => {
+                                    const nestedCdc = nestedSdo.cdc ? ` [${nestedSdo.cdc}]` : '';
+                                    sdoUl.appendChild(createTreeNode('SDO', `${nestedSdo.name}${nestedCdc}`));
+                                });
+                                sdoLi.appendChild(sdoUl);
+                            }
+                            ul.appendChild(sdoLi);
+                        });
+
+                       node.li.appendChild(ul);
+
+                        if (ul.children.length > 0) {
+                            const row = node.li.querySelector(':scope > .scl-tree-row');
+                            const toggle = row.querySelector('.scl-tree-toggle');
+
+                            toggle.classList.remove('hidden');
+                            node.li.classList.add('has-children', 'expanded');
+                            toggle.textContent = '▾';
+                            ul.style.display = '';
+
+                            const onToggle = () => {
+                                const expanded = node.li.classList.toggle('expanded');
+                                toggle.textContent = expanded ? '▾' : '▸';
+                                ul.style.display = expanded ? '' : 'none';
+                            };
+
+                            toggle.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                onToggle();
+                            });
+                        }
+                    }
+                    else
+                    {
+                        const error = defResult?.payload?.error || defResult?.rawText || 'Failed to fetch data definition';
+                        console.log(`Error fetching data definition for ${node.ref}:`, error);
+                    }
+                }
+                else if (node.nodeType == "DataSet") {
+                    const existingUl = node.li.querySelector(':scope > ul');
+                     if (existingUl) {
+                        return;
+                    }
+                    console.log('[handleNodeClick] DataSet node clicked:', node.ref, 'Existing UL:', existingUl);
+                    const ld_name = node.ref.split('/')[0];
+                    const ln_inst = node.ref.split('/')[1].split('.')[0];
+                    const dsName = node.ref.split('/')[1].split('.')[1];
+
+                    const defResult = await executeApiCall(
+                        getApiById('dataset-directory'),
+                        targetValue,
+                        {ld_inst: ld_name, ln_inst: ln_inst, ds_inst: dsName}
+                    );
+                    if (defResult && defResult.ok) {
+                        console.log('DataSet definition:', defResult.payload);
+                        const dataAttributes = defResult.payload.result.value;
+
+                         const ul = document.createElement('ul');
+                        ul.className = 'scl-tree-list';
+
+                        for(const da of dataAttributes) {
+                            const objRef = da.ref;
+                            const fc = da.fc;
+
+                            const typeSuffix = da.bType ? ` [${da.bType}]` : '';
+                            const daLi = createTreeNode('FCDA', objRef + ` [${fc}]`);
+                            const row = daLi.querySelector(':scope > .scl-tree-row');
+                            row.style.cursor = 'context-menu';
+
+                            const valueDisplaySpan = document.createElement('span');
+                            valueDisplaySpan.className = 'tree-value-display';
+                            valueDisplaySpan.setAttribute('data-obj-ref', `${node.ref}.${da.daRef}`);
+                            row.appendChild(valueDisplaySpan);
+
+                            row.addEventListener('contextmenu', (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                showContextMenuForDataAttribute(e, `${node.ref}.${da.daRef}`, fc, endpoint);
+                            });
+
+                            ul.appendChild(daLi);
+                        }
+                        node.li.appendChild(ul);
+
+                        if (ul.children.length > 0) {
+                            const row = node.li.querySelector(':scope > .scl-tree-row');
+                            const toggle = row.querySelector('.scl-tree-toggle');
+
+                            toggle.classList.remove('hidden');
+                            node.li.classList.add('has-children', 'expanded');
+                            toggle.textContent = '▾';
+                            ul.style.display = '';
+
+                            toggle.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const expanded = node.li.classList.toggle('expanded');
+                                toggle.textContent = expanded ? '▾' : '▸';
+                                ul.style.display = expanded ? '' : 'none';
+                            });
+                        }
+                    }
+                }
+        }
+
+        showStatus(rootElement, 'Fetching model...', 'info');
+        const result = await executeApiCall(
+            getApiById('model-tree'),
+            targetValue,
+            null
+        );
+
+        if (result && result.ok) {
+            const treeContainer = rootElement.querySelector('#acsi-client-tree-container-page');
+            const treeContent = rootElement.querySelector('#acsi-client-tree-content');
+            renderLiveModelTree(result.payload || {}, treeContent, handleNodeClick);
+            treeContainer.style.display = 'block';
+            showStatus(rootElement, 'Model fetched successfully', 'success');
+        }
+         else {
+            const error = result?.payload?.error || result?.rawText || 'Failed to fetch model';
+            showStatus(rootElement, error, 'error');
+        }
+    }
+
+    function setupCollapsibleTree(container) {
+      const treeItems = container.querySelectorAll('.scl-tree-item');
+
+      treeItems.forEach(function (item) {
+        const row = item.querySelector(':scope > .scl-tree-row');
+        const toggle = row ? row.querySelector('.scl-tree-toggle') : null;
+        const childList = item.querySelector(':scope > .scl-tree-list');
+
+        if (!row || !toggle) {
+          return;
+        }
+
+        if (!childList || childList.children.length === 0) {
+          toggle.classList.add('hidden');
+          return;
+        }
+
+        item.classList.add('has-children', 'expanded');
+        toggle.textContent = '▾';
+
+        toggle.classList.remove('hidden');
+        item.classList.add('has-children', 'expanded');
+        toggle.textContent = '▾';
+
+        const onToggle = function () {
+          const isExpanded = item.classList.toggle('expanded');
+          toggle.textContent = isExpanded ? '▾' : '▸';
+          childList.style.display = isExpanded ? '' : 'none';
+        };
+
+        toggle.addEventListener('click', function (event) {
+          event.stopPropagation();
+          onToggle();
+        });
+      });
+    }
 
     function renderLiveModelTree(data, containerOrId, onNodeClick) {
       var container = typeof containerOrId === 'string'
@@ -1201,7 +1213,7 @@
           row.classList.add('lm-selected');
 
           if (onNodeClick) {
-            onNodeClick({ ref: ref, fc: fc, nodeType: nodeType, li});
+            onNodeClick({ ref: ref, fc: fc, nodeType: nodeType, li: li });
           }
 
             const childList = li.querySelector(':scope > .scl-tree-list');
@@ -1214,7 +1226,6 @@
             }
         });
       }
-
 
       lds.forEach(function (ld) {
         var ldName = (typeof ld === 'object' ? ld.name : ld) || 'LD';
@@ -1307,7 +1318,6 @@
               doUl.appendChild(doLi);
             });
 
-
             lnLi.appendChild(doUl);
           }
 
@@ -1323,136 +1333,38 @@
 
       container.appendChild(root);
       setupCollapsibleTree(container);
-
-      window.SCLTree = {
-        buildSclTreeFromText,
-        renderSclTree,
-        loadSclFileAndRender
-      };
     }
 
-    function render(rootElement, selectedEndpoint) {
-        if (!rootElement) return;
-
-        const endpoint = selectedEndpoint || {};
-        const host = escapeHtml(endpoint.host || '');
-        const port = escapeHtml(endpoint.port || '');
-        const name = escapeHtml(endpoint.name || '');
-
-        const defaultWsIP = "0.0.0.0";
-        const defaultWsPort = "8765"
-
-        rootElement.innerHTML = `
-            <div class="page-header">
-                <div style="display:flex; align-items:center; gap:16px;">
-                    <h1><i class="fas fa-microchip" style="margin-right:10px; color:var(--primary-light);"></i>ACSI Client</h1>
-                    <span class="acsi-endpoint-badge" style="display:inline-block; padding:4px 12px; background:var(--info-color); color:white; border-radius:4px; font-size:12px;">
-                        ${name} · ${host}:${port}
-                    </span>
-                </div>
-            </div>
-
-            <div style="margin-top:24px;">
-                <h2>Connection Settings</h2>
-                <div style="display:flex; gap:16px; margin-top:16px;">
-                    <div class="form-group">
-                        <label for="acsi-client-host-page">Host</label>
-                        <input type="text" id="acsi-client-host-page" value="${defaultWsIP}" placeholder="127.0.0.1">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="acsi-client-port-page">Port</label>
-                        <input type="number" id="acsi-client-port-page" value="${defaultWsPort}" placeholder="102">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="acsi-client-cp-page">Connection Point (CP)</label>
-                        <input type="text" id="acsi-client-cp-page" value="cp1" placeholder="cp1">
-                    </div>
-                </div>
-
-                <div style="margin-top:24px; display:flex; gap:12px;">
-                    <button id="acsi-client-connect-page-btn" class="btn-primary" style="padding:10px 20px;">
-                        <i class="fas fa-plug" style="margin-right:8px;"></i>
-                        Connect
-                    </button>
-                    <button id="acsi-client-disconnect-page-btn" class="btn-secondary" style="padding:10px 20px;">
-                        <i class="fas fa-plug" style="margin-right:8px;"></i>
-                        Disconnect
-                    </button>
-                </div>
-            </div>
-
-            <div id="acsi-client-status" style="margin-top:24px; padding:16px; background:var(--bg-secondary); border-radius:8px; display:none;">
-                <h3>Status</h3>
-                <div id="acsi-client-status-message" style="margin-top:8px; color:var(--text-muted);"></div>
-            </div>
-
-            <div id="acsi-client-tree-page" style="margin-top:24px;">
-                <h2>Server Model</h2>
-                <button id="acsi-client-fetch-model-btn" class="btn-primary" style="margin-top:12px; padding:10px 20px;">
-                    <i class="fas fa-download" style="margin-right:8px;"></i>
-                    Fetch Model
-                </button>
-                <div id="acsi-client-tree-container-page" style="margin-top:16px; padding:16px; background:var(--bg-secondary); border-radius:8px; display:none;">
-                    <div id="acsi-client-tree-content" style="max-height:600px; overflow-y:auto; color:var(--text-secondary);"></div>
-            </div>
-            <div id="writeValueModal" class="modal hidden" style="
-                position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(0,0,0,0.7);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 9999;">
-              <div class="modal-content" style="
-                  background: #1e1e1e;
-                  color: #e0e0e0;
-                  padding: 24px;
-                  border-radius: 8px;
-                  width: 500px;
-                  max-width: 90%;
-                  max-height: 80vh;
-                  overflow-y: auto;
-                  box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-                <h2 id="writeValueTitle" style="margin-top: 0; color: #fff;">Write Data Value</h2>
-                <div style="margin-bottom: 16px; color: #ccc;">
-                  <div><strong>Reference:</strong> <span id="writeValueObjRef" style="color: #4fc3f7;"></span></div>
-                  <div><strong>Type:</strong> <span id="writeValueType" style="color: #ffc107;"></span></div>
-                  <div><strong>Current:</strong> <span id="writeValueCurrent" style="color: #8bc34a;"></span></div>
-                </div>
-                <input type="text" id="writeValueInput" style="
-                    width: 100%;
-                    padding: 10px;
-                    box-sizing: border-box;
-                    margin-bottom: 12px;
-                    background: #2d2d2d;
-                    color: #e0e0e0;
-                    border: 1px solid #444;
-                    border-radius: 4px;
-                    font-size: 14px;"
-                   placeholder="Enter new value">
-                <div id="writeValueValidation" style="color: #f44336; margin-bottom: 16px; min-height: 20px;"></div>
-                <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                  <button id="writeValueCancel" class="btn-secondary" style="padding: 8px 16px;">Cancel</button>
-                  <button id="writeValueSubmit" class="btn-primary" style="padding: 8px 16px;">Write</button>
-                </div>
-                <div id="writeValueResult" class="hidden" style="
-                    margin-top: 16px;
-                    padding: 12px;
-                    border-radius: 4px;
-                    text-align: center;"></div>
-              </div>
-            </div>
-
-        </div>
-        `;
-
-        setupEventListeners(rootElement, endpoint);
+    // Initialize the page
+    function init() {
+        const rootElement = document.querySelector('.acsi-server-page') || document.body;
+        
+        // Initialize with empty endpoint
+        setupEventListeners(rootElement, {});
         renderProtocolMessages(rootElement);
+        
+        // Disable buttons that need connection first
+        const fetchModelBtn = document.getElementById('acsi-client-fetch-model-btn');
+        if (fetchModelBtn) fetchModelBtn.disabled = true;
+        const disconnectBtn = document.getElementById('acsi-client-disconnect-page-btn');
+        if (disconnectBtn) disconnectBtn.disabled = true;
+        const startBtn = document.getElementById('messages-start-btn');
+        if (startBtn) startBtn.disabled = true;
+        const stopBtn = document.getElementById('messages-stop-btn');
+        if (stopBtn) stopBtn.disabled = true;
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
     }
 
     window.ACSIClientPage = {
-        render,
+        init,
+        executeApiCall,
+        renderLiveModelTree,
+        handleFetchModel
     };
 })();

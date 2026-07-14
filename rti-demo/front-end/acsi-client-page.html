@@ -1,5 +1,69 @@
-<div class="acsi-server-page">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACSI Client</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="acsi-client-page.css">
+</head>
+<body>
+    <div class="acsi-server-page">
+        <div class="page-header">
+            <div style="display:flex; align-items:center; gap:16px;">
+                <h1><i class="fas fa-microchip" style="margin-right:10px; color:var(--primary-light);"></i>ACSI Client</h1>
+                <span class="acsi-endpoint-badge" style="display:inline-block; padding:4px 12px; background:var(--info-color); color:white; border-radius:4px; font-size:12px;">
+                    <span id="endpoint-name">Endpoint</span> · <span id="endpoint-host">host</span>:<span id="endpoint-port">port</span>
+                </span>
+            </div>
+        </div>
 
+        <div style="margin-top:24px;">
+            <h2>Connection Settings</h2>
+            <div style="display:flex; gap:16px; margin-top:16px;">
+                <div class="form-group">
+                    <label for="acsi-client-host-page">Host</label>
+                    <input type="text" id="acsi-client-host-page" value="0.0.0.0" placeholder="127.0.0.1">
+                </div>
+
+                <div class="form-group">
+                    <label for="acsi-client-port-page">Port</label>
+                    <input type="number" id="acsi-client-port-page" value="8765" placeholder="102">
+                </div>
+
+                <div class="form-group">
+                    <label for="acsi-client-cp-page">Connection Point (CP)</label>
+                    <input type="text" id="acsi-client-cp-page" value="cp1" placeholder="cp1">
+                </div>
+            </div>
+
+            <div style="margin-top:24px; display:flex; gap:12px;">
+                <button id="acsi-client-connect-page-btn" class="btn-primary" style="padding:10px 20px;">
+                    <i class="fas fa-plug" style="margin-right:8px;"></i>
+                    Connect
+                </button>
+                <button id="acsi-client-disconnect-page-btn" class="btn-secondary" style="padding:10px 20px;" disabled>
+                    <i class="fas fa-plug" style="margin-right:8px;"></i>
+                    Disconnect
+                </button>
+            </div>
+        </div>
+
+        <div id="acsi-client-status" style="margin-top:24px; padding:16px; background:var(--bg-secondary); border-radius:8px; display:none;">
+            <h3>Status</h3>
+            <div id="acsi-client-status-message" style="margin-top:8px; color:var(--text-muted);"></div>
+        </div>
+
+        <div id="acsi-client-tree-page" style="margin-top:24px;">
+            <h2>Server Model</h2>
+            <button id="acsi-client-fetch-model-btn" class="btn-primary" style="margin-top:12px; padding:10px 20px;" disabled>
+                <i class="fas fa-download" style="margin-right:8px;"></i>
+                Fetch Model
+            </button>
+            <div id="acsi-client-tree-container-page" style="margin-top:16px; padding:16px; background:var(--bg-secondary); border-radius:8px; display:none;">
+                <div id="acsi-client-tree-content" style="max-height:600px; overflow-y:auto; color:var(--text-secondary);"></div>
+            </div>
+        </div>
 
         <section class="acsi-panel acsi-panel-main" id="acsi-api-logs-panel">
             <div class="protocol-header">
@@ -19,7 +83,7 @@
                         <i class="fas fa-rotate-right" aria-hidden="true"></i>
                         Reload
                     </button>
-                    <button id="messages-stop-btn" class="btn-primary" type="button" title="Stop">
+                    <button id="messages-stop-btn" class="btn-primary" type="button" title="Stop" disabled>
                         <i class="fas fa-stop"></i>
                         Stop
                     </button>
@@ -32,6 +96,26 @@
             </div>
             <div id="acsi-protocol-messages" class="acsi-log-list"></div>
         </section>
+
+        <div id="writeValueModal" class="modal">
+            <div class="modal-content">
+                <h2 id="writeValueTitle">Write Data Value</h2>
+                <div style="margin-bottom: 16px; color: #ccc;">
+                    <div><strong>Reference:</strong> <span id="writeValueObjRef" style="color: #4fc3f7;"></span></div>
+                    <div><strong>Type:</strong> <span id="writeValueType" style="color: #ffc107;"></span></div>
+                    <div><strong>Current:</strong> <span id="writeValueCurrent" style="color: #8bc34a;"></span></div>
+                </div>
+                <input type="text" id="writeValueInput" placeholder="Enter new value">
+                <div id="writeValueValidation" style="color: #f44336; margin-bottom: 16px; min-height: 20px;"></div>
+                <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                    <button id="writeValueCancel" class="btn-secondary" style="padding: 8px 16px;">Cancel</button>
+                    <button id="writeValueSubmit" class="btn-primary" style="padding: 8px 16px;">Write</button>
+                </div>
+                <div id="writeValueResult" class="hidden" style="margin-top: 16px; padding: 12px; border-radius: 4px; text-align: center;"></div>
+            </div>
+        </div>
     </div>
 
-</div>
+    <script src="acsi-client-page.js"></script>
+</body>
+</html>
