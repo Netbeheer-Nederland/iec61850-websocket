@@ -67,26 +67,31 @@
         <section class="acsi-panel acsi-panel-main" id="acsi-api-logs-panel">
             <div class="protocol-header">
                 <h2>Protocol Messages</h2>
-                <div class="monitor-controls">
+                <div class="message-controls">
                     <select class="monitor-interval-select" id="messages-interval">
                         <option value="1000">1s</option>
                         <option value="2000">2s</option>
                         <option value="5000" selected>5s</option>
                         <option value="10000">10s</option>
                     </select>
-                    <button class="btn-icon monitor-control-btn" id="messages-start-btn" title="Start">
-                    <i class="fas fa-play"></i>
-                </button>
-                    <button id="reloadMessagesBtn" title="Reload Messages" class="btn-icon monitor-control-btn">
-                        <i class="fas fa-rotate-right"></i>
+                    <button id="messages-start-btn" class="btn-primary" type="button" title="Start">
+                        <i class="fas fa-play"></i>
+                        Start
                     </button>
-                    <button class="btn-icon monitor-control-btn" id="messages-stop-btn" title="Pause" disabled>
-                    <i class="fas fa-pause"></i>
-                </button>
-                     <button class=" btn-icon messages-clear-btn" id="monitor1-clear" title="Clear">
-                    <i class="fas fa-trash"></i>
-                </button>
+                    <button id="reloadMessagesBtn" title="Reload Messages" class="btn-primary" type="button" aria-label="Reload Messages">
+                        <i class="fas fa-rotate-right" aria-hidden="true"></i>
+                        Reload
+                    </button>
+                    <button id="messages-stop-btn" class="btn-primary" type="button" title="Stop">
+                        <i class="fas fa-stop"></i>
+                        Stop
+                    </button>
+                    <button id="messages-clear-btn" class="btn-primary" type="button" title="Clear">
+                        <i class="fas fa-trash"></i>
+                        Clear
+                    </button>
                 </div>
+                <div class="monitor-status" id="messages-status">Select an endpoint and click Start</div>
             </div>
             <div id="acsi-protocol-messages" class="acsi-log-list"></div>
         </section>

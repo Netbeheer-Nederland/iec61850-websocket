@@ -3,6 +3,10 @@
    ============================================== */
 
 (function initACSIClientPage() {
+    // Protocol Messages state
+    let protocolMessages = [];
+    let isMonitoring = false;
+    let monitorInterval = null;
 
     // Put this at the top of initACSIClientPage(), outside all other functions
     document.addEventListener('click', () => hideContextMenu());
@@ -21,6 +25,8 @@
         { id: 'read', label: 'POST /api/readvalue', method: 'POST', path: '/api/readvalue' },
         { id: 'write', label: 'POST /api/writevalue', method: 'POST', path: '/api/writevalue' },
         { id: 'dataset-directory', label: 'POST /api/getDataSetDirectory', method: 'POST', path: '/api/getDataSetDirectory' },
+        { id: 'actions-logs', label: 'GET /api/actions_logs', method: 'GET', path: '/api/actions_logs', sampleBody: '' },
+        { id: 'clear-logs', label: 'POST /api/clear_logs', method: 'POST', path: '/api/clear_logs', sampleBody: '' },
     ];
 
     function getApiById(id) {
@@ -85,6 +91,162 @@
         if (String(bffStatus || '').toLowerCase() !== 'ok') {
             throw new Error('BFF health check returned non-ok status');
         }
+    }
+
+    // ==================== Protocol Messages Helper Functions ====================
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function getApiById(id) {
+        return apiDefinitions.find(api => api.id === id);
+    }
+
+    function renderProtocolMessages(rootElement) {
+        const messagesEl = rootElement.querySelector('#acsi-protocol-messages');
+        if (!messagesEl) {
+            return;
+        }
+
+        if (protocolMessages.length === 0) {
+            messagesEl.innerHTML = '<div class="acsi-log-empty">No log messages yet. Click Start to begin monitoring.</div>';
+            return;
+        }
+
+        messagesEl.innerHTML = protocolMessages.map((entry) => {
+            const action = entry.payload;
+            const hasDetail = action.detail && Object.keys(action.detail).length > 0;
+            const detailJson = hasDetail ? JSON.stringify(action.detail, null, 2).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+            const levelClass = action.level === 'error' ? 'message-direction recv' : action.level === 'warning' ? 'message-direction send' : '';
+            
+            return `
+                <div class="acsi-log-item acsi-log-${action.level}">
+                    <div class="acsi-log-head">
+                        <span class="acsi-log-time">#${action.id} - ${action.time}</span>
+                        <span class="acsi-log-message ${levelClass}">${escapeHtml(action.message)}</span>
+                    </div>
+                    ${hasDetail ? `<pre class="acsi-log-details">${detailJson}</pre>` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    function addProtocolMessagesEntry(messagesArray) {
+        const existingIds = new Set(protocolMessages.map(entry => entry.payload.id));
+        
+        if (Array.isArray(messagesArray)) {
+            messagesArray.forEach(msg => {
+                if (msg && msg.id && !existingIds.has(msg.id)) {
+                    protocolMessages.unshift({
+                        timestamp: new Date().toLocaleTimeString(),
+                        payload: msg,
+                    });
+                    existingIds.add(msg.id);
+                }
+            });
+        } else if (messagesArray && messagesArray.id && !existingIds.has(messagesArray.id)) {
+            protocolMessages.unshift({
+                timestamp: new Date().toLocaleTimeString(),
+                payload: messagesArray,
+            });
+        }
+        if (protocolMessages.length > 30) {
+            protocolMessages = protocolMessages.slice(0, 30);
+        }
+    }
+
+    function stopMonitoring() {
+        isMonitoring = false;
+        if (monitorInterval) {
+            clearInterval(monitorInterval);
+            monitorInterval = null;
+        }
+    }
+
+    function updateMessagesStatus(rootElement, statusText) {
+        const statusEl = rootElement.querySelector('#messages-status');
+        if (statusEl) {
+            statusEl.textContent = statusText;
+        }
+    }
+
+    async function fetchActionLogs(rootElement, targetValue) {
+        const api = getApiById('actions-logs');
+        const result = await executeApiCall(api, targetValue, {});
+        
+        if (result && result.ok && result.payload) {
+            const actions = result.payload.result?.actions || result.payload.actions || [];
+            if (Array.isArray(actions) && actions.length > 0) {
+                addProtocolMessagesEntry(actions);
+                renderProtocolMessages(rootElement);
+                const statusText = `Last updated: ${new Date().toLocaleTimeString()} - ${targetValue} (${protocolMessages.length} logs)`;
+                updateMessagesStatus(rootElement, statusText);
+            }
+        }
+    }
+
+    async function startMonitoring(rootElement, targetValue) {
+        if (isMonitoring) {
+            return;
+        }
+
+        if (!targetValue) {
+            updateMessagesStatus(rootElement, 'Please select an endpoint first');
+            return;
+        }
+
+        stopMonitoring();
+        isMonitoring = true;
+        
+        const startBtn = rootElement.querySelector('#messages-start-btn');
+        const stopBtn = rootElement.querySelector('#messages-stop-btn');
+        const reloadBtn = rootElement.querySelector('#reloadMessagesBtn');
+        const messagesIntervalSelect = rootElement.querySelector('#messages-interval');
+        
+        if (startBtn) startBtn.disabled = true;
+        if (stopBtn) stopBtn.disabled = false;
+        if (reloadBtn) reloadBtn.disabled = false;
+        
+        updateMessagesStatus(rootElement, `Monitoring ${targetValue}...`);
+        
+        await fetchActionLogs(rootElement, targetValue);
+        
+        const interval = messagesIntervalSelect ? parseInt(messagesIntervalSelect.value) : 5000;
+        monitorInterval = setInterval(() => {
+            fetchActionLogs(rootElement, targetValue);
+        }, interval);
+    }
+
+    async function clearMessages(rootElement, targetValue) {
+        if (!targetValue) {
+            updateMessagesStatus(rootElement, 'Please select an endpoint first');
+            return;
+        }
+
+        const clearApi = getApiById('clear-logs');
+        const result = await executeApiCall(clearApi, targetValue, {});
+        
+        if (result && result.ok) {
+            protocolMessages = [];
+            renderProtocolMessages(rootElement);
+            updateMessagesStatus(rootElement, 'Messages cleared');
+        } else {
+            const message = result ? `HTTP ${result.status}` : 'Unknown error';
+            updateMessagesStatus(rootElement, `Error clearing messages: ${message}`);
+        }
+        
+        setTimeout(() => {
+            if (isMonitoring) {
+                updateMessagesStatus(rootElement, `Monitoring ${targetValue}...`);
+            } else {
+                updateMessagesStatus(rootElement, `Ready to monitor ${targetValue}`);
+            }
+        }, 2000);
     }
 
     // ==================== Core API Call Function ====================
@@ -188,6 +350,12 @@
         const connectBtn = rootElement.querySelector('#acsi-client-connect-page-btn');
         const disconnectBtn = rootElement.querySelector('#acsi-client-disconnect-page-btn');
         const fetchModelBtn = rootElement.querySelector('#acsi-client-fetch-model-btn');
+        const messagesStartBtn = rootElement.querySelector('#messages-start-btn');
+        const messagesStopBtn = rootElement.querySelector('#messages-stop-btn');
+        const messagesClearBtn = rootElement.querySelector('#messages-clear-btn');
+        const reloadMessagesBtn = rootElement.querySelector('#reloadMessagesBtn');
+
+        const endpointTarget = endpoint ? `${endpoint.host}:${endpoint.port}` : '';
 
         if (connectBtn) {
             connectBtn.addEventListener('click', () => handleConnect(rootElement, endpoint));
@@ -200,6 +368,43 @@
         if (fetchModelBtn) {
             fetchModelBtn.addEventListener('click', () => handleFetchModel(rootElement, endpoint));
         }
+
+        // Protocol Messages event listeners
+        if (messagesStartBtn) {
+            messagesStartBtn.addEventListener('click', () => {
+                startMonitoring(rootElement, endpointTarget);
+            });
+        }
+
+        if (messagesStopBtn) {
+            messagesStopBtn.addEventListener('click', () => {
+                stopMonitoring();
+                const startBtn = rootElement.querySelector('#messages-start-btn');
+                const stopBtn = rootElement.querySelector('#messages-stop-btn');
+                if (startBtn) startBtn.disabled = false;
+                if (stopBtn) stopBtn.disabled = true;
+                updateMessagesStatus(rootElement, `Ready to monitor ${endpointTarget || 'endpoint'}`);
+            });
+        }
+
+        if (reloadMessagesBtn) {
+            reloadMessagesBtn.addEventListener('click', async () => {
+                if (!endpointTarget) {
+                    console.log('error', 'Reload blocked', 'No selected endpoint address available to resolve target.');
+                    return;
+                }
+                await fetchActionLogs(rootElement, endpointTarget);
+            });
+        }
+
+        if (messagesClearBtn) {
+            messagesClearBtn.addEventListener('click', () => {
+                clearMessages(rootElement, endpointTarget);
+            });
+        }
+
+        // Initialize messages status
+        updateMessagesStatus(rootElement, 'Select an endpoint and click Start');
     }
 
     async function handleConnect(rootElement, endpoint) {
@@ -1244,6 +1449,7 @@
         `;
 
         setupEventListeners(rootElement, endpoint);
+        renderProtocolMessages(rootElement);
     }
 
     window.ACSIClientPage = {
