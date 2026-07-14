@@ -3,7 +3,7 @@ services:
 #  rti-client:
 #    build:
 #      context: ../../..
-#      dockerfile: demo/src/iec61850/client/Dockerfile
+#      dockerfile: demo/src/iec61850/client/Dockerfile.acsi-ws-server.acsi-ws-client.rti-so.frontend.rti-fsp.bff
 #    container_name: rti-demo-client
 #    ports:
 #      - "9000:5000"
@@ -31,7 +31,7 @@ services:
 #  rti-server:
 #    build:
 #      context: ../../..
-#      dockerfile: demo/src/iec61850/server/Dockerfile
+#      dockerfile: demo/src/iec61850/server/Dockerfile.acsi-ws-server.acsi-ws-client.rti-so.frontend.rti-fsp.bff
 #    container_name: rti-demo-server
 #    ports:
 #      - "9001:5001"
@@ -57,8 +57,8 @@ services:
   # BFF Server
   bff-server:
     build:
-      context: ..
-      dockerfile: rti-demo/bff/Dockerfile
+      context: .
+      dockerfile: Dockerfile.bff
     container_name: bff-server
     ports:
       - "5000:5000"
@@ -89,7 +89,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: ./front-end/Dockerfile  # or Dockerfile.front-end
+      dockerfile: Dockerfile.frontend  # or Dockerfile.acsi-ws-server.acsi-ws-client.rti-so.frontend.rti-fsp.bff.front-end
     container_name: rti-demo-ui
     working_dir: /app
     ports:
@@ -108,7 +108,7 @@ services:
   rti-server:
     build:
       context: ..
-      dockerfile: rti-demo/fsp/Dockerfile
+      dockerfile: rti-demo/Dockerfile.rti-fsp
     container_name: rti-server
     ports:
       - "5001:5001"
@@ -135,7 +135,7 @@ services:
   rti-client:
     build:
       context: ..
-      dockerfile: rti-demo/so/Dockerfile
+      dockerfile: rti-demo/Dockerfile.rti-so
     container_name: rti-client
     ports:
       - "5002:5002"
@@ -163,7 +163,7 @@ services:
   rti-active-websocket:
     build:
       context: ..
-      dockerfile: rti-demo/acsi_ws_client/Dockerfile
+      dockerfile: rti-demo/Dockerfile.acsi-ws-client
     container_name: rti-active-websocket
     ports:
       - "5003:5003"
@@ -191,7 +191,7 @@ services:
   rti-passive-websocket:
     build:
       context: ..
-      dockerfile: rti-demo/acsi_ws_server/Dockerfile
+      dockerfile: rti-demo/Dockerfile.acsi-ws-server
     container_name: rti-passive-websocket
     ports:
       - "5004:5004"
@@ -212,7 +212,9 @@ services:
       - "rti.host=rti-passive-websocket"
       - "rti.port=5004"
     volumes:
-        - ./acsi_ws_server:/app/acsi_ws_server
+      - ./acsi_ws_server:/app/acsi_ws_server
+
+
 
 networks:
   rti-network:

@@ -1,0 +1,36 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PORT=5001
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+RUN pip install uv
+
+# ⚠️ CRITICAL: Copy pyproject.toml and uv.lock FIRST
+COPY rti-demo/pyproject.toml /app/pyproject.toml
+COPY rti-demo/uv.lock /app/uv.lock
+
+# Then copy source code
+COPY src/ws61850 /app/ws61850
+COPY rti-demo/so/ /app/so/
+
+# Set PYTHONPATH
+ENV PYTHONPATH="/app:${PYTHONPATH}"
+
+# Now uv sync can find the files
+RUN uv sync --frozen --no-dev
+
+EXPOSE 5001
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost:5001/api/status || exit 1
+
+CMD ["./.venv/bin/python", "-u", "so/bff_endpoint.py"]
