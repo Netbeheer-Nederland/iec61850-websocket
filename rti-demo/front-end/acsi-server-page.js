@@ -738,15 +738,39 @@
         });
 
         // Auto-load status and model on page load
-        if (endpointTarget) {
-            (async () => {
+        (async () => {
+            let targetToUse = endpointTarget;
+            
+            // If no endpoint target, try to load FSP targets
+            if (!targetToUse) {
+                try {
+                    const loadedTarget = await loadFspTargets();
+                    if (loadedTarget) {
+                        targetToUse = loadedTarget;
+                        ensureFallbackTarget(loadedTarget);
+                    }
+                } catch (error) {
+                    console.log('Could not load FSP targets:', error && error.message ? error.message : error);
+                }
+            }
+            
+            // If still no target, try to build from localStorage
+            if (!targetToUse) {
+                const storedHost = localStorage.getItem('bffHost');
+                const storedPort = localStorage.getItem('bffPort');
+                if (storedHost && storedPort) {
+                    targetToUse = buildTargetValue(storedHost, Number(storedPort));
+                }
+            }
+            
+            if (targetToUse) {
                 try {
                     await ensureBffHealthy();
                     
                     // Load status automatically
                     const statusApi = getApiById('status');
                     setUpdatedStatusText('Loading status...');
-                    const statusResult = await executeApiCall(statusApi, endpointTarget, {});
+                    const statusResult = await executeApiCall(statusApi, targetToUse, {});
                     if (statusResult && statusResult.ok && statusResult.payload) {
                         setUpdatedStatusText(formatStatusSummary(statusResult.payload));
                     } else {
@@ -757,14 +781,17 @@
                     // Load model automatically
                     setModelPanelMessage('Loading model...');
                     const modelApi = getApiById('model');
-                    await executeApiCall(modelApi, endpointTarget);
+                    await executeApiCall(modelApi, targetToUse);
                 } catch (error) {
                     const message = String(error && error.message ? error.message : error);
                     setUpdatedStatusText(`Auto-load failed: ${message}`, true);
                     setModelPanelMessage(`Auto-load failed: ${message}`, true);
                 }
-            })();
-        }
+            } else {
+                setUpdatedStatusText('No target configured. Check BFF settings.');
+                setModelPanelMessage('No target configured. Check BFF settings.', true);
+            }
+        })();
     }
 
     async function loadTemplate() {
@@ -812,4 +839,12 @@
     window.ACSIServerPage = {
         render,
     };
+
+    // Auto-initialize if this page is loaded directly (not as a module)
+    if (window.location && window.location.pathname && window.location.pathname.includes('acsi-server-page.html')) {
+        document.addEventListener('DOMContentLoaded', () => {
+            const rootEl = document.getElementById('acsi-server-root') || document.body;
+            window.ACSIServerPage.render(rootEl, null);
+        });
+    }
 })();
