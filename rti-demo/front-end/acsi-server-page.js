@@ -13,7 +13,11 @@
     // Acsi-Server APIs
     // =========================
 
+    { id: 'health', label: 'GET /api/health', method: 'GET', path: '/api/health', sampleBody: '' },
+
     { id: 'status', label: 'GET /api/status', method: 'GET', path: '/api/status', sampleBody: '' },
+
+    { id: 'properties', label: 'GET /api/properties', method: 'GET', path: '/api/properties', sampleBody: '' },
 
     { id: 'connections', label: 'GET /api/connections', method: 'GET', path: '/api/connections', sampleBody: '' },
 
@@ -21,17 +25,19 @@
 
     { id: 'update-iedmodel', label: 'POST /api/update-iedmodel', method: 'POST', path: '/api/update-iedmodel', sampleBody: '{\n  "modelPy": "# python code"\n}' },
 
+    { id: 'update-iedmodel-file', label: 'POST /api/update-iedmodel-file', method: 'POST', path: '/api/update-iedmodel-file', sampleBody: '' },
+
     { id: 'start', label: 'POST /api/start', method: 'POST', path: '/api/start', sampleBody: '{\n  "host": "0.0.0.0",\n  "port": 8765,\n  "mode": "server",\n  "cp": "cp1"\n}' },
 
     { id: 'stop', label: 'POST /api/stop', method: 'POST', path: '/api/stop', sampleBody: '' },
 
-    { id: 'actions', label: 'GET /api/actions', method: 'GET', path: '/api/actions', sampleBody: '' },
+    { id: 'actions', label: 'GET /api/actions_logs', method: 'GET', path: '/api/actions_logs', sampleBody: '' },
 
-    { id: 'actions-clear', label: 'POST /api/actions/clear', method: 'POST', path: '/api/actions/clear', sampleBody: '' },
+    { id: 'actions-clear', label: 'POST /api/clear_logs', method: 'POST', path: '/api/clear_logs', sampleBody: '' },
 
     { id: 'messages', label: 'GET /api/messages', method: 'GET', path: '/api/messages', sampleBody: '' },
 
-    { id: 'messages-clear', label: 'POST /api/messages/clear', method: 'POST', path: '/api/messages/clear', sampleBody: '' },
+    { id: 'messages-clear', label: 'POST /api/clear_messages', method: 'POST', path: '/api/clear_messages', sampleBody: '' },
 
     { id: 'readvalue', label: 'POST /api/readvalue', method: 'POST', path: '/api/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
 
@@ -142,7 +148,7 @@
 
         const requestUrl = new URL(`${baseUrl}${path}`, window.location.origin);
         if (targetValue) {
-            requestUrl.searchParams.set('fspTarget', targetValue);
+            requestUrl.searchParams.set('target', targetValue);
         }
         return requestUrl.toString();
     }
@@ -222,12 +228,20 @@
             return null;
         }
 
-        const iedName = sourceTree.name || (payload && payload.model && payload.model.iedName) || 'IED';
+        // Extract iedName from various possible locations
+        const iedName = sourceTree.name 
+            || (payload && payload.iedName)
+            || (payload && payload.model && payload.model.iedName)
+            || 'IED';
+        
+        // Extract accessPoints from various possible locations
         const accessPointNames = (payload && Array.isArray(payload.accessPoints) && payload.accessPoints.length > 0)
             ? payload.accessPoints
-            : [
-                (payload && payload.model && payload.model.server && payload.model.server.name) || 'Server',
-            ];
+            : (payload && payload.model && payload.model.server && Array.isArray(payload.model.server.accessPoints) && payload.model.server.accessPoints.length > 0)
+                ? payload.model.server.accessPoints
+                : [
+                    (payload && payload.model && payload.model.server && payload.model.server.name) || 'Server',
+                ];
 
         const ldevices = (sourceTree.children || [])
             .filter((child) => child && child.kind === 'LD')
@@ -309,6 +323,10 @@
         return buildTargetValue(endpoint.host, endpoint.port);
     }
 
+    function getApiById(id) {
+        return apiDefinitions.find((api) => api.id === id);
+    }
+
     function upsertTarget(target) {
         if (!target || !target.id) {
             return;
@@ -328,7 +346,7 @@
             return preferredTarget || '';
         }
         const encodedTarget = preferredTarget ? encodeURIComponent(preferredTarget) : '';
-        const targetQuery = encodedTarget ? `?fspTarget=${encodedTarget}` : '';
+        const targetQuery = encodedTarget ? `?target=${encodedTarget}` : '';
         const url = `${baseUrl}/api/fsp/targets${targetQuery}`;
 
         try {
@@ -411,11 +429,33 @@
         }
 
         function formatStatusSummary(payload) {
-            const status = payload && payload.status ? payload.status : 'unknown';
-            const host = payload && payload.host ? payload.host : 'N/A';
-            const port = payload && payload.port !== undefined ? payload.port : 'N/A';
-            const clients = payload && payload.connectedClients !== undefined ? payload.connectedClients : 'N/A';
-            const aps = payload && Array.isArray(payload.accessPoints) ? payload.accessPoints.join(', ') : 'N/A';
+            // Handle case where status is a stringified Python dict
+            let statusObj = payload;
+            if (payload && payload.status && typeof payload.status === 'string') {
+                // Try to parse Python dict string representation
+                try {
+                    // Replace Python dict string format to JSON format
+                    const pythonDictStr = payload.status;
+                    // Convert {'key': 'value'} to {"key": "value"}
+                    const jsonStr = pythonDictStr
+                        .replace(/'/g, '"')
+                        .replace(/True/g, 'true')
+                        .replace(/False/g, 'false')
+                        .replace(/None/g, 'null');
+                    statusObj = JSON.parse(jsonStr);
+                } catch (e) {
+                    // If parsing fails, use the original payload
+                    console.log('Warning: Could not parse status string as JSON:', e);
+                    statusObj = payload;
+                }
+            }
+            
+            const status = statusObj && statusObj.status ? statusObj.status : (payload && payload.status ? payload.status : 'unknown');
+            const host = statusObj && statusObj.host ? statusObj.host : (payload && payload.host ? payload.host : 'N/A');
+            const port = statusObj && statusObj.port !== undefined ? statusObj.port : (payload && payload.port !== undefined ? payload.port : 'N/A');
+            const clients = statusObj && statusObj.connectedClients !== undefined ? statusObj.connectedClients : (payload && payload.connectedClients !== undefined ? payload.connectedClients : 'N/A');
+            const aps = statusObj && Array.isArray(statusObj.accessPoints) ? statusObj.accessPoints.join(', ') : (payload && Array.isArray(payload.accessPoints) ? payload.accessPoints.join(', ') : 'N/A');
+            
             return `Updated status: ${status} | host ${host}:${port} | clients ${clients} | accessPoints ${aps}`;
         }
 
@@ -452,6 +492,7 @@
             daModalEl.hidden = false;
         }
 
+        // ==================== Core API Call Function ====================
         async function executeApiCall(selected, targetValue, bodyOverride) {
             if (!selected) {
                 return null;
@@ -459,75 +500,48 @@
 
             let url;
             try {
-                url = buildBffApiUrl(selected.path, targetValue);
+                url = buildBffApiUrl('/api/execute');
             } catch (error) {
-                console.log('error', `Blocked ${selected.label}`, String(error && error.message ? error.message : error));
+                console.error(`Blocked ${selected.label}:`, error && error.message ? error.message : error);
                 return null;
             }
 
             const options = {
-                method: selected.method,
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
             };
 
-            if (targetValue) {
-                options.headers['X-FSP-Target'] = targetValue;
+            const payload = {
+                target: targetValue,
+                method: selected.method,
+                path: selected.path,
+            };
+
+            if (bodyOverride) {
+                payload.body = bodyOverride;
             }
 
-            if (selected.method === 'POST') {
-                let payloadToSend = null;
-
-                if (bodyOverride !== undefined) {
-                    if (bodyOverride && typeof bodyOverride === 'object' && !Array.isArray(bodyOverride)) {
-                        payloadToSend = { ...bodyOverride };
-                    }
-                } else {
-                    const raw = bodyEl.value.trim();
-                    if (raw) {
-                        try {
-                            payloadToSend = JSON.parse(raw);
-                        } catch (error) {
-                            console.log('error', `Invalid JSON body for ${selected.label}`, String(error && error.message ? error.message : error));
-                            return null;
-                        }
-                    }
-                }
-
-                if (!payloadToSend) {
-                    payloadToSend = {};
-                }
-
-                if (targetValue && typeof payloadToSend === 'object' && !Array.isArray(payloadToSend) && !payloadToSend.fspTarget) {
-                    payloadToSend.fspTarget = targetValue;
-                }
-
-                options.body = JSON.stringify(payloadToSend);
-            }
+            options.body = JSON.stringify(payload);
 
             try {
-                console.log('info', 'Checking BFF health', `URL: ${buildBffApiUrl('/api/health')}`);
-
-                await ensureBffHealthy();
-
-                console.log('info', `Calling ${selected.label}`, `FSP target: ${targetValue || 'default'}\nURL: ${url}`);
-
                 const response = await fetch(url, options);
                 const rawText = await response.text();
-                let formatted = rawText;
                 let parsedPayload = null;
 
                 try {
                     parsedPayload = JSON.parse(rawText);
-                    formatted = JSON.stringify(parsedPayload, null, 2);
                 } catch (error) {
                     // keep raw text for non-JSON responses
                 }
 
+                // Handle special cases for model and messages
                 if (selected.id === 'model') {
                     if (response.ok && parsedPayload) {
-                        renderModelFromPayload(parsedPayload);
+                        // The BFF wraps the response in a 'result' field
+                        const modelData = parsedPayload.result || parsedPayload;
+                        renderModelFromPayload(modelData);
                     } else if (!response.ok) {
                         setModelPanelMessage(`Model request failed with HTTP ${response.status}`, true);
                     } else {
@@ -537,15 +551,16 @@
 
                 if (selected.id === 'messages') {
                     if (response.ok && parsedPayload) {
-                        const messagesPayload = Object.prototype.hasOwnProperty.call(parsedPayload, 'messages')
-                            ? parsedPayload.messages
-                            : parsedPayload;
+                        // The BFF wraps the response in a 'result' field
+                        const messagesPayload = (parsedPayload.result && Object.prototype.hasOwnProperty.call(parsedPayload.result, 'messages')
+                            ? parsedPayload.result.messages
+                            : (Object.prototype.hasOwnProperty.call(parsedPayload, 'messages')
+                                ? parsedPayload.messages
+                                : parsedPayload));
                         addProtocolMessagesEntry(messagesPayload);
                         renderProtocolMessages();
                     }
                 }
-
-                const messagePrefix = response.ok ? 'success' : 'error';
 
                 return {
                     ok: response.ok,
@@ -554,12 +569,12 @@
                     rawText,
                 };
             } catch (error) {
-                console.log('error', `Request failed for ${selected.label}`, String(error && error.message ? error.message : error));
+                console.error(`Request failed for ${selected.label}:`, error && error.message ? error.message : error);
                 return null;
             }
         }
 
-        	const selectedApiById = (id) => apiDefinitions.find((api) => api.id === id);
+
 
         async function runDaAction(actionId) {
             if (!activeDaSelection || !activeDaSelection.objRef) {
@@ -568,7 +583,7 @@
             }
 
             if (!endpointTarget) {
-                setDaModalResult('Missing selected endpoint address (fspTarget).');
+                setDaModalResult('Missing selected endpoint address (target).');
                 return;
             }
 
@@ -585,7 +600,7 @@
             }
 
             setDaModalResult('Loading...');
-            const result = await executeApiCall(api, endpointTarget, body);
+            const result = await executeApiCall(getApiById(actionId), endpointTarget, body);
             if (!result) {
                 setDaModalResult('Request failed. See API Logs for details.');
                 return;
@@ -602,20 +617,32 @@
         if (startBtn) {
             startBtn.addEventListener('click', async () => {
                 if (!endpointTarget) {
-                    console.log('error', 'Start blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    console.log('error', 'Start blocked', 'No selected endpoint address available to resolve target.');
                     return;
                 }
-                await executeApiCall(selectedApiById('start'), endpointTarget, {});
+                const api = getApiById('start');
+                const hostInput = document.getElementById('acsi-server-host-input');
+                const portInput = document.getElementById('acsi-server-port-input');
+                const modeInput = document.getElementById('acsi-server-mode-input');
+                const cpInput = document.getElementById('acsi-server-cp-input');
+                
+                const body = {};
+                if (hostInput) body.host = hostInput.value || '0.0.0.0';
+                if (portInput) body.port = Number(portInput.value) || 8765;
+                if (modeInput) body.mode = modeInput.value || 'server';
+                if (cpInput) body.cp = cpInput.value || 'cp1';
+                
+                await executeApiCall(api, endpointTarget, body);
             });
         }
 
         if (reloadBtn) {
             reloadBtn.addEventListener('click', async () => {
                 if (!endpointTarget) {
-                    console.log('error', 'Reload blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    console.log('error', 'Reload blocked', 'No selected endpoint address available to resolve target.');
                     return;
                 }
-                await executeApiCall(selectedApiById('messages'), endpointTarget, {});
+                await executeApiCall(getApiById('messages'), endpointTarget, {});
             });
         }
 
@@ -623,20 +650,20 @@
         if (stopBtn) {
             stopBtn.addEventListener('click', async () => {
                 if (!endpointTarget) {
-                    console.log('error', 'Stop blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    console.log('error', 'Stop blocked', 'No selected endpoint address available to resolve target.');
                     return;
                 }
-                await executeApiCall(selectedApiById('stop'), endpointTarget, {});
+                await executeApiCall(getApiById('stop'), endpointTarget, {});
             });
         }
 
         if (loadModelBtn) {
             loadModelBtn.addEventListener('click', async () => {
                 if (!endpointTarget) {
-                    console.log('error', 'Load model blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    console.log('error', 'Load model blocked', 'No selected endpoint address available to resolve target.');
                     return;
                 }
-                await executeApiCall(selectedApiById('model'), endpointTarget);
+                await executeApiCall(getApiById('model'), endpointTarget);
             });
         }
 
@@ -652,22 +679,17 @@
                     setUpdatedStatusText('Updated status: loading...');
                     await ensureBffHealthy();
 
-                    const url = buildBffApiUrl('/api/status', endpointTarget);
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-FSP-Target': endpointTarget,
-                        },
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
+                    const api = getApiById('status');
+                    const result = await executeApiCall(api, endpointTarget, {});
+                    
+                    if (result && result.ok && result.payload) {
+                        setUpdatedStatusText(formatStatusSummary(result.payload));
+                        console.log('success', 'GET /api/status -> HTTP 200', JSON.stringify(result.payload, null, 2));
+                    } else {
+                        const message = result ? `HTTP ${result.status}` : 'Unknown error';
+                        setUpdatedStatusText(`Updated status: failed (${message})`, true);
+                        console.log('error', 'GET /api/status failed', message);
                     }
-
-                    const payload = await response.json();
-                    setUpdatedStatusText(formatStatusSummary(payload));
-                    console.log('success', 'GET /api/status -> HTTP 200', JSON.stringify(payload, null, 2));
                 } catch (error) {
                     const message = String(error && error.message ? error.message : error);
                     setUpdatedStatusText(`Updated status: failed (${message})`, true);
@@ -714,6 +736,35 @@
                 closeDaModal();
             }
         });
+
+        // Auto-load status and model on page load
+        if (endpointTarget) {
+            (async () => {
+                try {
+                    await ensureBffHealthy();
+                    
+                    // Load status automatically
+                    const statusApi = getApiById('status');
+                    setUpdatedStatusText('Loading status...');
+                    const statusResult = await executeApiCall(statusApi, endpointTarget, {});
+                    if (statusResult && statusResult.ok && statusResult.payload) {
+                        setUpdatedStatusText(formatStatusSummary(statusResult.payload));
+                    } else {
+                        const message = statusResult ? `HTTP ${statusResult.status}` : 'Unknown error';
+                        setUpdatedStatusText(`Updated status: failed (${message})`, true);
+                    }
+
+                    // Load model automatically
+                    setModelPanelMessage('Loading model...');
+                    const modelApi = getApiById('model');
+                    await executeApiCall(modelApi, endpointTarget);
+                } catch (error) {
+                    const message = String(error && error.message ? error.message : error);
+                    setUpdatedStatusText(`Auto-load failed: ${message}`, true);
+                    setModelPanelMessage(`Auto-load failed: ${message}`, true);
+                }
+            })();
+        }
     }
 
     async function loadTemplate() {

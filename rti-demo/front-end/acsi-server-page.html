@@ -36,6 +36,24 @@
                 <button id="acsi-stop-btn" class="btn-primary" type="button">Stop</button>
                 <button id="acsi-load-model-btn" class="btn-primary" type="button">Load model</button>
             </div>
+            <div class="acsi-start-options" style="margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+                <div class="form-group">
+                    <label for="acsi-server-host-input">Host</label>
+                    <input type="text" id="acsi-server-host-input" value="0.0.0.0" placeholder="0.0.0.0" />
+                </div>
+                <div class="form-group">
+                    <label for="acsi-server-port-input">Port</label>
+                    <input type="number" id="acsi-server-port-input" value="8765" placeholder="8765" />
+                </div>
+                <div class="form-group">
+                    <label for="acsi-server-mode-input">Mode</label>
+                    <input type="text" id="acsi-server-mode-input" value="server" placeholder="server" />
+                </div>
+                <div class="form-group">
+                    <label for="acsi-server-cp-input">CP</label>
+                    <input type="text" id="acsi-server-cp-input" value="cp1" placeholder="cp1" />
+                </div>
+            </div>
         </section>
 
         <section class="acsi-panel acsi-panel-main acsi-model-panel" id="acsi-model-panel">

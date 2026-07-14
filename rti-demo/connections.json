@@ -59,5 +59,38 @@
       "available": false,
       "error": "HTTPConnectionPool(host='tedfg', port=5000): Max retries exceeded with url: /api/properties (Caused by NameResolutionError(\"HTTPConnection(host='tedfg', port=5000): Failed to resolve 'tedfg' ([Errno -2] Name or service not known)\"))"
     }
+  },
+    {
+    "id": 6,
+    "name": "Max_test_Client",
+    "host": "127.0.0.1",
+    "port": 5002,
+    "type": "RTI-SO",
+    "auto_discovered": false,
+    "created_at": "2026-07-09T09:46:19.806408",
+    "status": "connected",
+    "properties_info": {
+      "available": true,
+      "source": "/api/properties",
+      "properties": {
+        "ok": true,
+        "acsi_role": "ACSI-Client",
+        "ws_mode": "passive"
+      }
+    }
+  },
+   {
+    "id": 7,
+    "name": "Max_test_Server",
+    "host": "127.0.0.1",
+    "port": 5001,
+    "type": "RTI-SO",
+    "auto_discovered": false,
+    "created_at": "2026-07-09T12:56:34.933320",
+    "status": "disconnected",
+    "properties_info": {
+      "available": false,
+      "error": "HTTPConnectionPool(host='rti2-gg4', port=5000): Max retries exceeded with url: /api/properties (Caused by NameResolutionError(\"HTTPConnection(host='rti2-gg4', port=5000): Failed to resolve 'rti2-gg4' ([Errno -2] Name or service not known)\"))"
+    }
   }
 ]
