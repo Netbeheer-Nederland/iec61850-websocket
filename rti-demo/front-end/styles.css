@@ -1087,6 +1087,12 @@ body {
     }
 }
 
+@media (max-width: 1024px) {
+    .monitoring-workspace {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 768px) {
     .sidebar {
         position: fixed;
@@ -1159,6 +1165,200 @@ body {
     align-items: flex-start !important;  /* Override inline style */
     flex-wrap: wrap;
 }
+/* ==============================================
+   Monitoring Page
+   ============================================== */
+
+.monitoring-workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.monitor-block {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* Allows flex children to shrink */
+}
+
+.monitor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-light);
+    width: 100%;
+}
+
+.monitor-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.monitor-endpoint-select,
+.monitor-interval-select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    font-size: 13px;
+    min-width: 120px;
+    flex: 1;
+    min-width: 0; /* Allows flex children to shrink */
+}
+
+.monitor-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.monitor-endpoint-select:focus,
+.monitor-interval-select:focus {
+    outline: none;
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.monitor-control-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+}
+
+.monitor-control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.monitor-status {
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 8px;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.5);
+}
+
+/* Message Cards */
+.monitor-messages {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    min-height: 200px;
+    max-height: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.message-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    cursor: pointer;
+    transition: var(--transition);
+    background: transparent;
+}
+
+.message-header:hover {
+    background: var(--bg-hover);
+}
+
+.message-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    font-size: 12px;
+}
+
+.message-id {
+    font-weight: 700;
+    color: var(--primary-light);
+    min-width: 30px;
+}
+
+.message-timestamp {
+    color: var(--text-muted);
+}
+
+.message-direction {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 11px;
+}
+
+.message-direction.send {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--success-color);
+}
+
+.message-direction.recv {
+    background: rgba(59, 130, 246, 0.2);
+    color: var(--primary-light);
+}
+
+.message-category,
+.message-service {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+.message-toggle-icon {
+    font-size: 14px;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.message-body {
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid var(--border-light);
+}
+
+.message-json {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.4;
+}
+
+.monitor-no-messages {
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+}
+
 /* ==============================================
    ACSI Page
    ============================================== */

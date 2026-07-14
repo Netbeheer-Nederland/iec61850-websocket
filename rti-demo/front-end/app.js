@@ -37,6 +37,7 @@ class RTIDemoApp {
 
         this.currentConnectionId = null;
         this.connectionStatusTimeout = null;
+        this.monitoringPage = null;
 
     }
 
@@ -191,6 +192,110 @@ class RTIDemoApp {
 
     }
 
+    async executeApiCall(api, targetValue, bodyOverride = {}) {
+        // Execute an API call through the BFF /api/execute endpoint
+        try {
+            const url = `${this.bffBaseUrl}/api/execute`;
+            
+            const payload = {
+                target: targetValue,
+                method: api.method || 'GET',
+                path: api.path || '/'
+            };
+            
+            if (bodyOverride && Object.keys(bodyOverride).length > 0) {
+                payload.body = bodyOverride;
+            }
+            
+            const options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            };
+            
+            const response = await fetch(url, options);
+            const rawText = await response.text();
+            let parsedPayload = null;
+            
+            try {
+                parsedPayload = JSON.parse(rawText);
+            } catch (error) {
+                // keep raw text for non-JSON responses
+            }
+            
+            return {
+                ok: response.ok,
+                status: response.status,
+                payload: parsedPayload
+            };
+        } catch (error) {
+            console.error('API execution failed:', error);
+            return {
+                ok: false,
+                status: 0,
+                payload: null,
+                error: error.message
+            };
+        }
+    }
+
+    formatPayloadForDisplay(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return payload;
+        }
+        const formatted = JSON.parse(JSON.stringify(payload));
+        
+        // Parse any stringified Python dicts in the result
+        if (formatted.result && typeof formatted.result === 'object') {
+            if (formatted.result.status && typeof formatted.result.status === 'string') {
+                formatted.result.status = this.parsePythonDictString(formatted.result.status);
+            }
+            if (formatted.result.message && typeof formatted.result.message === 'string') {
+                formatted.result.message = this.parsePythonDictString(formatted.result.message);
+            }
+        }
+        
+        // Also check at top level
+        if (formatted.status && typeof formatted.status === 'string') {
+            formatted.status = this.parsePythonDictString(formatted.status);
+        }
+        
+        return formatted;
+    }
+
+    parsePythonDictString(pythonStr) {
+        if (!pythonStr || typeof pythonStr !== 'string') {
+            return pythonStr;
+        }
+        try {
+            const jsonStr = pythonStr
+                .replace(/'/g, '"')
+                .replace(/True/g, 'true')
+                .replace(/False/g, 'false')
+                .replace(/None/g, 'null');
+            return JSON.parse(jsonStr);
+        } catch (e) {
+            console.log('Warning: Could not parse Python dict string as JSON:', e);
+            return pythonStr;
+        }
+    }
+
+    loadMonitoring() {
+        const root = document.getElementById('monitoring-page-root');
+        if (root) {
+            if (!this.monitoringPage) {
+                if (window.MonitoringPage) {
+                    this.monitoringPage = new window.MonitoringPage(this);
+                }
+            }
+            if (this.monitoringPage && typeof this.monitoringPage.render === 'function') {
+                this.monitoringPage.render(root);
+            }
+        }
+    }
+
     loadPageContent(pageName) {
         switch(pageName) {
             case 'dashboard':
@@ -210,6 +315,9 @@ class RTIDemoApp {
                 break;
             case 'tools':
                 this.loadTools();
+                break;
+            case 'monitoring':
+                this.loadMonitoring();
                 break;
             case 'acsi-server':
                 this.loadAcsiServerPage();
