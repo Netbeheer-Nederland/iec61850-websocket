@@ -628,7 +628,7 @@
                 
                 const body = {};
                 if (hostInput) body.host = hostInput.value || '0.0.0.0';
-                if (portInput) body.port = Number(portInput.value) || 8765;
+                if (portInput) body.port = String(portInput.value) || '8765';
                 if (modeInput) body.mode = modeInput.value || 'server';
                 if (cpInput) body.cp = cpInput.value || 'cp1';
                 
