@@ -80,7 +80,7 @@
         }
         const requestUrl = new URL(`${baseUrl}${path}`, window.location.origin);
         if (targetValue) {
-            requestUrl.searchParams.set('soTarget', targetValue);
+            requestUrl.searchParams.set('target', targetValue);
         }
         return requestUrl.toString();
     }
@@ -257,7 +257,7 @@
             }
 
             const options = {
-                method: selected.method,
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -273,9 +273,7 @@
                 payload.body = bodyOverride;
             }
 
-            if (selected.method === 'POST') {
-                options.body = JSON.stringify(payload);
-            }
+           options.body = JSON.stringify(payload);
 
             try {
                 const response = await fetch(url, options);
@@ -291,7 +289,7 @@
                 return {
                     ok: response.ok,
                     status: response.status,
-                    payload: selected.method === 'POST' ? parsedPayload : null,
+                    payload: parsedPayload,
                     rawText,
                 };
             } catch (error) {
@@ -327,6 +325,13 @@
         return `${host}:${port}`;
     }
 
+    function getDefaultTargetFromEndpoint(endpoint) {
+        if (!endpoint) {
+            return '';
+        }
+        return buildTargetValue(endpoint.host, endpoint.port);
+    }
+
     function updateEndpointBadge(host, port, name = '') {
         const nameEl = document.getElementById('endpoint-name');
         const hostEl = document.getElementById('endpoint-host');
@@ -347,7 +352,7 @@
         const messagesClearBtn = rootElement.querySelector('#messages-clear-btn');
         const reloadMessagesBtn = rootElement.querySelector('#reloadMessagesBtn');
 
-        const endpointTarget = endpoint ? `${endpoint.host}:${endpoint.port}` : '';
+        const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
 
         if (connectBtn) {
             connectBtn.addEventListener('click', () => handleConnect(rootElement, endpoint));
@@ -364,10 +369,7 @@
         // Protocol Messages event listeners
         if (messagesStartBtn) {
             messagesStartBtn.addEventListener('click', () => {
-                const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
-                const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
-                const target = buildTargetValue(host, port);
-                startMonitoring(rootElement, target);
+                startMonitoring(rootElement, endpointTarget);
             });
         }
 
@@ -378,32 +380,19 @@
                 const stopBtn = rootElement.querySelector('#messages-stop-btn');
                 if (startBtn) startBtn.disabled = false;
                 if (stopBtn) stopBtn.disabled = true;
-                const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
-                const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
-                const target = buildTargetValue(host, port);
-                updateMessagesStatus(rootElement, `Ready to monitor ${target || 'endpoint'}`);
+                updateMessagesStatus(rootElement, `Ready to monitor ${endpointTarget || 'endpoint'}`);
             });
         }
 
         if (reloadMessagesBtn) {
             reloadMessagesBtn.addEventListener('click', async () => {
-                const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
-                const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
-                const target = buildTargetValue(host, port);
-                if (!target) {
-                    console.log('error', 'Reload blocked', 'No selected endpoint address available to resolve target.');
-                    return;
-                }
-                await fetchActionLogs(rootElement, target);
+                await fetchActionLogs(rootElement, endpointTarget);
             });
         }
 
         if (messagesClearBtn) {
             messagesClearBtn.addEventListener('click', () => {
-                const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
-                const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
-                const target = buildTargetValue(host, port);
-                clearMessages(rootElement, target);
+                clearMessages(rootElement, endpointTarget);
             });
         }
 
@@ -412,6 +401,7 @@
     }
 
     async function handleConnect(rootElement, endpoint) {
+        const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
         const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
         const port = parseInt(rootElement.querySelector('#acsi-client-port-page').value.trim());
         const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
@@ -427,10 +417,9 @@
         }
 
         showStatus(rootElement, 'Connecting...', 'info');
-        const targetValue = buildTargetValue(host, port);
         const result = await executeApiCall(
             getApiById('connect'),
-            targetValue,
+            endpointTarget,
             { host, port, cp }
         );
 
@@ -451,15 +440,16 @@
     }
 
     async function handleDisconnect(rootElement, endpoint) {
+        const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
         const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
         const port = parseInt(rootElement.querySelector('#acsi-client-port-page').value.trim());
         const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
 
         showStatus(rootElement, 'Disconnecting...', 'info');
-        const targetValue = buildTargetValue(host, port);
+        
         const result = await executeApiCall(
             getApiById('disconnect'),
-            targetValue,
+            endpointTarget,
             { host, port, cp }
         );
 
@@ -617,14 +607,14 @@
 
     async function readDataValue(objRef, fc, endpoint) {
       console.log('[readDataValue] Reading:', objRef, 'FC:', fc);
+      const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
       const host = document.getElementById('acsi-client-host-page').value.trim();
       const port = document.getElementById('acsi-client-port-page').value.trim();
-      const targetValue = buildTargetValue(host, port);
 
       try {
         const res = await executeApiCall(
             getApiById('read'),
-            targetValue,
+            endpointTarget,
             { objRef, fc }
         );
 
@@ -646,14 +636,12 @@
 
     async function writeDataValue(objRef, fc, endpoint, value, value_type) {
       console.log('[writeDataValue] Writing:', objRef, 'FC:', fc, 'Value:', value);
-      const host = document.getElementById('acsi-client-host-page').value.trim();
-      const port = document.getElementById('acsi-client-port-page').value.trim();
-      const targetValue = buildTargetValue(host, port);
+      const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
 
       try {
         const res = await executeApiCall(
             getApiById('write'),
-            targetValue,
+            endpointTarget,
             { objRef, fc, value, value_type }
         );
 
@@ -700,14 +688,12 @@
       modal.classList.add('active');
       inputEl.focus();
 
-      const host = document.getElementById('acsi-client-host-page').value.trim();
-      const port = document.getElementById('acsi-client-port-page').value.trim();
-      const targetValue = buildTargetValue(host, port);
+      const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
       
       try {
         const res = await executeApiCall(
             getApiById('read'),
-            targetValue,
+            endpointTarget,
             { objRef, fc }
         );
 
@@ -905,9 +891,7 @@
     }
 
     async function handleFetchModel(rootElement, endpoint) {
-        const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
-        const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
-        const targetValue = buildTargetValue(host, port);
+        const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
 
         const handleNodeClick = async (node) => {
                 if (node.nodeType === 'DO') {
@@ -922,7 +906,7 @@
 
                     const defResult = await executeApiCall(
                         getApiById('data-definition'),
-                        targetValue,
+                        endpointTarget,
                         {ld_inst: ldName, ln_inst: lnName, do_path: doPath}
                     );
                     if (defResult && defResult.ok) {
@@ -1064,7 +1048,7 @@
 
                     const defResult = await executeApiCall(
                         getApiById('dataset-directory'),
-                        targetValue,
+                        endpointTarget,
                         {ld_inst: ld_name, ln_inst: ln_inst, ds_inst: dsName}
                     );
                     if (defResult && defResult.ok) {
@@ -1121,7 +1105,7 @@
         showStatus(rootElement, 'Fetching model...', 'info');
         const result = await executeApiCall(
             getApiById('model-tree'),
-            targetValue,
+            endpointTarget,
             null
         );
 
@@ -1354,6 +1338,84 @@
         if (stopBtn) stopBtn.disabled = true;
     }
 
+    // Render function to match the server page pattern
+    async function render(root, endpoint) {
+        if (!root) {
+            return;
+        }
+
+        try {
+            // Ensure CSS is loaded
+            if (!document.getElementById('acsi-client-page-css')) {
+                const link = document.createElement('link');
+                link.id = 'acsi-client-page-css';
+                link.rel = 'stylesheet';
+                link.href = 'acsi-client-page.css';
+                document.head.appendChild(link);
+            }
+
+            // Ensure JS is loaded
+            if (!window.__acsiClientPageLoaded) {
+                await loadScript('acsi-client-page.js');
+            }
+
+            // Fetch and inject the HTML (without the script tag to avoid double-loading)
+            const response = await fetch('acsi-client-page.html');
+            if (!response.ok) {
+                throw new Error('Failed to load HTML');
+            }
+            let html = await response.text();
+            
+            // Remove the script tag from the HTML to prevent double-loading
+            html = html.replace(/<script\s+src=["']acsi-client-page\.js["']><\/script>/gi, '');
+            
+            root.innerHTML = html;
+
+            // Initialize the page
+            setupEventListeners(root, endpoint);
+            renderProtocolMessages(root);
+            
+            // Disable buttons that need connection first
+            const fetchModelBtn = document.getElementById('acsi-client-fetch-model-btn');
+            if (fetchModelBtn) fetchModelBtn.disabled = true;
+            const disconnectBtn = document.getElementById('acsi-client-disconnect-page-btn');
+            if (disconnectBtn) disconnectBtn.disabled = true;
+            const startBtn = document.getElementById('messages-start-btn');
+            if (startBtn) startBtn.disabled = true;
+            const stopBtn = document.getElementById('messages-stop-btn');
+            if (stopBtn) stopBtn.disabled = true;
+            
+            // Update endpoint badge if we have an endpoint
+            if (endpoint) {
+                const badge = root.querySelector('.acsi-endpoint-badge');
+                if (badge) {
+                    const name = endpoint.name || 'Endpoint';
+                    const host = endpoint.host || '';
+                    const port = endpoint.port || '';
+                    badge.innerHTML = `<span id="endpoint-name">${name}</span> · <span id="endpoint-host">${host}</span>:<span id="endpoint-port">${port}</span>`;
+                }
+            }
+        } catch (error) {
+            console.error('Error rendering ACSI Client page:', error);
+            root.innerHTML = '<p style="color: var(--text-muted);">ACSI Client page is unavailable.</p>';
+        }
+    }
+
+    // Helper to load scripts (if not already available in this scope)
+    function loadScript(url) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector(`script[src="${url}"]`)) {
+                resolve();
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = url;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
@@ -1362,6 +1424,7 @@
     }
 
     window.ACSIClientPage = {
+        render,
         init,
         executeApiCall,
         renderLiveModelTree,

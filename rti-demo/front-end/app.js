@@ -351,7 +351,7 @@ class RTIDemoApp {
         root.innerHTML = '<p style="color: var(--text-muted);">ACSI Server page is unavailable.</p>';
     }
 
-    async loadAcsiClientPage() {
+    loadAcsiClientPage() {
         // Hide the connection modal explicitly
         const modal = document.getElementById('modal-connection');
         if (modal) modal.classList.remove('active');
@@ -361,53 +361,12 @@ class RTIDemoApp {
             return;
         }
 
-        try {
-            // Ensure CSS is loaded
-            if (!document.getElementById('acsi-client-page-css')) {
-                const link = document.createElement('link');
-                link.id = 'acsi-client-page-css';
-                link.rel = 'stylesheet';
-                link.href = 'acsi-client-page.css';
-                document.head.appendChild(link);
-            }
-
-            // Ensure JS is loaded
-            if (!window.__acsiClientPageLoaded) {
-                // Load the JS file first
-                await this.loadScript('acsi-client-page.js');
-            }
-
-            // Fetch and inject the HTML (without the script tag to avoid double-loading)
-            const response = await fetch('acsi-client-page.html');
-            if (!response.ok) {
-                throw new Error('Failed to load HTML');
-            }
-            let html = await response.text();
-            
-            // Remove the script tag from the HTML to prevent double-loading
-            html = html.replace(/<script\s+src=["']acsi-client-page\.js["']><\/script>/gi, '');
-            
-            root.innerHTML = html;
-
-            // Initialize the page
-            if (window.ACSIClientPage && typeof window.ACSIClientPage.init === 'function') {
-                window.ACSIClientPage.init();
-            }
-
-            // Update endpoint badge if we have a selected endpoint
-            if (this.selectedAcsiEndpoint) {
-                const badge = root.querySelector('.acsi-endpoint-badge');
-                if (badge) {
-                    const name = this.selectedAcsiEndpoint.name || 'Endpoint';
-                    const host = this.selectedAcsiEndpoint.host || '';
-                    const port = this.selectedAcsiEndpoint.port || '';
-                    badge.innerHTML = `<span id="endpoint-name">${name}</span> · <span id="endpoint-host">${host}</span>:<span id="endpoint-port">${port}</span>`;
-                }
-            }
-        } catch (error) {
-            console.error('Error loading ACSI Client page:', error);
-            root.innerHTML = '<p style="color: var(--text-muted);">ACSI Client page is unavailable.</p>';
+        if (window.ACSIClientPage && typeof window.ACSIClientPage.render === 'function') {
+            window.ACSIClientPage.render(root, this.selectedAcsiEndpoint);
+            return;
         }
+
+        root.innerHTML = '<p style="color: var(--text-muted);">ACSI Client page is unavailable.</p>';
     }
 
     async loadScript(url) {
