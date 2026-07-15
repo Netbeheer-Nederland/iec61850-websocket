@@ -126,3 +126,30 @@ rti-demo/
 └── front-end/
     └── index.html         # Web HMI
 ```
+
+## UV 
+UV is already implemented to manage the dependencies inside the dockers. To add a dependency to the project, you can use the following command:
+
+```bash
+uv add <package_name>
+```
+This should be followed by rebuilding the dockers to make sure the new dependency is included in the images.
+
+```bash
+
+After adding the dependency, you can run the following command to make sure the lock file is updated with the new dependency:
+
+```bash
+uv lock
+```
+
+To run the python codes without the dockers, you can use the following command to install the dependencies in your local environment:
+
+```bash
+uv sync
+```
+and the python codes can be run using the following command:
+
+```bash
+uv run python <script_name.py>
+```
