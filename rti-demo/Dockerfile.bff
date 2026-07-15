@@ -12,13 +12,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY rti-demo/bff/ /app/bff/
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-RUN pip install fastapi uvicorn docker httpx
+# Copy BFF uv project files
+COPY pyproject.toml uv.lock /app/
+
+# Install dependencies from uv.lock
+RUN uv sync --frozen --no-dev
+
+
+COPY bff/ /app/bff/
+
+#RUN pip install fastapi uvicorn docker httpx
 
 EXPOSE 5000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:5000/api/health || exit 1
 
-CMD ["python", "-u", "bff/bff_server.py"]
+CMD ["./.venv/bin/python", "-u", "bff/bff_server.py"]
