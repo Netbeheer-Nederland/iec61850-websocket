@@ -1,107 +1,121 @@
-<div class="acsi-server-page">
-    <div class="acsi-server-page-header">
-        <h1>ACSI Server - IEC 61850 Server</h1>
-        <span class="acsi-page-pill">Preview</span>
-    </div>
-    <p class="acsi-server-subtitle">
-        Dedicated server workspace for ACSI endpoints. Functional actions will be added in a future step.
-    </p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACSI Client</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="acsi-client-page.css">
+</head>
+<body>
+    <div class="acsi-server-page">
+        <div class="page-header">
+            <div style="display:flex; align-items:center; gap:16px;">
+                <h1><i class="fas fa-microchip" style="margin-right:10px; color:var(--primary-light);"></i>ACSI Client</h1>
+                <span class="acsi-endpoint-badge" style="display:inline-block; padding:4px 12px; background:var(--info-color); color:white; border-radius:4px; font-size:12px;">
+                    <span id="endpoint-name">Endpoint</span> · <span id="endpoint-host">host</span>:<span id="endpoint-port">port</span>
+                </span>
+            </div>
+        </div>
 
-    <div class="acsi-server-layout">
-        <section class="acsi-panel acsi-panel-main">
-            <h2>Selected Endpoint</h2>
-            <div class="acsi-endpoint-card">
-                <div class="acsi-endpoint-row">
-                    <span class="acsi-endpoint-item"><span class="acsi-label">Name</span><span class="acsi-value">{{endpointName}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">Address</span><span class="acsi-value">{{endpointHost}}:{{endpointPort}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">Type</span><span class="acsi-value">{{endpointType}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">Status</span><span class="acsi-value acsi-status">{{endpointStatus}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">ACSI Role</span><span class="acsi-value">{{endpointRole}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">WS Mode</span><span class="acsi-value">{{endpointWsMode}}</span></span>
+        <div style="margin-top:24px;">
+            <h2>Connection Settings</h2>
+            <div style="display:flex; gap:16px; margin-top:16px;">
+                <div class="form-group">
+                    <label for="acsi-client-host-page">Host</label>
+                    <input type="text" id="acsi-client-host-page" value="0.0.0.0" placeholder="127.0.0.1">
                 </div>
-                <div class="acsi-endpoint-status-row">
-                    <button id="acsi-reload-status-btn" class="btn-primary" type="button" aria-label="Reload status" title="Reload status">
-                        <i class="fas fa-rotate-right" aria-hidden="true"></i>
-                    </button>
-                    <span class="acsi-endpoint-status-text" id="acsi-endpoint-updated-status">Updated status: not loaded yet.</span>
+
+                <div class="form-group">
+                    <label for="acsi-client-port-page">Port</label>
+                    <input type="number" id="acsi-client-port-page" value="8765" placeholder="102">
+                </div>
+
+                <div class="form-group">
+                    <label for="acsi-client-cp-page">Connection Point (CP)</label>
+                    <input type="text" id="acsi-client-cp-page" value="cp1" placeholder="cp1">
                 </div>
             </div>
-        </section>
 
-        
-        <section class="acsi-panel acsi-panel-main" id="acsi-actions-panel">
-            <h2>Actions</h2>
-            <div class="acsi-actions-row">
-                <button id="acsi-start-btn" class="btn-primary" type="button">Start</button>
-                <button id="acsi-stop-btn" class="btn-primary" type="button">Stop</button>
-                <button id="acsi-load-model-btn" class="btn-primary" type="button">Load model</button>
-            </div>
-        </section>
-
-        <section class="acsi-panel acsi-panel-main acsi-model-panel" id="acsi-model-panel">
-            <h2>Model</h2>
-            <div id="acsi-modelPanel" class="panel-content tree acsi-model-tree">
-                <div class="acsi-model-state">Loading model...</div>
-            </div>
-        </section>
-
-
-        <section class="acsi-panel acsi-panel-main" id="acsi-api-tester">
-            <h2>API Tester</h2>
-            <div class="acsi-api-controls">
-                <label class="acsi-label" for="acsi-api-select">API</label>
-                <select id="acsi-api-select" class="acsi-select"></select>
-
-                <label class="acsi-label" for="acsi-api-body">Request Body (JSON, optional)</label>
-                <textarea id="acsi-api-body" class="acsi-textarea" rows="6" placeholder="{\n  \"objRef\": \"LD0.LLN0.Mod.stVal\",\n  \"fc\": \"ST\"\n}"></textarea>
-
-                <button id="acsi-api-run" class="btn-primary" type="button">
-                    <i class="fas fa-play"></i>
-                    Run API
+            <div style="margin-top:24px; display:flex; gap:12px;">
+                <button id="acsi-client-connect-page-btn" class="btn-primary" style="padding:10px 20px;">
+                    <i class="fas fa-plug" style="margin-right:8px;"></i>
+                    Connect
+                </button>
+                <button id="acsi-client-disconnect-page-btn" class="btn-secondary" style="padding:10px 20px;" disabled>
+                    <i class="fas fa-plug" style="margin-right:8px;"></i>
+                    Disconnect
                 </button>
             </div>
-        </section>
+        </div>
+
+        <div id="acsi-client-status" style="margin-top:24px; padding:16px; background:var(--bg-secondary); border-radius:8px; display:none;">
+            <h3>Status</h3>
+            <div id="acsi-client-status-message" style="margin-top:8px; color:var(--text-muted);"></div>
+        </div>
+
+        <div id="acsi-client-tree-page" style="margin-top:24px;">
+            <h2>Server Model</h2>
+            <button id="acsi-client-fetch-model-btn" class="btn-primary" style="margin-top:12px; padding:10px 20px;" disabled>
+                <i class="fas fa-download" style="margin-right:8px;"></i>
+                Fetch Model
+            </button>
+            <div id="acsi-client-tree-container-page" style="margin-top:16px; padding:16px; background:var(--bg-secondary); border-radius:8px; display:none;">
+                <div id="acsi-client-tree-content" style="max-height:600px; overflow-y:auto; color:var(--text-secondary);"></div>
+            </div>
+        </div>
 
         <section class="acsi-panel acsi-panel-main" id="acsi-api-logs-panel">
-            <h2>Log Messages</h2>
-            <div class="acsi-log-tabs" role="tablist" aria-label="Log tabs">
-                <button id="acsi-log-tab-api-btn" class="acsi-log-tab active" type="button" role="tab" aria-selected="true">API Logs</button>
-                <button id="acsi-log-tab-messages-btn" class="acsi-log-tab" type="button" role="tab" aria-selected="false">Protocol Messages</button>
-            </div>
-            <div id="acsi-log-tab-api" class="acsi-log-tab-panel active" role="tabpanel">
-                <div id="acsi-api-logs" class="acsi-log-list"></div>
-            </div>
-            <div id="acsi-log-tab-messages" class="acsi-log-tab-panel" role="tabpanel" hidden>
-                <div id="acsi-protocol-messages" class="acsi-log-list"></div>
-            </div>
-        </section>
-    </div>
-
-    <div id="acsi-da-modal" class="acsi-da-modal" hidden>
-        <div class="acsi-da-modal-backdrop" data-da-modal-close="true"></div>
-        <div class="acsi-da-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="acsi-da-modal-title">
-            <div class="acsi-da-modal-header">
-                <h3 id="acsi-da-modal-title">Data Attribute Actions</h3>
-                <button id="acsi-da-modal-close" class="btn-primary" type="button" aria-label="Close DA actions" title="Close">✕</button>
-            </div>
-
-            <div class="acsi-da-modal-body">
-                <label class="acsi-label" for="acsi-da-modal-objref">DA Address</label>
-                <input id="acsi-da-modal-objref" class="acsi-select" type="text" readonly />
-
-                <label class="acsi-label" for="acsi-da-modal-fc">FC</label>
-                <input id="acsi-da-modal-fc" class="acsi-select" type="text" readonly />
-
-                <label class="acsi-label" for="acsi-da-modal-value">Value (for Write)</label>
-                <input id="acsi-da-modal-value" class="acsi-select" type="text" placeholder="Enter value" />
-
-                <div class="acsi-actions-row">
-                    <button id="acsi-da-modal-read" class="btn-primary" type="button">Read</button>
-                    <button id="acsi-da-modal-write" class="btn-primary" type="button">Write</button>
+            <div class="protocol-header">
+                <h2>Protocol Messages</h2>
+                <div class="message-controls">
+                    <select class="monitor-interval-select" id="messages-interval">
+                        <option value="1000">1s</option>
+                        <option value="2000">2s</option>
+                        <option value="5000" selected>5s</option>
+                        <option value="10000">10s</option>
+                    </select>
+                    <button id="messages-start-btn" class="btn-primary" type="button" title="Start">
+                        <i class="fas fa-play"></i>
+                        Start
+                    </button>
+                    <button id="reloadMessagesBtn" title="Reload Messages" class="btn-primary" type="button" aria-label="Reload Messages">
+                        <i class="fas fa-rotate-right" aria-hidden="true"></i>
+                        Reload
+                    </button>
+                    <button id="messages-stop-btn" class="btn-primary" type="button" title="Stop" disabled>
+                        <i class="fas fa-stop"></i>
+                        Stop
+                    </button>
+                    <button id="messages-clear-btn" class="btn-primary" type="button" title="Clear">
+                        <i class="fas fa-trash"></i>
+                        Clear
+                    </button>
                 </div>
+                <div class="monitor-status" id="messages-status">Select an endpoint and click Start</div>
+            </div>
+            <div id="acsi-protocol-messages" class="acsi-log-list"></div>
+        </section>
 
-                <pre id="acsi-da-modal-result" class="acsi-log-details">Select a DA node and click Read or Write.</pre>
+        <div id="writeValueModal" class="modal">
+            <div class="modal-content">
+                <h2 id="writeValueTitle">Write Data Value</h2>
+                <div style="margin-bottom: 16px; color: #ccc;">
+                    <div><strong>Reference:</strong> <span id="writeValueObjRef" style="color: #4fc3f7;"></span></div>
+                    <div><strong>Type:</strong> <span id="writeValueType" style="color: #ffc107;"></span></div>
+                    <div><strong>Current:</strong> <span id="writeValueCurrent" style="color: #8bc34a;"></span></div>
+                </div>
+                <input type="text" id="writeValueInput" placeholder="Enter new value">
+                <div id="writeValueValidation" style="color: #f44336; margin-bottom: 16px; min-height: 20px;"></div>
+                <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                    <button id="writeValueCancel" class="btn-secondary" style="padding: 8px 16px;">Cancel</button>
+                    <button id="writeValueSubmit" class="btn-primary" style="padding: 8px 16px;">Write</button>
+                </div>
+                <div id="writeValueResult" class="hidden" style="margin-top: 16px; padding: 12px; border-radius: 4px; text-align: center;"></div>
             </div>
         </div>
     </div>
-</div>
+
+    <script src="acsi-client-page.js"></script>
+</body>
+</html>

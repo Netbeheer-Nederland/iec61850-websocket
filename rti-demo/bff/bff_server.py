@@ -54,9 +54,26 @@ try:
 except ImportError:
     logger.warning("Docker Python SDK not available. Container auto-discovery disabled.")
 
-CONNECTIONS_FILE = '/app/connections.json'
-STATS_FILE = 'stats.json'
-DISCOVERED_FILE = 'discovered_endpoints.json'
+# Determine base directory - check /app (Docker), then script dir, then parent dir
+script_dir = os.path.dirname(os.path.abspath(__file__))
+if os.path.exists('/app'):
+    BASE_DIR = '/app'
+elif os.path.exists(os.path.join(script_dir, 'connections.json')):
+    BASE_DIR = script_dir
+else:
+    # Try parent directory
+    parent_dir = os.path.dirname(script_dir)
+    if os.path.exists(os.path.join(parent_dir, 'connections.json')):
+        BASE_DIR = parent_dir
+    else:
+        BASE_DIR = script_dir
+
+# Ensure base directory exists
+os.makedirs(BASE_DIR, exist_ok=True)
+
+CONNECTIONS_FILE = os.path.join(BASE_DIR, 'connections.json')
+STATS_FILE = os.path.join(BASE_DIR, 'stats.json')
+DISCOVERED_FILE = os.path.join(BASE_DIR, 'discovered_endpoints.json')
 
 
 # ==================== Pydantic Models ====================

@@ -37,6 +37,7 @@ class RTIDemoApp {
 
         this.currentConnectionId = null;
         this.connectionStatusTimeout = null;
+        this.monitoringPage = null;
 
     }
 
@@ -116,6 +117,8 @@ class RTIDemoApp {
     navigateToPage(pageName) {
         // Hide all pages
         document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+        // Hide all modals
+        document.querySelectorAll('.modal').forEach(modal => modal.classList.remove('active'));
         // Show selected page
         const page = document.getElementById(`page-${pageName}`);
         if (page) {
@@ -191,6 +194,110 @@ class RTIDemoApp {
 
     }
 
+    async executeApiCall(api, targetValue, bodyOverride = {}) {
+        // Execute an API call through the BFF /api/execute endpoint
+        try {
+            const url = `${this.bffBaseUrl}/api/execute`;
+            
+            const payload = {
+                target: targetValue,
+                method: api.method || 'GET',
+                path: api.path || '/'
+            };
+            
+            if (bodyOverride && Object.keys(bodyOverride).length > 0) {
+                payload.body = bodyOverride;
+            }
+            
+            const options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            };
+            
+            const response = await fetch(url, options);
+            const rawText = await response.text();
+            let parsedPayload = null;
+            
+            try {
+                parsedPayload = JSON.parse(rawText);
+            } catch (error) {
+                // keep raw text for non-JSON responses
+            }
+            
+            return {
+                ok: response.ok,
+                status: response.status,
+                payload: parsedPayload
+            };
+        } catch (error) {
+            console.error('API execution failed:', error);
+            return {
+                ok: false,
+                status: 0,
+                payload: null,
+                error: error.message
+            };
+        }
+    }
+
+    formatPayloadForDisplay(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return payload;
+        }
+        const formatted = JSON.parse(JSON.stringify(payload));
+        
+        // Parse any stringified Python dicts in the result
+        if (formatted.result && typeof formatted.result === 'object') {
+            if (formatted.result.status && typeof formatted.result.status === 'string') {
+                formatted.result.status = this.parsePythonDictString(formatted.result.status);
+            }
+            if (formatted.result.message && typeof formatted.result.message === 'string') {
+                formatted.result.message = this.parsePythonDictString(formatted.result.message);
+            }
+        }
+        
+        // Also check at top level
+        if (formatted.status && typeof formatted.status === 'string') {
+            formatted.status = this.parsePythonDictString(formatted.status);
+        }
+        
+        return formatted;
+    }
+
+    parsePythonDictString(pythonStr) {
+        if (!pythonStr || typeof pythonStr !== 'string') {
+            return pythonStr;
+        }
+        try {
+            const jsonStr = pythonStr
+                .replace(/'/g, '"')
+                .replace(/True/g, 'true')
+                .replace(/False/g, 'false')
+                .replace(/None/g, 'null');
+            return JSON.parse(jsonStr);
+        } catch (e) {
+            console.log('Warning: Could not parse Python dict string as JSON:', e);
+            return pythonStr;
+        }
+    }
+
+    loadMonitoring() {
+        const root = document.getElementById('monitoring-page-root');
+        if (root) {
+            if (!this.monitoringPage) {
+                if (window.MonitoringPage) {
+                    this.monitoringPage = new window.MonitoringPage(this);
+                }
+            }
+            if (this.monitoringPage && typeof this.monitoringPage.render === 'function') {
+                this.monitoringPage.render(root);
+            }
+        }
+    }
+
     loadPageContent(pageName) {
         switch(pageName) {
             case 'dashboard':
@@ -211,6 +318,9 @@ class RTIDemoApp {
             case 'tools':
                 this.loadTools();
                 break;
+            case 'monitoring':
+                this.loadMonitoring();
+                break;
             case 'acsi-server':
                 this.loadAcsiServerPage();
                 break;
@@ -224,6 +334,10 @@ class RTIDemoApp {
     }
 
     loadAcsiServerPage() {
+        // Hide the connection modal explicitly
+        const modal = document.getElementById('modal-connection');
+        if (modal) modal.classList.remove('active');
+        
         const root = document.getElementById('acsi-server-page-root');
         if (!root) {
             return;
@@ -238,6 +352,10 @@ class RTIDemoApp {
     }
 
     loadAcsiClientPage() {
+        // Hide the connection modal explicitly
+        const modal = document.getElementById('modal-connection');
+        if (modal) modal.classList.remove('active');
+        
         const root = document.getElementById('acsi-client-page-root');
         if (!root) {
             return;
@@ -249,6 +367,20 @@ class RTIDemoApp {
         }
 
         root.innerHTML = '<p style="color: var(--text-muted);">ACSI Client page is unavailable.</p>';
+    }
+
+    async loadScript(url) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector(`script[src="${url}"]`)) {
+                resolve();
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = url;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
     }
 
     loadACSI() {
@@ -526,30 +658,22 @@ class RTIDemoApp {
         const props = endpoint.properties_info?.properties || {};
         const acsiRoleRaw = props['acsi-role'] || props['acsi_role'] || '';
         const acsiRole = String(acsiRoleRaw).trim().toLowerCase();
+        const endpointType = (endpoint.type || '').toLowerCase();
 
-        if (acsiRole === 'acsi-server') {
+        if (acsiRole === 'acsi-server' || endpointType === 'rti-fsp') {
             this.selectedAcsiEndpoint = endpoint;
             this.navigateToPage('acsi-server');
             return;
         }
-        if (acsiRole === 'acsi-client') {
+        if (acsiRole === 'acsi-client' || endpointType === 'rti-so') {
             this.selectedAcsiEndpoint = endpoint;
             this.navigateToPage('acsi-client');
             return;
         }
 
-        // Default behavior for non-ACSI server endpoints.
-        this.navigateToPage('connections');
-        this.selectedEndpoint = endpoint;
-
-        // Show badge with endpoint name/host:port
-        const badge = document.getElementById('acsi-endpoint-badge');
-        if (badge && endpoint) {
-            badge.textContent = `${endpoint.name || ''} · ${endpoint.host}:${endpoint.port}`;
-            badge.style.display = 'inline-block';
-        }
-
-        this.navigateToPage('acsi');
+        // For any other ACSI-related endpoint, default to client page
+        this.selectedAcsiEndpoint = endpoint;
+        this.navigateToPage('acsi-client');
     }
 
     // =============================================

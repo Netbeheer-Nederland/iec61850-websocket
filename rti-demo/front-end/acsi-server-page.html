@@ -1,6 +1,6 @@
 <div class="acsi-server-page">
     <div class="acsi-server-page-header">
-        <h1>ACSI Server - IEC 61850 Server</h1>
+        <h1>ACSI Server</h1>
         <span class="acsi-page-pill">Preview</span>
     </div>
     <p class="acsi-server-subtitle">
@@ -13,11 +13,12 @@
             <div class="acsi-endpoint-card">
                 <div class="acsi-endpoint-row">
                     <span class="acsi-endpoint-item"><span class="acsi-label">Name</span><span class="acsi-value">{{endpointName}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">Address</span><span class="acsi-value">{{endpointHost}}:{{endpointPort}}</span></span>
+                    <span class="acsi-endpoint-item"><span class="acsi-label">Address</span><span id="acsi-address-field" class="acsi-value"></span></span>
+                    <span class="acsi-endpoint-item"><span class="acsi-label">AP</span><span id="acsi-ap-field" class="acsi-value"></span></span>
                     <span class="acsi-endpoint-item"><span class="acsi-label">Type</span><span class="acsi-value">{{endpointType}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">Status</span><span class="acsi-value acsi-status">{{endpointStatus}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">ACSI Role</span><span class="acsi-value">{{endpointRole}}</span></span>
-                    <span class="acsi-endpoint-item"><span class="acsi-label">WS Mode</span><span class="acsi-value">{{endpointWsMode}}</span></span>
+                    <span class="acsi-endpoint-item"><span class="acsi-label">Status</span><span id="acsi-status-field" class="acsi-value acsi-status"></span></span>
+                    <span class="acsi-endpoint-item"><span class="acsi-label">ACSI Role</span><span id="acsi-role-field" class="acsi-value">Server</span></span>
+                    <span class="acsi-endpoint-item"><span class="acsi-label">WS Mode</span><span id="acsi-wsmode-field" class="acsi-value"></span></span>
                 </div>
                 <div class="acsi-endpoint-status-row">
                     <button id="acsi-reload-status-btn" class="btn-primary" type="button" aria-label="Reload status" title="Reload status">
@@ -36,6 +37,24 @@
                 <button id="acsi-stop-btn" class="btn-primary" type="button">Stop</button>
                 <button id="acsi-load-model-btn" class="btn-primary" type="button">Load model</button>
             </div>
+            <div class="acsi-start-options" style="margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+                <div class="form-group">
+                    <label for="acsi-server-host-input">Host</label>
+                    <input type="text" id="acsi-server-host-input" value="0.0.0.0" placeholder="0.0.0.0" />
+                </div>
+                <div class="form-group">
+                    <label for="acsi-server-port-input">Port</label>
+                    <input type="number" id="acsi-server-port-input" value="8765" placeholder="8765" />
+                </div>
+                <div class="form-group">
+                    <label for="acsi-server-mode-input">Mode</label>
+                    <input type="text" id="acsi-server-mode-input" value="server" placeholder="server" />
+                </div>
+                <div class="form-group">
+                    <label for="acsi-server-cp-input">CP</label>
+                    <input type="text" id="acsi-server-cp-input" value="cp1" placeholder="cp1" />
+                </div>
+            </div>
         </section>
 
         <section class="acsi-panel acsi-panel-main acsi-model-panel" id="acsi-model-panel">
@@ -46,18 +65,35 @@
         </section>
 
         <section class="acsi-panel acsi-panel-main" id="acsi-api-logs-panel">
-            
-<div class="protocol-header">
-    <button id="reloadMessagesBtn" title="Reload Messages"  class="btn-primary" type="button" aria-label="Reload status" >
-                                <i class="fas fa-rotate-right" aria-hidden="true"></i>
-
-    </button>
-    <span>Protocol Message</span>
-</div>
-
-            <div id="acsi-log-tab-messages" class="acsi-log-tab-panel" role="tabpanel" hidden>
-                <div id="acsi-protocol-messages" class="acsi-log-list"></div>
+            <div class="protocol-header">
+                <h2>Protocol Messages</h2>
+                <div class="message-controls">
+                    <select class="monitor-interval-select" id="messages-interval">
+                        <option value="1000">1s</option>
+                        <option value="2000">2s</option>
+                        <option value="5000" selected>5s</option>
+                        <option value="10000">10s</option>
+                    </select>
+                    <button id="messages-start-btn" class="btn-primary" type="button" title="Start">
+                        <i class="fas fa-play"></i>
+                        Start
+                    </button>
+                    <button id="reloadMessagesBtn" title="Reload Messages" class="btn-primary" type="button" aria-label="Reload Messages">
+                        <i class="fas fa-rotate-right" aria-hidden="true"></i>
+                        Reload
+                    </button>
+                    <button id="messages-stop-btn" class="btn-primary" type="button" title="Stop">
+                        <i class="fas fa-stop"></i>
+                        Stop
+                    </button>
+                    <button id="messages-clear-btn" class="btn-primary" type="button" title="Clear">
+                        <i class="fas fa-trash"></i>
+                        Clear
+                    </button>
+                </div>
+                <div class="monitor-status" id="messages-status">Select an endpoint and click Start</div>
             </div>
+            <div id="acsi-protocol-messages" class="acsi-log-list"></div>
         </section>
     </div>
 
