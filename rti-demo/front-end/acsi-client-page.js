@@ -25,7 +25,7 @@
     const apiDefinitions = [
         { id: 'connect', label: 'POST /api/connect', method: 'POST', path: '/api/connect' },
         { id: 'disconnect', label: 'POST /api/disconnect', method: 'POST', path: '/api/disconnect' },
-        { id: 'model-tree', label: 'GET /api/model/tree', method: 'POST', path: '/api/model/tree' },
+        { id: 'model-tree', label: 'GET /api/model/tree', method: 'GET', path: '/api/model/tree' },
         { id: 'data-definition', label: 'POST /api/getDataDefinition', method: 'POST', path: '/api/getDataDefinition' },
         { id: 'read', label: 'POST /api/readvalue', method: 'POST', path: '/api/readvalue' },
         { id: 'write', label: 'POST /api/writevalue', method: 'POST', path: '/api/writevalue' },
@@ -407,16 +407,16 @@
         const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
 
         if (!host || !port) {
-            showStatus(rootElement, 'Please enter both host and port', 'error');
+            //showStatus(rootElement, 'Please enter both host and port', 'error');
             return;
         }
 
         if (isNaN(port) || port < 1 || port > 65535) {
-            showStatus(rootElement, 'Invalid port number', 'error');
+            //showStatus(rootElement, 'Invalid port number', 'error');
             return;
         }
 
-        showStatus(rootElement, 'Connecting...', 'info');
+        //showStatus(rootElement, 'Connecting...', 'info');
         const result = await executeApiCall(
             getApiById('connect'),
             endpointTarget,
@@ -424,10 +424,9 @@
         );
 
         if (result && result.ok) {
-            showStatus(rootElement, `Connected to ${host}:${port}`, 'success');
+            //showStatus(rootElement, `Connected to ${host}:${port}`, 'success');
             rootElement.querySelector('#acsi-client-connect-page-btn').disabled = true;
             rootElement.querySelector('#acsi-client-disconnect-page-btn').disabled = false;
-            rootElement.querySelector('#acsi-client-fetch-model-btn').disabled = false;
             updateEndpointBadge(host, port, '');
             
             // Enable message monitoring buttons
@@ -435,7 +434,7 @@
             if (startBtn) startBtn.disabled = false;
         } else {
             const error = result?.payload?.error || result?.rawText || 'Unknown error';
-            showStatus(rootElement, `Connection failed: ${error}`, 'error');
+            //showStatus(rootElement, `Connection failed: ${error}`, 'error');
         }
     }
 
@@ -445,7 +444,7 @@
         const port = parseInt(rootElement.querySelector('#acsi-client-port-page').value.trim());
         const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
 
-        showStatus(rootElement, 'Disconnecting...', 'info');
+        //showStatus(rootElement, 'Disconnecting...', 'info');
         
         const result = await executeApiCall(
             getApiById('disconnect'),
@@ -454,10 +453,9 @@
         );
 
         if (result && result.ok) {
-            showStatus(rootElement, 'Disconnected', 'info');
+            //showStatus(rootElement, 'Disconnected', 'info');
             rootElement.querySelector('#acsi-client-connect-page-btn').disabled = false;
             rootElement.querySelector('#acsi-client-disconnect-page-btn').disabled = true;
-            rootElement.querySelector('#acsi-client-fetch-model-btn').disabled = true;
             rootElement.querySelector('#acsi-client-tree-container-page').style.display = 'none';
             updateEndpointBadge('', '', '');
             
@@ -469,7 +467,7 @@
             stopMonitoring();
         } else {
             const error = result?.payload?.error || result?.rawText || 'Unknown error';
-            showStatus(rootElement, `Disconnect failed: ${error}`, 'error');
+            //showStatus(rootElement, `Disconnect failed: ${error}`, 'error');
         }
     }
 
@@ -1329,7 +1327,6 @@
         
         // Disable buttons that need connection first
         const fetchModelBtn = document.getElementById('acsi-client-fetch-model-btn');
-        if (fetchModelBtn) fetchModelBtn.disabled = true;
         const disconnectBtn = document.getElementById('acsi-client-disconnect-page-btn');
         if (disconnectBtn) disconnectBtn.disabled = true;
         const startBtn = document.getElementById('messages-start-btn');
@@ -1376,8 +1373,7 @@
             renderProtocolMessages(root);
             
             // Disable buttons that need connection first
-            const fetchModelBtn = document.getElementById('acsi-client-fetch-model-btn');
-            if (fetchModelBtn) fetchModelBtn.disabled = true;
+
             const disconnectBtn = document.getElementById('acsi-client-disconnect-page-btn');
             if (disconnectBtn) disconnectBtn.disabled = true;
             const startBtn = document.getElementById('messages-start-btn');

@@ -10,13 +10,13 @@
     "status": "disconnected",
     "properties_info": {
       "available": false,
-      "error": "HTTPConnectionPool(host='tedfg', port=5000): Max retries exceeded with url: /api/properties (Caused by NameResolutionError(\"HTTPConnection(host='tedfg', port=5000): Failed to resolve 'tedfg' ([Errno 11001] getaddrinfo failed)\"))"
+      "error": "HTTPConnectionPool(host='tedfg', port=5000): Max retries exceeded with url: /api/properties (Caused by NameResolutionError(\"HTTPConnection(host='tedfg', port=5000): Failed to resolve 'tedfg' ([Errno -2] Name or service not known)\"))"
     }
   },
   {
     "id": 6,
     "name": "Max_test_Client",
-    "host": "127.0.0.1",
+    "host": "rti-client",
     "port": 5002,
     "type": "RTI-SO",
     "auto_discovered": false,
@@ -35,20 +35,15 @@
   {
     "id": 7,
     "name": "Max_test_Server",
-    "host": "127.0.0.1",
+    "host": "rti-server",
     "port": 5001,
     "type": "RTI-SO",
     "auto_discovered": false,
     "created_at": "2026-07-09T12:56:34.933320",
-    "status": "connected",
+    "status": "disconnected",
     "properties_info": {
-      "available": true,
-      "source": "/api/properties",
-      "properties": {
-        "ok": true,
-        "acsi_role": "ACSI-Server",
-        "ws_mode": "Active"
-      }
+      "available": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=5001): Max retries exceeded with url: /api/properties (Caused by NewConnectionError(\"HTTPConnection(host='127.0.0.1', port=5001): Failed to establish a new connection: [Errno 111] Connection refused\"))"
     }
   }
 ]
