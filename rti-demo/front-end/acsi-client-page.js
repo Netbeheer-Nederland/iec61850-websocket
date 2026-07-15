@@ -32,6 +32,7 @@
         { id: 'dataset-directory', label: 'POST /api/getDataSetDirectory', method: 'POST', path: '/api/getDataSetDirectory' },
         { id: 'actions-logs', label: 'GET /api/actions_logs', method: 'GET', path: '/api/actions_logs', sampleBody: '' },
         { id: 'clear-logs', label: 'POST /api/clear_logs', method: 'POST', path: '/api/clear_logs', sampleBody: '' },
+        { id: 'status', label: 'GET /api/status', method: 'GET', path: '/api/status'},
     ];
 
     function getApiById(id) {
@@ -182,6 +183,84 @@
             }
         }
     }
+
+    function parsePythonDictString(pythonStr) {
+            if (!pythonStr || typeof pythonStr !== 'string') {
+                return pythonStr;
+            }
+            try {
+                const jsonStr = pythonStr
+                    .replace(/'/g, '"')
+                    .replace(/True/g, 'true')
+                    .replace(/False/g, 'false')
+                    .replace(/None/g, 'null');
+                return JSON.parse(jsonStr);
+            } catch (e) {
+                console.log('Warning: Could not parse Python dict string as JSON:', e);
+                return pythonStr;
+            }
+    }
+
+    function formatPayloadForDisplay(payload) {
+            if (!payload || typeof payload !== 'object') {
+                return payload;
+            }
+            const formatted = JSON.parse(JSON.stringify(payload));
+
+            // Parse any stringified Python dicts in the result
+            if (formatted.result && typeof formatted.result === 'object') {
+                if (formatted.result.status && typeof formatted.result.status === 'string') {
+                    formatted.result.status = parsePythonDictString(formatted.result.status);
+                }
+                if (formatted.result.message && typeof formatted.result.message === 'string') {
+                    formatted.result.message = parsePythonDictString(formatted.result.message);
+                }
+            }
+
+            // Also check at top level
+            if (formatted.status && typeof formatted.status === 'string') {
+                formatted.status = parsePythonDictString(formatted.status);
+            }
+
+            return formatted;
+    }
+
+    function setUpdatedStatusText(text, isError = false) {
+        const updatedStatusEl = document.getElementById('acsi-endpoint-updated-status');
+        if (!updatedStatusEl) {
+            return;
+        }
+        updatedStatusEl.textContent = text;
+        updatedStatusEl.classList.toggle('acsi-model-error', !!isError);
+    }
+
+    async function updateStatus(endpointTarget)
+        {
+            setUpdatedStatusText('Loading status...');
+            await ensureBffHealthy();
+
+            const api = getApiById('status');
+            const result = await executeApiCall(api, endpointTarget, null);
+
+            if (result && result.ok && result.payload) {
+
+                const addressEl = document.getElementById('acsi-address-field');
+                const statusEl = document.getElementById('acsi-status-field');
+                const apEl = document.getElementById('acsi-ap-field');
+
+                const formattedPayload = formatPayloadForDisplay(result.payload);
+                const text = `Connected clients: ${formattedPayload.result.status.connectedClients} - IED: ${formattedPayload.result.status.modelName} - Model source: ${formattedPayload.result.status.modelSource}`
+                setUpdatedStatusText(text);
+                addressEl.textContent = `${formattedPayload.result.host}:${formattedPayload.result.port}`
+                statusEl.textContent = `${formattedPayload.result.status}`
+                apEl.textContent = `${formattedPayload.result.accessPoints}`
+                console.log('success', 'GET /api/status -> HTTP 200', JSON.stringify(formattedPayload, null, 2));
+            } else {
+                const message = result ? `HTTP ${result.status}` : 'Unknown error';
+                setUpdatedStatusText(`Updated status: failed (${message})`, true);
+                console.log('error', 'GET /api/status failed', message);
+            }
+        }
 
     async function startMonitoring(rootElement, targetValue) {
         if (isMonitoring) {
@@ -351,6 +430,7 @@
         const messagesStopBtn = rootElement.querySelector('#messages-stop-btn');
         const messagesClearBtn = rootElement.querySelector('#messages-clear-btn');
         const reloadMessagesBtn = rootElement.querySelector('#reloadMessagesBtn');
+        const reloadStatusBtn = rootElement.querySelector('#acsi-reload-status-btn');
 
         const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
 
@@ -390,6 +470,26 @@
             });
         }
 
+        if (reloadStatusBtn) {
+            reloadStatusBtn.addEventListener('click', async () => {
+                if (!endpointTarget) {
+                    setUpdatedStatusText('Updated status: blocked (missing selected endpoint address).', true);
+                    return;
+                }
+
+                try {
+                    reloadStatusBtn.disabled = true;
+                    updateStatus(endpointTarget);
+                } catch (error) {
+                    const message = String(error && error.message ? error.message : error);
+                    setUpdatedStatusText(`Updated status: failed (${message})`, true);
+                    console.log('error', 'GET /api/status failed', message);
+                } finally {
+                    reloadStatusBtn.disabled = false;
+                }
+            });
+        }
+
         if (messagesClearBtn) {
             messagesClearBtn.addEventListener('click', () => {
                 clearMessages(rootElement, endpointTarget);
@@ -398,6 +498,26 @@
 
         // Initialize messages status
         updateMessagesStatus(rootElement, 'Select an endpoint and click Start');
+
+        (async () => {
+            let targetToUse = endpointTarget;
+
+            if (!targetToUse) {
+                const storedHost = localStorage.getItem('bffHost');
+                const storedPort = localStorage.getItem('bffPort');
+                if (storedHost && storedPort) {
+                    targetToUse = buildTargetValue(storedHost, Number(storedPort));
+                }
+            }
+
+            if (targetToUse) {
+                try {
+                    await updateStatus(targetToUse);
+                } catch (error) {
+                    console.log('Auto status load failed:', error);
+                }
+            }
+        })();
     }
 
     async function handleConnect(rootElement, endpoint) {
@@ -469,6 +589,11 @@
             const error = result?.payload?.error || result?.rawText || 'Unknown error';
             //showStatus(rootElement, `Disconnect failed: ${error}`, 'error');
         }
+
+        setUpdatedStatusText('Updated status: not loaded yet.');
+        document.getElementById('acsi-address-field').textContent = '';
+        document.getElementById('acsi-status-field').textContent = '';
+        document.getElementById('acsi-ap-field').textContent = '';
     }
 
     // Context menu for reading data values
@@ -1335,11 +1460,36 @@
         if (stopBtn) stopBtn.disabled = true;
     }
 
+    function interpolateTemplate(template, values) {
+        return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (match, key) => {
+            return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match;
+        });
+    }
+
+    let templateCache = null;
+
+     async function loadTemplate() {
+        if (templateCache) {
+            return templateCache;
+        }
+
+        const response = await fetch('./acsi-client-page.html', { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error('Unable to load acsi-client-page.html');
+        }
+
+        templateCache = await response.text();
+        return templateCache;
+    }
+
     // Render function to match the server page pattern
     async function render(root, endpoint) {
         if (!root) {
             return;
         }
+        const hasEndpoint = !!endpoint;
+        const endpointName = hasEndpoint ? escapeHtml(endpoint.name || 'Unnamed endpoint') : 'No endpoint selected';
+        const endpointType = hasEndpoint ? escapeHtml(endpoint.type || 'N/A') : 'N/A';
 
         try {
             // Ensure CSS is loaded
@@ -1356,31 +1506,25 @@
                 await loadScript('acsi-client-page.js');
             }
 
-            // Fetch and inject the HTML (without the script tag to avoid double-loading)
-            const response = await fetch('acsi-client-page.html');
-            if (!response.ok) {
-                throw new Error('Failed to load HTML');
-            }
-            let html = await response.text();
-            
-            // Remove the script tag from the HTML to prevent double-loading
-            html = html.replace(/<script\s+src=["']acsi-client-page\.js["']><\/script>/gi, '');
-            
-            root.innerHTML = html;
+            // ✅ Use ONLY template interpolation
+            const template = await loadTemplate();
+            root.innerHTML = interpolateTemplate(template, {
+                endpointName,
+                endpointType,
+            });
 
             // Initialize the page
             setupEventListeners(root, endpoint);
             renderProtocolMessages(root);
-            
-            // Disable buttons that need connection first
 
+            // Disable buttons that need connection first
             const disconnectBtn = document.getElementById('acsi-client-disconnect-page-btn');
             if (disconnectBtn) disconnectBtn.disabled = true;
             const startBtn = document.getElementById('messages-start-btn');
             if (startBtn) startBtn.disabled = true;
             const stopBtn = document.getElementById('messages-stop-btn');
             if (stopBtn) stopBtn.disabled = true;
-            
+
             // Update endpoint badge if we have an endpoint
             if (endpoint) {
                 const badge = root.querySelector('.acsi-endpoint-badge');
