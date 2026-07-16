@@ -1045,10 +1045,11 @@
                         ul.className = 'scl-tree-list';
 
                         dataAttributes.forEach((da) => {
-                            const typeSuffix = da.daType[0] ? ` [${da.daType[0]}]` : '';
+                            const typeSuffix = da.daType[0] ? ` (${da.daType[0]})` : '';
                             const daName = da.name || da.daRef.split('.').pop() || 'DA';
-                            const fc = da.fc || 'mx';
-                            const daLi = createTreeNode('DA', `${daName}${typeSuffix}`);
+                            const fc_display = da.fc ? ` [${da.fc}] ` : '';
+                            const fc = da.fc || '';
+                            const daLi = createTreeNode('DA', `${fc_display}${daName}${typeSuffix}`);
 
                             const daRef = `${node.ref}.${daName}`;
 
@@ -1391,9 +1392,9 @@
                 das.forEach(function (da) {
                   var daName   = (typeof da === 'object' ? da.name : da) || 'DA';
                   var daFc     = (da && (da.fc || doFc)) || null;
-                  var bTypeTxt = (da && da.bType) ? ' [' + da.bType + ']' : '';
+                  var bTypeTxt = (da && da.bType) ? ' (' + da.bType + ')' : '';
                   var daRef    = doRef + '.' + daName;
-                  var daLi     = createTreeNode('DA', daName + bTypeTxt);
+                  var daLi     = createTreeNode('DA', daName + bTypeTxt + (daFc ? ' [' + daFc + ']' : ''));
                   makeClickable(daLi, daRef, daFc, 'DA');
 
                   const row = daLi.querySelector(':scope > .scl-tree-row');
