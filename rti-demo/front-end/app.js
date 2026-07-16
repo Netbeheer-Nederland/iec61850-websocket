@@ -1219,7 +1219,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
             if (activePage === 'page-dashboard') {
                 this.refreshDashboard();
             }
-        }, 5000); // Refresh every 5 seconds
+        }, 30000); // Refresh every 30 seconds
     }
 
     stopAutoRefresh() {
