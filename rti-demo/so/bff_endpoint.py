@@ -985,18 +985,12 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             HTTPException 403: If client is not connected
             HTTPException 404: If instance not available or timeout
         """
-        print("entered api_get_data_definition")
         try:
             ld_inst = request.ld_inst
             ln_inst = request.ln_inst
             do_path = request.do_path
-            print("ld_inst: ", ld_inst, "ln_inst: ", ln_inst, "do_path: ", do_path)
+
             obj_ref = f"{ld_inst}/{ln_inst}.{do_path}" if do_path else f"{ld_inst}/{ln_inst}"
-
-            print("obj_ref: ", obj_ref)
-
-            #obj_ref = request.objRef
-            #fc = request.fc
 
             if not obj_ref:
                 #client._log_action("Client readvalue rejected: missing objRef", "warn")
@@ -1021,7 +1015,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     rti_so.get_data_definition(obj_ref), timeout=10
                 )
 
-                print("result: ", result)
 
                 if result is None:
                     #client._log_action(
@@ -1098,8 +1091,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             ds_inst = request.ds_inst
 
             obj_ref = f"{ld_inst}/{ln_inst}.{ds_inst}"
-
-            print("ds obj_ref: ", obj_ref)
 
             # obj_ref = request.objRef
             # fc = request.fc
