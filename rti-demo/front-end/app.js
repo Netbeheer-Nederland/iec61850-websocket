@@ -634,7 +634,7 @@ class RTIDemoApp {
                 <div class="endpoint-card-name">${endpoint.name}${badge}</div>
                 <div class="endpoint-card-desc">${endpoint.host}:${endpoint.port}</div>
                 <div style="margin-top: 8px;">
-                    <span class="endpoint-card-status">${endpoint.status}</span>
+                    <!-- <span class="endpoint-card-status">${endpoint.status}</span> -->
                     <small style="color: var(--text-muted); margin-left: 8px; font-size: 11px;">
                         ${endpoint.type}
                     </small>
