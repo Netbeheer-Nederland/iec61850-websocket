@@ -715,16 +715,6 @@ class RTIDemoApp {
     }
 
     // ========== START/STOP POLLING ==========
-    startConnectionStatusPolling() {
-        this.stopConnectionStatusPolling(); // Clear any existing poller
-
-        const poll = async () => {
-            await this.refreshConnectionStatuses();
-            this.connectionStatusTimeout = setTimeout(poll, 10000);
-        };
-
-        poll(); // Start immediately
-    }
 
     stopConnectionStatusPolling() {
         if (this.connectionStatusTimeout) {
@@ -732,6 +722,25 @@ class RTIDemoApp {
             this.connectionStatusTimeout = null;
         }
     }
+
+    startConnectionStatusPolling() {
+        this.stopConnectionStatusPolling();
+
+        const poll = async () => {
+            // Only poll if we're actually viewing connections
+            if (document.querySelector('.page.active')?.id !== 'page-connections') {
+                this.connectionStatusTimeout = setTimeout(poll, 10000);
+                return;
+            }
+
+            await this.refreshConnectionStatuses();
+            this.connectionStatusTimeout = setTimeout(poll, 10000);
+        };
+
+        poll();
+    }
+
+
 
     showConnectionsLoading() {
         const tbody = document.getElementById('connections-container');
