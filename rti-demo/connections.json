@@ -2,7 +2,7 @@
   {
     "id": 5,
     "name": "ttt",
-    "host": "tedfg",
+    "host": "gdgsdgs",
     "port": 5000,
     "type": "RTI-SO",
     "auto_discovered": false,
@@ -10,13 +10,13 @@
     "status": "disconnected",
     "properties_info": {
       "available": false,
-      "error": "HTTPConnectionPool(host='tedfg', port=5000): Max retries exceeded with url: /api/properties (Caused by NameResolutionError(\"HTTPConnection(host='tedfg', port=5000): Failed to resolve 'tedfg' ([Errno 11001] getaddrinfo failed)\"))"
+      "error": "HTTPConnectionPool(host='tedfg', port=5000): Max retries exceeded with url: /api/properties (Caused by NameResolutionError(\"HTTPConnection(host='tedfg', port=5000): Failed to resolve 'tedfg' ([Errno -2] Name or service not known)\"))"
     }
   },
   {
     "id": 6,
     "name": "Max_test_Client",
-    "host": "127.0.0.1",
+    "host": "rti-client",
     "port": 5002,
     "type": "RTI-SO",
     "auto_discovered": false,
@@ -35,7 +35,7 @@
   {
     "id": 7,
     "name": "Max_test_Server",
-    "host": "127.0.0.1",
+    "host": "rti-server",
     "port": 5001,
     "type": "RTI-SO",
     "auto_discovered": false,

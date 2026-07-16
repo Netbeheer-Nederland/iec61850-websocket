@@ -634,7 +634,7 @@ class RTIDemoApp {
                 <div class="endpoint-card-name">${endpoint.name}${badge}</div>
                 <div class="endpoint-card-desc">${endpoint.host}:${endpoint.port}</div>
                 <div style="margin-top: 8px;">
-                    <span class="endpoint-card-status">${endpoint.status}</span>
+                    <!-- <span class="endpoint-card-status">${endpoint.status}</span> -->
                     <small style="color: var(--text-muted); margin-left: 8px; font-size: 11px;">
                         ${endpoint.type}
                     </small>
@@ -715,16 +715,6 @@ class RTIDemoApp {
     }
 
     // ========== START/STOP POLLING ==========
-    startConnectionStatusPolling() {
-        this.stopConnectionStatusPolling(); // Clear any existing poller
-
-        const poll = async () => {
-            await this.refreshConnectionStatuses();
-            this.connectionStatusTimeout = setTimeout(poll, 10000);
-        };
-
-        poll(); // Start immediately
-    }
 
     stopConnectionStatusPolling() {
         if (this.connectionStatusTimeout) {
@@ -732,6 +722,25 @@ class RTIDemoApp {
             this.connectionStatusTimeout = null;
         }
     }
+
+    startConnectionStatusPolling() {
+        this.stopConnectionStatusPolling();
+
+        const poll = async () => {
+            // Only poll if we're actually viewing connections
+            if (document.querySelector('.page.active')?.id !== 'page-connections') {
+                this.connectionStatusTimeout = setTimeout(poll, 10000);
+                return;
+            }
+
+            await this.refreshConnectionStatuses();
+            this.connectionStatusTimeout = setTimeout(poll, 10000);
+        };
+
+        poll();
+    }
+
+
 
     showConnectionsLoading() {
         const tbody = document.getElementById('connections-container');
@@ -1210,7 +1219,7 @@ ${JSON.stringify(result, null, 2)}</pre>`;
             if (activePage === 'page-dashboard') {
                 this.refreshDashboard();
             }
-        }, 5000); // Refresh every 5 seconds
+        }, 30000); // Refresh every 30 seconds
     }
 
     stopAutoRefresh() {
