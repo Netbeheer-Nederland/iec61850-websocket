@@ -512,6 +512,10 @@
 
             if (targetToUse) {
                 try {
+
+                if (!document.getElementById('page-acsi-client')?.classList.contains('active')) {
+                    return;
+                }
                     await updateStatus(targetToUse);
                 } catch (error) {
                     console.log('Auto status load failed:', error);
