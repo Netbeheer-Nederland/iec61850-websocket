@@ -888,6 +888,32 @@
         });
     }
 
+    async function showReadContextMenuForDataAttribute(e, objRef, fc, endpoint) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const menuItems = [
+            {
+                label: `Read Value [${fc.toUpperCase()}]`,
+                icon: 'fa-eye',
+                action: () => readDataValue(objRef, fc, endpoint),
+                id: 'contextMenuReadValue',
+            },
+        ];
+
+        const menu = createContextMenu(menuItems);
+        menu.style.left = e.clientX + 'px';
+        menu.style.top  = e.clientY + 'px';
+        menu.style.display = 'block';
+
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth)  menu.style.left = (e.clientX - rect.width) + 'px';
+            if (rect.bottom > window.innerHeight) menu.style.top = (e.clientY - rect.height) + 'px';
+        });
+    }
+
+
     async function showContextMenuForDataAttribute(e, objRef, fc, endpoint) {
         e.preventDefault();
         e.stopPropagation();
@@ -896,12 +922,14 @@
             {
                 label: `Read Value [${fc.toUpperCase()}]`,
                 icon: 'fa-eye',
-                action: () => readDataValue(objRef, fc, endpoint)
+                action: () => readDataValue(objRef, fc, endpoint),
+                id: 'contextMenuReadValue',
             },
             {
                 label: `Write Value [${fc.toUpperCase()}]`,
                 icon: 'fa-pen',
-                action: () => showWriteValueDialog(objRef, fc, endpoint)
+                action: () => showWriteValueDialog(objRef, fc, endpoint),
+                id: 'contextMenuWriteValue',
             }
         ];
 
@@ -1061,11 +1089,22 @@
                             valueDisplaySpan.setAttribute('data-obj-ref', daRef);
                             row.appendChild(valueDisplaySpan);
 
-                            row.addEventListener('contextmenu', (e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                showContextMenuForDataAttribute(e, daRef, fc, endpoint);
-                            });
+                            if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
+                                row.addEventListener('contextmenu', (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    showContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                                });
+                            }
+                            else
+                            {
+                                row.addEventListener('contextmenu', (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    showReadContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                                });
+                            }
+
 
                             const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
                             if (subDas.length > 0) {
