@@ -1093,20 +1093,23 @@
                 valueDisplaySpan.setAttribute('data-obj-ref', daRef);
                 row.appendChild(valueDisplaySpan);
 
-                if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
-                    row.addEventListener('contextmenu', (e) => {
-                        e.preventDefault(); e.stopPropagation();
-                        showContextMenuForDataAttribute(e, daRef, fc, endpoint);
-                    });
+
+                if (da.daType[0] === "structure"){
+                    da.subDataAttributes = da.daType[1];
+                }
+
+               if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
+                row.addEventListener('contextmenu', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    showContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                });
                 } else {
                     row.addEventListener('contextmenu', (e) => {
                         e.preventDefault(); e.stopPropagation();
                         showReadContextMenuForDataAttribute(e, daRef, fc, endpoint);
                     });
                 }
-                if (da.daType[0] === "structure"){
-                    da.subDataAttributes = da.daType[1];
-                }
+
 
 
             const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
@@ -1150,12 +1153,12 @@
                      if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
                         sdaRow.addEventListener('contextmenu', (e) => {
                             e.preventDefault(); e.stopPropagation();
-                            showContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                            showContextMenuForDataAttribute(e, sdaRef, fc, endpoint);
                         });
                     } else {
                         sdaRow.addEventListener('contextmenu', (e) => {
                             e.preventDefault(); e.stopPropagation();
-                            showReadContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                            showReadContextMenuForDataAttribute(e, sdaRef, fc, endpoint);
                         });
                     }
 
