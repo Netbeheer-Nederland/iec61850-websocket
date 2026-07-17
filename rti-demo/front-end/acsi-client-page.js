@@ -1111,6 +1111,25 @@
 
             const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
 
+            if (Array.isArray(subDas) && subDas.length > 0) {
+                const daToggle = row.querySelector('.scl-tree-toggle');
+                if (daToggle) {
+                    daToggle.classList.remove('hidden');
+                    daLi.classList.add('has-children');
+                    daToggle.textContent = '▸';
+
+                    daToggle.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const expanded = daLi.classList.toggle('expanded');
+                        daToggle.textContent = expanded ? '▾' : '▸';
+                        const daUl = daLi.querySelector(':scope > ul');
+                        if (daUl) {
+                            daUl.style.display = expanded ? '' : 'none';
+                        }
+                    });
+                }
+            }
+
             if (subDas.length > 0) {
                 const daUl = document.createElement('ul');
                 daUl.className = 'scl-tree-list';
@@ -1143,7 +1162,7 @@
                     daUl.appendChild(sdaLi);
                 });
                 daLi.appendChild(daUl);
-            
+
             }
                 ul.appendChild(daLi);
             });
