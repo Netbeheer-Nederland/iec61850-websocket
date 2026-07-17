@@ -888,6 +888,32 @@
         });
     }
 
+    async function showReadContextMenuForDataAttribute(e, objRef, fc, endpoint) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const menuItems = [
+            {
+                label: `Read Value [${fc.toUpperCase()}]`,
+                icon: 'fa-eye',
+                action: () => readDataValue(objRef, fc, endpoint),
+                id: 'contextMenuReadValue',
+            },
+        ];
+
+        const menu = createContextMenu(menuItems);
+        menu.style.left = e.clientX + 'px';
+        menu.style.top  = e.clientY + 'px';
+        menu.style.display = 'block';
+
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth)  menu.style.left = (e.clientX - rect.width) + 'px';
+            if (rect.bottom > window.innerHeight) menu.style.top = (e.clientY - rect.height) + 'px';
+        });
+    }
+
+
     async function showContextMenuForDataAttribute(e, objRef, fc, endpoint) {
         e.preventDefault();
         e.stopPropagation();
@@ -896,12 +922,14 @@
             {
                 label: `Read Value [${fc.toUpperCase()}]`,
                 icon: 'fa-eye',
-                action: () => readDataValue(objRef, fc, endpoint)
+                action: () => readDataValue(objRef, fc, endpoint),
+                id: 'contextMenuReadValue',
             },
             {
                 label: `Write Value [${fc.toUpperCase()}]`,
                 icon: 'fa-pen',
-                action: () => showWriteValueDialog(objRef, fc, endpoint)
+                action: () => showWriteValueDialog(objRef, fc, endpoint),
+                id: 'contextMenuWriteValue',
             }
         ];
 
@@ -1017,153 +1045,196 @@
       parentLi.appendChild(ul);
     }
 
+    async function fetchDODefinition(node, endpointTarget, onNodeClick, container, endpoint) {
+        // If already has children, just toggle
+        const existingUl = node.li.querySelector(':scope > ul');
+        if (existingUl) {
+            const row = node.li.querySelector(':scope > .scl-tree-row');
+            const toggle = row.querySelector('.scl-tree-toggle');
+            if (toggle && !toggle.classList.contains('hidden')) {
+                const expanded = node.li.classList.toggle('expanded');
+                toggle.textContent = expanded ? '▾' : '▸';
+                existingUl.style.display = expanded ? '' : 'none';
+            }
+            return;
+        }
+
+        const ldName = node.ref.split('/')[0];
+        const lnName = node.ref.split('/')[1].split('.')[0];
+        const doPath = node.ref.split('/')[1].split('.').slice(1).join('.');
+
+        const defResult = await executeApiCall(
+            getApiById('data-definition'),
+            endpointTarget,
+            {ld_inst: ldName, ln_inst: lnName, do_path: doPath}
+        );
+
+        if (defResult && defResult.ok) {
+            const dataAttributes = defResult.payload.result.value?.dataAttributeDefinition || [];
+            const subDataObjects = defResult.payload.result.value?.subDataDefinition || [];
+
+            const ul = document.createElement('ul');
+            ul.className = 'scl-tree-list';
+
+            // Add DAs - FIXED: Use passed 'endpoint' parameter
+            dataAttributes.forEach((da) => {
+                const typeSuffix = da.daType?.[0] ? ` (${da.daType[0]})` : '';
+                const daName = da.name || da.daRef?.split('.').pop() || 'DA';
+                const fc_display = da.fc ? ` [${da.fc}] ` : '';
+                const fc = da.fc || '';
+                const daLi = createTreeNode('DA', `${fc_display}${daName}${typeSuffix}`);
+                const daRef = `${node.ref}.${daName}`;
+
+                const row = daLi.querySelector(':scope > .scl-tree-row');
+                row.style.cursor = 'context-menu';
+
+                const valueDisplaySpan = document.createElement('span');
+                valueDisplaySpan.className = 'tree-value-display';
+                valueDisplaySpan.setAttribute('data-obj-ref', daRef);
+                row.appendChild(valueDisplaySpan);
+
+
+                if (da.daType[0] === "structure"){
+                    da.subDataAttributes = da.daType[1];
+                }
+
+               if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
+                row.addEventListener('contextmenu', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    showContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                });
+                } else {
+                    row.addEventListener('contextmenu', (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        showReadContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                    });
+                }
+
+
+
+            const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
+
+            if (Array.isArray(subDas) && subDas.length > 0) {
+                const daToggle = row.querySelector('.scl-tree-toggle');
+                if (daToggle) {
+                    daToggle.classList.remove('hidden');
+                    daLi.classList.add('has-children');
+                    daToggle.textContent = '▸';
+
+                    daToggle.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const expanded = daLi.classList.toggle('expanded');
+                        daToggle.textContent = expanded ? '▾' : '▸';
+                        const daUl = daLi.querySelector(':scope > ul');
+                        if (daUl) {
+                            daUl.style.display = expanded ? '' : 'none';
+                        }
+                    });
+                }
+            }
+
+            if (subDas.length > 0) {
+                const daUl = document.createElement('ul');
+                daUl.className = 'scl-tree-list';
+                subDas.forEach((sda) => {
+                    const sdaTypeSuffix = ` (${sda.cmpType[0]})` || '';
+                    const sdaName = sda.cmpName || sda.daRef?.split('.').pop() || 'SDA';
+                    const sdaRef = `${daRef}.${sdaName}`;
+                    const sdaLi = createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`);
+
+                    const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
+                    const sdaValueDisplaySpan = document.createElement('span');
+                    sdaValueDisplaySpan.className = 'tree-value-display';
+                    sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
+                    sdaRow.appendChild(sdaValueDisplaySpan);
+
+                    sdaRow.style.cursor = 'context-menu';
+
+                     if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
+                        sdaRow.addEventListener('contextmenu', (e) => {
+                            e.preventDefault(); e.stopPropagation();
+                            showContextMenuForDataAttribute(e, sdaRef, fc, endpoint);
+                        });
+                    } else {
+                        sdaRow.addEventListener('contextmenu', (e) => {
+                            e.preventDefault(); e.stopPropagation();
+                            showReadContextMenuForDataAttribute(e, sdaRef, fc, endpoint);
+                        });
+                    }
+
+                    daUl.appendChild(sdaLi);
+                });
+                daLi.appendChild(daUl);
+
+            }
+                ul.appendChild(daLi);
+            });
+
+            // Add SDOs - FIXED: Pass endpoint in node object
+            subDataObjects.forEach((sdo) => {
+                const cdcSuffix = sdo.cdc ? ` [${sdo.cdc}]` : '';
+                const sdoRef = `${node.ref}.${sdo.name}`;
+                const sdoLi = createTreeNode('SDO', `${sdo.name}${cdcSuffix}`);
+
+                const sdoRow = sdoLi.querySelector(':scope > .scl-tree-row');
+
+                if (sdoRow) {
+                    sdoRow.style.cursor = 'pointer';
+                    sdoRow.addEventListener('click', function(e) {
+                        if (e.target && e.target.classList.contains('scl-tree-toggle')) return;
+                        e.stopPropagation();
+
+                        container.querySelectorAll('.scl-tree-row.lm-selected').forEach(function(r) {
+                            r.classList.remove('lm-selected');
+                        });
+                        sdoRow.classList.add('lm-selected');
+                        onNodeClick({ ref: sdoRef, fc: null, nodeType: 'SDO', li: sdoLi, endpoint: endpoint }); // ✅ Pass endpoint
+                    });
+                }
+
+                const sdoToggle = sdoRow?.querySelector('.scl-tree-toggle');
+                if (sdoToggle) {
+                    sdoToggle.classList.remove('hidden');
+                    sdoLi.classList.add('has-children');
+                    sdoToggle.textContent = '▸';
+                }
+
+                ul.appendChild(sdoLi);
+            });
+
+            node.li.appendChild(ul);
+
+            if (ul.children.length > 0) {
+                const row = node.li.querySelector(':scope > .scl-tree-row');
+                const toggle = row.querySelector('.scl-tree-toggle');
+
+                toggle.classList.remove('hidden');
+                node.li.classList.add('has-children', 'expanded');
+                toggle.textContent = '▾';
+                ul.style.display = '';
+
+                toggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const expanded = node.li.classList.toggle('expanded');
+                    toggle.textContent = expanded ? '▾' : '▸';
+                    ul.style.display = expanded ? '' : 'none';
+                });
+            }
+        } else {
+            console.log(`Error fetching data definition for ${node.ref}:`,
+                defResult?.payload?.error || defResult?.rawText || 'Failed');
+        }
+    }
     async function handleFetchModel(rootElement, endpoint) {
         const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
 
         const handleNodeClick = async (node) => {
-                if (node.nodeType === 'DO') {
-                    const existingUl = node.li.querySelector(':scope > ul');
-
-                    if (existingUl) {
-                        return;
+                if (node.nodeType === 'DO' || node.nodeType === 'SDO') {
+                    const container = document.getElementById('acsi-client-tree-content');
+                    // ✅ Pass endpoint from closure or from node object
+                    const endpointToUse = node.endpoint || endpoint;
+                    await fetchDODefinition(node, endpointTarget, handleNodeClick, container, endpointToUse);
                     }
-                    const ldName = node.ref.split('/')[0];
-                    const lnName = node.ref.split('/')[1].split('.')[0];
-                    const doPath = node.ref.split('/')[1].split('.').slice(1).join('.');
-
-                    const defResult = await executeApiCall(
-                        getApiById('data-definition'),
-                        endpointTarget,
-                        {ld_inst: ldName, ln_inst: lnName, do_path: doPath}
-                    );
-                    if (defResult && defResult.ok) {
-                        console.log('Data definition:', defResult.payload);
-                        const dataAttributes = defResult.payload.result.value?.dataAttributeDefinition || [];
-                        const subDataObjects = defResult.payload.result.value?.subDataDefinition || [];
-
-                        const ul = document.createElement('ul');
-                        ul.className = 'scl-tree-list';
-
-                        dataAttributes.forEach((da) => {
-                            const typeSuffix = da.daType[0] ? ` (${da.daType[0]})` : '';
-                            const daName = da.name || da.daRef.split('.').pop() || 'DA';
-                            const fc_display = da.fc ? ` [${da.fc}] ` : '';
-                            const fc = da.fc || '';
-                            const daLi = createTreeNode('DA', `${fc_display}${daName}${typeSuffix}`);
-
-                            const daRef = `${node.ref}.${daName}`;
-
-                            const row = daLi.querySelector(':scope > .scl-tree-row');
-                            row.style.cursor = 'context-menu';
-
-                            const valueDisplaySpan = document.createElement('span');
-                            valueDisplaySpan.className = 'tree-value-display';
-                            valueDisplaySpan.setAttribute('data-obj-ref', daRef);
-                            row.appendChild(valueDisplaySpan);
-
-                            row.addEventListener('contextmenu', (e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                showContextMenuForDataAttribute(e, daRef, fc, endpoint);
-                            });
-
-                            const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
-                            if (subDas.length > 0) {
-                                const daUl = document.createElement('ul');
-                                daUl.className = 'scl-tree-list';
-                                subDas.forEach((sda) => {
-                                    const sdaTypeSuffix = sda.daType[0] ? ` [${sda.daType[0].bType}]` : '';
-                                    const sdaName = sda.name || sda.daRef.split('.').pop() || 'SDA';
-                                    const sdaRef = `${daRef}.${sdaName}`;
-
-                                    const sdaLi = createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`);
-                                    const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
-                                    const sdaValueDisplaySpan = document.createElement('span');
-                                    sdaValueDisplaySpan.className = 'tree-value-display';
-                                    sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
-                                    sdaRow.appendChild(sdaValueDisplaySpan);
-
-                                    sdaRow.style.cursor = 'context-menu';
-                                    sdaRow.addEventListener('contextmenu', (e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        showContextMenuForDataAttribute(e, sdaRef, fc, endpoint);
-                                    });
-
-                                    daUl.appendChild(sdaLi);
-                                });
-                                daLi.appendChild(daUl);
-                            }
-                            ul.appendChild(daLi);
-                        });
-
-                        subDataObjects.forEach((sdo) => {
-                            const cdcSuffix = sdo.cdc ? ` [${sdo.cdc}]` : '';
-                            const sdoLi = createTreeNode('SDO', `${sdo.name}${cdcSuffix}`);
-
-                            const sdoDas = sdo.dataAttributes || sdo.data_attributes || sdo.da || [];
-                            const sdoSubSdos = sdo.subDataObjects || sdo.sub_data_objects || [];
-                            if (sdoDas.length > 0 || sdoSubSdos.length > 0) {
-                                const sdoUl = document.createElement('ul');
-                                sdoUl.className = 'scl-tree-list';
-                                sdoDas.forEach((da) => {
-                                    const typeSuffix = da.bType ? ` [${da.bType}]` : '';
-                                    const daName = da.name || da.daRef.split('.').pop() || 'DA';
-                                    const daRef = `${node.ref}.${sdo.name}.${daName}`;
-                                    const daLi = createTreeNode('DA', `${daName}${typeSuffix}`);
-                                    
-                                    const daRow = daLi.querySelector(':scope > .scl-tree-row');
-                                    const valueDisplaySpan = document.createElement('span');
-                                    valueDisplaySpan.className = 'tree-value-display';
-                                    valueDisplaySpan.setAttribute('data-obj-ref', daRef);
-                                    daRow.appendChild(valueDisplaySpan);
-                                    daRow.style.cursor = 'context-menu';
-                                    daRow.addEventListener('contextmenu', (e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        showContextMenuForDataAttribute(e, daRef, da.fc || 'mx', endpoint);
-                                    });
-                                    
-                                    sdoUl.appendChild(daLi);
-                                });
-                                sdoSubSdos.forEach((nestedSdo) => {
-                                    const nestedCdc = nestedSdo.cdc ? ` [${nestedSdo.cdc}]` : '';
-                                    sdoUl.appendChild(createTreeNode('SDO', `${nestedSdo.name}${nestedCdc}`));
-                                });
-                                sdoLi.appendChild(sdoUl);
-                            }
-                            ul.appendChild(sdoLi);
-                        });
-
-                       node.li.appendChild(ul);
-
-                        if (ul.children.length > 0) {
-                            const row = node.li.querySelector(':scope > .scl-tree-row');
-                            const toggle = row.querySelector('.scl-tree-toggle');
-
-                            toggle.classList.remove('hidden');
-                            node.li.classList.add('has-children', 'expanded');
-                            toggle.textContent = '▾';
-                            ul.style.display = '';
-
-                            const onToggle = () => {
-                                const expanded = node.li.classList.toggle('expanded');
-                                toggle.textContent = expanded ? '▾' : '▸';
-                                ul.style.display = expanded ? '' : 'none';
-                            };
-
-                            toggle.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                onToggle();
-                            });
-                        }
-                    }
-                    else
-                    {
-                        const error = defResult?.payload?.error || defResult?.rawText || 'Failed to fetch data definition';
-                        console.log(`Error fetching data definition for ${node.ref}:`, error);
-                    }
-                }
                 else if (node.nodeType == "DataSet") {
                     const existingUl = node.li.querySelector(':scope > ul');
                      if (existingUl) {
