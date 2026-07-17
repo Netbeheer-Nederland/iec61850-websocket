@@ -1096,41 +1096,55 @@
                 if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
                     row.addEventListener('contextmenu', (e) => {
                         e.preventDefault(); e.stopPropagation();
-                        showContextMenuForDataAttribute(e, daRef, fc, endpoint); // ✅ endpoint now defined
+                        showContextMenuForDataAttribute(e, daRef, fc, endpoint);
                     });
                 } else {
                     row.addEventListener('contextmenu', (e) => {
                         e.preventDefault(); e.stopPropagation();
-                        showReadContextMenuForDataAttribute(e, daRef, fc, endpoint); // ✅ endpoint now defined
+                        showReadContextMenuForDataAttribute(e, daRef, fc, endpoint);
                     });
                 }
+                if (da.daType[0] === "structure"){
+                    da.subDataAttributes = da.daType[1];
+                }
 
-                const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
-                if (subDas.length > 0) {
-                    const daUl = document.createElement('ul');
-                    daUl.className = 'scl-tree-list';
-                    subDas.forEach((sda) => {
-                        const sdaTypeSuffix = sda.daType?.[0]?.bType ? ` [${sda.daType[0].bType}]` : '';
-                        const sdaName = sda.name || sda.daRef?.split('.').pop() || 'SDA';
-                        const sdaRef = `${daRef}.${sdaName}`;
-                        const sdaLi = createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`);
 
-                        const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
-                        const sdaValueDisplaySpan = document.createElement('span');
-                        sdaValueDisplaySpan.className = 'tree-value-display';
-                        sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
-                        sdaRow.appendChild(sdaValueDisplaySpan);
+            const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
 
-                        sdaRow.style.cursor = 'context-menu';
+            if (subDas.length > 0) {
+                const daUl = document.createElement('ul');
+                daUl.className = 'scl-tree-list';
+                subDas.forEach((sda) => {
+                    const sdaTypeSuffix = ` (${sda.cmpType[0]})` || '';
+                    const sdaName = sda.cmpName || sda.daRef?.split('.').pop() || 'SDA';
+                    const sdaRef = `${daRef}.${sdaName}`;
+                    const sdaLi = createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`);
+
+                    const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
+                    const sdaValueDisplaySpan = document.createElement('span');
+                    sdaValueDisplaySpan.className = 'tree-value-display';
+                    sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
+                    sdaRow.appendChild(sdaValueDisplaySpan);
+
+                    sdaRow.style.cursor = 'context-menu';
+
+                     if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
                         sdaRow.addEventListener('contextmenu', (e) => {
                             e.preventDefault(); e.stopPropagation();
-                            showContextMenuForDataAttribute(e, sdaRef, fc, endpoint); // ✅ endpoint now defined
+                            showContextMenuForDataAttribute(e, daRef, fc, endpoint);
                         });
+                    } else {
+                        sdaRow.addEventListener('contextmenu', (e) => {
+                            e.preventDefault(); e.stopPropagation();
+                            showReadContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                        });
+                    }
 
-                        daUl.appendChild(sdaLi);
-                    });
-                    daLi.appendChild(daUl);
-                }
+                    daUl.appendChild(sdaLi);
+                });
+                daLi.appendChild(daUl);
+            
+            }
                 ul.appendChild(daLi);
             });
 
