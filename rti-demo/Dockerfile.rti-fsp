@@ -14,20 +14,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ws61850 package from repository sources
-COPY pyproject.toml /app/repo/
-COPY src/ /app/repo/src/
-RUN pip install /app/repo
+# Install uv
+RUN pip install uv
 
-# Copy FSP (Backend-for-Frontend) modules
+# Copy ws61850 to app directory
+COPY src/ws61850 /app/ws61850
+ENV PYTHONPATH="/app:${PYTHONPATH}"
+
+# Copy BFF uv project files FIRST
+COPY rti-demo/pyproject.toml rti-demo/uv.lock /app/
+
+# Copy FSP modules
 COPY rti-demo/fsp/ /app/fsp/
 
-# Install Flask and Flask-CORS dependencies
-RUN pip install fastapi uvicorn
+# Install dependencies from uv.lock (ONLY once, AFTER pyproject.toml is copied)
+RUN uv sync --frozen --no-dev
 
 EXPOSE 5001
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:5001/api/status || exit 1
 
-CMD ["python", "-u", "fsp/bff_endpoint.py"]
+CMD ["./.venv/bin/python", "-u", "fsp/bff_endpoint.py"]

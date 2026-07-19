@@ -6,6 +6,8 @@
     let templateCache = null;
     let protocolMessages = [];
     let fspTargets = [];
+    let isMonitoring = false;
+    let monitorInterval = null;
 
     const apiDefinitions = [
 
@@ -13,7 +15,11 @@
     // Acsi-Server APIs
     // =========================
 
+    { id: 'health', label: 'GET /api/health', method: 'GET', path: '/api/health', sampleBody: '' },
+
     { id: 'status', label: 'GET /api/status', method: 'GET', path: '/api/status', sampleBody: '' },
+
+    { id: 'properties', label: 'GET /api/properties', method: 'GET', path: '/api/properties', sampleBody: '' },
 
     { id: 'connections', label: 'GET /api/connections', method: 'GET', path: '/api/connections', sampleBody: '' },
 
@@ -21,17 +27,19 @@
 
     { id: 'update-iedmodel', label: 'POST /api/update-iedmodel', method: 'POST', path: '/api/update-iedmodel', sampleBody: '{\n  "modelPy": "# python code"\n}' },
 
+    { id: 'update-iedmodel-file', label: 'POST /api/update-iedmodel-file', method: 'POST', path: '/api/update-iedmodel-file', sampleBody: '' },
+
     { id: 'start', label: 'POST /api/start', method: 'POST', path: '/api/start', sampleBody: '{\n  "host": "0.0.0.0",\n  "port": 8765,\n  "mode": "server",\n  "cp": "cp1"\n}' },
 
     { id: 'stop', label: 'POST /api/stop', method: 'POST', path: '/api/stop', sampleBody: '' },
 
-    { id: 'actions', label: 'GET /api/actions', method: 'GET', path: '/api/actions', sampleBody: '' },
-
-    { id: 'actions-clear', label: 'POST /api/actions/clear', method: 'POST', path: '/api/actions/clear', sampleBody: '' },
-
     { id: 'messages', label: 'GET /api/messages', method: 'GET', path: '/api/messages', sampleBody: '' },
 
-    { id: 'messages-clear', label: 'POST /api/messages/clear', method: 'POST', path: '/api/messages/clear', sampleBody: '' },
+    { id: 'messages-clear', label: 'POST /api/clear_messages', method: 'POST', path: '/api/clear_messages', sampleBody: '' },
+
+    { id: 'actions-logs', label: 'GET /api/actions_logs', method: 'GET', path: '/api/actions_logs', sampleBody: '' },
+   
+    { id: 'clear-logs', label: 'POST /api/clear_logs', method: 'POST', path: '/api/clear_logs', sampleBody: '' },
 
     { id: 'readvalue', label: 'POST /api/readvalue', method: 'POST', path: '/api/readvalue', sampleBody: '{\n  "objRef": "LD0.LLN0.Mod.stVal",\n  "fc": "ST"\n}' },
 
@@ -82,33 +90,29 @@
         }
 
         if (protocolMessages.length === 0) {
-            messagesEl.innerHTML = '<div class="acsi-log-empty">No protocol messages yet. Run GET /api/messages.</div>';
+            messagesEl.innerHTML = '<div class="acsi-log-empty">No log messages yet. Click Start to begin monitoring.</div>';
             return;
         }
 
         messagesEl.innerHTML = protocolMessages.map((entry) => {
-            const formatted = JSON.stringify(entry.payload, null, 2);
+            const action = entry.payload;
+            const hasDetail = action.detail && Object.keys(action.detail).length > 0;
+            const detailJson = hasDetail ? JSON.stringify(action.detail, null, 2).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+            const levelClass = action.level === 'error' ? 'message-direction recv' : action.level === 'warning' ? 'message-direction send' : '';
+            
             return `
-                <div class="acsi-log-item acsi-log-info">
+                <div class="acsi-log-item acsi-log-${action.level}">
                     <div class="acsi-log-head">
-                        <span class="acsi-log-time">${escapeForHtml(entry.timestamp)}</span>
-                        <span class="acsi-log-message">GET /api/messages</span>
+                        <span class="acsi-log-time">#${action.id} - ${action.time}</span>
+                        <span class="acsi-log-message ${levelClass}">${escapeForHtml(action.message)}</span>
                     </div>
-                    <pre class="acsi-log-details">${escapeForHtml(formatted)}</pre>
+                    ${hasDetail ? `<pre class="acsi-log-details">${detailJson}</pre>` : ''}
                 </div>
             `;
         }).join('');
     }
 
-    function addProtocolMessagesEntry(payload) {
-        protocolMessages.unshift({
-            timestamp: new Date().toLocaleTimeString(),
-            payload,
-        });
-        if (protocolMessages.length > 30) {
-            protocolMessages = protocolMessages.slice(0, 30);
-        }
-    }
+
 
     function getBffBaseUrl() {
         if (window.app && window.app.bffBaseUrl) {
@@ -142,7 +146,7 @@
 
         const requestUrl = new URL(`${baseUrl}${path}`, window.location.origin);
         if (targetValue) {
-            requestUrl.searchParams.set('fspTarget', targetValue);
+            requestUrl.searchParams.set('target', targetValue);
         }
         return requestUrl.toString();
     }
@@ -222,12 +226,20 @@
             return null;
         }
 
-        const iedName = sourceTree.name || (payload && payload.model && payload.model.iedName) || 'IED';
+        // Extract iedName from various possible locations
+        const iedName = sourceTree.name 
+            || (payload && payload.iedName)
+            || (payload && payload.model && payload.model.iedName)
+            || 'IED';
+        
+        // Extract accessPoints from various possible locations
         const accessPointNames = (payload && Array.isArray(payload.accessPoints) && payload.accessPoints.length > 0)
             ? payload.accessPoints
-            : [
-                (payload && payload.model && payload.model.server && payload.model.server.name) || 'Server',
-            ];
+            : (payload && payload.model && payload.model.server && Array.isArray(payload.model.server.accessPoints) && payload.model.server.accessPoints.length > 0)
+                ? payload.model.server.accessPoints
+                : [
+                    (payload && payload.model && payload.model.server && payload.model.server.name) || 'Server',
+                ];
 
         const ldevices = (sourceTree.children || [])
             .filter((child) => child && child.kind === 'LD')
@@ -309,6 +321,10 @@
         return buildTargetValue(endpoint.host, endpoint.port);
     }
 
+    function getApiById(id) {
+        return apiDefinitions.find((api) => api.id === id);
+    }
+
     function upsertTarget(target) {
         if (!target || !target.id) {
             return;
@@ -328,7 +344,7 @@
             return preferredTarget || '';
         }
         const encodedTarget = preferredTarget ? encodeURIComponent(preferredTarget) : '';
-        const targetQuery = encodedTarget ? `?fspTarget=${encodedTarget}` : '';
+        const targetQuery = encodedTarget ? `?target=${encodedTarget}` : '';
         const url = `${baseUrl}/api/fsp/targets${targetQuery}`;
 
         try {
@@ -375,6 +391,11 @@
 
 
     async function wireApiTester(endpoint) {
+        const addressEl = document.getElementById('acsi-address-field');
+        const apEl = document.getElementById('acsi-ap-field');
+        const statusEl = document.getElementById('acsi-status-field');
+        const roleEl = document.getElementById('acsi-role-field');
+        const awsmodeEl = document.getElementById('acsi-wsmode-field');
         const reloadStatusBtn = document.getElementById('acsi-reload-status-btn');
         const updatedStatusEl = document.getElementById('acsi-endpoint-updated-status');
         const daModalEl = document.getElementById('acsi-da-modal');
@@ -389,13 +410,129 @@
         const stopBtn = document.getElementById('acsi-stop-btn');
         const loadModelBtn = document.getElementById('acsi-load-model-btn');
         const reloadBtn = document.getElementById("reloadMessagesBtn");
+        const messagesStartBtn = document.getElementById('messages-start-btn');
+        const messagesStopBtn = document.getElementById('messages-stop-btn');
+        const messagesClearBtn = document.getElementById('messages-clear-btn');
 
 
         const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
         let activeDaSelection = null;
+        let messagesIntervalSelect = document.getElementById('messages-interval');
 
         if (daModalEl) {
             daModalEl.hidden = true;
+        }
+
+        function addProtocolMessagesEntry(messagesArray) {
+            const existingIds = new Set(protocolMessages.map(entry => entry.payload.id));
+            
+            if (Array.isArray(messagesArray)) {
+                messagesArray.forEach(msg => {
+                    if (msg && msg.id && !existingIds.has(msg.id)) {
+                        protocolMessages.unshift({
+                            timestamp: new Date().toLocaleTimeString(),
+                            payload: msg,
+                        });
+                        existingIds.add(msg.id);
+                    }
+                });
+            } else if (messagesArray && messagesArray.id && !existingIds.has(messagesArray.id)) {
+                protocolMessages.unshift({
+                    timestamp: new Date().toLocaleTimeString(),
+                    payload: messagesArray,
+                });
+            }
+            if (protocolMessages.length > 30) {
+                protocolMessages = protocolMessages.slice(0, 30);
+            }
+        }
+
+        function stopMonitoring() {
+            isMonitoring = false;
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                monitorInterval = null;
+            }
+        }
+
+        function updateMessagesStatus(statusText) {
+            const statusEl = document.getElementById('messages-status');
+            if (statusEl) {
+                statusEl.textContent = statusText;
+            }
+        }
+
+        async function fetchActionLogs(targetValue) {
+            const api = getApiById('actions-logs');
+            const result = await executeApiCall(api, targetValue, {});
+            
+            if (result && result.ok && result.payload) {
+                const actions = result.payload.result?.actions || result.payload.actions || [];
+                if (Array.isArray(actions) && actions.length > 0) {
+                    addProtocolMessagesEntry(actions);
+                    renderProtocolMessages();
+                    const statusText = `Last updated: ${new Date().toLocaleTimeString()} - ${targetValue} (${protocolMessages.length} logs)`;
+                    updateMessagesStatus(statusText);
+                }
+            }
+        }
+
+        async function startMonitoring(targetValue) {
+            if (isMonitoring) {
+                return;
+            }
+
+            if (!targetValue) {
+                updateMessagesStatus('Please select an endpoint first');
+                return;
+            }
+
+            stopMonitoring();
+            isMonitoring = true;
+            
+            const startBtn = document.getElementById('messages-start-btn');
+            const stopBtn = document.getElementById('messages-stop-btn');
+            const reloadBtn = document.getElementById('reloadMessagesBtn');
+            
+            if (startBtn) startBtn.disabled = true;
+            if (stopBtn) stopBtn.disabled = false;
+            if (reloadBtn) reloadBtn.disabled = false;
+            
+            updateMessagesStatus(`Monitoring ${targetValue}...`);
+            
+            await fetchActionLogs(targetValue);
+            
+            const interval = messagesIntervalSelect ? parseInt(messagesIntervalSelect.value) : 5000;
+            monitorInterval = setInterval(() => {
+                fetchActionLogs(targetValue);
+            }, interval);
+        }
+
+        async function clearMessages(targetValue) {
+            if (!targetValue) {
+                updateMessagesStatus('Please select an endpoint first');
+                return;
+            }
+
+            const clearApi = getApiById('clear-logs');
+            const result = await executeApiCall(clearApi, targetValue, {});
+            
+            if (result && result.ok) {
+                protocolMessages = [];
+                renderProtocolMessages();
+                updateMessagesStatus('Messages cleared');
+            } else {
+                const message = result ? `HTTP ${result.status}` : 'Unknown error';
+                updateMessagesStatus(`Error clearing messages: ${message}`);
+            }
+            
+            setTimeout(() => {
+                if (isMonitoring) {
+                    updateMessagesStatus(`Monitoring ${targetValue}...`);
+                } else {
+                    updateMessagesStatus(`Ready to monitor ${targetValue}`);
+                }
+            }, 2000);
         }
 
         setModelPanelMessage('Run GET /api/model to load the model tree.');
@@ -410,12 +547,60 @@
             updatedStatusEl.classList.toggle('acsi-model-error', !!isError);
         }
 
+        function parsePythonDictString(pythonStr) {
+            if (!pythonStr || typeof pythonStr !== 'string') {
+                return pythonStr;
+            }
+            try {
+                const jsonStr = pythonStr
+                    .replace(/'/g, '"')
+                    .replace(/True/g, 'true')
+                    .replace(/False/g, 'false')
+                    .replace(/None/g, 'null');
+                return JSON.parse(jsonStr);
+            } catch (e) {
+                console.log('Warning: Could not parse Python dict string as JSON:', e);
+                return pythonStr;
+            }
+        }
+
+        function formatPayloadForDisplay(payload) {
+            if (!payload || typeof payload !== 'object') {
+                return payload;
+            }
+            const formatted = JSON.parse(JSON.stringify(payload));
+            
+            // Parse any stringified Python dicts in the result
+            if (formatted.result && typeof formatted.result === 'object') {
+                if (formatted.result.status && typeof formatted.result.status === 'string') {
+                    formatted.result.status = parsePythonDictString(formatted.result.status);
+                }
+                if (formatted.result.message && typeof formatted.result.message === 'string') {
+                    formatted.result.message = parsePythonDictString(formatted.result.message);
+                }
+            }
+            
+            // Also check at top level
+            if (formatted.status && typeof formatted.status === 'string') {
+                formatted.status = parsePythonDictString(formatted.status);
+            }
+            
+            return formatted;
+        }
+
         function formatStatusSummary(payload) {
-            const status = payload && payload.status ? payload.status : 'unknown';
-            const host = payload && payload.host ? payload.host : 'N/A';
-            const port = payload && payload.port !== undefined ? payload.port : 'N/A';
-            const clients = payload && payload.connectedClients !== undefined ? payload.connectedClients : 'N/A';
-            const aps = payload && Array.isArray(payload.accessPoints) ? payload.accessPoints.join(', ') : 'N/A';
+            // Handle case where status is a stringified Python dict
+            let statusObj = payload;
+            if (payload && payload.status && typeof payload.status === 'string') {
+                statusObj = parsePythonDictString(payload.status);
+            }
+            
+            const status = statusObj && statusObj.status ? statusObj.status : (payload && payload.status ? payload.status : 'unknown');
+            const host = statusObj && statusObj.host ? statusObj.host : (payload && payload.host ? payload.host : 'N/A');
+            const port = statusObj && statusObj.port !== undefined ? statusObj.port : (payload && payload.port !== undefined ? payload.port : 'N/A');
+            const clients = statusObj && statusObj.connectedClients !== undefined ? statusObj.connectedClients : (payload && payload.connectedClients !== undefined ? payload.connectedClients : 'N/A');
+            const aps = statusObj && Array.isArray(statusObj.accessPoints) ? statusObj.accessPoints.join(', ') : (payload && Array.isArray(payload.accessPoints) ? payload.accessPoints.join(', ') : 'N/A');
+            
             return `Updated status: ${status} | host ${host}:${port} | clients ${clients} | accessPoints ${aps}`;
         }
 
@@ -452,6 +637,7 @@
             daModalEl.hidden = false;
         }
 
+        // ==================== Core API Call Function ====================
         async function executeApiCall(selected, targetValue, bodyOverride) {
             if (!selected) {
                 return null;
@@ -459,93 +645,54 @@
 
             let url;
             try {
-                url = buildBffApiUrl(selected.path, targetValue);
+                url = buildBffApiUrl('/api/execute');
             } catch (error) {
-                console.log('error', `Blocked ${selected.label}`, String(error && error.message ? error.message : error));
+                console.error(`Blocked ${selected.label}:`, error && error.message ? error.message : error);
                 return null;
             }
 
             const options = {
-                method: selected.method,
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
             };
 
-            if (targetValue) {
-                options.headers['X-FSP-Target'] = targetValue;
+            const payload = {
+                target: targetValue,
+                method: selected.method,
+                path: selected.path,
+            };
+
+            if (bodyOverride) {
+                payload.body = bodyOverride;
             }
 
-            if (selected.method === 'POST') {
-                let payloadToSend = null;
-
-                if (bodyOverride !== undefined) {
-                    if (bodyOverride && typeof bodyOverride === 'object' && !Array.isArray(bodyOverride)) {
-                        payloadToSend = { ...bodyOverride };
-                    }
-                } else {
-                    const raw = bodyEl.value.trim();
-                    if (raw) {
-                        try {
-                            payloadToSend = JSON.parse(raw);
-                        } catch (error) {
-                            console.log('error', `Invalid JSON body for ${selected.label}`, String(error && error.message ? error.message : error));
-                            return null;
-                        }
-                    }
-                }
-
-                if (!payloadToSend) {
-                    payloadToSend = {};
-                }
-
-                if (targetValue && typeof payloadToSend === 'object' && !Array.isArray(payloadToSend) && !payloadToSend.fspTarget) {
-                    payloadToSend.fspTarget = targetValue;
-                }
-
-                options.body = JSON.stringify(payloadToSend);
-            }
+            options.body = JSON.stringify(payload);
 
             try {
-                console.log('info', 'Checking BFF health', `URL: ${buildBffApiUrl('/api/health')}`);
-
-                await ensureBffHealthy();
-
-                console.log('info', `Calling ${selected.label}`, `FSP target: ${targetValue || 'default'}\nURL: ${url}`);
-
                 const response = await fetch(url, options);
                 const rawText = await response.text();
-                let formatted = rawText;
                 let parsedPayload = null;
 
                 try {
                     parsedPayload = JSON.parse(rawText);
-                    formatted = JSON.stringify(parsedPayload, null, 2);
                 } catch (error) {
                     // keep raw text for non-JSON responses
                 }
 
+                // Handle special cases for model
                 if (selected.id === 'model') {
                     if (response.ok && parsedPayload) {
-                        renderModelFromPayload(parsedPayload);
+                        // The BFF wraps the response in a 'result' field
+                        const modelData = parsedPayload.result || parsedPayload;
+                        renderModelFromPayload(modelData);
                     } else if (!response.ok) {
                         setModelPanelMessage(`Model request failed with HTTP ${response.status}`, true);
                     } else {
                         setModelPanelMessage('Model response is not valid JSON.', true);
                     }
                 }
-
-                if (selected.id === 'messages') {
-                    if (response.ok && parsedPayload) {
-                        const messagesPayload = Object.prototype.hasOwnProperty.call(parsedPayload, 'messages')
-                            ? parsedPayload.messages
-                            : parsedPayload;
-                        addProtocolMessagesEntry(messagesPayload);
-                        renderProtocolMessages();
-                    }
-                }
-
-                const messagePrefix = response.ok ? 'success' : 'error';
 
                 return {
                     ok: response.ok,
@@ -554,12 +701,33 @@
                     rawText,
                 };
             } catch (error) {
-                console.log('error', `Request failed for ${selected.label}`, String(error && error.message ? error.message : error));
+                console.error(`Request failed for ${selected.label}:`, error && error.message ? error.message : error);
                 return null;
             }
         }
 
-        	const selectedApiById = (id) => apiDefinitions.find((api) => api.id === id);
+        async function updateStatus()
+        {
+            setUpdatedStatusText('Loading status...');
+            await ensureBffHealthy();
+
+            const api = getApiById('status');
+            const result = await executeApiCall(api, endpointTarget, {});
+            
+            if (result && result.ok && result.payload) {
+                const formattedPayload = formatPayloadForDisplay(result.payload);
+                const text = `Connected clients: ${formattedPayload.result.status.connectedClients} - IED: ${formattedPayload.result.status.modelName} - Model source: ${formattedPayload.result.status.modelSource}`
+                setUpdatedStatusText(text);
+                addressEl.textContent = `${formattedPayload.result.status.host}:${formattedPayload.result.status.port}`
+                statusEl.textContent = `${formattedPayload.result.status.status}`
+                apEl.textContent = `${formattedPayload.result.status.accessPoints}`
+                console.log('success', 'GET /api/status -> HTTP 200', JSON.stringify(formattedPayload, null, 2));
+            } else {
+                const message = result ? `HTTP ${result.status}` : 'Unknown error';
+                setUpdatedStatusText(`Updated status: failed (${message})`, true);
+                console.log('error', 'GET /api/status failed', message);
+            }
+        }
 
         async function runDaAction(actionId) {
             if (!activeDaSelection || !activeDaSelection.objRef) {
@@ -568,7 +736,7 @@
             }
 
             if (!endpointTarget) {
-                setDaModalResult('Missing selected endpoint address (fspTarget).');
+                setDaModalResult('Missing selected endpoint address (target).');
                 return;
             }
 
@@ -585,7 +753,7 @@
             }
 
             setDaModalResult('Loading...');
-            const result = await executeApiCall(api, endpointTarget, body);
+            const result = await executeApiCall(getApiById(actionId), endpointTarget, body);
             if (!result) {
                 setDaModalResult('Request failed. See API Logs for details.');
                 return;
@@ -602,20 +770,55 @@
         if (startBtn) {
             startBtn.addEventListener('click', async () => {
                 if (!endpointTarget) {
-                    console.log('error', 'Start blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    console.log('error', 'Start blocked', 'No selected endpoint address available to resolve target.');
                     return;
                 }
-                await executeApiCall(selectedApiById('start'), endpointTarget, {});
+                const api = getApiById('start');
+                const hostInput = document.getElementById('acsi-server-host-input');
+                const portInput = document.getElementById('acsi-server-port-input');
+                const modeInput = document.getElementById('acsi-server-mode-input');
+                const cpInput = document.getElementById('acsi-server-cp-input');
+                
+                const body = {};
+                if (hostInput) body.host = hostInput.value || '0.0.0.0';
+                if (portInput) body.port = String(portInput.value) || '8765';
+                if (modeInput) body.mode = modeInput.value || 'server';
+                if (cpInput) body.cp = cpInput.value || 'cp1';
+                
+                await executeApiCall(api, endpointTarget, body);
             });
         }
 
         if (reloadBtn) {
             reloadBtn.addEventListener('click', async () => {
                 if (!endpointTarget) {
-                    console.log('error', 'Reload blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    console.log('error', 'Reload blocked', 'No selected endpoint address available to resolve target.');
                     return;
                 }
-                await executeApiCall(selectedApiById('messages'), endpointTarget, {});
+                await fetchActionLogs(endpointTarget);
+            });
+        }
+
+        if (messagesStartBtn) {
+            messagesStartBtn.addEventListener('click', () => {
+                startMonitoring(endpointTarget);
+            });
+        }
+
+        if (messagesStopBtn) {
+            messagesStopBtn.addEventListener('click', () => {
+                stopMonitoring();
+                const startBtn = document.getElementById('messages-start-btn');
+                const stopBtn = document.getElementById('messages-stop-btn');
+                if (startBtn) startBtn.disabled = false;
+                if (stopBtn) stopBtn.disabled = true;
+                updateMessagesStatus(`Ready to monitor ${endpointTarget || 'endpoint'}`);
+            });
+        }
+
+        if (messagesClearBtn) {
+            messagesClearBtn.addEventListener('click', () => {
+                clearMessages(endpointTarget);
             });
         }
 
@@ -623,20 +826,20 @@
         if (stopBtn) {
             stopBtn.addEventListener('click', async () => {
                 if (!endpointTarget) {
-                    console.log('error', 'Stop blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    console.log('error', 'Stop blocked', 'No selected endpoint address available to resolve target.');
                     return;
                 }
-                await executeApiCall(selectedApiById('stop'), endpointTarget, {});
+                await executeApiCall(getApiById('stop'), endpointTarget, {});
             });
         }
 
         if (loadModelBtn) {
             loadModelBtn.addEventListener('click', async () => {
                 if (!endpointTarget) {
-                    console.log('error', 'Load model blocked', 'No selected endpoint address available to resolve fspTarget.');
+                    console.log('error', 'Load model blocked', 'No selected endpoint address available to resolve target.');
                     return;
                 }
-                await executeApiCall(selectedApiById('model'), endpointTarget);
+                await executeApiCall(getApiById('model'), endpointTarget);
             });
         }
 
@@ -649,25 +852,7 @@
 
                 try {
                     reloadStatusBtn.disabled = true;
-                    setUpdatedStatusText('Updated status: loading...');
-                    await ensureBffHealthy();
-
-                    const url = buildBffApiUrl('/api/status', endpointTarget);
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-FSP-Target': endpointTarget,
-                        },
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-
-                    const payload = await response.json();
-                    setUpdatedStatusText(formatStatusSummary(payload));
-                    console.log('success', 'GET /api/status -> HTTP 200', JSON.stringify(payload, null, 2));
+                    updateStatus();
                 } catch (error) {
                     const message = String(error && error.message ? error.message : error);
                     setUpdatedStatusText(`Updated status: failed (${message})`, true);
@@ -714,6 +899,76 @@
                 closeDaModal();
             }
         });
+
+        // Event delegation for message card expand/collapse
+        document.addEventListener('click', (e) => {
+            const header = e.target.closest('.message-header');
+            if (header) {
+                const card = header.closest('.message-card');
+                const body = card.querySelector('.message-body');
+                const icon = header.querySelector('.message-toggle-icon');
+                
+                if (body.style.display === 'none') {
+                    body.style.display = 'block';
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                } else {
+                    body.style.display = 'none';
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+            }
+        });
+
+        // Initialize messages status
+        updateMessagesStatus('Select an endpoint and click Start');
+
+        // Auto-load status and model on page load
+        (async () => {
+            let targetToUse = endpointTarget;
+            
+            // If no endpoint target, try to load FSP targets
+            if (!targetToUse) {
+                try {
+                    const loadedTarget = await loadFspTargets();
+                    if (loadedTarget) {
+                        targetToUse = loadedTarget;
+                        ensureFallbackTarget(loadedTarget);
+                    }
+                } catch (error) {
+                    console.log('Could not load FSP targets:', error && error.message ? error.message : error);
+                }
+            }
+            
+            // If still no target, try to build from localStorage
+            if (!targetToUse) {
+                const storedHost = localStorage.getItem('bffHost');
+                const storedPort = localStorage.getItem('bffPort');
+                if (storedHost && storedPort) {
+                    targetToUse = buildTargetValue(storedHost, Number(storedPort));
+                }
+            }
+            
+            if (targetToUse) {
+                try {                    
+                    // Load status automatically
+                    updateStatus();
+
+                    // Load model automatically
+                    await ensureBffHealthy();
+                    setModelPanelMessage('Loading model...');
+                    const modelApi = getApiById('model');
+                    await executeApiCall(modelApi, targetToUse);
+                } catch (error) {
+                    const message = String(error && error.message ? error.message : error);
+                    setUpdatedStatusText(`Auto-load failed: ${message}`, true);
+                    setModelPanelMessage(`Auto-load failed: ${message}`, true);
+                }
+            } else {
+                setUpdatedStatusText('No target configured. Check BFF settings.');
+                setModelPanelMessage('No target configured. Check BFF settings.', true);
+            }
+        })();
     }
 
     async function loadTemplate() {
@@ -761,4 +1016,12 @@
     window.ACSIServerPage = {
         render,
     };
+
+    // Auto-initialize if this page is loaded directly (not as a module)
+    if (window.location && window.location.pathname && window.location.pathname.includes('acsi-server-page.html')) {
+        document.addEventListener('DOMContentLoaded', () => {
+            const rootEl = document.getElementById('acsi-server-root') || document.body;
+            window.ACSIServerPage.render(rootEl, null);
+        });
+    }
 })();

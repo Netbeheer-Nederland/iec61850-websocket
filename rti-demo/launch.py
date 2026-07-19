@@ -6,22 +6,20 @@ It replaces fragmented startup paths and standardizes service management.
 
 Usage:
     # Launch all demo services
-    python launch.py all
+    python launch.py
     
     # Launch specific services
     python launch.py bff
     python launch.py fsp
     python launch.py so
-    python launch.py acsi-client
-    python launch.py acsi-server
     python launch.py frontend
     
     # Launch with custom port
     python launch.py bff --port 5005
     
-    # Launch all services with console kept alive
-    python launch.py all --foreground
-    python launch.py all -f
+    # Launch with console kept alive (default)
+    python launch.py bff --foreground
+    python launch.py bff -f
     
     # Get help
     python launch.py --help
@@ -32,7 +30,8 @@ Services:
     fsp:        RTI-FSP (default: port 5001)
     so:         RTI-SO (default: port 5002)
     frontend:   Web-based HMI (default: port 8080)
-    all:        Launch all services
+    
+    Default: Running without arguments launches all services with --foreground -v
 """
 
 import argparse
@@ -65,7 +64,6 @@ class ServiceType(Enum):
     FSP = "fsp"
     SO = "so"
     FRONTEND = "frontend"
-    ALL = "all"
 
 
 @dataclass
@@ -176,7 +174,7 @@ class RTILauncher:
             'service',
             nargs='*',
             default=[],
-            help='Service(s) to launch (bff, fsp, so, acsi-client, acsi-server, frontend, all, list, help)'
+            help='Service(s) to launch (bff, fsp, so, frontend, list, help). Default: all services'
         )
         parser.add_argument(
             '--port',
@@ -196,12 +194,14 @@ class RTILauncher:
         parser.add_argument(
             '--foreground', '-f',
             action='store_true',
-            help='Keep console alive (do not auto-background multiple services)'
+            default=True,
+            help='Keep console alive (default: True)'
         )
         parser.add_argument(
             '--verbose', '-v',
             action='store_true',
-            help='Show detailed logging'
+            default=True,
+            help='Show detailed logging (default: True)'
         )
         parser.add_argument(
             '--stop',
@@ -231,15 +231,11 @@ class RTILauncher:
         # Convert service strings to ServiceType enums
         services = []
         for svc in args.service:
-            if svc == 'all':
-                services = list(ServiceType)
-                break
-            else:
-                services.append(ServiceType(svc))
+            services.append(ServiceType(svc))
         
-        # Only default to ALL if no services specified and no management flags
+        # Default to all services if no services specified and no management flags
         if not services and not any([args.stop, args.status]):
-            services = [ServiceType.ALL]
+            services = list(ServiceType)
         
         # Build options dict
         options = {
@@ -264,8 +260,6 @@ class RTILauncher:
         ]
         
         for svc_type, config in SERVICES.items():
-            if svc_type == ServiceType.ALL:
-                continue
             lines.append(
                 f"  {svc_type.value:15} (port {config.default_port:5d}) - {config.description}"
             )
@@ -274,12 +268,11 @@ class RTILauncher:
             "",
             "Examples:",
             "-" * 60,
-            "  # Launch all services",
-            "  python launch.py all",
+            "  # Launch all services (default)",
+            "  python launch.py",
             "",
-            "  # Launch all services with console kept alive",
-            "  python launch.py all --foreground",
-            "  python launch.py all -f",
+            "  # Launch all services explicitly",
+            "  python launch.py bff fsp so frontend",
             "",
             "  # Launch BFF server on port 5000",
             "  python launch.py bff",
@@ -287,8 +280,11 @@ class RTILauncher:
             "  # Launch FSP ACSI-Server_WebsocketActive on custom port",
             "  python launch.py fsp --port 5010",
             "",
-            "  # Launch with verbose logging",
-            "  python launch.py bff so -v",
+            "  # Disable foreground mode (run in background)",
+            "  python launch.py --no-foreground",
+            "",
+            "  # Disable verbose logging",
+            "  python launch.py --no-verbose",
             "",
             "  # List available services",
             "  python launch.py list",
@@ -305,9 +301,6 @@ class RTILauncher:
         print("=" * 80)
         
         for svc_type, config in SERVICES.items():
-            if svc_type == ServiceType.ALL:
-                continue
-            
             print(f"\n{config.name} ({svc_type.value})")
             print("-" * 40)
             print(f"  Description: {config.description}")
@@ -546,14 +539,6 @@ class RTILauncher:
         processes = []
         
         for i, svc_type in enumerate(services):
-            if svc_type == ServiceType.ALL:
-                # Launch all services
-                all_services = [s for s in ServiceType if s != ServiceType.ALL]
-                processes.extend(self.launch_services(
-                    all_services, port, docker, background
-                ))
-                continue
-            
             # Calculate port if base port provided
             actual_port = port if port else None
             if port and i > 0:
@@ -765,13 +750,10 @@ def main():
         sys.exit(0)
     
     # Launch services
-    if not services:
-        print("No services specified. Use 'python launch.py --help' for usage.")
-        sys.exit(1)
-    
+    # Note: parse_args() already defaults to ALL if no services specified
     try:
-        # Auto-enable background mode for multiple services, unless --foreground is specified
-        use_background = options.get('background', False) or (len(services) > 1 and not options.get('foreground', False))
+        # Background mode only if explicitly requested (foreground is default)
+        use_background = options.get('background', False)
         
         processes = launcher.launch_services(
             services,

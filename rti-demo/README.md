@@ -5,11 +5,8 @@ Unified entry point for launching RTI (Real-Time Infrastructure) demo services.
 ## Quick Start
 
 ```bash
-# Launch all services
-python launch.py all
-
-# Launch all services with console kept alive (logs visible)
-python launch.py all --foreground
+# Launch all services (default: all services with foreground & verbose mode)
+python launch.py
 
 # Launch individual services
 python launch.py bff
@@ -46,15 +43,11 @@ python launch.py list
 # Launch with custom port
 python launch.py bff --port 5005
 
-# Launch with verbose logging
-python launch.py all -v
+# Disable foreground mode (run in background)
+python launch.py --background
 
-# Launch with console kept alive (see logs)
-python launch.py all --foreground
-python launch.py all -f
-
-# Run in background
-python launch.py all --background
+# Disable verbose logging
+python launch.py --no-verbose
 
 # Check running services
 python launch.py --status
@@ -63,12 +56,12 @@ python launch.py --status
 python launch.py --stop
 
 # Docker mode
-python launch.py all --docker
+python launch.py --docker
 ```
 
 ## Verbose Mode & Logs
 
-Use `-v` for verbose logging. With `--foreground`, all service logs are prefixed with the service name:
+By default, verbose logging is enabled and the console is kept alive (foreground mode). All service logs are prefixed with the service name:
 
 ```
 [BFF Server] INFO: Starting RTI Demo BFF Server (FastAPI)...
@@ -77,6 +70,9 @@ Use `-v` for verbose logging. With `--foreground`, all service logs are prefixed
 [SO ACSI-Client_WebsocketPassive] Connected to endpoint
 [Frontend] Serving HTTP on 0.0.0.0 port 8080
 ```
+
+To disable verbose logging: `python launch.py --no-verbose`
+To run in background: `python launch.py --background`
 
 ## Troubleshooting
 
@@ -108,8 +104,8 @@ docker build -t rti-demo-bff -f rti-demo/bff/Dockerfile .
 docker build -t rti-demo-fsp -f rti-demo/fsp/Dockerfile .
 docker build -t rti-demo-so -f rti-demo/so/Dockerfile .
 
-# Launch with Docker
-python launch.py all --docker
+# Launch with Docker (all services by default)
+python launch.py --docker
 
 # Docker Compose
 docker-compose -f rti-demo/docker-compose.yml up -d
@@ -129,4 +125,31 @@ rti-demo/
 │   └── bff_endpoint.py    # SO ACSI-Client
 └── front-end/
     └── index.html         # Web HMI
+```
+
+## UV 
+UV is already implemented to manage the dependencies inside the dockers. To add a dependency to the project, you can use the following command:
+
+```bash
+uv add <package_name>
+```
+This should be followed by rebuilding the dockers to make sure the new dependency is included in the images.
+
+```bash
+
+After adding the dependency, you can run the following command to make sure the lock file is updated with the new dependency:
+
+```bash
+uv lock
+```
+
+To run the python codes without the dockers, you can use the following command to install the dependencies in your local environment:
+
+```bash
+uv sync
+```
+and the python codes can be run using the following command:
+
+```bash
+uv run python <script_name.py>
 ```

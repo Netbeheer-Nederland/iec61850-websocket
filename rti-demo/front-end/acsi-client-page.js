@@ -3,6 +3,15 @@
    ============================================== */
 
 (function initACSIClientPage() {
+    // Guard against double-loading
+    if (window.__acsiClientPageLoaded) {
+        return;
+    }
+    window.__acsiClientPageLoaded = true;
+    // Protocol Messages state
+    let protocolMessages = [];
+    let isMonitoring = false;
+    let monitorInterval = null;
 
     // Put this at the top of initACSIClientPage(), outside all other functions
     document.addEventListener('click', () => hideContextMenu());
@@ -16,11 +25,14 @@
     const apiDefinitions = [
         { id: 'connect', label: 'POST /api/connect', method: 'POST', path: '/api/connect' },
         { id: 'disconnect', label: 'POST /api/disconnect', method: 'POST', path: '/api/disconnect' },
-        { id: 'model-tree', label: 'GET /api/model/tree', method: 'POST', path: '/api/model/tree' },
+        { id: 'model-tree', label: 'GET /api/model/tree', method: 'GET', path: '/api/model/tree' },
         { id: 'data-definition', label: 'POST /api/getDataDefinition', method: 'POST', path: '/api/getDataDefinition' },
         { id: 'read', label: 'POST /api/readvalue', method: 'POST', path: '/api/readvalue' },
         { id: 'write', label: 'POST /api/writevalue', method: 'POST', path: '/api/writevalue' },
         { id: 'dataset-directory', label: 'POST /api/getDataSetDirectory', method: 'POST', path: '/api/getDataSetDirectory' },
+        { id: 'actions-logs', label: 'GET /api/actions_logs', method: 'GET', path: '/api/actions_logs', sampleBody: '' },
+        { id: 'clear-logs', label: 'POST /api/clear_logs', method: 'POST', path: '/api/clear_logs', sampleBody: '' },
+        { id: 'status', label: 'GET /api/status', method: 'GET', path: '/api/status'},
     ];
 
     function getApiById(id) {
@@ -69,7 +81,7 @@
         }
         const requestUrl = new URL(`${baseUrl}${path}`, window.location.origin);
         if (targetValue) {
-            requestUrl.searchParams.set('soTarget', targetValue);
+            requestUrl.searchParams.set('target', targetValue);
         }
         return requestUrl.toString();
     }
@@ -87,6 +99,228 @@
         }
     }
 
+    // ==================== Protocol Messages Helper Functions ====================
+
+    function renderProtocolMessages(rootElement) {
+        const messagesEl = rootElement.querySelector('#acsi-protocol-messages');
+        if (!messagesEl) {
+            return;
+        }
+
+        if (protocolMessages.length === 0) {
+            messagesEl.innerHTML = '<div class="acsi-log-empty">No log messages yet. Click Start to begin monitoring.</div>';
+            return;
+        }
+
+        messagesEl.innerHTML = protocolMessages.map((entry) => {
+            const action = entry.payload;
+            const hasDetail = action.detail && Object.keys(action.detail).length > 0;
+            const detailJson = hasDetail ? JSON.stringify(action.detail, null, 2).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+            const levelClass = action.level === 'error' ? 'message-direction recv' : action.level === 'warning' ? 'message-direction send' : '';
+            
+            return `
+                <div class="acsi-log-item acsi-log-${action.level}">
+                    <div class="acsi-log-head">
+                        <span class="acsi-log-time">#${action.id} - ${action.time}</span>
+                        <span class="acsi-log-message ${levelClass}">${escapeHtml(action.message)}</span>
+                    </div>
+                    ${hasDetail ? `<pre class="acsi-log-details">${detailJson}</pre>` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    function addProtocolMessagesEntry(messagesArray) {
+        const existingIds = new Set(protocolMessages.map(entry => entry.payload.id));
+        
+        if (Array.isArray(messagesArray)) {
+            messagesArray.forEach(msg => {
+                if (msg && msg.id && !existingIds.has(msg.id)) {
+                    protocolMessages.unshift({
+                        timestamp: new Date().toLocaleTimeString(),
+                        payload: msg,
+                    });
+                    existingIds.add(msg.id);
+                }
+            });
+        } else if (messagesArray && messagesArray.id && !existingIds.has(messagesArray.id)) {
+            protocolMessages.unshift({
+                timestamp: new Date().toLocaleTimeString(),
+                payload: messagesArray,
+            });
+        }
+        if (protocolMessages.length > 30) {
+            protocolMessages = protocolMessages.slice(0, 30);
+        }
+    }
+
+    function stopMonitoring() {
+        isMonitoring = false;
+        if (monitorInterval) {
+            clearInterval(monitorInterval);
+            monitorInterval = null;
+        }
+    }
+
+    function updateMessagesStatus(rootElement, statusText) {
+        const statusEl = rootElement.querySelector('#messages-status');
+        if (statusEl) {
+            statusEl.textContent = statusText;
+        }
+    }
+
+    async function fetchActionLogs(rootElement, targetValue) {
+        const api = getApiById('actions-logs');
+        const result = await executeApiCall(api, targetValue, {});
+        
+        if (result && result.ok && result.payload) {
+            const actions = result.payload.result?.actions || result.payload.actions || [];
+            if (Array.isArray(actions) && actions.length > 0) {
+                addProtocolMessagesEntry(actions);
+                renderProtocolMessages(rootElement);
+                const statusText = `Last updated: ${new Date().toLocaleTimeString()} - ${targetValue} (${protocolMessages.length} logs)`;
+                updateMessagesStatus(rootElement, statusText);
+            }
+        }
+    }
+
+    function parsePythonDictString(pythonStr) {
+            if (!pythonStr || typeof pythonStr !== 'string') {
+                return pythonStr;
+            }
+            try {
+                const jsonStr = pythonStr
+                    .replace(/'/g, '"')
+                    .replace(/True/g, 'true')
+                    .replace(/False/g, 'false')
+                    .replace(/None/g, 'null');
+                return JSON.parse(jsonStr);
+            } catch (e) {
+                console.log('Warning: Could not parse Python dict string as JSON:', e);
+                return pythonStr;
+            }
+    }
+
+    function formatPayloadForDisplay(payload) {
+            if (!payload || typeof payload !== 'object') {
+                return payload;
+            }
+            const formatted = JSON.parse(JSON.stringify(payload));
+
+            // Parse any stringified Python dicts in the result
+            if (formatted.result && typeof formatted.result === 'object') {
+                if (formatted.result.status && typeof formatted.result.status === 'string') {
+                    formatted.result.status = parsePythonDictString(formatted.result.status);
+                }
+                if (formatted.result.message && typeof formatted.result.message === 'string') {
+                    formatted.result.message = parsePythonDictString(formatted.result.message);
+                }
+            }
+
+            // Also check at top level
+            if (formatted.status && typeof formatted.status === 'string') {
+                formatted.status = parsePythonDictString(formatted.status);
+            }
+
+            return formatted;
+    }
+
+    function setUpdatedStatusText(text, isError = false) {
+        const updatedStatusEl = document.getElementById('acsi-endpoint-updated-status');
+        if (!updatedStatusEl) {
+            return;
+        }
+        updatedStatusEl.textContent = text;
+        updatedStatusEl.classList.toggle('acsi-model-error', !!isError);
+    }
+
+    async function updateStatus(endpointTarget)
+        {
+            setUpdatedStatusText('Loading status...');
+            await ensureBffHealthy();
+
+            const api = getApiById('status');
+            const result = await executeApiCall(api, endpointTarget, null);
+
+            if (result && result.ok && result.payload) {
+
+                const addressEl = document.getElementById('acsi-address-field');
+                const statusEl = document.getElementById('acsi-status-field');
+                const apEl = document.getElementById('acsi-ap-field');
+
+                const formattedPayload = formatPayloadForDisplay(result.payload);
+                const text = `Connected clients: ${formattedPayload.result.status.connectedClients} - IED: ${formattedPayload.result.status.modelName} - Model source: ${formattedPayload.result.status.modelSource}`
+                setUpdatedStatusText(text);
+                addressEl.textContent = `${formattedPayload.result.host}:${formattedPayload.result.port}`
+                statusEl.textContent = `${formattedPayload.result.status}`
+                apEl.textContent = `${formattedPayload.result.accessPoints}`
+                console.log('success', 'GET /api/status -> HTTP 200', JSON.stringify(formattedPayload, null, 2));
+            } else {
+                const message = result ? `HTTP ${result.status}` : 'Unknown error';
+                setUpdatedStatusText(`Updated status: failed (${message})`, true);
+                console.log('error', 'GET /api/status failed', message);
+            }
+        }
+
+    async function startMonitoring(rootElement, targetValue) {
+        if (isMonitoring) {
+            return;
+        }
+
+        if (!targetValue) {
+            updateMessagesStatus(rootElement, 'Please select an endpoint first');
+            return;
+        }
+
+        stopMonitoring();
+        isMonitoring = true;
+        
+        const startBtn = rootElement.querySelector('#messages-start-btn');
+        const stopBtn = rootElement.querySelector('#messages-stop-btn');
+        const reloadBtn = rootElement.querySelector('#reloadMessagesBtn');
+        const messagesIntervalSelect = rootElement.querySelector('#messages-interval');
+        
+        if (startBtn) startBtn.disabled = true;
+        if (stopBtn) stopBtn.disabled = false;
+        if (reloadBtn) reloadBtn.disabled = false;
+        
+        updateMessagesStatus(rootElement, `Monitoring ${targetValue}...`);
+        
+        await fetchActionLogs(rootElement, targetValue);
+        
+        const interval = messagesIntervalSelect ? parseInt(messagesIntervalSelect.value) : 5000;
+        monitorInterval = setInterval(() => {
+            fetchActionLogs(rootElement, targetValue);
+        }, interval);
+    }
+
+    async function clearMessages(rootElement, targetValue) {
+        if (!targetValue) {
+            updateMessagesStatus(rootElement, 'Please select an endpoint first');
+            return;
+        }
+
+        const clearApi = getApiById('clear-logs');
+        const result = await executeApiCall(clearApi, targetValue, {});
+        
+        if (result && result.ok) {
+            protocolMessages = [];
+            renderProtocolMessages(rootElement);
+            updateMessagesStatus(rootElement, 'Messages cleared');
+        } else {
+            const message = result ? `HTTP ${result.status}` : 'Unknown error';
+            updateMessagesStatus(rootElement, `Error clearing messages: ${message}`);
+        }
+        
+        setTimeout(() => {
+            if (isMonitoring) {
+                updateMessagesStatus(rootElement, `Monitoring ${targetValue}...`);
+            } else {
+                updateMessagesStatus(rootElement, `Ready to monitor ${targetValue}`);
+            }
+        }, 2000);
+    }
+
     // ==================== Core API Call Function ====================
        async function executeApiCall(selected, targetValue, bodyOverride) {
             if (!selected) {
@@ -102,7 +336,7 @@
             }
 
             const options = {
-                method: selected.method,
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -118,22 +352,9 @@
                 payload.body = bodyOverride;
             }
 
-            if (selected.method === 'POST') {
-                options.body = JSON.stringify(payload);
-            }
-
-            //let payloadToSend = bodyOverride || {};
-
-            //if (selected.method === 'POST') {
-            //    if (targetValue && typeof payloadToSend === 'object' && !Array.isArray(payloadToSend)) {
-            //        payloadToSend.soTarget = targetValue;
-            //    }
-            //    options.body = JSON.stringify(payloadToSend);
-            //}
+           options.body = JSON.stringify(payload);
 
             try {
-                //await ensureBffHealthy();
-
                 const response = await fetch(url, options);
                 const rawText = await response.text();
                 let parsedPayload = null;
@@ -147,7 +368,7 @@
                 return {
                     ok: response.ok,
                     status: response.status,
-                    payload: selected.method === 'POST' ? parsedPayload : null,
+                    payload: parsedPayload,
                     rawText,
                 };
             } catch (error) {
@@ -183,11 +404,35 @@
         return `${host}:${port}`;
     }
 
+    function getDefaultTargetFromEndpoint(endpoint) {
+        if (!endpoint) {
+            return '';
+        }
+        return buildTargetValue(endpoint.host, endpoint.port);
+    }
+
+    function updateEndpointBadge(host, port, name = '') {
+        const nameEl = document.getElementById('endpoint-name');
+        const hostEl = document.getElementById('endpoint-host');
+        const portEl = document.getElementById('endpoint-port');
+        
+        if (nameEl) nameEl.textContent = name || 'Endpoint';
+        if (hostEl) hostEl.textContent = host || 'host';
+        if (portEl) portEl.textContent = port || 'port';
+    }
+
     // ==================== Event Handlers ====================
     function setupEventListeners(rootElement, endpoint) {
         const connectBtn = rootElement.querySelector('#acsi-client-connect-page-btn');
         const disconnectBtn = rootElement.querySelector('#acsi-client-disconnect-page-btn');
         const fetchModelBtn = rootElement.querySelector('#acsi-client-fetch-model-btn');
+        const messagesStartBtn = rootElement.querySelector('#messages-start-btn');
+        const messagesStopBtn = rootElement.querySelector('#messages-stop-btn');
+        const messagesClearBtn = rootElement.querySelector('#messages-clear-btn');
+        const reloadMessagesBtn = rootElement.querySelector('#reloadMessagesBtn');
+        const reloadStatusBtn = rootElement.querySelector('#acsi-reload-status-btn');
+
+        const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
 
         if (connectBtn) {
             connectBtn.addEventListener('click', () => handleConnect(rootElement, endpoint));
@@ -200,65 +445,159 @@
         if (fetchModelBtn) {
             fetchModelBtn.addEventListener('click', () => handleFetchModel(rootElement, endpoint));
         }
+
+        // Protocol Messages event listeners
+        if (messagesStartBtn) {
+            messagesStartBtn.addEventListener('click', () => {
+                startMonitoring(rootElement, endpointTarget);
+            });
+        }
+
+        if (messagesStopBtn) {
+            messagesStopBtn.addEventListener('click', () => {
+                stopMonitoring();
+                const startBtn = rootElement.querySelector('#messages-start-btn');
+                const stopBtn = rootElement.querySelector('#messages-stop-btn');
+                if (startBtn) startBtn.disabled = false;
+                if (stopBtn) stopBtn.disabled = true;
+                updateMessagesStatus(rootElement, `Ready to monitor ${endpointTarget || 'endpoint'}`);
+            });
+        }
+
+        if (reloadMessagesBtn) {
+            reloadMessagesBtn.addEventListener('click', async () => {
+                await fetchActionLogs(rootElement, endpointTarget);
+            });
+        }
+
+        if (reloadStatusBtn) {
+            reloadStatusBtn.addEventListener('click', async () => {
+                if (!endpointTarget) {
+                    setUpdatedStatusText('Updated status: blocked (missing selected endpoint address).', true);
+                    return;
+                }
+
+                try {
+                    reloadStatusBtn.disabled = true;
+                    updateStatus(endpointTarget);
+                } catch (error) {
+                    const message = String(error && error.message ? error.message : error);
+                    setUpdatedStatusText(`Updated status: failed (${message})`, true);
+                    console.log('error', 'GET /api/status failed', message);
+                } finally {
+                    reloadStatusBtn.disabled = false;
+                }
+            });
+        }
+
+        if (messagesClearBtn) {
+            messagesClearBtn.addEventListener('click', () => {
+                clearMessages(rootElement, endpointTarget);
+            });
+        }
+
+        // Initialize messages status
+        updateMessagesStatus(rootElement, 'Select an endpoint and click Start');
+
+        (async () => {
+            let targetToUse = endpointTarget;
+
+            if (!targetToUse) {
+                const storedHost = localStorage.getItem('bffHost');
+                const storedPort = localStorage.getItem('bffPort');
+                if (storedHost && storedPort) {
+                    targetToUse = buildTargetValue(storedHost, Number(storedPort));
+                }
+            }
+
+            if (targetToUse) {
+                try {
+
+                if (!document.getElementById('page-acsi-client')?.classList.contains('active')) {
+                    return;
+                }
+                    await updateStatus(targetToUse);
+                } catch (error) {
+                    console.log('Auto status load failed:', error);
+                }
+            }
+        })();
     }
 
     async function handleConnect(rootElement, endpoint) {
+        const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
         const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
         const port = parseInt(rootElement.querySelector('#acsi-client-port-page').value.trim());
         const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
 
         if (!host || !port) {
-            showStatus(rootElement, 'Please enter both host and port', 'error');
+            //showStatus(rootElement, 'Please enter both host and port', 'error');
             return;
         }
 
         if (isNaN(port) || port < 1 || port > 65535) {
-            showStatus(rootElement, 'Invalid port number', 'error');
+            //showStatus(rootElement, 'Invalid port number', 'error');
             return;
         }
 
-        showStatus(rootElement, 'Connecting...', 'info');
-        const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+        //showStatus(rootElement, 'Connecting...', 'info');
         const result = await executeApiCall(
             getApiById('connect'),
-            targetValue,
+            endpointTarget,
             { host, port, cp }
         );
 
         if (result && result.ok) {
-            showStatus(rootElement, `Connected to ${host}:${port}`, 'success');
+            //showStatus(rootElement, `Connected to ${host}:${port}`, 'success');
             rootElement.querySelector('#acsi-client-connect-page-btn').disabled = true;
             rootElement.querySelector('#acsi-client-disconnect-page-btn').disabled = false;
-            rootElement.querySelector('#acsi-client-fetch-model-btn').disabled = false;
+            updateEndpointBadge(host, port, '');
+            
+            // Enable message monitoring buttons
+            const startBtn = rootElement.querySelector('#messages-start-btn');
+            if (startBtn) startBtn.disabled = false;
         } else {
             const error = result?.payload?.error || result?.rawText || 'Unknown error';
-            showStatus(rootElement, `Connection failed: ${error}`, 'error');
+            //showStatus(rootElement, `Connection failed: ${error}`, 'error');
         }
     }
 
     async function handleDisconnect(rootElement, endpoint) {
+        const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
         const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
         const port = parseInt(rootElement.querySelector('#acsi-client-port-page').value.trim());
         const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
 
-        showStatus(rootElement, 'Disconnecting...', 'info');
-        const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+        //showStatus(rootElement, 'Disconnecting...', 'info');
+        
         const result = await executeApiCall(
             getApiById('disconnect'),
-            targetValue,
+            endpointTarget,
             { host, port, cp }
         );
 
         if (result && result.ok) {
-            showStatus(rootElement, 'Disconnected', 'info');
+            //showStatus(rootElement, 'Disconnected', 'info');
             rootElement.querySelector('#acsi-client-connect-page-btn').disabled = false;
             rootElement.querySelector('#acsi-client-disconnect-page-btn').disabled = true;
-            rootElement.querySelector('#acsi-client-fetch-model-btn').disabled = true;
             rootElement.querySelector('#acsi-client-tree-container-page').style.display = 'none';
+            updateEndpointBadge('', '', '');
+            
+            // Disable message monitoring buttons
+            const startBtn = rootElement.querySelector('#messages-start-btn');
+            const stopBtn = rootElement.querySelector('#messages-stop-btn');
+            if (startBtn) startBtn.disabled = true;
+            if (stopBtn) stopBtn.disabled = true;
+            stopMonitoring();
         } else {
             const error = result?.payload?.error || result?.rawText || 'Unknown error';
-            showStatus(rootElement, `Disconnect failed: ${error}`, 'error');
+            //showStatus(rootElement, `Disconnect failed: ${error}`, 'error');
         }
+
+        setUpdatedStatusText('Updated status: not loaded yet.');
+        document.getElementById('acsi-address-field').textContent = '';
+        document.getElementById('acsi-status-field').textContent = '';
+        document.getElementById('acsi-ap-field').textContent = '';
     }
 
     // Context menu for reading data values
@@ -334,25 +673,18 @@
 
       function asn1TimeStampToISOString(ts) {
           if (!ts || typeof ts.secondSinceEpoch !== 'number') return '';
-          // ASN.1 TimeStamp: seconds since epoch (UTC), fractionOfSecond is optional (microseconds)
           const seconds = ts.secondSinceEpoch;
           let ms = 0;
           if (typeof ts.fractionOfSecond === 'number') {
-            // fractionOfSecond is usually in microseconds (0..16777215)
-            // Convert to milliseconds (3 digits)
             ms = Math.floor(ts.fractionOfSecond / 1000);
           }
-          // Create JS Date from seconds and ms
           const date = new Date((seconds * 1000) + ms);
           return date.toISOString();
       }
 
-      // Helper to extract actual value from wrapped structure
       function extractActualValue(val) {
-        // Handle wrapped format: [{data: {...}}]
         if (Array.isArray(val) && val.length > 0 && val[0] && val[0].data) {
           const dataObj = val[0].data;
-          // If data is an object with a single key (the type), extract that value
           if (typeof dataObj === 'object' && !Array.isArray(dataObj)) {
             const keys = Object.keys(dataObj);
             if (keys.length === 1) {
@@ -364,7 +696,6 @@
         return val;
       }
 
-      // Check if this is a structured value
       if (Array.isArray(valueData) && valueData.length > 0) {
         const firstItem = valueData[0];
 
@@ -372,16 +703,13 @@
           if (firstItem.data.length === 2 &&
               typeof firstItem.data[0] === 'string' &&
               firstItem.data[0] === 'structure') {
-            // This is a structured attribute - show dash
             treeValueSpan.textContent = '—';
-            treeValueSpan.style.color = '#4caf50'; // Green
+            treeValueSpan.style.color = '#4caf50';
             return;
           }
 
-          // Simple value - extract and display
           if (firstItem.data.length === 2 && typeof firstItem.data[0] === 'string') {
             const value = firstItem.data[1];
-            // If ASN.1 TimeStamp object, convert to ISO
             let displayValue = value;
             if (value && typeof value === 'object' && typeof value.secondSinceEpoch === 'number') {
               displayValue = asn1TimeStampToISOString(value) || JSON.stringify(value);
@@ -390,79 +718,58 @@
             } else if (typeof value === 'boolean') {
               displayValue = value ? 'true' : 'false';
             } else if (typeof value === 'object') {
-              // For complex objects (like quality), show clean JSON
               displayValue = JSON.stringify(value);
             }
             treeValueSpan.textContent = displayValue;
-            treeValueSpan.style.color = '#4caf50'; // Green for successful read
+            treeValueSpan.style.color = '#4caf50';
             return;
           }
         }
       }
 
-      // Default display - extract actual value if wrapped
       const actualValue = extractActualValue(valueData);
       treeValueSpan.textContent = JSON.stringify(actualValue);
-      treeValueSpan.style.color = '#4caf50'; // Green
+      treeValueSpan.style.color = '#4caf50';
     }
-
 
     async function readDataValue(objRef, fc, endpoint) {
       console.log('[readDataValue] Reading:', objRef, 'FC:', fc);
-      const targetValue = buildTargetValue(endpoint.host, endpoint.port);
-      //const statusEl = document.getElementById('actionText');
-      //statusEl.textContent = `Reading ${objRef} [${fc}]...`;
-      //statusEl.className = 'info fetching';
-
-      // Ensure the tree node exists in the DOM before reading
-      // This is needed for nested attributes that might not be expanded yet
-      //await ensureTreeNodeExists(objRef);
-
-      // For nested DA sub-attributes (e.g., "mag.f" in "LD0/MMXU1.PhV.phsA.cVal.mag.f"),
-      // we need to ensure the parent DA tree node is expanded so the span exists
-      //await ensureDaTreeNodeExpanded(objRef);
+      const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
+      const host = document.getElementById('acsi-client-host-page').value.trim();
+      const port = document.getElementById('acsi-client-port-page').value.trim();
 
       try {
         const res = await executeApiCall(
             getApiById('read'),
-            targetValue,
+            endpointTarget,
             { objRef, fc }
         );
 
-        //const data = await res.json();
         const data = res?.payload || { error: 'No response payload' };
         console.log('[readDataValue] Response:', data);
 
         if (data.error) {
-          //statusEl.textContent = `Error reading ${objRef}: ${data.error}`;
-          //statusEl.className = 'error';
           console.log('[readDataValue] Error reading:', objRef, data.error);
           updateTreeValueDisplay(objRef, data.error, true);
         } else {
-          // Format the values for display
-          //const valueStr =
-          //statusEl.textContent = `${objRef} [${fc}]: ${valueStr}`;
-          //statusEl.className = 'info';
-          console.log('[readDataValue] Updating tree display for:', objRef, data.values);
-          updateTreeValueDisplay(objRef, data.result.value, false);
+          console.log('[readDataValue] Updating tree display for:', objRef, data.result?.value);
+          updateTreeValueDisplay(objRef, data.result?.value, false);
         }
       } catch (e) {
         console.error('[readDataValue] Exception:', e);
-        //statusEl.textContent = `Exception reading ${objRef}: ${e.message}`;
-        //statusEl.className = 'error';
         updateTreeValueDisplay(objRef, e.message, true);
       }
     }
 
     async function writeDataValue(objRef, fc, endpoint, value, value_type) {
       console.log('[writeDataValue] Writing:', objRef, 'FC:', fc, 'Value:', value);
-      const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+      const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
 
       try {
         const res = await executeApiCall(
             getApiById('write'),
-            targetValue,
-            { objRef, fc, value, value_type }  // ✅ Include value in payload
+            endpointTarget,
+            { objRef, fc, value, value_type }
         );
 
         const data = res?.payload || { error: 'No response payload' };
@@ -473,7 +780,6 @@
           throw new Error(data.error);
         }
 
-        // Update UI to show the new value
         updateTreeValueDisplay(objRef, data.result?.value || value, false);
         return data;
       } catch (e) {
@@ -482,7 +788,7 @@
         throw e;
       }
     }
-    // ===== Write Data Value Dialog Functions =====
+
     async function showWriteValueDialog(objRef, fc, endpoint) {
       const modal = document.getElementById('writeValueModal');
       const titleEl = document.getElementById('writeValueTitle');
@@ -495,7 +801,6 @@
       const submitBtn = document.getElementById('writeValueSubmit');
       const cancelBtn = document.getElementById('writeValueCancel');
 
-      // Reset state
       titleEl.textContent = 'Write Data Value';
       objRefEl.textContent = objRef;
       typeEl.textContent = 'Reading...';
@@ -507,16 +812,15 @@
       validationEl.textContent = '';
       resultDiv.classList.add('hidden');
 
-      // Show modal
-      modal.classList.remove('hidden');
-      inputEl.focus();  // ✅ Focus the input immediately
+      modal.classList.add('active');
+      inputEl.focus();
 
-      // Use executeApiCall
-      const targetValue = buildTargetValue(endpoint.host, endpoint.port);
+      const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
+      
       try {
         const res = await executeApiCall(
             getApiById('read'),
-            targetValue,
+            endpointTarget,
             { objRef, fc }
         );
 
@@ -547,7 +851,6 @@
         currentValueEl.textContent = e.message;
       }
 
-      // Button handlers
       submitBtn.onclick = async () => {
         const newValue = inputEl.value.trim();
         if (!newValue) {
@@ -564,7 +867,7 @@
           resultDiv.style.color = '#fff';
           resultDiv.classList.remove('hidden');
           setTimeout(() => {
-            modal.classList.add('hidden');
+            modal.classList.remove('active');
             submitBtn.disabled = false;
           }, 1500);
         } catch (e) {
@@ -576,15 +879,41 @@
         }
       };
 
-      cancelBtn.onclick = () => modal.classList.add('hidden');
+      cancelBtn.onclick = () => modal.classList.remove('active');
       inputEl.addEventListener('keypress', (e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
             submitBtn.click();
           }
         });
-      //inputEl.onkeypress = (e) => e.key === 'Enter' && submitBtn.onclick();
     }
+
+    async function showReadContextMenuForDataAttribute(e, objRef, fc, endpoint) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const menuItems = [
+            {
+                label: `Read Value [${fc.toUpperCase()}]`,
+                icon: 'fa-eye',
+                action: () => readDataValue(objRef, fc, endpoint),
+                id: 'contextMenuReadValue',
+            },
+        ];
+
+        const menu = createContextMenu(menuItems);
+        menu.style.left = e.clientX + 'px';
+        menu.style.top  = e.clientY + 'px';
+        menu.style.display = 'block';
+
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth)  menu.style.left = (e.clientX - rect.width) + 'px';
+            if (rect.bottom > window.innerHeight) menu.style.top = (e.clientY - rect.height) + 'px';
+        });
+    }
+
+
     async function showContextMenuForDataAttribute(e, objRef, fc, endpoint) {
         e.preventDefault();
         e.stopPropagation();
@@ -593,12 +922,14 @@
             {
                 label: `Read Value [${fc.toUpperCase()}]`,
                 icon: 'fa-eye',
-                action: () => readDataValue(objRef, fc, endpoint)
+                action: () => readDataValue(objRef, fc, endpoint),
+                id: 'contextMenuReadValue',
             },
             {
                 label: `Write Value [${fc.toUpperCase()}]`,
                 icon: 'fa-pen',
-                action: () => showWriteValueDialog(objRef, fc, endpoint)
+                action: () => showWriteValueDialog(objRef, fc, endpoint),
+                id: 'contextMenuWriteValue',
             }
         ];
 
@@ -607,7 +938,6 @@
         menu.style.top  = e.clientY + 'px';
         menu.style.display = 'block';
 
-        // Nudge back if it overflows the viewport
         requestAnimationFrame(() => {
             const rect = menu.getBoundingClientRect();
             if (rect.right > window.innerWidth)  menu.style.left = (e.clientX - rect.width) + 'px';
@@ -654,267 +984,25 @@
       parentLi.appendChild(ul);
     }
 
-    async function handleFetchModel(rootElement, endpoint) {
-        const host = rootElement.querySelector('#acsi-client-host-page').value.trim();
-        const port = rootElement.querySelector('#acsi-client-port-page').value.trim();
-        const targetValue = buildTargetValue(endpoint.host, endpoint.port);
-
-
-        const handleNodeClick = async (node) => {
-                if (node.nodeType === 'DO') {
-                    //showStatus(rootElement, `Fetching data definition for ${node.ref}...`, 'info');
-
-                    const existingUl = node.li.querySelector(':scope > ul');
-
-                    if (existingUl) {
-                        return;
-                    }
-                    const ldName = node.ref.split('/')[0];
-                    const lnName = node.ref.split('/')[1].split('.')[0];
-                    const doPath = node.ref.split('/')[1].split('.').slice(1).join('.');
-
-                    const defResult = await executeApiCall(
-                        getApiById('data-definition'),
-                        targetValue,
-                        {ld_inst: ldName, ln_inst: lnName, do_path: doPath}
-                    );
-                    if (defResult && defResult.ok) {
-                        //showStatus(rootElement, `Data definition fetched for ${node.ref}`, 'success');
-                        console.log('Data definition:', defResult.payload);
-                        const dataAttributes = defResult.payload.result.value?.dataAttributeDefinition || [];
-                        const subDataObjects = defResult.payload.result.value?.subDataDefinition || [];
-
-                        const ul = document.createElement('ul');
-                        ul.className = 'scl-tree-list';
-
-                        // Add DAs to the single UL
-                        dataAttributes.forEach((da) => {
-                            const typeSuffix = da.daType[0] ? ` [${da.daType[0]}]` : '';
-                            const daName = da.name || da.daRef.split('.').pop() || 'DA';
-                            const fc = da.fc || 'mx';  // Default to 'mx' if not provided
-                            const daLi = createTreeNode('DA', `${daName}${typeSuffix}`);
-
-                            const daRef = `${node.ref}.${daName}`;   // ← construct it explicitly
-
-
-                            const row = daLi.querySelector(':scope > .scl-tree-row');
-                            row.style.cursor = 'context-menu';
-
-                            //Create the tree-value-display span
-                            const valueDisplaySpan = document.createElement('span');
-                            valueDisplaySpan.className = 'tree-value-display';
-                            valueDisplaySpan.setAttribute('data-obj-ref', daRef);
-                            row.appendChild(valueDisplaySpan);
-
-                            row.addEventListener('contextmenu', (e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                showContextMenuForDataAttribute(e, daRef, fc, endpoint);
-                            });
-
-                            // Add SDAs under this DA (if any)
-                            const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
-                            if (subDas.length > 0) {
-                                const daUl = document.createElement('ul');
-                                daUl.className = 'scl-tree-list';
-                                subDas.forEach((sda) => {
-                                    const sdaTypeSuffix = sda.daType[0] ? ` [${daType[0].bType}]` : '';
-                                    const sdaName = sda.name || sda.daRef.split('.').pop() || 'SDA';
-
-                                    //Create the tree-value-display span for SDAs
-                                    const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
-                                    const sdaValueDisplaySpan = document.createElement('span');
-                                    sdaValueDisplaySpan.className = 'tree-value-display';
-                                    sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
-                                    sdaRow.appendChild(sdaValueDisplaySpan);
-
-
-                                    daUl.appendChild(createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`));
-                                });
-                                daLi.appendChild(daUl);
-                            }
-                            ul.appendChild(daLi);
-                        });
-
-                        // Add SDOs to the same UL
-                        subDataObjects.forEach((sdo) => {
-                            const cdcSuffix = sdo.cdc ? ` [${sdo.cdc}]` : '';
-                            const sdoLi = createTreeNode('SDO', `${sdo.name}${cdcSuffix}`);
-
-                            // Add children under this SDO (if any)
-                            const sdoDas = sdo.dataAttributes || sdo.data_attributes || sdo.da || [];
-                            const sdoSubSdos = sdo.subDataObjects || sdo.sub_data_objects || [];
-                            if (sdoDas.length > 0 || sdoSubSdos.length > 0) {
-                                const sdoUl = document.createElement('ul');
-                                sdoUl.className = 'scl-tree-list';
-                                sdoDas.forEach((da) => {
-                                    const typeSuffix = da.bType ? ` [${da.bType}]` : '';
-                                    const daName = da.name || da.daRef.split('.').pop() || 'DA';
-                                    sdoUl.appendChild(createTreeNode('DA', `${daName}${typeSuffix}`));
-                                });
-                                sdoSubSdos.forEach((nestedSdo) => {
-                                    const nestedCdc = nestedSdo.cdc ? ` [${nestedSdo.cdc}]` : '';
-                                    sdoUl.appendChild(createTreeNode('SDO', `${nestedSdo.name}${nestedCdc}`));
-                                });
-                                sdoLi.appendChild(sdoUl);
-                            }
-                            ul.appendChild(sdoLi);
-                        });
-
-                       node.li.appendChild(ul);
-
-                        if (ul.children.length > 0) {
-                            const row = node.li.querySelector(':scope > .scl-tree-row');
-                            const toggle = row.querySelector('.scl-tree-toggle');
-
-                            toggle.classList.remove('hidden');
-                            node.li.classList.add('has-children', 'expanded');
-                            toggle.textContent = '▾';
-                            ul.style.display = '';
-
-                            const onToggle = () => {
-                                const expanded = node.li.classList.toggle('expanded');
-                                toggle.textContent = expanded ? '▾' : '▸';
-                                ul.style.display = expanded ? '' : 'none';
-                            };
-
-                            toggle.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                onToggle();
-                            });
-                        }
-                    }
-                    else
-                    {
-                        const error = defResult?.payload?.error || defResult?.rawText || 'Failed to fetch data definition';
-                        console.log(`Error fetching data definition for ${node.ref}:`, error);
-                        //showStatus(rootElement, error, 'error');
-                    }
-                }
-                else if (node.nodeType == "DataSet") {
-                    const existingUl = node.li.querySelector(':scope > ul');
-                     if (existingUl) {
-                        return;
-                    }
-                    console.log('[handleNodeClick] DataSet node clicked:', node.ref, 'Existing UL:', existingUl);
-                    const ld_name = node.ref.split('/')[0];
-                    const ln_inst = node.ref.split('/')[1].split('.')[0];
-                    const dsName = node.ref.split('/')[1].split('.')[1];
-
-                    const defResult = await executeApiCall(
-                        getApiById('dataset-directory'),
-                        targetValue,
-                        {ld_inst: ld_name, ln_inst: ln_inst, ds_inst: dsName}
-                    );
-                    if (defResult && defResult.ok) {
-                        console.log('DataSet definition:', defResult.payload);
-                        const dataAttributes = defResult.payload.result.value;
-
-                         // ✅ Create UL for DAs
-                        const ul = document.createElement('ul');
-                        ul.className = 'scl-tree-list';
-
-                        for(const da of dataAttributes) {
-                            const objRef = da.ref;
-                            const fc = da.fc;
-
-                            const typeSuffix = da.bType ? ` [${da.bType}]` : '';
-                            const daLi = createTreeNode('FCDA', objRef + ` [${fc}]`);
-                            const row = daLi.querySelector(':scope > .scl-tree-row');
-                            row.style.cursor = 'context-menu';
-
-                            //Create the tree-value-display span
-                            const valueDisplaySpan = document.createElement('span');
-                            valueDisplaySpan.className = 'tree-value-display';
-                            valueDisplaySpan.setAttribute('data-obj-ref', `${node.ref}.${da.daRef}`);
-                            row.appendChild(valueDisplaySpan);
-
-                            ul.appendChild(daLi);
-                        }
-                        node.li.appendChild(ul);
-
-                        if (ul.children.length > 0) {
-                            const row = node.li.querySelector(':scope > .scl-tree-row');
-                            const toggle = row.querySelector('.scl-tree-toggle');
-
-                            toggle.classList.remove('hidden');
-                            node.li.classList.add('has-children', 'expanded');
-                            toggle.textContent = '▾';
-                            ul.style.display = '';
-
-                            toggle.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                const expanded = node.li.classList.toggle('expanded');
-                                toggle.textContent = expanded ? '▾' : '▸';
-                                ul.style.display = expanded ? '' : 'none';
-                            });
-                        }
-                    }
-                }
-        }
-
-
-        showStatus(rootElement, 'Fetching model...', 'info');
-        const result = await executeApiCall(
-            getApiById('model-tree'),
-            targetValue,
-            null
-        );
-
-        if (result && result.ok) {
-            const treeContainer = rootElement.querySelector('#acsi-client-tree-container-page');
-            const treeContent = rootElement.querySelector('#acsi-client-tree-content');
-            renderLiveModelTree(result.payload || {}, treeContent, handleNodeClick);
-            //treeContent.innerHTML = `<pre>${JSON.stringify(result.payload || {}, null, 2)}</pre>`;
-            treeContainer.style.display = 'block';
-            showStatus(rootElement, 'Model fetched successfully', 'success');
-        }
-         else {
-            const error = result?.payload?.error || result?.rawText || 'Failed to fetch model';
-            showStatus(rootElement, error, 'error');
-        }
-    }
-
-    // ==================== Render Function ====================
-    function setupCollapsibleTree(container) {
-      const treeItems = container.querySelectorAll('.scl-tree-item');
-
-      treeItems.forEach(function (item) {
-        const row = item.querySelector(':scope > .scl-tree-row');
-        const toggle = row ? row.querySelector('.scl-tree-toggle') : null;
-        const childList = item.querySelector(':scope > .scl-tree-list');
-
-        if (!row || !toggle) {
-          return;
-        }
-
-        if (!childList || childList.children.length === 0) {
-          toggle.classList.add('hidden');
-          return;
-        }
-
-        item.classList.add('has-children', 'expanded');
-        toggle.textContent = '▾';
-
-
-        // 👇 CRITICAL: Remove 'hidden' when children exist
-        toggle.classList.remove('hidden');
-        item.classList.add('has-children', 'expanded');
-        toggle.textContent = '▾';
-
-        const onToggle = function () {
-          const isExpanded = item.classList.toggle('expanded');
-          toggle.textContent = isExpanded ? '▾' : '▸';
-          childList.style.display = isExpanded ? '' : 'none';
+    function nodeTypeLabel(type) {
+        const labels = {
+            'LDevice': 'LD',
+            'LogicalNode': 'LN',
+            'DO': 'DO',
+            'DA': 'DA',
+            'SDA': 'SDA',
+            'SDO': 'SDO',
+            'DataSet': 'DataSet',
+            'ReportControl': 'RC',
+            'Group': '',
+            'FCDA': 'FCDA'
         };
-
-        toggle.addEventListener('click', function (event) {
-          event.stopPropagation();
-          onToggle();
-        });
-      });
+        return labels[type] || type || '';
     }
 
+    function normalizeNodeType(type) {
+        return (type || '').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    }
 
     function createTreeNode(nodeType, value) {
       const li = document.createElement('li');
@@ -957,6 +1045,318 @@
       parentLi.appendChild(ul);
     }
 
+    async function fetchDODefinition(node, endpointTarget, onNodeClick, container, endpoint) {
+        // If already has children, just toggle
+        const existingUl = node.li.querySelector(':scope > ul');
+        if (existingUl) {
+            const row = node.li.querySelector(':scope > .scl-tree-row');
+            const toggle = row.querySelector('.scl-tree-toggle');
+            if (toggle && !toggle.classList.contains('hidden')) {
+                const expanded = node.li.classList.toggle('expanded');
+                toggle.textContent = expanded ? '▾' : '▸';
+                existingUl.style.display = expanded ? '' : 'none';
+            }
+            return;
+        }
+
+        const ldName = node.ref.split('/')[0];
+        const lnName = node.ref.split('/')[1].split('.')[0];
+        const doPath = node.ref.split('/')[1].split('.').slice(1).join('.');
+
+        const defResult = await executeApiCall(
+            getApiById('data-definition'),
+            endpointTarget,
+            {ld_inst: ldName, ln_inst: lnName, do_path: doPath}
+        );
+
+        if (defResult && defResult.ok) {
+            const dataAttributes = defResult.payload.result.value?.dataAttributeDefinition || [];
+            const subDataObjects = defResult.payload.result.value?.subDataDefinition || [];
+
+            const ul = document.createElement('ul');
+            ul.className = 'scl-tree-list';
+
+            // Add DAs - FIXED: Use passed 'endpoint' parameter
+            dataAttributes.forEach((da) => {
+                const typeSuffix = da.daType?.[0] ? ` (${da.daType[0]})` : '';
+                const daName = da.name || da.daRef?.split('.').pop() || 'DA';
+                const fc_display = da.fc ? ` [${da.fc}] ` : '';
+                const fc = da.fc || '';
+                const daLi = createTreeNode('DA', `${fc_display}${daName}${typeSuffix}`);
+                const daRef = `${node.ref}.${daName}`;
+
+                const row = daLi.querySelector(':scope > .scl-tree-row');
+                row.style.cursor = 'context-menu';
+
+                const valueDisplaySpan = document.createElement('span');
+                valueDisplaySpan.className = 'tree-value-display';
+                valueDisplaySpan.setAttribute('data-obj-ref', daRef);
+                row.appendChild(valueDisplaySpan);
+
+
+                if (da.daType[0] === "structure"){
+                    da.subDataAttributes = da.daType[1];
+                }
+
+               if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
+                row.addEventListener('contextmenu', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    showContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                });
+                } else {
+                    row.addEventListener('contextmenu', (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        showReadContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                    });
+                }
+
+
+
+            const subDas = da.subDataAttributes || da.sub_attributes || da.sda || [];
+
+            if (Array.isArray(subDas) && subDas.length > 0) {
+                const daToggle = row.querySelector('.scl-tree-toggle');
+                if (daToggle) {
+                    daToggle.classList.remove('hidden');
+                    daLi.classList.add('has-children');
+                    daToggle.textContent = '▸';
+
+                    daToggle.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const expanded = daLi.classList.toggle('expanded');
+                        daToggle.textContent = expanded ? '▾' : '▸';
+                        const daUl = daLi.querySelector(':scope > ul');
+                        if (daUl) {
+                            daUl.style.display = expanded ? '' : 'none';
+                        }
+                    });
+                }
+            }
+
+            if (subDas.length > 0) {
+                const daUl = document.createElement('ul');
+                daUl.className = 'scl-tree-list';
+                subDas.forEach((sda) => {
+                    const sdaTypeSuffix = ` (${sda.cmpType[0]})` || '';
+                    const sdaName = sda.cmpName || sda.daRef?.split('.').pop() || 'SDA';
+                    const sdaRef = `${daRef}.${sdaName}`;
+                    const sdaLi = createTreeNode('SDA', `${sdaName}${sdaTypeSuffix}`);
+
+                    const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
+                    const sdaValueDisplaySpan = document.createElement('span');
+                    sdaValueDisplaySpan.className = 'tree-value-display';
+                    sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
+                    sdaRow.appendChild(sdaValueDisplaySpan);
+
+                    sdaRow.style.cursor = 'context-menu';
+
+                     if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
+                        sdaRow.addEventListener('contextmenu', (e) => {
+                            e.preventDefault(); e.stopPropagation();
+                            showContextMenuForDataAttribute(e, sdaRef, fc, endpoint);
+                        });
+                    } else {
+                        sdaRow.addEventListener('contextmenu', (e) => {
+                            e.preventDefault(); e.stopPropagation();
+                            showReadContextMenuForDataAttribute(e, sdaRef, fc, endpoint);
+                        });
+                    }
+
+                    daUl.appendChild(sdaLi);
+                });
+                daLi.appendChild(daUl);
+
+            }
+                ul.appendChild(daLi);
+            });
+
+            // Add SDOs - FIXED: Pass endpoint in node object
+            subDataObjects.forEach((sdo) => {
+                const cdcSuffix = sdo.cdc ? ` [${sdo.cdc}]` : '';
+                const sdoRef = `${node.ref}.${sdo.name}`;
+                const sdoLi = createTreeNode('SDO', `${sdo.name}${cdcSuffix}`);
+
+                const sdoRow = sdoLi.querySelector(':scope > .scl-tree-row');
+
+                if (sdoRow) {
+                    sdoRow.style.cursor = 'pointer';
+                    sdoRow.addEventListener('click', function(e) {
+                        if (e.target && e.target.classList.contains('scl-tree-toggle')) return;
+                        e.stopPropagation();
+
+                        container.querySelectorAll('.scl-tree-row.lm-selected').forEach(function(r) {
+                            r.classList.remove('lm-selected');
+                        });
+                        sdoRow.classList.add('lm-selected');
+                        onNodeClick({ ref: sdoRef, fc: null, nodeType: 'SDO', li: sdoLi, endpoint: endpoint }); // ✅ Pass endpoint
+                    });
+                }
+
+                const sdoToggle = sdoRow?.querySelector('.scl-tree-toggle');
+                if (sdoToggle) {
+                    sdoToggle.classList.remove('hidden');
+                    sdoLi.classList.add('has-children');
+                    sdoToggle.textContent = '▸';
+                }
+
+                ul.appendChild(sdoLi);
+            });
+
+            node.li.appendChild(ul);
+
+            if (ul.children.length > 0) {
+                const row = node.li.querySelector(':scope > .scl-tree-row');
+                const toggle = row.querySelector('.scl-tree-toggle');
+
+                toggle.classList.remove('hidden');
+                node.li.classList.add('has-children', 'expanded');
+                toggle.textContent = '▾';
+                ul.style.display = '';
+
+                toggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const expanded = node.li.classList.toggle('expanded');
+                    toggle.textContent = expanded ? '▾' : '▸';
+                    ul.style.display = expanded ? '' : 'none';
+                });
+            }
+        } else {
+            console.log(`Error fetching data definition for ${node.ref}:`,
+                defResult?.payload?.error || defResult?.rawText || 'Failed');
+        }
+    }
+    async function handleFetchModel(rootElement, endpoint) {
+        const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
+
+        const handleNodeClick = async (node) => {
+                if (node.nodeType === 'DO' || node.nodeType === 'SDO') {
+                    const container = document.getElementById('acsi-client-tree-content');
+                    // ✅ Pass endpoint from closure or from node object
+                    const endpointToUse = node.endpoint || endpoint;
+                    await fetchDODefinition(node, endpointTarget, handleNodeClick, container, endpointToUse);
+                    }
+                else if (node.nodeType == "DataSet") {
+                    const existingUl = node.li.querySelector(':scope > ul');
+                     if (existingUl) {
+                        return;
+                    }
+                    console.log('[handleNodeClick] DataSet node clicked:', node.ref, 'Existing UL:', existingUl);
+                    const ld_name = node.ref.split('/')[0];
+                    const ln_inst = node.ref.split('/')[1].split('.')[0];
+                    const dsName = node.ref.split('/')[1].split('.')[1];
+
+                    const defResult = await executeApiCall(
+                        getApiById('dataset-directory'),
+                        endpointTarget,
+                        {ld_inst: ld_name, ln_inst: ln_inst, ds_inst: dsName}
+                    );
+                    if (defResult && defResult.ok) {
+                        console.log('DataSet definition:', defResult.payload);
+                        const dataAttributes = defResult.payload.result.value;
+
+                         const ul = document.createElement('ul');
+                        ul.className = 'scl-tree-list';
+
+                        for(const da of dataAttributes) {
+                            const objRef = da.ref;
+                            const fc = da.fc;
+
+                            const typeSuffix = da.bType ? ` [${da.bType}]` : '';
+                            const daLi = createTreeNode('FCDA', objRef + ` [${fc}]`);
+                            const row = daLi.querySelector(':scope > .scl-tree-row');
+                            row.style.cursor = 'context-menu';
+
+                            const valueDisplaySpan = document.createElement('span');
+                            valueDisplaySpan.className = 'tree-value-display';
+                            valueDisplaySpan.setAttribute('data-obj-ref', `${node.ref}.${da.daRef}`);
+                            row.appendChild(valueDisplaySpan);
+
+                            row.addEventListener('contextmenu', (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                showContextMenuForDataAttribute(e, `${node.ref}.${da.daRef}`, fc, endpoint);
+                            });
+
+                            ul.appendChild(daLi);
+                        }
+                        node.li.appendChild(ul);
+
+                        if (ul.children.length > 0) {
+                            const row = node.li.querySelector(':scope > .scl-tree-row');
+                            const toggle = row.querySelector('.scl-tree-toggle');
+
+                            toggle.classList.remove('hidden');
+                            node.li.classList.add('has-children', 'expanded');
+                            toggle.textContent = '▾';
+                            ul.style.display = '';
+
+                            toggle.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const expanded = node.li.classList.toggle('expanded');
+                                toggle.textContent = expanded ? '▾' : '▸';
+                                ul.style.display = expanded ? '' : 'none';
+                            });
+                        }
+                    }
+                }
+        }
+
+        showStatus(rootElement, 'Fetching model...', 'info');
+        const result = await executeApiCall(
+            getApiById('model-tree'),
+            endpointTarget,
+            null
+        );
+
+        if (result && result.ok) {
+            const treeContainer = rootElement.querySelector('#acsi-client-tree-container-page');
+            const treeContent = rootElement.querySelector('#acsi-client-tree-content');
+            renderLiveModelTree(result.payload || {}, treeContent, handleNodeClick);
+            treeContainer.style.display = 'block';
+            showStatus(rootElement, 'Model fetched successfully', 'success');
+        }
+         else {
+            const error = result?.payload?.error || result?.rawText || 'Failed to fetch model';
+            showStatus(rootElement, error, 'error');
+        }
+    }
+
+    function setupCollapsibleTree(container) {
+      const treeItems = container.querySelectorAll('.scl-tree-item');
+
+      treeItems.forEach(function (item) {
+        const row = item.querySelector(':scope > .scl-tree-row');
+        const toggle = row ? row.querySelector('.scl-tree-toggle') : null;
+        const childList = item.querySelector(':scope > .scl-tree-list');
+
+        if (!row || !toggle) {
+          return;
+        }
+
+        if (!childList || childList.children.length === 0) {
+          toggle.classList.add('hidden');
+          return;
+        }
+
+        item.classList.add('has-children', 'expanded');
+        toggle.textContent = '▾';
+
+        toggle.classList.remove('hidden');
+        item.classList.add('has-children', 'expanded');
+        toggle.textContent = '▾';
+
+        const onToggle = function () {
+          const isExpanded = item.classList.toggle('expanded');
+          toggle.textContent = isExpanded ? '▾' : '▸';
+          childList.style.display = isExpanded ? '' : 'none';
+        };
+
+        toggle.addEventListener('click', function (event) {
+          event.stopPropagation();
+          onToggle();
+        });
+      });
+    }
 
     function renderLiveModelTree(data, containerOrId, onNodeClick) {
       var container = typeof containerOrId === 'string'
@@ -996,7 +1396,7 @@
           row.classList.add('lm-selected');
 
           if (onNodeClick) {
-            onNodeClick({ ref: ref, fc: fc, nodeType: nodeType, li});
+            onNodeClick({ ref: ref, fc: fc, nodeType: nodeType, li: li });
           }
 
             const childList = li.querySelector(':scope > .scl-tree-list');
@@ -1009,7 +1409,6 @@
             }
         });
       }
-
 
       lds.forEach(function (ld) {
         var ldName = (typeof ld === 'object' ? ld.name : ld) || 'LD';
@@ -1064,9 +1463,9 @@
                 das.forEach(function (da) {
                   var daName   = (typeof da === 'object' ? da.name : da) || 'DA';
                   var daFc     = (da && (da.fc || doFc)) || null;
-                  var bTypeTxt = (da && da.bType) ? ' [' + da.bType + ']' : '';
+                  var bTypeTxt = (da && da.bType) ? ' (' + da.bType + ')' : '';
                   var daRef    = doRef + '.' + daName;
-                  var daLi     = createTreeNode('DA', daName + bTypeTxt);
+                  var daLi     = createTreeNode('DA', daName + bTypeTxt + (daFc ? ' [' + daFc + ']' : ''));
                   makeClickable(daLi, daRef, daFc, 'DA');
 
                   const row = daLi.querySelector(':scope > .scl-tree-row');
@@ -1102,7 +1501,6 @@
               doUl.appendChild(doLi);
             });
 
-
             lnLi.appendChild(doUl);
           }
 
@@ -1118,135 +1516,134 @@
 
       container.appendChild(root);
       setupCollapsibleTree(container);
-
-      window.SCLTree = {
-        buildSclTreeFromText,
-        renderSclTree,
-        loadSclFileAndRender
-      };
     }
 
-    function render(rootElement, selectedEndpoint) {
-        if (!rootElement) return;
+    // Initialize the page
+    function init() {
+        const rootElement = document.querySelector('.acsi-server-page') || document.body;
+        
+        // Initialize with empty endpoint
+        setupEventListeners(rootElement, {});
+        renderProtocolMessages(rootElement);
+        
+        // Disable buttons that need connection first
+        const fetchModelBtn = document.getElementById('acsi-client-fetch-model-btn');
+        const disconnectBtn = document.getElementById('acsi-client-disconnect-page-btn');
+        if (disconnectBtn) disconnectBtn.disabled = true;
+        const startBtn = document.getElementById('messages-start-btn');
+        if (startBtn) startBtn.disabled = true;
+        const stopBtn = document.getElementById('messages-stop-btn');
+        if (stopBtn) stopBtn.disabled = true;
+    }
 
-        const endpoint = selectedEndpoint || {};
-        const host = escapeHtml(endpoint.host || '');
-        const port = escapeHtml(endpoint.port || '');
-        const name = escapeHtml(endpoint.name || '');
+    function interpolateTemplate(template, values) {
+        return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (match, key) => {
+            return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match;
+        });
+    }
 
-        const defaultWsIP = "0.0.0.0";
-        const defaultWsPort = "8765"
+    let templateCache = null;
 
-        rootElement.innerHTML = `
-            <div class="page-header">
-                <div style="display:flex; align-items:center; gap:16px;">
-                    <h1><i class="fas fa-microchip" style="margin-right:10px; color:var(--primary-light);"></i>ACSI Client</h1>
-                    <span class="acsi-endpoint-badge" style="display:inline-block; padding:4px 12px; background:var(--info-color); color:white; border-radius:4px; font-size:12px;">
-                        ${name} · ${host}:${port}
-                    </span>
-                </div>
-            </div>
+     async function loadTemplate() {
+        if (templateCache) {
+            return templateCache;
+        }
 
-            <div style="margin-top:24px;">
-                <h2>Connection Settings</h2>
-                <div style="display:flex; gap:16px; margin-top:16px;">
-                    <div class="form-group">
-                        <label for="acsi-client-host-page">Host</label>
-                        <input type="text" id="acsi-client-host-page" value="${defaultWsIP}" placeholder="127.0.0.1">
-                    </div>
+        const response = await fetch('./acsi-client-page.html', { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error('Unable to load acsi-client-page.html');
+        }
 
-                    <div class="form-group">
-                        <label for="acsi-client-port-page">Port</label>
-                        <input type="number" id="acsi-client-port-page" value="${defaultWsPort}" placeholder="102">
-                    </div>
+        templateCache = await response.text();
+        return templateCache;
+    }
 
-                    <div class="form-group">
-                        <label for="acsi-client-cp-page">Connection Point (CP)</label>
-                        <input type="text" id="acsi-client-cp-page" value="cp1" placeholder="cp1">
-                    </div>
-                </div>
+    // Render function to match the server page pattern
+    async function render(root, endpoint) {
+        if (!root) {
+            return;
+        }
+        const hasEndpoint = !!endpoint;
+        const endpointName = hasEndpoint ? escapeHtml(endpoint.name || 'Unnamed endpoint') : 'No endpoint selected';
+        const endpointType = hasEndpoint ? escapeHtml(endpoint.type || 'N/A') : 'N/A';
 
-                <div style="margin-top:24px; display:flex; gap:12px;">
-                    <button id="acsi-client-connect-page-btn" class="btn-primary" style="padding:10px 20px;">
-                        <i class="fas fa-plug" style="margin-right:8px;"></i>
-                        Connect
-                    </button>
-                    <button id="acsi-client-disconnect-page-btn" class="btn-secondary" style="padding:10px 20px;">
-                        <i class="fas fa-plug" style="margin-right:8px;"></i>
-                        Disconnect
-                    </button>
-                </div>
-            </div>
+        try {
+            // Ensure CSS is loaded
+            if (!document.getElementById('acsi-client-page-css')) {
+                const link = document.createElement('link');
+                link.id = 'acsi-client-page-css';
+                link.rel = 'stylesheet';
+                link.href = 'acsi-client-page.css';
+                document.head.appendChild(link);
+            }
 
-            <div id="acsi-client-status" style="margin-top:24px; padding:16px; background:var(--bg-secondary); border-radius:8px; display:none;">
-                <h3>Status</h3>
-                <div id="acsi-client-status-message" style="margin-top:8px; color:var(--text-muted);"></div>
-            </div>
+            // Ensure JS is loaded
+            if (!window.__acsiClientPageLoaded) {
+                await loadScript('acsi-client-page.js');
+            }
 
-            <div id="acsi-client-tree-page" style="margin-top:24px;">
-                <h2>Server Model</h2>
-                <button id="acsi-client-fetch-model-btn" class="btn-primary" style="margin-top:12px; padding:10px 20px;">
-                    <i class="fas fa-download" style="margin-right:8px;"></i>
-                    Fetch Model
-                </button>
-                <div id="acsi-client-tree-container-page" style="margin-top:16px; padding:16px; background:var(--bg-secondary); border-radius:8px; display:none;">
-                    <div id="acsi-client-tree-content" style="max-height:600px; overflow-y:auto; color:var(--text-secondary);"></div>
-            </div>
-            <div id="writeValueModal" class="modal hidden" style="
-                position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(0,0,0,0.7);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 9999;">
-              <div class="modal-content" style="
-                  background: #1e1e1e;
-                  color: #e0e0e0;
-                  padding: 24px;
-                  border-radius: 8px;
-                  width: 500px;
-                  max-width: 90%;
-                  max-height: 80vh;
-                  overflow-y: auto;
-                  box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-                <h2 id="writeValueTitle" style="margin-top: 0; color: #fff;">Write Data Value</h2>
-                <div style="margin-bottom: 16px; color: #ccc;">
-                  <div><strong>Reference:</strong> <span id="writeValueObjRef" style="color: #4fc3f7;"></span></div>
-                  <div><strong>Type:</strong> <span id="writeValueType" style="color: #ffc107;"></span></div>
-                  <div><strong>Current:</strong> <span id="writeValueCurrent" style="color: #8bc34a;"></span></div>
-                </div>
-                <input type="text" id="writeValueInput" style="
-                    width: 100%;
-                    padding: 10px;
-                    box-sizing: border-box;
-                    margin-bottom: 12px;
-                    background: #2d2d2d;
-                    color: #e0e0e0;
-                    border: 1px solid #444;
-                    border-radius: 4px;
-                    font-size: 14px;"
-                   placeholder="Enter new value">
-                <div id="writeValueValidation" style="color: #f44336; margin-bottom: 16px; min-height: 20px;"></div>
-                <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                  <button id="writeValueCancel" class="btn-secondary" style="padding: 8px 16px;">Cancel</button>
-                  <button id="writeValueSubmit" class="btn-primary" style="padding: 8px 16px;">Write</button>
-                </div>
-                <div id="writeValueResult" class="hidden" style="
-                    margin-top: 16px;
-                    padding: 12px;
-                    border-radius: 4px;
-                    text-align: center;"></div>
-              </div>
-            </div>
+            // ✅ Use ONLY template interpolation
+            const template = await loadTemplate();
+            root.innerHTML = interpolateTemplate(template, {
+                endpointName,
+                endpointType,
+            });
 
-        </div>
-        `;
+            // Initialize the page
+            setupEventListeners(root, endpoint);
+            renderProtocolMessages(root);
 
-        setupEventListeners(rootElement, endpoint);
+            // Disable buttons that need connection first
+            const disconnectBtn = document.getElementById('acsi-client-disconnect-page-btn');
+            if (disconnectBtn) disconnectBtn.disabled = true;
+            const startBtn = document.getElementById('messages-start-btn');
+            if (startBtn) startBtn.disabled = true;
+            const stopBtn = document.getElementById('messages-stop-btn');
+            if (stopBtn) stopBtn.disabled = true;
+
+            // Update endpoint badge if we have an endpoint
+            if (endpoint) {
+                const badge = root.querySelector('.acsi-endpoint-badge');
+                if (badge) {
+                    const name = endpoint.name || 'Endpoint';
+                    const host = endpoint.host || '';
+                    const port = endpoint.port || '';
+                    badge.innerHTML = `<span id="endpoint-name">${name}</span> · <span id="endpoint-host">${host}</span>:<span id="endpoint-port">${port}</span>`;
+                }
+            }
+        } catch (error) {
+            console.error('Error rendering ACSI Client page:', error);
+            root.innerHTML = '<p style="color: var(--text-muted);">ACSI Client page is unavailable.</p>';
+        }
+    }
+
+    // Helper to load scripts (if not already available in this scope)
+    function loadScript(url) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector(`script[src="${url}"]`)) {
+                resolve();
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = url;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
     }
 
     window.ACSIClientPage = {
         render,
+        init,
+        executeApiCall,
+        renderLiveModelTree,
+        handleFetchModel
     };
 })();

@@ -90,6 +90,26 @@ class IEC61850Server:
             ied_model, self.server_control_objects, lambda: self.control_handler
         )
 
+    def update_ied_model(self, new_ied_model) -> None:
+        """
+        Update the IED model and refresh all dependent services.
+        This allows hot-swapping the model without losing WebSocket connections.
+        
+        :param new_ied_model: The new IedModel to use
+        """
+        self.ied_model = new_ied_model
+        
+        # Recreate all services that depend on ied_model
+        self.server_report_controls = create_server_report_controls_list(new_ied_model)
+        self.server_control_objects = create_server_control_objects_list(new_ied_model)
+        
+        self._directory_service = DirectoryService(new_ied_model)
+        self._data_access_service = DataAccessService(new_ied_model)
+        self._report_service = ReportService(self.server_report_controls)
+        self._control_service = ControlService(
+            new_ied_model, self.server_control_objects, lambda: self.control_handler
+        )
+
     def install_send_msg_callback(self, callback):
         self.send_msg_callback = callback
 

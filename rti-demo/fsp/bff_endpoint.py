@@ -13,7 +13,7 @@ from acsi_server import ACSIServer
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
 import os
 from typing import Any, Dict
-from fastapi import FastAPI, APIRouter, Request, HTTPException, status
+from fastapi import FastAPI, APIRouter, Request, HTTPException, status, UploadFile, File
 from fastapi.responses import JSONResponse, RedirectResponse
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
@@ -107,7 +107,7 @@ def create_bff_router(
         responses={404: {"description": "Not found"}, 500: {"description": "Internal server error"}}
     )
 
-    server = ACSIServer(factory_dir)
+    rti_fsp = ACSIServer(factory_dir)
 
     # ==================== Helper Functions ====================
     def serialize_data_attribute(da: DataAttribute) -> Dict[str, Any]:
@@ -340,7 +340,7 @@ def create_bff_router(
         """
         try:
             return JSONResponse(
-                content={"ok": True, "status": str(server.get_status())},
+                content={"ok": True, "status": str(rti_fsp.get_status())},
                 status_code=200
             )
         except Exception as exc:
@@ -375,7 +375,7 @@ def create_bff_router(
             }
         """
         try:
-            status = server.get_status()
+            status = rti_fsp.get_status()
             return {
                 "status": "ok",
                 "service": "ACSI-Server",
@@ -415,7 +415,7 @@ def create_bff_router(
             }
         """
         try:
-            endpoint = server.runtime.endpoint
+            endpoint = rti_fsp.runtime.endpoint
             connections = []
 
             if endpoint is not None and hasattr(endpoint, "websocket_info_list"):
@@ -431,7 +431,7 @@ def create_bff_router(
                 "connections": connections,
             }
         except Exception as exc:
-            server._log_action(f"Get connections failed: {exc}", "error")
+            rti_fsp._log_action(f"Get connections failed: {exc}", "error")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
                 status_code=500
@@ -495,10 +495,10 @@ def create_bff_router(
             }
         """
         try:
-            ied_model: Optional[IedModel] = server.runtime.ied_model
-            source = server.runtime.model_source
-            selected_ied = server.runtime.model_ied_name
-            access_points = [server.runtime.cp or "cp1"]
+            ied_model: Optional[IedModel] = rti_fsp.runtime.ied_model
+            source = rti_fsp.runtime.model_source
+            selected_ied = rti_fsp.runtime.model_ied_name
+            access_points = [rti_fsp.runtime.cp or "cp1"]
 
             logical_devices: List[str] = []
             if ied_model is not None:
@@ -549,11 +549,12 @@ def create_bff_router(
     @router.post(
         "/update-iedmodel",
         summary="Update IED Model",
-        description="Updates the model.py file in the ACSI-Server directory and reloads the IED model. The server must be stopped before updating the model.",
+        description="Updates the model.py file in the ACSI-Server directory and reloads the IED model. Supports dynamic hot-swap while server is running.",
         response_description="Model update confirmation",
         responses={
             200: {"description": "Model updated successfully"},
-            400: {"description": "Invalid request or server is running"},
+            202: {"description": "Model update accepted, hot-swap in progress"},
+            400: {"description": "Invalid request"},
             500: {"description": "Error updating model"}
         },
         tags=["Model"]
@@ -561,7 +562,9 @@ def create_bff_router(
     def api_update_iedmodel(request: UpdateIedmodelRequest):
         """Update model.py in fsp directory and reload IED model.
 
-        **Note**: The server must be stopped before updating the model.
+        Supports dynamic model updates while the server is running (hot-swap).
+        The new model will be applied immediately if the server is running,
+        or loaded when the server starts.
 
         Request Body:
             UpdateIedmodelRequest: { "modelPy": str }
@@ -570,21 +573,13 @@ def create_bff_router(
             dict: {
                 "ok": True,
                 "source": str,  # Path to the updated model file
-                "ied": str      # Name of the IED model
+                "ied": str,     # Name of the IED model
+                "modelVersion": int,  # New model version number
+                "dynamicReload": bool, # Whether hot-swap was performed
+                "status": str   # "loaded" or "reloading"
             }
-
-        Raises:
-            HTTPException 400: If modelPy is missing or empty, or server is running
-            HTTPException 400: If model update fails
         """
         try:
-            with server.runtime.lock:
-                if server.runtime.status in ("starting", "listening", "stopping"):
-                    return JSONResponse(
-                        content={"ok": False, "error": "Stop server before updating model.py."},
-                        status_code=500
-                    )
-
             model_py = request.modelPy
 
             if not isinstance(model_py, str) or not model_py.strip():
@@ -593,18 +588,138 @@ def create_bff_router(
                     status_code=400
                 )
 
-            ied_model = server.update_model_file(model_py)
-            server._log_action(
+            # Check server status
+            server_status = rti_fsp.get_status()
+            is_running = server_status.get("status") == "listening"
+
+            # Always apply dynamically if server is running
+            ied_model = rti_fsp.update_model_file(model_py, apply_dynamically=True)
+
+            rti_fsp._log_action(
                 "IED model updated",
-                detail={"source": str(server.model_file), "ied": ied_model.name},
+                detail={
+                    "source": str(rti_fsp.model_file),
+                    "ied": ied_model.name,
+                    "dynamic": is_running,
+                    "version": rti_fsp.runtime.model_version
+                },
             )
-            return {
-                "ok": True,
-                "source": str(server.model_file),
-                "ied": ied_model.name,
-            }
+
+            # Check if hot-swap is in progress
+            if is_running and rti_fsp.runtime.model_reload_in_progress:
+                return JSONResponse(
+                    content={
+                        "ok": True,
+                        "source": str(rti_fsp.model_file),
+                        "ied": ied_model.name,
+                        "modelVersion": rti_fsp.runtime.model_version,
+                        "dynamicReload": True,
+                        "status": "reloading"
+                    },
+                    status_code=202  # Accepted - hot-swap in progress
+                )
+            else:
+                return {
+                    "ok": True,
+                    "source": str(rti_fsp.model_file),
+                    "ied": ied_model.name,
+                    "modelVersion": rti_fsp.runtime.model_version,
+                    "dynamicReload": is_running,
+                    "status": "loaded"
+                }
+
         except Exception as exc:
-            server._log_action(f"IED model update failed: {exc}", "error")
+            rti_fsp._log_action(f"IED model update failed: {exc}", "error")
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=400
+            )
+
+    @router.post(
+        "/update-iedmodel-file",
+        summary="Update IED Model from File",
+        description="Upload a model.py file directly. Supports dynamic hot-swap while server is running.",
+        response_description="Model update confirmation",
+        responses={
+            200: {"description": "Model updated successfully"},
+            202: {"description": "Model update accepted, hot-swap in progress"},
+            400: {"description": "Invalid request"},
+            500: {"description": "Error updating model"}
+        },
+        tags=["Model"]
+    )
+    async def api_update_iedmodel_file(file: UploadFile = File(...)):
+        """Upload model.py file directly for update.
+
+        Accepts multipart/form-data with a 'file' field containing the model.py content.
+        Supports the same hot-swap behavior as the JSON endpoint.
+
+        Args:
+            file: UploadFile - The model.py file to upload
+
+        Returns:
+            dict: {
+                "ok": True,
+                "source": str,  # Path to the updated model file
+                "ied": str,     # Name of the IED model
+                "modelVersion": int,  # New model version number
+                "dynamicReload": bool, # Whether hot-swap was performed
+                "status": str   # "loaded" or "reloading"
+            }
+        """
+        try:
+            # Read file content as string
+            model_py = await file.read()
+            model_py = model_py.decode('utf-8')
+
+            if not model_py.strip():
+                return JSONResponse(
+                    content={"ok": False, "error": "Uploaded file is empty."},
+                    status_code=400
+                )
+
+            # Reuse existing logic
+            server_status = rti_fsp.get_status()
+            is_running = server_status.get("status") == "listening"
+
+            ied_model = rti_fsp.update_model_file(model_py, apply_dynamically=True)
+
+            rti_fsp._log_action(
+                "IED model updated from file",
+                detail={
+                    "source": str(rti_fsp.model_file),
+                    "ied": ied_model.name,
+                    "dynamic": is_running,
+                    "version": rti_fsp.runtime.model_version,
+                    "filename": file.filename
+                },
+            )
+
+            # Check if hot-swap is in progress
+            if is_running and rti_fsp.runtime.model_reload_in_progress:
+                return JSONResponse(
+                    content={
+                        "ok": True,
+                        "source": str(rti_fsp.model_file),
+                        "ied": ied_model.name,
+                        "modelVersion": rti_fsp.runtime.model_version,
+                        "dynamicReload": True,
+                        "status": "reloading"
+                    },
+                    status_code=202  # Accepted - hot-swap in progress
+                )
+            else:
+                return {
+                    "ok": True,
+                    "source": str(rti_fsp.model_file),
+                    "ied": ied_model.name,
+                    "modelVersion": rti_fsp.runtime.model_version,
+                    "dynamicReload": is_running,
+                    "status": "loaded"
+                }
+
+        except Exception as exc:
+            rti_fsp._log_action(f"IED model file update failed: {exc}", "error")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
                 status_code=400
@@ -665,7 +780,7 @@ def create_bff_router(
 
             if cp:
                 try:
-                    server._set_runtime_state(cp=cp)
+                    rti_fsp._set_runtime_state(cp=cp)
                 except Exception as exc:
                     return JSONResponse(
                         content={"ok": False, "error": f"Failed to set runtime state: {exc}"},
@@ -673,7 +788,7 @@ def create_bff_router(
                     )
 
             try:
-                server.start_server(host, port)
+                rti_fsp.start_server(host, port)
             except Exception as exc:
                 return JSONResponse(
                     content={"ok": False, "error": f"Failed to start server: {exc}"},
@@ -711,21 +826,21 @@ def create_bff_router(
             HTTPException 500: If error occurs during stop
         """
         try:
-            status = server.runtime.status
+            status = rti_fsp.runtime.status
             if status in (None, "stopped"):
                 return {"ok": True, "status": "stopped"}
 
             try:
-                server.stop_server()
-                current = server.runtime.status
+                rti_fsp.stop_server()
+                current = rti_fsp.runtime.status
                 if current in ("stopping", "starting"):
                     return {"ok": True, "status": "stopping"}
                 return {"ok": True, "status": "stopped"}
             except Exception as exc:
-                current = server.runtime.status
+                current = rti_fsp.runtime.status
                 if current in ("stopping", "stopped"):
                     return {"ok": True, "status": current}
-                server._log_action(f"Stop failed: {exc}", "error")
+                rti_fsp._log_action(f"Stop failed: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": f"Unexpected error: {exc}"},
                     status_code=500
@@ -754,7 +869,7 @@ def create_bff_router(
             dict: { "actions": list[dict] }
         """
         try:
-            return {"actions": server.get_actions()}
+            return {"actions": rti_fsp.get_actions()}
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": f"Unexpected error: {exc}"},
@@ -779,7 +894,7 @@ def create_bff_router(
             dict: { "ok": True }
         """
         try:
-            server.clear_actions()
+            rti_fsp.clear_actions()
             return {"ok": True}
         except Exception as exc:
             return JSONResponse(
@@ -805,7 +920,7 @@ def create_bff_router(
             dict: { "messages": list[dict] }
         """
         try:
-            return {"messages": server.get_messages()}
+            return {"messages": rti_fsp.get_messages()}
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": f"Unexpected error: {exc}"},
@@ -830,7 +945,7 @@ def create_bff_router(
             dict: { "ok": True }
         """
         try:
-            server.clear_messages()
+            rti_fsp.clear_messages()
             return {"ok": True}
         except Exception as exc:
             return JSONResponse(
@@ -880,14 +995,14 @@ def create_bff_router(
             fc = request.fc
 
             if not obj_ref:
-                server._log_action("Server readvalue rejected: missing objRef", "warn")
+                rti_fsp._log_action("Server readvalue rejected: missing objRef", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
                 )
 
-            if server.runtime.server_cp is None:
-                server._log_action(
+            if rti_fsp.runtime.server is None:
+                rti_fsp._log_action(
                     "Server readvalue rejected: server not running",
                     "warn",
                     detail={"objRef": obj_ref, "fc": fc},
@@ -898,10 +1013,10 @@ def create_bff_router(
                 )
 
             try:
-                result = server.read_value(obj_ref)
+                result = rti_fsp.read_value(obj_ref)
 
                 if result is None:
-                    server._log_action(
+                    rti_fsp._log_action(
                         "Server readvalue failed: instanceNotAvailable",
                         "warn",
                         detail={"objRef": obj_ref, "fc": fc},
@@ -923,7 +1038,7 @@ def create_bff_router(
                     f"fc={fc!r} type={normalized.get('type')!r} value={normalized.get('value')!r}"
                 )
 
-                server._log_action(
+                rti_fsp._log_action(
                     "Server readvalue",
                     detail={
                         "objRef": obj_ref,
@@ -941,7 +1056,7 @@ def create_bff_router(
                 }
 
             except FuturesTimeoutError:
-                server._log_action(
+                rti_fsp._log_action(
                     "Server readvalue timeout",
                     "warn",
                     detail={"objRef": obj_ref, "fc": fc},
@@ -951,13 +1066,13 @@ def create_bff_router(
                     status_code=404
                 )
             except ValueError as exc:
-                server._log_action(f"Server readvalue failed: {exc}", "warn")
+                rti_fsp._log_action(f"Server readvalue failed: {exc}", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=404
                 )
             except Exception as exc:
-                server._log_action(f"Server readvalue failed: {exc}", "error")
+                rti_fsp._log_action(f"Server readvalue failed: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
@@ -1015,14 +1130,14 @@ def create_bff_router(
             data_type = request.data_type
 
             if not obj_ref:
-                server._log_action("Server writevalue rejected: missing objRef", "warn")
+                rti_fsp._log_action("Server writevalue rejected: missing objRef", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
                 )
 
             if value is None:
-                server._log_action(
+                rti_fsp._log_action(
                     "Server writevalue rejected: missing value",
                     "warn",
                     detail={"objRef": obj_ref, "fc": fc},
@@ -1032,8 +1147,8 @@ def create_bff_router(
                     status_code=400
                 )
 
-            if server.runtime.server_cp is None:
-                server._log_action(
+            if rti_fsp.runtime.server is None:
+                rti_fsp._log_action(
                     "Server writevalue rejected: server not running",
                     "warn",
                     detail={"objRef": obj_ref, "fc": fc, "value": value},
@@ -1044,7 +1159,7 @@ def create_bff_router(
                 )
 
             try:
-                result = server.write_value(obj_ref, value, data_type)
+                result = rti_fsp.write_value(obj_ref, value, data_type)
                 return {
                     "ok": True,
                     "success": True,
@@ -1055,7 +1170,7 @@ def create_bff_router(
                 }
 
             except FuturesTimeoutError:
-                server._log_action(
+                rti_fsp._log_action(
                     "Server writevalue timeout",
                     "warn",
                     detail={"objRef": obj_ref, "fc": fc},
@@ -1065,13 +1180,13 @@ def create_bff_router(
                     status_code=504
                 )
             except ValueError as exc:
-                server._log_action(f"Server writevalue failed: {exc}", "warn")
+                rti_fsp._log_action(f"Server writevalue failed: {exc}", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=404
                 )
             except Exception as exc:
-                server._log_action(f"Server writevalue failed: {exc}", "error")
+                rti_fsp._log_action(f"Server writevalue failed: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
@@ -1082,7 +1197,7 @@ def create_bff_router(
                 status_code=500
             )
 
-    return router, server
+    return router, rti_fsp
 
 def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
 
