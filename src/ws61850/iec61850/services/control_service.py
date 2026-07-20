@@ -131,25 +131,25 @@ class ControlService:
                 invoke_id, associate_id, False, None, ServiceStatusKind.typeConflict.name
             ), None
 
-        needs_quality_update = (control_do.get_objRef() == "LD0/DWMX1.WMaxSpt")
+        #needs_quality_update = (control_do.get_objRef() == "LD0/DWMX1.WMaxSpt")
 
         ctl_num = next((da for da in operate_item.data_attributes if da.name == "ctlNum"), None)
 
-        if not server_control_obj.is_selected:
-            return create_tpaa_response_operate(
-                invoke_id, associate_id, False, None, ServiceStatusKind.controlMustBeSelected.name
-            ), None
+        #if not server_control_obj.is_selected:
+        #    return create_tpaa_response_operate(
+        #        invoke_id, associate_id, False, None, ServiceStatusKind.controlMustBeSelected.name
+        #    ), None
 
         handler_fn, handler_param = control_handler
         from ws61850.iec61850.server.iec61850_server import IEC61850Server
         ctl_val = {"type": control_da.type.name, "value": control_da.mmsValue}
         result, error = handler_fn(control_da.get_objRef(), ctl_val, handler_param)
-
+        print("result is: ", result, "error is: ", error)
         if result == ControlHandlerResult.OK:
             if ctl_num:
                 ctl_num.mmsValue += 1
             return create_tpaa_response_operate(invoke_id, associate_id, True, None, None), \
-                   control_do if needs_quality_update else None
+                   control_do
 
         if isinstance(error, ControlServiceStatusKind):
             if ctl_num:

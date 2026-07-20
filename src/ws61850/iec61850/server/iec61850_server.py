@@ -571,9 +571,12 @@ class IEC61850Server:
                         gi_urcb.rcb.gi = False
 
             elif service_name == "operate":
-                tpaa_response, quality_do = self._control_service.operate(invoke_id, associate_id, decoded_message)
-                if quality_do is not None:
-                    await self.set_quality_to_good(quality_do)
+                #tpaa_response, quality_do = self._control_service.operate(invoke_id, associate_id, decoded_message)
+                #if quality_do is not None:
+                #    await self.set_quality_to_good(quality_do)
+                print("entered Operate service")
+                tpaa_response = self._control_service.operate(invoke_id, associate_id, decoded_message)
+                print("operate response:", tpaa_response)
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
 
             elif service_name == "select":
