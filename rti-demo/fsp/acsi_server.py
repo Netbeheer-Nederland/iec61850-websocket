@@ -115,15 +115,18 @@ class ACSIServer:
         )
 
         def control_handler(obj_ref, ctlVal_value, parameter):
+            ctl_val = ctlVal_value['value']
+            print("entered control handler: obj_ref:", obj_ref, "ctlVal_value:", ctl_val, "parameter:", parameter)
+
             TYPE_MAP = {
                 "boolean": bool,
                 "int32": int,
-                "float32": float,
+                "float32" : float,
                 "string": str,
             }
             if ctlVal_value is not None:
-                if ctlVal_value["type"] in TYPE_MAP:
-                    if isinstance(ctlVal_value["value"], TYPE_MAP[ctlVal_value["type"]]):
+                if ctl_val[0] in TYPE_MAP:
+                    if isinstance(ctl_val[1], TYPE_MAP[ctl_val[0]]):
                         return ControlHandlerResult.OK, None
                     else:
                         return ControlHandlerResult.FAILED, ControlServiceStatusKind.invalidPosition
@@ -133,7 +136,7 @@ class ACSIServer:
 
 
         iec61850_instance = IEC61850Server(self.runtime.ied_model, self.runtime.cp)
-        iec61850_instance.control_handler = control_handler
+        iec61850_instance.set_control_handler(control_handler, None)
         self.runtime.server = iec61850_instance
         self.runtime.endpoint.add_iec61850_server(self.runtime.server)
 

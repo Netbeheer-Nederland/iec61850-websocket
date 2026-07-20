@@ -575,7 +575,7 @@ class IEC61850Server:
                 #if quality_do is not None:
                 #    await self.set_quality_to_good(quality_do)
                 print("entered Operate service")
-                tpaa_response = self._control_service.operate(invoke_id, associate_id, decoded_message)
+                tpaa_response, control_do = self._control_service.operate(invoke_id, associate_id, decoded_message)
                 print("operate response:", tpaa_response)
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
 

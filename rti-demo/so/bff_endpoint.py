@@ -1439,12 +1439,12 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         status_code=404
                     )
                 else:
-                    operate_result = result.get('result', {})
-                    success = operate_result.get('success', False)
-                    error = operate_result.get('serviceError')
+                    print("operate result in so: ", result)
+                    #operate_result = result.get('result', {})
+                    success = result.get('result', False)
+                    error = result.get('serviceError', "")
                     return {
                         "ok": success,
-                        "success": success,
                         "error": error,
                     }
             except FuturesTimeoutError:
