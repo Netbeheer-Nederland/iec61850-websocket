@@ -33,6 +33,7 @@
         { id: 'actions-logs', label: 'GET /api/actions_logs', method: 'GET', path: '/api/actions_logs', sampleBody: '' },
         { id: 'clear-logs', label: 'POST /api/clear_logs', method: 'POST', path: '/api/clear_logs', sampleBody: '' },
         { id: 'status', label: 'GET /api/status', method: 'GET', path: '/api/status'},
+        { id: 'operate', label: 'GET /api/operate', method: 'POST', path: '/api/operate'},
     ];
 
     function getApiById(id) {
@@ -508,17 +509,11 @@
                     btn.textContent = 'Operating...';
 
                     const params = getControlParameters();
-                    const response = await fetch('/api/control/operate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(params)
-                    });
-
-                    const result = await response.json();
+                    const response = await executeApiCall(getApiById('operate'), endpointTarget, params);
                     if (response.ok) {
                         showControlResult(true, 'Operate successful');
                     } else {
-                        showControlResult(false, `Operate failed: ${result.error || 'Unknown error'}`);
+                        showControlResult(false, `Operate failed: ${response.error || 'Unknown error'}`);
                     }
                 } catch (error) {
                     console.error('Operate error:', error);
@@ -892,7 +887,7 @@
 
       // Immediately show a provisional menu with a loading indicator
       const provisionalMenu = createContextMenu([
-        { label: 'Loading FCs…', action: () => {} }
+        { label: 'Read DO', action: () => {} }
       ]);
       provisionalMenu.style.display = 'block';
       provisionalMenu.style.left = e.pageX + 'px';
@@ -1248,10 +1243,12 @@
 
         const cdc = modal.dataset.cdc?.toUpperCase() || '';
         let ctlVal = ctlValInput.value.trim();
+        value_type = 'unknown';
 
         // Parse control value based on CDC type
         switch(cdc) {
             case 'SPC':
+                value_type = 'boolean';
                 if (ctlVal === 'true' || ctlVal === '1' || ctlVal === 'on') {
                     ctlVal = true;
                 } else if (ctlVal === 'false' || ctlVal === '0' || ctlVal === 'off') {
@@ -1261,6 +1258,7 @@
                 }
                 break;
             case 'DPC':
+                value_type = 'enumerated';
                 const dpcMap = {
                     'on': 'on',
                     'off': 'off',
@@ -1274,6 +1272,7 @@
                 }
                 break;
             case 'APC':
+                value_type = 'float32';
                 ctlVal = parseFloat(ctlVal);
                 if (isNaN(ctlVal)) {
                     throw new Error('Invalid APC value. Must be a number');
@@ -1281,12 +1280,14 @@
                 break;
             case 'INC':
             case 'ENC':
+                value_type = 'int32';
                 ctlVal = parseInt(ctlVal);
                 if (isNaN(ctlVal)) {
                     throw new Error('Invalid value. Must be an integer');
                 }
                 break;
             case 'BSC':
+                value_type = 'string';
                 const bscMap = {
                     'step-up': 'stepUp',
                     'step-down': 'stepDown',
@@ -1304,13 +1305,14 @@
 
         return {
             objRef: modal.dataset.objRef,
-            ctlVal: ctlVal,
-            ctlNum: parseInt(ctlNumInput.value),
-            origin: {
-                orCat: parseInt(originCatSelect.value),
-                orIdent: originIdentInput.value
-            },
-            test: testModeCheck.checked
+            value: ctlVal,
+            value_type: value_type
+            //ctlNum: parseInt(ctlNumInput.value),
+            //origin: {
+            //    orCat: parseInt(originCatSelect.value),
+            //    orIdent: originIdentInput.value
+            //},
+            //test: testModeCheck.checked
         };
     }
 
