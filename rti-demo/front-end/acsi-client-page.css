@@ -504,6 +504,37 @@ h3 {
     display: none !important;
 }
 
+/* Control Window - Completely separate from other modals */
+.control-window {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.control-window:not(.hidden) {
+    display: flex !important;  /* Override any other rules */
+}
+
+/* Ensure content is visible */
+.control-window .modal-content {
+    background: #1e1e1e;
+    color: #e0e0e0;
+    padding: 24px;
+    border-radius: 8px;
+    width: 500px;
+    max-width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
 /* Node type border colors */
 .scl-node-LDevice { border-left: 3px solid #673ab7; }
 .scl-node-LogicalNode { border-left: 3px solid #ff5722; }

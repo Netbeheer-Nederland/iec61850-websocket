@@ -434,6 +434,103 @@
 
         const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
 
+        // Control event listeners - FIXED
+        const controlModal = rootElement.querySelector('#controlModal');
+        const closeControlModal = rootElement.querySelector('#closeControlModal');
+        const closeControlBtn = rootElement.querySelector('#closeControlBtn');
+        const cancelControlBtn = rootElement.querySelector('#cancelControlBtn');
+        const selectControlBtn = rootElement.querySelector('#selectControlBtn');
+        const operateControlBtn = rootElement.querySelector('#operateControlBtn');
+
+        const hideModal = () => {
+            if (controlModal) controlModal.classList.add('hidden');
+        };
+
+        // Close modal handlers
+        if (closeControlModal) {
+            closeControlModal.onclick = hideModal;
+        }
+        if (closeControlBtn) {
+            closeControlBtn.onclick = hideModal;
+        }
+        if (cancelControlBtn) {
+            cancelControlBtn.onclick = hideModal;
+        }
+
+        // Click outside to close
+        if (controlModal) {
+            controlModal.addEventListener('click', (e) => {
+                if (e.target === controlModal) {
+                    hideModal();
+                }
+            });
+        }
+
+        // Select button handler
+        if (selectControlBtn) {
+            selectControlBtn.addEventListener('click', async () => {
+                const btn = selectControlBtn;
+                const originalText = btn.textContent;
+                try {
+                    btn.disabled = true;
+                    btn.textContent = 'Selecting...';
+
+                    const params = getControlParameters();
+                    const response = await fetch('/api/control/select', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(params)
+                    });
+
+                    const result = await response.json();
+                    if (response.ok) {
+                        showControlResult(true, 'Select successful - Now you can Operate');
+                    } else {
+                        showControlResult(false, `Select failed: ${result.error || 'Unknown error'}`);
+                    }
+                } catch (error) {
+                    console.error('Select error:', error);
+                    showControlResult(false, `Select error: ${error.message}`);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            });
+        }
+
+        // Operate button handler - FIXED selector
+        if (operateControlBtn) {
+            operateControlBtn.addEventListener('click', async () => {
+                const btn = operateControlBtn;
+                const originalText = btn.textContent;
+                try {
+                    btn.disabled = true;
+                    btn.textContent = 'Operating...';
+
+                    const params = getControlParameters();
+                    const response = await fetch('/api/control/operate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(params)
+                    });
+
+                    const result = await response.json();
+                    if (response.ok) {
+                        showControlResult(true, 'Operate successful');
+                    } else {
+                        showControlResult(false, `Operate failed: ${result.error || 'Unknown error'}`);
+                    }
+                } catch (error) {
+                    console.error('Operate error:', error);
+                    showControlResult(false, `Operate error: ${error.message}`);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            });
+        }
+
+
         if (connectBtn) {
             connectBtn.addEventListener('click', () => handleConnect(rootElement, endpoint));
         }
@@ -789,6 +886,556 @@
       }
     }
 
+    async function showContextMenuForDataObject(e, objRef) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Immediately show a provisional menu with a loading indicator
+      const provisionalMenu = createContextMenu([
+        { label: 'Loading FCs…', action: () => {} }
+      ]);
+      provisionalMenu.style.display = 'block';
+      provisionalMenu.style.left = e.pageX + 'px';
+      provisionalMenu.style.top = e.pageY + 'px';
+
+      const statusEl = document.getElementById('actionText');
+      if (statusEl) {
+        statusEl.textContent = `Fetching FCs for ${objRef}…`;
+        statusEl.className = 'info fetching';
+      }
+
+      // Helper to replace menu contents
+      const replaceMenu = (fcs) => {
+        const items = (fcs && fcs.length ? fcs : ['mx','st','cf','dc','sp','sv','co']).map(fc => ({
+          label: `Read DO [${fc.toUpperCase()}]`,
+          action: () => readDataObject(objRef, fc)
+        }));
+        provisionalMenu.innerHTML = '';
+        items.forEach(item => {
+          const mi = document.createElement('div');
+          mi.className = 'context-menu-item';
+          mi.textContent = item.label;
+          mi.addEventListener('click', () => { item.action(); hideContextMenu(); });
+          provisionalMenu.appendChild(mi);
+        });
+      };
+    }
+
+
+    // List of controllable CDC types
+    const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
+
+//    async function showControlDialog(objRef, objName, cdc, endpoint) {
+//         // Use root.querySelector to find modal within the rendered template scope
+//        const root = document.querySelector('.acsi-server-page') || document;
+//
+//        // Find all modal elements with null checks
+//        const modal = root.querySelector('#controlModal');
+//        const controlTitle = root.querySelector('#controlTitle');
+//        const controlObjRef = root.querySelector('#controlObjRef');
+//        const controlCdcType = root.querySelector('#controlCdcType');
+//        const controlCtlModel = root.querySelector('#controlCtlModel');
+//        const ctlValInput = root.querySelector('#ctlVal');
+//        const ctlNumInput = root.querySelector('#ctlNum');
+//        const originCat = root.querySelector('#originCat');
+//        const originOrIdent = root.querySelector('#originOrIdent');
+//        const testMode = root.querySelector('#testMode');
+//        const controlResult = root.querySelector('#controlResult');
+//        const selectControlBtn = root.querySelector('#selectControlBtn');
+//        const operateControlBtn = root.querySelector('#operateControlBtn');
+//        const cancelControlBtn = root.querySelector('#cancelControlBtn');
+//        const closeControlBtn = root.querySelector('#closeControlBtn');
+//        const closeControlModal = root.querySelector('#closeControlModal');
+//
+//        // Early return if modal doesn't exist
+//        if (!modal) {
+//            console.error('Control modal not found');
+//            return;
+//        }
+//
+//
+//          // Reset form
+//          ctlValInput.value = '';
+//          ctlNumInput.value = '0';
+//          originCat.value = '1';
+//          originOrIdent.value = '0';
+//          testMode.checked = false;
+//          //resultDiv.classList.add('hidden');
+//          //resultDiv.className = 'control-result hidden';
+//
+//          // Set placeholder and type based on CDC
+//          switch(cdc.toUpperCase()) {
+//            case 'SPC':
+//              ctlValInput.placeholder = 'true or false';
+//              ctlValInput.type = 'text';
+//              break;
+//            case 'DPC':
+//              ctlValInput.placeholder = 'on, off, or intermediate-state';
+//              ctlValInput.type = 'text';
+//              break;
+//            case 'APC':
+//              ctlValInput.placeholder = 'Float value (e.g., 123.45)';
+//              ctlValInput.type = 'number';
+//              ctlValInput.step = 'any';
+//              break;
+//            case 'INC':
+//            case 'ENC':
+//              ctlValInput.placeholder = 'Integer value';
+//              ctlValInput.type = 'number';
+//              ctlValInput.step = '1';
+//              break;
+//            case 'BSC':
+//              ctlValInput.placeholder = 'step-up or step-down';
+//              ctlValInput.type = 'text';
+//              break;
+//            default:
+//              ctlValInput.placeholder = 'Control value';
+//              ctlValInput.type = 'text';
+//          }
+//
+//          // Store current control context
+//          modal.dataset.objRef = objRef;
+//          modal.dataset.cdc = cdc;
+//
+//          // Show modal
+//          modal.classList.remove('hidden');
+//
+//          const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
+//
+//
+//          // Read ctlModel attribute value
+//          try {
+//            const ctlModelRef = `${objRef}.ctlModel`;
+//            const res = await executeApiCall(getApiById('read'), endpointTarget, { objRef: ctlModelRef, fc: 'cf' });
+//            const data = res;
+//
+//            if (data.error) {
+//              //ctlModelEl.textContent = 'N/A';
+//              console.log(`[Control Dialog] Could not read ctlModel: ${data.error}`);
+//            } else if (data.values) {
+//              // Extract the ctlModel value
+//              let ctlModelValue = 'N/A';
+//
+//              if (Array.isArray(data.values)) {
+//                // Handle array format: [{data: [typeName, value]}]
+//                if (data.values[0] && data.values[0].data) {
+//                  const dataObj = data.values[0].data;
+//
+//                  // Check if it's [typeName, value] format
+//                  if (Array.isArray(dataObj) && dataObj.length === 2 && typeof dataObj[0] === 'string') {
+//                    ctlModelValue = dataObj[1]; // The actual value is at index 1
+//                  } else if (dataObj.enumerated) {
+//                    ctlModelValue = dataObj.enumerated;
+//                  } else if (typeof dataObj === 'object') {
+//                    // Get first value from object
+//                    ctlModelValue = Object.values(dataObj)[0];
+//                  }
+//                }
+//              } else if (typeof data.values === 'object') {
+//                // Handle direct object format
+//                if (data.values.enumerated) {
+//                  ctlModelValue = data.values.enumerated;
+//                } else if (data.values.data && data.values.data.enumerated) {
+//                  ctlModelValue = data.values.data.enumerated;
+//                }
+//              } else if (typeof data.values === 'string') {
+//                ctlModelValue = data.values;
+//              }
+//
+//              // Map numeric values to string representations
+//              const ctlModelMap = {
+//                0: 'status-only',
+//                1: 'direct-with-normal-security',
+//                2: 'sbo-with-normal-security',
+//                3: 'direct-with-enhanced-security',
+//                4: 'sbo-with-enhanced-security'
+//              };
+//
+//              // If it's a number, show both number and string representation
+//              if (typeof ctlModelValue === 'number' && ctlModelValue in ctlModelMap) {
+//                //ctlModelEl.textContent = `${ctlModelValue} (${ctlModelMap[ctlModelValue]})`;
+//              } else if (typeof ctlModelValue === 'string' && !isNaN(ctlModelValue)) {
+//                // Handle string numbers
+//                const numValue = parseInt(ctlModelValue);
+//                if (numValue in ctlModelMap) {
+//                  //ctlModelEl.textContent = `${numValue} (${ctlModelMap[numValue]})`;
+//                } else {
+//                  //ctlModelEl.textContent = ctlModelValue;
+//                }
+//              } else {
+//                //ctlModelEl.textContent = ctlModelValue;
+//              }
+//
+//              console.log(`[Control Dialog] ctlModel: ${ctlModelValue}`);
+//            } else {
+//              //ctlModelEl.textContent = 'N/A';
+//            }
+//          } catch (e) {
+//            console.error('[Control Dialog] Error reading ctlModel:', e);
+//            //ctlModelEl.textContent = 'N/A';
+//          }
+//    }
+
+    async function showControlDialog(objRef, objName, cdc, endpoint) {
+        const root = document.querySelector('.acsi-server-page') || document;
+
+        // Find all modal elements with null checks
+        const modal = root.querySelector('#controlModal');
+        const controlTitle = root.querySelector('#controlTitle');
+        const controlObjRef = root.querySelector('#controlObjRef');
+        const controlCdcType = root.querySelector('#controlCdcType');
+        const controlCtlModel = root.querySelector('#controlCtlModel');
+        const ctlValInput = root.querySelector('#ctlVal');
+        const ctlNumInput = root.querySelector('#ctlNum');
+        const originCat = root.querySelector('#originCat');
+        const originOrIdent = root.querySelector('#originOrIdent');
+        const testMode = root.querySelector('#testMode');
+        const controlResult = root.querySelector('#controlResult');
+        const selectControlBtn = root.querySelector('#selectControlBtn');
+        const operateControlBtn = root.querySelector('#operateControlBtn');
+        const cancelControlBtn = root.querySelector('#cancelControlBtn');
+        const closeControlBtn = root.querySelector('#closeControlBtn');
+        const closeControlModal = root.querySelector('#closeControlModal');
+
+        // Critical: Early return if modal doesn't exist
+        if (!modal) {
+            console.error('[showControlDialog] Control modal not found');
+            return;
+        }
+
+        try {
+            // Populate modal fields - ALL with null checks
+            if (controlTitle) controlTitle.textContent = 'Control Operation';
+            if (controlObjRef) controlObjRef.textContent = objRef || 'Unknown';
+            if (controlCdcType) controlCdcType.textContent = cdc || 'Unknown';
+            if (controlCtlModel) controlCtlModel.textContent = 'Loading...';
+            if (controlResult) {
+                controlResult.classList.add('hidden');
+                controlResult.textContent = '';
+            }
+
+            // Reset form with null checks
+            if (ctlValInput) ctlValInput.value = '';
+            if (ctlNumInput) ctlNumInput.value = '0';
+            if (originCat) originCat.value = '1';
+            if (originOrIdent) originOrIdent.value = '0';
+            if (testMode) testMode.checked = false;
+
+            // Set placeholder and type based on CDC - with null check
+            if (ctlValInput) {
+                switch(cdc?.toUpperCase()) {
+                    case 'SPC':
+                        ctlValInput.placeholder = 'true or false';
+                        ctlValInput.type = 'text';
+                        break;
+                    case 'DPC':
+                        ctlValInput.placeholder = 'on, off, or intermediate-state';
+                        ctlValInput.type = 'text';
+                        break;
+                    case 'APC':
+                        ctlValInput.placeholder = 'Float value (e.g., 123.45)';
+                        ctlValInput.type = 'number';
+                        ctlValInput.step = 'any';
+                        break;
+                    case 'INC':
+                    case 'ENC':
+                        ctlValInput.placeholder = 'Integer value';
+                        ctlValInput.type = 'number';
+                        ctlValInput.step = '1';
+                        break;
+                    case 'BSC':
+                        ctlValInput.placeholder = 'step-up or step-down';
+                        ctlValInput.type = 'text';
+                        break;
+                    default:
+                        ctlValInput.placeholder = 'Control value';
+                        ctlValInput.type = 'text';
+                }
+            }
+
+            // Store current control context
+            modal.dataset.objRef = objRef;
+            modal.dataset.cdc = cdc;
+
+            // ==== THIS IS CRITICAL: Show modal BEFORE async operations ====
+            modal.classList.remove('hidden');
+
+            const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
+
+            // Read ctlModel attribute value
+            try {
+                const ctlModelRef = `${objRef}.ctlModel`;
+                const res = await executeApiCall(getApiById('read'), endpointTarget, { objRef: ctlModelRef, fc: 'cf' });
+                const data = res;
+
+                if (data.error) {
+                    console.log(`[Control Dialog] Could not read ctlModel: ${data.error}`);
+                    if (controlCtlModel) controlCtlModel.textContent = 'N/A';
+                } else if (data.values) {
+                    let ctlModelValue = 'N/A';
+
+                    if (Array.isArray(data.values)) {
+                        if (data.values[0]?.data) {
+                            const dataObj = data.values[0].data;
+                            if (Array.isArray(dataObj) && dataObj.length === 2 && typeof dataObj[0] === 'string') {
+                                ctlModelValue = dataObj[1];
+                            } else if (dataObj?.enumerated) {
+                                ctlModelValue = dataObj.enumerated;
+                            } else if (typeof dataObj === 'object') {
+                                ctlModelValue = Object.values(dataObj)[0];
+                            }
+                        }
+                    } else if (typeof data.values === 'object') {
+                        if (data.values.enumerated) {
+                            ctlModelValue = data.values.enumerated;
+                        } else if (data.values.data?.enumerated) {
+                            ctlModelValue = data.values.data.enumerated;
+                        }
+                    } else if (typeof data.values === 'string') {
+                        ctlModelValue = data.values;
+                    }
+
+                    const ctlModelMap = {
+                        0: 'status-only',
+                        1: 'direct-with-normal-security',
+                        2: 'sbo-with-normal-security',
+                        3: 'direct-with-enhanced-security',
+                        4: 'sbo-with-enhanced-security'
+                    };
+
+                    if (typeof ctlModelValue === 'number' && ctlModelValue in ctlModelMap) {
+                        if (controlCtlModel) controlCtlModel.textContent = `${ctlModelValue} (${ctlModelMap[ctlModelValue]})`;
+                    } else if (typeof ctlModelValue === 'string' && !isNaN(ctlModelValue)) {
+                        const numValue = parseInt(ctlModelValue);
+                        if (numValue in ctlModelMap) {
+                            if (controlCtlModel) controlCtlModel.textContent = `${numValue} (${ctlModelMap[numValue]})`;
+                        } else if (controlCtlModel) {
+                            controlCtlModel.textContent = ctlModelValue;
+                        }
+                    } else if (controlCtlModel) {
+                        controlCtlModel.textContent = ctlModelValue;
+                    }
+
+                    console.log(`[Control Dialog] ctlModel: ${ctlModelValue}`);
+                } else if (controlCtlModel) {
+                    controlCtlModel.textContent = 'N/A';
+                }
+            } catch (e) {
+                console.error('[Control Dialog] Error reading ctlModel:', e);
+                if (controlCtlModel) controlCtlModel.textContent = 'N/A';
+            }
+
+        } catch (error) {
+            console.error('[showControlDialog] Error:', error);
+            // Ensure modal is hidden if there's an error
+            if (modal) modal.classList.add('hidden');
+        }
+    }
+
+    function getControlParameters() {
+        const root = document.querySelector('.acsi-server-page') || document;
+        const modal = root.querySelector('#controlModal');
+
+        const ctlValInput = root.querySelector('#ctlVal');
+        const ctlNumInput = root.querySelector('#ctlNum');
+        const originCatSelect = root.querySelector('#originCat');
+        const originIdentInput = root.querySelector('#originOrIdent');
+        const testModeCheck = root.querySelector('#testMode');
+
+        if (!modal || !ctlValInput || !ctlNumInput || !originCatSelect || !originIdentInput || !testModeCheck) {
+            throw new Error('Required modal elements not found');
+        }
+
+        const cdc = modal.dataset.cdc?.toUpperCase() || '';
+        let ctlVal = ctlValInput.value.trim();
+
+        // Parse control value based on CDC type
+        switch(cdc) {
+            case 'SPC':
+                if (ctlVal === 'true' || ctlVal === '1' || ctlVal === 'on') {
+                    ctlVal = true;
+                } else if (ctlVal === 'false' || ctlVal === '0' || ctlVal === 'off') {
+                    ctlVal = false;
+                } else {
+                    throw new Error('Invalid SPC value. Use true/false or on/off');
+                }
+                break;
+            case 'DPC':
+                const dpcMap = {
+                    'on': 'on',
+                    'off': 'off',
+                    'intermediate-state': 'intermediateState',
+                    'intermediate': 'intermediateState',
+                    'intermediatestate': 'intermediateState'
+                };
+                ctlVal = dpcMap[ctlVal.toLowerCase()];
+                if (!ctlVal) {
+                    throw new Error('Invalid DPC value. Use on, off, or intermediate-state');
+                }
+                break;
+            case 'APC':
+                ctlVal = parseFloat(ctlVal);
+                if (isNaN(ctlVal)) {
+                    throw new Error('Invalid APC value. Must be a number');
+                }
+                break;
+            case 'INC':
+            case 'ENC':
+                ctlVal = parseInt(ctlVal);
+                if (isNaN(ctlVal)) {
+                    throw new Error('Invalid value. Must be an integer');
+                }
+                break;
+            case 'BSC':
+                const bscMap = {
+                    'step-up': 'stepUp',
+                    'step-down': 'stepDown',
+                    'up': 'stepUp',
+                    'down': 'stepDown',
+                    'stepup': 'stepUp',
+                    'stepdown': 'stepDown'
+                };
+                ctlVal = bscMap[ctlVal.toLowerCase()];
+                if (!ctlVal) {
+                    throw new Error('Invalid BSC value. Use step-up or step-down');
+                }
+                break;
+        }
+
+        return {
+            objRef: modal.dataset.objRef,
+            ctlVal: ctlVal,
+            ctlNum: parseInt(ctlNumInput.value),
+            origin: {
+                orCat: parseInt(originCatSelect.value),
+                orIdent: originIdentInput.value
+            },
+            test: testModeCheck.checked
+        };
+    }
+
+    async function showContextMenuForControllableDO(e, objRef, objName, cdc, endpoint) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const menuItems = [
+            {
+                label: 'Operate',
+                icon: 'fa-play',
+                action: () => showControlDialog(objRef, objName, cdc, endpoint)  // Only this opens the modal
+            },
+            {
+                label: 'Read Value',
+                icon: 'fa-eye',
+                action: () => readDataValue(objRef, 'cf', endpoint)
+            }
+        ];
+
+        const menu = createContextMenu(menuItems);
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+        menu.style.display = 'block';
+
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) {
+                menu.style.left = (e.clientX - rect.width) + 'px';
+            }
+            if (rect.bottom > window.innerHeight) {
+                menu.style.top = (e.clientY - rect.height) + 'px';
+            }
+        });
+    }
+
+//    function getControlParameters() {
+//      const ctlValInput = document.getElementById('ctlVal');
+//      const ctlNumInput = document.getElementById('ctlNum');
+//      const originCatSelect = document.getElementById('originCat');
+//      const originIdentInput = document.getElementById('originOrIdent');
+//      const testModeCheck = document.getElementById('testMode');
+//      const modal = document.getElementById('controlModal');
+//
+//      const cdc = modal.dataset.cdc.toUpperCase();
+//      let ctlVal = ctlValInput.value.trim();
+//
+//      // Parse control value based on CDC type
+//      switch(cdc) {
+//        case 'SPC':
+//          if (ctlVal === 'true' || ctlVal === '1' || ctlVal === 'on') {
+//            ctlVal = true;
+//          } else if (ctlVal === 'false' || ctlVal === '0' || ctlVal === 'off') {
+//            ctlVal = false;
+//          } else {
+//            throw new Error('Invalid SPC value. Use true/false or on/off');
+//          }
+//          break;
+//        case 'DPC':
+//          const dpcMap = {
+//            'on': 'on',
+//            'off': 'off',
+//            'intermediate-state': 'intermediateState',
+//            'intermediate': 'intermediateState',
+//            'intermediatestate': 'intermediateState'
+//          };
+//          ctlVal = dpcMap[ctlVal.toLowerCase()];
+//          if (!ctlVal) {
+//            throw new Error('Invalid DPC value. Use on, off, or intermediate-state');
+//          }
+//          break;
+//        case 'APC':
+//          ctlVal = parseFloat(ctlVal);
+//          if (isNaN(ctlVal)) {
+//            throw new Error('Invalid APC value. Must be a number');
+//          }
+//          break;
+//        case 'INC':
+//        case 'ENC':
+//          ctlVal = parseInt(ctlVal);
+//          if (isNaN(ctlVal)) {
+//            throw new Error('Invalid value. Must be an integer');
+//          }
+//          break;
+//        case 'BSC':
+//          const bscMap = {
+//            'step-up': 'stepUp',
+//            'step-down': 'stepDown',
+//            'up': 'stepUp',
+//            'down': 'stepDown',
+//            'stepup': 'stepUp',
+//            'stepdown': 'stepDown'
+//          };
+//          ctlVal = bscMap[ctlVal.toLowerCase()];
+//          if (!ctlVal) {
+//            throw new Error('Invalid BSC value. Use step-up or step-down');
+//          }
+//          break;
+//      }
+//
+//      return {
+//        objRef: modal.dataset.objRef,
+//        ctlVal: ctlVal,
+//        ctlNum: parseInt(ctlNumInput.value),
+//        origin: {
+//          orCat: parseInt(originCatSelect.value),
+//          orIdent: originIdentInput.value
+//        },
+//        test: testModeCheck.checked
+//      };
+//    }
+
+    function showControlResult(success, message) {
+        const root = document.querySelector('.acsi-client-page') || document;
+        const resultDiv = root.querySelector('#controlResult');
+        if (!resultDiv) {
+            console.error('controlResult element not found');
+            return;
+        }
+        resultDiv.classList.remove('hidden', 'success', 'error');
+        resultDiv.classList.add(success ? 'success' : 'error');
+        resultDiv.textContent = message;
+    }
+
+
     async function showWriteValueDialog(objRef, fc, endpoint) {
       const modal = document.getElementById('writeValueModal');
       const titleEl = document.getElementById('writeValueTitle');
@@ -812,7 +1459,7 @@
       validationEl.textContent = '';
       resultDiv.classList.add('hidden');
 
-      modal.classList.add('active');
+      modal.classList.add('hidden');
       inputEl.focus();
 
       const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
@@ -867,7 +1514,7 @@
           resultDiv.style.color = '#fff';
           resultDiv.classList.remove('hidden');
           setTimeout(() => {
-            modal.classList.remove('active');
+            modal.classList.add('hidden');
             submitBtn.disabled = false;
           }, 1500);
         } catch (e) {
@@ -879,7 +1526,7 @@
         }
       };
 
-      cancelBtn.onclick = () => modal.classList.remove('active');
+      cancelBtn.onclick = () => modal.classList.add('hidden');
       inputEl.addEventListener('keypress', (e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
@@ -1311,7 +1958,7 @@
         if (result && result.ok) {
             const treeContainer = rootElement.querySelector('#acsi-client-tree-container-page');
             const treeContent = rootElement.querySelector('#acsi-client-tree-content');
-            renderLiveModelTree(result.payload || {}, treeContent, handleNodeClick);
+            renderLiveModelTree(result.payload || {}, treeContent, handleNodeClick, endpoint);
             treeContainer.style.display = 'block';
             showStatus(rootElement, 'Model fetched successfully', 'success');
         }
@@ -1358,7 +2005,7 @@
       });
     }
 
-    function renderLiveModelTree(data, containerOrId, onNodeClick) {
+    function renderLiveModelTree(data, containerOrId, onNodeClick, endpoint) {
       var container = typeof containerOrId === 'string'
         ? document.getElementById(containerOrId)
         : containerOrId;
@@ -1441,7 +2088,7 @@
             dsLi.appendChild(dsUl);
           const rcLi = createTreeNode('Group', 'Report Controls');
           appendChildrenTree(rcLi, data.result.model.logicalNodeDetails[ldName + '/' + lnName].reportControlBlocks.map(rcb => rcb.name) || [], 'ReportControl');
-
+          // Create DOs group with clickable items
           var dos = data.result.model.logicalNodeDetails[ldName + '/' + lnName].dataObjects || ln.dataObjects || ln.do || [];
           if (dos.length > 0) {
             var doUl = document.createElement('ul');
@@ -1452,8 +2099,30 @@
               var doFc    = (doObj && doObj.fc) || null;
               var cdcTxt  = (doObj && doObj.cdc) ? ' [' + doObj.cdc + ']' : '';
               var doRef   = lnRef + '.' + doName;
+
               var doLi    = createTreeNode('DO', doName + cdcTxt);
               makeClickable(doLi, doRef, doFc, 'DO');
+
+              // Check if this is a controllable CDC
+              const isControllable = doObj.cdc && CONTROLLABLE_CDCS.includes(doObj.cdc.toUpperCase());
+
+                if (isControllable) {
+                  doLi.style.cursor = 'context-menu';
+                  doLi.title = `Right-click to control ${doName} (${doObj.cdc.toUpperCase()})`;
+
+                  doLi.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showContextMenuForControllableDO(e, doRef, doName, doObj.cdc, endpoint);
+                  });
+                } else {
+                  doLi.style.cursor = 'context-menu';
+                  doLi.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showContextMenuForDataObject(e, doRef);
+                  });
+                }
 
               var das = (doObj && (doObj.data_attributes || doObj.dataAttributes || doObj.da)) || [];
               if (das.length > 0) {
@@ -1521,7 +2190,7 @@
     // Initialize the page
     function init() {
         const rootElement = document.querySelector('.acsi-server-page') || document.body;
-        
+
         // Initialize with empty endpoint
         setupEventListeners(rootElement, {});
         renderProtocolMessages(rootElement);
