@@ -105,11 +105,11 @@ services:
       - REACT_APP_BFF_URL=http://bff-server:5000
 
   # RTI-FSP (Acsi-Server)
-  rti-server:
+  rti-fsp:
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.rti-fsp
-    container_name: rti-server
+    container_name: rti-fsp
     ports:
       - "5001:5001"
     environment:
@@ -124,19 +124,19 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      - "rti.service=rti-server"
+      - "rti.service=rti-fsp"
       - "rti.type=RTI-FSP"
-      - "rti.host=rti-server"
+      - "rti.host=rti-fsp"
       - "rti.port=5001"
     volumes:
         - ./fsp:/app/fsp
 
   # RTI SO (Acsi-Client)
-  rti-client:
+  rti-so:
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.rti-so
-    container_name: rti-client
+    container_name: rti-so
     ports:
       - "5002:5002"
       - "8765:8765"    # WebSocket port - MUST ADD
@@ -152,19 +152,19 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      - "rti.service=rti-client"
+      - "rti.service=rti-so"
       - "rti.type=RTI-SO"
-      - "rti.host=rti-client"
+      - "rti.host=rti-so"
       - "rti.port=5002"
     volumes:
         - ./so:/app/so
 
   # RTI WS Client (Acsi-Client)
-  rti-active-websocket:
+  active-ws-acsi-client:
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.acsi-ws-client
-    container_name: rti-active-websocket
+    container_name: active-ws-acsi-client
     ports:
       - "5003:5003"
       - "8766:8765"    # WebSocket port - MUST ADD
@@ -180,19 +180,19 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      - "rti.service=rti-active-websocket"
-      - "rti.type=RTI-SO"
-      - "rti.host=rti-active-websocket"
+      - "rti.service=active-ws-acsi-client"
+      - "rti.type=active-ws-acsi-client"
+      - "rti.host=active-ws-acsi-client"
       - "rti.port=5003"
     volumes:
       - ./acsi_ws_client:/app/acsi_ws_client
 
   # RTI WS Server (Acsi-Server)
-  rti-passive-websocket:
+  passive-ws-acsi-server:
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.acsi-ws-server
-    container_name: rti-passive-websocket
+    container_name: passive-ws-acsi-server
     ports:
       - "5004:5004"
     environment:
@@ -207,9 +207,9 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      - "rti.service=rti-passive-websocket"
-      - "rti.type=RTI"
-      - "rti.host=rti-passive-websocket"
+      - "rti.service=passive-ws-acsi-server"
+      - "rti.type=passive-ws-acsi-server"
+      - "rti.host=passive-ws-acsi-server"
       - "rti.port=5004"
     volumes:
       - ./acsi_ws_server:/app/acsi_ws_server
