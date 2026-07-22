@@ -1,14 +1,14 @@
-# RTI Demo IEC 61850 Server Docker Image
+# RTI Demo IEC 61850 Client Docker Image
 # Build context: iec61850-websocket/ (repo root)
 
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PORT=5001
+    PORT=5002
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -21,7 +21,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 COPY src/ws61850 /app/ws61850
 
 # Copy project files for dependency management
-COPY rti-demo/pyproject.toml rti-demo/uv.lock /app/
+COPY examples/rti-demo/pyproject.toml examples/rti-demo/uv.lock /app/
 
 # Make ws61850 importable
 ENV PYTHONPATH="/app:${PYTHONPATH}"
@@ -30,11 +30,11 @@ ENV PYTHONPATH="/app:${PYTHONPATH}"
 RUN uv sync --frozen --no-dev
 
 # Copy application code
-COPY rti-demo/acsi_ws_server/ /app/acsi_ws_server/
+COPY examples/rti-demo/acsi_ws_client/ /app/acsi_ws_client/
 
-EXPOSE 5001
+EXPOSE 5003
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:5004/api/status || exit 1
+    CMD curl -f http://localhost:5003/api/status || exit 1
 
-CMD ["./.venv/bin/python", "-u", "acsi_ws_server/bff_endpoint.py"]
+CMD ["./.venv/bin/python", "-u", "acsi_ws_client/bff_endpoint.py"]
