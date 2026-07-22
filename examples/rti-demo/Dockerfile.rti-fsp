@@ -1,3 +1,6 @@
+# RTI Demo IEC 61850 Server Docker Image
+# Build context: iec61850-websocket/ (repo root)
+
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -14,18 +17,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv
 RUN pip install uv
 
-# ⚠️ CRITICAL: Copy pyproject.toml and uv.lock FIRST
-COPY rti-demo/pyproject.toml /app/pyproject.toml
-COPY rti-demo/uv.lock /app/uv.lock
-
-# Then copy source code
+# Copy ws61850 to app directory
 COPY src/ws61850 /app/ws61850
-COPY rti-demo/so/ /app/so/
-
-# Set PYTHONPATH
 ENV PYTHONPATH="/app:${PYTHONPATH}"
 
-# Now uv sync can find the files
+# Copy BFF uv project files FIRST
+COPY examples/rti-demo/pyproject.toml examples/rti-demo/uv.lock /app/
+
+# Copy FSP modules
+COPY examples/rti-demo/fsp/ /app/fsp/
+
+# Install dependencies from uv.lock (ONLY once, AFTER pyproject.toml is copied)
 RUN uv sync --frozen --no-dev
 
 EXPOSE 5001
@@ -33,4 +35,4 @@ EXPOSE 5001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:5001/api/status || exit 1
 
-CMD ["./.venv/bin/python", "-u", "so/bff_endpoint.py"]
+CMD ["./.venv/bin/python", "-u", "fsp/bff_endpoint.py"]
