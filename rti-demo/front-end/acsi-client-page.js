@@ -1326,11 +1326,11 @@
                 icon: 'fa-play',
                 action: () => showControlDialog(objRef, objName, cdc, endpoint)  // Only this opens the modal
             },
-            {
-                label: 'Read Value',
-                icon: 'fa-eye',
-                action: () => readDataValue(objRef, 'cf', endpoint)
-            }
+            //{
+            //    label: 'Read Value',
+            //    icon: 'fa-eye',
+            //    action: () => readDataValue(objRef, 'cf', endpoint)
+           // }
         ];
 
         const menu = createContextMenu(menuItems);
@@ -1606,6 +1606,9 @@
       const typeSuffix = da.bType ? ` [${da.bType}]` : '';
       const daLi = createTreeNode(nodeLabel, `${da.daRef}${typeSuffix}`);
 
+      if (da.subDataAttributes && da.subDataAttributes.length > 0) {
+        console.log(`Appending subDataAttributes for ${da.daRef}:`, da.subDataAttributes);
+      }
       appendDataAttributeNodes(daLi, da.subDataAttributes || [], 'SDA');
       ul.appendChild(daLi);
 
@@ -1796,6 +1799,64 @@
                     sdaValueDisplaySpan.className = 'tree-value-display';
                     sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
                     sdaRow.appendChild(sdaValueDisplaySpan);
+
+                    if (sda.cmpType[0] === "structure") {
+                        sda.subDataAttributes = sda.cmpType[1];
+                        console.log(`SDA ${sdaName} is a structure, subDataAttributes:`, sda.subDataAttributes);
+                    }
+
+                    if (sda.subDataAttributes && sda.subDataAttributes.length > 0) {
+                        const sdaToggle = sdaRow.querySelector('.scl-tree-toggle');
+                        if (sdaToggle) {
+                            sdaToggle.classList.remove('hidden');
+                            sdaLi.classList.add('has-children');
+                            sdaToggle.textContent = '▸';
+
+                            sdaToggle.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const expanded = sdaLi.classList.toggle('expanded');
+                                sdaToggle.textContent = expanded ? '▾' : '▸';
+                                const sdaUl = sdaLi.querySelector(':scope > ul');
+                                if (sdaUl) {
+                                    sdaUl.style.display = expanded ? '' : 'none';
+                                }
+                            });
+                        }
+
+                        const sdaUl = document.createElement('ul');
+                        sdaUl.className = 'scl-tree-list';
+
+                        for (const subSda of sda.subDataAttributes) {
+                            const subSdaTypeSuffix = ` (${subSda.cmpType[0]})` || '';
+                            const subSdaName = subSda.cmpName || subSda.daRef?.split('.').pop() || 'SDA';
+                            const subSdaRef = `${sdaRef}.${subSdaName}`;
+                            const subSdaLi = createTreeNode('SDA', `${subSdaName}${subSdaTypeSuffix}`);
+
+                            const subSdaRow = subSdaLi.querySelector(':scope > .scl-tree-row');
+                            const subSdaValueDisplaySpan = document.createElement('span');
+                            subSdaValueDisplaySpan.className = 'tree-value-display';
+                            subSdaValueDisplaySpan.setAttribute('data-obj-ref', subSdaRef);
+                            subSdaRow.appendChild(subSdaValueDisplaySpan);
+
+                            subSdaRow.style.cursor = 'context-menu';
+
+                            if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
+                                subSdaRow.addEventListener('contextmenu', (e) => {
+                                    e.preventDefault(); e.stopPropagation();
+                                    showContextMenuForDataAttribute(e, subSdaRef, fc, endpoint);
+                                });
+                            } else {
+                                subSdaRow.addEventListener('contextmenu', (e) => {
+                                    e.preventDefault(); e.stopPropagation();
+                                    showReadContextMenuForDataAttribute(e, subSdaRef, fc, endpoint);
+                                });
+                            }
+
+                            sdaUl.appendChild(subSdaLi);
+                        }
+
+                        sdaLi.appendChild(sdaUl);
+                    }
 
                     sdaRow.style.cursor = 'context-menu';
 
@@ -2007,6 +2068,32 @@
       });
     }
 
+    function appendSDAtoDataAttributeNode(da, daLi, daFc, daRef) {
+        var subDas = (da && (da.sub_attributes || da.subDataAttributes || da.sda)) || [];
+        if (subDas.length > 0) {
+            var sdaUl = document.createElement('ul');
+            sdaUl.className = 'scl-tree-list';
+            subDas.forEach(function (sda) {
+              var sdaName = (typeof sda === 'object' ? sda.name : sda) || 'SDA';
+              var sdaRef  = daRef + '.' + sdaName;
+              var sdaLi   = createTreeNode('SDA', sdaName);
+              if (sda.sub_attributes || sda.subDataAttributes || sda.sda) {
+                appendSDAtoDataAttributeNode(sda, sdaLi, daFc, sdaRef);
+              }
+
+              const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
+              const sdaValueDisplaySpan = document.createElement('span');
+              sdaValueDisplaySpan.className = 'tree-value-display';
+              sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
+              sdaRow.appendChild(sdaValueDisplaySpan);
+
+              makeClickable(sdaLi, sdaRef, daFc, 'SDA');
+              sdaUl.appendChild(sdaLi);
+            });
+            daLi.appendChild(sdaUl);
+        }
+    }
+
     function renderLiveModelTree(data, containerOrId, onNodeClick, endpoint) {
       var container = typeof containerOrId === 'string'
         ? document.getElementById(containerOrId)
@@ -2144,27 +2231,28 @@
                   valueDisplaySpan.className = 'tree-value-display';
                   valueDisplaySpan.setAttribute('data-obj-ref', daRef);
                   row.appendChild(valueDisplaySpan);
+                  appendSDAtoDataAttributeNode(da, daLi, daFc, daRef);
 
-                  var subDas = (da && (da.sub_attributes || da.subDataAttributes || da.sda)) || [];
-                  if (subDas.length > 0) {
-                    var sdaUl = document.createElement('ul');
-                    sdaUl.className = 'scl-tree-list';
-                    subDas.forEach(function (sda) {
-                      var sdaName = (typeof sda === 'object' ? sda.name : sda) || 'SDA';
-                      var sdaRef  = daRef + '.' + sdaName;
-                      var sdaLi   = createTreeNode('SDA', sdaName);
-
-                      const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
-                      const sdaValueDisplaySpan = document.createElement('span');
-                      sdaValueDisplaySpan.className = 'tree-value-display';
-                      sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
-                      sdaRow.appendChild(sdaValueDisplaySpan);
-
-                      makeClickable(sdaLi, sdaRef, daFc, 'SDA');
-                      sdaUl.appendChild(sdaLi);
-                    });
-                    daLi.appendChild(sdaUl);
-                  }
+//                  var subDas = (da && (da.sub_attributes || da.subDataAttributes || da.sda)) || [];
+//                  if (subDas.length > 0) {
+//                    var sdaUl = document.createElement('ul');
+//                    sdaUl.className = 'scl-tree-list';
+//                    subDas.forEach(function (sda) {
+//                      var sdaName = (typeof sda === 'object' ? sda.name : sda) || 'SDA';
+//                      var sdaRef  = daRef + '.' + sdaName;
+//                      var sdaLi   = createTreeNode('SDA', sdaName);
+//
+//                      const sdaRow = sdaLi.querySelector(':scope > .scl-tree-row');
+//                      const sdaValueDisplaySpan = document.createElement('span');
+//                      sdaValueDisplaySpan.className = 'tree-value-display';
+//                      sdaValueDisplaySpan.setAttribute('data-obj-ref', sdaRef);
+//                      sdaRow.appendChild(sdaValueDisplaySpan);
+//
+//                      makeClickable(sdaLi, sdaRef, daFc, 'SDA');
+//                      sdaUl.appendChild(sdaLi);
+//                    });
+//                    daLi.appendChild(sdaUl);
+                  //});
                   daUl.appendChild(daLi);
                 });
                 doLi.appendChild(daUl);
