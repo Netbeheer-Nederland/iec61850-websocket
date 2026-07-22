@@ -268,6 +268,19 @@ class ACSIClient:
             loop.close()
             self._set_runtime_state(loop=None, thread=None)
 
+    def _convert_operate_val_to_its_type(self, oper_val: Any, val_type: str) -> Any:
+        """Convert the operate value to its specified type."""
+        if val_type == "boolean":
+            return bool(oper_val)
+        elif val_type == "int32":
+            return int(oper_val)
+        elif val_type == "float32":
+            return float(oper_val)
+        elif val_type == "string":
+            return str(oper_val)
+        else:
+            raise ValueError(f"Unsupported value type: {val_type}")
+
     def connect(self, host: str, port: int, cp: str = "cp1") -> None:
         """Connect to the server in a background thread."""
         self._validate_connection_params(host, port)
@@ -388,7 +401,6 @@ class ACSIClient:
             raise RuntimeError("Client is not connected")
 
         websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
-        # dataAttrVal expects [{"data": (type_str, value)}]
         if data_type == "boolean":
             value = bool(value)
         result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
@@ -397,3 +409,33 @@ class ACSIClient:
         print("new value:", value)
         print("obj_ref:", obj_ref)
         return {"objRef": obj_ref, "value": value}
+
+    async def operate(self, obj_ref, oper_val, val_type: str) -> Dict[str, Any]:
+        """Perform an operate command on the server."""
+        client = self.runtime.client
+        if client is None:
+            raise RuntimeError("Client is not connected")
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+
+        oper_val = {
+            "ref": obj_ref,
+            "ctlVal": (val_type, self._convert_operate_val_to_its_type(oper_val, val_type)),
+            "origin": {"orCat": "stationControl", "orIdent": b"ORIGIN_ID_1234567890"},
+            "ctlNum": 0,
+            "t": {
+                "secondSinceEpoch": 1757588367,
+                "fractionOfSecond": 8120140,
+                "timeQuality": {
+                    "leapSecondsKown": False,
+                    "clockFailure": False,
+                    "clockNotSynchronized": False,
+                    "timeAccuracy": 3,
+                },
+            },
+            "test": True,
+            "check": {"synchroCheck": False, "interlockCheck": False},
+        }
+
+        result = await client.operate(oper_val, websocket_info, None, None)
+        return {"objRef": obj_ref, "result": result}

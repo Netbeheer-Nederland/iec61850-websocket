@@ -102,6 +102,35 @@ class GetDataSetDirectory(BaseModel):
     )
 
 
+class OperateRequest(BaseModel):
+    """Request body for writing a value to the connected server.
+
+    Used by: POST /api/operate
+    """
+    objRef: str = Field(
+        ...,
+        description="Controllable DO Object reference in IEC61850 format",
+        json_schema_extra={"example": "LD0/MMXU.WMaxSpt"}
+    )
+    value: Any = Field(
+        ...,
+        description="Value to write (will be converted to appropriate type)",
+        json_schema_extra={"example": "12.4"}
+    )
+    value_type: Any = Field(
+        ...,
+        description="Value type hint for coercion (BOOLEAN, INT32, FLOAT32, etc.)",
+        json_schema_extra={"example": "float32"}
+    )
+
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "objRef": "LD0/MMXU.WMaxSpt",
+            "value": "2.11",
+            "value_type": "float32"
+        }
+    })
+
 
 class WriteValueRequest(BaseModel):
     """Request body for writing a value to the connected server.
@@ -1337,6 +1366,106 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=500
                 )
         except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/operate",
+        summary="Operate",
+        description="Sends an operate command to the connected Acsi-Server. The client must be connected before calling this endpoint.",
+        response_description="Operate command",
+        responses={
+            200: {"description": "Operate command sent successfully"},
+            400: {"description": "Missing parameters (objRef or value)"},
+            403: {"description": "Client is not connected"},
+            500: {"description": "Error writing value"}
+        },
+        tags=["Data Access"]
+    )
+    async def api_operate(request: OperateRequest):
+        """Send an Operate command to the connected server.
+
+                Request Body:
+                    WriteValueRequest: {
+                        "objRef": str,     # Required - Object reference
+                        "value": any,     # Required - Value to write
+                        "value_type": str # Optional - Value type hint
+                    }
+
+                Returns:
+                    dict: {
+                        "ok": True,
+                        "success": True,
+                        "objRef": str,
+                        "value": any  # The written value
+                    }
+
+                Raises:
+                    HTTPException 400: If objRef or value is missing
+                    HTTPException 403: If client is not connected
+                    HTTPException 500: If write operation fails
+                """
+        try:
+            obj_ref = request.objRef
+            value = request.value
+            value_type = request.value_type
+
+            if not obj_ref:
+                return JSONResponse(
+                    content={"ok": False, "error": "objRef is required"},
+                    status_code=400
+                )
+            if value is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "value is required"},
+                    status_code=400
+                )
+
+            if rti_so.runtime.client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "Client is not connected"},
+                    status_code=503
+                )
+
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.operate(obj_ref, value, value_type), timeout=10
+                )
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+                else:
+                    print("operate result in so: ", result)
+                    #operate_result = result.get('result', {})
+                    success = result.get('result', False)
+                    error = result.get('serviceError', "")
+                    return {
+                        "ok": success,
+                        "error": error,
+                    }
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "Operate timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                print("entered here 1")
+                print(f"Exception in api_operate: {exc}")
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except Exception as exc:
+            print("entered here 2")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
                 status_code=500

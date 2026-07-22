@@ -26,6 +26,9 @@ from typing import Any, Callable, Dict, List, Optional
 from ws61850.endpoint import ActiveEndpoint
 from ws61850.iec61850.data_model.ied_model import DataAttribute, IedModel
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
+from ws61850.iec61850.server.control_handling import ControlHandlerResult, ControlServiceStatusKind
+from ws61850.iec61850.server.service_error import ServiceStatusKind
+
 
 
 class ACSIServerRuntime:
@@ -111,7 +114,30 @@ class ACSIServer:
             model_ied_name=self.runtime.ied_model.name,
         )
 
-        self.runtime.server = IEC61850Server(self.runtime.ied_model, self.runtime.cp)
+        def control_handler(obj_ref, ctlVal_value, parameter):
+            ctl_val = ctlVal_value['value']
+            print("entered control handler: obj_ref:", obj_ref, "ctlVal_value:", ctl_val, "parameter:", parameter)
+
+            TYPE_MAP = {
+                "boolean": bool,
+                "int32": int,
+                "float32" : float,
+                "string": str,
+            }
+            if ctlVal_value is not None:
+                if ctl_val[0] in TYPE_MAP:
+                    if isinstance(ctl_val[1], TYPE_MAP[ctl_val[0]]):
+                        return ControlHandlerResult.OK, None
+                    else:
+                        return ControlHandlerResult.FAILED, ControlServiceStatusKind.invalidPosition
+            else:
+                return None, ServiceStatusKind.instanceNotAvailable
+            return None, None
+
+
+        iec61850_instance = IEC61850Server(self.runtime.ied_model, self.runtime.cp)
+        iec61850_instance.set_control_handler(control_handler, None)
+        self.runtime.server = iec61850_instance
         self.runtime.endpoint.add_iec61850_server(self.runtime.server)
 
     def load_current_runtime_model(self) -> IedModel:

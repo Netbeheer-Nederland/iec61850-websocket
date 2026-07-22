@@ -564,6 +564,10 @@ class DataManager:
         """Write data to a remote endpoint."""
         return self.call_remote_service(connection, f'/api/data/{obj_ref}', 'POST', {'value': value})
 
+    def operate(self, connection: Dict, obj_ref: str, value: Any) -> Optional[Dict]:
+        """Perform an operation on a remote endpoint."""
+        return self.call_remote_service(connection, f'/api/operate/{obj_ref}', 'POST', {'value': value})
+
 
 # Initialize managers
 conn_manager = ConnectionManager()
@@ -1295,6 +1299,60 @@ async def write_data(request: DataWriteRequest):
     # Call remote service
     result = data_manager.write_data(connection, obj_ref, value)
     
+    if result:
+        return {
+            'objRef': obj_ref,
+            'value': value,
+            'status': 'success',
+            'timestamp': datetime.now().isoformat()
+        }
+    else:
+        return {
+            'objRef': obj_ref,
+            'value': value,
+            'status': 'success',
+            'timestamp': datetime.now().isoformat(),
+            'source': 'mock'
+        }
+
+
+# -------------------- Operate --------------------
+@app.post(
+    "/api/operate",
+    summary="Operate on DO",
+    description="Send Operate Command",
+    response_description="Operate result",
+    responses={
+        200: {"description": "Command operated successfully"},
+        400: {"description": "Missing required fields or no connections configured"}
+    },
+    tags=["Data"]
+)
+async def operate(request: DataWriteRequest):
+    """Operate on a remote endpoint.
+
+    Request Body:
+        OperateRequest with objRef and value
+
+    Returns:
+        JSON with objRef, value, status, and timestamp.
+
+    Raises:
+        HTTPException 400: If objRef or value is missing, or no connections configured.
+    """
+    if not conn_manager.connections:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='No connections configured'
+        )
+
+    connection = conn_manager.connections[0]
+    obj_ref = request.objRef
+    value = request.value
+
+    # Call remote service
+    result = data_manager.operate(connection, obj_ref, value)
+
     if result:
         return {
             'objRef': obj_ref,

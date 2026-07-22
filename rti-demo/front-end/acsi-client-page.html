@@ -119,7 +119,73 @@
             <div id="acsi-protocol-messages" class="acsi-log-list"></div>
         </section>
 
-        <div id="writeValueModal" class="modal">
+         <!-- Control Dialog Modal -->
+        <div id="controlModal" class="control-window hidden">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 id="controlTitle">Control Operation</h3>
+            <button id="closeControlModal" class="modal-close-btn">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="control-info">
+              <div class="control-field">
+                <label>Object Reference:</label>
+                <span id="controlObjRef" class="control-value"></span>
+              </div>
+              <div class="control-field">
+                <label>CDC Type:</label>
+                <span id="controlCdcType" class="control-value cdc-badge"></span>
+              </div>
+              <div class="control-field">
+                <label>Control Model:</label>
+                <span id="controlCtlModel" class="control-value"></span>
+              </div>
+            </div>
+            <div id="controlForm" class="control-form">
+              <div class="control-field">
+                <label for="ctlVal">Control Value (ctlVal):</label>
+                <input type="text" id="ctlVal" placeholder="Enter control value">
+              </div>
+              <div class="control-field">
+                <label for="ctlNum">Control Number (ctlNum):</label>
+                <input type="number" id="ctlNum" value="0" min="0">
+              </div>
+              <div class="control-field">
+                <label for="originCat">Origin Category:</label>
+                <select id="originCat">
+                  <option value="0">not-supported</option>
+                  <option value="1" selected>bay-control</option>
+                  <option value="2">station-control</option>
+                  <option value="3">remote-control</option>
+                  <option value="4">automatic-bay</option>
+                  <option value="5">automatic-station</option>
+                  <option value="6">automatic-remote</option>
+                  <option value="7">maintenance</option>
+                  <option value="8">process</option>
+                </select>
+              </div>
+          <div class="control-field">
+            <label for="originOrIdent">Origin Ident:</label>
+            <input type="text" id="originOrIdent" value="0" maxlength="64">
+          </div>
+          <div class="test-mode-container">
+            <label>
+              <input type="checkbox" id="testMode">
+              Test Mode
+            </label>
+          </div>
+        </div>
+        <div id="controlResult" class="control-result hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="operateControlBtn" class="btn-secondary">Operate</button>
+        <button id="closeControlBtn" class="btn-primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+
+        <div id="writeValueModal" class="modal hidden">
             <div class="modal-content">
                 <h2 id="writeValueTitle">Write Data Value</h2>
                 <div style="margin-bottom: 16px; color: #ccc;">
