@@ -49,7 +49,7 @@
   {
     "id": 4,
     "name": "docker-test-client",
-    "host": "rti-client",
+    "host": "rti-so",
     "port": 5002,
     "type": "RTI-SO",
     "auto_discovered": false,
@@ -68,7 +68,7 @@
   {
     "id": 5,
     "name": "docker-test-server",
-    "host": "rti-server",
+    "host": "rti-fsp",
     "port": 5001,
     "type": "RTI-FSP",
     "auto_discovered": false,
