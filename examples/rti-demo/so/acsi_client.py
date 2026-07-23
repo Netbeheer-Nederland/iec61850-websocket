@@ -54,6 +54,8 @@ class ACSIClientRuntime:
         self.recv_msg_callback: Optional[Callable] = None
         self.send_msg_callback: Optional[Callable] = None
 
+        self.client_list = None
+
 
 class ACSIClient:
     """IEC 61850 WebSocket client controller."""
@@ -63,8 +65,12 @@ class ACSIClient:
         self.runtime.endpoint = PassiveEndpoint()
         self.runtime.endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
         self.runtime.endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
-        self.runtime.client = IEC61850Client(self.runtime.cp)
-        self.runtime.endpoint.add_iec61850_client(self.runtime.client)
+        #self.runtime.client = IEC61850Client(self.runtime.cp)
+        #self.runtime.endpoint.add_iec61850_client(self.runtime.client)
+        self.runtime.client_list = self.runtime.endpoint.client_list
+
+    def get_iec61850_client(self, cp):
+        return next((client for client in self.runtime.client_list if client.cp == cp), None)
 
     def _log_action(
         self, message: str, level: str = "info", detail: Optional[Dict[str, Any]] = None
@@ -174,23 +180,32 @@ class ACSIClient:
                 name="so-active"
             )
 
+            #client = self.get_iec61850_client(cp)
+            #if not client:
+            #    raise RuntimeError(f"ACSI Client for {cp} not found!")
+
             # Remember the task so we can cancel it on disconnect.
             self._set_runtime_state(
                 endpoint=self.runtime.endpoint,
-                client=self.runtime.client,
+                #client=client,
                 _start_task=start_task,
             )
 
-            try:
-                await asyncio.wait_for(self.runtime.client.ready_event.wait(), None)
-            except asyncio.TimeoutError as exc:
-                start_task.cancel()
-                raise RuntimeError(
-                    f"Association with {host}:{port}/{cp} timed out"
-                ) from exc
+
+            #try:
+            #    await asyncio.wait_for(client.ready_event.wait(), None)
+            #except asyncio.TimeoutError as exc:
+            #    start_task.cancel()
+            #    raise RuntimeError(
+            #        f"Association with {host}:{port}/{cp} timed out"
+            #    ) from exc
+            status = "disconnected"
+            if self.runtime.endpoint.get_endpoint_status():
+                status = "connected"
+
 
             self._set_runtime_state(
-                status="connected",
+                status=status,
                 error=None,
             )
 
@@ -207,7 +222,7 @@ class ACSIClient:
     async def _disconnect_async(self) -> None:
         """Disconnect from the server asynchronously."""
         endpoint = self.runtime.endpoint
-        client = self.runtime.client
+        #client = self.runtime.client
 
         self._log_action("Disconnecting...")
         self._set_runtime_state(status="disconnecting")
@@ -364,43 +379,44 @@ class ACSIClient:
         with self.runtime.lock:
             self.runtime.messages.clear()
 
-    async def read_value(self, obj_ref: str, fc: str) -> Dict[str, Any]:
+    async def read_value(self, obj_ref: str, fc: str, cp: str) -> Dict[str, Any]:
         """Read a value from the server."""
-        client = self.runtime.client
-        if client is None:
-            raise RuntimeError("Client is not connected")
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
-        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
         result = await client.get_data_values(obj_ref, fc, False, websocket_info, None, None)
         return {"value": result}
 
-    async def get_dataset_directory(self, ld_inst: str, ln_inst: str, ds_inst) -> Dict[str, Any]:
+    async def get_dataset_directory(self, ld_inst: str, ln_inst: str, ds_inst: str, cp: str) -> Dict[str, Any]:
         """Read a value from the server."""
-        client = self.runtime.client
-        if client is None:
-            raise RuntimeError("Client is not connected")
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
-        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
         result = await client.get_dataset_directory(ld_inst, ln_inst, ds_inst, websocket_info, None, None)
         return {"value": result}
 
-    async def get_data_definition(self, obj_ref: str) -> Dict[str, Any]:
+    async def get_data_definition(self, obj_ref: str, cp: str) -> Dict[str, Any]:
         """Read a value from the server."""
-        client = self.runtime.client
-        if client is None:
-            raise RuntimeError("Client is not connected")
 
-        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
         result = await client.get_data_definition(obj_ref, websocket_info, None, None)
         return {"dataDefinition": result}
 
-    async def write_value(self, obj_ref: str, value: Any, fc: str, data_type: str) -> Dict[str, Any]:
+    async def write_value(self, obj_ref: str, value: Any, fc: str, data_type: str, cp:str) -> Dict[str, Any]:
         """Write a value to the server."""
-        client = self.runtime.client
-        if client is None:
-            raise RuntimeError("Client is not connected")
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
-        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
         if data_type == "boolean":
             value = bool(value)
         result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
@@ -410,13 +426,13 @@ class ACSIClient:
         print("obj_ref:", obj_ref)
         return {"objRef": obj_ref, "value": value}
 
-    async def operate(self, obj_ref, oper_val, val_type: str) -> Dict[str, Any]:
+    async def operate(self, obj_ref, oper_val, val_type: str, cp: str) -> Dict[str, Any]:
         """Perform an operate command on the server."""
-        client = self.runtime.client
-        if client is None:
-            raise RuntimeError("Client is not connected")
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
-        websocket_info = self.runtime.endpoint.get_websocket_info(self.runtime.client)
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
 
         oper_val = {
             "ref": obj_ref,

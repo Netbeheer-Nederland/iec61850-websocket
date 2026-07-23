@@ -26,6 +26,7 @@ from websockets.asyncio.server import serve
 from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
 
+from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
 from ws61850.endpoint.association_handler import (
     ACTION_ABORT,
@@ -93,6 +94,7 @@ class PassiveEndpoint:
         self.send_msg_callback = None
         self.recv_msg_callback = None
         self.server = None  # websockets.Server set in start()
+        self._is_endpoint_running = False
 
         self._tls_config = tls_config
         self._oauth_enable = oauth_enable
@@ -123,6 +125,9 @@ class PassiveEndpoint:
     # ------------------------------------------------------------------
     # Public interface (EndpointProtocol)
     # ------------------------------------------------------------------
+    def get_endpoint_status(self):
+        return self._is_endpoint_running
+
     def get_websocket_info(self, iec61850_client) -> WebSocketInfo | None:
         return next(
             (
@@ -172,13 +177,15 @@ class PassiveEndpoint:
 
         serve_kwargs = dict(
             subprotocols=protocol if protocol is not None else None,
-            process_request=self.process_request if self._oauth_enable else None,
+            process_request=self.process_request,
             ping_interval=15,
             ping_timeout=30,
             logger=self._websocket_server_logger,
         )
         if ssl_ctx:
             serve_kwargs["ssl"] = ssl_ctx
+
+        self._is_endpoint_running = True
 
         async with serve(self.handle_client, hostname, port, **serve_kwargs) as server:
             self.server = server
@@ -190,6 +197,8 @@ class PassiveEndpoint:
             if self.server is not None:
                 self.server.close()
                 await self.server.wait_closed()
+
+                self._is_endpoint_running = False
                 logger.info("WebSocket passive server stopped")
             else:
                 logger.info("Passive server stop requested but server reference is None")
@@ -365,34 +374,41 @@ class PassiveEndpoint:
         headers = request.headers
         auth_header = headers.get("Authorization")
 
-        if not auth_header or not auth_header.startswith("Bearer "):
-            logger.warning("OAuth: missing or malformed Authorization header for cp=%r", cp)
-            return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Missing or invalid token\n")
+        # create IEC61850 client using cp
+        self.client_list.append(IEC61850Client(cp))
 
-        token = auth_header[len("Bearer "):]
+        if self._oauth_enable:
+            if not auth_header or not auth_header.startswith("Bearer "):
+                logger.warning("OAuth: missing or malformed Authorization header for cp=%r", cp)
+                return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Missing or invalid token\n")
 
-        if self._jwt_validator is None:
-            logger.error("OAuth: JWT validator not configured but oauth_enable=True for cp=%r", cp)
-            return self._http_error_response(
-                HTTPStatus.SERVICE_UNAVAILABLE, b"Token verification unavailable\n"
+            token = auth_header[len("Bearer "):]
+
+            if self._jwt_validator is None:
+                logger.error("OAuth: JWT validator not configured but oauth_enable=True for cp=%r", cp)
+                return self._http_error_response(
+                    HTTPStatus.SERVICE_UNAVAILABLE, b"Token verification unavailable\n"
+                )
+
+            try:
+                is_valid, claims = self._jwt_validator.validate(token)
+            except (KeyError, Exception) as e:
+                logger.error("OAuth: JWKS fetch or decode error for cp=%r: %s", cp, e)
+                return self._http_error_response(
+                    HTTPStatus.SERVICE_UNAVAILABLE, b"Token verification unavailable\n"
+                )
+
+            if not is_valid or claims is None:
+                logger.warning("OAuth: token rejected (invalid or expired) for cp=%r", cp)
+                return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Invalid or expired token\n")
+
+            logger.info("OAuth: token accepted for cp=%r expires_at=%s", cp, claims.expiry)
+            self.access_token_list.append(
+                {"access_token": {"exp": claims.expiry}, "cp": cp, "access_token_raw": token}
             )
-
-        try:
-            is_valid, claims = self._jwt_validator.validate(token)
-        except (KeyError, Exception) as e:
-            logger.error("OAuth: JWKS fetch or decode error for cp=%r: %s", cp, e)
-            return self._http_error_response(
-                HTTPStatus.SERVICE_UNAVAILABLE, b"Token verification unavailable\n"
-            )
-
-        if not is_valid or claims is None:
-            logger.warning("OAuth: token rejected (invalid or expired) for cp=%r", cp)
-            return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Invalid or expired token\n")
-
-        logger.info("OAuth: token accepted for cp=%r expires_at=%s", cp, claims.expiry)
-        self.access_token_list.append(
-            {"access_token": {"exp": claims.expiry}, "cp": cp, "access_token_raw": token}
-        )
+            return None
+        else:
+            return None
 
     # ------------------------------------------------------------------
     # Internal helpers

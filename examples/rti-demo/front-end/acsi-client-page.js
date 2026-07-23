@@ -25,7 +25,7 @@
     const apiDefinitions = [
         { id: 'connect', label: 'POST /api/connect', method: 'POST', path: '/api/connect' },
         { id: 'disconnect', label: 'POST /api/disconnect', method: 'POST', path: '/api/disconnect' },
-        { id: 'model-tree', label: 'GET /api/model/tree', method: 'GET', path: '/api/model/tree' },
+        { id: 'model-tree', label: 'POST /api/model/tree', method: 'POST', path: '/api/model/tree' },
         { id: 'data-definition', label: 'POST /api/getDataDefinition', method: 'POST', path: '/api/getDataDefinition' },
         { id: 'read', label: 'POST /api/readvalue', method: 'POST', path: '/api/readvalue' },
         { id: 'write', label: 'POST /api/writevalue', method: 'POST', path: '/api/writevalue' },
@@ -33,7 +33,7 @@
         { id: 'actions-logs', label: 'GET /api/actions_logs', method: 'GET', path: '/api/actions_logs', sampleBody: '' },
         { id: 'clear-logs', label: 'POST /api/clear_logs', method: 'POST', path: '/api/clear_logs', sampleBody: '' },
         { id: 'status', label: 'GET /api/status', method: 'GET', path: '/api/status'},
-        { id: 'operate', label: 'GET /api/operate', method: 'POST', path: '/api/operate'},
+        { id: 'operate', label: 'POST /api/operate', method: 'POST', path: '/api/operate'},
     ];
 
     function getApiById(id) {
@@ -2011,11 +2011,13 @@
                 }
         }
 
+        const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
+
         showStatus(rootElement, 'Fetching model...', 'info');
         const result = await executeApiCall(
             getApiById('model-tree'),
             endpointTarget,
-            null
+            {cp}
         );
 
         if (result && result.ok) {
