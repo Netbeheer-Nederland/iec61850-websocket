@@ -43,6 +43,17 @@ class ConnectRequest(BaseModel):
         json_schema_extra={"example": "cp1"}
     )
 
+class ModelRequest(BaseModel):
+    """Request body for connecting to an IEC61850 WebSocket server.
+
+    Used by: POST /api/model
+    """
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
 class ReadvalueRequest(BaseModel):
     """Request body for reading a value from the connected server.
 
@@ -57,6 +68,12 @@ class ReadvalueRequest(BaseModel):
         default=None,
         description="Functional constraint (ST, MX, CO, etc.) - optional",
         json_schema_extra={"example": "ST"}
+    )
+
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
     )
 
 class GetDataDefinitionRequest(BaseModel):
@@ -80,6 +97,12 @@ class GetDataDefinitionRequest(BaseModel):
         json_schema_extra={"example": "Mod"}
     )
 
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
 class GetDataSetDirectory(BaseModel):
     """Request body for reading a value from the connected server.
 
@@ -99,6 +122,12 @@ class GetDataSetDirectory(BaseModel):
         ...,
         description="DataSet name (e.g., 'Event1')",
         json_schema_extra={"example": "Event1"}
+    )
+
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
     )
 
 
@@ -123,11 +152,18 @@ class OperateRequest(BaseModel):
         json_schema_extra={"example": "float32"}
     )
 
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "objRef": "LD0/MMXU.WMaxSpt",
             "value": "2.11",
-            "value_type": "float32"
+            "value_type": "float32",
+            "cp": "cp1",
         }
     })
 
@@ -158,12 +194,19 @@ class WriteValueRequest(BaseModel):
         json_schema_extra={"example": "BOOLEAN"}
     )
 
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "objRef": "LD0/LLN0$ST$Mod",
             "fc": "ST",
             "value": "ON",
-            "value_type": "BOOLEAN"
+            "value_type": "BOOLEAN",
+            "cp": "cp1"
         }
     })
 
@@ -340,11 +383,11 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         return await _invoke_ln_directory(acsi_client, ws_info, ld_inst, ln_inst, mode)
 
     # ================ Background Model Build ================
-    async def _abuild_full_model() -> None:
+    async def _abuild_full_model(cp) -> None:
         """Build full model sequentially with progress updates."""
         endpoint = rti_so.runtime.endpoint
         loop = rti_so.runtime.loop
-        acsi_client = rti_so.runtime.client
+        acsi_client = rti_so.get_iec61850_client(cp)
         if not rti_so or not endpoint or not loop or not acsi_client.is_connected:
             raise RuntimeError('not-connected')
         try:
@@ -398,7 +441,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         async def _process_ld(ld):
             try:
                 _set_current_ld(ld)
-                ln_list = await rti_so.runtime.client.get_logical_device_directory(ld, ws_info, None, None)
+                ln_list = await acsi_client.get_logical_device_directory(ld, ws_info, None, None)
                 if not isinstance(ln_list, list):
                     raise RuntimeError('unexpected-ln-list')
                 logical_device_map[ld] = ln_list
@@ -413,7 +456,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         ln_inst = ln_full
                     _set_current_ln(ln_inst)
                     try:
-                        details = await _aget_ln_details(ld, ln_inst, rti_so.runtime.client, ws_info)
+                        details = await _aget_ln_details(ld, ln_inst, acsi_client, ws_info)
                         logical_node_details[f"{ld}/{ln_inst}"] = details
                     except Exception as e:
                         print(f"Failed to get details for {ld}/{ln_inst}: {e}")
@@ -429,7 +472,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 _finish_ld()
 
         try:
-            ld_list = await rti_so.runtime.client.get_server_directory(ws_info, None, None)
+            ld_list = await acsi_client.get_server_directory(ws_info, None, None)
             if not isinstance(ld_list, list):
                 raise RuntimeError('unexpected-server-directory')
             _init_progress(ld_list)
@@ -455,7 +498,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 rti_so.runtime.model_error = str(e)
             raise
 
-    def _start_model_build_if_needed():
+    def _start_model_build_if_needed(cp):
         """Schedule background model build if idle or error."""
         with rti_so.runtime.lock:
             model_status = rti_so.runtime.model_status
@@ -474,7 +517,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
         try:
             #client._log_action("Scheduling model build", "info")
-            fut = asyncio.run_coroutine_threadsafe(_abuild_full_model(), loop)
+            fut = asyncio.run_coroutine_threadsafe(_abuild_full_model(cp), loop)
             #client._log_action("Model build scheduled", "info")
         except Exception as e:
             with rti_so.runtime.lock:
@@ -544,7 +587,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 status_code=500
             )
 
-    @router.get(
+    @router.post(
         "/connections",
         summary="Get Connection Info",
         description="Returns detailed information about the current WebSocket connection, including peer address, port, and connection status.",
@@ -555,7 +598,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         },
         tags=["Client Status"]
     )
-    def api_connections():
+    def api_connections(request:ModelRequest):
         """Get connection information.
 
         Returns:
@@ -576,6 +619,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             }
         """
         try:
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
             endpoint = rti_so.runtime.endpoint
             connection_info = {
                 "ok": True,
@@ -586,8 +637,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 "connection": None,
             }
 
-            if endpoint is not None and rti_so.runtime.client is not None:
-                ws_info = endpoint.get_websocket_info(rti_so.runtime.client)
+            if endpoint is not None and acsi_client is not None:
+                ws_info = endpoint.get_websocket_info(acsi_client)
                 if ws_info is not None:
                     peer_address = None
                     peer_port = None
@@ -734,7 +785,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
 
-    @router.get(
+    @router.post(
         "/model/tree",
         summary="Get IED Model Tree",
         description="Retrieves the complete IED model tree from the connected server. This includes logical devices, logical nodes, data objects, and data attributes.",
@@ -746,9 +797,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         },
         tags=["Model Access"]
     )
-    async def api_model(request: Request, refresh: bool = False):
+    async def api_model(request: ModelRequest, refresh: bool = False):
         """Get the IED model tree from the connected server."""
-        
+
+        cp = request.cp
+
+        print("len client_list is: ", len(rti_so.runtime.client_list))
+        print("len client_list in endpoint is: ", len(rti_so.runtime.endpoint.client_list))
+
         if refresh:
                 with rti_so.runtime.lock:
                     rti_so.runtime.model_status = 'idle'
@@ -770,7 +826,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             if model_status == 'error':
                 raise HTTPException(status_code=500, detail=error)
             if model_status == 'idle':
-                start_result = _start_model_build_if_needed()
+                start_result = _start_model_build_if_needed(cp)
                 if start_result == 'error':
                     rti_so._log_action('Model build scheduling failed', 'error')
                     raise HTTPException(status_code=503, detail=rti_so.runtime.model_error)
@@ -902,6 +958,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             obj_ref = request.objRef
             fc = request.fc
 
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
             if not obj_ref:
                 rti_so._log_action("Client readvalue rejected: missing objRef", "warn")
                 return JSONResponse(
@@ -909,20 +973,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400
                 )
 
-            if rti_so.runtime.client is None:
-                rti_so._log_action(
-                    "Client readvalue rejected: not connected",
-                    "warn",
-                    detail={"objRef": obj_ref, "fc": fc},
-                )
-                return JSONResponse(
-                    content={"ok": False, "error": "Client is not connected"},
-                    status_code=503
-                )
-
             try:
                 result = rti_so.invoke_on_runtime_loop(
-                    rti_so.read_value(obj_ref, fc), timeout=10
+                    rti_so.read_value(obj_ref, fc, cp), timeout=10
                 )
 
                 if result is None:
@@ -1019,6 +1072,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             ln_inst = request.ln_inst
             do_path = request.do_path
 
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
             obj_ref = f"{ld_inst}/{ln_inst}.{do_path}" if do_path else f"{ld_inst}/{ln_inst}"
 
             if not obj_ref:
@@ -1028,20 +1089,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400
                 )
 
-            if rti_so.runtime.client is None:
-                #client._log_action(
-                #    "Client readvalue rejected: not connected",
-                #    "warn",
-                #    detail={"objRef": obj_ref, "fc": fc},
-                #)
-                return JSONResponse(
-                    content={"ok": False, "error": "Client is not connected"},
-                    status_code=503
-                )
-
             try:
                 result = rti_so.invoke_on_runtime_loop(
-                    rti_so.get_data_definition(obj_ref), timeout=10
+                    rti_so.get_data_definition(obj_ref, cp), timeout=10
                 )
 
 
@@ -1121,6 +1171,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
             obj_ref = f"{ld_inst}/{ln_inst}.{ds_inst}"
 
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
             # obj_ref = request.objRef
             # fc = request.fc
 
@@ -1131,20 +1189,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400
                 )
 
-            if rti_so.runtime.client is None:
-                # client._log_action(
-                #    "Client readvalue rejected: not connected",
-                #    "warn",
-                #    detail={"objRef": obj_ref, "fc": fc},
-                # )
-                return JSONResponse(
-                    content={"ok": False, "error": "Client is not connected"},
-                    status_code=503
-                )
-
             try:
                 result = rti_so.invoke_on_runtime_loop(
-                    rti_so.get_dataset_directory(ld_inst, ln_inst, ds_inst), timeout=10
+                    rti_so.get_dataset_directory(ld_inst, ln_inst, ds_inst, cp), timeout=10
                 )
 
                 print("get ds result: ", result)
@@ -1285,6 +1332,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             value = request.value
             value_type = request.value_type
 
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
             if not obj_ref:
                 #client._log_action("Client writevalue rejected: missing objRef", "warn")
                 return JSONResponse(
@@ -1310,20 +1365,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400
                 )
 
-            if rti_so.runtime.client is None:
-                #client._log_action(
-                #    "Client writevalue rejected: not connected",
-                #    "warn",
-                #   detail={"objRef": obj_ref, "fc": fc, "value": value},
-                #)
-                return JSONResponse(
-                    content={"ok": False, "error": "Client is not connected"},
-                    status_code=503
-                )
-
             try:
                 result = rti_so.invoke_on_runtime_loop(
-                    rti_so.write_value(obj_ref, value, fc, value_type), timeout=10
+                    rti_so.write_value(obj_ref, value, fc, value_type, cp), timeout=10
                 )
                 if result is None:
                     #client._log_action(
@@ -1412,6 +1456,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             value = request.value
             value_type = request.value_type
 
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
             if not obj_ref:
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
@@ -1423,15 +1475,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400
                 )
 
-            if rti_so.runtime.client is None:
-                return JSONResponse(
-                    content={"ok": False, "error": "Client is not connected"},
-                    status_code=503
-                )
-
             try:
                 result = rti_so.invoke_on_runtime_loop(
-                    rti_so.operate(obj_ref, value, value_type), timeout=10
+                    rti_so.operate(obj_ref, value, value_type, cp), timeout=10
                 )
                 if result is None:
                     return JSONResponse(

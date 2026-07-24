@@ -25,7 +25,7 @@
     const apiDefinitions = [
         { id: 'connect', label: 'POST /api/connect', method: 'POST', path: '/api/connect' },
         { id: 'disconnect', label: 'POST /api/disconnect', method: 'POST', path: '/api/disconnect' },
-        { id: 'model-tree', label: 'GET /api/model/tree', method: 'GET', path: '/api/model/tree' },
+        { id: 'model-tree', label: 'POST /api/model/tree', method: 'POST', path: '/api/model/tree' },
         { id: 'data-definition', label: 'POST /api/getDataDefinition', method: 'POST', path: '/api/getDataDefinition' },
         { id: 'read', label: 'POST /api/readvalue', method: 'POST', path: '/api/readvalue' },
         { id: 'write', label: 'POST /api/writevalue', method: 'POST', path: '/api/writevalue' },
@@ -33,7 +33,7 @@
         { id: 'actions-logs', label: 'GET /api/actions_logs', method: 'GET', path: '/api/actions_logs', sampleBody: '' },
         { id: 'clear-logs', label: 'POST /api/clear_logs', method: 'POST', path: '/api/clear_logs', sampleBody: '' },
         { id: 'status', label: 'GET /api/status', method: 'GET', path: '/api/status'},
-        { id: 'operate', label: 'GET /api/operate', method: 'POST', path: '/api/operate'},
+        { id: 'operate', label: 'POST /api/operate', method: 'POST', path: '/api/operate'},
     ];
 
     function getApiById(id) {
@@ -424,6 +424,9 @@
 
     // ==================== Event Handlers ====================
     function setupEventListeners(rootElement, endpoint) {
+
+        const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
+
         const connectBtn = rootElement.querySelector('#acsi-client-connect-page-btn');
         const disconnectBtn = rootElement.querySelector('#acsi-client-disconnect-page-btn');
         const fetchModelBtn = rootElement.querySelector('#acsi-client-fetch-model-btn');
@@ -535,7 +538,7 @@
         }
 
         if (fetchModelBtn) {
-            fetchModelBtn.addEventListener('click', () => handleFetchModel(rootElement, endpoint));
+            fetchModelBtn.addEventListener('click', () => handleFetchModel(rootElement, endpoint, cp));
         }
 
         // Protocol Messages event listeners
@@ -824,7 +827,7 @@
       treeValueSpan.style.color = '#4caf50';
     }
 
-    async function readDataValue(objRef, fc, endpoint) {
+    async function readDataValue(objRef, fc, endpoint, cp) {
       console.log('[readDataValue] Reading:', objRef, 'FC:', fc);
       const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
       const host = document.getElementById('acsi-client-host-page').value.trim();
@@ -834,7 +837,7 @@
         const res = await executeApiCall(
             getApiById('read'),
             endpointTarget,
-            { objRef, fc }
+            { objRef, fc, cp }
         );
 
         const data = res?.payload || { error: 'No response payload' };
@@ -853,7 +856,7 @@
       }
     }
 
-    async function writeDataValue(objRef, fc, endpoint, value, value_type) {
+    async function writeDataValue(objRef, fc, endpoint, value, value_type, cp) {
       console.log('[writeDataValue] Writing:', objRef, 'FC:', fc, 'Value:', value);
       const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
 
@@ -861,7 +864,7 @@
         const res = await executeApiCall(
             getApiById('write'),
             endpointTarget,
-            { objRef, fc, value, value_type }
+            { objRef, fc, value, value_type, cp }
         );
 
         const data = res?.payload || { error: 'No response payload' };
@@ -1071,7 +1074,7 @@
 //          }
 //    }
 
-    async function showControlDialog(objRef, objName, cdc, endpoint) {
+    async function showControlDialog(objRef, objName, cdc, endpoint, cp) {
         const root = document.querySelector('.acsi-server-page') || document;
 
         // Find all modal elements with null checks
@@ -1160,7 +1163,7 @@
             // Read ctlModel attribute value
             try {
                 const ctlModelRef = `${objRef}.ctlModel`;
-                const res = await executeApiCall(getApiById('read'), endpointTarget, { objRef: ctlModelRef, fc: 'cf' });
+                const res = await executeApiCall(getApiById('read'), endpointTarget, { objRef: ctlModelRef, fc: 'cf', cp:cp });
                 const data = res;
 
                 if (data.error) {
@@ -1316,7 +1319,7 @@
         };
     }
 
-    async function showContextMenuForControllableDO(e, objRef, objName, cdc, endpoint) {
+    async function showContextMenuForControllableDO(e, objRef, objName, cdc, endpoint, cp) {
         e.preventDefault();
         e.stopPropagation();
 
@@ -1324,7 +1327,7 @@
             {
                 label: 'Operate',
                 icon: 'fa-play',
-                action: () => showControlDialog(objRef, objName, cdc, endpoint)  // Only this opens the modal
+                action: () => showControlDialog(objRef, objName, cdc, endpoint, cp)  // Only this opens the modal
             },
             //{
             //    label: 'Read Value',
@@ -1438,7 +1441,7 @@
     }
 
 
-    async function showWriteValueDialog(objRef, fc, endpoint) {
+    async function showWriteValueDialog(objRef, fc, endpoint, cp) {
       const modal = document.getElementById('writeValueModal');
       const titleEl = document.getElementById('writeValueTitle');
       const objRefEl = document.getElementById('writeValueObjRef');
@@ -1461,7 +1464,7 @@
       validationEl.textContent = '';
       resultDiv.classList.add('hidden');
 
-      modal.classList.add('hidden');
+      modal.classList.remove('hidden');
       inputEl.focus();
 
       const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
@@ -1470,7 +1473,7 @@
         const res = await executeApiCall(
             getApiById('read'),
             endpointTarget,
-            { objRef, fc }
+            { objRef, fc, cp }
         );
 
         if (res?.ok && res.payload?.result?.value) {
@@ -1510,7 +1513,7 @@
         submitBtn.disabled = true;
 
         try {
-          await writeDataValue(objRef, fc, endpoint, newValue, typeEl.textContent);
+          await writeDataValue(objRef, fc, endpoint, newValue, typeEl.textContent, cp);
           resultDiv.textContent = '✓ Write successful!';
           resultDiv.style.background = '#2e7d32';
           resultDiv.style.color = '#fff';
@@ -1563,7 +1566,7 @@
     }
 
 
-    async function showContextMenuForDataAttribute(e, objRef, fc, endpoint) {
+    async function showContextMenuForDataAttribute(e, objRef, fc, endpoint, cp) {
         e.preventDefault();
         e.stopPropagation();
 
@@ -1571,13 +1574,13 @@
             {
                 label: `Read Value [${fc.toUpperCase()}]`,
                 icon: 'fa-eye',
-                action: () => readDataValue(objRef, fc, endpoint),
+                action: () => readDataValue(objRef, fc, endpoint, cp),
                 id: 'contextMenuReadValue',
             },
             {
                 label: `Write Value [${fc.toUpperCase()}]`,
                 icon: 'fa-pen',
-                action: () => showWriteValueDialog(objRef, fc, endpoint),
+                action: () => showWriteValueDialog(objRef, fc, endpoint, cp),
                 id: 'contextMenuWriteValue',
             }
         ];
@@ -1697,7 +1700,7 @@
       parentLi.appendChild(ul);
     }
 
-    async function fetchDODefinition(node, endpointTarget, onNodeClick, container, endpoint) {
+    async function fetchDODefinition(node, endpointTarget, onNodeClick, container, endpoint, cp) {
         // If already has children, just toggle
         const existingUl = node.li.querySelector(':scope > ul');
         if (existingUl) {
@@ -1718,7 +1721,7 @@
         const defResult = await executeApiCall(
             getApiById('data-definition'),
             endpointTarget,
-            {ld_inst: ldName, ln_inst: lnName, do_path: doPath}
+            {ld_inst: ldName, ln_inst: lnName, do_path: doPath, cp:cp}
         );
 
         if (defResult && defResult.ok) {
@@ -1753,7 +1756,7 @@
                if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
                 row.addEventListener('contextmenu', (e) => {
                     e.preventDefault(); e.stopPropagation();
-                    showContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                    showContextMenuForDataAttribute(e, daRef, fc, endpoint, cp);
                 });
                 } else {
                     row.addEventListener('contextmenu', (e) => {
@@ -1843,7 +1846,7 @@
                             if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
                                 subSdaRow.addEventListener('contextmenu', (e) => {
                                     e.preventDefault(); e.stopPropagation();
-                                    showContextMenuForDataAttribute(e, subSdaRef, fc, endpoint);
+                                    showContextMenuForDataAttribute(e, subSdaRef, fc, endpoint, cp);
                                 });
                             } else {
                                 subSdaRow.addEventListener('contextmenu', (e) => {
@@ -1863,7 +1866,7 @@
                      if(fc.toLowerCase() === 'sp' || fc.toLowerCase() === 'cf') {
                         sdaRow.addEventListener('contextmenu', (e) => {
                             e.preventDefault(); e.stopPropagation();
-                            showContextMenuForDataAttribute(e, sdaRef, fc, endpoint);
+                            showContextMenuForDataAttribute(e, sdaRef, fc, endpoint, cp);
                         });
                     } else {
                         sdaRow.addEventListener('contextmenu', (e) => {
@@ -1935,7 +1938,7 @@
                 defResult?.payload?.error || defResult?.rawText || 'Failed');
         }
     }
-    async function handleFetchModel(rootElement, endpoint) {
+    async function handleFetchModel(rootElement, endpoint, cp) {
         const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
 
         const handleNodeClick = async (node) => {
@@ -1943,7 +1946,7 @@
                     const container = document.getElementById('acsi-client-tree-content');
                     // ✅ Pass endpoint from closure or from node object
                     const endpointToUse = node.endpoint || endpoint;
-                    await fetchDODefinition(node, endpointTarget, handleNodeClick, container, endpointToUse);
+                    await fetchDODefinition(node, endpointTarget, handleNodeClick, container, endpointToUse, cp);
                     }
                 else if (node.nodeType == "DataSet") {
                     const existingUl = node.li.querySelector(':scope > ul');
@@ -1984,7 +1987,7 @@
                             row.addEventListener('contextmenu', (e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                showContextMenuForDataAttribute(e, `${node.ref}.${da.daRef}`, fc, endpoint);
+                                showContextMenuForDataAttribute(e, `${node.ref}.${da.daRef}`, fc, endpoint, cp);
                             });
 
                             ul.appendChild(daLi);
@@ -2015,13 +2018,13 @@
         const result = await executeApiCall(
             getApiById('model-tree'),
             endpointTarget,
-            null
+            {cp}
         );
 
         if (result && result.ok) {
             const treeContainer = rootElement.querySelector('#acsi-client-tree-container-page');
             const treeContent = rootElement.querySelector('#acsi-client-tree-content');
-            renderLiveModelTree(result.payload || {}, treeContent, handleNodeClick, endpoint);
+            renderLiveModelTree(result.payload || {}, treeContent, handleNodeClick, endpoint, cp);
             treeContainer.style.display = 'block';
             showStatus(rootElement, 'Model fetched successfully', 'success');
         }
@@ -2094,7 +2097,7 @@
         }
     }
 
-    function renderLiveModelTree(data, containerOrId, onNodeClick, endpoint) {
+    function renderLiveModelTree(data, containerOrId, onNodeClick, endpoint, cp) {
       var container = typeof containerOrId === 'string'
         ? document.getElementById(containerOrId)
         : containerOrId;
@@ -2202,7 +2205,7 @@
                   doLi.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    showContextMenuForControllableDO(e, doRef, doName, doObj.cdc, endpoint);
+                    showContextMenuForControllableDO(e, doRef, doName, doObj.cdc, endpoint, cp);
                   });
                 } else {
                   doLi.style.cursor = 'context-menu';
@@ -2282,7 +2285,7 @@
         const rootElement = document.querySelector('.acsi-server-page') || document.body;
 
         // Initialize with empty endpoint
-        setupEventListeners(rootElement, {});
+        //setupEventListeners(rootElement, {});
         renderProtocolMessages(rootElement);
         
         // Disable buttons that need connection first
