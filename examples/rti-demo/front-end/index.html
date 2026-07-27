@@ -270,21 +270,39 @@
                     </div>
 
                     <div class="settings-group">
-                        <h3>Display Settings</h3>
+                        <h3>Connection Refresh Time</h3>
                         <div class="setting-item">
-                            <label>
-                                <input type="checkbox" id="dark-mode-toggle" checked>
-                                Dark Mode
-                            </label>
+                            <label>Refresh Period in ms</label>
+                            <input type="text" id="connection-status-period" value="10000">
                         </div>
                         <div class="setting-item">
-                            <label>
-                                <input type="checkbox" id="auto-refresh-toggle" checked>
-                                Auto Refresh (5s)
-                            </label>
+                            <div class="setting-item">
+                            <label>Connection Cards Refresh Period in ms</label>
+                            <input type="text" id="auto-refresh-toggle" value="30000">
+                            </div>
                         </div>
+
+                        <button class="btn-primary" id="btn-save-refresh-period">
+                            <i class="fas fa-save"></i>
+                            Save
+                        </button>
                     </div>
-                </div>
+
+                    <div class="settings-group" hidden>
+                    <h3>Display Settings</h3>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="dark-mode-toggle" checked>
+                            Dark Mode
+                        </label>
+                    </div>
+
+                    </div>
+                 </div>
+
+
+
+
             </section>
 
             <!-- ACSI Client Page -->

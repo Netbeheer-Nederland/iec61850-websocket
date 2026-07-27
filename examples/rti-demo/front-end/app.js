@@ -75,8 +75,9 @@ class RTIDemoApp {
 
         // Settings
         document.getElementById('btn-save-settings').addEventListener('click', () => this.saveSettings());
+        document.getElementById('btn-save-refresh-period').addEventListener('click', () => this.savePollingSettings());
         document.getElementById('dark-mode-toggle').addEventListener('change', () => this.toggleDarkMode());
-        document.getElementById('auto-refresh-toggle').addEventListener('change', (e) => this.toggleAutoRefresh(e));
+        //document.getElementById('auto-refresh-toggle').addEventListener('change', (e) => this.toggleAutoRefresh(e));
 
         // Header
         document.getElementById('refresh-btn').addEventListener('click', () => this.handleManualRefresh());
@@ -726,15 +727,16 @@ class RTIDemoApp {
     startConnectionStatusPolling() {
         this.stopConnectionStatusPolling();
 
+        const poll_time = Number(document.getElementById("connection-status-period").value);
         const poll = async () => {
             // Only poll if we're actually viewing connections
             if (document.querySelector('.page.active')?.id !== 'page-connections') {
-                this.connectionStatusTimeout = setTimeout(poll, 10000);
+                this.connectionStatusTimeout = setTimeout(poll, poll_time);
                 return;
             }
 
             await this.refreshConnectionStatuses();
-            this.connectionStatusTimeout = setTimeout(poll, 10000);
+            this.connectionStatusTimeout = setTimeout(poll, poll_time);
         };
 
         poll();
@@ -1142,6 +1144,11 @@ ${JSON.stringify(result, null, 2)}</pre>`;
         this.checkBFFConnection();
     }
 
+    savePollingSettings(){
+        this.startConnectionStatusPolling();
+        this.toggleAutoRefresh();
+    }
+
     updateBffConfigFromSettingsInputs(persist = false) {
         const host = (document.getElementById('bff-host')?.value || '').trim();
         const port = (document.getElementById('bff-port')?.value || '').trim();
@@ -1200,26 +1207,23 @@ ${JSON.stringify(result, null, 2)}</pre>`;
     }
 
     toggleAutoRefresh(e) {
-        localStorage.setItem('autoRefresh', e.target.checked);
-        
-        if (e.target.checked) {
-            this.startAutoRefresh();
-        } else {
-            this.stopAutoRefresh();
-        }
+
+        this.stopAutoRefresh();
+        this.startAutoRefresh();
     }
 
     startAutoRefresh() {
         if (this.autoRefreshInterval) {
             clearInterval(this.autoRefreshInterval);
         }
+        const poll_time = Number(document.getElementById("auto-refresh-toggle").value);
 
         this.autoRefreshInterval = setInterval(() => {
             const activePage = document.querySelector('.page.active').id;
             if (activePage === 'page-dashboard') {
                 this.refreshDashboard();
             }
-        }, 30000); // Refresh every 30 seconds
+        }, poll_time);
     }
 
     stopAutoRefresh() {
