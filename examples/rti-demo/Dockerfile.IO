@@ -1,11 +1,10 @@
 # RTI Demo GPIO LED Control API Docker Image
-# Build context: iec61850-websocket/examples/rti-demo/demo_IO
+# Build context: rti-demo/
 
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 
-# Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -16,18 +15,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+# Copy project files for dependency management
+COPY examples/rti-demo/demo_IO/pyproject.toml /app/pyproject.toml
+
+# Install dependencies from pyproject.toml
+RUN uv sync --no-dev && \
+    uv pip compile -o /app/uv.lock /app/pyproject.toml
+
 # Copy application code
-COPY . /app/demo_IO
+COPY examples/rti-demo/demo_IO/ /app/demo_IO/
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r /app/demo_IO/requirements.txt
-
-# Expose port
 EXPOSE 8000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:8000/api/io/health || exit 1
 
-# Run the application
-CMD ["python", "-u", "demo_IO/main.py"]
+CMD ["./.venv/bin/python", "-u", "demo_IO/main.py"]
