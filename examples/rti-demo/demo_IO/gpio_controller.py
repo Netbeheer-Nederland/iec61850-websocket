@@ -84,7 +84,7 @@ class GPIOController:
             
             for name, config in self.config.items():
                 try:
-                    led = LED(config.gpio_pin)
+                    led = GPIOLED(config.gpio_pin)
                     if config.initial_state:
                         led.on()
                     else:
@@ -125,8 +125,18 @@ class GPIOController:
             logger.info(f"GPIO Controller initialized in simulation mode with {len(self.leds)} LEDs")
             return True
         except Exception as e:
-            logger.error(f"Failed to initialize GPIO: {e}")
-            return False
+            logger.warning(
+                f"GPIO unavailable ({e}), using simulation mode"
+            )
+
+            for name, config in self.config.items():
+                self.leds[name] = _MockLED(
+                    config.gpio_pin,
+                    config.initial_state
+                )
+
+            self._initialized = True
+            return True
     
     def cleanup(self) -> None:
         """Clean up all GPIO resources."""
