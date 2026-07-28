@@ -21,9 +21,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 # Copy project files for dependency management
 COPY demo_IO/pyproject.toml /app/pyproject.toml
 
-# Install dependencies from pyproject.toml
-RUN uv sync --no-dev && \
-    uv pip compile -o /app/uv.lock /app/pyproject.toml
+# Install dependencies from pyproject.toml using uv
+RUN uv sync --no-dev
 
 # Copy application code
 COPY demo_IO/ /app/demo_IO/
