@@ -14,12 +14,6 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libgpiod-dev \
-    liblgpio1 \
-    swig \
-    gcc \
-    g++ \
-    build-essential \
-    python3-dev \
  && rm -rf /var/lib/apt/lists/*
 
 # Install uv
