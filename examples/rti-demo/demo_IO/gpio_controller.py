@@ -14,10 +14,10 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+import gpiod
+from gpiod.line import Value
 
 class GPIOLED:
-    """Pi 5 GPIO implementation using libgpiod"""
-
     def __init__(self, pin: int):
         self.pin = pin
 
@@ -32,18 +32,27 @@ class GPIOLED:
         )
 
     def on(self):
-        self.request.set_value(self.pin, 1)
+        self.request.set_value(
+            self.pin,
+            Value.ACTIVE
+        )
 
     def off(self):
-        self.request.set_value(self.pin, 0)
+        self.request.set_value(
+            self.pin,
+            Value.INACTIVE
+        )
 
     @property
     def is_lit(self):
-        return bool(self.request.get_value(self.pin))
+        return (
+            self.request.get_value(self.pin)
+            == Value.ACTIVE
+        )
 
     def close(self):
         self.request.release()
-
+        
 @dataclass
 class LEDConfig:
     """Configuration for a single LED."""
