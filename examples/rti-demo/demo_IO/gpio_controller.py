@@ -91,9 +91,26 @@ class GPIOController:
                         led.off()
                     self.leds[name] = led
                     logger.info(f"Initialized LED '{name}' on GPIO {config.gpio_pin} (state: {'ON' if config.initial_state else 'OFF'})")
+
                 except Exception as e:
-                    logger.error(f"Failed to initialize LED '{name}': {e}")
-                    return False
+                    logger.warning(
+                        f"GPIO unavailable ({e}), switching to simulation mode"
+                    )
+
+                    for name, config in self.config.items():
+                        self.leds[name] = _MockLED(
+                            config.gpio_pin,
+                            config.initial_state
+                        )
+
+                    self._initialized = True
+
+                    logger.info(
+                        f"GPIO Controller initialized in simulation mode "
+                        f"with {len(self.leds)} LEDs"
+                    )
+
+                    return True
             
             self._initialized = True
             logger.info(f"GPIO Controller initialized with {len(self.leds)} LEDs")
