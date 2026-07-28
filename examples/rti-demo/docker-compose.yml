@@ -221,23 +221,23 @@ services:
       dockerfile: Dockerfile.IO
     container_name: demo_io
     ports:
-      - "8080:8080"
+      - "8000:8000"
     environment:
-      - PORT=8080
+      - PORT=8000
       - PYTHONUNBUFFERED=1
     networks:
       - rti-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/api/io/health" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/io/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
     labels:
       - "rti.service=demo_io"
-      - "rti.type=GPIO-Control"
+      - "rti.type=GPIO-LED-Control"
       - "rti.host=demo_io"
-      - "rti.port=8080"
+      - "rti.port=8000"
     volumes:
       - ./demo_IO:/app/demo_IO
 

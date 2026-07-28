@@ -9,7 +9,7 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PORT=8080
+    PORT=8000
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -23,11 +23,11 @@ COPY . /app/demo_IO
 RUN pip install --no-cache-dir -r /app/demo_IO/requirements.txt
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:8080/api/io/health || exit 1
+    CMD curl -f http://localhost:8000/api/io/health || exit 1
 
 # Run the application
 CMD ["python", "-u", "demo_IO/main.py"]
