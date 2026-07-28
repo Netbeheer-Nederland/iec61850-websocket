@@ -14,6 +14,7 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libgpiod-dev \
+    liblgpio1 \
     swig \
     gcc \
     g++ \
