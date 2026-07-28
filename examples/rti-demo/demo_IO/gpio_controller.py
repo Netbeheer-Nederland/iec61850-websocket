@@ -77,7 +77,10 @@ class GPIOController:
         
         try:
             # Import gpiozero here to allow graceful failure on non-Pi systems
-            from gpiozero import LED
+            from gpiozero import LED, Device
+            from gpiozero.pins.native import NativeFactory
+
+            Device.pin_factory = NativeFactory()
             
             for name, config in self.config.items():
                 try:

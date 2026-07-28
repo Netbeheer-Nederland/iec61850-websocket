@@ -225,7 +225,6 @@ services:
     environment:
       - PORT=8000
       - PYTHONUNBUFFERED=1
-      - GPIOZERO_PIN_FACTORY=lgpio
     devices:
       - "/dev/gpiochip0:/dev/gpiochip0"
       - "/dev/gpiochip1:/dev/gpiochip1"
