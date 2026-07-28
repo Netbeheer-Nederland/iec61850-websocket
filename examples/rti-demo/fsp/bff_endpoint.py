@@ -501,6 +501,8 @@ def create_bff_router(
             }
         """
         try:
+
+            print("getting model for cpin fsp: ", rti_fsp.runtime.cp)
             ied_model: Optional[IedModel] = rti_fsp.runtime.ied_model
             source = rti_fsp.runtime.model_source
             selected_ied = rti_fsp.runtime.model_ied_name

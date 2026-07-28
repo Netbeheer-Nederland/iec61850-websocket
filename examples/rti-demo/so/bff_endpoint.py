@@ -388,6 +388,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         endpoint = rti_so.runtime.endpoint
         loop = rti_so.runtime.loop
         acsi_client = rti_so.get_iec61850_client(cp)
+
+        if acsi_client is None:
+            raise HTTPException(status_code=404, detail=f"Client with cp={cp} not found")
+
         if not rti_so or not endpoint or not loop or not acsi_client.is_connected:
             raise RuntimeError('not-connected')
         try:
@@ -803,6 +807,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         cp = request.cp
 
         print("len client_list is: ", len(rti_so.runtime.client_list))
+        for i in rti_so.runtime.client_list:
+            print("the cleint in client_list cp is: ", i.cp)
         print("len client_list in endpoint is: ", len(rti_so.runtime.endpoint.client_list))
 
         if refresh:
