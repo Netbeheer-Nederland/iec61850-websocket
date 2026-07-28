@@ -27,9 +27,6 @@ COPY demo_IO/pyproject.toml /app/pyproject.toml
 # Install dependencies from pyproject.toml using uv
 RUN uv sync --no-dev
 
-# Install RPi.GPIO into the virtual environment
-RUN .venv/bin/pip install RPi.GPIO
-
 # Copy application code
 COPY demo_IO/ /app/demo_IO/
 
