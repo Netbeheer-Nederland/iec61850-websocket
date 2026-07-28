@@ -13,6 +13,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    python3-rpi.gpio \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
