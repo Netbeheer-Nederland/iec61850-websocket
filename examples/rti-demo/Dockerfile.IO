@@ -19,14 +19,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 # Copy project files for dependency management
-COPY examples/rti-demo/demo_IO/pyproject.toml /app/pyproject.toml
+COPY demo_IO/pyproject.toml /app/pyproject.toml
 
 # Install dependencies from pyproject.toml
 RUN uv sync --no-dev && \
     uv pip compile -o /app/uv.lock /app/pyproject.toml
 
 # Copy application code
-COPY examples/rti-demo/demo_IO/ /app/demo_IO/
+COPY demo_IO/ /app/demo_IO/
 
 EXPOSE 8000
 
