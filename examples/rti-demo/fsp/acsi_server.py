@@ -148,10 +148,12 @@ class ACSIServer:
             raise FileNotFoundError(f"Model file not found: {self.model_file}")
 
         importlib.invalidate_caches()
-        if "model" in sys.modules:
-            model_module = importlib.reload(sys.modules["model"])
+
+        model_name = self.model_file.stem
+        if model_name in sys.modules:
+            model_module = importlib.reload(sys.modules[model_name])
         else:
-            model_module = importlib.import_module("model")
+            model_module = importlib.import_module(model_name)
 
         ied = getattr(model_module, "ied", None)
         if ied is None and hasattr(model_module, "build_ied_model"):
