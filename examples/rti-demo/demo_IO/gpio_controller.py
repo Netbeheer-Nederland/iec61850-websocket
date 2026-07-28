@@ -8,11 +8,41 @@ It uses gpiozero for simplicity and safety, with fallback handling for non-Pi en
 from __future__ import annotations
 
 import logging
+import gpiod
 from typing import Dict, Optional, Any
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+
+class GPIOLED:
+    """Pi 5 GPIO implementation using libgpiod"""
+
+    def __init__(self, pin: int):
+        self.pin = pin
+
+        self.request = gpiod.request_lines(
+            "/dev/gpiochip0",
+            consumer="demo_io",
+            config={
+                pin: gpiod.LineSettings(
+                    direction=gpiod.line.Direction.OUTPUT
+                )
+            }
+        )
+
+    def on(self):
+        self.request.set_value(self.pin, 1)
+
+    def off(self):
+        self.request.set_value(self.pin, 0)
+
+    @property
+    def is_lit(self):
+        return bool(self.request.get_value(self.pin))
+
+    def close(self):
+        self.request.release()
 
 @dataclass
 class LEDConfig:
@@ -76,12 +106,7 @@ class GPIOController:
             return True
         
         try:
-            # Import gpiozero here to allow graceful failure on non-Pi systems
-            from gpiozero import LED, Device
-            from gpiozero.pins.native import NativeFactory
-
-            Device.pin_factory = NativeFactory()
-            
+            # Import gpiozero here to allow graceful failure on non-Pi systems            
             for name, config in self.config.items():
                 try:
                     led = GPIOLED(config.gpio_pin)
@@ -93,29 +118,16 @@ class GPIOController:
                     logger.info(f"Initialized LED '{name}' on GPIO {config.gpio_pin} (state: {'ON' if config.initial_state else 'OFF'})")
 
                 except Exception as e:
-                    logger.warning(
-                        f"GPIO unavailable ({e}), switching to simulation mode"
-                    )
-
-                    for name, config in self.config.items():
-                        self.leds[name] = _MockLED(
-                            config.gpio_pin,
-                            config.initial_state
-                        )
-
-                    self._initialized = True
-
-                    logger.info(
-                        f"GPIO Controller initialized in simulation mode "
-                        f"with {len(self.leds)} LEDs"
-                    )
-
-                    return True
-            
+                    logger.error( f"Failed to initialize LED '{name}': {e}" )
+                    return False
+                
             self._initialized = True
+
             logger.info(f"GPIO Controller initialized with {len(self.leds)} LEDs")
+
             return True
-            
+
+                  
         except ImportError as e:
             logger.warning(f"gpiozero not available: {e}. Running in simulation mode.")
             # Create mock LED objects for testing without hardware
@@ -136,6 +148,8 @@ class GPIOController:
                 )
 
             self._initialized = True
+
+            logger.info(f"GPIO Controller initialized in simulation mode "f"with {len(self.leds)} LEDs")
             return True
     
     def cleanup(self) -> None:
