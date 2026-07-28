@@ -3,8 +3,14 @@
 This module exposes REST API endpoints that interact with the ACSI server,
 handling model management, server lifecycle, and value operations.
 """
-
 from __future__ import annotations
+
+import os
+print("\n\n=== DEBUG: Checking /models directory ===")
+os.system("ls -la /models/ 2>&1 || echo 'Directory does not exist'")
+print("=== DEBUG: End ===\n\n")
+
+
 
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
@@ -89,7 +95,7 @@ class ReadvalueRequest(BaseModel):
     )
 
 def create_bff_router(
-    factory_dir: Path,
+    factory_dir,
     scl_default_path: Optional[Path] = None,
 ) -> tuple[APIRouter, ACSIServer]:
     """Create a FastAPI router for the ACSI server BFF API.
@@ -1243,7 +1249,8 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
         ]
     )
 
-    resolved_factory_dir = factory_dir or Path(__file__).parent
+    #resolved_factory_dir = factory_dir or Path(__file__).parent
+    resolved_factory_dir = os.getenv('MODELPATH')
     router, _server = create_bff_router(resolved_factory_dir)
     app.include_router(router)
     app.state.server = _server

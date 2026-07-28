@@ -51,7 +51,7 @@ class ACSIServerRuntime:
         self.ied_model: Optional[IedModel] = None
         self.model_ied_name: Optional[str] = None
         self.model_source: Optional[str] = None
-        self.cp: str = "cp1"
+        self.cp: str =  os.getenv('CP', 'cp1')
         self.last_status_log_signature: Optional[tuple] = None
         self.lock: threading.Lock = threading.Lock()
         self.model_lock: threading.Lock = threading.Lock()  # Separate lock for model operations
@@ -70,7 +70,7 @@ class ACSIServerRuntime:
 class ACSIServer:
     """IEC 61850 WebSocket server controller."""
 
-    def __init__(self, factory_dir: Path):
+    def __init__(self, model_path):
         self.runtime = ACSIServerRuntime()
         self.runtime.endpoint = ActiveEndpoint()
         self.runtime.endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
@@ -78,12 +78,14 @@ class ACSIServer:
 
         # Prefer the model already in runtime (freshly loaded from SCL/model.py)
         # Only reload from file as fallback if runtime model is missing
-        self.factory_dir = factory_dir
-        self.model_file = factory_dir / "model.py"
+        #self.factory_dir = factory_dir
+        #self.model_file = factory_dir / "model.py"
+        self.model_file = Path(model_path)
+        factory_dir = str(self.model_file.parent)
 
         # Ensure `import model` resolves to the expected fsp/model.py directory.
-        if str(self.factory_dir) not in sys.path:
-            sys.path.insert(0, str(self.factory_dir))
+        if factory_dir not in sys.path:
+            sys.path.insert(0, factory_dir)
 
         if not self.model_file.exists():
             raise FileNotFoundError(

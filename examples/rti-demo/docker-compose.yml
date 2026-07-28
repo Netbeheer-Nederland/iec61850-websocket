@@ -115,6 +115,8 @@ services:
     environment:
       - PORT=5001
       - PYTHONUNBUFFERED=1
+      - CP=cp1
+      - MODELPATH=/models/model.py
     networks:
       - rti-network
     healthcheck:
@@ -130,6 +132,36 @@ services:
       - "rti.port=5001"
     volumes:
         - ./fsp:/app/fsp
+        - ./models:/models
+
+  # Second FSP instance
+  rti-fsp-2:
+    build:
+      context: ../..
+      dockerfile: examples/rti-demo/Dockerfile.rti-fsp
+    container_name: rti-fsp-2
+    ports:
+      - "5005:5001"  # Map to different host port, same container port
+    networks:
+      - rti-network
+    environment:
+      - PORT=5005
+      - CP=cp2
+      - MODELPATH=/models/model_2.py
+    healthcheck: # ✅ Add healthcheck (optional but recommended)
+      test: [ "CMD", "curl", "-f", "http://localhost:5001/api/status" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels: # ✅ Add labels for consistency
+      - "rti.service=rti-fsp-2"
+      - "rti.type=RTI-FSP"
+      - "rti.host=rti-fsp-2"
+      - "rti.port=5001"
+    volumes: # ✅ Add volumes if needed
+      - ./fsp:/app/fsp
+      - ./models:/models
 
   # RTI SO (Acsi-Client)
   rti-so:
