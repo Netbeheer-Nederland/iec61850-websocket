@@ -8,6 +8,6 @@ dependencies = [
     "fastapi>=0.95.0",
     "uvicorn[standard]>=0.21.0",
     "gpiozero>=1.6.0",
-    "RPi.GPIO>=0.7.0",
+    "lgpio>=0.2.0",
     "pydantic>=1.10.0",
 ]

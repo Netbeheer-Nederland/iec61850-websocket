@@ -10,22 +10,26 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=8000
 
-# Install system dependencies
+# Install system dependencies for GPIO
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    gcc \
-    python3-dev \
-    python3-rpi.gpio \
+    libgpiod-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Copy project files for dependency management
+# Copy demo_IO project files
 COPY demo_IO/pyproject.toml /app/pyproject.toml
 
 # Install dependencies from pyproject.toml using uv
-RUN uv sync --no-dev
+# If no uv.lock exists, generate it; otherwise use frozen mode
+RUN if [ -f /app/uv.lock ]; then \
+    uv sync --frozen --no-dev; \
+else \
+    uv sync --no-dev && \
+    uv lock; \
+fi
 
 # Copy application code
 COPY demo_IO/ /app/demo_IO/
