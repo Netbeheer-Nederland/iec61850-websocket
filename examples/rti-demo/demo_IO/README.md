@@ -139,10 +139,14 @@ sudo raspi-config
 
 ```bash
 # Install Python 3 (usually pre-installed)
-sudo apt install python3 python3-pip -y
+sudo apt install python3 python3-pip python3-venv -y
+
+# Create and activate virtual environment (recommended)
+python3 -m venv ~/venv
+source ~/venv/bin/activate
 
 # Install required packages
-pip3 install fastapi uvicorn gpiozero
+pip install fastapi uvicorn gpiozero
 ```
 
 #### 4. Verify gpiozero Installation
