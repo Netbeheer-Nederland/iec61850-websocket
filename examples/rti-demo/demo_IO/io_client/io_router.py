@@ -24,6 +24,7 @@ from .client_io import DemoIOClient
 
 logger = logging.getLogger(__name__)
 
+
 # ==================== Pydantic Models ====================
 
 class LEDConfigRequest(BaseModel):
@@ -341,6 +342,67 @@ def create_io_router() -> APIRouter:
             description=request.description,
             initial_state=request.initial_state
         )
+
+    # ==================== Bulk Operations (MOVED BEFORE single-LED routes) ====================
+
+    @router.post(
+        "/leds/all/set",
+        summary="Set All LEDs",
+        description="Set all configured LEDs to a specific state on demo_IO.",
+        response_description="Bulk set confirmation",
+        responses={
+            200: {"description": "All LEDs set successfully"},
+            503: {"description": "demo_IO not connected"}
+        },
+        tags=["Bulk Operations"]
+    )
+    async def api_set_all_leds(request: LEDStateRequest):
+        """Set all LEDs to a specific state on demo_IO.
+        
+        Request Body:
+            LEDStateRequest: {
+                "state": bool  # Required - True for ON, False for OFF
+            }
+        
+        Returns:
+            dict: Confirmation with resulting states of all LEDs
+        """
+        client = _get_client_or_error()
+        return client.set_all_leds(request.state)
+    
+    @router.post(
+        "/leds/all/on",
+        summary="All LEDs On",
+        description="Turn all configured LEDs ON on demo_IO.",
+        response_description="Bulk on confirmation",
+        responses={
+            200: {"description": "All LEDs turned ON successfully"},
+            503: {"description": "demo_IO not connected"}
+        },
+        tags=["Bulk Operations"]
+    )
+    async def api_all_on(request: Request):
+        """Turn all LEDs ON on demo_IO."""
+        client = _get_client_or_error()
+        return client.all_leds_on()
+    
+    @router.post(
+        "/leds/all/off",
+        summary="All LEDs Off",
+        description="Turn all configured LEDs OFF on demo_IO.",
+        response_description="Bulk off confirmation",
+        responses={
+            200: {"description": "All LEDs turned OFF successfully"},
+            503: {"description": "demo_IO not connected"}
+        },
+        tags=["Bulk Operations"]
+    )
+    async def api_all_off(request: Request):
+        """Turn all LEDs OFF on demo_IO."""
+        client = _get_client_or_error()
+        return client.all_leds_off()
+    
+    # ==================== LED Status ====================
     
     @router.get(
         "/leds",
@@ -484,65 +546,6 @@ def create_io_router() -> APIRouter:
         """
         client = _get_client_or_error()
         return client.turn_off(name)
-    
-    # ==================== Bulk Operations ====================
-    
-    @router.post(
-        "/leds/all/set",
-        summary="Set All LEDs",
-        description="Set all configured LEDs to a specific state on demo_IO.",
-        response_description="Bulk set confirmation",
-        responses={
-            200: {"description": "All LEDs set successfully"},
-            503: {"description": "demo_IO not connected"}
-        },
-        tags=["Bulk Operations"]
-    )
-    async def api_set_all_leds(request: LEDStateRequest):
-        """Set all LEDs to a specific state on demo_IO.
-        
-        Request Body:
-            LEDStateRequest: {
-                "state": bool  # Required - True for ON, False for OFF
-            }
-        
-        Returns:
-            dict: Confirmation with resulting states of all LEDs
-        """
-        client = _get_client_or_error()
-        return client.set_all_leds(request.state)
-    
-    @router.post(
-        "/leds/all/on",
-        summary="All LEDs On",
-        description="Turn all configured LEDs ON on demo_IO.",
-        response_description="Bulk on confirmation",
-        responses={
-            200: {"description": "All LEDs turned ON successfully"},
-            503: {"description": "demo_IO not connected"}
-        },
-        tags=["Bulk Operations"]
-    )
-    async def api_all_on(request: Request):
-        """Turn all LEDs ON on demo_IO."""
-        client = _get_client_or_error()
-        return client.all_leds_on()
-    
-    @router.post(
-        "/leds/all/off",
-        summary="All LEDs Off",
-        description="Turn all configured LEDs OFF on demo_IO.",
-        response_description="Bulk off confirmation",
-        responses={
-            200: {"description": "All LEDs turned OFF successfully"},
-            503: {"description": "demo_IO not connected"}
-        },
-        tags=["Bulk Operations"]
-    )
-    async def api_all_off(request: Request):
-        """Turn all LEDs OFF on demo_IO."""
-        client = _get_client_or_error()
-        return client.all_leds_off()
     
     # ==================== GPIO Management ====================
     

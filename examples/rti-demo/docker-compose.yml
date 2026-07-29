@@ -117,6 +117,7 @@ services:
       - PYTHONUNBUFFERED=1
       - CP=cp1
       - MODELPATH=/models/model.py
+      - DEMO_IO_URL=http://demo_io:8000
     networks:
       - rti-network
     healthcheck:
@@ -133,6 +134,7 @@ services:
     volumes:
         - ./fsp:/app/fsp
         - ./models:/models
+        - ./demo_IO:/app/demo_IO
 
   # Second FSP instance
   rti-fsp-2:
@@ -148,6 +150,7 @@ services:
       - PORT=5005
       - CP=cp2
       - MODELPATH=/models/model_2.py
+      - DEMO_IO_URL=http://demo_io:8000
     healthcheck: # ✅ Add healthcheck (optional but recommended)
       test: [ "CMD", "curl", "-f", "http://localhost:5001/api/status" ]
       interval: 30s
@@ -162,6 +165,7 @@ services:
     volumes: # ✅ Add volumes if needed
       - ./fsp:/app/fsp
       - ./models:/models
+      - ./demo_IO:/app/demo_IO
 
   # RTI SO (Acsi-Client)
   rti-so:
