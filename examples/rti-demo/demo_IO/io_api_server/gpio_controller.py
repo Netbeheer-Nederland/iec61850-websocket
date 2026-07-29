@@ -158,7 +158,7 @@ class GPIOController:
 
             self._initialized = True
 
-            logger.info(f"GPIO Controller initialized in simulation mode "f"with {len(self.leds)} LEDs")
+            logger.info(f"GPIO Controller initialized in simulation mode with {len(self.leds)} LEDs")
             return True
     
     def cleanup(self) -> None:
