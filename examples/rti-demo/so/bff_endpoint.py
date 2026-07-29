@@ -391,6 +391,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
         if acsi_client is None:
             raise HTTPException(status_code=404, detail=f"Client with cp={cp} not found")
+        else:
+            logger.info("client found with cp: ", acsi_client.cp)
 
         if not rti_so or not endpoint or not loop or not acsi_client.is_connected:
             raise RuntimeError('not-connected')
@@ -407,9 +409,11 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         logical_device_map = {}
         logical_device_status = {}
 
+        model_info = rti_so.get_model_info(cp)
+
         def _init_progress(ld_list):
             with rti_so.runtime.lock:
-                rti_so.runtime.model_progress = {
+                model_info.model_progress = {
                     'lds_total': len(ld_list), 'lds_done': 0,
                     'lns_total': 0, 'lns_done': 0,
                     'current_ld': None, 'current_ln': None
@@ -417,30 +421,30 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
         def _set_current_ld(ld):
             with rti_so.runtime.lock:
-                if rti_so.runtime.model_progress:
-                    rti_so.runtime.model_progress['current_ld'] = ld
+                if model_info.model_progress:
+                    model_info.model_progress['current_ld'] = ld
 
         def _add_lns_total(n):
             if n:
                 with rti_so.runtime.lock:
-                    if rti_so.runtime.model_progress:
-                        rti_so.runtime.model_progress['lns_total'] += n
+                    if model_info.model_progress:
+                        model_info.model_progress['lns_total'] += n
 
         def _set_current_ln(ln):
             with rti_so.runtime.lock:
-                if rti_so.runtime.model_progress:
-                    rti_so.runtime.model_progress['current_ln'] = ln
+                if model_info.model_progress:
+                    model_info.model_progress['current_ln'] = ln
 
         def _inc_ln_done():
             with rti_so.runtime.lock:
-                if rti_so.runtime.model_progress:
-                    rti_so.runtime.model_progress['lns_done'] += 1
+                if model_info.model_progress:
+                    model_info.model_progress['lns_done'] += 1
 
         def _finish_ld():
             with rti_so.runtime.lock:
-                if rti_so.runtime.model_progress:
-                    rti_so.runtime.model_progress['lds_done'] += 1
-                    rti_so.runtime.model_progress['current_ln'] = None
+                if model_info.model_progress:
+                    model_info.model_progress['lds_done'] += 1
+                    model_info.model_progress['current_ln'] = None
 
         async def _process_ld(ld):
             try:
@@ -490,33 +494,35 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 'source': 'live'
             }
             with rti_so.runtime.lock:
-                rti_so.runtime.model_data = model
-                rti_so.runtime.model_error = None
-                rti_so.runtime.model_status = 'ready'
-                rti_so.runtime.model_ready_event.set()
+                model_info.model_data = model
+                model_info.model_error = None
+                model_info.model_status = 'ready'
+                model_info.model_ready_event.set()
 
 
         except Exception as e:
             with rti_so.runtime.lock:
-                rti_so.runtime.model_status = 'error'
-                rti_so.runtime.model_error = str(e)
+                model_info.model_status = 'error'
+                model_info.model_error = str(e)
             raise
 
     def _start_model_build_if_needed(cp):
         """Schedule background model build if idle or error."""
+        model_info = rti_so.get_model_info(cp)
+
         with rti_so.runtime.lock:
-            model_status = rti_so.runtime.model_status
+            model_status = model_info.model_status
             if model_status in ('ready', 'building'):
                 return model_status
-            rti_so.runtime.model_data = None
-            rti_so.runtime.model_error = None
-            rti_so.runtime.model_status = 'building'
+            model_info.model_data = None
+            model_info.model_error = None
+            model_info.model_status = 'building'
 
         loop = rti_so.runtime.loop
         if not loop:
             with rti_so.runtime.lock:
-                rti_so.runtime.model_status = 'error'
-                rti_so.runtime.model_error = 'no-loop'
+                model_info.model_status = 'error'
+                model_info.model_error = 'no-loop'
             return 'error'
 
         try:
@@ -525,32 +531,33 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             #client._log_action("Model build scheduled", "info")
         except Exception as e:
             with rti_so.runtime.lock:
-                rti_so.runtime.model_status = 'error'
-                rti_so.runtime.model_error = str(e)
+                model_info.model_status = 'error'
+                model_info.model_error = str(e)
             #client._log_action(f"Failed to schedule model build: {e}", "error")
             return 'error'
 
         with rti_so.runtime.lock:
-            rti_so.runtime.model_task = fut
+            model_info.model_task = fut
 
         def _on_model_task_done(future):
+            model_info = rti_so.get_model_info(cp)
             try:
                 exc = future.exception()
             except Exception:
                 exc = None
             with rti_so.runtime.lock:
                 try:
-                    rti_so.runtime.model_task = None
+                    model_info.model_task = None
                 except Exception:
                     pass
                 if exc is not None:
-                    rti_so.runtime.model_status = 'error'
-                    rti_so.runtime.model_error = str(exc)
+                    model_info.model_status = 'error'
+                    model_info.model_error = str(exc)
                     #client._log_action(f"Model build failed: {exc}", "error")
                 else:
-                    if rti_so.runtime.model_status != 'ready':
-                        rti_so.runtime.model_status = 'ready'
-                        rti_so.runtime.model_error = None
+                    if model_info.model_status != 'ready':
+                        model_info.model_status = 'ready'
+                        model_info.model_error = None
                     #client._log_action("Model build completed", "info")
 
         try:
@@ -805,18 +812,20 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         """Get the IED model tree from the connected server."""
 
         cp = request.cp
+        print("selected cp in so: ", cp)
+        print("len of model_info: ", len(rti_so.model_info_list))
+        for mi in rti_so.model_info_list:
+            print("the model info exists with cp: ", mi.cp)
+        model_info = rti_so.get_model_info(cp)
 
-        print("len client_list is: ", len(rti_so.runtime.client_list))
-        for i in rti_so.runtime.client_list:
-            print("the cleint in client_list cp is: ", i.cp)
-        print("len client_list in endpoint is: ", len(rti_so.runtime.endpoint.client_list))
+
 
         if refresh:
                 with rti_so.runtime.lock:
-                    rti_so.runtime.model_status = 'idle'
-                    rti_so.runtime.model_data = None
-                    rti_so.runtime.model_error = None
-                    rti_so.runtime.model_ready_event.clear()
+                    model_info.model_status = 'idle'
+                    model_info.model_data = None
+                    model_info.model_error = None
+                    model_info.model_ready_event.clear()
 
         try:
             loop = rti_so.runtime.loop
@@ -824,9 +833,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 raise HTTPException(status_code=503, detail="client-not-connected")
 
             with rti_so.runtime.lock:
-                model_status = rti_so.runtime.model_status
-                data = rti_so.runtime.model_data
-                error = rti_so.runtime.model_error
+                model_status = model_info.model_status
+                data = model_info.model_data
+                error = model_info.model_error
             if model_status == 'ready' and data:
                 return {'status': 'ready', 'model': data}
             if model_status == 'error':
@@ -837,8 +846,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     rti_so._log_action('Model build scheduling failed', 'error')
                     raise HTTPException(status_code=503, detail=rti_so.runtime.model_error)
                 else:
-                    await rti_so.runtime.model_ready_event.wait()
-                    data = rti_so.runtime.model_data
+                    await model_info.model_ready_event.wait()
+                    data = model_info.model_data
                     return {"status": "ready", "model": data}
 
             return {'status': 'error', 'model': None}
@@ -1523,52 +1532,52 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 status_code=500
             )
 
-    @router.get(
-        "/internal/model/status",
-        summary="Internal Model Status",
-        description="Internal diagnostic endpoint exposing model build state for debugging purposes.",
-        response_description="Model build state",
-        responses={
-            200: {"description": "Model build status returned"},
-            500: {"description": "Error retrieving status"}
-        },
-        tags=["Diagnostics"]
-    )
-    async def _internal_model_status(request: Request):
-        """Internal diagnostic endpoint exposing model build state."""
-        try:
-            with rti_so.runtime.lock:
-                status = getattr(rti_so.runtime, 'model_status', None)
-                progress = getattr(rti_so.runtime, 'model_progress', None)
-                error = getattr(rti_so.runtime, 'model_error', None)
-                task = getattr(rti_so.runtime, 'model_task', None)
-                loop = getattr(rti_so.runtime, 'loop', None)
-                client_conn = getattr(rti_so.runtime, 'client', None)
-
-            loop_running = False
-            try:
-                loop_running = bool(loop and getattr(loop, 'is_running', lambda: False)())
-            except Exception:
-                loop_running = False
-
-            client_connected = False
-            try:
-                client_connected = bool(client_conn and getattr(client_conn, 'is_connected', False))
-            except Exception:
-                client_connected = False
-
-            return {
-                'ok': True,
-                'model_status': status,
-                'model_progress': progress,
-                'model_error': error,
-                'model_task_present': task is not None,
-                'loop_running': loop_running,
-                'client_connected': client_connected,
-            }
-        except Exception as exc:
-            rti_so._log_action(f"Internal model status failed: {exc}", 'error')
-            raise HTTPException(status_code=500, detail=str(exc))
+    # @router.get(
+    #     "/internal/model/status",
+    #     summary="Internal Model Status",
+    #     description="Internal diagnostic endpoint exposing model build state for debugging purposes.",
+    #     response_description="Model build state",
+    #     responses={
+    #         200: {"description": "Model build status returned"},
+    #         500: {"description": "Error retrieving status"}
+    #     },
+    #     tags=["Diagnostics"]
+    # )
+    # async def _internal_model_status(request: Request):
+    #     """Internal diagnostic endpoint exposing model build state."""
+    #     try:
+    #         with rti_so.runtime.lock:
+    #             status = getattr(rti_so.runtime, 'model_status', None)
+    #             progress = getattr(rti_so.runtime, 'model_progress', None)
+    #             error = getattr(rti_so.runtime, 'model_error', None)
+    #             task = getattr(rti_so.runtime, 'model_task', None)
+    #             loop = getattr(rti_so.runtime, 'loop', None)
+    #             client_conn = getattr(rti_so.runtime, 'client', None)
+    #
+    #         loop_running = False
+    #         try:
+    #             loop_running = bool(loop and getattr(loop, 'is_running', lambda: False)())
+    #         except Exception:
+    #             loop_running = False
+    #
+    #         client_connected = False
+    #         try:
+    #             client_connected = bool(client_conn and getattr(client_conn, 'is_connected', False))
+    #         except Exception:
+    #             client_connected = False
+    #
+    #         return {
+    #             'ok': True,
+    #             'model_status': status,
+    #             'model_progress': progress,
+    #             'model_error': error,
+    #             'model_task_present': task is not None,
+    #             'loop_running': loop_running,
+    #             'client_connected': client_connected,
+    #         }
+    #     except Exception as exc:
+    #         rti_so._log_action(f"Internal model status failed: {exc}", 'error')
+    #         raise HTTPException(status_code=500, detail=str(exc))
 
     return router, rti_so
 

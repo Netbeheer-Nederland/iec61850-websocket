@@ -280,6 +280,9 @@ class IEC61850Client:
         )
 
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
+
+        print(f"ServerConnection attributes: {dir(websocket_info.websocket)}")
+
         await websocket_info.websocket.send(request)
         if self.send_msg_callback is not None:
             self.send_msg_callback(request, datetime.datetime.now())

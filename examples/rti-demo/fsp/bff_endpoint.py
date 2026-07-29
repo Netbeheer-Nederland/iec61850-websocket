@@ -502,11 +502,13 @@ def create_bff_router(
         """
         try:
 
-            print("getting model for cpin fsp: ", rti_fsp.runtime.cp)
+            print("getting model for cp in fsp: ", rti_fsp.runtime.cp)
             ied_model: Optional[IedModel] = rti_fsp.runtime.ied_model
             source = rti_fsp.runtime.model_source
             selected_ied = rti_fsp.runtime.model_ied_name
             access_points = [rti_fsp.runtime.cp or "cp1"]
+
+            print("selected_ied in fsp: ", selected_ied)
 
             logical_devices: List[str] = []
             if ied_model is not None:

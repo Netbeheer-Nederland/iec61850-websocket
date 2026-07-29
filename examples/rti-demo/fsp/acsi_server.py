@@ -72,9 +72,16 @@ class ACSIServer:
 
     def __init__(self, model_path):
         self.runtime = ACSIServerRuntime()
+        self.runtime.ied_model = None
+        self.runtime.model_ied_name = None
+        self.runtime.model_source = None
+        self.runtime.model_version = 0
+
         self.runtime.endpoint = ActiveEndpoint()
         self.runtime.endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
         self.runtime.endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
+
+        print(f"[DEBUG] New ACSIServer instance: model_path={model_path}, id={id(self.runtime)}")
 
         # Prefer the model already in runtime (freshly loaded from SCL/model.py)
         # Only reload from file as fallback if runtime model is missing
@@ -147,21 +154,19 @@ class ACSIServer:
         if not self.model_file.exists():
             raise FileNotFoundError(f"Model file not found: {self.model_file}")
 
-        importlib.invalidate_caches()
-
-        model_name = self.model_file.stem
-        if model_name in sys.modules:
-            model_module = importlib.reload(sys.modules[model_name])
-        else:
-            model_module = importlib.import_module(model_name)
+        # Use importlib.util to load without polluting sys.modules
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(self.model_file.stem, self.model_file)
+        model_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(model_module)
 
         ied = getattr(model_module, "ied", None)
         if ied is None and hasattr(model_module, "build_ied_model"):
             ied = model_module.build_ied_model()
         if ied is None:
-            raise RuntimeError("model.py does not define variable 'ied' or build_ied_model()")
+            raise RuntimeError(f"{self.model_file.stem}.py does not define 'ied' or build_ied_model()")
         if not isinstance(ied, IedModel):
-            raise RuntimeError("Runtime model is not an IedModel instance")
+            raise RuntimeError(f"Model in {self.model_file.stem}.py is not an IedModel")
         return ied
 
     def update_model_file(self, model_source: str, apply_dynamically: bool = True) -> IedModel:
