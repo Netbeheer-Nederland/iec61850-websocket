@@ -538,7 +538,7 @@
         }
 
         if (fetchModelBtn) {
-            fetchModelBtn.addEventListener('click', () => handleFetchModel(rootElement, endpoint, cp));
+            fetchModelBtn.addEventListener('click', () => handleFetchModel(rootElement, endpoint));
         }
 
         // Protocol Messages event listeners
@@ -1540,7 +1540,7 @@
         });
     }
 
-    async function showReadContextMenuForDataAttribute(e, objRef, fc, endpoint) {
+    async function showReadContextMenuForDataAttribute(e, objRef, fc, endpoint, cp) {
         e.preventDefault();
         e.stopPropagation();
 
@@ -1548,7 +1548,7 @@
             {
                 label: `Read Value [${fc.toUpperCase()}]`,
                 icon: 'fa-eye',
-                action: () => readDataValue(objRef, fc, endpoint),
+                action: () => readDataValue(objRef, fc, endpoint, cp),
                 id: 'contextMenuReadValue',
             },
         ];
@@ -1761,7 +1761,7 @@
                 } else {
                     row.addEventListener('contextmenu', (e) => {
                         e.preventDefault(); e.stopPropagation();
-                        showReadContextMenuForDataAttribute(e, daRef, fc, endpoint);
+                        showReadContextMenuForDataAttribute(e, daRef, fc, endpoint, cp);
                     });
                 }
 
@@ -1851,7 +1851,7 @@
                             } else {
                                 subSdaRow.addEventListener('contextmenu', (e) => {
                                     e.preventDefault(); e.stopPropagation();
-                                    showReadContextMenuForDataAttribute(e, subSdaRef, fc, endpoint);
+                                    showReadContextMenuForDataAttribute(e, subSdaRef, fc, endpoint, cp);
                                 });
                             }
 
@@ -1871,7 +1871,7 @@
                     } else {
                         sdaRow.addEventListener('contextmenu', (e) => {
                             e.preventDefault(); e.stopPropagation();
-                            showReadContextMenuForDataAttribute(e, sdaRef, fc, endpoint);
+                            showReadContextMenuForDataAttribute(e, sdaRef, fc, endpoint, cp);
                         });
                     }
 
@@ -1938,7 +1938,10 @@
                 defResult?.payload?.error || defResult?.rawText || 'Failed');
         }
     }
-    async function handleFetchModel(rootElement, endpoint, cp) {
+    async function handleFetchModel(rootElement, endpoint) {
+
+        const cp = rootElement.querySelector('#acsi-client-cp-page').value.trim() || 'cp1';
+
         const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
 
         const handleNodeClick = async (node) => {

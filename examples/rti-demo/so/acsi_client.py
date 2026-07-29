@@ -22,6 +22,15 @@ from typing import Any, Callable, Dict, List, Optional
 from ws61850.endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
+class ModelInfo:
+    def __init__(self, cp):
+        self.model_status: str = "idle"  # idle|building|ready|error
+        self.model_data: Optional[Dict[str, Any]] = None
+        self.model_error: Optional[str] = None
+        self.model_progress: Optional[Dict[str, Any]] = None
+        self.model_ready_event = asyncio.Event()
+        self.cp = cp
+
 class ACSIClientRuntime:
     """Manages IEC 61850 WebSocket client runtime state and lifecycle."""
 
@@ -42,19 +51,11 @@ class ACSIClientRuntime:
         self.last_status_log_signature: Optional[tuple] = None
         self.lock: threading.Lock = threading.Lock()
         self.invoke_lock: asyncio.Lock = asyncio.Lock()
+        self.client_list = None
 
-        # Model and tree caching
-        self.model_status: str = "idle"  # idle|building|ready|error
-        self.model_data: Optional[Dict[str, Any]] = None
-        self.model_error: Optional[str] = None
-        self.model_progress: Optional[Dict[str, Any]] = None
-        self.model_ready_event = asyncio.Event()
-        
         # Callbacks for message logging
         self.recv_msg_callback: Optional[Callable] = None
         self.send_msg_callback: Optional[Callable] = None
-
-        self.client_list = None
 
 
 class ACSIClient:
@@ -68,6 +69,40 @@ class ACSIClient:
         #self.runtime.client = IEC61850Client(self.runtime.cp)
         #self.runtime.endpoint.add_iec61850_client(self.runtime.client)
         self.runtime.client_list = self.runtime.endpoint.client_list
+
+        # Model and tree caching
+        self.model_list = []
+
+        # Track ModelInfo by cp to preserve state
+        self._model_info_dict = {}  # cp -> ModelInfo
+        self._update_model_info_dict()
+
+
+    def _update_model_info_dict(self):
+        """Sync ModelInfo dict with current client_list, preserving existing objects"""
+        current_cps = {client.cp for client in self.runtime.client_list}
+
+        # Add new clients
+        for client in self.runtime.client_list:
+            if client.cp not in self._model_info_dict:
+                self._model_info_dict[client.cp] = ModelInfo(client.cp)
+
+        # Remove clients that are gone
+        for cp in list(self._model_info_dict.keys()):
+            if cp not in current_cps:
+                del self._model_info_dict[cp]
+
+
+    @property
+    def model_info_list(self):
+        """Returns list of ModelInfo objects (preserves state between calls)"""
+        return list(self._model_info_dict.values())
+
+    def get_model_info(self, cp):
+        """Get or create ModelInfo for a CP."""
+        if cp not in self._model_info_dict:
+            self._model_info_dict[cp] = ModelInfo(cp)  # New object (default values)
+        return self._model_info_dict[cp]  # ✅ Returns EXISTING object with all its data
 
     def get_iec61850_client(self, cp):
         return next((client for client in self.runtime.client_list if client.cp == cp), None)
@@ -355,8 +390,8 @@ class ACSIClient:
             "port": self.runtime.port,
             "cp": self.runtime.cp,
             "error": self.runtime.error,
-            "modelStatus": self.runtime.model_status,
-            "modelError": self.runtime.model_error,
+            #"modelStatus": model_info.model_status,
+            #"modelError": model_info.model_error,
         }
 
     def get_actions(self) -> List[Dict[str, Any]]:
