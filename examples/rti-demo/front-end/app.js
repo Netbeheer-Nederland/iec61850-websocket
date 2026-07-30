@@ -699,10 +699,10 @@ class RTIDemoApp {
                 const newStatus = statusMap.get(key);
                 if (newStatus && newStatus !== conn.status) {
                     conn.status = newStatus;
-                    connField = document.getElementById(`status-button-${conn.name}`);
-                    if (connField)
-                        connField.textContent = newStatus;
-                    updated = true;
+                    //connField = document.getElementById(`status-button-${conn.name}`);
+                    //if (connField)
+                    //    connField.textContent = newStatus;
+                    //updated = true;
                 }
             });
 
@@ -802,7 +802,7 @@ class RTIDemoApp {
                         ? 'var(--danger-color)'
                         : '#eab308';
 
-            const statusText = conn.status || '⏳ checking...';
+            const statusText = 'Live' || '⏳ checking...';
             html += `
                 <tr>
                     <td>${conn.name}</td>
