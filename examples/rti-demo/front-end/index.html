@@ -400,6 +400,94 @@
         </div>
     </div>
 
+    <!--Modal for TLS and OAuth -->
+    <!-- TLS Configuration Modal -->
+    <div id="modal-tls" class="tls-oauth-modal-overlay">
+        <div class="tls-oauth-modal-content">
+            <div class="tls-oauth-modal-header">
+                <h2>Configure security for WebSocket Client Mode</h2>
+                <button class="btn-close-tls-oauth-modal" onclick="app.closeTLSModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="tls-oauth-modal-body">
+                <div class="tls-oauth-form-group">
+                    <label class="tls-oauth-checkbox-label">
+                        <input type="checkbox" id="tls-enable" checked>
+                        <span>Enable TLS (WSS)</span>
+                    </label>
+                </div>
+
+                <div class="tls-oauth-form-group">
+                    <label>Server CA Certificate (PEM):</label>
+                    <div class="tls-oauth-file-input-group">
+                        <input type="file" id="tls-ca-cert" accept=".pem,.crt,.cer">
+                        <span id="tls-cert-file-name">No file chosen</span>
+                    </div>
+                    <textarea id="tls-cert-content" style="display: none;"></textarea>
+                </div>
+            </div>
+            <div class="tls-oauth-modal-footer">
+                <button class="btn-secondary" onclick="app.closeTLSModal()">Cancel</button>
+                <button class="btn-primary" onclick="app.saveTLSConfig()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OAuth Configuration Modal -->
+    <div id="modal-oauth" class="tls-oauth-modal-overlay">
+        <div class="tls-oauth-modal-content">
+            <div class="tls-oauth-modal-header">
+                <h2>OAuth 2.0 Configuration</h2>
+                <button class="btn-close-tls-oauth-modal" onclick="app.closeOAuthModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="tls-oauth-modal-body">
+                <div class="tls-oauth-form-group">
+                    <label class="tls-oauth-checkbox-label">
+                        <input type="checkbox" id="oauth-enable">
+                        <span>Enable OAuth 2.0</span>
+                    </label>
+                </div>
+
+                <div class="tls-oauth-form-group">
+                    <label>Token Endpoint URL:</label>
+                    <input type="text" id="oauth-token-url" placeholder="https://auth.example.com/token">
+                </div>
+
+                <div class="tls-oauth-form-group">
+                    <label>Client ID:</label>
+                    <input type="text" id="oauth-client-id" placeholder="Your client ID">
+                </div>
+
+                <div class="tls-oauth-form-group">
+                    <label>Client Secret:</label>
+                    <input type="password" id="oauth-client-secret" placeholder="Your client secret">
+                </div>
+
+                <div class="tls-oauth-form-group">
+                    <label>Auth Server CA Certificate (PEM):</label>
+                    <div class="tls-oauth-file-input-group">
+                        <input type="file" id="oauth-ca-cert" accept=".pem,.crt,.cer">
+                        <span id="oauth-cert-file-name">No file chosen</span>
+                    </div>
+                    <textarea id="oauth-cert-content" style="display: none;"></textarea>
+                </div>
+
+                <div class="tls-oauth-form-group">
+                    <label class="tls-oauth-checkbox-label">
+                        <input type="checkbox" id="oauth-enable-refresh">
+                        <span>Enable Token Refresh</span>
+                    </label>
+                </div>
+            </div>
+            <div class="tls-oauth-modal-footer">
+                <button class="btn-secondary" onclick="app.closeOAuthModal()">Cancel</button>
+                <button class="btn-primary" onclick="app.saveOAuthConfig()">Save</button>
+            </div>
+        </div>
+    </div>
     <script src="acsi-server-page.js"></script>
     <script src="acsi-client-page.js"></script>
     <script src="app.js"></script>

@@ -101,6 +101,18 @@ class RTIDemoApp {
         if (acsiConnectBtn) {
             acsiConnectBtn.addEventListener('click', () => this.connectACSIClient());
         }
+
+        // TLS Certificate file input
+        const tlsCertInput = document.getElementById('tls-ca-cert');
+        if (tlsCertInput) {
+            tlsCertInput.addEventListener('change', (e) => this.handleFileInput(e, 'tls'));
+        }
+
+        // OAuth Certificate file input
+        const oauthCertInput = document.getElementById('oauth-ca-cert');
+        if (oauthCertInput) {
+            oauthCertInput.addEventListener('change', (e) => this.handleFileInput(e, 'oauth'));
+        }
     }
 
     // =============================================
@@ -413,16 +425,136 @@ class RTIDemoApp {
         this.showTLSModal();
     }
 
-    showOAuthModal() {
-        // Implement your OAuth config modal
-        console.log('Opening OAuth config for:', this.selectedConnection.name);
-        alert(`OAuth Config for ${this.selectedConnection.name} - Implement this modal`);
+    // =============================================
+    // TLS/OAuth Modal Methods
+    // =============================================
+
+    // Show TLS Modal
+    showTLSModal() {
+        const modal = document.getElementById('modal-tls');
+        if (modal) {
+            modal.classList.add('active');
+            // Reset form
+            document.getElementById('tls-enable').checked = true;
+            document.getElementById('tls-ca-cert').value = '';
+            document.getElementById('tls-cert-file-name').textContent = 'No file chosen';
+            document.getElementById('tls-cert-content').value = '';
+        }
     }
 
-    showTLSModal() {
-        // Implement your TLS config modal
-        console.log('Opening TLS config for:', this.selectedConnection.name);
-        alert(`TLS Config for ${this.selectedConnection.name} - Implement this modal`);
+    // Close TLS Modal
+    closeTLSModal() {
+        document.getElementById('modal-tls').classList.remove('active');
+    }
+
+    // Show OAuth Modal
+    showOAuthModal() {
+        const modal = document.getElementById('modal-oauth');
+        if (modal) {
+            modal.classList.add('active');
+            // Reset form
+            document.getElementById('oauth-enable').checked = false;
+            document.getElementById('oauth-token-url').value = '';
+            document.getElementById('oauth-client-id').value = '';
+            document.getElementById('oauth-client-secret').value = '';
+            document.getElementById('oauth-ca-cert').value = '';
+            document.getElementById('oauth-cert-file-name').textContent = 'No file chosen';
+            document.getElementById('oauth-cert-content').value = '';
+            document.getElementById('oauth-enable-refresh').checked = false;
+        }
+    }
+
+    // Close OAuth Modal
+    closeOAuthModal() {
+        document.getElementById('modal-oauth').classList.remove('active');
+    }
+
+    // Handle file input for both modals
+    handleFileInput(event, type) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const fileNameSpan = document.getElementById(`${type}-cert-file-name`);
+        const contentTextarea = document.getElementById(`${type}-cert-content`);
+
+        if (fileNameSpan) {
+            fileNameSpan.textContent = file.name;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            if (contentTextarea) {
+                contentTextarea.value = e.target.result;
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // Save TLS Config
+    async saveTLSConfig() {
+        const enableTLS = document.getElementById('tls-enable').checked;
+        const certContent = document.getElementById('tls-cert-content').value;
+
+        if (!this.selectedConnection) {
+            this.addDiagnosticMessage('No connection selected', 'error');
+            return;
+        }
+
+        const config = {
+            connection_name: this.selectedConnection.name,
+            enable_tls: enableTLS,
+            ca_certificate: certContent
+        };
+
+        try {
+            const result = await this.callBFF('/api/connections/tls-config', 'POST', config);
+            if (result) {
+                this.addDiagnosticMessage(`TLS config saved for ${this.selectedConnection.name}`, 'success');
+                this.closeTLSModal();
+            }
+        } catch (error) {
+            this.addDiagnosticMessage(`Failed to save TLS config: ${error.message}`, 'error');
+        }
+    }
+
+    // Save OAuth Config
+    async saveOAuthConfig() {
+        const enableOAuth = document.getElementById('oauth-enable').checked;
+        const tokenUrl = document.getElementById('oauth-token-url').value;
+        const clientId = document.getElementById('oauth-client-id').value;
+        const clientSecret = document.getElementById('oauth-client-secret').value;
+        const certContent = document.getElementById('oauth-cert-content').value;
+        const enableRefresh = document.getElementById('oauth-enable-refresh').checked;
+
+        if (!this.selectedConnection) {
+            this.addDiagnosticMessage('No connection selected', 'error');
+            return;
+        }
+
+        if (enableOAuth && !tokenUrl) {
+            alert('Token Endpoint URL is required when OAuth is enabled');
+            return;
+        }
+
+        const config = {
+            connection_name: this.selectedConnection.name,
+            enable_oauth: enableOAuth,
+            token_endpoint_url: tokenUrl,
+            client_id: clientId,
+            client_secret: clientSecret,
+            ca_certificate: certContent,
+            enable_token_refresh: enableRefresh
+        };
+
+        try {
+            const result = await this.callBFF('/api/connections/oauth-config', 'POST', config);
+            if (result) {
+                this.addDiagnosticMessage(`OAuth config saved for ${this.selectedConnection.name}`, 'success');
+                this.closeOAuthModal();
+            }
+        } catch (error) {
+            this.addDiagnosticMessage(`Failed to save OAuth config: ${error.message}`, 'error');
+        }
     }
 
     loadAcsiServerPage() {
