@@ -439,7 +439,7 @@ class ConnectionManager:
         logger.info(f"Connection added: {name} ({host}:{port})")
         return connection
     
-    def delete_connection(self, conn_id: int) -> bool:
+    def delete_connection(self, conn_name) -> bool:
         """Delete a connection by ID.
         
         Args:
@@ -449,25 +449,25 @@ class ConnectionManager:
             True if connection was deleted, False otherwise.
         """
         original_count = len(self.connections)
-        self.connections = [c for c in self.connections if c['id'] != conn_id]
+        self.connections = [c for c in self.connections if c['name'] != conn_name]
         if len(self.connections) < original_count:
             self.save_connections()
-            logger.info(f"Connection deleted: {conn_id}")
+            logger.info(f"Connection deleted: {conn_name}")
             return True
         return False
     
-    def get_connection(self, conn_id: int) -> Optional[Dict]:
+    def get_connection(self, conn_name: str) -> Optional[Dict]:
         """Get a specific connection by ID."""
-        return next((c for c in self.connections if c['id'] == conn_id), None)
+        return next((c for c in self.connections if c['name'] == conn_name), None)
     
     def get_connection_by_host_port(self, host: str, port: int) -> Optional[Dict]:
         """Get connection by host and port."""
         return next((c for c in self.connections 
                     if c['host'] == host and c['port'] == port), None)
     
-    def update_connection_status(self, conn_id: int, status: str) -> None:
+    def update_connection_status(self, conn_name: str, status: str) -> None:
         """Update connection status."""
-        conn = self.get_connection(conn_id)
+        conn = self.get_connection(conn_name)
         if conn:
             conn['status'] = status
             self.save_connections()
@@ -1129,7 +1129,7 @@ async def create_connection(request: ConnectionCreateRequest):
 
 
 @app.delete(
-    "/api/connections/{conn_id}",
+    "/api/connections/{conn_name}",
     summary="Delete Connection",
     description="Delete an existing connection.",
     response_description="Deletion confirmation",
@@ -1139,7 +1139,7 @@ async def create_connection(request: ConnectionCreateRequest):
     },
     tags=["Connections"]
 )
-async def delete_connection(conn_id: int):
+async def delete_connection(conn_name: str):
     """Delete a connection by its ID.
     
     Path Parameters:
@@ -1148,7 +1148,7 @@ async def delete_connection(conn_id: int):
     Returns:
         JSON with deletion status.
     """
-    success = conn_manager.delete_connection(conn_id)
+    success = conn_manager.delete_connection(conn_name)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1158,7 +1158,7 @@ async def delete_connection(conn_id: int):
 
 
 @app.put(
-    "/api/connections/{conn_id}",
+    "/api/connections/{conn_name}",
     summary="Update Connection",
     description="Update an existing connection.",
     response_description="Updated connection details",
@@ -1168,7 +1168,7 @@ async def delete_connection(conn_id: int):
     },
     tags=["Connections"]
 )
-async def update_connection(conn_id: int, request: ConnectionUpdateRequest):
+async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
     """Update a connection by its ID.
     
     Path Parameters:
@@ -1183,7 +1183,7 @@ async def update_connection(conn_id: int, request: ConnectionUpdateRequest):
     Raises:
         HTTPException 404: If connection is not found.
     """
-    connection = conn_manager.get_connection(conn_id)
+    connection = conn_manager.get_connection(conn_name)
     if not connection:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
