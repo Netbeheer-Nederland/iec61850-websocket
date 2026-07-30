@@ -390,6 +390,10 @@ class RTIDemoApp {
                         <p style="margin: 5px 0; color: var(--text-muted);">
                             <strong>Type:</strong> ${conn.type}
                         </p>
+                        <p style="margin: 5px 0; color: var(--text-muted);">
+                            <strong>WS Mode:</strong>
+                            <span id="ws-mode-${conn.name}">${conn?.properties_info?.properties?.ws_mode ?? 'N/A'}</span>
+                        </p>
                     </div>
                     <div style="display: flex; gap: 10px;">
                         <button class="btn-primary" style="flex: 1;"
