@@ -5,12 +5,13 @@ handling model management, server lifecycle, and value operations.
 """
 from __future__ import annotations
 
+import logging
 import os
 print("\n\n=== DEBUG: Checking /models directory ===")
 os.system("ls -la /models/ 2>&1 || echo 'Directory does not exist'")
 print("=== DEBUG: End ===\n\n")
 
-
+logger = logging.getLogger(__name__)
 
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
@@ -1170,6 +1171,25 @@ def create_bff_router(
 
             try:
                 result = rti_fsp.write_value(obj_ref, value, data_type)
+                
+                # Sync with mapped LED if mapping exists
+                try:
+                    # Get the existing IO router's client and mapping manager
+                    from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                    
+                    io_client = get_io_client()
+                    if io_client and io_client.is_healthy():
+                        try:
+                            # Try to sync LED state based on written value
+                            io_client.write_iec61850_value(obj_ref, value, data_type)
+                            logger.info(f"Synced IEC61850 write to LED: {obj_ref}={value}")
+                        except Exception as sync_exc:
+                            logger.warning(f"LED sync failed for {obj_ref}: {sync_exc}")
+                    else:
+                        logger.debug("IO client not available or not healthy for LED sync")
+                except Exception as import_exc:
+                    logger.debug(f"IO client not available for LED sync: {import_exc}")
+                
                 return {
                     "ok": True,
                     "success": True,
@@ -1257,6 +1277,24 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     resolved_factory_dir = os.getenv('MODELPATH')
     router, _server = create_bff_router(resolved_factory_dir)
     app.include_router(router)
+    
+    # Include IO router for LED control via demo_IO
+    try:
+        import sys
+        # Add parent directory to path so we can import from demo_IO
+        demo_io_parent = Path(__file__).parent.parent
+        if str(demo_io_parent) not in sys.path:
+            sys.path.insert(0, str(demo_io_parent))
+        
+        from demo_IO.io_client.io_router import create_io_router
+        io_router = create_io_router()
+        app.include_router(io_router)
+        logger.info("IO router included for demo_IO LED control")
+    except ImportError as e:
+        logger.warning(f"IO router not available (missing dependencies): {e}")
+    except Exception as e:
+        logger.error(f"Failed to include IO router: {e}")
+    
     app.state.server = _server
     return app
 
