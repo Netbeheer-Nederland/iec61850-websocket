@@ -699,10 +699,10 @@ class RTIDemoApp {
                 const newStatus = statusMap.get(key);
                 if (newStatus && newStatus !== conn.status) {
                     conn.status = newStatus;
-                    connField = document.getElementById(`status-button-${conn.name}`);
-                    if (connField)
-                        connField.textContent = newStatus;
-                    updated = true;
+                    //connField = document.getElementById(`status-button-${conn.name}`);
+                    //if (connField)
+                    //    connField.textContent = newStatus;
+                    //updated = true;
                 }
             });
 
@@ -802,7 +802,7 @@ class RTIDemoApp {
                         ? 'var(--danger-color)'
                         : '#eab308';
 
-            const statusText = conn.status || '⏳ checking...';
+            const statusText = 'Live' || '⏳ checking...';
             html += `
                 <tr>
                     <td>${conn.name}</td>
@@ -815,10 +815,10 @@ class RTIDemoApp {
                         </span>
                     </td>
                     <td>
-                        <button class="btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="app.editConnection(${conn.id})">
+                        <button class="btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick='app.editConnection(${JSON.stringify(conn.name)})'>
                             Edit
                         </button>
-                        <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="app.deleteConnection(${conn.id})">
+                        <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick='app.deleteConnection(${JSON.stringify(conn.name)})'>
                             Delete
                         </button>
                     </td>
@@ -882,9 +882,9 @@ class RTIDemoApp {
         }
     }
 
-    async deleteConnection(id) {
+    async deleteConnection(name) {
         if (confirm('Are you sure?')) {
-            const result = await this.callBFF(`/api/connections/${id}`, 'DELETE');
+            const result = await this.callBFF(`/api/connections/${name}`, 'DELETE');
             if (result) {
                 this.loadConnections();
                 this.addDiagnosticMessage('Connection deleted', 'success');
@@ -893,8 +893,8 @@ class RTIDemoApp {
         }
     }
 
-    editConnection(id) {
-        const conn = this.connections.find(c => c.id === id);
+    async editConnection(name) {
+        const conn = this.connections.find(c => c.name === name);
         if (conn) {
             document.getElementById('conn-name').value = conn.name;
             document.getElementById('conn-name').readOnly = true;
@@ -902,7 +902,20 @@ class RTIDemoApp {
             document.getElementById('conn-port').value = conn.port;
             document.getElementById('conn-type').value = conn.type;
             document.getElementById('modal-connection').classList.add('active');
-            this.currentConnectionId = id;  // ← Mark as EDIT
+            this.currentConnectionId = conn.id;
+
+            const result = await this.callBFF(`/api/connections/${name}`, 'PUT', {
+                name: conn.name,
+                host: conn.host,
+                port: conn.port,
+                type: conn.type,
+                status: conn.status
+            });
+            if (result) {
+                this.loadConnections();
+                this.addDiagnosticMessage('Connection deleted', 'success');
+                this.loadEndpoints();
+            }
         }
     }
 
