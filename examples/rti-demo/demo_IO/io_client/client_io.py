@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
+from .mapping_manager import IOMappingManager
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,14 +42,16 @@ class DemoIOClient:
         state = client.get_led_state("led1")
     """
     
-    def __init__(self, base_url: str = "http://localhost:8080"):
+    def __init__(self, base_url: str = "http://localhost:8080", mapping_file: Optional[str] = None):
         """Initialize the demo_IO client.
         
         Args:
             base_url: Base URL of the demo_IO service (without /api/io suffix)
+            mapping_file: Optional path to io_mapping.json file
         """
         self.base_url = base_url.rstrip('/')
         self.io_base = f"{self.base_url}/api/io"
+        self.mapping = IOMappingManager(mapping_file=mapping_file)
         logger.info(f"Initialized DemoIOClient with base URL: {self.io_base}")
     
     def _request(self, method: str, endpoint: str, json: Optional[dict] = None, 
@@ -323,3 +327,81 @@ class DemoIOClient:
             Configuration confirmation
         """
         return self.config_led(name, gpio_pin, **kwargs)
+
+    # ==================== IEC 61850 Mapping Methods ====================
+
+    def config_led_with_mapping(
+        self,
+        led_name: str,
+        gpio_pin: int,
+        obj_ref: Optional[str] = None,
+        description: str = "",
+        initial_state: bool = False,
+        **extra_properties: Any
+    ) -> Dict[str, Any]:
+        """Configure an LED with IEC 61850 mapping and send to demo_io.
+        
+        Args:
+            led_name: Unique LED identifier
+            gpio_pin: GPIO pin number
+            obj_ref: IEC 61850 object reference (optional)
+            description: LED description
+            initial_state: Initial LED state
+            **extra_properties: Additional custom properties
+            
+        Returns:
+            dict: Result with both mapping and demo_io configuration
+        """
+        # Get demo_io config from mapping manager
+        demoio_config = self.mapping.config_led_with_mapping(
+            led_name=led_name,
+            gpio_pin=gpio_pin,
+            obj_ref=obj_ref,
+            description=description,
+            initial_state=initial_state,
+            **extra_properties
+        )
+        
+        # Configure on demo_io service
+        demo_io_result = self.config_led(
+            name=led_name,
+            gpio_pin=gpio_pin,
+            description=description or f"Mapped to {obj_ref}" if obj_ref else "",
+            initial_state=initial_state
+        )
+        
+        # Save mapping to file
+        self.mapping.save()
+        
+        return {
+            "demo_io": demo_io_result,
+            "mapping": demoio_config,
+            "led_name": led_name,
+            "objRef": obj_ref
+        }
+
+    def write_iec61850_value(
+        self,
+        obj_ref: str,
+        value: Any,
+        data_type: str = "unknown"
+    ) -> bool:
+        """Handle IEC 61850 write by syncing to mapped LED if exists.
+        
+        Args:
+            obj_ref: IEC 61850 object reference
+            value: Value to write
+            data_type: Data type (unused for LED sync)
+            
+        Returns:
+            bool: True if LED was synced, False if no mapping found
+        """
+        return self.mapping.sync_led_from_iec61850(obj_ref, value, client=self)
+
+    def get_mapping_manager(self) -> IOMappingManager:
+        """Get the mapping manager instance.
+        
+        Returns:
+            IOMappingManager: The mapping manager for this client
+        """
+        return self.mapping

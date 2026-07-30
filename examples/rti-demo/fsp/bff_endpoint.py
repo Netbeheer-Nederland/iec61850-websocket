@@ -1171,6 +1171,25 @@ def create_bff_router(
 
             try:
                 result = rti_fsp.write_value(obj_ref, value, data_type)
+                
+                # Sync with mapped LED if mapping exists
+                try:
+                    # Get the existing IO router's client and mapping manager
+                    from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                    
+                    io_client = get_io_client()
+                    if io_client and io_client.is_healthy():
+                        try:
+                            # Try to sync LED state based on written value
+                            io_client.write_iec61850_value(obj_ref, value, data_type)
+                            logger.info(f"Synced IEC61850 write to LED: {obj_ref}={value}")
+                        except Exception as sync_exc:
+                            logger.warning(f"LED sync failed for {obj_ref}: {sync_exc}")
+                    else:
+                        logger.debug("IO client not available or not healthy for LED sync")
+                except Exception as import_exc:
+                    logger.debug(f"IO client not available for LED sync: {import_exc}")
+                
                 return {
                     "ok": True,
                     "success": True,

@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .client_io import DemoIOClient
+from .mapping_manager import IOMappingManager
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +71,61 @@ class IOConnectionConfig(BaseModel):
     )
 
 
+# ==================== Mapping Models ====================
+
+class IOMappingRequest(BaseModel):
+    """Request body for adding/updating an IO mapping."""
+    led_name: str = Field(
+        ...,
+        description="Unique LED identifier",
+        json_schema_extra={"example": "LD0/GGIO1$ST$Ind1"}
+    )
+    objRef: Optional[str] = Field(
+        default=None,
+        description="IEC 61850 object reference (optional)",
+        json_schema_extra={"example": "LD0/GGIO1$ST$Ind1"}
+    )
+    gpio_pin: Optional[int] = Field(
+        default=None,
+        description="GPIO pin number (BCM numbering)",
+        ge=0,
+        json_schema_extra={"example": 17}
+    )
+    description: str = Field(
+        default="",
+        description="LED description",
+        json_schema_extra={"example": "GGIO Indication 1"}
+    )
+    initial_state: bool = Field(
+        default=False,
+        description="Initial LED state",
+        json_schema_extra={"example": False}
+    )
+
+
+class IOMappingResponse(BaseModel):
+    """Response for IO mapping operations."""
+    led_name: str
+    objRef: Optional[str] = None
+    gpio_pin: Optional[int] = None
+    description: str = ""
+    initial_state: bool = False
+
+
+class MappingListResponse(BaseModel):
+    """Response for listing all IO mappings."""
+    mappings: Dict[str, IOMappingResponse] = Field(
+        default_factory=dict,
+        description="Dictionary of all LED mappings by led_name"
+    )
+    count: int = Field(default=0, description="Total number of mappings")
+
+
 # Global demo_IO client instance (lazy initialized)
 _io_client: Optional[DemoIOClient] = None
+
+# Global mapping manager instance
+_mapping_manager: Optional[IOMappingManager] = None
 
 
 def get_io_client() -> Optional[DemoIOClient]:
@@ -85,6 +139,21 @@ def set_io_client(client: DemoIOClient) -> None:
     global _io_client
     _io_client = client
     logger.info(f"DemoIOClient configured with base URL: {client.base_url}")
+
+
+def get_mapping_manager() -> IOMappingManager:
+    """Get or create the mapping manager instance."""
+    global _mapping_manager
+    if _mapping_manager is None:
+        _mapping_manager = IOMappingManager()
+    return _mapping_manager
+
+
+def set_mapping_manager(manager: IOMappingManager) -> None:
+    """Set the mapping manager instance."""
+    global _mapping_manager
+    _mapping_manager = manager
+    logger.info("IOMappingManager configured")
 
 
 def create_io_router() -> APIRouter:
@@ -580,5 +649,314 @@ def create_io_router() -> APIRouter:
         """Clean up GPIO resources on demo_IO."""
         client = _get_client_or_error()
         return client.cleanup()
+    
+    # ==================== Mapping Management ====================
+    
+    @router.post(
+        "/mappings/add",
+        summary="Add IO Mapping",
+        description="Add a new mapping between IEC 61850 object reference and LED.",
+        response_description="Mapping added successfully",
+        responses={
+            200: {"description": "Mapping added successfully"},
+            409: {"description": "Mapping already exists"},
+            500: {"description": "Failed to add mapping"}
+        },
+        tags=["IO Mapping"]
+    )
+    async def api_add_mapping(request: IOMappingRequest):
+        """Add a new IO mapping.
+        
+        Request Body:
+            IOMappingRequest: {
+                "led_name": str,        # Required - LED identifier
+                "objRef": str,         # Optional - IEC 61850 object reference
+                "gpio_pin": int,       # Optional - GPIO pin number
+                "description": str,    # Optional - LED description
+                "initial_state": bool  # Optional - Initial state
+            }
+        
+        Returns:
+            dict: Confirmation of mapping addition
+        """
+        try:
+            manager = get_mapping_manager()
+            mapping = manager.add_mapping(
+                led_name=request.led_name,
+                obj_ref=request.objRef,
+                gpio_pin=request.gpio_pin,
+                description=request.description,
+                initial_state=request.initial_state
+            )
+            manager.save()
+            
+            logger.info(f"Added mapping: {request.led_name} -> {request.objRef}")
+            return {
+                "ok": True,
+                "message": f"Mapping added for {request.led_name}",
+                "mapping": mapping
+            }
+        except Exception as exc:
+            logger.error(f"Failed to add mapping: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    @router.get(
+        "/mappings",
+        summary="List All Mappings",
+        description="Returns all IO mappings between IEC 61850 references and LEDs.",
+        response_description="List of all IO mappings",
+        responses={
+            200: {"description": "List of all mappings"}
+        },
+        tags=["IO Mapping"]
+    )
+    async def api_list_mappings(request: Request):
+        """Get all IO mappings.
+        
+        Returns:
+            dict: All mappings with their configurations
+        """
+        try:
+            manager = get_mapping_manager()
+            mappings = manager.get_all_mappings()
+            
+            # Convert to response format
+            response_mappings = {}
+            for led_name, config in mappings.items():
+                response_mappings[led_name] = IOMappingResponse(
+                    led_name=led_name,
+                    objRef=config.get("objRef"),
+                    gpio_pin=config.get("gpio_pin"),
+                    description=config.get("description", ""),
+                    initial_state=config.get("initial_state", False)
+                )
+            
+            return MappingListResponse(
+                mappings=response_mappings,
+                count=len(response_mappings)
+            )
+        except Exception as exc:
+            logger.error(f"Failed to list mappings: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    @router.get(
+        "/mappings/{led_name}",
+        summary="Get Mapping",
+        description="Get a specific IO mapping by LED name.",
+        response_description="Mapping configuration",
+        responses={
+            200: {"description": "Mapping found"},
+            404: {"description": "Mapping not found"}
+        },
+        tags=["IO Mapping"]
+    )
+    async def api_get_mapping(led_name: str, request: Request):
+        """Get a specific IO mapping by LED name.
+        
+        Args:
+            led_name: LED identifier
+            
+        Returns:
+            dict: Mapping configuration
+        """
+        try:
+            manager = get_mapping_manager()
+            mapping = manager.get_mapping(led_name)
+            
+            if not mapping:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No mapping found for LED: {led_name}"
+                )
+            
+            return IOMappingResponse(
+                led_name=led_name,
+                objRef=mapping.get("objRef"),
+                gpio_pin=mapping.get("gpio_pin"),
+                description=mapping.get("description", ""),
+                initial_state=mapping.get("initial_state", False)
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Failed to get mapping for {led_name}: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    @router.get(
+        "/mappings/by-objref/{objRef:path}",
+        summary="Get Mapping by objRef",
+        description="Get IO mapping by IEC 61850 object reference.",
+        response_description="Mapping configuration",
+        responses={
+            200: {"description": "Mapping found"},
+            404: {"description": "Mapping not found"}
+        },
+        tags=["IO Mapping"]
+    )
+    async def api_get_mapping_by_objref(objRef: str, request: Request):
+        """Get IO mapping by IEC 61850 object reference.
+        
+        Args:
+            objRef: IEC 61850 object reference
+            
+        Returns:
+            dict: Mapping configuration with led_name
+        """
+        try:
+            manager = get_mapping_manager()
+            mapping = manager.get_led_by_objref(objRef)
+            
+            if not mapping:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No mapping found for objRef: {objRef}"
+                )
+            
+            return {
+                "ok": True,
+                "led_name": mapping["led_name"],
+                "mapping": IOMappingResponse(
+                    led_name=mapping["led_name"],
+                    objRef=mapping.get("objRef"),
+                    gpio_pin=mapping.get("gpio_pin"),
+                    description=mapping.get("description", ""),
+                    initial_state=mapping.get("initial_state", False)
+                )
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Failed to get mapping for objRef {objRef}: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    @router.delete(
+        "/mappings/{led_name}",
+        summary="Remove Mapping",
+        description="Remove an IO mapping by LED name.",
+        response_description="Deletion confirmation",
+        responses={
+            200: {"description": "Mapping removed successfully"},
+            404: {"description": "Mapping not found"},
+            500: {"description": "Failed to remove mapping"}
+        },
+        tags=["IO Mapping"]
+    )
+    async def api_remove_mapping(led_name: str, request: Request):
+        """Remove an IO mapping by LED name.
+        
+        Args:
+            led_name: LED identifier
+            
+        Returns:
+            dict: Deletion confirmation
+        """
+        try:
+            manager = get_mapping_manager()
+            if not manager.remove_mapping(led_name):
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No mapping found for LED: {led_name}"
+                )
+            
+            manager.save()
+            logger.info(f"Removed mapping: {led_name}")
+            return {
+                "ok": True,
+                "message": f"Mapping removed for {led_name}"
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Failed to remove mapping for {led_name}: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    @router.post(
+        "/mappings/load",
+        summary="Load Mappings",
+        description="Reload mappings from the JSON file.",
+        response_description="Load confirmation",
+        responses={
+            200: {"description": "Mappings loaded successfully"},
+            500: {"description": "Failed to load mappings"}
+        },
+        tags=["IO Mapping"]
+    )
+    async def api_load_mappings(request: Request):
+        """Reload mappings from the JSON file.
+        
+        Returns:
+            dict: Load confirmation with count of mappings
+        """
+        try:
+            manager = get_mapping_manager()
+            success = manager.load()
+            
+            return {
+                "ok": success,
+                "message": "Mappings reloaded",
+                "count": len(manager.get_all_mappings())
+            }
+        except Exception as exc:
+            logger.error(f"Failed to load mappings: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    @router.post(
+        "/mappings/save",
+        summary="Save Mappings",
+        description="Save current mappings to the JSON file.",
+        response_description="Save confirmation",
+        responses={
+            200: {"description": "Mappings saved successfully"},
+            500: {"description": "Failed to save mappings"}
+        },
+        tags=["IO Mapping"]
+    )
+    async def api_save_mappings(request: Request):
+        """Save current mappings to the JSON file.
+        
+        Returns:
+            dict: Save confirmation with count of mappings
+        """
+        try:
+            manager = get_mapping_manager()
+            success = manager.save()
+            
+            return {
+                "ok": success,
+                "message": "Mappings saved",
+                "count": len(manager.get_all_mappings())
+            }
+        except Exception as exc:
+            logger.error(f"Failed to save mappings: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    @router.get(
+        "/mappings/objrefs",
+        summary="List All objRefs",
+        description="Returns all IEC 61850 object references that have LED mappings.",
+        response_description="List of objRefs",
+        responses={
+            200: {"description": "List of objRefs"}
+        },
+        tags=["IO Mapping"]
+    )
+    async def api_list_objrefs(request: Request):
+        """Get all IEC 61850 object references with LED mappings.
+        
+        Returns:
+            dict: List of all objRefs with mappings
+        """
+        try:
+            manager = get_mapping_manager()
+            objrefs = manager.list_mapped_objrefs()
+            
+            return {
+                "ok": True,
+                "objRefs": objrefs,
+                "count": len(objrefs)
+            }
+        except Exception as exc:
+            logger.error(f"Failed to list objRefs: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
     
     return router
