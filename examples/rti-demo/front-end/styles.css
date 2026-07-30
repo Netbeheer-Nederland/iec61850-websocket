@@ -1437,3 +1437,11 @@ body {
   color: #721c24;
   border: 1px solid #f5c6cb;
 }
+
+#page-tls-oauth {
+    padding: 20px;
+}
+
+#tls-oauth-container {
+    margin-top: 20px;
+}

@@ -332,7 +332,97 @@ class RTIDemoApp {
             case 'acsi':
                 this.loadACSI();
                 break;
+            case 'tls-oauth':
+                this.loadTLSOAuthPage();
+                break;
         }
+    }
+
+    async loadTLSOAuthPage() {
+        const container = document.getElementById('tls-oauth-container');
+        if (!container) return;
+
+        // Show loading state
+        container.innerHTML = '<div class="spinner"></div>';
+
+        // Load connections
+        const result = await this.callBFF('/api/connections');
+        if (!result || !result.connections) {
+            container.innerHTML = '<p style="color: var(--text-muted);">No connections found</p>';
+            return;
+        }
+
+        this.renderTLSOAuthConnections(result.connections);
+    }
+
+    renderTLSOAuthConnections(connections) {
+        const container = document.getElementById('tls-oauth-container');
+
+        if (connections.length === 0) {
+            container.innerHTML = '<p style="padding: 20px; color: var(--text-muted);">No connections configured</p>';
+            return;
+        }
+
+        let html = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 20px;">
+        `;
+
+        connections.forEach(conn => {
+            html += `
+                <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px;">
+                    <h3 style="margin-bottom: 15px; color: var(--text-primary);">${conn.name}</h3>
+                    <div style="margin-bottom: 15px;">
+                        <p style="margin: 5px 0; color: var(--text-muted);">
+                            <strong>Host:</strong> ${conn.host}:${conn.port}
+                        </p>
+                        <p style="margin: 5px 0; color: var(--text-muted);">
+                            <strong>Type:</strong> ${conn.type}
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-primary" style="flex: 1;"
+                                onclick="app.openOAuthConfig('${conn.name}')">
+                            <i class="fas fa-key"></i> OAuth Config
+                        </button>
+                        <button class="btn-secondary" style="flex: 1;"
+                                onclick="app.openTLSConfig('${conn.name}')">
+                            <i class="fas fa-shield-alt"></i> TLS Config
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        container.innerHTML = html;
+    }
+
+    openOAuthConfig(connectionName) {
+        const conn = this.connections.find(c => c.name === connectionName);
+        if (!conn) return;
+
+        this.selectedConnection = conn;
+        this.showOAuthModal();
+    }
+
+    openTLSConfig(connectionName) {
+        const conn = this.connections.find(c => c.name === connectionName);
+        if (!conn) return;
+
+        this.selectedConnection = conn;
+        this.showTLSModal();
+    }
+
+    showOAuthModal() {
+        // Implement your OAuth config modal
+        console.log('Opening OAuth config for:', this.selectedConnection.name);
+        alert(`OAuth Config for ${this.selectedConnection.name} - Implement this modal`);
+    }
+
+    showTLSModal() {
+        // Implement your TLS config modal
+        console.log('Opening TLS config for:', this.selectedConnection.name);
+        alert(`TLS Config for ${this.selectedConnection.name} - Implement this modal`);
     }
 
     loadAcsiServerPage() {
