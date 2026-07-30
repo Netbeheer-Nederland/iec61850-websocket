@@ -305,7 +305,7 @@ function appendDataAttributeNodes(parentLi, attributes, nodeLabel) {
   ul.className = 'scl-tree-list';
 
   attributes.forEach(function (da) {
-    const typeSuffix = da.bType ? ` [${da.bType}]` : '';
+    const typeSuffix = da.bType ? ` (${da.bType})[${da.fc}]` : '';
     const daLi = createTreeNode(nodeLabel, `${da.name}${typeSuffix}`);
     appendDataAttributeNodes(daLi, da.subDataAttributes || [], 'SDA');
     ul.appendChild(daLi);
