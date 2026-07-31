@@ -436,13 +436,35 @@ class RTIDemoApp {
     // Show TLS Modal
     showTLSModal() {
         const modal = document.getElementById('modal-tls');
-        if (modal) {
+        const ws_mode = this.selectedConnection?.properties_info?.properties?.ws_mode || 'N/A';
+
+        console.log("Modal before:", modal.className);
+        if (modal && ws_mode !== 'N/A') {
             modal.classList.add('active');
-            // Reset form
-            document.getElementById('tls-enable').checked = true;
-            document.getElementById('tls-ca-cert').value = '';
-            document.getElementById('tls-cert-file-name').textContent = 'No file chosen';
-            document.getElementById('tls-cert-content').value = '';
+
+            console.log("Modal after:", modal.className);
+
+
+            let isServer = false;
+
+            if (ws_mode === "passive" || ws_mode === "Passive")
+                isServer = true;
+
+            console.log(`showTLSModal: ws_mode=${ws_mode}, isServer=${isServer}`);
+
+            const serverFields = document.getElementById('tls-server-fields');
+            const clientFields = document.getElementById('tls-client-fields');
+            serverFields.hidden = false;
+            clientFields.hidden = false;
+
+            if(isServer)
+            {
+                clientFields.hidden = true;
+            }
+            else
+            {
+                serverFields.hidden = true;
+            }
         }
     }
 
