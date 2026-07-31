@@ -113,6 +113,11 @@ class RTIDemoApp {
         if (oauthCertInput) {
             oauthCertInput.addEventListener('change', (e) => this.handleFileInput(e, 'oauth'));
         }
+        const securityConfigRefreshBtn = document.getElementById('refresh-security-configs-btn');
+        if (securityConfigRefreshBtn) {
+            securityConfigRefreshBtn.addEventListener('click', () => this.loadTLSOAuthPage());
+        }
+
     }
 
     // =============================================
