@@ -368,7 +368,7 @@ class RTIDemoApp {
             container.innerHTML = '<p style="color: var(--text-muted);">No connections found</p>';
             return;
         }
-
+        this.connections = result.connections;
         this.renderTLSOAuthConnections(result.connections);
     }
 
