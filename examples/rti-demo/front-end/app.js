@@ -450,19 +450,17 @@ class RTIDemoApp {
             if (ws_mode === "passive" || ws_mode === "Passive")
                 isServer = true;
 
-            console.log(`showTLSModal: ws_mode=${ws_mode}, isServer=${isServer}`);
-
             const serverFields = document.getElementById('tls-server-fields');
             const clientFields = document.getElementById('tls-client-fields');
-            serverFields.hidden = false;
-            clientFields.hidden = false;
 
             if(isServer)
             {
+                serverFields.hidden = false;
                 clientFields.hidden = true;
             }
             else
             {
+                clientFields.hidden = false;
                 serverFields.hidden = true;
             }
         }
@@ -476,17 +474,25 @@ class RTIDemoApp {
     // Show OAuth Modal
     showOAuthModal() {
         const modal = document.getElementById('modal-oauth');
-        if (modal) {
+        const ws_mode = this.selectedConnection?.properties_info?.properties?.ws_mode || 'N/A';
+
+        if (modal&& ws_mode !== 'N/A') {
             modal.classList.add('active');
-            // Reset form
-            document.getElementById('oauth-enable').checked = false;
-            document.getElementById('oauth-token-url').value = '';
-            document.getElementById('oauth-client-id').value = '';
-            document.getElementById('oauth-client-secret').value = '';
-            document.getElementById('oauth-ca-cert').value = '';
-            document.getElementById('oauth-cert-file-name').textContent = 'No file chosen';
-            document.getElementById('oauth-cert-content').value = '';
-            document.getElementById('oauth-enable-refresh').checked = false;
+            let isServer = false;
+            if (ws_mode === "passive" || ws_mode === "Passive")
+                isServer = true;
+
+            const serverFields = document.getElementById('oauth-server-fields');
+            const clientFields = document.getElementById('oauth-client-fields');
+
+            if (isServer) {
+                serverFields.hidden = false;
+                clientFields.hidden = true;
+            }
+            else {
+                serverFields.hidden = true;
+                clientFields.hidden = false;
+            }
         }
     }
 
