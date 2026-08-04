@@ -17,6 +17,9 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from acsi_client import ACSIClient
 
+from ws61850.security.tls import TLSConfig
+import ssl
+
 logger = logging.getLogger(__name__)
 
 # ==================== Pydantic Models ====================
@@ -275,6 +278,30 @@ class OperateRequest(BaseModel):
         }
     })
 
+
+class TLSConnectionCreateConfigRequest(BaseModel):
+    """Request body for creating a new connection."""
+    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_tls: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
+    tls_version: str = Field(default= "1.2", description="TLS version", json_schema_extra={"example": "1.2"})
+
+    server_key: str | None = Field(
+        default=None,
+        description="Server private key",
+        json_schema_extra={"example": "-----BEGIN PRIVATE KEY-----..."},
+    )
+    server_cert: str | None = Field(
+        default=None,
+        description="Server certificate",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+    server_ca: str | None = Field(
+        default=None,
+        description="Server CA certificate",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+
+    ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
 
 class WriteValueRequest(BaseModel):
     """Request body for writing a value to the connected server.
@@ -821,6 +848,55 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             return connection_info
         except Exception as exc:
             rti_so._log_action(f"Get connections failed: {exc}", "error")
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/reconfig-connection",
+        summary="Get Connection Info",
+        description="Returns detailed information about the current WebSocket connection, including peer address, port, and connection status.",
+        response_description="Connection details",
+        responses={
+            200: {"description": "Connection information returned successfully"},
+            500: {"description": "Error retrieving connection info"}
+        },
+        tags=["Client Status"]
+    )
+    async def api_reconfig_connection(request: TLSConnectionCreateConfigRequest):
+        """Reconfigure the connection with a new communication point."""
+        try:
+            tls_version = ssl.TLSVersion.TLSv1_2 if request.tls_version == "1.2" else ssl.TLSVersion.TLSv1_3
+            print("Reconfiguring connection with TLS version: ", tls_version)
+            if request.ws_mode == "passive" or request.ws_mode == "Passive":
+                print("Reconfiguring passive endpoint with TLS: ", request.enable_tls)
+                tls_config = TLSConfig(
+                    mode="server",
+                    certfile=request.server_cert,
+                    keyfile=request.server_key,
+                    min_version=tls_version,
+                    max_version=tls_version,
+                    keylog_file=os.path.join("tlskeys.log"),
+                )
+                print("TLS Config: ", tls_config)
+                await rti_so.runtime.endpoint.reconfigure_endpoint(request.enable_tls, tls_config=tls_config)
+                if request.enable_tls:
+                    await rti_so.runtime.endpoint._endpoint_running_event.wait()  # ← Wait here
+                    print("endpoint status is: ", rti_so.runtime.endpoint._is_endpoint_running)
+                return JSONResponse(
+                    content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode, "enable_tls": request.enable_tls},
+                    status_code=200
+                )
+            else:
+                return JSONResponse(
+                    content={"ok": False, "error": "Only passive mode is supported for reconfiguration."},
+                    status_code=400
+                )
+
+        except Exception as exc:
+            print("reconfig error: ", exc)
+            rti_so._log_action(f"Reconfig connection failed: {exc}", "error")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
                 status_code=500

@@ -2,6 +2,15 @@
    RTI Demo UI - Application JavaScript
    ============================================== */
 
+ const apiDefinitions = [
+    { id: 'reconfig-connection', label: 'POST /api/reconfig-connection', method: 'POST', path: '/api/reconfig-connection' },
+
+];
+
+function getApiById(id) {
+    return apiDefinitions.find(api => api.id === id);
+}
+
 class RTIDemoApp {
     constructor() {
         this.bffHost = localStorage.getItem('bffHost') || 'localhost';
@@ -117,6 +126,45 @@ class RTIDemoApp {
         if (securityConfigRefreshBtn) {
             securityConfigRefreshBtn.addEventListener('click', () => this.loadTLSOAuthPage());
         }
+        document.getElementById('tls-save').addEventListener('click', () => this.saveTLSConfig());
+
+        document.getElementById('tls-private-key').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            // Read file content
+            const reader = new FileReader();
+            reader.onload = function(e) {
+            const content = e.target.result;
+            document.getElementById('tls-key-content').value = content;
+            };
+            reader.readAsText(file);
+        });
+
+        document.getElementById('tls-server-cert').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            // Read file content
+            const reader = new FileReader();
+            reader.onload = function(e) {
+            const content = e.target.result;
+            document.getElementById('tls-server-cert-content').value = content;
+            };
+            reader.readAsText(file);
+        });
+
+        document.getElementById('tls-ca-cert').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            // Read file content
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                document.getElementById('tls-ca-cert-content').value = content;
+            };
+            reader.readAsText(file);
+        });
+
+
 
     }
 
@@ -390,7 +438,8 @@ class RTIDemoApp {
                     <h3 style="margin-bottom: 15px; color: var(--text-primary);">${conn.name}</h3>
                     <div style="margin-bottom: 15px;">
                         <p style="margin: 5px 0; color: var(--text-muted);">
-                            <strong>Host:</strong> ${conn.host}:${conn.port}
+                            <strong>Host:</strong>
+                                <span id="targetEndpoint-${conn.name}">${conn.host}:${conn.port}</span>
                         </p>
                         <p style="margin: 5px 0; color: var(--text-muted);">
                             <strong>Type:</strong> ${conn.type}
@@ -528,23 +577,53 @@ class RTIDemoApp {
     }
 
     // Save TLS Config
-    async saveTLSConfig() {
-        const enableTLS = document.getElementById('tls-enable').checked;
-        const certContent = document.getElementById('tls-cert-content').value;
-
+    async saveTLSConfig()
+    {
         if (!this.selectedConnection) {
             this.addDiagnosticMessage('No connection selected', 'error');
             return;
         }
 
-        const config = {
-            connection_name: this.selectedConnection.name,
-            enable_tls: enableTLS,
-            ca_certificate: certContent
-        };
+        const targetEndpoint = document.getElementById(`targetEndpoint-${this.selectedConnection.name}`).textContent;
+        const enableTLS = document.getElementById('tls-enable').checked;
+        const tlsVersion = document.getElementById('tls-version').value;
+        const serverKey = document.getElementById('tls-key-content').value;  // FIXED: was tls-server-cert-content
+        const serverCert = document.getElementById('tls-server-cert-content').value;
+        const ws_mode = this.selectedConnection?.properties_info?.properties?.ws_mode || 'N/A';
+        const serverCACert = document.getElementById('tls-ca-cert-content')?.value || null;
+
+        console.log("Saving TLS Config for connection:", this.selectedConnection.name);
+        console.log("Enable TLS:", enableTLS);
+        console.log("TLS Version:", tlsVersion);
+        console.log("Server Key:", serverKey);
+        console.log("Server Cert:", serverCert);
+
+        let config = null;
+        if (ws_mode === 'passive' || ws_mode === 'Passive') {
+            config = {
+                connection_name: this.selectedConnection.name,
+                enable_tls: enableTLS,
+                tls_version: tlsVersion,
+                server_key: serverKey,
+                server_cert: serverCert,
+                server_ca: null,
+                ws_mode: ws_mode
+            };
+        }
+        else if (ws_mode === 'active' || ws_mode === 'Active') {
+            config = {
+                connection_name: this.selectedConnection.name,
+                enable_tls: enableTLS,
+                tls_version: tlsVersion,
+                server_key: null,
+                server_cert: null,
+                server_ca: serverCACert,
+                ws_mode: ws_mode
+            }
+        }
 
         try {
-            const result = await this.callBFF('/api/connections/tls-config', 'POST', config);
+            const result = await this.executeApiCall(getApiById('reconfig-connection'), targetEndpoint, config);
             if (result) {
                 this.addDiagnosticMessage(`TLS config saved for ${this.selectedConnection.name}`, 'success');
                 this.closeTLSModal();
@@ -553,7 +632,6 @@ class RTIDemoApp {
             this.addDiagnosticMessage(`Failed to save TLS config: ${error.message}`, 'error');
         }
     }
-
     // Save OAuth Config
     async saveOAuthConfig() {
         const enableOAuth = document.getElementById('oauth-enable').checked;

@@ -436,19 +436,18 @@
                 <div id="tls-server-fields">
                     <div class="tls-oauth-form-group" id="tls-server-key-section">
                         <label>Server Private Key (PEM):</label>
-                        <div class="tls-oauth-file-input-group">
+                        <div class="tls-oauth-file-input-group" style="margin-bottom: 10px;">
                             <input type="file" id="tls-private-key" accept=".pem,.key">
-                            <span id="tls-key-file-name">No file chosen</span>
                         </div>
-                        <textarea id="tls-key-content" style="display: none;"></textarea>
+                        <textarea id="tls-key-content" placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>
+
                     </div>
                     <div class="tls-oauth-form-group" id="tls-server-cert-section">
                         <label>Server Certificate (PEM):</label>
-                        <div class="tls-oauth-file-input-group">
+                        <div class="tls-oauth-file-input-group" style="margin-bottom: 10px;">
                             <input type="file" id="tls-server-cert" accept=".pem,.crt,.cer">
-                            <span id="tls-server-cert-file-name">No file chosen</span>
                         </div>
-                        <textarea id="tls-server-cert-content" style="display: none;"></textarea>
+                        <textarea id="tls-server-cert-content" placeholder="-----BEGIN CERTIFICATE-----..."></textarea>
                     </div>
                 </div>
 
@@ -460,13 +459,13 @@
                             <input type="file" id="tls-ca-cert" accept=".pem,.crt,.cer">
                             <span id="tls-cert-file-name">No file chosen</span>
                         </div>
-                        <textarea id="tls-cert-content" style="display: none;"></textarea>
+                        <textarea id="tls-ca-cert-content" style="display: none;"></textarea>
                     </div>
                 </div>
             </div>
             <div class="tls-oauth-modal-footer">
                 <button class="btn-secondary" onclick="app.closeTLSModal()">Cancel</button>
-                <button class="btn-primary" onclick="app.saveTLSConfig()">Save</button>
+                <button class="btn-primary" id="tls-save">Save</button>
             </div>
         </div>
     </div>

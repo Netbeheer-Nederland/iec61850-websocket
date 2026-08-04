@@ -36,7 +36,7 @@ from ws61850.shared.extractors import (
     retrieve_associate_id_from_decoded_msg,
     retrieve_max_outstanding_calls_from_decoded_msg,
 )
-from ws61850.security.tls import build_tls_context
+from ws61850.security.tls import build_tls_context, build_tls_context_from_strings
 from ws61850.transport.reconnect import ReconnectPolicy
 
 logger = logging.getLogger(__name__)
@@ -125,6 +125,13 @@ class ActiveEndpoint:
             ),
             None,
         )
+    async def reconfigure_connection(self, cp, tls_enable, tls_config=None):
+        """Reconfigure TLS and OAuth settings for future connections."""
+        self._tls_config = tls_config
+
+        if tls_enable:
+            await self.start("rti-so", 8765, cp)
+
 
     async def start(self, hostname: str, port: int, cp: str, *, access_token=None, protocol=None) -> None:
         """Connect to ws[s]://hostname:port/cp, with automatic reconnection."""
@@ -164,7 +171,7 @@ class ActiveEndpoint:
         uri = f"{scheme}://{hostname}:{int(port)}/{cp}"
 
         connect_kwargs = dict(
-            ssl=build_tls_context(self._tls_config) if self._tls_config else None,
+            ssl=build_tls_context_from_strings(self._tls_config) if self._tls_config else None,
             subprotocols=protocol if protocol is not None else None,
             additional_headers={"Authorization": f"Bearer {access_token}"} if access_token else None,
             compression=None,

@@ -19,6 +19,8 @@ from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, Ied
 from fastapi import FastAPI, APIRouter, Request, HTTPException, status, UploadFile, File
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field, ConfigDict
+import ssl
+from ws61850.security.tls import TLSConfig
 
 # ==================== Pydantic Models ====================
 class WritevalueRequest(BaseModel):
@@ -89,6 +91,30 @@ class ReadvalueRequest(BaseModel):
         description="Functional constraint (optional)",
         json_schema_extra={"example": "MX"}
     )
+
+class TLSConnectionCreateConfigRequest(BaseModel):
+    """Request body for creating a new connection."""
+    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_tls: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
+    tls_version: str = Field(default= "1.2", description="TLS version", json_schema_extra={"example": "1.2"})
+
+    server_key: str | None = Field(
+        default=None,
+        description="Server private key",
+        json_schema_extra={"example": "-----BEGIN PRIVATE KEY-----..."},
+    )
+    server_cert: str | None = Field(
+        default=None,
+        description="Server certificate",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+    server_ca: str | None = Field(
+        default=None,
+        description="Server CA certificate",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+
+    ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
 
 def create_bff_router(
     factory_dir,
@@ -913,6 +939,49 @@ def create_bff_router(
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": f"Unexpected error: {exc}"},
+                status_code=500
+            )
+
+    @router.post(
+        "/reconfig-connection",
+        summary="Get Connection Info",
+        description="Returns detailed information about the current WebSocket connection, including peer address, port, and connection status.",
+        response_description="Connection details",
+        responses={
+            200: {"description": "Connection information returned successfully"},
+            500: {"description": "Error retrieving connection info"}
+        },
+        tags=["Client Status"]
+    )
+    async def api_reconfig_connection(request: TLSConnectionCreateConfigRequest):
+        """Reconfigure the connection with a new communication point."""
+        try:
+            tls_version = ssl.TLSVersion.TLSv1_2 if request.tls_version == "1.2" else ssl.TLSVersion.TLSv1_3
+
+            if request.ws_mode == "active" or request.ws_mode == "Active":
+                tls_config = TLSConfig(
+                    mode="client",
+                    cafile= request.server_ca,
+                    min_version=tls_version,
+                    max_version=tls_version,
+                    keylog_file=os.path.join("tlskeys.log"),
+                )
+                await rti_fsp.runtime.endpoint.reconfigure_endpoint(request.enable_tls, tls_config=tls_config)
+                return JSONResponse(
+                    content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
+                             "enable_tls": request.enable_tls},
+                    status_code=200
+                )
+            else:
+                return JSONResponse(
+                    content={"ok": False, "error": "Only passive mode is supported for reconfiguration."},
+                    status_code=400
+                )
+
+        except Exception as exc:
+            rti_fsp._log_action(f"Reconfig connection failed: {exc}", "error")
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
                 status_code=500
             )
 

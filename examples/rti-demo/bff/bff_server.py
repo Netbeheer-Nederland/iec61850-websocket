@@ -88,6 +88,14 @@ class ConnectionCreateRequest(BaseModel):
     ws_mode: str = Field(default="", description="WebSocket mode", json_schema_extra={"example": ""})
     auto_discovered: bool = Field(default=False, description="Whether this connection was auto-discovered")
 
+class TLSConnectionCreateConfigRequest(BaseModel):
+    """Request body for creating a new connection."""
+    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_tls: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
+    tls_version: str = Field(default= "1.2", description="TLS version", json_schema_extra={"example": "1.2"})
+    server_key: str = Field(..., description="Server private key", json_schema_extra={"example": "-----BEGIN PRIVATE KEY-----..."})
+    server_cert: str = Field(..., description="Server certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
 
 class ConnectionUpdateRequest(BaseModel):
     """Request body for updating an existing connection."""
@@ -1118,6 +1126,105 @@ async def get_connections():
         "connections": conn_manager.connections,
         "count": len(conn_manager.connections)
     }
+
+
+@app.post(
+    "/api/connections/tls-config",
+    summary="update TLS Config for a specific connection",
+    description="update TLS Config for a specific connectio",
+    response_description="apply result",
+    responses={
+        201: {"description": "Connection with TLS config created successfully"},
+        400: {"description": "Missing required fields"}
+    },
+    tags=["TLS"]
+)
+async def create_tls_connection(request: TLSConnectionCreateConfigRequest):
+    """Create a new connection to a remote RTI endpoint.
+
+    Request Body:
+        ConnectionCreateRequest with name, host, port, type
+
+    Returns:
+        JSON with the created connection details.
+
+    Raises:
+        HTTPException 400: If required fields are missing.
+    """
+    print("server_key: ", request.server_key)
+    print("server_cert: ", request.server_cert)
+
+    ws_mode = request.ws_mode
+    print("debug 1")
+    if ws_mode == "passive" or ws_mode == "Passive":
+        if not request.server_key or not request.server_cert:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Missing required fields: server key or server cert for passive mode'
+        )
+    print("debug 2")
+
+    connection = conn_manager.get_connection(request.connection_name)
+    print("debug 3")
+
+
+    if connection:
+        connection['TLS'] = {}
+        connection['TLS']['server_key'] = request.server_key
+        connection['TLS']['server_cert'] = request.server_cert
+        connection['TLS']['enable_tls'] = request.enable_tls
+        connection['TLS']['tls_version'] = request.tls_version
+        conn_manager.save_connections()
+        print("debug 4")
+
+        # target = request.target
+        # method = request.method.upper()
+        # path = request.path
+        # body = request.body
+        #
+        # if not target or not path:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="target and path are required"
+        #     )
+        #
+        # try:
+        #     # Get client from registry
+        #     client = _bff_clients.get(target)
+        #
+        #     if not client:
+        #         raise HTTPException(
+        #             status_code=status.HTTP_404_NOT_FOUND,
+        #             detail=f"Unknown target: {target}"
+        #         )
+        #
+        #     # Call API dynamically
+        #     result = client.request(
+        #         method=method,
+        #         path=path,
+        #         json=body
+        #     )
+        #
+        #     return {
+        #         "ok": True,
+        #         "target": target,
+        #         "method": method,
+        #         "path": path,
+        #         "result": result
+        #     }
+        # except Exception as e:
+        #     logger.error(f"Error calling API on target {target}: {e}")
+        #     raise HTTPException(
+        #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        #         detail=str(e)
+        #     )
+
+    print("debug 5")
+
+    return {
+        "ok": False
+    }
+
 
 @app.post(
     "/api/add-connection",

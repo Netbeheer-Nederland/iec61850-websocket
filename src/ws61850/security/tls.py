@@ -18,6 +18,8 @@
 import ssl
 from dataclasses import dataclass, field
 from typing import Literal
+import tempfile
+import os
 
 
 @dataclass(frozen=True)
@@ -35,6 +37,53 @@ class TLSConfig:
     require_client_cert: bool = False
     alpn_protocols: tuple[str, ...] = field(default_factory=tuple)
     keylog_file: str | None = None
+
+import tempfile
+import ssl
+import os
+
+def build_tls_context_from_strings(tls_config: TLSConfig) -> ssl.SSLContext:
+    """Build SSLContext from string contents."""
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER if tls_config.mode == "server" else ssl.PROTOCOL_TLS_CLIENT)
+    try:
+        # Create temp files for cert and key
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as cert_f:
+            cert_f.write(tls_config.certfile)
+            cert_path = cert_f.name
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as key_f:
+            key_f.write(tls_config.keyfile)
+            key_path = key_f.name
+
+        if tls_config.mode == "server":
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            if tls_config.certfile:
+                ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
+            if tls_config.cafile:
+                ctx.load_verify_locations(tls_config.cafile)
+            if tls_config.require_client_cert:
+                ctx.verify_mode = ssl.CERT_REQUIRED
+
+            if tls_config.min_version is not None:
+                ctx.minimum_version = tls_config.min_version
+            if tls_config.max_version is not None:
+                ctx.maximum_version = tls_config.max_version
+            if tls_config.ciphers:
+                ctx.set_ciphers(tls_config.ciphers)
+            if tls_config.alpn_protocols:
+                ctx.set_alpn_protocols(list(tls_config.alpn_protocols))
+            if tls_config.keylog_file:
+                ctx.keylog_filename = tls_config.keylog_file
+
+            return ctx
+    except Exception  as e:
+        print("error in build_tls_context_from_strings:", e)
+        raise RuntimeError(f"Failed to build TLS context: {e}")
+
+    finally:
+        # Always clean up cert and key files
+        os.unlink(cert_path)
+        os.unlink(key_path)
 
 
 def build_tls_context(config: TLSConfig) -> ssl.SSLContext:

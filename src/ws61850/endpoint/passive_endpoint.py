@@ -38,7 +38,7 @@ from ws61850.endpoint.connection_router import ConnectionRouter
 from ws61850.iec61850.client.request_handling import create_tpaa_associate_request
 from ws61850.security.oauth2.jwks import JwksCache
 from ws61850.security.oauth2.validator import JwtValidator
-from ws61850.security.tls import build_tls_context
+from ws61850.security.tls import build_tls_context, build_tls_context_from_strings
 from ws61850.shared.extractors import (
     extract_associate_request_type,
     retrieve_associate_id_from_decoded_msg,
@@ -95,6 +95,7 @@ class PassiveEndpoint:
         self.recv_msg_callback = None
         self.server = None  # websockets.Server set in start()
         self._is_endpoint_running = False
+        self._endpoint_running_event = asyncio.Event()
 
         self._tls_config = tls_config
         self._oauth_enable = oauth_enable
@@ -171,9 +172,34 @@ class PassiveEndpoint:
             None,
         )
 
+    async def reconfigure_endpoint(self, tls_enable, tls_config=None, oauth_enable=False):
+        self._tls_config = tls_config
+        self._oauth_enable = oauth_enable
+
+        if tls_enable:
+            if self._is_endpoint_running:
+                try:
+                    await asyncio.wait_for(self.stop_passive(), timeout=10.0)  # ← Add timeout
+                except asyncio.TimeoutError:
+                    logger.warning("Server stop timed out, continuing reconfigure")
+            # Start server in background without blocking
+            logger.info("Starting WebSocket server with TLS on")
+            self._server_task = asyncio.create_task(
+                self._run_server("0.0.0.0", 8765)
+            )
+
+    async def _run_server(self, hostname: str, port: int):
+        """Internal method that actually runs the server."""
+        try:
+            await self.start(hostname, port)
+        except Exception as e:
+            logger.error("Error running WebSocket server: %s", e, exc_info=True)
+
+
     async def start(self, hostname: str, port: int, protocol=None) -> None:
-        ssl_ctx = build_tls_context(self._tls_config) if self._tls_config else None
+        ssl_ctx = build_tls_context_from_strings(self._tls_config) if self._tls_config else None
         scheme = "wss" if ssl_ctx else "ws"
+        print("the scheme is: ", scheme)
 
         serve_kwargs = dict(
             subprotocols=protocol if protocol is not None else None,
@@ -182,10 +208,13 @@ class PassiveEndpoint:
             ping_timeout=30,
             logger=self._websocket_server_logger,
         )
+        print("serve_kwargs: ", serve_kwargs)
         if ssl_ctx:
             serve_kwargs["ssl"] = ssl_ctx
+        print("serve_kwargs after ssl: ", serve_kwargs)
 
         self._is_endpoint_running = True
+        self._endpoint_running_event.set()
 
         async with serve(self.handle_client, hostname, port, **serve_kwargs) as server:
             self.server = server
