@@ -303,6 +303,50 @@ class TLSConnectionCreateConfigRequest(BaseModel):
 
     ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
 
+class OAUTHCreateConfigRequest(BaseModel):
+    """Request body for creating a new connection."""
+    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_oauth: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
+
+    certificate_endpoint_url: str | None = Field(
+        default=None,
+        description="OAuth Certificate endpoint URL",
+        json_schema_extra={"example": "https://auth.example.com/certs"},
+    )
+    token_issuer_url: str | None = Field(
+        default=None,
+        description="token issuer url",
+        json_schema_extra={"example": "https://auth.example.com"},
+    )
+    server_ca: str | None = Field(
+        default=None,
+        description="Server CA certificate",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+
+    token_endpoint_url: str | None = Field(
+        default=None,
+        description="OAuth Token endpoint URL",
+        json_schema_extra={"example": "https://auth.example.com/token"},
+    )
+
+    client_id: str | None = Field(
+        default=None,
+        description="OAuth Client ID",
+        json_schema_extra={"example": "my-client-id"},
+    )
+
+    client_secret: str | None = Field(
+        default=None,
+        description="OAuth Client Secret",
+        json_schema_extra={"example": "my-client-secret"},
+    )
+
+    enable_token_refresh: bool = Field(default=False, description="Enable token refresh", json_schema_extra={"example": False})
+
+    ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+
+
 class WriteValueRequest(BaseModel):
     """Request body for writing a value to the connected server.
 
@@ -886,6 +930,48 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     print("endpoint status is: ", rti_so.runtime.endpoint._is_endpoint_running)
                 return JSONResponse(
                     content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode, "enable_tls": request.enable_tls},
+                    status_code=200
+                )
+            else:
+                return JSONResponse(
+                    content={"ok": False, "error": "Only passive mode is supported for reconfiguration."},
+                    status_code=400
+                )
+
+        except Exception as exc:
+            print("reconfig error: ", exc)
+            rti_so._log_action(f"Reconfig connection failed: {exc}", "error")
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/reconfig-oauth",
+        summary="Get Connection Info",
+        description="Returns detailed information about the current WebSocket connection, including peer address, port, and connection status.",
+        response_description="Connection details",
+        responses={
+            200: {"description": "Connection information returned successfully"},
+            500: {"description": "Error retrieving connection info"}
+        },
+        tags=["Client Status"]
+    )
+    async def api_reconfig_oauth(request: OAUTHCreateConfigRequest):
+        """Reconfigure the connection with a new communication point."""
+        try:
+            tls_version = ssl.TLSVersion.TLSv1_2 if request.tls_version == "1.2" else ssl.TLSVersion.TLSv1_3
+            print("Reconfiguring connection with TLS version: ", tls_version)
+            if request.ws_mode == "passive" or request.ws_mode == "Passive":
+
+                await rti_so.runtime.endpoint.reconfigure_oauth(request.enable_oauth, certificate_endpoint=request,
+                                                                token_issuer=request.token_issuer_url, kc_cert= request.server_ca)
+                if request.enable_tls:
+                    await rti_so.runtime.endpoint._endpoint_running_event.wait()  # ← Wait here
+                    print("endpoint status is: ", rti_so.runtime.endpoint._is_endpoint_running)
+                return JSONResponse(
+                    content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
+                             "enable_tls": request.enable_tls},
                     status_code=200
                 )
             else:

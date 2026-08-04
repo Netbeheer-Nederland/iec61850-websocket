@@ -22,6 +22,7 @@ import logging
 import websockets
 import websockets.exceptions
 
+from security.oauth import get_access_token
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
 from ws61850.endpoint.association_handler import (
     ACTION_ABORT,
@@ -38,6 +39,7 @@ from ws61850.shared.extractors import (
 )
 from ws61850.security.tls import build_tls_context, build_tls_context_from_strings
 from ws61850.transport.reconnect import ReconnectPolicy
+from ws61850.security.oauth2.client_credentials import ClientCredentialsProvider
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +82,7 @@ class ActiveEndpoint:
             max_retries=max_retries,
             delay_seconds=retry_connection_delay,
         )
+        self._oauth_enable = oauth_enable
         self._assoc_handler = AssociationHandler(
             kc_cert=kc_cert,
             own_cert=own_cert,
@@ -133,6 +136,22 @@ class ActiveEndpoint:
             print("entered reconfigure_connection with tls_enable True, tls_config:", tls_config)
             await self.start("rti-so", 8765, cp)
 
+
+    async def reconfigure_oauth(self, cp, oauth_enable, token_endpoint=None, client_id=None, client_secret=None, kc_cert=None, enable_token_refresh=False):
+        """Reconfigure TLS and OAuth settings for future connections."""
+        self._oauth_enable = oauth_enable
+        self._assoc_handler._kc_cert = kc_cert
+        self._assoc_handler._token_endpoint = token_endpoint
+
+        client_con_provider: ClientCredentialsProvider = ClientCredentialsProvider(
+            token_url=token_endpoint,
+            client_id=client_id,
+            client_secret=client_secret,
+            cafile= kc_cert,
+        )
+        access_token = client_con_provider.get_access_token()
+        if oauth_enable:
+            await self.start("rti-so", 8765, cp, access_token= access_token)
 
     async def start(self, hostname: str, port: int, cp: str, *, access_token=None, protocol=None) -> None:
         """Connect to ws[s]://hostname:port/cp, with automatic reconnection."""

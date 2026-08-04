@@ -172,6 +172,24 @@ class PassiveEndpoint:
             None,
         )
 
+    async def reconfigure_oauth(self, oauth_enable, certificate_endpoint=None, token_issuer=None, kc_cert=None):
+        self._oauth_enable = oauth_enable
+        self._kc_cert = kc_cert
+        self._cert_endpoint = certificate_endpoint
+        self._token_issuer = token_issuer
+
+        if oauth_enable:
+            if self._is_endpoint_running:
+                try:
+                    await asyncio.wait_for(self.stop_passive(), timeout=10.0)  # ← Add timeout
+                except asyncio.TimeoutError:
+                    logger.warning("Server stop timed out, continuing reconfigure")
+            # Start server in background without blocking
+            logger.info("Starting WebSocket server with TLS on")
+            self._server_task = asyncio.create_task(
+                self._run_server("0.0.0.0", 8765)
+            )
+
     async def reconfigure_endpoint(self, tls_enable, tls_config=None, oauth_enable=False):
         self._tls_config = tls_config
         self._oauth_enable = oauth_enable

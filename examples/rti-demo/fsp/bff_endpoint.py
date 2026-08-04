@@ -116,6 +116,50 @@ class TLSConnectionCreateConfigRequest(BaseModel):
 
     ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
 
+class OAUTHCreateConfigRequest(BaseModel):
+    """Request body for creating a new connection."""
+    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_oauth: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
+
+    certificate_endpoint_url: str | None = Field(
+        default=None,
+        description="OAuth Certificate endpoint URL",
+        json_schema_extra={"example": "https://auth.example.com/certs"},
+    )
+    token_issuer_url: str | None = Field(
+        default=None,
+        description="token issuer url",
+        json_schema_extra={"example": "https://auth.example.com"},
+    )
+    server_ca: str | None = Field(
+        default=None,
+        description="Server CA certificate",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+
+    token_endpoint_url: str | None = Field(
+        default=None,
+        description="OAuth Token endpoint URL",
+        json_schema_extra={"example": "https://auth.example.com/token"},
+    )
+
+    client_id: str | None = Field(
+        default=None,
+        description="OAuth Client ID",
+        json_schema_extra={"example": "my-client-id"},
+    )
+
+    client_secret: str | None = Field(
+        default=None,
+        description="OAuth Client Secret",
+        json_schema_extra={"example": "my-client-secret"},
+    )
+
+    enable_token_refresh: bool = Field(default=False, description="Enable token refresh", json_schema_extra={"example": False})
+
+    ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+
+
 def create_bff_router(
     factory_dir,
     scl_default_path: Optional[Path] = None,
@@ -969,6 +1013,45 @@ def create_bff_router(
                 cp = os.getenv("CP", "cp1")
                 await rti_fsp.runtime.endpoint.reconfigure_connection(cp, request.enable_tls, tls_config=tls_config)
                 print("Reconfigured connection with TLS enabled:", request.enable_tls)
+                return JSONResponse(
+                    content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
+                             "enable_tls": request.enable_tls},
+                    status_code=200
+                )
+            else:
+                return JSONResponse(
+                    content={"ok": False, "error": "Only active mode is supported for reconfiguration."},
+                    status_code=400
+                )
+
+        except Exception as exc:
+            rti_fsp._log_action(f"Reconfig connection failed: {exc}", "error")
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/reconfig-oauth",
+        summary="Get Connection Info",
+        description="Returns detailed information about the current WebSocket connection, including peer address, port, and connection status.",
+        response_description="Connection details",
+        responses={
+            200: {"description": "Connection information returned successfully"},
+            500: {"description": "Error retrieving connection info"}
+        },
+        tags=["Client Status"]
+    )
+    async def api_reconfig_oaut(request: OAUTHCreateConfigRequest):
+        """Reconfigure the connection with a new communication point."""
+        try:
+
+            if request.ws_mode == "active" or request.ws_mode == "Active":
+
+                cp = os.getenv("CP", "cp1")
+                await rti_fsp.runtime.endpoint.reconfigure_oauth(cp, request.enable_oauth, request.token_endpoint_url
+                                                                      , request.client_id, request.client_secret,
+                                                                      request.server_ca)
                 return JSONResponse(
                     content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
                              "enable_tls": request.enable_tls},
