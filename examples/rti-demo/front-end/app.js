@@ -4,6 +4,7 @@
 
  const apiDefinitions = [
     { id: 'reconfig-connection', label: 'POST /api/reconfig-connection', method: 'POST', path: '/api/reconfig-connection' },
+    { id: 'reconfig-oauth', label: 'POST /api/reconfig-oauth', method: 'POST', path: '/api/reconfig-oauth' },
 
 ];
 
@@ -632,37 +633,40 @@ class RTIDemoApp {
             this.addDiagnosticMessage(`Failed to save TLS config: ${error.message}`, 'error');
         }
     }
-    // Save OAuth Config
     async saveOAuthConfig() {
+        const targetEndpoint = document.getElementById(`targetEndpoint-${this.selectedConnection.name}`).textContent;
         const enableOAuth = document.getElementById('oauth-enable').checked;
-        const tokenUrl = document.getElementById('oauth-token-url').value;
-        const clientId = document.getElementById('oauth-client-id').value;
-        const clientSecret = document.getElementById('oauth-client-secret').value;
-        const certContent = document.getElementById('oauth-cert-content').value;
-        const enableRefresh = document.getElementById('oauth-enable-refresh').checked;
+        const ws_mode = this.selectedConnection?.properties_info?.properties?.ws_mode || 'N/A';
+        const isServer = ws_mode === 'active' || ws_mode === 'Active';
 
-        if (!this.selectedConnection) {
-            this.addDiagnosticMessage('No connection selected', 'error');
-            return;
-        }
-
-        if (enableOAuth && !tokenUrl) {
-            alert('Token Endpoint URL is required when OAuth is enabled');
-            return;
-        }
-
-        const config = {
+        let config = {
             connection_name: this.selectedConnection.name,
             enable_oauth: enableOAuth,
-            token_endpoint_url: tokenUrl,
-            client_id: clientId,
-            client_secret: clientSecret,
-            ca_certificate: certContent,
-            enable_token_refresh: enableRefresh
+            ws_mode: ws_mode
         };
 
+        if (isServer) {
+            // Active mode (WS Server - RTI-FSP)
+            config = {
+                ...config,
+                certificate_endpoint_url: document.getElementById('oauth-cert-url').value,
+                token_issuer_url: document.getElementById('oauth-issuer-url').value,
+                ca_certificate: document.getElementById('oauth-cert-content').value
+            };
+        } else {
+            // Passive mode (WS Client - RTI-SO)
+            config = {
+                ...config,
+                token_endpoint_url: document.getElementById('oauth-token-url').value,
+                client_id: document.getElementById('oauth-client-id').value,
+                client_secret: document.getElementById('oauth-client-secret').value,
+                ca_certificate: document.getElementById('oauth-cert-content-client').value,
+                enable_token_refresh: document.getElementById('oauth-enable-refresh').checked
+            };
+        }
+
         try {
-            const result = await this.callBFF('/api/connections/oauth-config', 'POST', config);
+            const result = await this.executeApiCall(getApiById('reconfig-oauth'), targetEndpoint, config);
             if (result) {
                 this.addDiagnosticMessage(`OAuth config saved for ${this.selectedConnection.name}`, 'success');
                 this.closeOAuthModal();
