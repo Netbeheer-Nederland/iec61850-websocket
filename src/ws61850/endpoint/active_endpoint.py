@@ -128,8 +128,9 @@ class ActiveEndpoint:
     async def reconfigure_connection(self, cp, tls_enable, tls_config=None):
         """Reconfigure TLS and OAuth settings for future connections."""
         self._tls_config = tls_config
-
+        print("entering reconfigure_connection with tls_enable:", tls_enable)
         if tls_enable:
+            print("entered reconfigure_connection with tls_enable True, tls_config:", tls_config)
             await self.start("rti-so", 8765, cp)
 
 
@@ -167,8 +168,12 @@ class ActiveEndpoint:
 
     async def _connect_once(self, hostname: str, port: int, cp: str, *, access_token=None, protocol=None) -> None:
         scheme = "wss" if self._tls_config else "ws"
+        print("schema in fsp active endpoint _connect_once:", scheme)
         print(f"Connecting to {scheme}://{hostname}:{port}/{cp} with protocol={protocol}")
         uri = f"{scheme}://{hostname}:{int(port)}/{cp}"
+
+        print("fsp is connecting with tls_config:", self._tls_config)
+        print("fsp is connecting to uri: ", uri)
 
         connect_kwargs = dict(
             ssl=build_tls_context_from_strings(self._tls_config) if self._tls_config else None,

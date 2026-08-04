@@ -957,7 +957,7 @@ def create_bff_router(
         """Reconfigure the connection with a new communication point."""
         try:
             tls_version = ssl.TLSVersion.TLSv1_2 if request.tls_version == "1.2" else ssl.TLSVersion.TLSv1_3
-
+            print("tls_version in reconfig connection: ", tls_version)
             if request.ws_mode == "active" or request.ws_mode == "Active":
                 tls_config = TLSConfig(
                     mode="client",
@@ -966,7 +966,9 @@ def create_bff_router(
                     max_version=tls_version,
                     keylog_file=os.path.join("tlskeys.log"),
                 )
-                await rti_fsp.runtime.endpoint.reconfigure_endpoint(request.enable_tls, tls_config=tls_config)
+                cp = os.getenv("CP", "cp1")
+                await rti_fsp.runtime.endpoint.reconfigure_connection(cp, request.enable_tls, tls_config=tls_config)
+                print("Reconfigured connection with TLS enabled:", request.enable_tls)
                 return JSONResponse(
                     content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
                              "enable_tls": request.enable_tls},
@@ -974,7 +976,7 @@ def create_bff_router(
                 )
             else:
                 return JSONResponse(
-                    content={"ok": False, "error": "Only passive mode is supported for reconfiguration."},
+                    content={"ok": False, "error": "Only active mode is supported for reconfiguration."},
                     status_code=400
                 )
 

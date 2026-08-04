@@ -44,46 +44,68 @@ import os
 
 def build_tls_context_from_strings(tls_config: TLSConfig) -> ssl.SSLContext:
     """Build SSLContext from string contents."""
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER if tls_config.mode == "server" else ssl.PROTOCOL_TLS_CLIENT)
+    cert_path = key_path = ca_path = None  # ← Initialize first
+
     try:
-        # Create temp files for cert and key
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as cert_f:
-            cert_f.write(tls_config.certfile)
-            cert_path = cert_f.name
-
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as key_f:
-            key_f.write(tls_config.keyfile)
-            key_path = key_f.name
-
         if tls_config.mode == "server":
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as cert_f:
+                cert_f.write(tls_config.certfile)
+                cert_path = cert_f.name
+
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as key_f:
+                key_f.write(tls_config.keyfile)
+                key_path = key_f.name
+
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            if tls_config.certfile:
-                ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
+            ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
+
             if tls_config.cafile:
-                ctx.load_verify_locations(tls_config.cafile)
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as ca_f:
+                    ca_f.write(tls_config.cafile)
+                    ca_path = ca_f.name
+                ctx.load_verify_locations(ca_path)
+
             if tls_config.require_client_cert:
                 ctx.verify_mode = ssl.CERT_REQUIRED
 
-            if tls_config.min_version is not None:
-                ctx.minimum_version = tls_config.min_version
-            if tls_config.max_version is not None:
-                ctx.maximum_version = tls_config.max_version
-            if tls_config.ciphers:
-                ctx.set_ciphers(tls_config.ciphers)
-            if tls_config.alpn_protocols:
-                ctx.set_alpn_protocols(list(tls_config.alpn_protocols))
-            if tls_config.keylog_file:
-                ctx.keylog_filename = tls_config.keylog_file
+        else:  # Client mode
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as ca_f:
+                ca_f.write(tls_config.cafile)
+                ca_path = ca_f.name
+            ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_path)
 
-            return ctx
-    except Exception  as e:
+            if not tls_config.verify_peer:
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+            elif not tls_config.check_hostname:
+                ctx.check_hostname = False
+
+        # Common settings
+        if tls_config.min_version:
+            ctx.minimum_version = tls_config.min_version
+        if tls_config.max_version:
+            ctx.maximum_version = tls_config.max_version
+        if tls_config.ciphers:
+            ctx.set_ciphers(tls_config.ciphers)
+        if tls_config.alpn_protocols:
+            ctx.set_alpn_protocols(list(tls_config.alpn_protocols))
+        if tls_config.keylog_file:
+            ctx.keylog_filename = tls_config.keylog_file
+
+        return ctx
+
+    except Exception as e:
         print("error in build_tls_context_from_strings:", e)
         raise RuntimeError(f"Failed to build TLS context: {e}")
 
     finally:
-        # Always clean up cert and key files
-        os.unlink(cert_path)
-        os.unlink(key_path)
+        # Safe cleanup - only unlink if path exists
+        for path in [cert_path, key_path, ca_path]:
+            if path is not None:
+                try:
+                    os.unlink(path)
+                except Exception:
+                    pass
 
 
 def build_tls_context(config: TLSConfig) -> ssl.SSLContext:
