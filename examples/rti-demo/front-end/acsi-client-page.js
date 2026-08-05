@@ -34,6 +34,10 @@
         { id: 'clear-logs', label: 'POST /api/clear_logs', method: 'POST', path: '/api/clear_logs', sampleBody: '' },
         { id: 'status', label: 'GET /api/status', method: 'GET', path: '/api/status'},
         { id: 'operate', label: 'POST /api/operate', method: 'POST', path: '/api/operate'},
+        { id: 'urcb-read', label: 'POST /api/urcb-read', method: 'POST', path: '/api/urcb-read'},
+        { id: 'brcb-read', label: 'POST /api/brcb-read', method: 'POST', path: '/api/brcb-read'},
+        { id: 'brcb-write', label: 'POST /api/brcb-write', method: 'POST', path: '/api/brcb-write'},
+        { id: 'urcb-write', label: 'POST /api/urcb-write', method: 'POST', path: '/api/urcb-write'},
     ];
 
     function getApiById(id) {
@@ -1620,6 +1624,113 @@
       parentLi.appendChild(ul);
     }
 
+    // Add to your JavaScript
+    let currentBrcbRef = null;
+
+    // Open modal with BRCB data
+    function openReportControlModal(ref, type, cp, endpointTarget) {
+        currentBrcbRef = ref;
+        const modal = document.getElementById('brcb-modal');
+        const form = document.getElementById('brcb-form');
+
+        // Set reference
+        document.getElementById('brcb-ref').value = ref;
+
+        // Fetch current BRCB values from your backend
+        fetchRCBValues(ref, type, cp, endpointTarget).then(brcbData => {
+            if (brcbData) {
+                // Populate form
+                document.getElementById('brcb-dataset').value = brcbData.dataSet || '';
+                document.getElementById('brcb-intgpd').value = brcbData.intgPd || 2000;
+                document.getElementById('brcb-rptena').checked = brcbData.rptEna || false;
+
+                // Set optFlds checkboxes
+                if (brcbData.optFlds) {
+                    Object.entries(brcbData.optFlds).forEach(([key, value]) => {
+                        const cb = form.querySelector(`input[name="optFlds"][value="${key}"]`);
+                        if (cb) cb.checked = value;
+                    });
+                }
+
+                // Set trgOp checkboxes
+                if (brcbData.trgOp) {
+                    Object.entries(brcbData.trgOp).forEach(([key, value]) => {
+                        const cb = form.querySelector(`input[name="trgOp"][value="${key}"]`);
+                        if (cb) cb.checked = value;
+                    });
+                }
+            }
+
+            modal.style.display = 'block';
+        });
+
+        // Close handlers
+        // Change these lines in openReportControlModal:
+        modal.querySelector('.brcb-close-modal').onclick = () => modal.style.display = 'none';
+        document.getElementById('brcb-cancel').onclick = () => modal.style.display = 'none';
+
+        // Save handler
+        document.getElementById('brcb-save').onclick = () => {
+            const data = {
+                brcbRef: currentBrcbRef,
+                dataSet: document.getElementById('brcb-dataset').value,
+                intgPd: parseInt(document.getElementById('brcb-intgpd').value) || 0,
+                rptEna: document.getElementById('brcb-rptena').checked,
+                optFlds: {},
+                trgOp: {}
+            };
+
+            // Get optFlds
+            form.querySelectorAll('input[name="optFlds"]:checked').forEach(cb => {
+                data.optFlds[cb.value] = true;
+            });
+            form.querySelectorAll('input[name="optFlds"]:not(:checked)').forEach(cb => {
+                data.optFlds[cb.value] = false;
+            });
+
+            // Get trgOp
+            form.querySelectorAll('input[name="trgOp"]:checked').forEach(cb => {
+                data.trgOp[cb.value] = true;
+            });
+            form.querySelectorAll('input[name="trgOp"]:not(:checked)').forEach(cb => {
+                data.trgOp[cb.value] = false;
+            });
+
+            // Send to backend
+            saveBRCBValues(data).then(() => {
+                modal.style.display = 'none';
+                addDiagnosticMessage(`BRCB ${currentBrcbRef} configured successfully`, 'success');
+            }).catch(err => {
+                addDiagnosticMessage(`Failed to configure BRCB: ${err.message}`, 'error');
+            });
+        };
+    }
+
+    // Example backend functions (implement these)
+    async function fetchRCBValues(ref, type, cp, endpointTarget) {
+        // Call your backend API to get current BRCB values
+        const response = await executeApiCall(
+            type == "BRCB" ? getApiById('brcb-read') : getApiById('urcb-read'),
+            endpointTarget,
+            { objRef: ref, cp: cp }
+        );
+        if (response.ok) {
+            return response;
+        } else {
+            throw new Error(response.payload.error || 'Failed to fetch BRCB values');
+        }
+    }
+
+    async function saveBRCBValues(data) {
+        // Call your backend API to save BRCB values
+        const response = await fetch('/api/brcb', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return response.json();
+    }
+
     function appendSubDataObjectNodes(parentLi, subDataObjects) {
       if (!subDataObjects || subDataObjects.length === 0) {
         return;
@@ -1649,6 +1760,8 @@
             'SDO': 'SDO',
             'DataSet': 'DataSet',
             'ReportControl': 'RC',
+            'BRCB': 'BRCB',
+            'URCB': 'URCB',
             'Group': '',
             'FCDA': 'FCDA'
         };
@@ -2015,6 +2128,11 @@
                         }
                     }
                 }
+                if (node.nodeType === 'ReportControl') {
+                    const rcbType = node.li.getAttribute('rcbType')
+                    openReportControlModal(node.ref, rcbType, cp, endpointTarget);  // Direct modal open
+                    return;  // Skip onNodeClick if you want
+                }
         }
 
         showStatus(rootElement, 'Fetching model...', 'info');
@@ -2182,7 +2300,23 @@
             });
             dsLi.appendChild(dsUl);
           const rcLi = createTreeNode('Group', 'Report Controls');
-          appendChildrenTree(rcLi, data.result.model.logicalNodeDetails[ldName + '/' + lnName].reportControlBlocks.map(rcb => rcb.name) || [], 'ReportControl');
+          //appendChildrenTree(rcLi, data.result.model.logicalNodeDetails[ldName + '/' + lnName].reportControlBlocks.map(rcb => rcb.name) || [], 'ReportControl');
+          // Create Report Controls group with clickable items
+          const rcUl = document.createElement('ul');
+          rcUl.className = 'scl-tree-list';
+          const reportControls = data.result.model.logicalNodeDetails[ldName + '/' + lnName].reportControlBlocks || [];
+
+           reportControls.forEach(function(rcb) {
+                const rcbName = (typeof rcb === 'object' ? rcb.name : rcb) || 'ReportControl';
+                const rcbRef = lnRef + '.' + rcbName;
+                const rcbNode = createTreeNode(rcb.type, rcbName);
+                rcbNode.setAttribute('rcbType', rcb.type);
+
+                makeClickable(rcbNode, rcbRef, null, 'ReportControl');  // ← Make clickable
+                rcUl.appendChild(rcbNode);
+            });
+           rcLi.appendChild(rcUl);
+
           // Create DOs group with clickable items
           var dos = data.result.model.logicalNodeDetails[ldName + '/' + lnName].dataObjects || ln.dataObjects || ln.do || [];
           if (dos.length > 0) {

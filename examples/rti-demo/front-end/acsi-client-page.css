@@ -653,6 +653,79 @@ h3 {
     background: var(--bg-secondary);
     color: var(--text-primary);
 }
+
+/* CSS - All classes prefixed with brcb- */
+.brcb-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.brcb-modal-content {
+    background-color: #2d3748;
+    margin: 5% auto;
+    padding: 20px;
+    border-radius: 8px;
+    width: 600px;
+    max-width: 90%;
+    color: white;
+}
+
+.brcb-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.brcb-close-modal {
+    cursor: pointer;
+    font-size: 24px;
+}
+
+.brcb-modal-body {
+    margin-bottom: 20px;
+}
+
+.brcb-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.brcb-form-group {
+    margin-bottom: 15px;
+}
+
+.brcb-checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.brcb-checkbox-grid label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.brcb-form-control {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    background-color: #1a202c;
+    color: white;
+    border: 1px solid #4a5568;
+    border-radius: 4px;
+}
+
 /* Node type border colors */
 .scl-node-LDevice { border-left: 3px solid #673ab7; }
 .scl-node-LogicalNode { border-left: 3px solid #ff5722; }

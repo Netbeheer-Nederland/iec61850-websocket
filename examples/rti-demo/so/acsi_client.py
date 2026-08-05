@@ -445,6 +445,28 @@ class ACSIClient:
         result = await client.get_data_definition(obj_ref, websocket_info, None, None)
         return {"dataDefinition": result}
 
+    async def get_brcb_definition(self, obj_ref: str, cp: str) -> Dict[str, Any]:
+        """Read a value from the server."""
+
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
+        result = await client.get_BRCB_values(obj_ref, websocket_info, None, None)
+        return {"brcbDefinition": result}
+
+    async def get_urcb_definition(self, obj_ref: str, cp: str) -> Dict[str, Any]:
+        """Read a value from the server."""
+
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
+        result = await client.get_URCB_values(obj_ref, websocket_info, None, None)
+        return {"urcbDefinition": result}
+
     async def write_value(self, obj_ref: str, value: Any, fc: str, data_type: str, cp:str) -> Dict[str, Any]:
         """Write a value to the server."""
         client = self.get_iec61850_client(cp)

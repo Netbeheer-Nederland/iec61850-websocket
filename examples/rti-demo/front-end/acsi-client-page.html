@@ -201,6 +201,70 @@
                 <div id="writeValueResult" class="hidden" style="margin-top: 16px; padding: 12px; border-radius: 4px; text-align: center;"></div>
             </div>
         </div>
+
+        <!-- brcb modal -->
+        <div id="brcb-modal" class="brcb-modal" style="display: none;">
+          <div class="brcb-modal-content">
+            <div class="brcb-modal-header">
+              <h3>Configure BRCB</h3>
+              <span class="brcb-close-modal">&times;</span>
+            </div>
+
+            <div class="brcb-modal-body">
+              <form id="brcb-form">
+                <input type="hidden" id="brcb-ref">
+
+                <div class="brcb-form-group">
+                  <label for="brcb-dataset">Data Set:</label>
+                  <select id="brcb-dataset" class="brcb-form-control"></select>
+                </div>
+
+                <div class="brcb-form-group">
+                  <label for="brcb-intgpd">Integrity Period (ms):</label>
+                  <input type="number" id="brcb-intgpd" class="brcb-form-control" min="0">
+                </div>
+
+                <div class="brcb-form-group">
+                  <label>
+                    <input type="checkbox" id="brcb-rptena">
+                    Enable Reporting
+                  </label>
+                </div>
+
+                <fieldset class="brcb-form-group">
+                  <legend>Optional Fields:</legend>
+                  <div class="brcb-checkbox-grid">
+                    <label><input type="checkbox" name="optFlds" value="seqNum"> seqNum</label>
+                    <label><input type="checkbox" name="optFlds" value="timeStamp"> timeStamp</label>
+                    <label><input type="checkbox" name="optFlds" value="dataSet"> dataSet</label>
+                    <label><input type="checkbox" name="optFlds" value="bufOvfl"> bufOvfl</label>
+                    <label><input type="checkbox" name="optFlds" value="configRef"> configRef</label>
+                    <label><input type="checkbox" name="optFlds" value="entryID"> entryID</label>
+                    <label><input type="checkbox" name="optFlds" value="dataRef"> dataRef</label>
+                    <label><input type="checkbox" name="optFlds" value="reasonCode"> reasonCode</label>
+                  </div>
+                </fieldset>
+
+                <fieldset class="brcb-form-group">
+                  <legend>Trigger Options:</legend>
+                  <div class="brcb-checkbox-grid">
+                    <label><input type="checkbox" name="trgOp" value="dchg"> dchg</label>
+                    <label><input type="checkbox" name="trgOp" value="qchg"> qchg</label>
+                    <label><input type="checkbox" name="trgOp" value="dupd"> dupd</label>
+                    <label><input type="checkbox" name="trgOp" value="integrity"> integrity</label>
+                    <label><input type="checkbox" name="trgOp" value="gi"> gi</label>
+                  </div>
+                </fieldset>
+              </form>
+            </div>
+
+            <div class="brcb-modal-footer">
+              <button type="button" class="btn btn-secondary" id="brcb-cancel">Cancel</button>
+              <button type="button" class="btn btn-primary" id="brcb-save">Save</button>
+            </div>
+          </div>
+        </div>
+
     </div>
 
     <script src="acsi-client-page.js"></script>
