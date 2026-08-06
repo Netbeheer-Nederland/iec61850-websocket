@@ -46,6 +46,7 @@ class RTIDemoApp {
         this.loadSettings();
         this.checkBFFConnection();
         this.startAutoRefresh();
+        this.refreshDashboard(); 
     }
 
 
