@@ -639,7 +639,7 @@
         const result = await executeApiCall(
             getApiById('connect'),
             endpointTarget,
-            { host, port, cp }
+            { host, port }
         );
 
         if (result && result.ok) {

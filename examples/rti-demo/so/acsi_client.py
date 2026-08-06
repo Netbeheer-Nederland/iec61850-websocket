@@ -38,7 +38,7 @@ class ACSIClientRuntime:
         self.status: str = "disconnected"  # disconnected|connecting|connected|disconnecting|error
         self.host: str = "localhost"
         self.port: int = 8765
-        self.cp: str = "cp1"
+        #self.cp: str = "cp1"
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.thread: Optional[threading.Thread] = None
         self.client = None
@@ -193,12 +193,11 @@ class ACSIClient:
         if port < 1 or port > 65535:
             raise ValueError("Port must be in range 1..65535")
 
-    async def _connect_async(self, host: str, port: int, cp: str) -> None:
+    async def _connect_async(self, host: str, port: int) -> None:
         """Connect to the server asynchronously."""
         self._set_runtime_state(
             host=host,
             port=port,
-            cp=cp,
             status="connecting",
             error=None,
         )
@@ -246,7 +245,7 @@ class ACSIClient:
 
             self._log_action(
                 "Connected to server",
-                detail={"host": host, "port": port, "cp": cp},
+                detail={"host": host, "port": port},
             )
 
         except Exception as exc:
@@ -282,14 +281,14 @@ class ACSIClient:
         self._log_action("Disconnected")
         asyncio.get_running_loop().call_soon(asyncio.get_running_loop().stop)
 
-    def _event_loop_thread(self, host: str, port: int, cp: str) -> None:
+    def _event_loop_thread(self, host: str, port: int) -> None:
         """Run the event loop in a separate thread."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         self._set_runtime_state(loop=loop)
 
         connect_task = loop.create_task(
-            self._connect_async(host, port, cp), name="client-connect"
+            self._connect_async(host, port), name="client-connect"
         )
 
         def _on_connect_done(task: asyncio.Task) -> None:
@@ -331,7 +330,7 @@ class ACSIClient:
         else:
             raise ValueError(f"Unsupported value type: {val_type}")
 
-    def connect(self, host: str, port: int, cp: str = "cp1") -> None:
+    def connect(self, host: str, port: int) -> None:
         """Connect to the server in a background thread."""
         self._validate_connection_params(host, port)
 
@@ -342,11 +341,11 @@ class ACSIClient:
             self.runtime.status = "connecting"
 
         t = threading.Thread(
-            target=self._event_loop_thread, args=(host, port, cp), daemon=True
+            target=self._event_loop_thread, args=(host, port), daemon=True
         )
         self._set_runtime_state(thread=t)
         t.start()
-        self._log_action("Connection initiated", detail={"host": host, "port": port, "cp": cp})
+        self._log_action("Connection initiated", detail={"host": host, "port": port})
 
     def disconnect(self) -> None:
         """Disconnect from the server."""
@@ -388,7 +387,7 @@ class ACSIClient:
             "status": self.runtime.status,
             "host": self.runtime.host,
             "port": self.runtime.port,
-            "cp": self.runtime.cp,
+            #"cp": self.runtime.cp,
             "error": self.runtime.error,
             #"modelStatus": model_info.model_status,
             #"modelError": model_info.model_error,

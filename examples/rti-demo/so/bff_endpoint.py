@@ -37,11 +37,6 @@ class ConnectRequest(BaseModel):
         le=65535,
         json_schema_extra={"example": 8765}
     )
-    cp: str = Field(
-        default="cp1",
-        description="Communication point identifier",
-        json_schema_extra={"example": "cp1"}
-    )
 
 class ModelRequest(BaseModel):
     """Request body for connecting to an IEC61850 WebSocket server.
@@ -745,11 +740,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         try:
             host = request.host
             port = request.port
-            cp = request.cp.lower()
 
             try:
-                rti_so.connect(host, port, cp)
-                return {"ok": True, "status": "connecting", "host": host, "port": port, "cp": cp}
+                rti_so.connect(host, port)
+                return {"ok": True, "status": "connecting", "host": host, "port": port}
             except (ValueError, RuntimeError) as exc:
                 rti_so._log_action(f"Connect rejected: {exc}", "warn")
                 return JSONResponse(
@@ -1587,3 +1581,4 @@ if __name__ == "__main__":
     app = create_fastapi_app()
     port = int(os.getenv("PORT", "5003"))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
