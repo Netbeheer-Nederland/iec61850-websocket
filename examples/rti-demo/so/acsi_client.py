@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 from ws61850.endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
+from datetime import datetime
 
 class ModelInfo:
     def __init__(self, cp):
@@ -444,6 +445,114 @@ class ACSIClient:
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
         result = await client.get_data_definition(obj_ref, websocket_info, None, None)
         return {"dataDefinition": result}
+
+    async def get_brcb_definition(self, obj_ref: str, cp: str) -> Dict[str, Any]:
+        """Read a value from the server."""
+
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
+        result = await client.get_BRCB_values(obj_ref, websocket_info, None, None)
+        return {"brcbDefinition": result}
+
+    def create_rcb_from_frontend_data(self, rcb_data, type: str):
+        """
+        Map frontend JSON data to IEC61850 ClientReportControlBlock
+
+        Args:
+            data: dict from frontend request body
+            client: IEC61850Client instance
+
+        Returns:
+            Configured ClientReportControlBlock
+        """
+        # Extract from nested data structure
+        obj_ref = rcb_data.get('ref', '')
+        is_buffered = True if type == 'BRCB' else False
+
+        # Create BRCB instance
+        rcb = IEC61850Client.ClientReportControlBlock(obj_ref, rcb_data.get('rptEna', is_buffered))
+
+        # Map fields from frontend
+        rcb.dataSet = rcb_data.get('dataSet', '')
+        rcb.intgPd = rcb_data.get('intgPd', 0)
+        rcb.rptEna = rcb_data.get('rptEna', True)
+
+        # Map optFlds - convert dict to expected format
+        opt_flds_data = rcb_data.get('optFlds', {})
+        rcb.optFlds = {
+            'seqNum': opt_flds_data.get('seqNum', False),
+            'timeStamp': opt_flds_data.get('timeStamp', True),
+            'dataSet': opt_flds_data.get('dataSet', True),
+            'bufOvfl': opt_flds_data.get('bufOvfl', True),
+            'configRef': opt_flds_data.get('configRef', False),
+            'entryID': opt_flds_data.get('entryID', True),
+            'dataRef': opt_flds_data.get('dataRef', True),
+            'reasonCode': opt_flds_data.get('reasonCode', False)
+        }
+
+        # Map trgOps (note: capital O in BRCB)
+        trg_op_data = rcb_data.get('trgOp', {})
+        rcb.trgOps = {
+            'dchg': trg_op_data.get('dchg', False),
+            'qchg': trg_op_data.get('qchg', False),
+            'dupd': trg_op_data.get('dupd', False),
+            'integrity': trg_op_data.get('integrity', True),
+            'gi': trg_op_data.get('gi', False)
+        }
+
+        # Set defaults for other required fields
+        rcb.confRev = 1
+        rcb.bufTm = 1000
+        rcb.sqNum = 0
+        rcb.gi = rcb.trgOps.get('gi', False)
+        rcb.purgeBuf = False
+        rcb.entryId = b"\x01\x02\x03\x04\x05\x06\x07\x08"
+        rcb.timeOfEntry = datetime.now()
+        rcb.resvTms = 5
+
+        return rcb
+
+    async def set_brcb_values(self, cp: str, data: Any) -> Dict[str, Any]:
+        """Read a value from the server."""
+
+        brcb = self.create_rcb_from_frontend_data(data, "BRCB")
+
+        print("created brcb:", brcb.__dict__)
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
+        result = await client.set_BRCB_values(brcb, websocket_info , None, None)
+        return {"result": result}
+
+    async def set_urcb_values(self, cp: str, data: Any) -> Dict[str, Any]:
+        """Read a value from the server."""
+
+        rcb = self.create_rcb_from_frontend_data(data, "URCB")
+
+        print("created urcb:", rcb.__dict__)
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
+        result = await client.set_URCB_values(rcb, websocket_info , None, None)
+        return {"result": result}
+
+    async def get_urcb_definition(self, obj_ref: str, cp: str) -> Dict[str, Any]:
+        """Read a value from the server."""
+
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
+        result = await client.get_URCB_values(obj_ref, websocket_info, None, None)
+        return {"urcbDefinition": result}
 
     async def write_value(self, obj_ref: str, value: Any, fc: str, data_type: str, cp:str) -> Dict[str, Any]:
         """Write a value to the server."""

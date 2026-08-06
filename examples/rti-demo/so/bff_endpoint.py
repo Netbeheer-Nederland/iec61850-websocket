@@ -76,6 +76,45 @@ class ReadvalueRequest(BaseModel):
         json_schema_extra={"example": "cp1"}
     )
 
+class ReadRCBValueRequest(BaseModel):
+    """Request body for reading a value from the connected server.
+
+    Used by: POST /api/readvalue
+    """
+    objRef: str = Field(
+        ...,
+        description="Object reference in IEC61850 format (e.g., 'LD0/LLN0$ST$Mod')",
+        json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
+    )
+
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
+class WriteRCBValueRequest(BaseModel):
+    """Request body for reading a value from the connected server.
+
+    Used by: POST /api/readvalue
+    """
+    objRef: str = Field(
+        ...,
+        description="Object reference in IEC61850 format (e.g., 'LD0/LLN0$ST$Mod')",
+        json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
+    )
+
+    data: Any = Field(
+        ...,
+        description="Data to write (will be converted to appropriate type)",
+    )
+
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
 class GetDataDefinitionRequest(BaseModel):
     """Request body for reading a value from the connected server.
 
@@ -812,10 +851,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         """Get the IED model tree from the connected server."""
 
         cp = request.cp
-        print("selected cp in so: ", cp)
-        print("len of model_info: ", len(rti_so.model_info_list))
-        for mi in rti_so.model_info_list:
-            print("the model info exists with cp: ", mi.cp)
         model_info = rti_so.get_model_info(cp)
 
 
@@ -1153,6 +1188,301 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
             except Exception as exc:
                 #client._log_action(f"Client readvalue failed: {exc}", "error")
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/brcb-read",
+        summary="Get brcb values",
+        description="Retrieves BRCB values for a specified object reference from the connected IEC61850 server. The client must be connected before calling this endpoint.",
+        response_description="Data definition result",
+        responses={
+            200: {"description": "BRCB values successfully"},
+            400: {"description": "Missing objRef parameter"},
+            403: {"description": "Client is not connected"},
+            404: {"description": "Instance not available or retrieval timeout"},
+            500: {"description": "Error retrieving data definition"}
+        },
+        tags=["Data Access"]
+    )
+
+    async def api_get_brcb_values(request: ReadRCBValueRequest):
+        """Read BRCB values from the connected server."""
+        try:
+            obj_ref = request.objRef
+
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            if not obj_ref:
+                # client._log_action("Client readvalue rejected: missing objRef", "warn")
+                return JSONResponse(
+                    content={"ok": False, "error": "objRef is required"},
+                    status_code=400
+                )
+
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.get_brcb_definition(obj_ref, cp), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "objRef": obj_ref,
+                    "value": result.get("brcbDefinition"),
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/brcb-write",
+        summary="Writes brcb values",
+        description="Writes BRCB values for a specified object reference from the connected IEC61850 server. The client must be connected before calling this endpoint.",
+        response_description="Data definition result",
+        responses={
+            200: {"description": "BRCB values written successfully"},
+            400: {"description": "Missing objRef parameter"},
+            403: {"description": "Client is not connected"},
+            404: {"description": "Instance not available or retrieval timeout"},
+            500: {"description": "Error retrieving data definition"}
+        },
+        tags=["Data Access"]
+    )
+    async def api_set_brcb_values(request: WriteRCBValueRequest):
+        """Read BRCB values from the connected server."""
+        try:
+            obj_ref = request.objRef
+
+            cp = request.cp
+            data = request.data
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            if not obj_ref:
+                # client._log_action("Client readvalue rejected: missing objRef", "warn")
+                return JSONResponse(
+                    content={"ok": False, "error": "objRef is required"},
+                    status_code=400
+                )
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.set_brcb_values(cp, data), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "objRef": obj_ref,
+                    "value": result.get("result"),
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/urcb-read",
+        summary="Get brcb values",
+        description="Retrieves BRCB values for a specified object reference from the connected IEC61850 server. The client must be connected before calling this endpoint.",
+        response_description="Data definition result",
+        responses={
+            200: {"description": "BRCB values successfully"},
+            400: {"description": "Missing objRef parameter"},
+            403: {"description": "Client is not connected"},
+            404: {"description": "Instance not available or retrieval timeout"},
+            500: {"description": "Error retrieving data definition"}
+        },
+        tags=["Data Access"]
+    )
+
+    async def api_get_urcb_values(request: ReadRCBValueRequest):
+        """Read BRCB values from the connected server."""
+        try:
+            obj_ref = request.objRef
+
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            if not obj_ref:
+                # client._log_action("Client readvalue rejected: missing objRef", "warn")
+                return JSONResponse(
+                    content={"ok": False, "error": "objRef is required"},
+                    status_code=400
+                )
+
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.get_urcb_definition(obj_ref, cp), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "objRef": obj_ref,
+                    "value": result.get("urcbDefinition"),
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/urcb-write",
+        summary="Writes urcb values",
+        description="Writes URCB values for a specified object reference from the connected IEC61850 server. The client must be connected before calling this endpoint.",
+        response_description="Data definition result",
+        responses={
+            200: {"description": "URCB values written successfully"},
+            400: {"description": "Missing objRef parameter"},
+            403: {"description": "Client is not connected"},
+            404: {"description": "Instance not available or retrieval timeout"},
+            500: {"description": "Error retrieving data definition"}
+        },
+        tags=["Data Access"]
+    )
+    async def api_set_urcb_values(request: WriteRCBValueRequest):
+        """Read BRCB values from the connected server."""
+        try:
+            obj_ref = request.objRef
+
+            cp = request.cp
+            data = request.data
+
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            if not obj_ref:
+                # client._log_action("Client readvalue rejected: missing objRef", "warn")
+                return JSONResponse(
+                    content={"ok": False, "error": "objRef is required"},
+                    status_code=400
+                )
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.set_urcb_values(cp, data), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "objRef": obj_ref,
+                    "value": result.get("result"),
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
