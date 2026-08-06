@@ -1715,7 +1715,7 @@
             { objRef: ref, cp: cp }
         );
         if (response.ok) {
-            return response;
+            return response.payload.result.value || {};
         } else {
             throw new Error(response.payload.error || 'Failed to fetch BRCB values');
         }

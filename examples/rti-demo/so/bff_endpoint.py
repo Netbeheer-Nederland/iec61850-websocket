@@ -1230,7 +1230,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     "ok": True,
                     "success": True,
                     "objRef": obj_ref,
-                    "value": result.get("dataDefinition"),
+                    "value": result.get("brcbDefinition"),
                 }
 
             except FuturesTimeoutError:
@@ -1304,7 +1304,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     "ok": True,
                     "success": True,
                     "objRef": obj_ref,
-                    "value": result.get("dataDefinition"),
+                    "value": result.get("urcbDefinition"),
                 }
 
             except FuturesTimeoutError:
