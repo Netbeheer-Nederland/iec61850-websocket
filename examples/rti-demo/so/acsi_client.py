@@ -77,6 +77,9 @@ class ACSIClient:
         self._model_info_dict = {}  # cp -> ModelInfo
         self._update_model_info_dict()
 
+        #start Websocket Passive instance
+        self.connect("0.0.0.0", 8765)
+
 
     def _update_model_info_dict(self):
         """Sync ModelInfo dict with current client_list, preserving existing objects"""
