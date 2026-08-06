@@ -1628,7 +1628,7 @@
     let currentBrcbRef = null;
 
     // Open modal with BRCB data
-    function openReportControlModal(ref, type, cp, endpointTarget) {
+     function openReportControlModal(ref, type, cp, endpointTarget) {
         currentBrcbRef = ref;
         const modal = document.getElementById('brcb-modal');
         const form = document.getElementById('brcb-form');
@@ -1672,7 +1672,7 @@
         // Save handler
         document.getElementById('brcb-save').onclick = () => {
             const data = {
-                brcbRef: currentBrcbRef,
+                ref: currentBrcbRef,
                 dataSet: document.getElementById('brcb-dataset').value,
                 intgPd: parseInt(document.getElementById('brcb-intgpd').value) || 0,
                 rptEna: document.getElementById('brcb-rptena').checked,
@@ -1697,13 +1697,21 @@
             });
 
             // Send to backend
-            saveBRCBValues(data).then(() => {
-                modal.style.display = 'none';
-                addDiagnosticMessage(`BRCB ${currentBrcbRef} configured successfully`, 'success');
-            }).catch(err => {
-                addDiagnosticMessage(`Failed to configure BRCB: ${err.message}`, 'error');
-            });
-        };
+            saveBRCBValues(currentBrcbRef, cp, data, modal, type, endpointTarget)
+                .then(() => {
+                    modal.style.display = 'none';
+                })
+                .catch(err => {
+                    alert('Error saving BRCB values: ' + err.message);
+                });
+        }
+    }
+    async function saveBRCBValues(objRef, cp, data, modal, type, endpointTarget) {
+        response = executeApiCall(
+                    type == "BRCB" ? getApiById('brcb-write') : getApiById('urcb-write'),
+                    endpointTarget,
+                    { objRef: currentBrcbRef, data: data, cp: cp })
+
     }
 
     // Example backend functions (implement these)
@@ -1721,15 +1729,6 @@
         }
     }
 
-    async function saveBRCBValues(data) {
-        // Call your backend API to save BRCB values
-        const response = await fetch('/api/brcb', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        return response.json();
-    }
 
     function appendSubDataObjectNodes(parentLi, subDataObjects) {
       if (!subDataObjects || subDataObjects.length === 0) {
