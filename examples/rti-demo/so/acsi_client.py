@@ -522,7 +522,6 @@ class ACSIClient:
 
         brcb = self.create_rcb_from_frontend_data(data, "BRCB")
 
-        print("created brcb:", brcb.__dict__)
         client = self.get_iec61850_client(cp)
         if not client:
             raise RuntimeError(f"ACSI Client for {cp} not found!", cp)

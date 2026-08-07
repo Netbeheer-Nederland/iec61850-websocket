@@ -146,6 +146,8 @@ class ACSIServer:
 
         iec61850_instance = IEC61850Server(self.runtime.ied_model, self.runtime.cp)
         iec61850_instance.set_control_handler(control_handler, None)
+        iec61850_instance.send_msg_callback = self.runtime.endpoint.send_msg_callback
+        iec61850_instance.recv_msg_callback = self.runtime.endpoint.recv_msg_callback
         self.runtime.server = iec61850_instance
         self.runtime.endpoint.add_iec61850_server(self.runtime.server)
 
