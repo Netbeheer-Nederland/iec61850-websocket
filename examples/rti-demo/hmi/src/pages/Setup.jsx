@@ -206,6 +206,7 @@ function Setup({ settings }) {
                         const soConnection = connections.find(conn => conn.type === 'RTI-SO' && conn.status === 'connected');
                         navigate('/acsi-client', { state: { endpoint: soConnection || { host: '127.0.0.1', port: 102, name: 'Default' } } });
                       }}
+                      title="Type: RTI-SO (Client)"
                     >
                       <span style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600' }}>SO</span>
                     </div>
@@ -236,6 +237,7 @@ function Setup({ settings }) {
                             cursor: 'pointer'
                           }}
                           onClick={() => handleEditConnection(conn)}
+                          title={`Type: ${conn.type}`}
                         >
                           <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{conn.name}</span>
                           {conn.properties_info?.properties && (
@@ -293,7 +295,8 @@ function Setup({ settings }) {
                               background: 'var(--bg-card)',
                               cursor: 'pointer'
                             }}
-                            onClick={() => handleEditConnection(conn)}
+                            onClick={() => navigate('/acsi-server', { state: { endpoint: conn } })}
+                            title={`Type: ${conn.type}`}
                           >
                             <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>
                               {conn.name}

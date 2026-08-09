@@ -38,6 +38,11 @@ const API_DEFINITIONS = [
   
   // Health check
   { id: 'health', label: 'GET /api/health', method: 'GET', path: '/api/health' },
+  
+  // ACSI Server operations
+  { id: 'start', label: 'POST /api/start', method: 'POST', path: '/api/start' },
+  { id: 'stop', label: 'POST /api/stop', method: 'POST', path: '/api/stop' },
+  { id: 'model', label: 'GET /api/model', method: 'GET', path: '/api/model' },
 ];
 
 /**
