@@ -889,7 +889,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             )
 
     @router.get(
-        "/actions_logs",
+        "/actions-logs",
         summary="Get Action Log",
         description="Retrieves the logged client actions for debugging and auditing. Actions include connection events, model builds, and data operations.",
         response_description="List of logged actions",
