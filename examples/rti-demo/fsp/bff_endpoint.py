@@ -7,9 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
-print("\n\n=== DEBUG: Checking /models directory ===")
-os.system("ls -la /models/ 2>&1 || echo 'Directory does not exist'")
-print("=== DEBUG: End ===\n\n")
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +16,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from acsi_server import ACSIServer
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
-import os
-from typing import Any, Dict
 from fastapi import FastAPI, APIRouter, Request, HTTPException, status, UploadFile, File
 from fastapi.responses import JSONResponse, RedirectResponse
-from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 # ==================== Pydantic Models ====================
@@ -1273,8 +1268,7 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
         ]
     )
 
-    #resolved_factory_dir = factory_dir or Path(__file__).parent
-    resolved_factory_dir = os.getenv('MODELPATH')
+    resolved_factory_dir = os.getenv('MODELPATH') or factory_dir or Path(__file__).parent
     router, _server = create_bff_router(resolved_factory_dir)
     app.include_router(router)
     

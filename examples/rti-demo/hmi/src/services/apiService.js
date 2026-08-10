@@ -43,6 +43,7 @@ const API_DEFINITIONS = [
   { id: 'start', label: 'POST /api/start', method: 'POST', path: '/api/start' },
   { id: 'stop', label: 'POST /api/stop', method: 'POST', path: '/api/stop' },
   { id: 'model', label: 'GET /api/model', method: 'GET', path: '/api/model' },
+  { id: 'update-iedmodel', label: 'POST /api/update-iedmodel', method: 'POST', path: '/api/update-iedmodel' },
 ];
 
 /**

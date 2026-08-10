@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Tree from '../components/Tree';
 import InstanceVisualization from '../components/InstanceVisualization';
 import { executeApiCall, buildTargetValue } from '../services/apiService';
+import { generateModelPyCode } from '../utils/sclParser';
 
 function Model({ settings }) {
   const navigate = useNavigate();
@@ -10,6 +11,9 @@ function Model({ settings }) {
   const [loading, setLoading] = useState(true);
   const [treeData, setTreeData] = useState(null);
   const [selectedConnection, setSelectedConnection] = useState(null);
+  const [uploadingModel, setUploadingModel] = useState(false);
+  const fileInputRef = useRef(null);
+  const [uploadStatus, setUploadStatus] = useState('');
   
   // Fetch connections from BFF API
   const fetchConnections = useCallback(async () => {
@@ -143,6 +147,104 @@ function Model({ settings }) {
     }
   };
 
+  // Handle model file upload for a specific connection
+  const handleUpdateModel = useCallback(async (conn, file) => {
+    if (!conn || !file) return;
+
+    try {
+      setUploadingModel(true);
+      setUploadStatus(`Uploading model for ${conn.name}...`);
+
+      // Read file content
+      const reader = new FileReader();
+      const content = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsText(file);
+      });
+
+      // Ensure content is valid
+      if (!content || typeof content !== 'string') {
+        throw new Error('Could not read file content');
+      }
+
+      // Check if content is empty
+      if (!content.trim()) {
+        throw new Error('File content is empty');
+      }
+
+      let modelPyContent = content;
+
+      // If SCL file, convert to Python
+      if (file.name.endsWith('.scl') || file.name.endsWith('.scd') || file.name.endsWith('.icd') || file.name.endsWith('.cid')) {
+        modelPyContent = generateModelPyCode(content, null, null, file.name);
+      }
+      // If .py file, use content directly
+      // Note: content already includes the file content as string
+
+      // Validate connection has required fields
+      if (!conn) {
+        throw new Error('No connection provided');
+      }
+      if (!('host' in conn) || !('port' in conn)) {
+        throw new Error(`Connection ${conn.name || 'unknown'} is missing host or port property`);
+      }
+      if (!conn.host || !conn.port) {
+        throw new Error(`Connection ${conn.name || 'unknown'} has empty host or port (host: ${conn.host}, port: ${conn.port})`);
+      }
+
+      // Call the update-iedmodel endpoint through the main BFF's /api/execute
+      const targetValue = buildTargetValue(conn.host, conn.port);
+      if (!targetValue) {
+        throw new Error(`Could not build target value from host: ${conn.host}, port: ${conn.port}`);
+      }
+      const result = await executeApiCall('update-iedmodel', targetValue, { modelPy: modelPyContent });
+
+      if (result?.ok) {
+        setUploadStatus(`Model updated successfully for ${conn.name}`);
+        // Reload connections to get the updated model
+        setTimeout(() => {
+          fetchConnections();
+          setUploadStatus('');
+        }, 1000);
+      } else {
+        setUploadStatus(`Error updating model: ${result?.error || result?.payload?.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Failed to update model:', error);
+      setUploadStatus(`Error: ${error.message}`);
+    } finally {
+      setUploadingModel(false);
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [fetchConnections, setUploadingModel, setUploadStatus]);
+
+  // Trigger file input click
+  const handleUpdateModelClick = useCallback((conn) => {
+    // Store the connection for later use
+    const currentConn = conn;
+    
+    // Click the hidden file input
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.py,.scl,.scd,.icd,.cid';
+    input.style.display = 'none';
+    
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        await handleUpdateModel(currentConn, file);
+      }
+      document.body.removeChild(input);
+    };
+    
+    document.body.appendChild(input);
+    input.click();
+  }, [handleUpdateModel]);
+
   return (
     <section className="page">
       <div className="page-header" style={{ marginBottom: '20px' }}>
@@ -221,6 +323,18 @@ function Model({ settings }) {
                         View
                       </button>
                       <button 
+                        className="btn-secondary"
+                        style={{ padding: '6px 12px', fontSize: '12px' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateModelClick(conn);
+                        }}
+                        title="Upload model file (Python or SCL)"
+                        disabled={uploadingModel}
+                      >
+                        {uploadingModel ? 'Uploading...' : 'Update Model'}
+                      </button>
+                      <button 
                         className="btn-icon" 
                         style={{ padding: '6px', fontSize: '14px' }}
                         onClick={(e) => {
@@ -241,6 +355,35 @@ function Model({ settings }) {
           <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
             No RTI-FSP (Server) instances found.
           </p>
+        )}
+        {uploadStatus && (
+          <div style={{ 
+            marginTop: '12px', 
+            padding: '10px 16px', 
+            background: uploadStatus.includes('Error') ? 'var(--danger-bg)' : 'var(--success-bg)',
+            borderRadius: '4px',
+            color: uploadStatus.includes('Error') ? 'var(--danger-color)' : 'var(--success-color)',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            {uploadingModel ? (
+              <>
+                <span className="spinner" style={{ width: '14px', height: '14px' }}></span>
+                {uploadStatus}
+              </>
+            ) : (
+              <>
+                {uploadStatus.includes('Error') ? (
+                  <i className="fas fa-exclamation-circle"></i>
+                ) : (
+                  <i className="fas fa-check-circle"></i>
+                )}
+                {uploadStatus}
+              </>
+            )}
+          </div>
         )}
       </div>
 
