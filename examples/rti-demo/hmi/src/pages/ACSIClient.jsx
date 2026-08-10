@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
+import Tree from '../components/Tree';
 
 function ACSIClient() {
   const location = useLocation();
@@ -224,59 +225,6 @@ function ACSIClient() {
     } catch (error) { setError(error.message); }
   }, [connected, endpointTarget, wsCp, executeApiCall, treeData]);
 
-  // Tree Node Component for expand/collapse
-  const TreeNode = ({ node, depth }) => {
-    const [isExpanded, setIsExpanded] = useState(depth < 2); // Auto-expand first levels
-    const hasChildren = node.children && node.children.length > 0;
-    const nodeClass = `scl-node-${node.type || 'default'}`;
-    const displayName = node.name || node.ref || 'Unknown';
-
-    const handleToggle = (e) => {
-      e.stopPropagation();
-      console.log('[ACSI Client] Tree node toggle clicked', { nodeName: displayName, nodeRef: node.ref });
-      setIsExpanded(!isExpanded);
-    };
-
-    return (
-      <li className="scl-tree-item">
-        <div 
-          className="scl-tree-row" 
-          style={{ cursor: hasChildren || node.fc ? 'pointer' : 'default' }}
-        >
-          {hasChildren && (
-            <button className="scl-tree-toggle" onClick={handleToggle}>
-              <i className={`fas ${isExpanded ? 'fa-minus' : 'fa-plus'}`}></i>
-            </button>
-          )}
-          <span className={`scl-tree-value ${nodeClass}`}>{displayName}</span>
-          <span className={`scl-tree-tag ${node.type || 'hidden'}`}>{node.type ? node.type.toUpperCase() : ''}</span>
-          {node.fc && <span className="tree-fc-tag">[{node.fc.toUpperCase()}]</span>}
-          {node.value !== undefined && <span className="tree-value-display">= {JSON.stringify(node.value)}</span>}
-          {node.cdc && <span className="tree-cdc-tag">({node.cdc})</span>}
-        </div>
-        {hasChildren && node.children && node.children.length > 0 && isExpanded && (
-          <ul className="scl-tree-list">
-            {node.children.map((child, idx) => (
-              <TreeNode key={child.ref || idx} node={child} depth={depth + 1} />
-            ))}
-          </ul>
-        )}
-      </li>
-    );
-  };
-
-  // Render tree
-  const renderTree = useCallback((nodes) => {
-    if (!nodes) return null;
-    return (
-      <ul className="scl-tree-root">
-        {nodes.map((node, idx) => (
-          <TreeNode key={node.ref || idx} node={node} depth={0} />
-        ))}
-      </ul>
-    );
-  }, []);
-
   // Cleanup
   useEffect(() => () => { stopMonitoring(); }, [stopMonitoring]);
 
@@ -333,7 +281,7 @@ function ACSIClient() {
         </div>
       )}
       <div id="acsi-client-tree-container" className="model-tree" style={{ marginTop: '24px' }}>
-        {treeData ? <div className="tree">{renderTree(treeData.children || [])}</div> : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>{connected ? 'Click "Fetch Model" to load the ACSI model tree' : endpoint ? `Start the WebSocket connection to ${endpoint.name || endpoint.host}:${endpoint.port}` : 'Start the WebSocket connection to fetch the model'}</p>}
+        {treeData ? <Tree data={treeData} /> : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>{connected ? 'Click "Fetch Model" to load the ACSI model tree' : endpoint ? `Start the WebSocket connection to ${endpoint.name || endpoint.host}:${endpoint.port}` : 'Start the WebSocket connection to fetch the model'}</p>}
       </div>
       {isMonitoring && (
         <div style={{ marginTop: '24px' }}>

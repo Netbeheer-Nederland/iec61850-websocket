@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
+import Tree from '../components/Tree';
 
 function ACSIServer() {
   const location = useLocation();
@@ -139,13 +140,72 @@ function ACSIServer() {
     try {
       const result = await executeApiCall('model', endpointTarget, {});
       if (result?.ok) {
-        setTreeData(result.payload);
+        // Debug: log the raw response
+        console.log('[ACSIServer] Raw model API response:', JSON.stringify(result.payload, null, 2));
+        
+        // Try to extract model from various possible locations
+        let modelData = result.payload;
+        
+        // Path 1: result.result.model (BFF wraps response in result)
+        if (modelData?.result?.model) {
+          modelData = modelData.result.model;
+          console.log('[ACSIServer] Found model at result.result.model');
+        }
+        // Path 2: result.model
+        else if (modelData?.result?.model) {
+          modelData = modelData.result.model;
+          console.log('[ACSIServer] Found model at result.model');
+        }
+        // Path 3: Direct model field
+        else if (modelData?.model) {
+          modelData = modelData.model;
+          console.log('[ACSIServer] Found model at payload.model');
+        }
+        // Path 4: The payload itself might be the model
+        
+        // Check if there's a tree field
+        if (modelData?.tree) {
+          modelData = modelData.tree;
+          console.log('[ACSIServer] Extracted tree from model');
+        }
+        
+        // Handle case where model is a Python dict string
+        if (typeof modelData === 'string') {
+          console.log('[ACSIServer] Model is a string, parsing...');
+          modelData = parsePythonDictString(modelData);
+        }
+        
+        console.log('[ACSIServer] Extracted model data:', JSON.stringify(modelData, null, 2));
+        
+        // If we still have the full BFF response, try result field
+        if (modelData === result.payload && modelData?.result) {
+          modelData = modelData.result;
+          console.log('[ACSIServer] Using result field as model');
+        }
+        
+        // If modelData has accessPoints but no children structure, create a simple tree
+        if (modelData?.accessPoints && !modelData.children && !modelData.ieds && !modelData.kind) {
+          console.log('[ACSIServer] Creating simple tree from accessPoints');
+          modelData = {
+            iedName: modelData.iedName || endpoint?.name || 'Server',
+            accessPoints: modelData.accessPoints.map(apName => ({
+              name: apName,
+              ldevices: []
+            }))
+          };
+        }
+        
+        if (modelData && Object.keys(modelData).length > 0) {
+          setTreeData(modelData);
+        } else {
+          setError('No model data found in response');
+        }
       } else {
         setError(result?.payload?.error || result?.rawText || 'Failed to load model');
       }
     } catch (error) { setError(error.message); }
     finally { setLoading(false); }
-  }, [endpointTarget, executeApiCall]);
+  }, [endpointTarget, executeApiCall, parsePythonDictString, endpoint]);
 
   useEffect(() => () => { stopMonitoring(); }, [stopMonitoring]);
 
@@ -222,9 +282,9 @@ function ACSIServer() {
       )}
       
       <div id="acsi-modelPanel" className="model-tree" style={{ marginTop: '24px' }}>
-        {treeData ? <pre style={{ background: 'var(--bg-card)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', overflowX: 'auto' }}>{JSON.stringify(treeData, null, 2)}</pre> : 
+        {treeData ? <Tree data={treeData} /> : 
           <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-            {connected ? 'Click "Load Model" to view the server model' : endpoint ? `Start the server at ${endpoint.name || endpoint.host}:${endpoint.port}` : 'Configure and start the ACSI Server'}
+            {endpoint ? `Click "Load Model" to view the server model for ${endpoint.name || endpoint.host}:${endpoint.port}` : 'Configure and start the ACSI Server to load model'}
           </p>}
       </div>
       
