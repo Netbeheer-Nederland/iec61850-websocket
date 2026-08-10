@@ -9,7 +9,9 @@ function ACSIClient() {
   const [wsHost, setWsHost] = useState(endpoint?.host || '127.0.0.1');
   const [wsPort, setWsPort] = useState(endpoint?.port || 102);
   const [wsCp, setWsCp] = useState(endpoint?.cp || 'cp1');
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(() => {
+   return localStorage.getItem('acsi-connected') === 'true';
+  });
   const [treeData, setTreeData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -17,6 +19,10 @@ function ACSIClient() {
   const [protocolMessages, setProtocolMessages] = useState([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const monitorIntervalRef = useRef(null);
+
+  useEffect(() => {
+  localStorage.setItem('acsi-connected', String(connected));
+  }, [connected]);
 
   // Build target from the endpoint that was clicked to open this page, or from form fields
   const endpointTarget = useMemo(() => 

@@ -9,7 +9,7 @@ function ACSIServer() {
   const endpoint = location.state?.endpoint;
   
   const [host, setHost] = useState(endpoint?.host || '0.0.0.0');
-  const [port, setPort] = useState(endpoint?.port || 102);
+  const [port, setPort] = useState(String(endpoint?.port || 102));
   const [cp, setCp] = useState(endpoint?.cp || 'cp1');
   const [mode, setMode] = useState(endpoint?.mode || 'server');
   const [connected, setConnected] = useState(false);
@@ -229,7 +229,7 @@ function ACSIServer() {
         </div>
         <div className="form-group">
           <label>WS Port</label>
-          <input type="number" value={port} placeholder="102" onChange={(e) => setPort(parseInt(e.target.value) || 102)} disabled={loading} />
+          <input type="number" value={port} placeholder="102" onChange={(e) => setPort(e.target.value)} disabled={loading} />
         </div>
         <div className="form-group">
           <label>WS CP</label>
