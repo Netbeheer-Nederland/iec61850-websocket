@@ -88,6 +88,9 @@ class ACSIServer:
         #self.factory_dir = factory_dir
         #self.model_file = factory_dir / "model.py"
         self.model_file = Path(model_path)
+        # If model_path is a directory, append model.py
+        if self.model_file.is_dir():
+            self.model_file = self.model_file / "model.py"
         factory_dir = str(self.model_file.parent)
 
         # Ensure `import model` resolves to the expected fsp/model.py directory.
