@@ -428,7 +428,7 @@ class IEC61850Server:
         ied = self.ied_model
         maxMessageSize_client = 65000
         decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
-        associate_id = "id_" + cp
+        associate_id = cp
         websocket_info.associate_id = associate_id
 
         if decoded_message[0] == "associate":

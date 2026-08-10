@@ -133,31 +133,46 @@ class ACSIClient:
         """Extract metadata from a message (service type, category)."""
         service_type = "unknown"
         category = "unknown"
+        cp = ""
         try:
             msg = json.loads(raw)
             if not isinstance(msg, dict):
-                return {"service_type": service_type, "category": category}
+                return {"service_type": service_type, "category": category, "cp": cp}
 
             if "request" in msg:
                 category = "request"
                 service = msg.get("request", {}).get("service", {})
+                request = msg["request"]
+                cp = request.get("associateId", "")
                 if isinstance(service, dict) and service:
                     service_type = next(iter(service.keys()))
             elif "response" in msg:
                 category = "response"
                 service = msg.get("response", {}).get("service", {})
+                response = msg["response"]
+                cp = response.get("associateId", "")
                 if isinstance(service, dict) and service:
                     service_type = next(iter(service.keys()))
             elif "associate" in msg:
                 category = "associate"
                 service = msg.get("associate", {}).get("service", {})
+                cp = msg.get("associate", {}).get("service", {}).get("calledAP", "")
+
+                # associateId is inside associateResponse
+                if "associateResponse" in service:
+                    cp = service["associateResponse"].get("associateId", "")
+
+                # calledAP is inside associateRequest
+                elif "associateRequest" in service:
+                    cp = service["associateRequest"].get("calledAP", "")
+
                 if isinstance(service, dict) and service:
                     service_type = next(iter(service.keys()))
         except Exception:
             service_type = "parse-error"
             category = "parse-error"
 
-        return {"service_type": service_type, "category": category}
+        return {"service_type": service_type, "category": category, "cp": cp}
 
     def _log_message(self, direction: str, message: Any, timestamp: Any) -> None:
         """Log a message (request/response) to the runtime messages deque."""
@@ -183,6 +198,7 @@ class ACSIClient:
                     "category": meta["category"],
                     "message": text,
                     "preview": text[:220] + ("..." if len(text) > 220 else ""),
+                    "cp": meta["cp"]
                 }
             )
 
