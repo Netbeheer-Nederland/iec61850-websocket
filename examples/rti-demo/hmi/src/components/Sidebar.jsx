@@ -5,6 +5,7 @@ function Sidebar() {
   const navItems = [
     { path: '/setup', icon: 'fa-gear', label: 'Setup' },
     { path: '/model', icon: 'fa-sitemap', label: 'Model' },
+    { path: '/traffic', icon: 'fa-exchange-alt', label: 'Traffic' },
     { path: '/tools', icon: 'fa-tools', label: 'Tools' },
     { path: '/monitoring', icon: 'fa-satellite-dish', label: 'Monitoring' },
     { path: '/settings', icon: 'fa-cog', label: 'Settings' },

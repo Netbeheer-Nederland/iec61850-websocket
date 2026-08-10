@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Connections from './pages/Connections';
 import Model from './pages/Model';
+import Traffic from './pages/Traffic';
 import Data from './pages/Data';
 import Reports from './pages/Reports';
 import Diagnostics from './pages/Diagnostics';
@@ -106,6 +107,7 @@ function App() {
             <Route path="/setup" element={<Setup settings={settings} />} />
             <Route path="/connections" element={<Connections connections={connections} setConnections={setConnections} />} />
             <Route path="/model" element={<Model settings={settings} />} />
+            <Route path="/traffic" element={<Traffic settings={settings} />} />
             <Route path="/data" element={<Data />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/diagnostics" element={<Diagnostics />} />
