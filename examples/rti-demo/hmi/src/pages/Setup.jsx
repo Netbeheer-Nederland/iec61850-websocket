@@ -176,21 +176,13 @@ function Setup({ settings }) {
               <p style={{ marginTop: '10px', fontSize: '12px' }}>Please check BFF settings and ensure the BFF server is running.</p>
             </div>
           ) : (
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'center', 
-              alignItems: 'flex-start',
-              gap: '40px',
-              minHeight: '300px'
-            }}>
-              <InstanceVisualization
-                connections={connections}
-                loading={loading}
-                onReload={handleCheckAllConnections}
-                onConnectionClick={handleEditConnection}
-                showReload={true}
-              />
-            </div>
+            <InstanceVisualization
+              connections={connections}
+              loading={loading}
+              onReload={handleCheckAllConnections}
+              onConnectionClick={handleEditConnection}
+              showReload={true}
+            />
           )}</div>
 
         {/* Instances Table */}

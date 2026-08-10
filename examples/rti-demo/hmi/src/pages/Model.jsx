@@ -157,23 +157,15 @@ function Model({ settings }) {
             Loading connections...
           </div>
         ) : (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            gap: '40px',
-            minHeight: '300px'
-          }}>
-            <InstanceVisualization
-              connections={connections}
-              selectedConnection={selectedConnection}
-              loading={loading}
-              onReload={fetchConnections}
-              onConnectionClick={handleConnectionClick}
-              showLabels={true}
-              showReload={true}
-            />
-          </div>
+          <InstanceVisualization
+            connections={connections}
+            selectedConnection={selectedConnection}
+            loading={loading}
+            onReload={fetchConnections}
+            onConnectionClick={handleConnectionClick}
+            showLabels={true}
+            showReload={true}
+          />
         )}
       </div>
 

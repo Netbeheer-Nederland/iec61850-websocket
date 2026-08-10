@@ -52,7 +52,7 @@ function InstanceVisualization({
           Loading...
         </div>
       ) : connections.filter(conn => conn.status === 'connected').length > 0 ? (
-        <>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: '40px', minHeight: '300px' }}>
           {/* SO (Client) Side - Left */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '180px' }}>
             <div
@@ -194,7 +194,7 @@ function InstanceVisualization({
                 </React.Fragment>
               ))}
           </div>
-        </>
+        </div>
       ) : (
         <div style={{
           textAlign: 'center',
