@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import InstanceVisualization from '../components/InstanceVisualization';
 
 function Setup({ settings }) {
   const navigate = useNavigate();
@@ -159,9 +160,6 @@ function Setup({ settings }) {
           <i className="fas fa-plus"></i>
           Register Instance
         </button>
-        <button className="btn-icon" id="refresh-cons-btn" title="Refresh Instances" onClick={handleCheckAllConnections}>
-          <i className="fas fa-sync-alt"></i>
-        </button>
       </div>
 
       <React.Fragment>
@@ -185,155 +183,13 @@ function Setup({ settings }) {
               gap: '40px',
               minHeight: '300px'
             }}>
-              {connections.filter(conn => conn.status === 'connected').length > 0 && (
-                <>
-                  {/* SO (Client) Side - Left */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '180px' }}>
-                    <div 
-                      style={{ 
-                        width: '140px', 
-                        height: '140px', 
-                        border: '2px solid var(--border-color)',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: '12px',
-                        background: 'var(--bg-card)',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => {
-                        const soConnection = connections.find(conn => conn.type === 'RTI-SO' && conn.status === 'connected');
-                        navigate('/acsi-client', { state: { endpoint: soConnection || { host: '127.0.0.1', port: 102, name: 'Default' } } });
-                      }}
-                      title="Type: RTI-SO (Client)"
-                    >
-                      <span style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600' }}>SO</span>
-                    </div>
-                    <div style={{ 
-                      padding: '6px 12px', 
-                      background: 'var(--bg-hover)',
-                      borderRadius: '16px',
-                      textAlign: 'center',
-                      fontSize: '11px',
-                      border: '1px solid var(--border-color)'
-                    }}>
-                      client · passive
-                    </div>
-                    {connections
-                      .filter(conn => conn.type === 'RTI-SO' && conn.status === 'connected')
-                      .map((conn) => (
-                        <div 
-                          key={`so-${conn.name}`}
-                          style={{
-                            padding: '6px 12px',
-                            background: 'var(--bg-hover)',
-                            borderRadius: '16px',
-                            margin: '6px 0',
-                            textAlign: 'center',
-                            fontSize: '10px',
-                            border: '1px solid var(--border-color)',
-                            minWidth: '140px',
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => handleEditConnection(conn)}
-                          title={`Type: ${conn.type}`}
-                        >
-                          <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{conn.name}</span>
-                          {conn.properties_info?.properties && (
-                            <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>
-                              {conn.properties_info.properties.acsi_role} · {conn.properties_info.properties.ws_mode}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                  
-                  {/* Connection lines */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '60px' }}>
-                    {connections
-                      .filter(conn => conn.type === 'RTI-FSP' && conn.status === 'connected')
-                      .map((_, index) => (
-                        <div 
-                          key={`line-${index}`}
-                          style={{ 
-                            height: '1px', 
-                            width: '40px', 
-                            background: 'var(--border-color)',
-                            margin: '6px 0',
-                            borderStyle: 'dashed'
-                          }}
-                        ></div>
-                      ))}
-                    {connections.filter(conn => conn.type === 'RTI-FSP' && conn.status === 'connected').length === 0 && (
-                      <div style={{ 
-                        height: '1px', 
-                        width: '40px', 
-                        background: 'var(--border-color)',
-                        margin: '6px 0',
-                        borderStyle: 'dashed'
-                      }}></div>
-                    )}
-                  </div>
-                  
-                  {/* FSP (Server) Side - Right */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '180px' }}>
-                    {connections
-                      .filter(conn => conn.type === 'RTI-FSP' && conn.status === 'connected')
-                      .map((conn) => (
-                        <React.Fragment key={`fsp-${conn.name}`}>
-                          <div 
-                            style={{
-                              width: '120px', 
-                              height: '120px', 
-                              border: '2px solid var(--border-color)',
-                              borderRadius: '50%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              margin: '6px 0',
-                              background: 'var(--bg-card)',
-                              cursor: 'pointer'
-                            }}
-                            onClick={() => navigate('/acsi-server', { state: { endpoint: conn } })}
-                            title={`Type: ${conn.type}`}
-                          >
-                            <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>
-                              {conn.name}
-                            </span>
-                          </div>
-                          <div style={{ 
-                            padding: '6px 12px', 
-                            background: 'var(--bg-hover)',
-                            borderRadius: '16px',
-                            textAlign: 'center',
-                            fontSize: '11px',
-                            border: '1px solid var(--border-color)',
-                            minWidth: '120px'
-                          }}>
-                            server · active
-                            {conn.properties_info?.properties && (
-                              <div style={{ color: 'var(--text-muted)', marginTop: '2px', fontSize: '9px' }}>
-                                {conn.properties_info.properties.acsi_role} · {conn.properties_info.properties.ws_mode}
-                              </div>
-                            )}
-                          </div>
-                        </React.Fragment>
-                      ))}
-                  </div>
-                </>
-              )}
-              
-              {connections.filter(conn => conn.status === 'connected').length === 0 && (
-                <div style={{
-                  textAlign: 'center',
-                  color: 'var(--text-muted)',
-                  fontSize: '12px',
-                  padding: '40px'
-                }}>
-                  No connected instances to visualize
-                </div>
-              )}
+              <InstanceVisualization
+                connections={connections}
+                loading={loading}
+                onReload={handleCheckAllConnections}
+                onConnectionClick={handleEditConnection}
+                showReload={true}
+              />
             </div>
           )}</div>
 

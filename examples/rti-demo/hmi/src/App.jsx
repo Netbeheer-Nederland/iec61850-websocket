@@ -105,7 +105,7 @@ function App() {
             <Route path="/" element={<Setup settings={settings} />} />
             <Route path="/setup" element={<Setup settings={settings} />} />
             <Route path="/connections" element={<Connections connections={connections} setConnections={setConnections} />} />
-            <Route path="/model" element={<Model />} />
+            <Route path="/model" element={<Model settings={settings} />} />
             <Route path="/data" element={<Data />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/diagnostics" element={<Diagnostics />} />
