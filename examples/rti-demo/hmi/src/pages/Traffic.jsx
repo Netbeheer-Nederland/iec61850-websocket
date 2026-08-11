@@ -3,7 +3,7 @@ import InstanceVisualization from '../components/InstanceVisualization';
 import MessageMonitor from '../components/MessageMonitor';
 import DataAccessPanel from '../components/DataAccessPanel';
 
-function Traffic({ settings, getModel, updateModel, connections: propConnections }) {
+function Traffic({ settings, getModel, connections: propConnections }) {
   const [connections, setConnections] = useState(propConnections || []);
   const [loading, setLoading] = useState(false);
 
@@ -117,7 +117,6 @@ function Traffic({ settings, getModel, updateModel, connections: propConnections
                 key={`data-access-panel-${id}`}
                 connections={connections}
                 getModel={getModel}
-                updateModel={updateModel}
                 settings={settings}
                 cp={settings?.cp || 'cp1'}
               />
