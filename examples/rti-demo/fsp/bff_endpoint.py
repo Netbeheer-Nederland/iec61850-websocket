@@ -79,7 +79,7 @@ class StartRequest(BaseModel):
 class ReadvalueRequest(BaseModel):
 
     """Request body for reading a value from the ACSI server model."""
-    obj_ref: str = Field(
+    objRef: str = Field(
         ...,
         description="Object reference in ACSI format",
         json_schema_extra={"example": "LD0/MMXU1$MX$volA"}
@@ -997,7 +997,7 @@ def create_bff_router(
             HTTPException 404: If instance not available or timeout
         """
         try:
-            obj_ref = request.obj_ref  # Fixed typo from request,object
+            obj_ref = request.objRef  # Fixed typo from request,object
             fc = request.fc
 
             if not obj_ref:
