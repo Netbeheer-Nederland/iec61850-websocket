@@ -706,7 +706,11 @@ function DataAccessPanel({ connections, getModel, settings }) {
       background: 'var(--bg-card)'
     }}>
       <h3 style={{ margin: 0, marginBottom: '16px', color: 'var(--text-secondary)' }}>
-        Data Access
+        {selectedTarget ? (
+          connectedEndpoints.find(c => buildTargetValue(c.host, c.port) === selectedTarget)?.acsi === 'client' 
+            ? 'ACSI Client - Read or write to ACSI Server'
+            : 'Read or write to ACSI Server'
+        ) : 'Data Access'}
       </h3>
       
       {/* Endpoint Selection */}
@@ -727,6 +731,16 @@ function DataAccessPanel({ connections, getModel, settings }) {
             </option>
           ))}
         </select>
+        {selectedTarget && (
+          <div style={{ 
+            marginTop: '4px', 
+            fontSize: '11px', 
+            color: 'var(--text-muted)',
+            fontStyle: 'italic'
+          }}>
+            ACSI: {connectedEndpoints.find(c => buildTargetValue(c.host, c.port) === selectedTarget)?.acsi || 'Unknown'}
+          </div>
+        )}
       </div>
       
       {/* Cascading Dropdowns */}
