@@ -458,20 +458,23 @@ const handleNodeClick = useCallback(
                 const daName = da.name || da.daRef?.split('.').pop() || 'DA';
                 const daRef = `${ref}.${daName}`;
                 const fc = da.fc || '';
+                if (da.daType[0] === 'structure') {
+                  da.subDataAttributes = da.daType[1] || [];
+                }
                 const subDas = (da.subDataAttributes || da.sub_attributes || da.sda || [])
                   .filter((sda) => {
-                    const sdaName = sda.name || sda.daRef?.split('.').pop() || 'SDA';
+                    const sdaName = sda['cmpName'];
                     const sdaRef = `${daRef}.${sdaName}`;
                     return !existingRefs.has(sdaRef);
                   })
                   .map((sda) => {
-                    const sdaName = sda.name || sda.daRef?.split('.').pop() || 'SDA';
+                    const sdaName = sda['cmpName'];
                     const sdaRef = `${daRef}.${sdaName}`;
                     return {
                       name: sdaName,
                       type: 'SDA',
                       ref: sdaRef,
-                      fc,
+                      fc: '',
                       bType: sda.bType || '',
                       children: [],
                     };
