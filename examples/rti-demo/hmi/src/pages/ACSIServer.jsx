@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
 import Tree from '../components/Tree';
 
-function ACSIServer() {
+function ACSIServer({ settings, updateModel, getModel, connections }) {
   const location = useLocation();
   const navigate = useNavigate();
   const endpoint = location.state?.endpoint;
@@ -197,6 +197,8 @@ function ACSIServer() {
         
         if (modelData && Object.keys(modelData).length > 0) {
           setTreeData(modelData);
+          // Save the model in the global models list
+          updateModel(endpointTarget, modelData);
         } else {
           setError('No model data found in response');
         }

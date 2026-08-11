@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import InstanceVisualization from '../components/InstanceVisualization';
 import MessageMonitor from '../components/MessageMonitor';
+import DataAccessPanel from '../components/DataAccessPanel';
 
-function Traffic({ settings }) {
-  const [connections, setConnections] = useState([]);
-  const [loading, setLoading] = useState(true);
+function Traffic({ settings, getModel, updateModel, connections: propConnections }) {
+  const [connections, setConnections] = useState(propConnections || []);
+  const [loading, setLoading] = useState(false);
 
-  // Fetch connections from BFF API
+  // Fetch connections function (memoized)
   const fetchConnections = useCallback(async () => {
     try {
       setLoading(true);
@@ -22,11 +23,18 @@ function Traffic({ settings }) {
     }
   }, [settings?.bffHost, settings?.bffPort]);
 
+  // Use connections from props, fall back to fetching if not provided
   useEffect(() => {
-    fetchConnections();
-  }, [fetchConnections]);
+    if (propConnections && propConnections.length > 0) {
+      setConnections(propConnections);
+    } else {
+      fetchConnections();
+    }
+  }, [settings?.bffHost, settings?.bffPort, propConnections, fetchConnections]);
 
   const [monitorsExpanded, setMonitorsExpanded] = useState(true);
+  const [panelsExpanded, setPanelsExpanded] = useState(true);
+  const [dataAccessPanels, setDataAccessPanels] = useState([1]);
 
   return (
     <section className="page">
@@ -45,6 +53,75 @@ function Traffic({ settings }) {
           showLabels={true}
           showReload={true}
         />
+      </div>
+      
+      {/* Collapsible Data Access Panels block */}
+      <div style={{ 
+        marginBottom: '20px',
+        border: '1px solid var(--border-color)',
+        borderRadius: '8px',
+        padding: '12px',
+        background: 'var(--bg-card)'
+      }}>
+        <div 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            marginBottom: '12px',
+            padding: '4px 0'
+          }}
+          onClick={() => setPanelsExpanded(!panelsExpanded)}
+        >
+          <h3 style={{ margin: 0, color: 'var(--text-secondary)', flex: 1 }}>
+            Data Access Panels
+          </h3>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              className="btn-icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDataAccessPanels(prev => [...prev, prev.length + 1]);
+              }}
+              title="Add panel"
+              style={{ padding: '4px 8px' }}
+            >
+              <i className="fas fa-plus" style={{ fontSize: '12px' }}></i>
+            </button>
+            <button
+              className="btn-icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (dataAccessPanels.length > 1) {
+                  setDataAccessPanels(prev => prev.slice(0, -1));
+                }
+              }}
+              title="Remove panel"
+              disabled={dataAccessPanels.length <= 1}
+              style={{ padding: '4px 8px' }}
+            >
+              <i className="fas fa-minus" style={{ fontSize: '12px' }}></i>
+            </button>
+            <i 
+              className={`fas ${panelsExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`}
+              style={{ color: 'var(--text-muted)', fontSize: '14px' }}
+            ></i>
+          </div>
+        </div>
+        
+        <div style={{ display: panelsExpanded ? 'block' : 'none' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '16px' }}>
+            {dataAccessPanels.map((id) => (
+              <DataAccessPanel
+                key={`data-access-panel-${id}`}
+                connections={connections}
+                getModel={getModel}
+                settings={settings}
+              />
+            ))}
+          </div>
+        </div>
       </div>
       
       {/* Collapsible monitors block */}

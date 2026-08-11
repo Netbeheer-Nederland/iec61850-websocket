@@ -23,10 +23,28 @@ function App() {
   const [endpoints, setEndpoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [connections, setConnections] = useState([]);
+  const [models, setModels] = useState({});
   const [settings, setSettings] = useState({
     bffHost: 'localhost',
     bffPort: '5000'
   });
+
+  // Models state: stores endpoint -> model mapping
+  // updateModel: add/update a model for an endpoint
+  const updateModel = useCallback((endpointId, modelData) => {
+    setModels(prev => ({
+      ...prev,
+      [endpointId]: {
+        data: modelData,
+        timestamp: Date.now()
+      }
+    }));
+  }, []);
+
+  // getModel: retrieve a model by endpoint ID
+  const getModel = useCallback((endpointId) => {
+    return models[endpointId]?.data;
+  }, [models]);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -106,16 +124,16 @@ function App() {
             <Route path="/" element={<Setup settings={settings} />} />
             <Route path="/setup" element={<Setup settings={settings} />} />
             <Route path="/connections" element={<Connections connections={connections} setConnections={setConnections} />} />
-            <Route path="/model" element={<Model settings={settings} />} />
-            <Route path="/traffic" element={<Traffic settings={settings} />} />
+            <Route path="/model" element={<Model settings={settings} connections={connections} updateModel={updateModel} getModel={getModel} />} />
+            <Route path="/traffic" element={<Traffic settings={settings} connections={connections} updateModel={updateModel} getModel={getModel} />} />
             <Route path="/data" element={<Data />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/diagnostics" element={<Diagnostics />} />
             <Route path="/tools" element={<Tools />} />
             <Route path="/monitoring" element={<Monitoring />} />
             <Route path="/settings" element={<Settings settings={settings} setSettings={setSettings} />} />
-            <Route path="/acsi-client" element={<ACSIClient />} />
-            <Route path="/acsi-server" element={<ACSIServer />} />
+            <Route path="/acsi-client" element={<ACSIClient settings={settings} connections={connections} updateModel={updateModel} getModel={getModel} />} />
+            <Route path="/acsi-server" element={<ACSIServer settings={settings} connections={connections} updateModel={updateModel} getModel={getModel} />} />
             <Route path="*" element={<Navigate to="/setup" replace />} />
           </Routes>
         </main>
