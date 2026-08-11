@@ -9,7 +9,7 @@ function ACSIServer({ settings, updateModel, getModel, connections }) {
   const endpoint = location.state?.endpoint;
   
   const [host, setHost] = useState(endpoint?.host || '0.0.0.0');
-  const [port, setPort] = useState(String(endpoint?.port || 102));
+  const [port, setPort] = useState(String(8765));
   const [cp, setCp] = useState(endpoint?.cp || 'cp1');
   const [mode, setMode] = useState(endpoint?.mode || 'server');
   const [connected, setConnected] = useState(false);
@@ -31,7 +31,8 @@ function ACSIServer({ settings, updateModel, getModel, connections }) {
         .replace(/'/g, '"')
         .replace(/True/g, 'true')
         .replace(/False/g, 'false')
-        .replace(/None/g, 'null');
+        .replace(/None/g, 'null')
+        .replace(/""+/g, '"');
       return JSON.parse(jsonStr);
     } catch (e) {
       console.warn('Could not parse Python dict string:', e);

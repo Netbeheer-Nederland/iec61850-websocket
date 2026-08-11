@@ -944,7 +944,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             raise HTTPException(status_code=500, detail=str(exc))
 
     @router.post(
-        "/clear_messages",
+        "/clear-messages",
         summary="Clear Message Log",
         description="Clears all logged protocol messages.",
         response_description="Clear confirmation",

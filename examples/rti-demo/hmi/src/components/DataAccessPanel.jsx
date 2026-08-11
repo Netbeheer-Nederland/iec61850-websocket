@@ -14,10 +14,10 @@ import { executeApiCall, buildTargetValue } from '../services/apiService';
  * @param {Object} props
  * @param {Object[]} props.connections - Array of connection objects with host, port, name, type, status
  * @param {Function} props.getModel - Function to retrieve cached model by endpoint target
- * @param {Function} props.updateModel - Function to save/update model for endpoint target
  * @param {Object} props.settings - BFF settings with bffHost and bffPort
+ * @param {string} props.cp - The control point/access point identifier
  */
-function DataAccessPanel({ connections, getModel, updateModel, settings }) {
+function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
   // State for selections
   const [selectedTarget, setSelectedTarget] = useState('');
   const [selectedLD, setSelectedLD] = useState('');
@@ -38,6 +38,9 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
   const [writeValue, setWriteValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Local cache for fetched DAs (DO reference -> array of DA names)
+  const [daCache, setDaCache] = useState({});
 
   // Get connected endpoints
   const connectedEndpoints = useMemo(() => {
@@ -54,13 +57,24 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
       // Handle different model structures - normalize to the actual model object
       let data = modelData;
       
-      // The stored model is the full API response payload
-      // For model-tree API: result.payload contains the model structure
-      // For model API: similar structure
+      // The stored model could be:
+      // 1. Full API response: { ok: true, result: { server: {...}, logicalDeviceMap: {...}, logicalNodeDetails: {...} } }
+      // 2. Just the result: { server: {...}, logicalDeviceMap: {...}, logicalNodeDetails: {...} }
+      // 3. Tree structure: { tree: {...} } or { kind: 'Server', children: [...] }
       
       // Try to get to the actual model data
-      if (data?.result?.model) {
+      if (data?.result?.server?.logicalDevices) {
+        data = data.result;
+      } else if (data?.result?.model?.server?.logicalDevices) {
         data = data.result.model;
+      } else if (data?.result?.tree?.children) {
+        data = data.result;
+      } else if (data?.result?.model) {
+        data = data.result.model;
+      } else if (data?.model?.server?.logicalDevices) {
+        data = data.model;
+      } else if (data?.model?.tree?.children) {
+        data = data.model;
       } else if (data?.model) {
         data = data.model;
       }
@@ -82,7 +96,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
           hierarchy.lds.push(tree.name);
           extractFromKindTree(tree, tree.name, 'LD', hierarchy);
         }
-        console.log('[DataAccessPanel] Extracted from model.tree structure');
         return hierarchy;
       }
       
@@ -94,7 +107,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
             extractFromKindTree(node, node.name, 'LD', hierarchy);
           }
         });
-        console.log('[DataAccessPanel] Extracted from root tree structure');
         return hierarchy;
       }
       
@@ -247,10 +259,8 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
         // Recursively process
         return extractHierarchyFromModel(data);
       }
-      
-      console.log('[DataAccessPanel] Extracted hierarchy:', hierarchy);
     } catch (e) {
-      console.error('Failed to extract hierarchy from model:', e);
+      // Silent error handling - model structure not recognized
     }
     
     return hierarchy;
@@ -400,16 +410,8 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
       
       // Get model for this endpoint
       const modelData = getModel ? getModel(selectedTarget) : null;
-      console.log(`[DataAccessPanel] Model data for ${selectedTarget}:`, modelData);
-      
-      // Save model for later use
-      if (updateModel && modelData) {
-        updateModel(selectedTarget, modelData);
-      }
       
       const hierarchy = extractHierarchyFromModel(modelData);
-      
-      console.log(`[DataAccessPanel] Extracted hierarchy:`, hierarchy);
       
       setAvailableLDs(hierarchy.lds);
       
@@ -452,10 +454,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
     const modelData = getModel ? getModel(selectedTarget) : null;
     const hierarchy = extractHierarchyFromModel(modelData);
     
-    console.log(`[DataAccessPanel] Looking up DOs for LN: ${lnRef}`);
-    console.log(`[DataAccessPanel] Available DO keys:`, Object.keys(hierarchy.dos));
-    console.log(`[DataAccessPanel] DOs at ${lnRef}:`, hierarchy.dos[lnRef]);
-    
     setAvailableDOs(hierarchy.dos[lnRef] || []);
   }, [selectedLN, selectedLD, selectedTarget, getModel, extractHierarchyFromModel]);
 
@@ -472,12 +470,118 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
     const modelData = getModel ? getModel(selectedTarget) : null;
     const hierarchy = extractHierarchyFromModel(modelData);
     
-    console.log(`[DataAccessPanel] Looking up DAs for DO: ${doRef}`);
-    console.log(`[DataAccessPanel] Available DA keys:`, Object.keys(hierarchy.das));
-    console.log(`[DataAccessPanel] DAs at ${doRef}:`, hierarchy.das[doRef]);
+    // Check hierarchy first (from model tree structure)
+    const cachedDas = hierarchy.das[doRef] || [];
+    if (cachedDas.length > 0) {
+      setAvailableDAs(cachedDas);
+      return;
+    }
     
-    setAvailableDAs(hierarchy.das[doRef] || []);
-  }, [selectedDO, selectedLN, selectedLD, selectedTarget, getModel, extractHierarchyFromModel]);
+    // Check local DA cache
+    if (daCache[doRef]) {
+      setAvailableDAs(daCache[doRef]);
+      return;
+    }
+    
+    // Otherwise, fetch DA definition from API
+    const fetchDAsForDO = async () => {
+      try {
+        // Extract path components for API call
+        const ldName = selectedLD;
+        const lnName = selectedLN;
+        const doPath = selectedDO;
+        
+        // Try to get cp from the selected connection, fall back to prop or default
+        const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
+        const effectiveCp = selectedConnection?.cp || cp || 'cp1';
+        
+        // Use the standard BFF execute endpoint - it will add method, path, target automatically
+        const result = await executeApiCall('data-definition', selectedTarget, {
+          cp: effectiveCp,
+          ld_inst: ldName,
+          ln_inst: lnName,
+          do_path: doPath,
+        });
+        
+        if (result?.ok && result.payload) {
+          // Extract DAs from various possible response structures
+          let dataAttributes = [];
+          
+          // Debug logging
+          console.log('[DataAccessPanel] DA definition API response:', result.payload);
+          console.log('[DataAccessPanel] Full result:', result);
+          
+          // Try different paths for dataAttributeDefinition
+          const payload = result.payload;
+          
+          // Path 1: payload.result.value.dataAttributeDefinition
+          if (payload.result?.value?.dataAttributeDefinition) {
+            dataAttributes = payload.result.value.dataAttributeDefinition;
+          }
+          // Path 2: payload.value.dataAttributeDefinition
+          else if (payload.value?.dataAttributeDefinition) {
+            dataAttributes = payload.value.dataAttributeDefinition;
+          }
+          // Path 3: payload.dataAttributeDefinition (direct at payload level)
+          else if (payload.dataAttributeDefinition) {
+            dataAttributes = payload.dataAttributeDefinition;
+          }
+          // Path 4: payload.result.dataAttributeDefinition
+          else if (payload.result?.dataAttributeDefinition) {
+            dataAttributes = payload.result.dataAttributeDefinition;
+          }
+          // Path 5: payload.data (sometimes the data is wrapped in a data field)
+          else if (payload.data?.dataAttributeDefinition) {
+            dataAttributes = payload.data.dataAttributeDefinition;
+          }
+          // Path 6: payload.value is an array of DA objects
+          else if (Array.isArray(payload.value)) {
+            dataAttributes = payload.value;
+          }
+          // Path 7: payload is an array of DA objects
+          else if (Array.isArray(payload)) {
+            dataAttributes = payload;
+          }
+          // Path 8: Check if payload.value has a different structure
+          else if (payload.value && typeof payload.value === 'object' && !Array.isArray(payload.value)) {
+            // Maybe the DAs are in a different field
+            dataAttributes = payload.value.dataAttributes || 
+                           payload.value.daList || 
+                           payload.value.das || 
+                           payload.value.attributes || [];
+          }
+          // Path 9: Check payload.result.value as array
+          else if (Array.isArray(payload.result?.value)) {
+            dataAttributes = payload.result.value;
+          }
+          
+          console.log('[DataAccessPanel] Extracted dataAttributes:', dataAttributes);
+          
+          // Extract DA names
+          const das = dataAttributes.map(da => {
+            if (typeof da === 'string') return da;
+            if (typeof da === 'object' && da !== null) {
+              return da.name || da.daRef?.split('.').pop() || da.id || 'DA';
+            }
+            return 'DA';
+          });
+          
+          console.log('[DataAccessPanel] Extracted DAs:', das);
+          
+          // Cache the DAs locally
+          setDaCache(prev => ({ ...prev, [doRef]: das }));
+          setAvailableDAs(das);
+        } else {
+          console.log('[DataAccessPanel] API call failed or no payload');
+          setAvailableDAs([]);
+        }
+      } catch (error) {
+        setAvailableDAs([]);
+      }
+    };
+    
+    fetchDAsForDO();
+  }, [selectedDO, selectedLN, selectedLD, selectedTarget, getModel, extractHierarchyFromModel, cp, connectedEndpoints, daCache]);
 
   // Update FC when DA changes
   useEffect(() => {
@@ -562,10 +666,10 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
             const lnRef = `${ldNameActual}/${lnNameActual}`;
             const details = logicalNodeDetails[lnRef] || {};
             const dos = details.dataObjects || ln.dataObjects || ln.do || [];
-            const doObj = dos.find(doObj => doObj.name === doName || doObj === doName);
+            const doObj = dos.find(doItem => doItem.name === doName || doItem === doName);
             if (doObj) {
               const das = doObj.dataAttributes || doObj.data_attributes || doObj.da || [];
-              const daObj = das.find(da => da.name === daName || da === daName);
+              const daObj = das.find(daItem => daItem.name === daName || daItem === daName);
               if (daObj) {
                 return daObj.fc || daObj.Fc || daObj.FC || '';
               }
@@ -634,10 +738,21 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
     setReadResult(null);
     
     try {
-      const result = await executeApiCall('read', selectedTarget, {
-        obj_ref: objRef,
+      // Get cp from the selected connection if it's an ACSI client
+      const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
+      const effectiveCp = selectedConnection?.cp || cp || 'cp1';
+      
+      // Add cp to body for ACSI client endpoints
+      const isAcsiClient = selectedConnection?.acsi === 'client';
+      const body = {
+        objRef: objRef,
         fc: selectedFC.toLowerCase() || 'st'
-      });
+      };
+      if (isAcsiClient) {
+        body.cp = effectiveCp;
+      }
+      
+      const result = await executeApiCall('read', selectedTarget, body);
       
       if (result?.ok) {
         setReadResult(result.payload);
@@ -649,7 +764,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedTarget, buildObjectRef, selectedFC]);
+  }, [selectedTarget, buildObjectRef, selectedFC, connections, cp]);
 
   // Handle write operation
   const handleWrite = useCallback(async () => {
@@ -674,11 +789,22 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
     setWriteResult(null);
     
     try {
-      const result = await executeApiCall('write', selectedTarget, {
+      // Get cp from the selected connection if it's an ACSI client
+      const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
+      const effectiveCp = selectedConnection?.cp || cp || 'cp1';
+      
+      // Add cp to body for ACSI client endpoints
+      const isAcsiClient = selectedConnection?.acsi === 'client';
+      const body = {
         obj_ref: objRef,
         value: writeValue,
         fc: selectedFC.toLowerCase() || 'st'
-      });
+      };
+      if (isAcsiClient) {
+        body.cp = effectiveCp;
+      }
+      
+      const result = await executeApiCall('write', selectedTarget, body);
       
       if (result?.ok) {
         setWriteResult(result.payload);
@@ -690,7 +816,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedTarget, buildObjectRef, writeValue, selectedFC]);
+  }, [selectedTarget, buildObjectRef, writeValue, selectedFC, connections, cp]);
 
   // Reset selections and results
   const handleReset = useCallback(() => {

@@ -858,7 +858,7 @@ def create_bff_router(
             )
 
     @router.get(
-        "/actions_logs",
+        "/actions-logs",
         summary="Get Action Log",
         description="Retrieves the logged server actions for debugging and auditing purposes.",
         response_description="List of logged actions",
@@ -883,7 +883,7 @@ def create_bff_router(
             )
 
     @router.post(
-        "/clear_logs",
+        "/clear-logs",
         summary="Clear Action Log",
         description="Clears all logged server actions.",
         response_description="Action log clear confirmation",
@@ -934,7 +934,7 @@ def create_bff_router(
             )
 
     @router.post(
-        "/clear_messages",
+        "/clear-messages",
         summary="Clear Message Log",
         description="Clears all logged protocol messages.",
         response_description="Message log clear confirmation",
