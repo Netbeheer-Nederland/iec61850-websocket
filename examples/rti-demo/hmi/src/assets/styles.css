@@ -1742,7 +1742,7 @@ h3 {
     border-radius: 10px;
     box-shadow: var(--shadow-lg);
     padding: 6px;
-    display: none;
+    display: block;          /* <-- Changed from 'none' to 'block' */
     overflow: hidden;
     animation: fadeIn 0.15s ease-in-out;
 }
@@ -1755,7 +1755,7 @@ h3 {
     border-radius: 7px;
     font-size: 13px;
     font-weight: 500;
-    color: var(--text-secondary);
+    color: #ffffff; 
     cursor: pointer;
     transition: var(--transition);
     white-space: nowrap;
@@ -1788,7 +1788,7 @@ h3 {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--bg-primary);
     display: flex;
     align-items: center;
     justify-content: center;

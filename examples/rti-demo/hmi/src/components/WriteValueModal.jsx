@@ -72,7 +72,7 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
 
   return (
     <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000 }}>
-      <div className="write-value-modal" style={{ background: 'white', padding: '20px', borderRadius: '8px', maxWidth: '500px', margin: '50px auto' }}>
+      <div className="write-value-modal" style={{ background: '#1e1e1e', padding: '20px', borderRadius: '8px', maxWidth: '500px', margin: '50px auto' }}>
         <h2>Write Data Value</h2>
         <div>
           <label>Object Reference:</label>
@@ -89,6 +89,7 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
         <div style={{ margin: '16px 0' }}>
           <label>New Value:</label>
           <input
+            style={{ margin: '0 16px' }}
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}

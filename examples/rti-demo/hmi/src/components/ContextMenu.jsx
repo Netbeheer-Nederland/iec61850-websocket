@@ -28,7 +28,6 @@ const ContextMenu = ({ x, y, visible, onClose, items }) => {
         position: 'fixed',
         left: `${x}px`,
         top: `${y}px`,
-        background: 'white',
         border: '1px solid var(--border-color)',
         boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
         zIndex: 1000,

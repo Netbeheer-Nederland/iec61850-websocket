@@ -34,6 +34,8 @@ const ACSIClient = ({ updateModel }) => {
 
   const endpointTarget = `${wsHost}:${wsPort}`;
 
+  const [writeModalTarget, setWriteModalTarget] = useState({ ref: '', fc: '' });
+
   // Stop monitoring
   const stopMonitoring = useCallback(() => {
     if (monitorIntervalRef.current) {
@@ -339,12 +341,13 @@ const ACSIClient = ({ updateModel }) => {
   );
 
   // Handle context menu
-  const handleContextMenu = useCallback((e, nodeInfo) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenuTarget(nodeInfo);
-    setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
-  }, []);
+const handleContextMenu = useCallback((e, nodeInfo) => {
+  e.preventDefault();
+  e.stopPropagation();
+  console.log("ACSIClient handleContextMenu called for:", nodeInfo);  // Debug
+  setContextMenuTarget(nodeInfo);
+  setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+}, []);
 
   // Close context menu
   const closeContextMenu = useCallback(() => {
@@ -554,72 +557,77 @@ const handleNodeClick = useCallback(
   return { ...treeData, children: updateNode(treeData.children) };
 };
 
-  // Get context menu items based on node type
-  const getContextMenuItems = () => {
-    if (!contextMenuTarget) return [];
-    const { nodeType, ref, fc, cdc } = contextMenuTarget;
-    const items = [];
+const getContextMenuItems = () => {
+  if (!contextMenuTarget) return [];
+  const { nodeType, ref, fc, cdc } = contextMenuTarget;
 
-    if (nodeType === 'DO') {
-      if (cdc && CONTROLLABLE_CDCS.includes(cdc.toUpperCase())) {
-        items.push({
-          label: 'Operate',
-          icon: 'fa-play',
-          action: () => {
-            setShowControlModal(true);
-            closeContextMenu();
-          },
-        });
-      }
+  const items = [];
+
+  if (nodeType === 'DO') {
+    if (cdc && CONTROLLABLE_CDCS.includes(cdc.toUpperCase())) {
       items.push({
-        label: `Read Value [CF]`,
-        icon: 'fa-eye',
+        label: 'Operate',
+        icon: 'fa-play',
         action: () => {
-          readDataValue(ref, 'cf');
-          closeContextMenu();
-        },
-      });
-    } else if (nodeType === 'DA' || nodeType === 'SDA' || nodeType === 'FCDA') {
-      items.push({
-        label: `Read Value [${fc?.toUpperCase() || 'CF'}]`,
-        icon: 'fa-eye',
-        action: () => {
-          readDataValue(ref, fc || 'cf');
-          closeContextMenu();
-        },
-      });
-      if (fc?.toLowerCase() === 'sp' || fc?.toLowerCase() === 'cf') {
-        items.push({
-          label: `Write Value [${fc?.toUpperCase()}]`,
-          icon: 'fa-pen',
-          action: () => {
-            setShowWriteModal(true);
-            closeContextMenu();
-          },
-        });
-      }
-    } else if (nodeType === 'SDO') {
-      items.push({
-        label: 'Expand',
-        icon: 'fa-folder-open',
-        action: () => {
-          handleNodeClick({ ref, nodeType: 'SDO' });
-          closeContextMenu();
-        },
-      });
-    } else if (nodeType === 'ReportControl') {
-      items.push({
-        label: 'Configure',
-        icon: 'fa-cog',
-        action: () => {
-          console.log('Configure ReportControl:', ref);
+          setShowControlModal(true);
           closeContextMenu();
         },
       });
     }
+    items.push({
+      label: 'Read Value [CF]',
+      icon: 'fa-eye',
+      action: () => {
+        readDataValue(ref, 'cf');
+        closeContextMenu();
+      },
+    });
+  }
+  else if (nodeType === 'DA' || nodeType === 'SDA' || nodeType === 'FCDA') {
+    items.push({
+      label: `Read Value [${fc?.toUpperCase() || 'CF'}]`,
+      icon: 'fa-eye',
+      action: () => {
+        readDataValue(ref, fc || 'cf');
+        closeContextMenu();
+      },
+    });
+    if (fc?.toLowerCase() === 'sp' || fc?.toLowerCase() === 'cf') {
+      items.push({
+        label: `Write Value [${fc?.toUpperCase()}]`,
+        icon: 'fa-pen',
+        action: () => {
+        const { ref, fc } = contextMenuTarget;  // Capture values first
+        setWriteModalTarget({ ref, fc });         // Store in new state
+        setShowWriteModal(true);
+        closeContextMenu();
+      },
+      });
+    }
+  }
+  else if (nodeType === 'SDO') {
+    items.push({
+      label: 'Expand',
+      icon: 'fa-folder-open',
+      action: () => {
+        handleNodeClick({ ref, nodeType: 'SDO' });
+        closeContextMenu();
+      },
+    });
+  }
+  else if (nodeType === 'ReportControl') {
+    items.push({
+      label: 'Configure',
+      icon: 'fa-cog',
+      action: () => {
+        console.log('Configure ReportControl:', ref);
+        closeContextMenu();
+      },
+    });
+  }
 
-    return items;
-  };
+  return items;
+};
 
   // Cleanup
   useEffect(() => {
@@ -818,19 +826,19 @@ const handleNodeClick = useCallback(
       )}
 
       {/* Write Value Modal */}
-      {showWriteModal && contextMenuTarget && (
+      {showWriteModal && (
         <WriteValueModal
-          objRef={contextMenuTarget.ref}
-          fc={contextMenuTarget.fc}
+          objRef={writeModalTarget.ref}
+          fc={writeModalTarget.fc}
           endpoint={{ host: wsHost, port: wsPort }}
           cp={wsCp}
           onClose={() => {
             setShowWriteModal(false);
-            setContextMenuTarget(null);
+            setWriteModalTarget({ ref: '', fc: '' });
           }}
           onSuccess={() => {
             setShowWriteModal(false);
-            setContextMenuTarget(null);
+            setWriteModalTarget({ ref: '', fc: '' });
           }}
         />
       )}

@@ -50,7 +50,8 @@ const TreeNode = ({
 
   const handleClick = useCallback(
     (e) => {
-      if (e.target.classList?.contains('scl-tree-toggle')) return;
+      // Skip if this is a right-click (context menu)
+      if (e.button === 2) return;  // Right-click (button 2)
       e.stopPropagation();
       if (onNodeClick) onNodeClick({ ref: node.ref, fc: node.fc, nodeType: node.type, endpoint, cp });
     },
@@ -62,6 +63,7 @@ const TreeNode = ({
       if (!node.ref || !onContextMenu) return;
       e.preventDefault();
       e.stopPropagation();
+      console.log("TreeNode context menu triggered for:", node.ref, node.type);  // Debug
       onContextMenu(e, {
         ref: node.ref,
         fc: node.fc,
