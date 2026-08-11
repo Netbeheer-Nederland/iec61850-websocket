@@ -16,8 +16,9 @@ import { executeApiCall, buildTargetValue } from '../services/apiService';
  * @param {Function} props.getModel - Function to retrieve cached model by endpoint target
  * @param {Function} props.updateModel - Function to save/update model for endpoint target
  * @param {Object} props.settings - BFF settings with bffHost and bffPort
+ * @param {string} props.cp - The control point/access point identifier
  */
-function DataAccessPanel({ connections, getModel, updateModel, settings }) {
+function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'cp1' }) {
   // State for selections
   const [selectedTarget, setSelectedTarget] = useState('');
   const [selectedLD, setSelectedLD] = useState('');
@@ -476,8 +477,61 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
     console.log(`[DataAccessPanel] Available DA keys:`, Object.keys(hierarchy.das));
     console.log(`[DataAccessPanel] DAs at ${doRef}:`, hierarchy.das[doRef]);
     
-    setAvailableDAs(hierarchy.das[doRef] || []);
-  }, [selectedDO, selectedLN, selectedLD, selectedTarget, getModel, extractHierarchyFromModel]);
+    const cachedDas = hierarchy.das[doRef] || [];
+    
+    // If we have cached DAs, use them
+    if (cachedDas.length > 0) {
+      setAvailableDAs(cachedDas);
+      return;
+    }
+    
+    // Otherwise, fetch DA definition from API
+    const fetchDAsForDO = async () => {
+      try {
+        console.log(`[DataAccessPanel] Fetching DA definition for ${doRef}`);
+        
+        // Extract path components for API call
+        const ldName = selectedLD;
+        const lnName = selectedLN;
+        const doPath = selectedDO;
+        
+        // Try to get cp from the selected connection, fall back to prop or default
+        const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
+        const effectiveCp = selectedConnection?.cp || cp || 'cp1';
+        
+        const result = await executeApiCall('data-definition', selectedTarget, {
+          ld_inst: ldName,
+          ln_inst: lnName,
+          do_path: doPath,
+          cp: effectiveCp,
+        });
+        
+        if (result?.ok && result.payload) {
+          const dataAttributes = result.payload.result?.value?.dataAttributeDefinition || [];
+          const das = dataAttributes.map(da => da.name || da.daRef?.split('.').pop() || 'DA');
+          
+          console.log(`[DataAccessPanel] Fetched DAs for ${doRef}:`, das);
+          
+          // Update the model with the fetched DAs
+          if (updateModel && modelData) {
+            // Create a new model with the DAs added
+            const updatedModel = addDasToModel(modelData, doRef, das, dataAttributes);
+            updateModel(selectedTarget, updatedModel);
+          }
+          
+          setAvailableDAs(das);
+        } else {
+          console.warn(`[DataAccessPanel] Failed to fetch DA definition for ${doRef}`);
+          setAvailableDAs([]);
+        }
+      } catch (error) {
+        console.error(`[DataAccessPanel] Error fetching DA definition:`, error);
+        setAvailableDAs([]);
+      }
+    };
+    
+    fetchDAsForDO();
+  }, [selectedDO, selectedLN, selectedLD, selectedTarget, getModel, extractHierarchyFromModel, cp, updateModel]);
 
   // Update FC when DA changes
   useEffect(() => {
@@ -579,6 +633,100 @@ function DataAccessPanel({ connections, getModel, updateModel, settings }) {
     }
     
     return null;
+  }, []);
+
+  // Helper to add DAs to the model for a specific DO
+  const addDasToModel = useCallback((modelData, doRef, daNames, dataAttributes) => {
+    if (!modelData) return modelData;
+    
+    try {
+      // Parse the DO reference to extract components
+      const doRefParts = doRef.split('.');
+      const lnRef = doRefParts[0]; // e.g., "LD0/LLN0"
+      const doName = doRefParts[1]; // e.g., "Mod"
+      const [ldName, lnName] = lnRef.split('/');
+      
+      // Make a deep copy of the model to avoid mutating the original
+      const newModel = JSON.parse(JSON.stringify(modelData));
+      
+      let data = newModel;
+      
+      // Normalize to the actual model object
+      if (data?.result?.model) {
+        data = newModel.result.model;
+      } else if (data?.model) {
+        data = newModel.model;
+      }
+      
+      // Handle server.logicalDevices structure (ACSI Client model-tree)
+      if (data?.server?.logicalDevices) {
+        const logicalDeviceMap = data.logicalDeviceMap || {};
+        const logicalNodeDetails = data.logicalNodeDetails || {};
+        const lnRefFull = `${ldName}/${lnName}`;
+        const details = logicalNodeDetails[lnRefFull] || {};
+        
+        // Ensure logicalNodeDetails exists
+        if (!data.logicalNodeDetails) {
+          data.logicalNodeDetails = {};
+        }
+        
+        // Ensure the LN details exist
+        if (!data.logicalNodeDetails[lnRefFull]) {
+          data.logicalNodeDetails[lnRefFull] = { dataObjects: [], dataAttributes: [] };
+        }
+        
+        // Find the DO and add DAs to it
+        const detailsObj = data.logicalNodeDetails[lnRefFull];
+        if (!detailsObj.dataObjects) {
+          detailsObj.dataObjects = [];
+        }
+        
+        // Find or create the DO entry
+        let doObj = detailsObj.dataObjects.find(do => do.name === doName);
+        if (!doObj) {
+          doObj = { name: doName, dataAttributes: [] };
+          detailsObj.dataObjects.push(doObj);
+        }
+        
+        // Add DAs with their metadata
+        if (!doObj.dataAttributes) {
+          doObj.dataAttributes = [];
+        }
+        
+        dataAttributes.forEach((da, index) => {
+          const daName = da.name || da.daRef?.split('.').pop() || daNames[index] || 'DA';
+          // Only add if not already present
+          if (!doObj.dataAttributes.some(existingDa => existingDa.name === daName)) {
+            doObj.dataAttributes.push({
+              name: daName,
+              fc: da.fc || '',
+              bType: da.bType || '',
+            });
+          }
+        });
+        
+        // Also add to dataAttributes list for hierarchy extraction
+        if (!detailsObj.dataAttributes) {
+          detailsObj.dataAttributes = [];
+        }
+        daNames.forEach(daName => {
+          if (!detailsObj.dataAttributes.includes(`${doName}.${daName}`)) {
+            detailsObj.dataAttributes.push(`${doName}.${daName}`);
+          }
+        });
+        
+        return newModel;
+      }
+      
+      // For tree-based models, we'd need to traverse and add DAs to the DO node
+      // This is a simplified version - the main use case is the ACSI Client structure above
+      console.log('[DataAccessPanel] Model structure not yet supported for DA addition:', modelData);
+      return newModel;
+      
+    } catch (e) {
+      console.error('Failed to add DAs to model:', e);
+      return modelData;
+    }
   }, []);
 
   // Format values for display

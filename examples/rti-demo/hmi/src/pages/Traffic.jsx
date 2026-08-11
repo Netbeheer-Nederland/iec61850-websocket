@@ -117,7 +117,9 @@ function Traffic({ settings, getModel, updateModel, connections: propConnections
                 key={`data-access-panel-${id}`}
                 connections={connections}
                 getModel={getModel}
+                updateModel={updateModel}
                 settings={settings}
+                cp={settings?.cp || 'cp1'}
               />
             ))}
           </div>
