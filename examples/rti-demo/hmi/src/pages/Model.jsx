@@ -12,8 +12,16 @@ function Model({ settings }) {
   const [treeData, setTreeData] = useState(null);
   const [selectedConnection, setSelectedConnection] = useState(null);
   const [uploadingModel, setUploadingModel] = useState(false);
+  const [expandedNodes, setExpandedNodes] = useState({});
   const fileInputRef = useRef(null);
   const [uploadStatus, setUploadStatus] = useState('');
+  
+  const handleExpandToggle = useCallback((ref, expanded) => {
+    setExpandedNodes(prev => ({
+      ...prev,
+      [ref]: expanded
+    }));
+  }, []);
   
   // Fetch connections from BFF API
   const fetchConnections = useCallback(async () => {
@@ -112,8 +120,29 @@ function Model({ settings }) {
     }
   }, []);
 
-  const transformModelToTree = (model) => {
+  const transformModelToTree = (model, path = '') => {
     if (!model) return null;
+    
+    // If model already has children array (new format with IED/LD/LN/DA hierarchy)
+    if (model.children && Array.isArray(model.children)) {
+      const name = model.name || model.iedName || 'Root';
+      const nodePath = path ? `${path}/${name}` : name;
+      const node = {
+        name: name,
+        type: model.kind || model.type || 'IED',
+        children: model.children.map(child => transformModelToTree(child, nodePath))
+      };
+      // Preserve ref, fc, cdc, bType, value and other Tree component properties
+      if (model.ref !== undefined) node.ref = model.ref;
+      else node.ref = nodePath;
+      if (model.fc !== undefined) node.fc = model.fc;
+      if (model.cdc !== undefined) node.cdc = model.cdc;
+      if (model.bType !== undefined) node.bType = model.bType;
+      if (model.value !== undefined) node.value = model.value;
+      return node;
+    }
+    
+    // Legacy server/logicalDevices format
     if (model.server && model.server.logicalDevices) {
       return {
         name: model.server.iedName || 'Server',
@@ -125,6 +154,8 @@ function Model({ settings }) {
         }))
       };
     }
+    
+    // Legacy iedName with object properties (old format)
     if (model.iedName) {
       return {
         name: model.iedName,
@@ -136,6 +167,7 @@ function Model({ settings }) {
         }))
       };
     }
+    
     return model;
   };
 
@@ -410,7 +442,7 @@ function Model({ settings }) {
               Loading model...
             </div>
           ) : treeData ? (
-            <Tree data={treeData} />
+            <Tree data={treeData} expandedNodes={expandedNodes} onExpandToggle={handleExpandToggle} />
           ) : selectedConnection ? (
             <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
               Click on a connection to load its model
