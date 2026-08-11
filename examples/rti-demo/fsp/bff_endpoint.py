@@ -39,7 +39,7 @@ class WritevalueRequest(BaseModel):
         description="Value to write as string representation",
         json_schema_extra={"example": "ON"}
     )
-    data_type: str = Field(
+    dataType: str = Field(
         default="",
         description="Optional data type for value coercion",
         json_schema_extra={"example": "BOOLEAN"}
@@ -1133,7 +1133,7 @@ def create_bff_router(
             obj_ref = request.objRef
             fc = request.fc
             value = request.value
-            data_type = request.data_type
+            data_type = request.dataType
 
             if not obj_ref:
                 rti_fsp._log_action("Server writevalue rejected: missing objRef", "warn")

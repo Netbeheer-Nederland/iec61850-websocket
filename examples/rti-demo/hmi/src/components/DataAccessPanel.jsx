@@ -750,7 +750,6 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
         objRef: objRef,
         fc: selectedFC.toLowerCase() || 'st'
       };
-
       if (isAcsiClient) {
         body.cp = effectiveCp;
       }
@@ -767,7 +766,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedTarget, buildObjectRef, selectedFC, connections, cp, daCache, selectedLD, selectedLN, selectedDO, selectedDA]);
+  }, [selectedTarget, buildObjectRef, selectedFC, connections, cp]);
 
   // Handle write operation
   const handleWrite = useCallback(async () => {
@@ -810,7 +809,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
         fc: selectedFC.toLowerCase() || 'st'
       };
       if (valueType) {
-        body.valueType = valueType;
+        body.dataType = valueType;
       }
       if (isAcsiClient) {
         body.cp = effectiveCp;
@@ -903,7 +902,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
           >
             <option value="">Select LD...</option>
             {availableLDs.map(ld => (
-              <option key={ld} value={ld}>{ld}</option>
+              <option key={String(ld)} value={ld}>{ld}</option>
             ))}
           </select>
         </div>
@@ -921,7 +920,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
           >
             <option value="">Select LN...</option>
             {availableLNs.map(ln => (
-              <option key={ln} value={ln}>{ln}</option>
+              <option key={String(ln)} value={ln}>{ln}</option>
             ))}
           </select>
         </div>
@@ -939,7 +938,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
           >
             <option value="">Select DO...</option>
             {availableDOs.map(doObj => (
-              <option key={doObj} value={doObj}>{doObj}</option>
+              <option key={String(doObj)} value={doObj}>{doObj}</option>
             ))}
           </select>
         </div>

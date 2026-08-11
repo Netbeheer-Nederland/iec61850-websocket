@@ -222,7 +222,7 @@ class WriteValueRequest(BaseModel):
         description="Value to write (will be converted to appropriate type)",
         json_schema_extra={"example": "ON"}
     )
-    data_type: Optional[str] = Field(
+    dataType: Optional[str] = Field(
         default=None,
         description="Optional value type hint for coercion",
         json_schema_extra={"example": "BOOLEAN"}
@@ -1669,7 +1669,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             obj_ref = request.objRef
             fc = request.fc
             value = request.value
-            value_type = request.value_type
+            value_type = request.dataType
 
             cp = request.cp
             acsi_client = rti_so.get_iec61850_client(cp)
