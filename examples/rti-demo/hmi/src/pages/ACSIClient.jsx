@@ -12,8 +12,11 @@ const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG
 const ACSIClient = ({ updateModel }) => {
   const location = useLocation();
   const endpoint = location.state?.endpoint;
-  const [wsHost, setWsHost] = useState(endpoint?.host || '127.0.0.1');
-  const [wsPort, setWsPort] = useState(endpoint?.port || 102);
+  // Store the original API endpoint (BFF) - this is used for all API calls
+  // WS host/port are only used in the body of connect/disconnect calls
+  const apiTarget = endpoint ? `${endpoint.host}:${endpoint.port}` : null;
+  const [wsHost, setWsHost] = useState('127.0.0.1');
+  const [wsPort, setWsPort] = useState(8765);
   const [wsCp, setWsCp] = useState(endpoint?.cp || 'cp1');
   const [connected, setConnected] = useState(() => localStorage.getItem('acsi-connected') === 'true');
   const [treeData, setTreeData] = useState(null);
@@ -32,7 +35,8 @@ const ACSIClient = ({ updateModel }) => {
     localStorage.setItem('acsi-connected', String(connected));
   }, [connected]);
 
-  const endpointTarget = `${wsHost}:${wsPort}`;
+  // apiTarget for WS connection display (can be edited by user)
+  const wsEndpointTarget = `${wsHost}:${wsPort}`;
 
   // Stop monitoring
   const stopMonitoring = useCallback(() => {
@@ -63,10 +67,14 @@ const ACSIClient = ({ updateModel }) => {
       setError('Invalid port number');
       return;
     }
+    if (!apiTarget) {
+      setError('No API endpoint configured');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const result = await executeApiCall('connect', endpointTarget, { host: wsHost, port: wsPort, cp: wsCp });
+      const result = await executeApiCall('connect', apiTarget, { host: wsHost, port: wsPort, cp: wsCp });
       if (result?.ok) {
         setConnected(true);
         await loadStatus();
@@ -78,15 +86,16 @@ const ACSIClient = ({ updateModel }) => {
     } finally {
       setLoading(false);
     }
-  }, [wsHost, wsPort, wsCp, endpointTarget]);
+  }, [wsHost, wsPort, wsCp, apiTarget]);
 
   // Disconnect
   const handleDisconnect = useCallback(async () => {
     if (!connected) return;
+    if (!apiTarget) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await executeApiCall('disconnect', endpointTarget, { host: wsHost, port: wsPort, cp: wsCp });
+      const result = await executeApiCall('disconnect', apiTarget, { host: wsHost, port: wsPort, cp: wsCp });
       if (result?.ok) {
         setConnected(false);
         setTreeData(null);
@@ -98,24 +107,24 @@ const ACSIClient = ({ updateModel }) => {
     } finally {
       setLoading(false);
     }
-  }, [connected, wsHost, wsPort, wsCp, endpointTarget]);
+  }, [connected, wsHost, wsPort, wsCp, apiTarget]);
 
   // Load status
   const loadStatus = useCallback(async () => {
-    if (!endpointTarget) return;
+    if (!apiTarget) return;
     try {
-      const result = await executeApiCall('status', endpointTarget, null);
+      const result = await executeApiCall('status', apiTarget, null);
       if (result?.ok) setStatusInfo(result.payload);
     } catch (error) {
       console.error('Failed to load status:', error);
     }
-  }, [endpointTarget]);
+  }, [apiTarget]);
 
   // Fetch action logs
   const fetchActionLogs = useCallback(async () => {
-    if (!endpointTarget) return;
+    if (!apiTarget) return;
     try {
-      const result = await executeApiCall('actions-logs', endpointTarget, {});
+      const result = await executeApiCall('actions-logs', apiTarget, {});
       if (result?.ok) {
         const actions = result.payload.result?.actions || result.payload.actions || [];
         if (Array.isArray(actions) && actions.length > 0) {
@@ -131,31 +140,31 @@ const ACSIClient = ({ updateModel }) => {
     } catch (error) {
       console.error('Failed to fetch action logs:', error);
     }
-  }, [endpointTarget]);
+  }, [apiTarget]);
 
   // Start monitoring
   const startMonitoring = useCallback(async () => {
     if (isMonitoring) return;
-    if (!endpointTarget) {
-      setError('No endpoint configured');
+    if (!apiTarget) {
+      setError('No API endpoint configured');
       return;
     }
     stopMonitoring();
     setIsMonitoring(true);
     await fetchActionLogs();
     monitorIntervalRef.current = setInterval(fetchActionLogs, 5000);
-  }, [isMonitoring, endpointTarget, fetchActionLogs, stopMonitoring]);
+  }, [isMonitoring, apiTarget, fetchActionLogs, stopMonitoring]);
 
   // Clear messages
   const clearMessages = useCallback(async () => {
-    if (!endpointTarget) {
-      setError('No endpoint configured');
+    if (!apiTarget) {
+      setError('No API endpoint configured');
       return;
     }
-    const result = await executeApiCall('clear-logs', endpointTarget, {});
+    const result = await executeApiCall('clear-logs', apiTarget, {});
     if (result?.ok) setProtocolMessages([]);
     else setError(`Error clearing messages: ${result?.payload?.error || 'Unknown error'}`);
-  }, [endpointTarget]);
+  }, [apiTarget]);
 
   // Load model tree
   const loadClientTree = useCallback(async () => {
@@ -163,19 +172,19 @@ const ACSIClient = ({ updateModel }) => {
       setError('Please connect first');
       return;
     }
-    if (!endpointTarget) {
-      setError('No endpoint configured');
+    if (!apiTarget) {
+      setError('No API endpoint configured');
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const result = await executeApiCall('model-tree', endpointTarget, { cp: wsCp });
+      const result = await executeApiCall('model-tree', apiTarget, { cp: wsCp });
       if (result?.ok) {
         const tree = transformTree(result.payload);
         setTreeData(tree.length > 0 ? { name: 'Server', type: 'server', children: tree } : null);
         if (updateModel) {
-          updateModel(endpointTarget, result.payload);
+          updateModel(apiTarget, result.payload);
         }
       } else {
         setError(result?.payload?.error || result?.rawText || 'Failed to fetch model');
@@ -185,7 +194,7 @@ const ACSIClient = ({ updateModel }) => {
     } finally {
       setLoading(false);
     }
-  }, [connected, endpointTarget, wsCp]);
+  }, [connected, apiTarget, wsCp]);
 
   // Transform API response to tree structure
   const transformTree = (data) => {
@@ -312,12 +321,12 @@ const ACSIClient = ({ updateModel }) => {
         setError('Please connect first');
         return;
       }
-      if (!endpointTarget) {
+      if (!apiTarget) {
         setError('No endpoint configured');
         return;
       }
       try {
-        const result = await executeApiCall('read', endpointTarget, { objRef, fc, cp: wsCp });
+        const result = await executeApiCall('read', apiTarget, { objRef, fc, cp: wsCp });
         if (result?.ok) {
           const updateTreeWithValue = (nodes, targetRef, value) => {
             return nodes.map((node) =>
@@ -335,7 +344,7 @@ const ACSIClient = ({ updateModel }) => {
         setError(error.message);
       }
     },
-    [connected, endpointTarget, wsCp, treeData]
+    [connected, apiTarget, wsCp, treeData]
   );
 
   // Handle context menu
@@ -371,7 +380,7 @@ const handleNodeClick = useCallback(
         const ldName = nodeInfo.ref.split('/')[0];
         const lnName = nodeInfo.ref.split('/')[1].split('.')[0];
         const doPath = nodeInfo.ref.split('/')[1].split('.').slice(1).join('.');
-        const result = await executeApiCall('data-definition', endpointTarget, {
+        const result = await executeApiCall('data-definition', apiTarget, {
           ld_inst: ldName,
           ln_inst: lnName,
           do_path: doPath,
@@ -398,7 +407,7 @@ const handleNodeClick = useCallback(
       const lnInst = nodeInfo.ref.split('/')[1].split('.')[0];
       const dsName = nodeInfo.ref.split('/')[1].split('.')[1];
       try {
-        const result = await executeApiCall('dataset-directory', endpointTarget, {
+        const result = await executeApiCall('dataset-directory', apiTarget, {
           ld_inst: ldName,
           ln_inst: lnInst,
           ds_inst: dsName,
@@ -416,7 +425,7 @@ const handleNodeClick = useCallback(
       console.log('ReportControl clicked:', nodeInfo.ref);
     }
   },
-  [endpointTarget, wsCp, treeData]
+  [apiTarget, wsCp, treeData]
 );
   const findNodeInTree = (tree, ref) => {
     if (!tree) return null;
@@ -696,16 +705,16 @@ const handleNodeClick = useCallback(
         <button id="acsi-read-data-btn" className="btn-primary" onClick={loadClientTree} disabled={loading || !connected}>
           {loading ? 'Fetching...' : 'Fetch Model'}
         </button>
-        <button className="btn-secondary" onClick={loadStatus} disabled={!endpointTarget}>
+        <button className="btn-secondary" onClick={loadStatus} disabled={!apiTarget}>
           Reload Status
         </button>
-        <button id="messages-start-btn" className="btn-primary" onClick={startMonitoring} disabled={!endpointTarget || isMonitoring}>
+        <button id="messages-start-btn" className="btn-primary" onClick={startMonitoring} disabled={!apiTarget || isMonitoring}>
           {isMonitoring ? 'Monitoring...' : 'Start Monitor'}
         </button>
         <button id="messages-stop-btn" className="btn-secondary" onClick={stopMonitoring} disabled={!isMonitoring}>
           Stop Monitor
         </button>
-        <button id="messages-clear-btn" className="btn-secondary" onClick={clearMessages} disabled={!endpointTarget}>
+        <button id="messages-clear-btn" className="btn-secondary" onClick={clearMessages} disabled={!apiTarget}>
           Clear Logs
         </button>
       </div>
