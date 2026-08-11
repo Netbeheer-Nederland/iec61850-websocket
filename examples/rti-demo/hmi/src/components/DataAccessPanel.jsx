@@ -14,9 +14,10 @@ import { executeApiCall, buildTargetValue } from '../services/apiService';
  * @param {Object} props
  * @param {Object[]} props.connections - Array of connection objects with host, port, name, type, status
  * @param {Function} props.getModel - Function to retrieve cached model by endpoint target
+ * @param {Function} props.updateModel - Function to save/update model for endpoint target
  * @param {Object} props.settings - BFF settings with bffHost and bffPort
  */
-function DataAccessPanel({ connections, getModel, settings }) {
+function DataAccessPanel({ connections, getModel, updateModel, settings }) {
   // State for selections
   const [selectedTarget, setSelectedTarget] = useState('');
   const [selectedLD, setSelectedLD] = useState('');
@@ -400,6 +401,12 @@ function DataAccessPanel({ connections, getModel, settings }) {
       // Get model for this endpoint
       const modelData = getModel ? getModel(selectedTarget) : null;
       console.log(`[DataAccessPanel] Model data for ${selectedTarget}:`, modelData);
+      
+      // Save model for later use
+      if (updateModel && modelData) {
+        updateModel(selectedTarget, modelData);
+      }
+      
       const hierarchy = extractHierarchyFromModel(modelData);
       
       console.log(`[DataAccessPanel] Extracted hierarchy:`, hierarchy);

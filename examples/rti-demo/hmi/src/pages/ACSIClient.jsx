@@ -9,7 +9,7 @@ import { executeApiCall, buildTargetValue, getApiById } from '../services/apiSer
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
-const ACSIClient = () => {
+const ACSIClient = ({ updateModel }) => {
   const location = useLocation();
   const endpoint = location.state?.endpoint;
   const [wsHost, setWsHost] = useState(endpoint?.host || '127.0.0.1');
@@ -174,6 +174,9 @@ const ACSIClient = () => {
       if (result?.ok) {
         const tree = transformTree(result.payload);
         setTreeData(tree.length > 0 ? { name: 'Server', type: 'server', children: tree } : null);
+        if (updateModel) {
+          updateModel(endpointTarget, result.payload);
+        }
       } else {
         setError(result?.payload?.error || result?.rawText || 'Failed to fetch model');
       }
