@@ -31,7 +31,8 @@ function ACSIServer({ settings, updateModel, getModel, connections }) {
         .replace(/'/g, '"')
         .replace(/True/g, 'true')
         .replace(/False/g, 'false')
-        .replace(/None/g, 'null');
+        .replace(/None/g, 'null')
+        .replace(/""+/g, '"');
       return JSON.parse(jsonStr);
     } catch (e) {
       console.warn('Could not parse Python dict string:', e);
