@@ -479,7 +479,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
     
     // Check local DA cache
     if (daCache[doRef]) {
-      setAvailableDAs(daCache[doRef]);
+      setAvailableDAs(daCache[doRef].map(d => d.name));
       return;
     }
     
@@ -557,20 +557,22 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
           
           console.log('[DataAccessPanel] Extracted dataAttributes:', dataAttributes);
           
-          // Extract DA names
+          // Extract DA names and types
           const das = dataAttributes.map(da => {
-            if (typeof da === 'string') return da;
+            if (typeof da === 'string') return { name: da, daType: null };
             if (typeof da === 'object' && da !== null) {
-              return da.name || da.daRef?.split('.').pop() || da.id || 'DA';
+              const daName = da.name || da.daRef?.split('.').pop() || da.id || 'DA';
+              const daType = Array.isArray(da.daType) ? da.daType[0] : da.daType;
+              return { name: daName, daType: daType || null };
             }
-            return 'DA';
+            return { name: 'DA', daType: null };
           });
           
           console.log('[DataAccessPanel] Extracted DAs:', das);
           
-          // Cache the DAs locally
+          // Cache the DAs locally with type information
           setDaCache(prev => ({ ...prev, [doRef]: das }));
-          setAvailableDAs(das);
+          setAvailableDAs(das.map(d => d.name));
         } else {
           console.log('[DataAccessPanel] API call failed or no payload');
           setAvailableDAs([]);
@@ -741,13 +743,14 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
       // Get cp from the selected connection if it's an ACSI client
       const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
       const effectiveCp = selectedConnection?.cp || cp || 'cp1';
-      
+     
       // Add cp to body for ACSI client endpoints
       const isAcsiClient = selectedConnection?.acsi === 'client';
       const body = {
         objRef: objRef,
         fc: selectedFC.toLowerCase() || 'st'
       };
+
       if (isAcsiClient) {
         body.cp = effectiveCp;
       }
@@ -764,7 +767,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedTarget, buildObjectRef, selectedFC, connections, cp]);
+  }, [selectedTarget, buildObjectRef, selectedFC, connections, cp, daCache, selectedLD, selectedLN, selectedDO, selectedDA]);
 
   // Handle write operation
   const handleWrite = useCallback(async () => {
@@ -795,11 +798,20 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
       
       // Add cp to body for ACSI client endpoints
       const isAcsiClient = selectedConnection?.acsi === 'client';
+      
+      // Get the daType for the selected DA
+      const doRef = `${selectedLD}/${selectedLN}.${selectedDO}`;
+      const daInfo = daCache[doRef]?.find(da => da.name === selectedDA);
+      const valueType = daInfo?.daType;
+      
       const body = {
-        obj_ref: objRef,
+        objRef: objRef,
         value: writeValue,
         fc: selectedFC.toLowerCase() || 'st'
       };
+      if (valueType) {
+        body.valueType = valueType;
+      }
       if (isAcsiClient) {
         body.cp = effectiveCp;
       }
@@ -816,7 +828,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedTarget, buildObjectRef, writeValue, selectedFC, connections, cp]);
+  }, [selectedTarget, buildObjectRef, writeValue, selectedFC, connections, cp, daCache, selectedLD, selectedLN, selectedDO, selectedDA]);
 
   // Reset selections and results
   const handleReset = useCallback(() => {
@@ -945,7 +957,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
           >
             <option value="">Select DA...</option>
             {availableDAs.map(da => (
-              <option key={da} value={da}>{da}</option>
+              <option key={String(da)} value={da}>{da}</option>
             ))}
           </select>
         </div>

@@ -222,7 +222,7 @@ class WriteValueRequest(BaseModel):
         description="Value to write (will be converted to appropriate type)",
         json_schema_extra={"example": "ON"}
     )
-    value_type: Optional[str] = Field(
+    data_type: Optional[str] = Field(
         default=None,
         description="Optional value type hint for coercion",
         json_schema_extra={"example": "BOOLEAN"}

@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field, ConfigDict
 class WritevalueRequest(BaseModel):
 
     """Request body for writing a value to the ACSI server model."""
-    obj_ref: str = Field(
+    objRef: str = Field(
         ...,
         description="Object reference in ACSI format (e.g., 'LD0/LLN0$ST$Mod')",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
@@ -1130,7 +1130,7 @@ def create_bff_router(
             HTTPException 404: If write timeout occurs
         """
         try:
-            obj_ref = request.obj_ref
+            obj_ref = request.objRef
             fc = request.fc
             value = request.value
             data_type = request.data_type
