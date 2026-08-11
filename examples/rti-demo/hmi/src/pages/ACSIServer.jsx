@@ -9,7 +9,7 @@ function ACSIServer({ settings, updateModel, getModel, connections }) {
   const endpoint = location.state?.endpoint;
   
   const [host, setHost] = useState(endpoint?.host || '0.0.0.0');
-  const [port, setPort] = useState(String(endpoint?.port || 102));
+  const [port, setPort] = useState(String(8765));
   const [cp, setCp] = useState(endpoint?.cp || 'cp1');
   const [mode, setMode] = useState(endpoint?.mode || 'server');
   const [connected, setConnected] = useState(false);
