@@ -152,9 +152,39 @@ def create_bff_router(
                         {
                             "kind": "LN",
                             "name": ln.name,
-                            "children": [
+                            "children": (
+                                [
+                                    {
+                                        "kind": "Group",
+                                        "name": "DataSets",
+                                        "children": [
+                                            {
+                                                "kind": "DataSet",
+                                                "name": ds.name,
+                                                "ref": f"{ld.name}/{ln.name}.{ds.name}"
+                                            }
+                                            for ds in (ln.data_sets or [])
+                                        ]
+                                    }
+                                ] if (ln.data_sets or []) else []
+                            ) + (
+                                [
+                                    {
+                                        "kind": "Group",
+                                        "name": "ReportControls",
+                                        "children": [
+                                            {
+                                                "kind": "BRCB" if rcb.buffered else "URCB",
+                                                "name": rcb.name,
+                                                "ref": f"{ld.name}/{ln.name}.{rcb.name}"
+                                            }
+                                            for rcb in (ln.rcbs or [])
+                                        ]
+                                    }
+                                ] if (ln.rcbs or []) else []
+                            ) + [
                                 serialize_data_object(do) for do in (ln.data_objects or [])
-                            ],
+                            ]
                         }
                         for ln in (ld.logical_nodes or [])
                     ],
@@ -206,10 +236,10 @@ def create_bff_router(
                     cdc = (data_object.cdc or "").lower()
                     obj_info = {"name": data_object.name, "cdc": data_object.cdc}
                     
-                    # Collect DataSets
+                    # Collect DataSets (from DataObjects with cdc="dataset")
                     if cdc == "dataset":
                         datasets.append(obj_info)
-                    # Collect Report Control Blocks (RCB, BRCB, URCB)
+                    # Collect Report Control Blocks (RCB, BRCB, URCB) from DataObjects
                     elif cdc in ("rcb", "brcb", "urcb"):
                         report_control_blocks.append(obj_info)
                     
@@ -218,6 +248,14 @@ def create_bff_router(
                         data_attributes.append(da_path)
                         if fc_name:
                             da_fc_map[f"{ln_prefix}{da_path}"] = fc_name
+
+                # Also collect DataSets from ln.data_sets
+                for ds in (ln.data_sets or []):
+                    datasets.append({"name": ds.name, "cdc": "dataset"})
+
+                # Also collect ReportControls from ln.rcbs
+                for rcb in (ln.rcbs or []):
+                    report_control_blocks.append({"name": rcb.name, "cdc": "rcb"})
 
                 ln_key = f"{ld.name}/{ln.name}"
                 details[ln_key] = {
