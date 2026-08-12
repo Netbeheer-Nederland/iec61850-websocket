@@ -21,7 +21,7 @@ const nodeTypeLabel = (type) => {
   return labels[type] || type || '';
 };
 
-const TreeNode = ({
+const TreeNode = React.memo(({
   node,
   depth = 0,
   onNodeClick,
@@ -130,7 +130,7 @@ const TreeNode = ({
       {renderChildren()}
     </li>
   );
-};
+});
 
 const Tree = ({ data, onNodeClick, onContextMenu, endpoint, cp, className = '', expandedNodes = {}, onExpandToggle }) => {
   const [selectedRef, setSelectedRef] = useState(null);
@@ -176,3 +176,4 @@ const Tree = ({ data, onNodeClick, onContextMenu, endpoint, cp, className = '', 
 };
 
 export default Tree;
+

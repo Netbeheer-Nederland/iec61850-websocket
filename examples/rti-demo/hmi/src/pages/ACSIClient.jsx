@@ -516,6 +516,12 @@ const handleNodeClick = useCallback(
     }));
     
     if (nodeInfo.nodeType === 'DO' || nodeInfo.nodeType === 'SDO') {
+      // Skip fetching if children already loaded
+      const nodeInTree = findNodeInTree(treeData, nodeInfo.ref);
+      if (nodeInTree?.children?.length > 0) {
+        return;
+      }
+
       // Fetch DO definition and update tree
       try {
         const ldName = nodeInfo.ref.split('/')[0];
@@ -582,7 +588,6 @@ const handleNodeClick = useCallback(
   // Helper to update tree with children for DOs/SDOs
   const updateTreeWithChildren = (ref, dataAttributes, subDataObjects) => {
 
-    // Recursively build SDA children from cmpType structure
     const buildSdaChildren = (sdaList, parentRef, parentFc) => {
       return sdaList.map((sda) => {
         const sdaName = sda['cmpName'];
@@ -592,95 +597,72 @@ const handleNodeClick = useCallback(
           Array.isArray(sda.cmpType) && sda.cmpType[0] === 'structure' && Array.isArray(sda.cmpType[1])
             ? buildSdaChildren(sda.cmpType[1], sdaRef, parentFc)
             : [];
-        return {
-          name: sdaName,
-          type: 'SDA',
-          ref: sdaRef,
-          fc: parentFc,
-          bType: sdaBType,
-          children: nestedChildren,
-        };
+        return { name: sdaName, type: 'SDA', ref: sdaRef, fc: parentFc, bType: sdaBType, children: nestedChildren };
       });
     };
 
-      const updateNode = (nodes) => {
-        return nodes.map((node) => {
-          if (node.ref === ref) {
-            const existingChildren = node.children || [];
-            const existingRefs = new Set(existingChildren.map((child) => child.ref));
+    const updateNode = (nodes) => {
+      let changed = false;
+      const result = nodes.map((node) => {
+        if (node.ref === ref) {
+          const existingChildren = node.children || [];
+          const existingRefs = new Set(existingChildren.map((child) => child.ref));
 
-            const daChildren = dataAttributes
-              .filter((da) => {
-                const daName = da.name || da.daRef?.split('.').pop() || 'DA';
-                const daRef = `${ref}.${daName}`;
-                return !existingRefs.has(daRef);
-              })
-              .map((da) => {
-                const daName = da.name || da.daRef?.split('.').pop() || 'DA';
-                const daRef = `${ref}.${daName}`;
-                const fc = da.fc || '';
-                const bType = Array.isArray(da.daType) ? da.daType[0] : (da.bType || '');
-                const rawSubDas =
-                  Array.isArray(da.daType) && da.daType[0] === 'structure' && Array.isArray(da.daType[1])
-                    ? da.daType[1]
-                    : (da.subDataAttributes || da.sub_attributes || da.sda || []);
-                const subDas = buildSdaChildren(rawSubDas, daRef, fc);
-                return {
-                  name: daName,
-                  type: 'DA',
-                  ref: daRef,
-                  fc,
-                  bType,
-                  children: subDas,
-                };
+          const daChildren = dataAttributes
+            .filter((da) => {
+              const daName = da.name || da.daRef?.split('.').pop() || 'DA';
+              return !existingRefs.has(`${ref}.${daName}`);
+            })
+            .map((da) => {
+              const daName = da.name || da.daRef?.split('.').pop() || 'DA';
+              const daRef = `${ref}.${daName}`;
+              const fc = da.fc || '';
+              const bType = Array.isArray(da.daType) ? da.daType[0] : (da.bType || '');
+              const rawSubDas =
+                Array.isArray(da.daType) && da.daType[0] === 'structure' && Array.isArray(da.daType[1])
+                  ? da.daType[1]
+                  : (da.subDataAttributes || da.sub_attributes || da.sda || []);
+              return { name: daName, type: 'DA', ref: daRef, fc, bType, children: buildSdaChildren(rawSubDas, daRef, fc) };
+            });
+
+          const sdoChildren = subDataObjects
+            .filter((sdo) => !existingRefs.has(`${ref}.${sdo.name || 'SDO'}`))
+            .map((sdo) => {
+              const sdoName = sdo.name || 'SDO';
+              const sdoRef = `${ref}.${sdoName}`;
+              const sdoDas = (sdo.dataAttributes || sdo.data_attributes || []).map((sdoDa) => {
+                const sdoDaName = sdoDa.name || sdoDa.daRef?.split('.').pop() || 'SDA';
+                return { name: sdoDaName, type: 'SDA', ref: `${sdoRef}.${sdoDaName}`, fc: sdoDa.fc || '', bType: sdoDa.bType || '', children: [] };
               });
+              return { name: sdoName, type: 'SDO', ref: sdoRef, cdc: sdo.cdc || '', children: sdoDas };
+            });
 
-            const sdoChildren = subDataObjects
-              .filter((sdo) => {
-                const sdoName = sdo.name || 'SDO';
-                const sdoRef = `${ref}.${sdoName}`;
-                return !existingRefs.has(sdoRef);
-              })
-              .map((sdo) => {
-                const sdoName = sdo.name || 'SDO';
-                const sdoRef = `${ref}.${sdoName}`;
-                const sdoDas = (sdo.dataAttributes || sdo.data_attributes || [])
-                  .filter((sdoDa) => {
-                    const sdoDaName = sdoDa.name || sdoDa.daRef?.split('.').pop() || 'SDA';
-                    const sdoDaRef = `${sdoRef}.${sdoDaName}`;
-                    return !existingRefs.has(sdoDaRef);
-                  })
-                  .map((sdoDa) => {
-                    const sdoDaName = sdoDa.name || sdoDa.daRef?.split('.').pop() || 'SDA';
-                    const sdoDaRef = `${sdoRef}.${sdoDaName}`;
-                    return {
-                      name: sdoDaName,
-                      type: 'SDA',
-                      ref: sdoDaRef,
-                      fc: sdoDa.fc || '',
-                      bType: sdoDa.bType || '',
-                      children: [],
-                    };
-                  });
-                return {
-                  name: sdoName,
-                  type: 'SDO',
-                  ref: sdoRef,
-                  cdc: sdo.cdc || '',
-                  children: sdoDas,
-                };
-              });
+          changed = true;
+          // Return same object reference if nothing new to add
+          if (daChildren.length === 0 && sdoChildren.length === 0) return node;
+          return { ...node, children: [...existingChildren, ...daChildren, ...sdoChildren] };
+        }
 
-            return {
-              ...node,
-              children: [...existingChildren, ...daChildren, ...sdoChildren],
-            };
+        if (node.children && node.children.length > 0) {
+          const updatedChildren = updateNode(node.children);
+          // Only create new object if children actually changed
+          if (updatedChildren !== node.children) {
+            return { ...node, children: updatedChildren };
           }
-          return node.children ? { ...node, children: updateNode(node.children) } : node;
-        });
-      };
-      return { ...treeData, children: updateNode(treeData.children) };
+        }
+        // Return same reference for unchanged nodes — React skips re-rendering these
+        return node;
+      });
+
+      // Return same array reference if nothing changed
+      return changed || result.some((n, i) => n !== nodes[i]) ? result : nodes;
     };
+
+    const updatedChildren = updateNode(treeData.children);
+    // Only trigger re-render if something actually changed
+    if (updatedChildren === treeData.children) return treeData;
+    return { ...treeData, children: updatedChildren };
+  };
 
   // Helper to update tree with DataSet children
   const updateTreeWithDataSetChildren = (ref, dataAttributes) => {
