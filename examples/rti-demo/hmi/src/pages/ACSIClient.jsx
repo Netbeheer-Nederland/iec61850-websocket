@@ -5,6 +5,7 @@ import Tree from '../components/Tree';
 import ContextMenu from '../components/ContextMenu';
 import ControlModal from '../components/ControlModal';
 import WriteValueModal from '../components/WriteValueModal';
+import BrcbConfigModal from '../components/BrcbConfigModal';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
@@ -29,6 +30,7 @@ const ACSIClient = ({ updateModel }) => {
   const [contextMenuTarget, setContextMenuTarget] = useState(null);
   const [showControlModal, setShowControlModal] = useState(false);
   const [showWriteModal, setShowWriteModal] = useState(false);
+  const [showBrcbConfigModal, setShowBrcbConfigModal] = useState(false);
   const monitorIntervalRef = useRef(null);
 
   useEffect(() => {
@@ -40,6 +42,7 @@ const ACSIClient = ({ updateModel }) => {
 
   const [writeModalTarget, setWriteModalTarget] = useState({ ref: '', fc: '', endpoint: null, cp: null });
   const [controlModalTarget, setControlModalTarget] = useState({ ref: '', name: '', cdc: '', endpoint: null, cp: null });
+  const [brcbConfigTarget, setBrcbConfigTarget] = useState({ ref: '', rcbType: '', endpoint: null, cp: null });
 
   // Stop monitoring
   const stopMonitoring = useCallback(() => {
@@ -487,7 +490,6 @@ const ACSIClient = ({ updateModel }) => {
 const handleContextMenu = useCallback((e, nodeInfo) => {
   e.preventDefault();
   e.stopPropagation();
-  console.log("ACSIClient handleContextMenu called for:", nodeInfo);  // Debug
   setContextMenuTarget(nodeInfo);
   setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
 }, []);
@@ -497,6 +499,8 @@ const handleContextMenu = useCallback((e, nodeInfo) => {
     setContextMenu({ visible: false, x: 0, y: 0 });
     setContextMenuTarget(null);
   }, []);
+
+
 
   // Handle node click (for expanding DOs/SDOs)
   // Handle node click (for expanding DOs/SDOs)
@@ -702,7 +706,7 @@ const handleNodeClick = useCallback(
 
 const getContextMenuItems = () => {
   if (!contextMenuTarget) return [];
-  const { nodeType, ref, fc, cdc } = contextMenuTarget;
+  const { nodeType, ref, fc, cdc, rcbType } = contextMenuTarget;
 
   const items = [];
 
@@ -754,12 +758,15 @@ const getContextMenuItems = () => {
       },
     });
   }
-  else if (nodeType === 'ReportControl') {
+  else if (nodeType === 'ReportControl' || nodeType === 'BRCB' || nodeType === 'URCB' || nodeType === 'ReportControlBlock' || rcbType) {
     items.push({
       label: 'Configure',
       icon: 'fa-cog',
       action: () => {
-        console.log('Configure ReportControl:', ref);
+        // Capture the target info before closing the context menu
+        const { ref, rcbType: nodeRcbType, endpoint: nodeEndpoint, cp: nodeCp } = contextMenuTarget;
+        setBrcbConfigTarget({ ref, rcbType: nodeRcbType || nodeType, endpoint: nodeEndpoint, cp: nodeCp });
+        setShowBrcbConfigModal(true);
         closeContextMenu();
       },
     });
@@ -982,6 +989,24 @@ const getContextMenuItems = () => {
             if (writeModalTarget.ref && writeModalTarget.fc) {
               await readDataValue(writeModalTarget.ref, writeModalTarget.fc);
             }
+          }}
+        />
+      )}
+
+      {/* BRCB Configuration Modal */}
+      {showBrcbConfigModal && (
+        <BrcbConfigModal
+          objRef={brcbConfigTarget.ref}
+          rcbType={brcbConfigTarget.rcbType}
+          endpoint={brcbConfigTarget.endpoint || contextMenuTarget?.endpoint || endpoint}
+          cp={brcbConfigTarget.cp || contextMenuTarget?.cp || wsCp}
+          onClose={() => {
+            setShowBrcbConfigModal(false);
+            setBrcbConfigTarget({ ref: '', rcbType: '', endpoint: null, cp: null });
+          }}
+          onSuccess={() => {
+            setShowBrcbConfigModal(false);
+            setBrcbConfigTarget({ ref: '', rcbType: '', endpoint: null, cp: null });
           }}
         />
       )}

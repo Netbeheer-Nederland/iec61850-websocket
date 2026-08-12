@@ -63,18 +63,18 @@ const TreeNode = ({
       if (!node.ref || !onContextMenu) return;
       e.preventDefault();
       e.stopPropagation();
-      console.log("TreeNode context menu triggered for:", node.ref, node.type);  // Debug
       onContextMenu(e, {
         ref: node.ref,
         fc: node.fc,
         nodeType: node.type,
         cdc: node.cdc,
         bType: node.bType,
+        rcbType: node.rcbType,
         endpoint,
         cp,
       });
     },
-    [node.ref, node.fc, node.type, node.cdc, node.bType, onContextMenu, endpoint, cp]
+    [node.ref, node.fc, node.type, node.cdc, node.bType, node.rcbType, onContextMenu, endpoint, cp]
   );
 
   const renderChildren = () => {

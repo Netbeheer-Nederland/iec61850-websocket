@@ -2210,3 +2210,190 @@ h3 {
     color: var(--danger-color);
     border: 1px solid var(--danger-color);
 }
+
+/* CSS - All classes prefixed with brcb- */
+
+.brcb-modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.brcb-modal-content {
+    background-color: #2d3748;
+    padding: 20px;
+    border-radius: 8px;
+    width: 600px;
+    max-width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    color: white;
+    box-sizing: border-box;
+}
+
+.brcb-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.brcb-modal-header h2 {
+    margin: 0;
+    color: white;
+}
+
+.brcb-close-modal {
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+    color: white;
+}
+
+.brcb-close-modal:hover {
+    opacity: 0.7;
+}
+
+.brcb-modal-body {
+    margin-bottom: 20px;
+}
+
+.brcb-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.brcb-form-group {
+    margin-bottom: 15px;
+}
+
+.brcb-form-group > label:not(.brcb-checkbox-label) {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+}
+
+.brcb-checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.brcb-checkbox-grid label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    color: white;
+}
+
+.brcb-checkbox-grid input[type="checkbox"],
+.brcb-checkbox-label input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.brcb-checkbox-label {
+    display: flex !important;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    color: white;
+    font-size: 14px;
+}
+
+.brcb-form-control {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    background-color: #1a202c;
+    color: white;
+    border: 1px solid #4a5568;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+.brcb-form-control:focus {
+    outline: none;
+    border-color: #718096;
+}
+
+.brcb-object-reference {
+    word-break: break-all;
+    font-family: monospace;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+}
+
+.brcb-loading {
+    text-align: center;
+    padding: 20px;
+    color: #a0aec0;
+}
+
+.brcb-btn {
+    border: none;
+    padding: 10px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.brcb-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.brcb-btn-primary {
+    background-color: #3182ce;
+    color: white;
+}
+
+.brcb-btn-primary:hover:not(:disabled) {
+    background-color: #2b6cb0;
+}
+
+.brcb-btn-secondary {
+    background-color: #4a5568;
+    color: white;
+    border: 1px solid #718096;
+}
+
+.brcb-btn-secondary:hover:not(:disabled) {
+    background-color: #2d3748;
+}
+
+.brcb-result {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border-radius: 4px;
+    color: white;
+    font-size: 14px;
+    text-align: center;
+}
+
+.brcb-result-success {
+    background-color: #38a169;
+}
+
+.brcb-result-error {
+    background-color: #e53e3e;
+}
