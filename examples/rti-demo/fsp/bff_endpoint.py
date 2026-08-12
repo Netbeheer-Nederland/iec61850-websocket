@@ -198,10 +198,22 @@ def create_bff_router(
                 data_objects: List[Dict[str, Any]] = []
                 data_attributes: List[str] = []
                 da_fc_map: Dict[str, str] = {}
+                report_control_blocks: List[Dict[str, Any]] = []
+                datasets: List[Dict[str, Any]] = []
                 ln_prefix = f"{ld.name}/{ln.name}."
 
                 for data_object in (ln.data_objects or []):
-                    data_objects.append({"name": data_object.name, "cdc": data_object.cdc})
+                    cdc = (data_object.cdc or "").lower()
+                    obj_info = {"name": data_object.name, "cdc": data_object.cdc}
+                    
+                    # Collect DataSets
+                    if cdc == "dataset":
+                        datasets.append(obj_info)
+                    # Collect Report Control Blocks (RCB, BRCB, URCB)
+                    elif cdc in ("rcb", "brcb", "urcb"):
+                        report_control_blocks.append(obj_info)
+                    
+                    data_objects.append(obj_info)
                     for da_path, fc_name in collect_da_paths_from_do(data_object, data_object.name):
                         data_attributes.append(da_path)
                         if fc_name:
@@ -212,8 +224,8 @@ def create_bff_router(
                     "dataObjects": data_objects,
                     "dataAttributes": sorted(set(data_attributes)),
                     "dataAttributeFcs": da_fc_map,
-                    "reportControlBlocks": [],
-                    "dataSets": [],
+                    "reportControlBlocks": report_control_blocks,
+                    "dataSets": datasets,
                 }
 
         return details
