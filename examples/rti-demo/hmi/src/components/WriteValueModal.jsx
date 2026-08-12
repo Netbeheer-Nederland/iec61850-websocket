@@ -51,11 +51,22 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
     setIsSubmitting(true);
     try {
       const endpointTarget = `${endpoint.host}:${endpoint.port}`;
+
+      // Coerce value to the correct JS type before sending
+      let coercedValue = value;
+      if (type === 'boolean') {
+        coercedValue = (value === 'true' || value === '1' || value === true);
+      } else if (['enumerated', 'integer', 'int8', 'int16', 'int32', 'int64', 'int8u', 'int16u', 'int32u'].includes(type)) {
+        coercedValue = parseInt(value, 10);
+      } else if (type === 'float32') {
+        coercedValue = parseFloat(value);
+      }
+
       await executeApiCall('write', endpointTarget, {
         objRef,
         fc,
-        value,
-        value_type: type,
+        value: coercedValue,
+        dataType: type,
         cp,
       });
       setResult({ visible: true, success: true, message: '✓ Write successful!' });

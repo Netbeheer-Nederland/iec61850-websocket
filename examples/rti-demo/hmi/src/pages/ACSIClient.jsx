@@ -615,7 +615,7 @@ const handleNodeClick = useCallback(
                       name: sdaName,
                       type: 'SDA',
                       ref: sdaRef,
-                      fc: '',
+                      fc: fc,  // inherit fc from parent DA
                       bType: sda.bType || '',
                       children: [],
                     };
@@ -1015,3 +1015,4 @@ const getContextMenuItems = () => {
 };
 
 export default ACSIClient;
+
