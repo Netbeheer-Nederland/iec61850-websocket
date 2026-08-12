@@ -422,11 +422,24 @@ class ConnectionManager:
         connection_in_file = next((c for c in self.connections
                          if c['name'] == name), None)
         if connection_in_file:
+            # Track old host:port for _bff_clients cleanup
+            old_key = f"{connection_in_file.get('host')}:{connection_in_file.get('port')}"
+            
             connection_in_file['host'] = host
             connection_in_file['port'] = port
             connection_in_file['type'] = conn_type
             connection_in_file['acsi'] = acsi
             connection_in_file['ws_mode'] = ws_mode
+            
+            # Update _bff_clients if host or port changed
+            new_key = f"{host}:{port}"
+            if old_key != new_key:
+                if old_key in _bff_clients:
+                    del _bff_clients[old_key]
+                if new_key not in _bff_clients:
+                    _bff_clients[new_key] = BffClient(f"http://{host}:{port}")
+            
+            self.save_connections()
             return connection_in_file
         
         connection = {
@@ -459,10 +472,20 @@ class ConnectionManager:
         Returns:
             True if connection was deleted, False otherwise.
         """
+        # Find the connection to get its host:port before deleting
+        connection = self.get_connection(conn_name)
+        
         original_count = len(self.connections)
         self.connections = [c for c in self.connections if c['name'] != conn_name]
         if len(self.connections) < original_count:
             self.save_connections()
+            
+            # Remove from _bff_clients if it exists
+            if connection and connection.get('host') and connection.get('port'):
+                old_key = f"{connection['host']}:{connection['port']}"
+                if old_key in _bff_clients:
+                    del _bff_clients[old_key]
+            
             logger.info(f"Connection deleted: {conn_name}")
             return True
         return False
@@ -1203,6 +1226,11 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
             detail='Connection not found'
         )
     
+    # Track old host:port for _bff_clients cleanup
+    old_host = connection.get('host')
+    old_port = connection.get('port')
+    old_key = f"{old_host}:{old_port}" if old_host and old_port else None
+    
     # Update fields from request
     if request.name is not None:
         connection['name'] = request.name
@@ -1218,6 +1246,19 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         connection['ws_mode'] = request.ws_mode
     if request.status is not None:
         connection['status'] = request.status
+    
+    # Update _bff_clients if host or port changed
+    new_host = connection.get('host')
+    new_port = connection.get('port')
+    new_key = f"{new_host}:{new_port}" if new_host and new_port else None
+    
+    if old_key and new_key and old_key != new_key:
+        # Remove old entry
+        if old_key in _bff_clients:
+            del _bff_clients[old_key]
+        # Add new entry
+        if new_key not in _bff_clients:
+            _bff_clients[new_key] = BffClient(f"http://{new_host}:{new_port}")
     
     conn_manager.save_connections()
     
