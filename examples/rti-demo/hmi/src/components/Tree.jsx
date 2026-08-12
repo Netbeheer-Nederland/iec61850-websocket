@@ -120,7 +120,7 @@ const TreeNode = ({
         </span>
         {!isGroupNode && (
           <>
-            {node.bType && <span className="tree-btype-tag">[{node.bType}]</span>}
+            {node.bType && <span className="tree-btype-tag">({node.bType})</span>}
             {node.fc && <span className="tree-fc-tag">[{node.fc.toUpperCase()}]</span>}
             {node.cdc && <span className="tree-cdc-tag">({node.cdc})</span>}
             {node.value !== undefined && <span className="tree-value-display" data-obj-ref={node.ref} style={{ color: node.valueColor || 'var(--text-muted)' }}>{node.value}</span>}

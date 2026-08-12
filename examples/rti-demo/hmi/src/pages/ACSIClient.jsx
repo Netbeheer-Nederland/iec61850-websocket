@@ -581,14 +581,34 @@ const handleNodeClick = useCallback(
   };
   // Helper to update tree with children for DOs/SDOs
   const updateTreeWithChildren = (ref, dataAttributes, subDataObjects) => {
+
+    // Recursively build SDA children from cmpType structure
+    const buildSdaChildren = (sdaList, parentRef, parentFc) => {
+      return sdaList.map((sda) => {
+        const sdaName = sda['cmpName'];
+        const sdaRef = `${parentRef}.${sdaName}`;
+        const sdaBType = Array.isArray(sda.cmpType) ? sda.cmpType[0] : (sda.bType || '');
+        const nestedChildren =
+          Array.isArray(sda.cmpType) && sda.cmpType[0] === 'structure' && Array.isArray(sda.cmpType[1])
+            ? buildSdaChildren(sda.cmpType[1], sdaRef, parentFc)
+            : [];
+        return {
+          name: sdaName,
+          type: 'SDA',
+          ref: sdaRef,
+          fc: parentFc,
+          bType: sdaBType,
+          children: nestedChildren,
+        };
+      });
+    };
+
       const updateNode = (nodes) => {
         return nodes.map((node) => {
           if (node.ref === ref) {
-            // Check if children already exist for this node
             const existingChildren = node.children || [];
             const existingRefs = new Set(existingChildren.map((child) => child.ref));
 
-            // Only add new children that don't already exist
             const daChildren = dataAttributes
               .filter((da) => {
                 const daName = da.name || da.daRef?.split('.').pop() || 'DA';
@@ -599,33 +619,18 @@ const handleNodeClick = useCallback(
                 const daName = da.name || da.daRef?.split('.').pop() || 'DA';
                 const daRef = `${ref}.${daName}`;
                 const fc = da.fc || '';
-                if (da.daType[0] === 'structure') {
-                  da.subDataAttributes = da.daType[1] || [];
-                }
-                const subDas = (da.subDataAttributes || da.sub_attributes || da.sda || [])
-                  .filter((sda) => {
-                    const sdaName = sda['cmpName'];
-                    const sdaRef = `${daRef}.${sdaName}`;
-                    return !existingRefs.has(sdaRef);
-                  })
-                  .map((sda) => {
-                    const sdaName = sda['cmpName'];
-                    const sdaRef = `${daRef}.${sdaName}`;
-                    return {
-                      name: sdaName,
-                      type: 'SDA',
-                      ref: sdaRef,
-                      fc: fc,  // inherit fc from parent DA
-                      bType: sda.bType || '',
-                      children: [],
-                    };
-                  });
+                const bType = Array.isArray(da.daType) ? da.daType[0] : (da.bType || '');
+                const rawSubDas =
+                  Array.isArray(da.daType) && da.daType[0] === 'structure' && Array.isArray(da.daType[1])
+                    ? da.daType[1]
+                    : (da.subDataAttributes || da.sub_attributes || da.sda || []);
+                const subDas = buildSdaChildren(rawSubDas, daRef, fc);
                 return {
                   name: daName,
                   type: 'DA',
                   ref: daRef,
                   fc,
-                  bType: da.bType || '',
+                  bType,
                   children: subDas,
                 };
               });
