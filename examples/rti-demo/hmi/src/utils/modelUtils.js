@@ -21,7 +21,7 @@ export function transformModelToTree(model, path = '') {
     const nodePath = path ? `${path}/${name}` : name;
     const node = {
       name: name,
-      type: model.kind || model.type || 'IED',
+      type: model.type || model.kind || 'IED',
       children: model.children.map(child => transformModelToTree(child, nodePath))
     };
     // Preserve ref, fc, cdc, bType, value and other Tree component properties

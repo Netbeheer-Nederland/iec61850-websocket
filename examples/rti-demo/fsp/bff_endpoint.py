@@ -183,7 +183,7 @@ def create_bff_router(
                                         "children": [
                                             {
                                                 "kind": "BRCB" if rcb.buffered else "URCB",
-                                                "type": "BRCB" if rcb.buffered else "URCB",
+                                                "type": "ReportControl",
                                                 "name": rcb.name,
                                                 "ref": f"{ld.name}/{ln.name}.{rcb.name}"
                                             }
