@@ -18,7 +18,7 @@ const ContextMenu = ({ x, y, visible, onClose, items }) => {
     };
   }, [visible, onClose]);
 
-  if (!visible) return null;
+  if (!visible || items.length === 0) return null;
 
   return (
     <div

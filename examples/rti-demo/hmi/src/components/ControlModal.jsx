@@ -136,6 +136,24 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess }
         parsedCtlVal = bscMap[parsedCtlVal.toLowerCase()];
         if (!parsedCtlVal) throw new Error('Invalid BSC value. Use step-up or step-down');
         break;
+      case 'ING':
+        valueType = 'int32';
+        parsedCtlVal = parseInt(parsedCtlVal);
+        if (isNaN(parsedCtlVal)) throw new Error('Invalid ING value. Must be an integer');
+        break;
+      case 'ASG':
+        valueType = 'string';
+        // ASG typically uses enumerated values
+        break;
+      case 'CTE':
+        valueType = 'int32';
+        parsedCtlVal = parseInt(parsedCtlVal);
+        if (isNaN(parsedCtlVal)) throw new Error('Invalid CTE value. Must be an integer');
+        break;
+      case 'ENG':
+        valueType = 'enumerated';
+        // ENG typically uses enumerated values
+        break;
       default:
         throw new Error('Unsupported CDC type for control');
     }
@@ -145,28 +163,61 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess }
       value: parsedCtlVal,
       value_type: valueType,
       ctlNum: parseInt(ctlNum),
-      origin: { orCat: parseInt(originCat), orIdent },
+      origin: { orCat: parseInt(originCat), orIdent: originIdent },
       test: testMode,
     };
   };
 
   return (
-    <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000 }}>
-      <div className="control-modal" style={{ background: 'white', padding: '20px', borderRadius: '8px', maxWidth: '500px', margin: '50px auto' }}>
+    <div className="control-window">
+      <div className="modal-content">
         <h2>Control Operation</h2>
-        <div>
+        <div className="form-group">
           <label>Object Reference:</label>
           <div>{objRef}</div>
         </div>
-        <div>
+        <div className="form-group">
           <label>CDC:</label>
           <div>{cdc || 'Unknown'}</div>
         </div>
-        <div>
+        <div className="form-group">
           <label>ctlModel:</label>
           <div>{ctlModel}</div>
         </div>
-        <div style={{ margin: '16px 0' }}>
+        <div className="form-group">
+          <label>ctlNum:</label>
+          <input
+            type="number"
+            value={ctlNum}
+            onChange={(e) => setCtlNum(parseInt(e.target.value) || 0)}
+          />
+        </div>
+        <div className="form-group">
+          <label>Origin Category:</label>
+          <input
+            type="number"
+            value={originCat}
+            onChange={(e) => setOriginCat(e.target.value)}
+          />
+        </div>
+        <div className="form-group">
+          <label>Origin Identifier:</label>
+          <input
+            type="text"
+            value={originIdent}
+            onChange={(e) => setOriginIdent(e.target.value)}
+          />
+        </div>
+        <div className="test-mode-container">
+          <input
+            type="checkbox"
+            id="testMode"
+            checked={testMode}
+            onChange={(e) => setTestMode(e.target.checked)}
+          />
+          <label htmlFor="testMode">Test Mode</label>
+        </div>
+        <div className="form-group">
           <label>Value:</label>
           <input
             type={cdc?.toUpperCase() === 'APC' ? 'number' : cdc?.toUpperCase() === 'INC' || cdc?.toUpperCase() === 'ENC' ? 'number' : 'text'}
@@ -182,14 +233,13 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess }
             }
           />
         </div>
-        <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-          <button onClick={handleSelect} disabled={isSelecting}>
-            {isSelecting ? 'Selecting...' : 'Select'}
-          </button>
-          <button onClick={handleOperate} disabled={isOperating}>
+        <div className="modal-buttons">
+          <button className="btn-primary" onClick={handleOperate} disabled={isSelecting || isOperating}>
             {isOperating ? 'Operating...' : 'Operate'}
           </button>
-          <button onClick={onClose}>Cancel</button>
+          <button className="btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
         </div>
         {result.visible && (
           <div className={`control-result ${result.success ? 'success' : 'error'}`}>

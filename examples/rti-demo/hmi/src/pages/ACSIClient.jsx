@@ -38,7 +38,8 @@ const ACSIClient = ({ updateModel }) => {
   // apiTarget for WS connection display (can be edited by user)
   const wsEndpointTarget = `${wsHost}:${wsPort}`;
 
-  const [writeModalTarget, setWriteModalTarget] = useState({ ref: '', fc: '' });
+  const [writeModalTarget, setWriteModalTarget] = useState({ ref: '', fc: '', endpoint: null, cp: null });
+  const [controlModalTarget, setControlModalTarget] = useState({ ref: '', name: '', cdc: '', endpoint: null, cp: null });
 
   // Stop monitoring
   const stopMonitoring = useCallback(() => {
@@ -578,23 +579,18 @@ const getContextMenuItems = () => {
         label: 'Operate',
         icon: 'fa-play',
         action: () => {
+          // Capture the target info before closing the context menu
+          const { ref, name, cdc, endpoint: nodeEndpoint, cp: nodeCp } = contextMenuTarget;
+          setControlModalTarget({ ref, name, cdc, endpoint: nodeEndpoint, cp: nodeCp });
           setShowControlModal(true);
           closeContextMenu();
         },
       });
     }
-    items.push({
-      label: 'Read Value [CF]',
-      icon: 'fa-eye',
-      action: () => {
-        readDataValue(ref, 'cf');
-        closeContextMenu();
-      },
-    });
   }
   else if (nodeType === 'DA' || nodeType === 'SDA' || nodeType === 'FCDA') {
     items.push({
-      label: `Read Value [${fc?.toUpperCase() || 'CF'}]`,
+      label: `Read Value`,
       icon: 'fa-eye',
       action: () => {
         readDataValue(ref, fc || 'cf');
@@ -606,8 +602,8 @@ const getContextMenuItems = () => {
         label: `Write Value [${fc?.toUpperCase()}]`,
         icon: 'fa-pen',
         action: () => {
-        const { ref, fc } = contextMenuTarget;  // Capture values first
-        setWriteModalTarget({ ref, fc });         // Store in new state
+        const { ref, fc, endpoint: nodeEndpoint, cp: nodeCp } = contextMenuTarget;  // Capture values first
+        setWriteModalTarget({ ref, fc, endpoint: nodeEndpoint, cp: nodeCp });         // Store in state
         setShowWriteModal(true);
         closeContextMenu();
       },
@@ -772,7 +768,7 @@ const getContextMenuItems = () => {
             onContextMenu={handleContextMenu}
             onExpandToggle={handleExpandToggle}
             expandedNodes={expandedNodes}
-            endpoint={{ host: wsHost, port: wsPort }}
+            endpoint={endpoint}
             cp={wsCp}
           />
         ) : (
@@ -816,20 +812,20 @@ const getContextMenuItems = () => {
       />
 
       {/* Control Modal */}
-      {showControlModal && contextMenuTarget && (
+      {showControlModal && (
         <ControlModal
-          objRef={contextMenuTarget.ref}
-          objName={contextMenuTarget.name}
-          cdc={contextMenuTarget.cdc}
-          endpoint={{ host: wsHost, port: wsPort }}
-          cp={wsCp}
+          objRef={controlModalTarget.ref}
+          objName={controlModalTarget.name}
+          cdc={controlModalTarget.cdc}
+          endpoint={controlModalTarget.endpoint || endpoint}
+          cp={controlModalTarget.cp || wsCp}
           onClose={() => {
             setShowControlModal(false);
-            setContextMenuTarget(null);
+            setControlModalTarget({ ref: '', name: '', cdc: '', endpoint: null, cp: null });
           }}
           onSuccess={() => {
             setShowControlModal(false);
-            setContextMenuTarget(null);
+            setControlModalTarget({ ref: '', name: '', cdc: '', endpoint: null, cp: null });
           }}
         />
       )}
@@ -839,15 +835,15 @@ const getContextMenuItems = () => {
         <WriteValueModal
           objRef={writeModalTarget.ref}
           fc={writeModalTarget.fc}
-          endpoint={{ host: wsHost, port: wsPort }}
-          cp={wsCp}
+          endpoint={writeModalTarget.endpoint || contextMenuTarget?.endpoint || endpoint}
+          cp={writeModalTarget.cp || contextMenuTarget?.cp || wsCp}
           onClose={() => {
             setShowWriteModal(false);
-            setWriteModalTarget({ ref: '', fc: '' });
+            setWriteModalTarget({ ref: '', fc: '', endpoint: null, cp: null });
           }}
           onSuccess={() => {
             setShowWriteModal(false);
-            setWriteModalTarget({ ref: '', fc: '' });
+            setWriteModalTarget({ ref: '', fc: '', endpoint: null, cp: null });
           }}
         />
       )}
