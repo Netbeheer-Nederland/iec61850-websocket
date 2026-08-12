@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InstanceVisualization from '../components/InstanceVisualization';
+import ConnectionModal from '../components/ConnectionModal';
 
 function Setup({ settings }) {
   const navigate = useNavigate();
@@ -11,7 +12,9 @@ function Setup({ settings }) {
     name: '',
     host: '',
     port: 5000,
-    type: 'RTI-SO'
+    type: 'RTI-SO',
+    acsi: 'server',
+    ws_mode: ''
   });
   const [loading, setLoading] = useState(true);
   const [bffError, setBffError] = useState(null);
@@ -78,21 +81,31 @@ function Setup({ settings }) {
   // Add connection
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO' });
+    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '' });
     setShowModal(true);
   };
 
   // Edit connection
   const handleEditConnection = (conn) => {
     setCurrentConnection(conn);
-    setFormData({ ...conn });
+    setFormData({
+      name: conn.name || '',
+      host: conn.host || '',
+      port: conn.port || 5000,
+      type: conn.type || 'RTI-SO',
+      acsi: conn.acsi || 'server',
+      ws_mode: conn.ws_mode || ''
+    });
     setShowModal(true);
   };
 
   // Delete connection
   const handleDeleteConnection = async (connection) => {
+    const confirmed = window.confirm(`Permanently delete instance "${connection.name}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
     try {
-      const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/connections/${connection.name}`, {
+      const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/delete-connection/${connection.name}`, {
         method: 'DELETE'
       });
       if (response.ok) {
@@ -113,7 +126,7 @@ function Setup({ settings }) {
 
       if (currentConnection) {
         // Update existing connection
-        const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/connections/${currentConnection.name}`, {
+        const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/edit-connection/${currentConnection.name}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
@@ -124,7 +137,7 @@ function Setup({ settings }) {
         }
       } else {
         // Add new connection
-        const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/connections`, {
+        const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/add-connection`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
@@ -138,14 +151,6 @@ function Setup({ settings }) {
       console.error('Failed to save connection:', error);
       alert('Failed to save connection. Check console for details.');
     }
-  };
-
-  const handleInputChange = (e) => {
-    const { id, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [id]: type === 'number' ? parseInt(value) : value
-    }));
   };
 
   return (
@@ -250,67 +255,15 @@ function Setup({ settings }) {
       </React.Fragment>
 
       {/* Connection Modal */}
-      {showModal && (
-        <div className="modal active">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2>{currentConnection ? 'Edit Instance' : 'Register Instance'}</h2>
-              <button className="btn-close" onClick={() => setShowModal(false)}>
-                &times;
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label htmlFor="conn-name">Name</label>
-                <input 
-                  type="text" 
-                  id="conn-name" 
-                  value={formData.name} 
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="conn-host">Host</label>
-                <input 
-                  type="text" 
-                  id="conn-host" 
-                  value={formData.host} 
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="conn-port">Port</label>
-                <input 
-                  type="number" 
-                  id="conn-port" 
-                  value={formData.port} 
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="conn-type">Type</label>
-                <select 
-                  id="conn-type" 
-                  value={formData.type} 
-                  onChange={handleInputChange}
-                >
-                  <option value="RTI-SO">RTI-SO (WS Passive/ACSI Client)</option>
-                  <option value="RTI-FSP">RTI-FSP (WS Active/ACSI Server)</option>
-                </select>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowModal(false)}>
-                Close
-              </button>
-              <button className="btn-primary" onClick={handleSaveConnection}>
-                <i className="fas fa-save"></i>
-                Save Instance
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConnectionModal
+        settings={settings}
+        showModal={showModal}
+        onClose={() => setShowModal(false)}
+        currentConnection={currentConnection}
+        formData={formData}
+        onFormChange={setFormData}
+        onSave={handleSaveConnection}
+      />
     </section>
   );
 }
