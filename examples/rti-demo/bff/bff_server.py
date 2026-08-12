@@ -84,6 +84,8 @@ class ConnectionCreateRequest(BaseModel):
     host: str = Field(..., description="Hostname or IP address of the endpoint", json_schema_extra={"example": "localhost"})
     port: int = Field(..., description="Port number of the endpoint", json_schema_extra={"example": 5000})
     type: str = Field(..., description="Type of the endpoint (e.g., RTI-FSP, RTI-SO)", json_schema_extra={"example": "RTI-FSP"})
+    acsi: str = Field(default="server", description="ACSI role (server/client)", json_schema_extra={"example": "server"})
+    ws_mode: str = Field(default="", description="WebSocket mode", json_schema_extra={"example": ""})
     auto_discovered: bool = Field(default=False, description="Whether this connection was auto-discovered")
 
 
@@ -93,6 +95,8 @@ class ConnectionUpdateRequest(BaseModel):
     host: Optional[str] = Field(default=None, description="Hostname or IP address of the endpoint")
     port: Optional[int] = Field(default=None, description="Port number of the endpoint")
     type: Optional[str] = Field(default=None, description="Type of the endpoint")
+    acsi: Optional[str] = Field(default=None, description="ACSI role (server/client)")
+    ws_mode: Optional[str] = Field(default=None, description="WebSocket mode")
     status: Optional[str] = Field(default=None, description="Connection status")
 
 
@@ -393,7 +397,7 @@ class ConnectionManager:
             logger.error(f"Error saving connections: {e}")
     
     def add_connection(self, name: str, host: str, port: int, conn_type: str, 
-                      auto_discovered: bool = False) -> Dict:
+                      acsi: str = "server", ws_mode: str = "", auto_discovered: bool = False) -> Dict:
         """Add a new connection.
         
         Args:
@@ -401,6 +405,8 @@ class ConnectionManager:
             host: Hostname or IP address
             port: Port number
             conn_type: Type of endpoint
+            acsi: ACSI role (server/client)
+            ws_mode: WebSocket mode
             auto_discovered: Whether this connection was auto-discovered
             
         Returns:
@@ -418,6 +424,9 @@ class ConnectionManager:
         if connection_in_file:
             connection_in_file['host'] = host
             connection_in_file['port'] = port
+            connection_in_file['type'] = conn_type
+            connection_in_file['acsi'] = acsi
+            connection_in_file['ws_mode'] = ws_mode
             return connection_in_file
         
         connection = {
@@ -426,6 +435,8 @@ class ConnectionManager:
             'host': host,
             'port': port,
             'type': conn_type,
+            'acsi': acsi,
+            'ws_mode': ws_mode,
             'auto_discovered': auto_discovered,
             'created_at': datetime.now().isoformat()
         }
@@ -1086,7 +1097,7 @@ async def get_connections():
     }
 
 @app.post(
-    "/api/connections",
+    "/api/add-connection",
     summary="Create Connection",
     description="Create a new connection to a remote endpoint.",
     response_description="Created connection details",
@@ -1118,6 +1129,8 @@ async def create_connection(request: ConnectionCreateRequest):
         host=request.host,
         port=request.port,
         conn_type=request.type,
+        acsi=request.acsi,
+        ws_mode=request.ws_mode,
         auto_discovered=request.auto_discovered
     )
     conn_manager.save_connections()
@@ -1129,7 +1142,7 @@ async def create_connection(request: ConnectionCreateRequest):
 
 
 @app.delete(
-    "/api/connections/{conn_name}",
+    "/api/delete-connection/{conn_name}",
     summary="Delete Connection",
     description="Delete an existing connection.",
     response_description="Deletion confirmation",
@@ -1158,7 +1171,7 @@ async def delete_connection(conn_name: str):
 
 
 @app.put(
-    "/api/connections/{conn_name}",
+    "/api/edit-connection/{conn_name}",
     summary="Update Connection",
     description="Update an existing connection.",
     response_description="Updated connection details",
@@ -1199,6 +1212,10 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         connection['port'] = request.port
     if request.type is not None:
         connection['type'] = request.type
+    if request.acsi is not None:
+        connection['acsi'] = request.acsi
+    if request.ws_mode is not None:
+        connection['ws_mode'] = request.ws_mode
     if request.status is not None:
         connection['status'] = request.status
     

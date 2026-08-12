@@ -9,7 +9,6 @@ import Data from './pages/Data';
 import Reports from './pages/Reports';
 import Diagnostics from './pages/Diagnostics';
 import Tools from './pages/Tools';
-import Monitoring from './pages/Monitoring';
 import Settings from './pages/Settings';
 import Setup from './pages/Setup';
 import ACSIClient from './pages/ACSIClient';
@@ -130,7 +129,6 @@ function App() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/diagnostics" element={<Diagnostics />} />
             <Route path="/tools" element={<Tools />} />
-            <Route path="/monitoring" element={<Monitoring />} />
             <Route path="/settings" element={<Settings settings={settings} setSettings={setSettings} />} />
             <Route path="/acsi-client" element={<ACSIClient settings={settings} connections={connections} updateModel={updateModel} getModel={getModel} />} />
             <Route path="/acsi-server" element={<ACSIServer settings={settings} connections={connections} updateModel={updateModel} getModel={getModel} />} />
