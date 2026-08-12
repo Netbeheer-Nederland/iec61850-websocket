@@ -1,6 +1,6 @@
 // src/components/WriteValueModal.jsx
-import React, { useState, useEffect } from 'react';
-import { executeApiCall, getApiById } from '../services/apiService';
+import React, { useState, useEffect, useRef } from 'react';
+import { executeApiCall } from '../services/apiService';
 
 const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
   const [value, setValue] = useState('');
@@ -9,6 +9,7 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
   const [validation, setValidation] = useState('');
   const [result, setResult] = useState({ visible: false, success: false, message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     const fetchCurrentValue = async () => {
@@ -16,14 +17,18 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
         const endpointTarget = `${endpoint.host}:${endpoint.port}`;
         const res = await executeApiCall('read', endpointTarget, { objRef, fc, cp });
         if (res?.ok && res.payload?.result?.value) {
-          const values = Array.isArray(res.payload.result.value) ? res.payload.result.value : [res.payload.result.value];
+          const values = Array.isArray(res.payload.result.value)
+            ? res.payload.result.value
+            : [res.payload.result.value];
           if (values.length > 0 && values[0]?.data) {
             const firstValue = values[0];
             if (Array.isArray(firstValue.data) && firstValue.data.length >= 2) {
               setType(firstValue.data[0]);
               setCurrentValue(JSON.stringify(firstValue.data[1]));
             } else if (typeof firstValue.data === 'object') {
-              const typeKeys = Object.keys(firstValue.data).filter((k) => !['name', 'elementName'].includes(k));
+              const typeKeys = Object.keys(firstValue.data).filter(
+                (k) => !['name', 'elementName'].includes(k)
+              );
               if (typeKeys.length > 0) {
                 setType(typeKeys[0]);
                 setCurrentValue(JSON.stringify(firstValue.data[typeKeys[0]]));
@@ -40,10 +45,13 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
       }
     };
     fetchCurrentValue();
+    // Focus input after mount
+    setTimeout(() => inputRef.current?.focus(), 50);
   }, [objRef, fc, endpoint, cp]);
 
   const handleSubmit = async () => {
-    if (!value.trim()) {
+    const newValue = value.trim();
+    if (!newValue) {
       setValidation('Please enter a value');
       return;
     }
@@ -53,13 +61,13 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
       const endpointTarget = `${endpoint.host}:${endpoint.port}`;
 
       // Coerce value to the correct JS type before sending
-      let coercedValue = value;
+      let coercedValue = newValue;
       if (type === 'boolean') {
-        coercedValue = (value === 'true' || value === '1' || value === true);
+        coercedValue = (newValue === 'true' || newValue === '1' || newValue === true);
       } else if (['enumerated', 'integer', 'int8', 'int16', 'int32', 'int64', 'int8u', 'int16u', 'int32u'].includes(type)) {
-        coercedValue = parseInt(value, 10);
+        coercedValue = parseInt(newValue, 10);
       } else if (type === 'float32') {
-        coercedValue = parseFloat(value);
+        coercedValue = parseFloat(newValue);
       }
 
       await executeApiCall('write', endpointTarget, {
@@ -69,9 +77,10 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
         dataType: type,
         cp,
       });
+
       setResult({ visible: true, success: true, message: '✓ Write successful!' });
       setTimeout(() => {
-        onSuccess();
+        if (onSuccess) onSuccess();
         onClose();
       }, 1500);
     } catch (error) {
@@ -81,47 +90,50 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
     }
   };
 
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
   return (
-    <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000 }}>
-      <div className="write-value-modal" style={{ background: '#1e1e1e', padding: '20px', borderRadius: '8px', maxWidth: '500px', margin: '50px auto' }}>
-        <h2>Write Data Value</h2>
-        <div>
-          <label>Object Reference:</label>
-          <div>{objRef}</div>
+    <div className="control-window" style={{ display: 'flex' }}>
+      <div className="modal-content">
+        <h2 id="writeValueTitle">Write Data Value</h2>
+        <div style={{ marginBottom: '16px', color: '#ccc' }}>
+          <div><strong>Reference:</strong> <span style={{ color: '#4fc3f7' }}>{objRef}</span></div>
+          <div><strong>Type:</strong> <span style={{ color: '#ffc107' }}>{type}</span></div>
+          <div><strong>Current:</strong> <span style={{ color: '#8bc34a' }}>{currentValue}</span></div>
         </div>
-        <div>
-          <label>Type:</label>
-          <div>{type}</div>
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="Enter new value"
+        />
+        <div style={{ color: '#f44336', marginBottom: '16px', minHeight: '20px' }}>
+          {validation}
         </div>
-        <div>
-          <label>Current Value:</label>
-          <div>{currentValue}</div>
-        </div>
-        <div style={{ margin: '16px 0' }}>
-          <label>New Value:</label>
-          <input
-            style={{ margin: '0 16px' }}
-            type="text"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Enter new value"
-          />
-          {validation && <div style={{ color: 'red', fontSize: '12px' }}>{validation}</div>}
-        </div>
-        <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-          <button onClick={handleSubmit} disabled={isSubmitting}>
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          <button className="btn-secondary" style={{ padding: '8px 16px' }} onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </button>
+          <button className="btn-primary" style={{ padding: '8px 16px' }} onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? 'Writing...' : 'Write'}
           </button>
-          <button onClick={onClose}>Cancel</button>
         </div>
         {result.visible && (
           <div
             style={{
               marginTop: '16px',
-              padding: '8px',
-              background: result.success ? '#2e7d32' : '#c62828',
-              color: 'white',
+              padding: '12px',
               borderRadius: '4px',
+              textAlign: 'center',
+              background: result.success ? '#2e7d32' : '#c62828',
+              color: '#fff',
             }}
           >
             {result.message}
