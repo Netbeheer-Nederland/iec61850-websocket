@@ -116,9 +116,10 @@ def create_bff_router(
         """Serialize a DataAttribute to JSON-compatible dict."""
         return {
             "kind": "DA",
+            "type": "DA",
             "name": da.name,
             "fc": da.fc.name if da.fc is not None else None,
-            "type": da.type.name if da.type is not None else None,
+            "bType": da.type.name if da.type is not None else None,
             "children": [serialize_data_attribute(child) for child in (da.data_attributes or [])],
         }
 
@@ -133,6 +134,7 @@ def create_bff_router(
 
         return {
             "kind": "DO",
+            "type": "DO",
             "name": do.name,
             "cdc": do.cdc,
             "children": children,
@@ -142,24 +144,29 @@ def create_bff_router(
         """Serialize an IED model tree to JSON-compatible dict."""
         return {
             "kind": "IED",
+            "type": "IED",
             "name": ied.name,
             "children": [
                 {
                     "kind": "LD",
+                    "type": "LDevice",
                     "name": ld.name,
                     "ldName": ld.ldName,
                     "children": [
                         {
                             "kind": "LN",
+                            "type": "LogicalNode",
                             "name": ln.name,
                             "children": (
                                 [
                                     {
                                         "kind": "Group",
+                                        "type": "Group",
                                         "name": "DataSets",
                                         "children": [
                                             {
                                                 "kind": "DataSet",
+                                                "type": "DataSet",
                                                 "name": ds.name,
                                                 "ref": f"{ld.name}/{ln.name}.{ds.name}"
                                             }
@@ -171,10 +178,12 @@ def create_bff_router(
                                 [
                                     {
                                         "kind": "Group",
+                                        "type": "Group",
                                         "name": "ReportControls",
                                         "children": [
                                             {
                                                 "kind": "BRCB" if rcb.buffered else "URCB",
+                                                "type": "BRCB" if rcb.buffered else "URCB",
                                                 "name": rcb.name,
                                                 "ref": f"{ld.name}/{ln.name}.{rcb.name}"
                                             }
