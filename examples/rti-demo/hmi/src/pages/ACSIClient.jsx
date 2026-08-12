@@ -317,9 +317,71 @@ const ACSIClient = ({ updateModel }) => {
   });
 };
 
+  // Format value for display - matching the JS version logic
+  const formatValueForDisplay = useCallback((valueData, isError = false) => {
+    if (isError) {
+      return { display: '✗ Error', color: '#c62828' };
+    }
+
+    function asn1TimeStampToISOString(ts) {
+      if (!ts || typeof ts.secondSinceEpoch !== 'number') return '';
+      const seconds = ts.secondSinceEpoch;
+      let ms = 0;
+      if (typeof ts.fractionOfSecond === 'number') {
+        ms = Math.floor(ts.fractionOfSecond / 1000);
+      }
+      const date = new Date((seconds * 1000) + ms);
+      return date.toISOString();
+    }
+
+    function extractActualValue(val) {
+      if (Array.isArray(val) && val.length > 0 && val[0] && val[0].data) {
+        const dataObj = val[0].data;
+        if (typeof dataObj === 'object' && !Array.isArray(dataObj)) {
+          const keys = Object.keys(dataObj);
+          if (keys.length === 1) {
+            return dataObj[keys[0]];
+          }
+        }
+        return dataObj;
+      }
+      return val;
+    }
+
+    if (Array.isArray(valueData) && valueData.length > 0) {
+      const firstItem = valueData[0];
+
+      if (firstItem && firstItem.data && Array.isArray(firstItem.data)) {
+        if (firstItem.data.length === 2 &&
+            typeof firstItem.data[0] === 'string' &&
+            firstItem.data[0] === 'structure') {
+          return { display: '—', color: '#4caf50' };
+        }
+
+        if (firstItem.data.length === 2 && typeof firstItem.data[0] === 'string') {
+          const value = firstItem.data[1];
+          let displayValue = value;
+          if (value && typeof value === 'object' && typeof value.secondSinceEpoch === 'number') {
+            displayValue = asn1TimeStampToISOString(value) || JSON.stringify(value);
+          } else if (typeof value === 'number') {
+            displayValue = value.toFixed(2);
+          } else if (typeof value === 'boolean') {
+            displayValue = value ? 'true' : 'false';
+          } else if (typeof value === 'object') {
+            displayValue = JSON.stringify(value);
+          }
+          return { display: displayValue, color: '#4caf50' };
+        }
+      }
+    }
+
+    const actualValue = extractActualValue(valueData);
+    return { display: JSON.stringify(actualValue), color: '#4caf50' };
+  }, []);
+
   // Read data value
   const readDataValue = useCallback(
-    async (objRef, fc) => {
+    async (objRef, fc, cpParam) => {
       if (!connected) {
         setError('Please connect first');
         return;
@@ -329,25 +391,96 @@ const ACSIClient = ({ updateModel }) => {
         return;
       }
       try {
-        const result = await executeApiCall('read', apiTarget, { objRef, fc, cp: wsCp });
+        const cpToUse = cpParam || wsCp;
+        const result = await executeApiCall('read', apiTarget, { objRef, fc, cp: cpToUse });
         if (result?.ok) {
-          const updateTreeWithValue = (nodes, targetRef, value) => {
+          const updateTreeWithValue = (nodes, targetRef, valueData, isError) => {
+            const formatted = formatValueForDisplay(valueData, isError);
             return nodes.map((node) =>
-              node.ref === targetRef ? { ...node, value } : node.children ? { ...node, children: updateTreeWithValue(node.children, targetRef, value) } : node
+              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } : 
+              node.children ? { ...node, children: updateTreeWithValue(node.children, targetRef, valueData, isError) } : node
             );
           };
-          const value = result.payload?.result?.value;
-          if (value && treeData) {
-            setTreeData((prev) => ({ ...prev, children: updateTreeWithValue(prev.children, objRef, value) }));
+          const valueData = result.payload?.result?.value;
+          if (valueData && treeData) {
+            setTreeData((prev) => ({ ...prev, children: updateTreeWithValue(prev.children, objRef, valueData, false) }));
           }
         } else {
-          setError(`Read failed: ${result?.payload?.error || 'Unknown error'}`);
+          const errorValue = result?.payload?.error || 'Unknown error';
+          const updateTreeWithError = (nodes, targetRef) => {
+            const formatted = formatValueForDisplay(errorValue, true);
+            return nodes.map((node) =>
+              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } : 
+              node.children ? { ...node, children: updateTreeWithError(node.children, targetRef) } : node
+            );
+          };
+          if (treeData) {
+            setTreeData((prev) => ({ ...prev, children: updateTreeWithError(prev.children, objRef) }));
+          }
         }
       } catch (error) {
-        setError(error.message);
+        const updateTreeWithError = (nodes, targetRef) => {
+          const formatted = formatValueForDisplay(error.message, true);
+          return nodes.map((node) =>
+            node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } : 
+            node.children ? { ...node, children: updateTreeWithError(node.children, targetRef) } : node
+          );
+        };
+        if (treeData) {
+          setTreeData((prev) => ({ ...prev, children: updateTreeWithError(prev.children, objRef) }));
+        }
       }
     },
-    [connected, apiTarget, wsCp, treeData]
+    [connected, apiTarget, wsCp, treeData, formatValueForDisplay]
+  );
+
+  // Write data value
+  const writeDataValue = useCallback(
+    async (objRef, fc, value, value_type) => {
+      if (!connected) {
+        setError('Please connect first');
+        throw new Error('Please connect first');
+      }
+      if (!apiTarget) {
+        setError('No endpoint configured');
+        throw new Error('No endpoint configured');
+      }
+      try {
+        const result = await executeApiCall('write', apiTarget, { objRef, fc, value, value_type, cp: wsCp });
+        if (result?.ok) {
+          const updateTreeWithValue = (nodes, targetRef, valueData, isError) => {
+            const formatted = formatValueForDisplay(valueData, isError);
+            return nodes.map((node) =>
+              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } : 
+              node.children ? { ...node, children: updateTreeWithValue(node.children, targetRef, valueData, isError) } : node
+            );
+          };
+          const valueData = result.payload?.result?.value || value;
+          if (valueData && treeData) {
+            setTreeData((prev) => ({ ...prev, children: updateTreeWithValue(prev.children, objRef, valueData, false) }));
+          }
+          return result;
+        } else {
+          const errorMsg = result?.payload?.error || result?.rawText || 'Write failed';
+          setError(`Write failed: ${errorMsg}`);
+          throw new Error(errorMsg);
+        }
+      } catch (error) {
+        const updateTreeWithError = (nodes, targetRef) => {
+          const formatted = formatValueForDisplay(error.message, true);
+          return nodes.map((node) =>
+            node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } : 
+            node.children ? { ...node, children: updateTreeWithError(node.children, targetRef) } : node
+          );
+        };
+        if (treeData) {
+          setTreeData((prev) => ({ ...prev, children: updateTreeWithError(prev.children, objRef) }));
+        }
+        setError(error.message);
+        throw error;
+      }
+    },
+    [connected, apiTarget, wsCp, treeData, formatValueForDisplay]
   );
 
   // Handle context menu
@@ -586,20 +719,21 @@ const getContextMenuItems = () => {
           closeContextMenu();
         },
       });
-    }
+    } 
   }
   else if (nodeType === 'DA' || nodeType === 'SDA' || nodeType === 'FCDA') {
+    const displayFc = fc || 'cf';
     items.push({
-      label: `Read Value`,
+      label: `Read Value [${displayFc.toUpperCase()}]`,
       icon: 'fa-eye',
       action: () => {
-        readDataValue(ref, fc || 'cf');
+        readDataValue(ref, displayFc, contextMenuTarget.cp || wsCp);
         closeContextMenu();
       },
     });
-    if (fc?.toLowerCase() === 'sp' || fc?.toLowerCase() === 'cf') {
+    if (displayFc.toLowerCase() === 'sp' || displayFc.toLowerCase() === 'cf') {
       items.push({
-        label: `Write Value [${fc?.toUpperCase()}]`,
+        label: `Write Value [${displayFc.toUpperCase()}]`,
         icon: 'fa-pen',
         action: () => {
         const { ref, fc, endpoint: nodeEndpoint, cp: nodeCp } = contextMenuTarget;  // Capture values first
@@ -841,9 +975,13 @@ const getContextMenuItems = () => {
             setShowWriteModal(false);
             setWriteModalTarget({ ref: '', fc: '', endpoint: null, cp: null });
           }}
-          onSuccess={() => {
+          onSuccess={async () => {
             setShowWriteModal(false);
             setWriteModalTarget({ ref: '', fc: '', endpoint: null, cp: null });
+            // Refresh the value after write
+            if (writeModalTarget.ref && writeModalTarget.fc) {
+              await readDataValue(writeModalTarget.ref, writeModalTarget.fc);
+            }
           }}
         />
       )}
