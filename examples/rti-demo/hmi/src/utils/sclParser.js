@@ -220,6 +220,111 @@ function parseIedValOverrides(iedNode, templates) {
 }
 
 /**
+ * Parse DataSet elements from LN/LN0 node
+ */
+function parseDataSets(lnNode) {
+  const dataSetNodes = getDirectChildrenByTagName(lnNode, 'DataSet');
+  if (dataSetNodes.length === 0) {
+    return [];
+  }
+
+  return dataSetNodes.map((dsNode) => {
+    const name = getAttribute(dsNode, 'name');
+    const desc = getAttribute(dsNode, 'desc');
+    
+    const fcdas = getDirectChildrenByTagName(dsNode, 'FCDA').map((fcda) => ({
+      ldInst: getAttribute(fcda, 'ldInst'),
+      prefix: getAttribute(fcda, 'prefix'),
+      lnClass: getAttribute(fcda, 'lnClass'),
+      lnInst: getAttribute(fcda, 'lnInst'),
+      doName: getAttribute(fcda, 'doName'),
+      daName: getAttribute(fcda, 'daName'),
+      fc: getAttribute(fcda, 'fc'),
+      fcEnum: FC_TO_ENUM_NAME[String(getAttribute(fcda, 'fc') || '').toUpperCase()] || null,
+      ix: getAttribute(fcda, 'ix')
+    }));
+
+    return {
+      name,
+      desc,
+      entries: fcdas
+    };
+  });
+}
+
+/**
+ * Parse ReportControl elements from LN/LN0 node
+ */
+function parseReportControls(lnNode) {
+  const rcNodes = getDirectChildrenByTagName(lnNode, 'ReportControl');
+  if (rcNodes.length === 0) {
+    return [];
+  }
+
+  return rcNodes.map((rcNode) => {
+    const name = getAttribute(rcNode, 'name');
+    const buffered = getAttribute(rcNode, 'buffered') === 'true';
+    const rptId = getAttribute(rcNode, 'rptID');
+    const indexed = getAttribute(rcNode, 'indexed') === 'true';
+    const bufTime = getAttribute(rcNode, 'bufTime');
+    const intPeriod = getAttribute(rcNode, 'intgPd');
+    const confRev = Number.parseInt(getAttribute(rcNode, 'confRev'), 10) || 1;
+    const datSet = getAttribute(rcNode, 'datSet');
+
+    // Parse TrgOps - defaults to false for all if not present
+    const trgOpsNode = getDirectChildrenByTagName(rcNode, 'TrgOps')[0];
+    const trgOps = trgOpsNode ? {
+      dchg: getAttribute(trgOpsNode, 'dchg') === 'true',
+      qchg: getAttribute(trgOpsNode, 'qchg') === 'true',
+      dupd: getAttribute(trgOpsNode, 'dupd') === 'true',
+      period: getAttribute(trgOpsNode, 'period') === 'true',
+      gi: getAttribute(trgOpsNode, 'gi') === 'true'
+    } : {
+      dchg: false,
+      qchg: false,
+      dupd: false,
+      period: false,
+      gi: false
+    };
+
+    // Parse OptFields - defaults to false for all if not present
+    const optFieldsNode = getDirectChildrenByTagName(rcNode, 'OptFields')[0];
+    const optFlds = optFieldsNode ? {
+      seqNum: getAttribute(optFieldsNode, 'seqNum') === 'true',
+      timeStamp: getAttribute(optFieldsNode, 'timeStamp') === 'true',
+      dataSet: getAttribute(optFieldsNode, 'dataSet') === 'true',
+      reasonCode: getAttribute(optFieldsNode, 'reasonCode') === 'true',
+      dataRef: getAttribute(optFieldsNode, 'dataRef') === 'true',
+      entryID: getAttribute(optFieldsNode, 'entryID') === 'true',
+      configRef: getAttribute(optFieldsNode, 'configRef') === 'true',
+      bufOvfl: getAttribute(optFieldsNode, 'bufOvfl') === 'true'
+    } : {
+      seqNum: false,
+      timeStamp: false,
+      dataSet: false,
+      reasonCode: false,
+      dataRef: false,
+      entryID: false,
+      configRef: false,
+      bufOvfl: false
+    };
+
+    return {
+      name,
+      buffered,
+      rptId,
+      indexed,
+      bufferedTime: bufTime ? Number.parseInt(bufTime, 10) : 0,
+      intPeriod: intPeriod ? Number.parseInt(intPeriod, 10) : 0,
+      confRev,
+      datasetPath: datSet || '',
+      trgOps,
+      optFlds
+    };
+  });
+}
+
+/**
  * Parse runtime model from SCL document
  */
 function parseRuntimeModelFromDoc(doc, selectedIedName, selectedApName) {
@@ -273,7 +378,9 @@ function parseRuntimeModelFromDoc(doc, selectedIedName, selectedApName) {
         lnClass,
         inst: instValue,
         prefix: prefixValue,
-        lnType: getAttribute(lnNode, 'lnType')
+        lnType: getAttribute(lnNode, 'lnType'),
+        dataSets: parseDataSets(lnNode),
+        reportControls: parseReportControls(lnNode)
       };
     });
     const lnNodes = getDirectChildrenByTagName(ldNode, 'LN').map((lnNode) => {
@@ -285,7 +392,9 @@ function parseRuntimeModelFromDoc(doc, selectedIedName, selectedApName) {
         lnClass,
         inst: instValue,
         prefix: prefixValue,
-        lnType: getAttribute(lnNode, 'lnType')
+        lnType: getAttribute(lnNode, 'lnType'),
+        dataSets: parseDataSets(lnNode),
+        reportControls: parseReportControls(lnNode)
       };
     });
     return {
@@ -481,13 +590,29 @@ export function generateModelPyCode(sclContent, selectedIedName = null, selected
       if (Array.isArray(ln.dataSets) && ln.dataSets.length > 0) {
         ln.dataSets.forEach((dataSet, dsIndex) => {
           const dsVar = `dataset_${ldIndex + 1}_${lnIndex + 1}_${dsIndex + 1}`;
-          const dsLogicalDeviceName = dataSet.logicalDeviceName || ld.inst;
+          const dsLogicalDeviceName = ld.inst;
           lines.push(`    ${dsVar} = DataSet(${lnVar}, "${dsLogicalDeviceName}", "${dataSet.name}")`);
 
           (dataSet.entries || []).forEach((entry, entryIndex) => {
             if (!entry.fcEnum) return;
             const entryVar = `data_entry_${ldIndex + 1}_${lnIndex + 1}_${dsIndex + 1}_${entryIndex + 1}`;
-            lines.push(`    ${entryVar} = DataSetEntry("${entry.logicalDeviceName}", "${entry.variableName}", FunctionalConstraint.${entry.fcEnum})`);
+            
+            // Construct variable name from FCDA attributes
+            // Format: {ldInst}/{prefix}{lnClass}{lnInst}.{doName}[.{daName}]
+            const ldInst = entry.ldInst || ld.inst;
+            const prefix = entry.prefix || '';
+            const lnClass = entry.lnClass || '';
+            const lnInst = entry.lnInst || '';
+            const doName = entry.doName || '';
+            const daName = entry.daName || '';
+            
+            const lnPath = `${prefix}${lnClass}${lnInst}`;
+            let variableName = `${ldInst}/${lnPath}.${doName}`;
+            if (daName) {
+              variableName += `.${daName}`;
+            }
+            
+            lines.push(`    ${entryVar} = DataSetEntry("${ldInst}", "${variableName}", FunctionalConstraint.${entry.fcEnum})`);
             lines.push(`    ${dsVar}.add_entry(${entryVar})`);
           });
 
@@ -505,8 +630,8 @@ export function generateModelPyCode(sclContent, selectedIedName = null, selected
           lines.push(`        dataset_name="${rc.datasetPath}",`);
           lines.push(`        rpt_id="${rc.rptId}",`);
           lines.push(`        conf_rev=${rc.confRev},`);
-          lines.push(`        trg_ops=${JSON.stringify(rc.trgOps)},`);
-          lines.push(`        opt_flds=${JSON.stringify(rc.optFlds)},`);
+          lines.push(`        trg_ops=${toPythonLiteral(rc.trgOps, 8)},`);
+          lines.push(`        opt_flds=${toPythonLiteral(rc.optFlds, 8)},`);
           lines.push(`        buffered_time=${rc.bufferedTime},`);
           lines.push(`        int_period=${rc.intPeriod},`);
           lines.push(`        indexed=${rc.indexed ? 'True' : 'False'},`);
