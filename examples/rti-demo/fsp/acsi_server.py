@@ -687,7 +687,7 @@ class ACSIServer:
         if server is None:
             raise RuntimeError("Server is not running")
 
-        result = self.invoke_on_runtime_loop(server.read_value(obj_ref), timeout=10)
+        result = self.invoke_on_runtime_loop(server.get_data_value_and_type(obj_ref), timeout=10)
         #result = server.read_value(obj_ref)
 
         if result is None:
