@@ -428,7 +428,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
     # ================ Background Model Build ================
     async def _abuild_full_model(cp) -> None:
-        """Build full model sequentially with progress updates."""
+        """Build full model with PARALLEL websocket calls for better performance."""
         endpoint = rti_so.runtime.endpoint
         loop = rti_so.runtime.loop
         acsi_client = rti_so.get_iec61850_client(cp)
@@ -448,10 +448,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
         if ws_info is None:
             raise RuntimeError('no-websocket-info')
-
-        logical_node_details = {}
-        logical_device_map = {}
-        logical_device_status = {}
 
         model_info = rti_so.get_model_info(cp)
 
@@ -490,15 +486,44 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     model_info.model_progress['lds_done'] += 1
                     model_info.model_progress['current_ln'] = None
 
-        async def _process_ld(ld):
-            try:
-                _set_current_ld(ld)
-                ln_list = await acsi_client.get_logical_device_directory(ld, ws_info, None, None)
-                if not isinstance(ln_list, list):
-                    raise RuntimeError('unexpected-ln-list')
+        try:
+            # Step 1: Get all LDs
+            ld_list = await acsi_client.get_server_directory(ws_info, None, None)
+            if not isinstance(ld_list, list):
+                raise RuntimeError('unexpected-server-directory')
+            
+            _init_progress(ld_list)
+            
+            # Step 2: Fetch all LD directories in PARALLEL
+            async def fetch_ld_directory(ld):
+                try:
+                    _set_current_ld(ld)
+                    ln_list = await acsi_client.get_logical_device_directory(ld, ws_info, None, None)
+                    if not isinstance(ln_list, list):
+                        raise RuntimeError('unexpected-ln-list')
+                    return {'ld': ld, 'ln_list': ln_list, 'status': 'ok'}
+                except Exception as e:
+                    logger.error(f"Failed to get directory for {ld}: {e}")
+                    return {'ld': ld, 'ln_list': [], 'status': 'error'}
+                finally:
+                    _finish_ld()
+            
+            ld_coros = [fetch_ld_directory(ld) for ld in ld_list]
+            ld_results = await asyncio.gather(*ld_coros)
+            
+            # Build maps from results
+            logical_device_map = {}
+            logical_device_status = {}
+            all_ln_tasks = []  # List of (ld, ln_inst) tuples
+            
+            for result in ld_results:
+                ld = result['ld']
+                ln_list = result['ln_list']
                 logical_device_map[ld] = ln_list
-                logical_device_status[ld] = 'ok'
+                logical_device_status[ld] = result['status']
                 _add_lns_total(len(ln_list))
+                
+                # Collect all LNs for parallel fetching
                 for ln_full in ln_list:
                     if '/' in ln_full:
                         ln_inst = ln_full.split('/')[-1]
@@ -506,30 +531,30 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         ln_inst = ln_full.split(':')[-1]
                     else:
                         ln_inst = ln_full
+                    all_ln_tasks.append((ld, ln_inst))
+            
+            # Step 3: Fetch all LN details in PARALLEL
+            async def fetch_ln_details(task):
+                ld, ln_inst = task
+                try:
                     _set_current_ln(ln_inst)
-                    try:
-                        details = await _aget_ln_details(ld, ln_inst, acsi_client, ws_info)
-                        logical_node_details[f"{ld}/{ln_inst}"] = details
-                    except Exception as e:
-                        print(f"Failed to get details for {ld}/{ln_inst}: {e}")
-                        #pass
-                    finally:
-                        _inc_ln_done()
-            except Exception as e:
-                logger.error(f"Failed to get directory for {ld}: {e}")
-
-                logical_device_map[ld] = []
-                logical_device_status[ld] = 'error'
-            finally:
-                _finish_ld()
-
-        try:
-            ld_list = await acsi_client.get_server_directory(ws_info, None, None)
-            if not isinstance(ld_list, list):
-                raise RuntimeError('unexpected-server-directory')
-            _init_progress(ld_list)
-            for ld in ld_list:
-                await _process_ld(ld)
+                    details = await _aget_ln_details(ld, ln_inst, acsi_client, ws_info)
+                    _inc_ln_done()
+                    return {'ld': ld, 'ln_inst': ln_inst, 'details': details}
+                except Exception as e:
+                    print(f"Failed to get details for {ld}/{ln_inst}: {e}")
+                    _inc_ln_done()
+                    return {'ld': ld, 'ln_inst': ln_inst, 'details': None}
+            
+            ln_coros = [fetch_ln_details(task) for task in all_ln_tasks]
+            ln_results = await asyncio.gather(*ln_coros)
+            
+            # Build logical_node_details
+            logical_node_details = {}
+            for result in ln_results:
+                if result['details']:
+                    logical_node_details[f"{result['ld']}/{result['ln_inst']}"] = result['details']
+            
             model = {
                 'server': {'logicalDevices': ld_list},
                 'logicalDeviceMap': logical_device_map,
@@ -542,7 +567,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 model_info.model_error = None
                 model_info.model_status = 'ready'
                 model_info.model_ready_event.set()
-
 
         except Exception as e:
             with rti_so.runtime.lock:
