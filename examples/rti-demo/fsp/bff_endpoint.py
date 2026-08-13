@@ -116,9 +116,10 @@ def create_bff_router(
         """Serialize a DataAttribute to JSON-compatible dict."""
         return {
             "kind": "DA",
+            "type": "DA",
             "name": da.name,
             "fc": da.fc.name if da.fc is not None else None,
-            "type": da.type.name if da.type is not None else None,
+            "bType": da.type.name if da.type is not None else None,
             "children": [serialize_data_attribute(child) for child in (da.data_attributes or [])],
         }
 
@@ -133,6 +134,7 @@ def create_bff_router(
 
         return {
             "kind": "DO",
+            "type": "DO",
             "name": do.name,
             "cdc": do.cdc,
             "children": children,
@@ -142,19 +144,56 @@ def create_bff_router(
         """Serialize an IED model tree to JSON-compatible dict."""
         return {
             "kind": "IED",
+            "type": "IED",
             "name": ied.name,
             "children": [
                 {
                     "kind": "LD",
+                    "type": "LDevice",
                     "name": ld.name,
                     "ldName": ld.ldName,
                     "children": [
                         {
                             "kind": "LN",
+                            "type": "LogicalNode",
                             "name": ln.name,
-                            "children": [
+                            "children": (
+                                [
+                                    {
+                                        "kind": "Group",
+                                        "type": "Group",
+                                        "name": "DataSets",
+                                        "children": [
+                                            {
+                                                "kind": "DataSet",
+                                                "type": "DataSet",
+                                                "name": ds.name,
+                                                "ref": f"{ld.name}/{ln.name}.{ds.name}"
+                                            }
+                                            for ds in (ln.data_sets or [])
+                                        ]
+                                    }
+                                ] if (ln.data_sets or []) else []
+                            ) + (
+                                [
+                                    {
+                                        "kind": "Group",
+                                        "type": "Group",
+                                        "name": "ReportControls",
+                                        "children": [
+                                            {
+                                                "kind": "BRCB" if rcb.buffered else "URCB",
+                                                "type": "ReportControl",
+                                                "name": rcb.name,
+                                                "ref": f"{ld.name}/{ln.name}.{rcb.name}"
+                                            }
+                                            for rcb in (ln.rcbs or [])
+                                        ]
+                                    }
+                                ] if (ln.rcbs or []) else []
+                            ) + [
                                 serialize_data_object(do) for do in (ln.data_objects or [])
-                            ],
+                            ]
                         }
                         for ln in (ld.logical_nodes or [])
                     ],
@@ -198,22 +237,42 @@ def create_bff_router(
                 data_objects: List[Dict[str, Any]] = []
                 data_attributes: List[str] = []
                 da_fc_map: Dict[str, str] = {}
+                report_control_blocks: List[Dict[str, Any]] = []
+                datasets: List[Dict[str, Any]] = []
                 ln_prefix = f"{ld.name}/{ln.name}."
 
                 for data_object in (ln.data_objects or []):
-                    data_objects.append({"name": data_object.name, "cdc": data_object.cdc})
+                    cdc = (data_object.cdc or "").lower()
+                    obj_info = {"name": data_object.name, "cdc": data_object.cdc}
+                    
+                    # Collect DataSets (from DataObjects with cdc="dataset")
+                    if cdc == "dataset":
+                        datasets.append(obj_info)
+                    # Collect Report Control Blocks (RCB, BRCB, URCB) from DataObjects
+                    elif cdc in ("rcb", "brcb", "urcb"):
+                        report_control_blocks.append(obj_info)
+                    
+                    data_objects.append(obj_info)
                     for da_path, fc_name in collect_da_paths_from_do(data_object, data_object.name):
                         data_attributes.append(da_path)
                         if fc_name:
                             da_fc_map[f"{ln_prefix}{da_path}"] = fc_name
+
+                # Also collect DataSets from ln.data_sets
+                for ds in (ln.data_sets or []):
+                    datasets.append({"name": ds.name, "cdc": "dataset"})
+
+                # Also collect ReportControls from ln.rcbs
+                for rcb in (ln.rcbs or []):
+                    report_control_blocks.append({"name": rcb.name, "cdc": "rcb"})
 
                 ln_key = f"{ld.name}/{ln.name}"
                 details[ln_key] = {
                     "dataObjects": data_objects,
                     "dataAttributes": sorted(set(data_attributes)),
                     "dataAttributeFcs": da_fc_map,
-                    "reportControlBlocks": [],
-                    "dataSets": [],
+                    "reportControlBlocks": report_control_blocks,
+                    "dataSets": datasets,
                 }
 
         return details
