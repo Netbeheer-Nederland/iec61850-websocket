@@ -1091,16 +1091,11 @@ def create_bff_router(
                         status_code=404
                     )
 
-                if isinstance(result, dict):
-                    normalized = result
-                else:
-                    normalized = {"type": type(result).__name__, "value": result}
 
-                values = [normalized]
 
                 print(
                     f"[POST /ap/readvalue] SUCCESS objRef={obj_ref!r} "
-                    f"fc={fc!r} type={normalized.get('type')!r} value={normalized.get('value')!r}"
+                    f"fc={fc!r} type={result.get('type')!r} value={result.get('value')!r}"
                 )
 
                 rti_fsp._log_action(
@@ -1108,8 +1103,8 @@ def create_bff_router(
                     detail={
                         "objRef": obj_ref,
                         "fc": fc,
-                        "type": normalized.get("type"),
-                        "value": normalized.get("value"),
+                        "type": result.get("type"),
+                        "value": result.get("value"),
                     },
                 )
                 return {
@@ -1117,7 +1112,7 @@ def create_bff_router(
                     "success": True,
                     "objRef": obj_ref,
                     "fc": fc,
-                    "values": values,
+                    "values": result,
                 }
 
             except FuturesTimeoutError:

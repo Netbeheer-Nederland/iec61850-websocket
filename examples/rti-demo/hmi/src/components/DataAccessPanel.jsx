@@ -699,8 +699,8 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
       if (result?.result?.value !== undefined) {
         return { type: typeof result.result.value, value: result.result.value };
       }
-      if (result?.value !== undefined) {
-        return { type: typeof result.value, value: result.value };
+      if (result?.result?.values !== undefined) {
+        return { type: result.result.values.type, value: result.result.values.value };
       }
       return result;
     }
