@@ -9,7 +9,7 @@ function ACSIServer({ settings, updateModel, getModel, connections }) {
   const navigate = useNavigate();
   const endpoint = location.state?.endpoint;
   
-  const [host, setHost] = useState(endpoint?.host || 'rti-so');
+  const [host, setHost] = useState('rti-so');
   const [port, setPort] = useState(String(8765));
   const [cp, setCp] = useState(endpoint?.cp || 'cp1');
   const [mode, setMode] = useState(endpoint?.mode || 'server');
