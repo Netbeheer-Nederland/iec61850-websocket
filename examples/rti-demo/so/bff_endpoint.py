@@ -285,6 +285,16 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     rti_so = ACSIClient()
 
     # ==================== Helper Functions ====================
+    def _check_websocket_connection():
+        """Verify that an active WebSocket connection exists.
+
+        Raises:
+            HTTPException 503: If no WebSocket connection is established
+        """
+        endpoint = rti_so.runtime.endpoint
+        if endpoint is None or len(endpoint.websocket_info_list) == 0:
+            raise HTTPException(status_code=503, detail="no-active-websocket-connection")
+
     def _convert_bytes_to_hex(obj: Any) -> Any:
         """Recursively convert bytes objects to hex strings for JSON serialization."""
         if isinstance(obj, bytes):
@@ -847,8 +857,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         cp = request.cp
         model_info = rti_so.get_model_info(cp)
 
-
-
         if refresh:
                 with rti_so.runtime.lock:
                     model_info.model_status = 'idle'
@@ -860,6 +868,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             loop = rti_so.runtime.loop
             if loop is None or not getattr(loop, "is_running", lambda: False)():
                 raise HTTPException(status_code=503, detail="client-not-connected")
+
+            _check_websocket_connection()
 
             with rti_so.runtime.lock:
                 model_status = model_info.model_status
@@ -880,6 +890,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     return {"status": "ready", "model": data}
 
             return {'status': 'error', 'model': None}
+        except HTTPException:
+            raise
         except Exception as exc:
             rti_so._log_action(f"Get model failed (outer): {exc}", "error")
             logger.exception("Unhandled outer exception in api_model")
@@ -999,6 +1011,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             HTTPException 404: If instance not available or timeout
         """
         try:
+            # ✅ Check WebSocket connection before attempting to read
+            _check_websocket_connection()
+
             obj_ref = request.objRef
             fc = request.fc
 
@@ -1069,6 +1084,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
+        except HTTPException:
+            raise
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
@@ -1112,6 +1129,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             HTTPException 404: If instance not available or timeout
         """
         try:
+            # ✅ Check WebSocket connection before attempting to get data definition
+            _check_websocket_connection()
+
             ld_inst = request.ld_inst
             ln_inst = request.ln_inst
             do_path = request.do_path
@@ -1138,25 +1158,12 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     rti_so.get_data_definition(obj_ref, cp), timeout=10
                 )
 
-
                 if result is None:
-                    #client._log_action(
-                    #    "Client readvalue failed: instanceNotAvailable",
-                    #    "warn",
-                    #   detail={"objRef": obj_ref, "fc": fc}
-                    #)
                     return JSONResponse(
                         content={"ok": False, "error": "instanceNotAvailable"},
                         status_code=404
                     )
 
-                #client._log_action(
-                #    "Client readvalue",
-                #    detail={
-                #       "objRef": obj_ref,
-                #        "value": result.get("value"),
-                #    },
-                #)
                 return {
                     "ok": True,
                     "success": True,
@@ -1165,23 +1172,16 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 }
 
             except FuturesTimeoutError:
-                #client._log_action(
-                #    "Client readvalue timeout",
-                #    "warn",
-                #    detail={"objRef": obj_ref},
-                #)
                 return JSONResponse(
                     content={"ok": False, "error": "read timeout"},
                     status_code=504
                 )
             except ValueError as exc:
-                #client._log_action(f"Client readvalue failed: {exc}", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=404
                 )
             except Exception as exc:
-                #client._log_action(f"Client readvalue failed: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
@@ -1210,6 +1210,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_get_brcb_values(request: ReadRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
+            # ✅ Check WebSocket connection before attempting to read BRCB
+            _check_websocket_connection()
+
             obj_ref = request.objRef
 
             cp = request.cp
@@ -1221,7 +1224,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
 
             if not obj_ref:
-                # client._log_action("Client readvalue rejected: missing objRef", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
@@ -1260,6 +1262,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
+        except HTTPException:
+            raise
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
@@ -1283,6 +1287,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_set_brcb_values(request: WriteRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
+            # ✅ Check WebSocket connection before attempting to write BRCB
+            _check_websocket_connection()
+
             obj_ref = request.objRef
 
             cp = request.cp
@@ -1357,6 +1364,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_get_urcb_values(request: ReadRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
+            # ✅ Check WebSocket connection before attempting to read URCB
+            _check_websocket_connection()
+
             obj_ref = request.objRef
 
             cp = request.cp
@@ -1368,7 +1378,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
 
             if not obj_ref:
-                # client._log_action("Client readvalue rejected: missing objRef", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
@@ -1407,6 +1416,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
+        except HTTPException:
+            raise
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
@@ -1430,6 +1441,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_set_urcb_values(request: WriteRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
+            # ✅ Check WebSocket connection before attempting to write URCB
+            _check_websocket_connection()
+
             obj_ref = request.objRef
 
             cp = request.cp
@@ -1504,6 +1518,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_get_dataset_directory(request: GetDataSetDirectory):
 
         try:
+            # ✅ Check WebSocket connection before attempting to get dataset directory
+            _check_websocket_connection()
+
             ld_inst = request.ld_inst
             ln_inst = request.ln_inst
             ds_inst = request.ds_inst
@@ -1518,11 +1535,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=500
                 )
 
-            # obj_ref = request.objRef
-            # fc = request.fc
-
             if not obj_ref:
-                # client._log_action("Client readvalue rejected: missing objRef", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
@@ -1536,23 +1549,11 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 print("get ds result: ", result)
 
                 if result is None:
-                    # client._log_action(
-                    #    "Client readvalue failed: instanceNotAvailable",
-                    #    "warn",
-                    #   detail={"objRef": obj_ref, "fc": fc}
-                    # )
                     return JSONResponse(
                         content={"ok": False, "error": "instanceNotAvailable"},
                         status_code=404
                     )
 
-                # client._log_action(
-                #    "Client readvalue",
-                #    detail={
-                #       "objRef": obj_ref,
-                #        "value": result.get("value"),
-                #    },
-                # )
                 return {
                     "ok": True,
                     "success": True,
@@ -1561,27 +1562,22 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 }
 
             except FuturesTimeoutError:
-                # client._log_action(
-                #    "Client readvalue timeout",
-                #    "warn",
-                #    detail={"objRef": obj_ref},
-                # )
                 return JSONResponse(
                     content={"ok": False, "error": "read timeout"},
                     status_code=504
                 )
             except ValueError as exc:
-                # client._log_action(f"Client readvalue failed: {exc}", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=404
                 )
             except Exception as exc:
-                # client._log_action(f"Client readvalue failed: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
+        except HTTPException:
+            raise
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
@@ -1666,6 +1662,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     HTTPException 500: If write operation fails
                 """
         try:
+            # ✅ Check WebSocket connection before attempting to write value
+            _check_websocket_connection()
+
             obj_ref = request.objRef
             fc = request.fc
             value = request.value
@@ -1791,6 +1790,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     HTTPException 500: If write operation fails
                 """
         try:
+            # ✅ Check WebSocket connection before attempting to operate
+            _check_websocket_connection()
+
             obj_ref = request.objRef
             value = request.value
             value_type = request.value_type
@@ -1849,6 +1851,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
+        except HTTPException:
+            raise
         except Exception as exc:
             print("entered here 2")
             return JSONResponse(
