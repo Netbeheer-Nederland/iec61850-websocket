@@ -49,6 +49,80 @@ class ModelRequest(BaseModel):
         json_schema_extra={"example": "cp1"}
     )
 
+class ServerDirectoryRequest(BaseModel):
+    """Request body for getting server directory.
+
+    Used by: POST /api/server-directory
+    """
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
+class LogicalDeviceRequest(BaseModel):
+    """Request body for getting logical device directory.
+
+    Used by: POST /api/logical-device
+    """
+    ld_inst: str = Field(
+        ...,
+        description="Logical Device instance name (e.g., 'LD0')",
+        json_schema_extra={"example": "LD0"}
+    )
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
+class LogicalNodeRequest(BaseModel):
+    """Request body for getting logical node tree.
+
+    Used by: POST /api/logical-node
+    """
+    ld_inst: str = Field(
+        ...,
+        description="Logical Device instance name (e.g., 'LD0')",
+        json_schema_extra={"example": "LD0"}
+    )
+    ln_inst: str = Field(
+        ...,
+        description="Logical Node instance name (e.g., 'LLN0')",
+        json_schema_extra={"example": "LLN0"}
+    )
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
+class DataObjectRequest(BaseModel):
+    """Request body for getting data object details.
+
+    Used by: POST /api/data-object
+    """
+    ld_inst: str = Field(
+        ...,
+        description="Logical Device instance name (e.g., 'LD0')",
+        json_schema_extra={"example": "LD0"}
+    )
+    ln_inst: str = Field(
+        ...,
+        description="Logical Node instance name (e.g., 'LLN0')",
+        json_schema_extra={"example": "LLN0"}
+    )
+    do_name: str = Field(
+        ...,
+        description="Data Object name (e.g., 'Mod')",
+        json_schema_extra={"example": "Mod"}
+    )
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
 class ReadvalueRequest(BaseModel):
     """Request body for reading a value from the connected server.
 
@@ -922,6 +996,311 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             raise HTTPException(
                 status_code=500,
                 detail={"error": str(exc), "traceback": traceback.format_exc()}
+            )
+
+    @router.post(
+        "/server-directory",
+        summary="Get Server Directory",
+        description="Retrieves the list of all Logical Devices from the connected IEC61850 server. This is a modular endpoint for incremental model building.",
+        response_description="Server directory with list of logical devices",
+        responses={
+            200: {"description": "Server directory returned successfully"},
+            503: {"description": "Client not connected"},
+            500: {"description": "Error retrieving server directory"}
+        },
+        tags=["Model Access"]
+    )
+    async def api_server_directory(request: ServerDirectoryRequest):
+        """Get the server directory (list of Logical Devices) from the connected server."""
+        try:
+            _check_websocket_connection()
+
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.get_server_directory_tree(cp), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "serverDirectory": result,
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/logical-device",
+        summary="Get Logical Device Directory",
+        description="Retrieves the list of all Logical Nodes for a specific Logical Device from the connected IEC61850 server. This is a modular endpoint for incremental model building.",
+        response_description="Logical Device directory with list of logical nodes",
+        responses={
+            200: {"description": "Logical Device directory returned successfully"},
+            400: {"description": "Missing ld_inst parameter"},
+            503: {"description": "Client not connected"},
+            500: {"description": "Error retrieving logical device directory"}
+        },
+        tags=["Model Access"]
+    )
+    async def api_logical_device(request: LogicalDeviceRequest):
+        """Get the Logical Node list for a specific Logical Device from the connected server."""
+        try:
+            _check_websocket_connection()
+
+            ld_inst = request.ld_inst
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            if not ld_inst:
+                return JSONResponse(
+                    content={"ok": False, "error": "ld_inst is required"},
+                    status_code=400
+                )
+
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.get_logical_device_tree(ld_inst, cp), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "logicalDevice": result,
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/logical-node",
+        summary="Get Logical Node Tree",
+        description="Retrieves the complete tree (Data Objects, Data Attributes, RCBs, DataSets) for a specific Logical Node from the connected IEC61850 server. This is a modular endpoint for incremental model building.",
+        response_description="Logical Node tree with all child elements",
+        responses={
+            200: {"description": "Logical Node tree returned successfully"},
+            400: {"description": "Missing ld_inst or ln_inst parameter"},
+            503: {"description": "Client not connected"},
+            500: {"description": "Error retrieving logical node tree"}
+        },
+        tags=["Model Access"]
+    )
+    async def api_logical_node(request: LogicalNodeRequest):
+        """Get the complete tree for a specific Logical Node from the connected server."""
+        try:
+            _check_websocket_connection()
+
+            ld_inst = request.ld_inst
+            ln_inst = request.ln_inst
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            if not ld_inst:
+                return JSONResponse(
+                    content={"ok": False, "error": "ld_inst is required"},
+                    status_code=400
+                )
+
+            if not ln_inst:
+                return JSONResponse(
+                    content={"ok": False, "error": "ln_inst is required"},
+                    status_code=400
+                )
+
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.get_logical_node_tree(ld_inst, ln_inst, cp), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "logicalNode": result,
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/data-object",
+        summary="Get Data Object Details",
+        description="Retrieves complete details for a specific Data Object including its definition and data attributes from the connected IEC61850 server. This is a modular endpoint for incremental model building.",
+        response_description="Data Object details with definition and data attributes",
+        responses={
+            200: {"description": "Data Object details returned successfully"},
+            400: {"description": "Missing ld_inst, ln_inst, or do_name parameter"},
+            503: {"description": "Client not connected"},
+            500: {"description": "Error retrieving data object details"}
+        },
+        tags=["Model Access"]
+    )
+    async def api_data_object(request: DataObjectRequest):
+        """Get the complete details for a specific Data Object from the connected server."""
+        try:
+            _check_websocket_connection()
+
+            ld_inst = request.ld_inst
+            ln_inst = request.ln_inst
+            do_name = request.do_name
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            if not ld_inst:
+                return JSONResponse(
+                    content={"ok": False, "error": "ld_inst is required"},
+                    status_code=400
+                )
+
+            if not ln_inst:
+                return JSONResponse(
+                    content={"ok": False, "error": "ln_inst is required"},
+                    status_code=400
+                )
+
+            if not do_name:
+                return JSONResponse(
+                    content={"ok": False, "error": "do_name is required"},
+                    status_code=400
+                )
+
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.get_data_object_details(ld_inst, ln_inst, do_name, cp), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "dataObject": result,
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
             )
 
     @router.get(
