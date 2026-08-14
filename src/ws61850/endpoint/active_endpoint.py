@@ -22,7 +22,7 @@ import logging
 import websockets
 import websockets.exceptions
 
-from security.oauth import get_access_token
+from ws61850.security.oauth import get_access_token
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
 from ws61850.endpoint.association_handler import (
     ACTION_ABORT,

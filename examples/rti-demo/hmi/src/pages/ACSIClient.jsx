@@ -6,11 +6,13 @@ import ContextMenu from '../components/ContextMenu';
 import ControlModal from '../components/ControlModal';
 import WriteValueModal from '../components/WriteValueModal';
 import BrcbConfigModal from '../components/BrcbConfigModal';
+import TLSConfigModal from '../components/TLSConfigModal';
+import OAuthConfigModal from '../components/OAuthConfigModal';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
-const ACSIClient = ({ updateModel }) => {
+const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000' }) => {
   const location = useLocation();
   const endpoint = location.state?.endpoint;
   // Store the original API endpoint (BFF) - this is used for all API calls
@@ -31,6 +33,9 @@ const ACSIClient = ({ updateModel }) => {
   const [showControlModal, setShowControlModal] = useState(false);
   const [showWriteModal, setShowWriteModal] = useState(false);
   const [showBrcbConfigModal, setShowBrcbConfigModal] = useState(false);
+  const [showTLSModal, setShowTLSModal] = useState(false);
+  const [showOAuthModal, setShowOAuthModal] = useState(false);
+  const [message, setMessage] = useState(null);
   const monitorIntervalRef = useRef(null);
 
   useEffect(() => {
@@ -835,6 +840,28 @@ const getContextMenuItems = () => {
         </button>
       </div>
 
+      {/* Security Configuration Buttons */}
+      <div style={{ display: 'flex', gap: '16px', marginLeft: 'auto', marginBottom: '24px' }}>
+        <button
+          className="btn-secondary"
+          onClick={() => setShowTLSModal(true)}
+          disabled={loading}
+          title="Configure TLS settings"
+          id="acsi-client-tls-btn"
+        >
+          <i className="fas fa-shield-alt" style={{ marginRight: '8px' }}></i>TLS Config
+        </button>
+        <button
+          className="btn-secondary"
+          onClick={() => setShowOAuthModal(true)}
+          disabled={loading}
+          title="Configure OAuth settings"
+          id="acsi-client-oauth-btn"
+        >
+          <i className="fas fa-key" style={{ marginRight: '8px' }}></i>OAuth Config
+        </button>
+      </div>
+
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
         <button id="acsi-read-data-btn" className="btn-primary" onClick={loadClientTree} disabled={loading || !connected}>
@@ -853,6 +880,21 @@ const getContextMenuItems = () => {
           Clear Logs
         </button>
       </div>
+
+      {message && (
+        <div className="alert" style={{
+          marginBottom: '16px',
+          padding: '12px',
+          background: message.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+          color: message.type === 'success' ? 'var(--success-color)' : 'var(--danger-color)',
+          borderRadius: '4px',
+          display: 'flex',
+          alignItems: 'center'
+        }}>
+          <i className={`fas fa-${message.type === 'success' ? 'check-circle' : 'exclamation-circle'}`} style={{ marginRight: '8px' }}></i>
+          {message.text}
+        </div>
+      )}
 
       {/* Error Display */}
       {error && (
@@ -997,6 +1039,48 @@ const getContextMenuItems = () => {
           }}
         />
       )}
+
+      <TLSConfigModal
+        isOpen={showTLSModal}
+        onClose={() => {
+          setShowTLSModal(false);
+          setTimeout(() => setMessage(null), 3000);
+        }}
+        connection={{
+          name: endpoint?.name || wsHost,
+          host: endpoint?.host || wsHost,
+          port: endpoint?.port || wsPort,
+          properties_info: {
+            properties: {
+              ws_mode: 'passive'
+            }
+          }
+        }}
+        bffBaseUrl={bffBaseUrl}
+        onSuccess={(msg) => setMessage({ type: 'success', text: msg })}
+        onError={(msg) => setMessage({ type: 'error', text: msg })}
+      />
+
+      <OAuthConfigModal
+        isOpen={showOAuthModal}
+        onClose={() => {
+          setShowOAuthModal(false);
+          setTimeout(() => setMessage(null), 3000);
+        }}
+        connection={{
+          name: endpoint?.name || wsHost,
+          host: endpoint?.host || wsHost,
+          port: endpoint?.port || wsPort,
+          properties_info: {
+            properties: {
+              ws_mode: 'passive'
+            }
+          }
+        }}
+        bffBaseUrl={bffBaseUrl}
+        onSuccess={(msg) => setMessage({ type: 'success', text: msg })}
+        onError={(msg) => setMessage({ type: 'error', text: msg })}
+      />
     </section>
   );
 };

@@ -4,7 +4,10 @@ import { executeApiCall, buildTargetValue, getApiById } from '../services/apiSer
 import Tree from '../components/Tree';
 import { transformModelToTree } from '../utils/modelUtils';
 
-function ACSIServer({ settings, updateModel, getModel, connections }) {
+import TLSConfigModal from '../components/TLSConfigModal';
+import OAuthConfigModal from '../components/OAuthConfigModal';
+
+function ACSIServer({ settings, updateModel, getModel, connections, bffBaseUrl = 'http://localhost:5000'}) {
   const location = useLocation();
   const navigate = useNavigate();
   const endpoint = location.state?.endpoint;
@@ -22,6 +25,10 @@ function ACSIServer({ settings, updateModel, getModel, connections }) {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState({});
   const monitorIntervalRef = useRef(null);
+
+  const [showTLSModal, setShowTLSModal] = useState(false);
+  const [showOAuthModal, setShowOAuthModal] = useState(false);
+  const [message, setMessage] = useState(null);
 
   const handleExpandToggle = useCallback((ref, expanded) => {
     setExpandedNodes(prev => ({
@@ -256,6 +263,29 @@ function ACSIServer({ settings, updateModel, getModel, connections }) {
           {loading ? 'Stopping...' : 'Stop Server'}
         </button>
       </div>
+
+      {/* Security Configuration Buttons */}
+      <div style={{ display: 'flex', gap: '16px', marginLeft: 'auto', marginBottom: '24px' }}>
+        <button
+          className="btn-secondary"
+          onClick={() => setShowTLSModal(true)}
+          disabled={loading}
+          title="Configure TLS settings"
+          id="acsi-tls-btn"
+        >
+          <i className="fas fa-shield-alt" style={{ marginRight: '8px' }}></i>TLS Config
+        </button>
+        <button
+          className="btn-secondary"
+          onClick={() => setShowOAuthModal(true)}
+          disabled={loading}
+          title="Configure OAuth settings"
+          id="acsi-oauth-btn"
+        >
+          <i className="fas fa-key" style={{ marginRight: '8px'}}></i>OAuth Config
+        </button>
+      </div>
+
       
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
         <button id="acsi-load-model-btn" className="btn-primary" onClick={loadServerModel} disabled={loading}>
@@ -274,6 +304,21 @@ function ACSIServer({ settings, updateModel, getModel, connections }) {
           Clear Logs
         </button>
       </div>
+
+      {message && (
+      <div className="alert" style={{
+        marginBottom: '16px',
+        padding: '12px',
+        background: message.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+        color: message.type === 'success' ? 'var(--success-color)' : 'var(--danger-color)',
+        borderRadius: '4px',
+        display: 'flex',
+        alignItems: 'center'
+      }}>
+        <i className={`fas fa-${message.type === 'success' ? 'check-circle' : 'exclamation-circle'}`} style={{ marginRight: '8px' }}></i>
+        {message.text}
+      </div>
+    )}
       
       {error && <div className="alert alert-error" style={{ marginBottom: '16px', padding: '12px', background: 'var(--danger-bg)', color: 'var(--danger-color)', borderRadius: '4px' }}>
         <i className="fas fa-exclamation-triangle" style={{ marginRight: '8px' }}></i>{error}
@@ -315,6 +360,48 @@ function ACSIServer({ settings, updateModel, getModel, connections }) {
           </div>
         </div>
       )}
+
+      <TLSConfigModal
+        isOpen={showTLSModal}
+        onClose={() => {
+          setShowTLSModal(false);
+          setTimeout(() => setMessage(null), 3000);
+        }}
+        connection={{
+          name: endpoint?.name || host,
+          host: endpoint?.host || host,
+          port: endpoint?.port || port,
+          properties_info: {
+            properties: {
+              ws_mode: 'Active'
+            }
+          }
+        }}
+        bffBaseUrl={bffBaseUrl}
+        onSuccess={(msg) => setMessage({ type: 'success', text: msg })}
+        onError={(msg) => setMessage({ type: 'error', text: msg })}
+      />
+
+      <OAuthConfigModal
+        isOpen={showOAuthModal}
+        onClose={() => {
+          setShowOAuthModal(false);
+          setTimeout(() => setMessage(null), 3000);
+        }}
+        connection={{
+          name: endpoint?.name || host,
+          host: endpoint?.host || host,
+          port: endpoint?.port || port,
+          properties_info: {
+            properties: {
+              ws_mode: 'Active'
+            }
+          }
+        }}
+        bffBaseUrl={bffBaseUrl}
+        onSuccess={(msg) => setMessage({ type: 'success', text: msg })}
+        onError={(msg) => setMessage({ type: 'error', text: msg })}
+      />
     </section>
   );
 }
