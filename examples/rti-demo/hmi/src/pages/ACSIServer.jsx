@@ -378,6 +378,8 @@ function ACSIServer({ settings, updateModel, getModel, connections, bffBaseUrl =
           }
         }}
         bffBaseUrl={bffBaseUrl}
+        wsHost={host}       
+        wsPort={port}      
         onSuccess={(msg) => setMessage({ type: 'success', text: msg })}
         onError={(msg) => setMessage({ type: 'error', text: msg })}
       />

@@ -1057,6 +1057,8 @@ const getContextMenuItems = () => {
           }
         }}
         bffBaseUrl={bffBaseUrl}
+        wsHost={wsHost}       // ← Add this
+        wsPort={wsPort}       // ← Add this
         onSuccess={(msg) => setMessage({ type: 'success', text: msg })}
         onError={(msg) => setMessage({ type: 'error', text: msg })}
       />

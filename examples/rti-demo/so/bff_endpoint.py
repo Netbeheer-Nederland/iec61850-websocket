@@ -913,7 +913,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         try:
             tls_version = ssl.TLSVersion.TLSv1_2 if request.tls_version == "1.2" else ssl.TLSVersion.TLSv1_3
             print("Reconfiguring connection with TLS version: ", tls_version)
-            if request.ws_mode == "passive" or request.ws_mode == "Passive":
+            if request.ws_mode.lower() == "passive":
                 print("Reconfiguring passive endpoint with TLS: ", request.enable_tls)
                 tls_config = TLSConfig(
                     mode="server",
@@ -924,27 +924,36 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     keylog_file=os.path.join("tlskeys.log"),
                 )
                 print("TLS Config: ", tls_config)
-                await rti_so.runtime.endpoint.reconfigure_endpoint(request.enable_tls, tls_config=tls_config)
+
+                # Run on the loop that actually owns the endpoint (runtime.loop),
+                # not uvicorn's own loop — matches the pattern used by
+                # read_value/write_value/operate elsewhere in this router.
+                rti_so.invoke_on_runtime_loop(
+                    rti_so.runtime.endpoint.reconfigure_endpoint(request.enable_tls, tls_config=tls_config),
+                    timeout=20,  # stop_passive + restart can take a few seconds
+                )
+
                 if request.enable_tls:
-                    await rti_so.runtime.endpoint._endpoint_running_event.wait()  # ← Wait here
+                    rti_so.invoke_on_runtime_loop(
+                        rti_so.runtime.endpoint._endpoint_running_event.wait(),
+                        timeout=20,
+                    )
                     print("endpoint status is: ", rti_so.runtime.endpoint._is_endpoint_running)
+
                 return JSONResponse(
-                    content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode, "enable_tls": request.enable_tls},
-                    status_code=200
+                    content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
+                             "enable_tls": request.enable_tls},
+                    status_code=200,
                 )
             else:
                 return JSONResponse(
                     content={"ok": False, "error": "Only passive mode is supported for reconfiguration."},
-                    status_code=400
+                    status_code=400,
                 )
-
         except Exception as exc:
             print("reconfig error: ", exc)
             rti_so._log_action(f"Reconfig connection failed: {exc}", "error")
-            return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=500
-            )
+            return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
 
     @router.post(
         "/reconfig-oauth",

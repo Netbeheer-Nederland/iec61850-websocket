@@ -128,13 +128,13 @@ class ActiveEndpoint:
             ),
             None,
         )
-    async def reconfigure_connection(self, cp, tls_enable, tls_config=None):
+    async def reconfigure_connection(self,host, port, cp, tls_enable, tls_config=None):
         """Reconfigure TLS and OAuth settings for future connections."""
         self._tls_config = tls_config
         print("entering reconfigure_connection with tls_enable:", tls_enable)
         if tls_enable:
             print("entered reconfigure_connection with tls_enable True, tls_config:", tls_config)
-            await self.start("rti-so", 8765, cp)
+            await self.start(host, int(port), cp)
 
 
     async def reconfigure_oauth(self, cp, oauth_enable, token_endpoint=None, client_id=None, client_secret=None, kc_cert=None, enable_token_refresh=False):
@@ -164,6 +164,14 @@ class ActiveEndpoint:
                 self._reconnect_policy.reset()
             except (ConnectionRefusedError, OSError) as e:
                 logger.warning("Connection failed cp=%r: %s", cp, e)
+                await self._on_connection_closed(cp)
+                if self._reconnect_policy.should_reconnect():
+                    await self._reconnect_policy.wait()
+                else:
+                    logger.warning("Reconnection disabled or max retries reached for cp=%r, giving up", cp)
+                    break
+            except (websockets.exceptions.InvalidMessage, EOFError) as e:
+                logger.warning("Connection failed cp=%r: protocol mismatch or server unavailable (%s)", cp, str(e).split('\n')[0])
                 await self._on_connection_closed(cp)
                 if self._reconnect_policy.should_reconnect():
                     await self._reconnect_policy.wait()

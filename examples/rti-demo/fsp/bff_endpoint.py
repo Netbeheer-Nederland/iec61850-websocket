@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field, ConfigDict
 import ssl
 from ws61850.security.tls import TLSConfig
+import asyncio
 
 # ==================== Pydantic Models ====================
 class WritevalueRequest(BaseModel):
@@ -94,6 +95,18 @@ class ReadvalueRequest(BaseModel):
 
 class TLSConnectionCreateConfigRequest(BaseModel):
     """Request body for creating a new connection."""
+
+    host: str = Field(
+        default="0.0.0.0",
+        description="Hostname or IP address to bind to",
+        json_schema_extra={"example": "0.0.0.0"}
+    )
+    port: str = Field(
+        default="8765",
+        description="Port number to listen on",
+        json_schema_extra={"example": "8765"}
+    )
+
     connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
     enable_tls: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
     tls_version: str = Field(default= "1.2", description="TLS version", json_schema_extra={"example": "1.2"})
@@ -1002,34 +1015,47 @@ def create_bff_router(
         try:
             tls_version = ssl.TLSVersion.TLSv1_2 if request.tls_version == "1.2" else ssl.TLSVersion.TLSv1_3
             print("tls_version in reconfig connection: ", tls_version)
-            if request.ws_mode == "active" or request.ws_mode == "Active":
+            host = request.host
+            request_port = request.port
+            if request.ws_mode.lower() == "active":
                 tls_config = TLSConfig(
                     mode="client",
-                    cafile= request.server_ca,
+                    cafile=request.server_ca,
                     min_version=tls_version,
                     max_version=tls_version,
                     keylog_file=os.path.join("tlskeys.log"),
                 )
                 cp = os.getenv("CP", "cp1")
-                await rti_fsp.runtime.endpoint.reconfigure_connection(cp, request.enable_tls, tls_config=tls_config)
+
+                loop = rti_fsp.runtime.loop
+                if loop is None or not loop.is_running():
+                    raise HTTPException(status_code=503, detail="server-not-running")
+
+                # Bridge onto the loop that actually owns the endpoint —
+                # same pattern as invoke_on_runtime_loop, but async-friendly
+                # so it doesn't block uvicorn's loop while connecting.
+                fut = asyncio.run_coroutine_threadsafe(
+                    rti_fsp.runtime.endpoint.reconfigure_connection(
+                        host, request_port, cp, request.enable_tls, tls_config=tls_config
+                    ),
+                    loop,
+                )
+                await asyncio.wrap_future(fut)
+
                 print("Reconfigured connection with TLS enabled:", request.enable_tls)
                 return JSONResponse(
                     content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
                              "enable_tls": request.enable_tls},
-                    status_code=200
+                    status_code=200,
                 )
             else:
                 return JSONResponse(
                     content={"ok": False, "error": "Only active mode is supported for reconfiguration."},
-                    status_code=400
+                    status_code=400,
                 )
-
         except Exception as exc:
             rti_fsp._log_action(f"Reconfig connection failed: {exc}", "error")
-            return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=500
-            )
+            return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
 
     @router.post(
         "/reconfig-oauth",
