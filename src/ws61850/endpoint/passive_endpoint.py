@@ -472,6 +472,7 @@ class PassiveEndpoint:
         auth_header = headers.get("Authorization")
 
         # create IEC61850 client using cp
+        self.client_list[:] = [c for c in self.client_list if c.cp != cp]
         self.client_list.append(IEC61850Client(cp))
 
         if self._oauth_enable:

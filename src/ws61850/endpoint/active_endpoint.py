@@ -77,6 +77,8 @@ class ActiveEndpoint:
         self._tls_config = tls_config
         self._is_direct = is_direct
 
+        self._connect_task = None
+
         self._reconnect_policy = ReconnectPolicy(
             enabled=try_reconnect,
             max_retries=max_retries,
@@ -128,13 +130,28 @@ class ActiveEndpoint:
             ),
             None,
         )
-    async def reconfigure_connection(self,host, port, cp, tls_enable, tls_config=None):
+
+    async def reconfigure_connection(self, host, port, cp, tls_enable, tls_config=None):
         """Reconfigure TLS and OAuth settings for future connections."""
         self._tls_config = tls_config
         print("entering reconfigure_connection with tls_enable:", tls_enable)
+
+        # Cancel any existing connection loop before starting a new one,
+        # otherwise we'd have two `start()` loops racing for the same cp.
+        old_task = getattr(self, "_connect_task", None)
+        if old_task is not None and not old_task.done():
+            old_task.cancel()
+            try:
+                await old_task
+            except asyncio.CancelledError:
+                pass
+
         if tls_enable:
             print("entered reconfigure_connection with tls_enable True, tls_config:", tls_config)
-            await self.start(host, int(port), cp)
+            # start() runs forever (reconnect loop) — schedule it, don't await it.
+            self._connect_task = asyncio.create_task(
+                self.start(host, int(port), cp), name=f"{cp}-active-reconnect"
+            )
 
 
     async def reconfigure_oauth(self, cp, oauth_enable, token_endpoint=None, client_id=None, client_secret=None, kc_cert=None, enable_token_refresh=False):
