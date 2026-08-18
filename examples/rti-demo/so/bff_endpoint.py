@@ -318,7 +318,7 @@ class OAUTHCreateConfigRequest(BaseModel):
         description="token issuer url",
         json_schema_extra={"example": "https://auth.example.com"},
     )
-    server_ca: str | None = Field(
+    ca_certificate: str | None = Field(
         default=None,
         description="Server CA certificate",
         json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
@@ -969,33 +969,43 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_reconfig_oauth(request: OAUTHCreateConfigRequest):
         """Reconfigure the connection with a new communication point."""
         try:
-            tls_version = ssl.TLSVersion.TLSv1_2 if request.tls_version == "1.2" else ssl.TLSVersion.TLSv1_3
-            print("Reconfiguring connection with TLS version: ", tls_version)
-            if request.ws_mode == "passive" or request.ws_mode == "Passive":
+            if request.ws_mode.lower() == "passive":
+                loop = rti_so.runtime.loop
+                if loop is None or not loop.is_running():
+                    raise HTTPException(status_code=503, detail="client-not-connected")
 
-                await rti_so.runtime.endpoint.reconfigure_oauth(request.enable_oauth, certificate_endpoint=request,
-                                                                token_issuer=request.token_issuer_url, kc_cert= request.server_ca)
-                if request.enable_tls:
-                    await rti_so.runtime.endpoint._endpoint_running_event.wait()  # ← Wait here
+                fut = asyncio.run_coroutine_threadsafe(
+                    rti_so.runtime.endpoint.reconfigure_oauth(
+                        request.enable_oauth,
+                        certificate_endpoint=request.certificate_endpoint_url,
+                        token_issuer=request.token_issuer_url,
+                        kc_cert=request.ca_certificate,
+                    ),
+                    loop,
+                )
+                await asyncio.wrap_future(fut)
+
+                if request.enable_oauth:
+                    wait_fut = asyncio.run_coroutine_threadsafe(
+                        rti_so.runtime.endpoint._endpoint_running_event.wait(), loop
+                    )
+                    await asyncio.wrap_future(wait_fut)
                     print("endpoint status is: ", rti_so.runtime.endpoint._is_endpoint_running)
+
                 return JSONResponse(
                     content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
-                             "enable_tls": request.enable_tls},
-                    status_code=200
+                             "enable_oauth": request.enable_oauth},
+                    status_code=200,
                 )
             else:
                 return JSONResponse(
                     content={"ok": False, "error": "Only passive mode is supported for reconfiguration."},
-                    status_code=400
+                    status_code=400,
                 )
-
         except Exception as exc:
             print("reconfig error: ", exc)
             rti_so._log_action(f"Reconfig connection failed: {exc}", "error")
-            return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=500
-            )
+            return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
 
     @router.get(
         "/properties",

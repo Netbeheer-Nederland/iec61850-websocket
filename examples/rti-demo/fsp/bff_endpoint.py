@@ -131,6 +131,18 @@ class TLSConnectionCreateConfigRequest(BaseModel):
 
 class OAUTHCreateConfigRequest(BaseModel):
     """Request body for creating a new connection."""
+
+    host: str = Field(
+        default="0.0.0.0",
+        description="Hostname or IP address to bind to",
+        json_schema_extra={"example": "0.0.0.0"}
+    )
+    port: str = Field(
+        default="8765",
+        description="Port number to listen on",
+        json_schema_extra={"example": "8765"}
+    )
+
     connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
     enable_oauth: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
 
@@ -144,7 +156,7 @@ class OAUTHCreateConfigRequest(BaseModel):
         description="token issuer url",
         json_schema_extra={"example": "https://auth.example.com"},
     )
-    server_ca: str | None = Field(
+    ca_certificate: str | None = Field(
         default=None,
         description="Server CA certificate",
         json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
@@ -1068,33 +1080,48 @@ def create_bff_router(
         },
         tags=["Client Status"]
     )
-    async def api_reconfig_oaut(request: OAUTHCreateConfigRequest):
+    async def api_reconfig_oauth(request: OAUTHCreateConfigRequest):
         """Reconfigure the connection with a new communication point."""
         try:
-
-            if request.ws_mode == "active" or request.ws_mode == "Active":
-
+            if request.ws_mode.lower() == "active":
                 cp = os.getenv("CP", "cp1")
-                await rti_fsp.runtime.endpoint.reconfigure_oauth(cp, request.enable_oauth, request.token_endpoint_url
-                                                                      , request.client_id, request.client_secret,
-                                                                      request.server_ca)
+
+                loop = rti_fsp.runtime.loop
+                if loop is None or not loop.is_running():
+                    raise HTTPException(status_code=503, detail="server-not-running")
+
+                host = request.host
+                oauth_port = request.port
+
+                fut = asyncio.run_coroutine_threadsafe(
+                    rti_fsp.runtime.endpoint.reconfigure_oauth(
+                        host,
+                        oauth_port,
+                        cp,
+                        request.enable_oauth,
+                        request.token_endpoint_url,
+                        request.client_id,
+                        request.client_secret,
+                        request.ca_certificate,
+                    ),
+                    loop,
+                )
+                await asyncio.wrap_future(fut)
+
                 return JSONResponse(
                     content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
-                             "enable_tls": request.enable_tls},
-                    status_code=200
+                             "enable_oauth": request.enable_oauth},
+                    status_code=200,
                 )
             else:
                 return JSONResponse(
                     content={"ok": False, "error": "Only active mode is supported for reconfiguration."},
-                    status_code=400
+                    status_code=400,
                 )
-
         except Exception as exc:
+            print("entered here: ", exc)
             rti_fsp._log_action(f"Reconfig connection failed: {exc}", "error")
-            return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=500
-            )
+            return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
 
     @router.get(
         "/actions-logs",

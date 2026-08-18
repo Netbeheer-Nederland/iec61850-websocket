@@ -534,9 +534,7 @@ class ACSIServer:
                 name="toggle-value",
             )
 
-        ws_task = asyncio.create_task(
-            self.runtime.endpoint.start(host, port, cp), name="ws-active"
-        )
+        ws_task = self.runtime.endpoint.run_in_background(host, port, cp)
         tasks["ws"] = ws_task
 
         self._set_runtime_state(

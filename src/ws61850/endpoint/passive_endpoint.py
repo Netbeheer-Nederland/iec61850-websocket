@@ -44,7 +44,9 @@ from ws61850.shared.extractors import (
     retrieve_associate_id_from_decoded_msg,
     retrieve_max_outstanding_calls_from_decoded_msg,
 )
-import threading
+
+import tempfile
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -180,27 +182,64 @@ class PassiveEndpoint:
 
     async def reconfigure_oauth(self, oauth_enable, certificate_endpoint=None, token_issuer=None, kc_cert=None):
         self._oauth_enable = oauth_enable
-        self._kc_cert = kc_cert
+
         self._cert_endpoint = certificate_endpoint
         self._token_issuer = token_issuer
 
-        if oauth_enable:
-            if self._is_endpoint_running:
-                try:
-                    await asyncio.wait_for(self.stop_passive(), timeout=10.0)  # ← Add timeout
-                except asyncio.TimeoutError:
-                    logger.warning("Server stop timed out, continuing reconfigure")
-            # Start server in background without blocking
-            logger.info("Starting WebSocket server with TLS on")
-            self._server_task = asyncio.create_task(
-                self._run_server("0.0.0.0", 8765)
-            )
+        cert_file = None
+
+        try:
+            # kc_cert contains the certificate CONTENT, not a filename
+            if kc_cert:
+                cert_file = tempfile.NamedTemporaryFile(
+                    mode="w",
+                    suffix=".pem",
+                    delete=False,
+                )
+                cert_file.write(kc_cert)
+                cert_file.flush()
+                cert_file.close()
+
+                cafile = cert_file.name
+            else:
+                cafile = None
+
+            self._kc_cert = cafile
+
+            if oauth_enable and certificate_endpoint and token_issuer:
+                _cache = JwksCache(jwks_uri=certificate_endpoint, cafile=cafile)
+                self._jwt_validator = JwtValidator(_cache, issuer=token_issuer, audience="account")
+            else:
+                self._jwt_validator = None
+
+            if oauth_enable:
+                if self._is_endpoint_running:
+                    try:
+                        await asyncio.wait_for(self.stop_passive(), timeout=10.0)  # ← Add timeout
+                    except asyncio.TimeoutError:
+                        logger.warning("Server stop timed out, continuing reconfigure")
+                # Start server in background without blocking
+                logger.info("Starting WebSocket server with TLS on")
+                self._server_task = asyncio.create_task(
+                    self._run_server("0.0.0.0", 8765)
+                )
+        except Exception  as e:
+            logger.error(f"Error during reconfigure_oauth: {e}", exc_info=True)
+            raise
+
+
+        #finally:
+            # Remove the temporary certificate file
+        #    if cert_file is not None:
+        #        try:
+        #            os.unlink(cert_file.name)
+        #        except FileNotFoundError:
+        #            pass
 
     async def reconfigure_endpoint(self, tls_enable, tls_config=None, oauth_enable=False):
         self._tls_config = tls_config
         self._oauth_enable = oauth_enable
 
-        logger.info(f"[reconfigure] loop id={id(asyncio.get_running_loop())}")
         if tls_enable:
             if self._is_endpoint_running:
                 try:
@@ -215,8 +254,6 @@ class PassiveEndpoint:
 
             if not self._is_endpoint_running:
                 logger.info("Starting WebSocket server with TLS on")
-                logger.info(f"[create] loop id={id(asyncio.get_running_loop())}")
-
                 self._server_task = asyncio.create_task(
                     self._run_server("0.0.0.0", 8765)
                 )
@@ -224,7 +261,6 @@ class PassiveEndpoint:
                 raise RuntimeError("Cannot start TLS server: old server still running")
 
     async def _run_server(self, hostname: str, port: int):
-        logger.info(f"[_run_server] loop={id(asyncio.get_running_loop())} thread={threading.current_thread().name}")
         """Internal method that actually runs the server."""
         max_retries = 3
         for attempt in range(max_retries):
@@ -257,7 +293,6 @@ class PassiveEndpoint:
             ping_interval=15,
             ping_timeout=30,
             logger=self._websocket_server_logger,
-            reuse_address=True, 
         )
         print("serve_kwargs: ", serve_kwargs)
         if ssl_ctx:
@@ -272,7 +307,6 @@ class PassiveEndpoint:
             await server.serve_forever()
 
     async def stop_passive(self) -> None:
-        logger.info(f"[reconfigure] loop id={id(asyncio.get_running_loop())}")
         try:
             if self.server is not None:
                 self.server.close()
@@ -280,25 +314,15 @@ class PassiveEndpoint:
                     await self.server.wait_closed()
                 except RuntimeError as e:
                     if "attached to a different loop" in str(e):
-                        logger.error(
-                            "Server attached to different loop than caller — "
-                            "this is a bug, not a timing issue. Investigate which "
-                            "loop created _server_task vs which loop calls stop_passive()."
-                        )
-                        raise  # don't paper over this
-                    raise
-
-            # Deterministically finish the task instead of trusting serve_forever() to exit on its own
-            if hasattr(self, '_server_task') and self._server_task and not self._server_task.done():
-                self._server_task.cancel()
-                try:
-                    await self._server_task
-                except asyncio.CancelledError:
-                    pass
-
-            self._is_endpoint_running = False
-            self._endpoint_running_event.clear()
-            logger.info("WebSocket passive server stopped")
+                        # Server is closing in another loop; wait briefly
+                        await asyncio.sleep(0.5)
+                    else:
+                        raise
+                self._is_endpoint_running = False
+                self._endpoint_running_event.clear()
+                logger.info("WebSocket passive server stopped")
+            else:
+                logger.info("Passive server stop requested but server reference is None")
         except Exception as e:
             logger.error(f"Error stopping passive server: {e}")
             raise
@@ -472,7 +496,6 @@ class PassiveEndpoint:
         auth_header = headers.get("Authorization")
 
         # create IEC61850 client using cp
-        self.client_list[:] = [c for c in self.client_list if c.cp != cp]
         self.client_list.append(IEC61850Client(cp))
 
         if self._oauth_enable:
