@@ -1011,6 +1011,18 @@ def create_bff_router(
                 status_code=500
             )
 
+    async def _wait_for_runtime_loop(rti_fsp, timeout: float = 5.0) -> asyncio.AbstractEventLoop:
+        """Poll until the server's background event loop is created and running,
+        or raise if it doesn't show up within `timeout` seconds."""
+        deadline = asyncio.get_event_loop().time() + timeout
+        while True:
+            loop = rti_fsp.runtime.loop
+            if loop is not None and loop.is_running():
+                return loop
+            if asyncio.get_event_loop().time() >= deadline:
+                raise RuntimeError("server-failed-to-start")
+            await asyncio.sleep(0.05)
+
     @router.post(
         "/reconfig-connection",
         summary="Get Connection Info",
@@ -1041,7 +1053,9 @@ def create_bff_router(
 
                 loop = rti_fsp.runtime.loop
                 if loop is None or not loop.is_running():
-                    raise HTTPException(status_code=503, detail="server-not-running")
+                    print("server not running, starting server instance")
+                    rti_fsp.start_server(host, int(request_port))
+                    loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
 
                 # Bridge onto the loop that actually owns the endpoint —
                 # same pattern as invoke_on_runtime_loop, but async-friendly
@@ -1086,12 +1100,16 @@ def create_bff_router(
             if request.ws_mode.lower() == "active":
                 cp = os.getenv("CP", "cp1")
 
-                loop = rti_fsp.runtime.loop
-                if loop is None or not loop.is_running():
-                    raise HTTPException(status_code=503, detail="server-not-running")
-
                 host = request.host
                 oauth_port = request.port
+
+                loop = rti_fsp.runtime.loop
+                if loop is None or not loop.is_running():
+                    print("server not running, starting server instance")
+                    rti_fsp.start_server(host, int(oauth_port))
+                    loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
+
+
 
                 fut = asyncio.run_coroutine_threadsafe(
                     rti_fsp.runtime.endpoint.reconfigure_oauth(
