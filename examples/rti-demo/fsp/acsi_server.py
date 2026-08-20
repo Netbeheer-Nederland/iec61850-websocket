@@ -523,6 +523,14 @@ class ACSIServer:
 
         cp = self.runtime.cp or "cp1"
 
+        # ready_event is bound to whichever loop is running when it's created.
+        # Since self.runtime.server is a long-lived singleton reused across
+        # stop/start cycles, but each start_server() spins up a brand-new event
+        # loop, we must recreate ready_event here — on the loop that will
+        # actually use it — rather than relying on the one created once in
+        # IEC61850Server.__init__ (which becomes stale after the first restart).
+        self.runtime.server.ready_event = asyncio.Event()
+
         report_task = asyncio.create_task(
             self.runtime.server.periodic_report_start(), name=f"{cp}-periodic-report"
         )

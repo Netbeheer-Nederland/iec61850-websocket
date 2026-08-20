@@ -314,12 +314,16 @@ class PassiveEndpoint:
                     await self.server.wait_closed()
                 except RuntimeError as e:
                     if "attached to a different loop" in str(e):
-                        # Server is closing in another loop; wait briefly
                         await asyncio.sleep(0.5)
                     else:
                         raise
                 self._is_endpoint_running = False
                 self._endpoint_running_event.clear()
+                # Clear stale per-connection state so nothing carries loop-bound
+                # asyncio primitives (Events/Locks) into the next server lifetime.
+                self.client_list.clear()
+                self.access_token_list.clear()
+                self.websocket_info_list.clear()
                 logger.info("WebSocket passive server stopped")
             else:
                 logger.info("Passive server stop requested but server reference is None")
@@ -494,6 +498,8 @@ class PassiveEndpoint:
         cp = connection.request.path.lstrip("/")
         headers = request.headers
         auth_header = headers.get("Authorization")
+
+        self.client_list[:] = [c for c in self.client_list if c.cp != cp]
         self.client_list.append(IEC61850Client(cp))
         if self._oauth_enable:
             if not auth_header or not auth_header.startswith("Bearer "):
