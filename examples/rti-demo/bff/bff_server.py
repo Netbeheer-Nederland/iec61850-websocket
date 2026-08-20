@@ -81,11 +81,12 @@ DISCOVERED_FILE = os.path.join(BASE_DIR, 'discovered_endpoints.json')
 class ConnectionCreateRequest(BaseModel):
     """Request body for creating a new connection."""
     name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
-    host: str = Field(..., description="Hostname or IP address of the endpoint", json_schema_extra={"example": "localhost"})
-    port: int = Field(..., description="Port number of the endpoint", json_schema_extra={"example": 5000})
-    type: str = Field(..., description="Type of the endpoint (e.g., RTI-FSP, RTI-SO)", json_schema_extra={"example": "RTI-FSP"})
-    acsi: str = Field(default="server", description="ACSI role (server/client)", json_schema_extra={"example": "server"})
-    ws_mode: str = Field(default="", description="WebSocket mode", json_schema_extra={"example": ""})
+    host: Optional[str] = Field(default=None, description="Hostname or IP address of the endpoint", json_schema_extra={"example": "localhost"})
+    port: Optional[int] = Field(default=None, description="Port number of the endpoint", json_schema_extra={"example": 5000})
+    type: str = Field(..., description="Type of the endpoint (e.g., RTI-FSP, RTI-SO, IDP-Server)", json_schema_extra={"example": "RTI-FSP"})
+    acsi: Optional[str] = Field(default=None, description="ACSI role (server/client)", json_schema_extra={"example": "server"})
+    ws_mode: Optional[str] = Field(default=None, description="WebSocket mode", json_schema_extra={"example": ""})
+    endpoint: Optional[str] = Field(default=None, description="Endpoint path for IDP-Server", json_schema_extra={"example": "/idp"})
     auto_discovered: bool = Field(default=False, description="Whether this connection was auto-discovered")
 
 class TLSConnectionCreateConfigRequest(BaseModel):
@@ -105,6 +106,7 @@ class ConnectionUpdateRequest(BaseModel):
     type: Optional[str] = Field(default=None, description="Type of the endpoint")
     acsi: Optional[str] = Field(default=None, description="ACSI role (server/client)")
     ws_mode: Optional[str] = Field(default=None, description="WebSocket mode")
+    endpoint: Optional[str] = Field(default=None, description="Endpoint path for IDP-Server")
     status: Optional[str] = Field(default=None, description="Connection status")
 
 
@@ -404,8 +406,8 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"Error saving connections: {e}")
     
-    def add_connection(self, name: str, host: str, port: int, conn_type: str, 
-                      acsi: str = "server", ws_mode: str = "", auto_discovered: bool = False) -> Dict:
+    def add_connection(self, name: str, host: Optional[str] = None, port: Optional[int] = None, conn_type: str = "", 
+                      acsi: Optional[str] = None, ws_mode: Optional[str] = None, endpoint: Optional[str] = None, auto_discovered: bool = False) -> Dict:
         """Add a new connection.
         
         Args:
@@ -420,32 +422,39 @@ class ConnectionManager:
         Returns:
             The created connection dictionary.
         """
-        # Check if connection already exists
-        existing = next((c for c in self.connections 
-                        if c['host'] == host and c['port'] == port and c['name'] == name), None)
-        if existing:
-            logger.warning(f"Connection already exists: {host}:{port}")
-            return existing
+        # Check if connection already exists (for non-IDP-Server types)
+        if conn_type != 'IDP-Server' and host and port:
+            existing = next((c for c in self.connections 
+                            if c.get('host') == host and c.get('port') == port and c['name'] == name), None)
+            if existing:
+                logger.warning(f"Connection already exists: {host}:{port}")
+                return existing
 
         connection_in_file = next((c for c in self.connections
                          if c['name'] == name), None)
         if connection_in_file:
-            # Track old host:port for _bff_clients cleanup
-            old_key = f"{connection_in_file.get('host')}:{connection_in_file.get('port')}"
-            
-            connection_in_file['host'] = host
-            connection_in_file['port'] = port
-            connection_in_file['type'] = conn_type
-            connection_in_file['acsi'] = acsi
-            connection_in_file['ws_mode'] = ws_mode
-            
-            # Update _bff_clients if host or port changed
-            new_key = f"{host}:{port}"
-            if old_key != new_key:
-                if old_key in _bff_clients:
-                    del _bff_clients[old_key]
-                if new_key not in _bff_clients:
-                    _bff_clients[new_key] = BffClient(f"http://{host}:{port}")
+            # For IDP-Server, only update name, type, and endpoint
+            if conn_type == 'IDP-Server':
+                connection_in_file['type'] = conn_type
+                if endpoint is not None:
+                    connection_in_file['endpoint'] = endpoint
+            else:
+                # Track old host:port for _bff_clients cleanup
+                old_key = f"{connection_in_file.get('host')}:{connection_in_file.get('port')}"
+                
+                connection_in_file['host'] = host
+                connection_in_file['port'] = port
+                connection_in_file['type'] = conn_type
+                connection_in_file['acsi'] = acsi
+                connection_in_file['ws_mode'] = ws_mode
+                
+                # Update _bff_clients if host or port changed
+                new_key = f"{host}:{port}"
+                if old_key != new_key:
+                    if old_key in _bff_clients:
+                        del _bff_clients[old_key]
+                    if new_key not in _bff_clients:
+                        _bff_clients[new_key] = BffClient(f"http://{host}:{port}")
             
             self.save_connections()
             return connection_in_file
@@ -461,12 +470,19 @@ class ConnectionManager:
             'auto_discovered': auto_discovered,
             'created_at': datetime.now().isoformat()
         }
+        
+        # Add endpoint for IDP-Server
+        if conn_type == 'IDP-Server' and endpoint:
+            connection['endpoint'] = endpoint
+        
         self.connections.append(connection)
         self.save_connections()
 
-        key = f"{host}:{port}"
-        if key not in _bff_clients:
-            _bff_clients[key] = BffClient(f"http://{host}:{port}")
+        # Only create BFF client for non-IDP-Server types with host and port
+        if conn_type != 'IDP-Server' and host and port:
+            key = f"{host}:{port}"
+            if key not in _bff_clients:
+                _bff_clients[key] = BffClient(f"http://{host}:{port}")
 
         logger.info(f"Connection added: {name} ({host}:{port})")
         return connection
@@ -539,6 +555,16 @@ class ConnectionManager:
         return registered
 
     async def check_connection(self, con, client):
+        # IDP-Server is a local server, always mark as connected
+        if con.get('type') == 'IDP-Server':
+            con["status"] = "connected"
+            return
+        
+        # For other types, check connectivity via host:port
+        if not con.get('host') or not con.get('port'):
+            con["status"] = "disconnected"
+            return
+            
         try:
             response = await client.get(
                 f"http://{con['host']}:{con['port']}",
@@ -1121,10 +1147,20 @@ async def get_connections():
     Returns:
         JSON with list of connections and their count.
     """
+    # Ensure all connections have a status field
+    connections_with_status = []
+    for conn in conn_manager.connections:
+        if 'status' not in conn:
+            # Set default status based on type
+            if conn.get('type') == 'IDP-Server':
+                conn['status'] = 'connected'
+            else:
+                conn['status'] = 'disconnected'
+        connections_with_status.append(conn)
 
     return {
-        "connections": conn_manager.connections,
-        "count": len(conn_manager.connections)
+        "connections": connections_with_status,
+        "count": len(connections_with_status)
     }
 
 
@@ -1249,11 +1285,26 @@ async def create_connection(request: ConnectionCreateRequest):
     Raises:
         HTTPException 400: If required fields are missing.
     """
-    if not request.name or not request.host or not request.port or not request.type:
+    if not request.name or not request.type:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail='Missing required fields: name, host, port, type'
+            detail='Missing required fields: name, type'
         )
+    
+    # For IDP-Server, host and port are not required but endpoint is
+    if request.type == 'IDP-Server':
+        if not request.endpoint:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Missing required field: endpoint'
+            )
+    else:
+        # For other types, host and port are required
+        if not request.host or not request.port:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Missing required fields: host, port'
+            )
     connection = conn_manager.add_connection(
         name=request.name,
         host=request.host,
@@ -1261,6 +1312,7 @@ async def create_connection(request: ConnectionCreateRequest):
         conn_type=request.type,
         acsi=request.acsi,
         ws_mode=request.ws_mode,
+        endpoint=request.endpoint,
         auto_discovered=request.auto_discovered
     )
     conn_manager.save_connections()
@@ -1351,6 +1403,8 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         connection['acsi'] = request.acsi
     if request.ws_mode is not None:
         connection['ws_mode'] = request.ws_mode
+    if request.endpoint is not None:
+        connection['endpoint'] = request.endpoint
     if request.status is not None:
         connection['status'] = request.status
     

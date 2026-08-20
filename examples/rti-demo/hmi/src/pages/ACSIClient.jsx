@@ -12,7 +12,7 @@ import { executeApiCall, buildTargetValue, getApiById } from '../services/apiSer
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
-const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000' }) => {
+const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connections: propConnections = [] }) => {
   const location = useLocation();
   const endpoint = location.state?.endpoint;
   // Store the original API endpoint (BFF) - this is used for all API calls
@@ -32,6 +32,27 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000' }) => {
   const [contextMenuTarget, setContextMenuTarget] = useState(null);
   const [showControlModal, setShowControlModal] = useState(false);
   const [showWriteModal, setShowWriteModal] = useState(false);
+  const [connections, setConnections] = useState([]);
+
+  // Fetch connections from BFF to get IDP-Server instances
+  useEffect(() => {
+    const fetchConnections = async () => {
+      try {
+        const url = `${bffBaseUrl}/api/connections`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          setConnections(data.connections || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch connections:', error);
+      }
+    };
+    
+    if (bffBaseUrl) {
+      fetchConnections();
+    }
+  }, [bffBaseUrl]);
   const [showBrcbConfigModal, setShowBrcbConfigModal] = useState(false);
   const [showTLSModal, setShowTLSModal] = useState(false);
   const [showOAuthModal, setShowOAuthModal] = useState(false);
@@ -1069,6 +1090,7 @@ const getContextMenuItems = () => {
           setShowOAuthModal(false);
           setTimeout(() => setMessage(null), 3000);
         }}
+        connections={connections}
         connection={{
           name: endpoint?.name || wsHost,
           host: endpoint?.host || wsHost,

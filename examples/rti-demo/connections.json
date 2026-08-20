@@ -97,5 +97,17 @@
         "ws_mode": "Active"
       }
     }
+  },
+  {
+    "id": 6,
+    "name": "keycloak",
+    "host": "",
+    "port": 5000,
+    "type": "IDP-Server",
+    "acsi": "",
+    "ws_mode": "",
+    "auto_discovered": false,
+    "created_at": "2026-08-20T17:33:37.544481",
+    "endpoint": "https://localhost:8443"
   }
 ]

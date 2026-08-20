@@ -14,7 +14,8 @@ function Setup({ settings }) {
     port: 5000,
     type: 'RTI-SO',
     acsi: 'server',
-    ws_mode: ''
+    ws_mode: '',
+    endpoint: ''
   });
   const [loading, setLoading] = useState(true);
   const [bffError, setBffError] = useState(null);
@@ -53,6 +54,10 @@ function Setup({ settings }) {
       
       // Update connections with status from BFF
       const updatedConnections = connectionsList.map(conn => {
+        // IDP-Server is always connected (local server)
+        if (conn.type === 'IDP-Server') {
+          return { ...conn, connected: true };
+        }
         const target = data.targets.find(t => t.target === `${conn.host}:${conn.port}`);
         return { ...conn, connected: target?.status === 'reachable' };
       });
@@ -81,7 +86,7 @@ function Setup({ settings }) {
   // Add connection
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '' });
+    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '' });
     setShowModal(true);
   };
 
@@ -94,7 +99,8 @@ function Setup({ settings }) {
       port: conn.port || 5000,
       type: conn.type || 'RTI-SO',
       acsi: conn.acsi || 'server',
-      ws_mode: conn.ws_mode || ''
+      ws_mode: conn.ws_mode || '',
+      endpoint: conn.endpoint || ''
     });
     setShowModal(true);
   };
@@ -119,8 +125,21 @@ function Setup({ settings }) {
   // Save connection (add or update)
   const handleSaveConnection = async () => {
     try {
-      if (!formData.name || !formData.host || !formData.port) {
+      // Validate required fields based on type
+      if (!formData.name) {
         alert('Please fill in all required fields');
+        return;
+      }
+      
+      // For RTI-SO and RTI-FSP, host and port are required
+      if ((formData.type === 'RTI-SO' || formData.type === 'RTI-FSP' || formData.type === 'Generic') && (!formData.host || !formData.port)) {
+        alert('Please fill in the host and port fields');
+        return;
+      }
+      
+      // For IDP-Server, endpoint is required
+      if (formData.type === 'IDP-Server' && !formData.endpoint) {
+        alert('Please fill in the endpoint field');
         return;
       }
 
@@ -215,9 +234,15 @@ function Setup({ settings }) {
                       {conn.name}
                     </span>
                     <span style={{ color: 'var(--text-muted)' }}>⋅</span>
-                    <span style={{ color: 'var(--text-secondary)', minWidth: '150px' }}>
-                      {conn.host}:{conn.port}
-                    </span>
+                    {conn.type === 'IDP-Server' ? (
+                      <span style={{ color: 'var(--text-secondary)', minWidth: '150px' }}>
+                        {conn.endpoint}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--text-secondary)', minWidth: '150px' }}>
+                        {conn.host}:{conn.port}
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <span 

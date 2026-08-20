@@ -49,6 +49,9 @@ function ConnectionModal({
     } else if (value === 'RTI-FSP') {
       newAcsi = 'server';
       newWsMode = 'active';
+    } else if (value === 'IDP-Server') {
+      newAcsi = '';
+      newWsMode = '';
     }
     
     onFormChange(prev => ({
@@ -60,6 +63,7 @@ function ConnectionModal({
   };
 
   const isGeneric = formData.type === 'Generic';
+  const isIDP = formData.type === 'IDP-Server';
 
   return (
     <>
@@ -82,24 +86,28 @@ function ConnectionModal({
                   onChange={handleInputChange}
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="host">Host</label>
-                <input 
-                  type="text" 
-                  id="host" 
-                  value={formData.host} 
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="port">Port</label>
-                <input 
-                  type="number" 
-                  id="port" 
-                  value={formData.port} 
-                  onChange={handleInputChange}
-                />
-              </div>
+              {!isIDP && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="host">Host</label>
+                    <input 
+                      type="text" 
+                      id="host" 
+                      value={formData.host} 
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="port">Port</label>
+                    <input 
+                      type="number" 
+                      id="port" 
+                      value={formData.port} 
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </>
+              )}
               <div className="form-group">
                 <label htmlFor="type">Type</label>
                 <select 
@@ -110,33 +118,50 @@ function ConnectionModal({
                   <option value="Generic">Generic</option>
                   <option value="RTI-SO">RTI-SO (WS Passive/ACSI Client)</option>
                   <option value="RTI-FSP">RTI-FSP (WS Active/ACSI Server)</option>
+                  <option value="IDP-Server">IDP-Server</option>
                 </select>
               </div>
-              <div className="form-group">
-                <label htmlFor="acsi">ACSI</label>
-                <select 
-                  id="acsi" 
-                  value={formData.acsi || 'server'}
-                  onChange={handleInputChange}
-                  disabled={!isGeneric}
-                >
-                  <option value="server">Server</option>
-                  <option value="client">Client</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="ws_mode">WebSocket Mode</label>
-                <select 
-                  id="ws_mode" 
-                  value={formData.ws_mode || ''}
-                  onChange={handleInputChange}
-                  disabled={!isGeneric}
-                >
-                  <option value="">Select mode...</option>
-                  <option value="active">Active</option>
-                  <option value="passive">Passive</option>
-                </select>
-              </div>
+              {!isIDP && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="acsi">ACSI</label>
+                    <select 
+                      id="acsi" 
+                      value={formData.acsi || 'server'}
+                      onChange={handleInputChange}
+                      disabled={!isGeneric}
+                    >
+                      <option value="server">Server</option>
+                      <option value="client">Client</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="ws_mode">WebSocket Mode</label>
+                    <select 
+                      id="ws_mode" 
+                      value={formData.ws_mode || ''}
+                      onChange={handleInputChange}
+                      disabled={!isGeneric}
+                    >
+                      <option value="">Select mode...</option>
+                      <option value="active">Active</option>
+                      <option value="passive">Passive</option>
+                    </select>
+                  </div>
+                </>
+              )}
+              {isIDP && (
+                <div className="form-group">
+                  <label htmlFor="endpoint">Endpoint</label>
+                  <input 
+                    type="text" 
+                    id="endpoint" 
+                    value={formData.endpoint || ''} 
+                    onChange={handleInputChange}
+                    placeholder="e.g., /idp"
+                  />
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={onClose}>
