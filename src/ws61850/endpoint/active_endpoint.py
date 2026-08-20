@@ -44,6 +44,8 @@ from ws61850.security.oauth2.client_credentials import ClientCredentialsProvider
 import tempfile
 import os
 
+import base64, json, time as _time
+
 logger = logging.getLogger(__name__)
 
 
@@ -183,9 +185,13 @@ class ActiveEndpoint:
             # new one — never await start() directly, it runs forever.
             self.run_in_background(host, port, cp)
 
+
     async def reconfigure_oauth(self, host, port, cp, oauth_enable, token_endpoint=None,
                                 client_id=None, client_secret=None, kc_cert=None,
                                 enable_token_refresh=False):
+
+        print(f"### DIAG reconfigure_oauth called with enable_token_refresh={enable_token_refresh!r}")
+
         self._oauth_enable = oauth_enable
         self._assoc_handler._kc_cert = kc_cert
         self._assoc_handler._token_endpoint = token_endpoint
@@ -203,7 +209,13 @@ class ActiveEndpoint:
             client_secret=client_secret, cafile=cafile,
         )
         access_token = await client_con_provider.get_access_token()
-        print("the access token:", access_token)
+        print("the access token:", access_token, "| refresh enabled:", enable_token_refresh)
+
+        payload_b64 = access_token.split(".")[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(payload_b64))
+        print(f"### DIAG JWT exp={claims.get('exp')} iat={claims.get('iat')} now={int(_time.time())} "
+              f"seconds_until_expiry={claims.get('exp', 0) - int(_time.time())}")
 
         if oauth_enable:
             previous_task = self._connect_task  # capture BEFORE creating the new task
@@ -211,7 +223,15 @@ class ActiveEndpoint:
             async def _run_and_cleanup():
                 try:
                     await self._cancel_task(previous_task)
-                    await self.start(host, int(port), cp, access_token=access_token)
+                    if enable_token_refresh:
+                        # Provider is handed to start() — every reconnect fetches
+                        # a fresh token via the provider's own expiry-aware cache.
+                        await self.start(host, int(port), cp, credentials_provider=client_con_provider)
+                    else:
+                        # Static token — once it expires, every reconnect keeps
+                        # presenting the same dead token and will keep failing,
+                        # by design (demo mode).
+                        await self.start(host, int(port), cp, access_token=access_token)
                 finally:
                     if cafile is not None:
                         try:
@@ -228,14 +248,28 @@ class ActiveEndpoint:
                 except FileNotFoundError:
                     pass
 
-    async def start(self, hostname: str, port: int, cp: str, *, access_token=None, protocol=None) -> None:
-        """Connect to ws[s]://hostname:port/cp, with automatic reconnection."""
+    async def start(self, hostname: str, port: int, cp: str, *,
+                    access_token: str | None = None,
+                    credentials_provider: "ClientCredentialsProvider | None" = None,
+                    protocol=None) -> None:
+        """Connect to ws[s]://hostname:port/cp, with automatic reconnection.
+
+        If credentials_provider is given, a fresh access token is fetched on
+        every connection attempt (including reconnects). Otherwise, a single
+        static access_token is reused for the lifetime of this task — once it
+        expires, reconnect attempts will keep failing with the same auth error
+        (by design, when token refresh is disabled).
+        """
         self._reconnect_policy.reset()
         first = True
         while first or self._reconnect_policy.should_reconnect():
             first = False
             try:
-                await self._connect_once(hostname, port, cp, access_token=access_token, protocol=protocol)
+                token = await credentials_provider.get_access_token() if credentials_provider else access_token
+
+                print(
+                    f"### DIAG task_id={id(asyncio.current_task())} has_provider={credentials_provider is not None} token_tail={token[-12:] if token else None}")
+                await self._connect_once(hostname, port, cp, access_token=token, protocol=protocol)
                 self._reconnect_policy.reset()
             except (ConnectionRefusedError, OSError) as e:
                 logger.warning("Connection failed cp=%r: %s", cp, e)
@@ -246,7 +280,8 @@ class ActiveEndpoint:
                     logger.warning("Reconnection disabled or max retries reached for cp=%r, giving up", cp)
                     break
             except (websockets.exceptions.InvalidMessage, EOFError) as e:
-                logger.warning("Connection failed cp=%r: protocol mismatch or server unavailable (%s)", cp, str(e).split('\n')[0])
+                logger.warning("Connection failed cp=%r: protocol mismatch or server unavailable (%s)", cp,
+                               str(e).split('\n')[0])
                 await self._on_connection_closed(cp)
                 if self._reconnect_policy.should_reconnect():
                     await self._reconnect_policy.wait()

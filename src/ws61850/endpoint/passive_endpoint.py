@@ -494,23 +494,17 @@ class PassiveEndpoint:
         cp = connection.request.path.lstrip("/")
         headers = request.headers
         auth_header = headers.get("Authorization")
-
-        # create IEC61850 client using cp
         self.client_list.append(IEC61850Client(cp))
-
         if self._oauth_enable:
             if not auth_header or not auth_header.startswith("Bearer "):
                 logger.warning("OAuth: missing or malformed Authorization header for cp=%r", cp)
                 return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Missing or invalid token\n")
-
             token = auth_header[len("Bearer "):]
-
             if self._jwt_validator is None:
                 logger.error("OAuth: JWT validator not configured but oauth_enable=True for cp=%r", cp)
                 return self._http_error_response(
                     HTTPStatus.SERVICE_UNAVAILABLE, b"Token verification unavailable\n"
                 )
-
             try:
                 is_valid, claims = self._jwt_validator.validate(token)
             except (KeyError, Exception) as e:
@@ -518,12 +512,14 @@ class PassiveEndpoint:
                 return self._http_error_response(
                     HTTPStatus.SERVICE_UNAVAILABLE, b"Token verification unavailable\n"
                 )
-
             if not is_valid or claims is None:
                 logger.warning("OAuth: token rejected (invalid or expired) for cp=%r", cp)
                 return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Invalid or expired token\n")
-
             logger.info("OAuth: token accepted for cp=%r expires_at=%s", cp, claims.expiry)
+            # Replace any stale entry for this cp so handle_client always sees
+            # the token that was just validated for THIS connection attempt,
+            # not a leftover from an earlier one.
+            self.access_token_list = [item for item in self.access_token_list if item["cp"] != cp]
             self.access_token_list.append(
                 {"access_token": {"exp": claims.expiry}, "cp": cp, "access_token_raw": token}
             )

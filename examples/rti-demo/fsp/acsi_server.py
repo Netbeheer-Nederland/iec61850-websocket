@@ -508,8 +508,8 @@ class ACSIServer:
             self.runtime.old_server_cp = None
 
         self._set_runtime_state(
-            endpoint=None,
-            server_cp=None,
+            #endpoint=None,
+            #server_cp=None,
             tasks={},
             status="stopped",
             error=None,

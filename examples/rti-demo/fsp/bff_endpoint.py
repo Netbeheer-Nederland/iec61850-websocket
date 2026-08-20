@@ -1067,6 +1067,7 @@ def create_bff_router(
                     loop,
                 )
                 await asyncio.wrap_future(fut)
+                rti_fsp.runtime.tasks["ws"] = rti_fsp.runtime.endpoint._connect_task
 
                 print("Reconfigured connection with TLS enabled:", request.enable_tls)
                 return JSONResponse(
@@ -1103,6 +1104,8 @@ def create_bff_router(
                 host = request.host
                 oauth_port = request.port
 
+                print("the received request is: ", request)
+
                 loop = rti_fsp.runtime.loop
                 if loop is None or not loop.is_running():
                     print("server not running, starting server instance")
@@ -1113,18 +1116,20 @@ def create_bff_router(
 
                 fut = asyncio.run_coroutine_threadsafe(
                     rti_fsp.runtime.endpoint.reconfigure_oauth(
-                        host,
-                        oauth_port,
-                        cp,
-                        request.enable_oauth,
-                        request.token_endpoint_url,
-                        request.client_id,
-                        request.client_secret,
-                        request.ca_certificate,
+                        host=host,
+                        port=oauth_port,
+                        cp=cp,
+                        oauth_enable=request.enable_oauth,
+                        token_endpoint=request.token_endpoint_url,
+                        client_id=request.client_id,
+                        client_secret=request.client_secret,
+                        kc_cert=request.ca_certificate,
+                        enable_token_refresh=request.enable_token_refresh,
                     ),
                     loop,
                 )
                 await asyncio.wrap_future(fut)
+                rti_fsp.runtime.tasks["ws"] = rti_fsp.runtime.endpoint._connect_task
 
                 return JSONResponse(
                     content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
