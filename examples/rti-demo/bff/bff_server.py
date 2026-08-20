@@ -87,6 +87,13 @@ class ConnectionCreateRequest(BaseModel):
     acsi: Optional[str] = Field(default=None, description="ACSI role (server/client)", json_schema_extra={"example": "server"})
     ws_mode: Optional[str] = Field(default=None, description="WebSocket mode", json_schema_extra={"example": ""})
     endpoint: Optional[str] = Field(default=None, description="Endpoint path for IDP-Server", json_schema_extra={"example": "/idp"})
+    certificate_endpoint: Optional[str] = Field(default=None, description="Certificate endpoint for OAuth", json_schema_extra={"example": "https://localhost:8443/certs"})
+    auth_server_ca: Optional[str] = Field(default=None, description="Auth server CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    realm: Optional[str] = Field(default=None, description="OAuth realm for FSP", json_schema_extra={"example": "master"})
+    token_endpoint: Optional[str] = Field(default=None, description="OAuth token endpoint for FSP", json_schema_extra={"example": "https://localhost:8443/auth/realms/master/protocol/openid-connect/token"})
+    client_id: Optional[str] = Field(default=None, description="OAuth client ID for FSP", json_schema_extra={"example": "rti-fsp-client"})
+    client_secret: Optional[str] = Field(default=None, description="OAuth client secret for FSP")
+    enable_token_refresh: Optional[bool] = Field(default=None, description="Enable token refresh for FSP", json_schema_extra={"example": True})
     auto_discovered: bool = Field(default=False, description="Whether this connection was auto-discovered")
 
 class TLSConnectionCreateConfigRequest(BaseModel):
@@ -107,6 +114,13 @@ class ConnectionUpdateRequest(BaseModel):
     acsi: Optional[str] = Field(default=None, description="ACSI role (server/client)")
     ws_mode: Optional[str] = Field(default=None, description="WebSocket mode")
     endpoint: Optional[str] = Field(default=None, description="Endpoint path for IDP-Server")
+    certificate_endpoint: Optional[str] = Field(default=None, description="Certificate endpoint for OAuth")
+    auth_server_ca: Optional[str] = Field(default=None, description="Auth server CA certificate")
+    realm: Optional[str] = Field(default=None, description="OAuth realm for FSP")
+    token_endpoint: Optional[str] = Field(default=None, description="OAuth token endpoint for FSP")
+    client_id: Optional[str] = Field(default=None, description="OAuth client ID for FSP")
+    client_secret: Optional[str] = Field(default=None, description="OAuth client secret for FSP")
+    enable_token_refresh: Optional[bool] = Field(default=None, description="Enable token refresh for FSP")
     status: Optional[str] = Field(default=None, description="Connection status")
 
 
@@ -407,7 +421,11 @@ class ConnectionManager:
             logger.error(f"Error saving connections: {e}")
     
     def add_connection(self, name: str, host: Optional[str] = None, port: Optional[int] = None, conn_type: str = "", 
-                      acsi: Optional[str] = None, ws_mode: Optional[str] = None, endpoint: Optional[str] = None, auto_discovered: bool = False) -> Dict:
+                      acsi: Optional[str] = None, ws_mode: Optional[str] = None, endpoint: Optional[str] = None, 
+                      certificate_endpoint: Optional[str] = None, auth_server_ca: Optional[str] = None, 
+                      realm: Optional[str] = None, token_endpoint: Optional[str] = None, 
+                      client_id: Optional[str] = None, client_secret: Optional[str] = None, 
+                      enable_token_refresh: Optional[bool] = None, auto_discovered: bool = False) -> Dict:
         """Add a new connection.
         
         Args:
@@ -472,8 +490,26 @@ class ConnectionManager:
         }
         
         # Add endpoint for IDP-Server
-        if conn_type == 'IDP-Server' and endpoint:
+        if conn_type == 'IDP-Server' and endpoint is not None:
             connection['endpoint'] = endpoint
+        
+        # Add OAuth fields if provided
+        if certificate_endpoint is not None:
+            connection['certificate_endpoint'] = certificate_endpoint
+        if auth_server_ca is not None:
+            connection['auth_server_ca'] = auth_server_ca
+        
+        # Add FSP-specific OAuth fields if provided
+        if realm is not None:
+            connection['realm'] = realm
+        if token_endpoint is not None:
+            connection['token_endpoint'] = token_endpoint
+        if client_id is not None:
+            connection['client_id'] = client_id
+        if client_secret is not None:
+            connection['client_secret'] = client_secret
+        if enable_token_refresh is not None:
+            connection['enable_token_refresh'] = enable_token_refresh
         
         self.connections.append(connection)
         self.save_connections()
@@ -1313,6 +1349,13 @@ async def create_connection(request: ConnectionCreateRequest):
         acsi=request.acsi,
         ws_mode=request.ws_mode,
         endpoint=request.endpoint,
+        certificate_endpoint=request.certificate_endpoint,
+        auth_server_ca=request.auth_server_ca,
+        realm=request.realm,
+        token_endpoint=request.token_endpoint,
+        client_id=request.client_id,
+        client_secret=request.client_secret,
+        enable_token_refresh=request.enable_token_refresh,
         auto_discovered=request.auto_discovered
     )
     conn_manager.save_connections()
@@ -1405,6 +1448,20 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         connection['ws_mode'] = request.ws_mode
     if request.endpoint is not None:
         connection['endpoint'] = request.endpoint
+    if request.certificate_endpoint is not None:
+        connection['certificate_endpoint'] = request.certificate_endpoint
+    if request.auth_server_ca is not None:
+        connection['auth_server_ca'] = request.auth_server_ca
+    if request.realm is not None:
+        connection['realm'] = request.realm
+    if request.token_endpoint is not None:
+        connection['token_endpoint'] = request.token_endpoint
+    if request.client_id is not None:
+        connection['client_id'] = request.client_id
+    if request.client_secret is not None:
+        connection['client_secret'] = request.client_secret
+    if request.enable_token_refresh is not None:
+        connection['enable_token_refresh'] = request.enable_token_refresh
     if request.status is not None:
         connection['status'] = request.status
     

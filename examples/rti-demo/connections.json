@@ -11,7 +11,12 @@
     "properties_info": {
       "available": false,
       "error": "HTTPConnectionPool(host='127.0.0.1', port=5002): Max retries exceeded with url: /api/properties (Caused by NewConnectionError(\"HTTPConnection(host='127.0.0.1', port=5002): Failed to establish a new connection: [Errno 111] Connection refused\"))"
-    }
+    },
+    "acsi": "client",
+    "ws_mode": "passive",
+    "endpoint": "",
+    "certificate_endpoint": "https://localhost:8443/realms/iec61850-websocket/protocol/openid-connect/certs",
+    "auth_server_ca": "-----BEGIN CERTIFICATE-----\nMIIDjzCCAnegAwIBAgIUEdejLY81yBEs3hCM3K73pBb8SkMwDQYJKoZIhvcNAQEL\nBQAwbDELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEjAQ\nBgNVBAMMCWtleWNsb2FjazAeFw0yNTA4MTMxNDM3MjhaFw0zNTA4MTExNDM3Mjha\nMGwxCzAJBgNVBAYTAkRFMQswCQYDVQQIDAJCVzERMA8GA1UEBwwIRnJlaWJ1cmcx\nGzAZBgNVBAoMEk1aIEF1dG9tYXRpb24gR21iSDEMMAoGA1UECwwDUiZEMRIwEAYD\nVQQDDAlrZXljbG9hY2swggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDu\nnXFutSb7aybJy1I8o0PWOvQYPnPaQe8m/RlU5tn/CZK3wPvZUJScEL8rLOA9Z2D9\nTk226HfW54pimYkoEvhXMo1gzVyO6g4virnUWfL1PJX0BQPRj38cXZ4gBVcBPJ6N\nhfjMnA+HZ5OQPybtNAlTrObdMA5VoKLmTv/vM2COVPkV1l57bMt6GYkV5fn+NSnz\nnhoPxybqtkTvVARptcDeBiEDZ5G5KNtm94jhVHgEQRwisp+Jz+Ay+sntuWaQgkRJ\nT5X7yx1JtV1fSau6xf0qOqZKDD2Kt+qvgMk6Q+1WluCi8BUNv8RdRSS13sjlyyjD\nkwuwMw/r/R9f9XdG1CYPAgMBAAGjKTAnMCUGA1UdEQQeMByCCWtleWNsb2Fja4IJ\nbG9jYWxob3N0hwR/AAABMA0GCSqGSIb3DQEBCwUAA4IBAQCjHojfNCHbgqLqbSyi\nFnMQ4DxzWtw2Nk1PxKJvGoqfrs2dHdB8zvlEuBxIAKWcTkb8WngudRCtBFDM3pJE\nxkCxcPmcyLK5yolI5lZx0Ozc1hjKQxh28mtOC/EwZQzLlOddwEHytX6ZlMSC5Q1u\n26l8mf3bljQDolqWTLEF4Mpkn5X3UQWw9VI8Eo8t7/DBC9Ozu2DEcbNPMahsCJ5G\nkoMt0NrQN5hCr9LXnNida4vjLaSjUb/ksI4TYRismKVlea/ztjrn6mwiid6Au4P2\nWhTfH15GYOcKKD2/v9SGMGSHb3ewaaiRuhlaTsJzb9wS8zVKIMEL11iDOjyJ5wfd\nzpFA\n-----END CERTIFICATE-----\n"
   },
   {
     "id": 7,
@@ -27,7 +32,15 @@
       "error": "HTTPConnectionPool(host='127.0.0.1', port=5001): Max retries exceeded with url: /api/properties (Caused by NewConnectionError(\"HTTPConnection(host='127.0.0.1', port=5001): Failed to establish a new connection: [Errno 111] Connection refused\"))"
     },
     "acsi": "server",
-    "ws_mode": "active"
+    "ws_mode": "active",
+    "endpoint": "",
+    "certificate_endpoint": "https://localhost:8443/realms/iec61850-websocket/protocol/openid-connect/certs",
+    "auth_server_ca": "-----BEGIN CERTIFICATE-----\nMIIDjzCCAnegAwIBAgIUEdejLY81yBEs3hCM3K73pBb8SkMwDQYJKoZIhvcNAQEL\nBQAwbDELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEjAQ\nBgNVBAMMCWtleWNsb2FjazAeFw0yNTA4MTMxNDM3MjhaFw0zNTA4MTExNDM3Mjha\nMGwxCzAJBgNVBAYTAkRFMQswCQYDVQQIDAJCVzERMA8GA1UEBwwIRnJlaWJ1cmcx\nGzAZBgNVBAoMEk1aIEF1dG9tYXRpb24gR21iSDEMMAoGA1UECwwDUiZEMRIwEAYD\nVQQDDAlrZXljbG9hY2swggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDu\nnXFutSb7aybJy1I8o0PWOvQYPnPaQe8m/RlU5tn/CZK3wPvZUJScEL8rLOA9Z2D9\nTk226HfW54pimYkoEvhXMo1gzVyO6g4virnUWfL1PJX0BQPRj38cXZ4gBVcBPJ6N\nhfjMnA+HZ5OQPybtNAlTrObdMA5VoKLmTv/vM2COVPkV1l57bMt6GYkV5fn+NSnz\nnhoPxybqtkTvVARptcDeBiEDZ5G5KNtm94jhVHgEQRwisp+Jz+Ay+sntuWaQgkRJ\nT5X7yx1JtV1fSau6xf0qOqZKDD2Kt+qvgMk6Q+1WluCi8BUNv8RdRSS13sjlyyjD\nkwuwMw/r/R9f9XdG1CYPAgMBAAGjKTAnMCUGA1UdEQQeMByCCWtleWNsb2Fja4IJ\nbG9jYWxob3N0hwR/AAABMA0GCSqGSIb3DQEBCwUAA4IBAQCjHojfNCHbgqLqbSyi\nFnMQ4DxzWtw2Nk1PxKJvGoqfrs2dHdB8zvlEuBxIAKWcTkb8WngudRCtBFDM3pJE\nxkCxcPmcyLK5yolI5lZx0Ozc1hjKQxh28mtOC/EwZQzLlOddwEHytX6ZlMSC5Q1u\n26l8mf3bljQDolqWTLEF4Mpkn5X3UQWw9VI8Eo8t7/DBC9Ozu2DEcbNPMahsCJ5G\nkoMt0NrQN5hCr9LXnNida4vjLaSjUb/ksI4TYRismKVlea/ztjrn6mwiid6Au4P2\nWhTfH15GYOcKKD2/v9SGMGSHb3ewaaiRuhlaTsJzb9wS8zVKIMEL11iDOjyJ5wfd\nzpFA\n-----END CERTIFICATE-----\n",
+    "realm": "iec61850-websocket",
+    "token_endpoint": "https://localhost:8443/realms/iec61850-websocket",
+    "client_id": "rti-fsp",
+    "client_secret": "Af901GzeYXmZAqtJc03jGkHLEwgyPyHN",
+    "enable_token_refresh": true
   },
   {
     "id": 4,
@@ -108,6 +121,7 @@
     "ws_mode": "",
     "auto_discovered": false,
     "created_at": "2026-08-20T17:33:37.544481",
-    "endpoint": "https://localhost:8443"
+    "endpoint": "https://localhost:8443",
+    "status": "connected"
   }
 ]

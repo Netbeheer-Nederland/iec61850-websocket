@@ -15,7 +15,14 @@ function Setup({ settings }) {
     type: 'RTI-SO',
     acsi: 'server',
     ws_mode: '',
-    endpoint: ''
+    endpoint: '',
+    certificate_endpoint: '',
+    auth_server_ca: '',
+    realm: '',
+    token_endpoint: '',
+    client_id: '',
+    client_secret: '',
+    enable_token_refresh: false
   });
   const [loading, setLoading] = useState(true);
   const [bffError, setBffError] = useState(null);
@@ -86,7 +93,7 @@ function Setup({ settings }) {
   // Add connection
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '' });
+    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '', certificate_endpoint: '', auth_server_ca: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false });
     setShowModal(true);
   };
 
@@ -100,7 +107,14 @@ function Setup({ settings }) {
       type: conn.type || 'RTI-SO',
       acsi: conn.acsi || 'server',
       ws_mode: conn.ws_mode || '',
-      endpoint: conn.endpoint || ''
+      endpoint: conn.endpoint || '',
+      certificate_endpoint: conn.certificate_endpoint || '',
+      auth_server_ca: conn.auth_server_ca || '',
+      realm: conn.realm || '',
+      token_endpoint: conn.token_endpoint || '',
+      client_id: conn.client_id || '',
+      client_secret: conn.client_secret || '',
+      enable_token_refresh: conn.enable_token_refresh || false
     });
     setShowModal(true);
   };
@@ -143,12 +157,17 @@ function Setup({ settings }) {
         return;
       }
 
+      // Add auth_server_ca to formData if it exists
+      // Note: authServerCa is managed in ConnectionModal component state, not in formData
+      // For now, we'll include it in the save
+      const saveData = { ...formData };
+
       if (currentConnection) {
         // Update existing connection
         const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/edit-connection/${currentConnection.name}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify(saveData)
         });
         if (response.ok) {
           fetchConnections();
@@ -159,7 +178,7 @@ function Setup({ settings }) {
         const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/add-connection`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify(saveData)
         });
         if (response.ok) {
           fetchConnections();
@@ -286,6 +305,7 @@ function Setup({ settings }) {
         onClose={() => setShowModal(false)}
         currentConnection={currentConnection}
         formData={formData}
+        connections={connections}
         onFormChange={setFormData}
         onSave={handleSaveConnection}
       />

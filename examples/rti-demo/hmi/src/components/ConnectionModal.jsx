@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function ConnectionModal({ 
   settings, 
@@ -6,15 +6,35 @@ function ConnectionModal({
   onClose, 
   currentConnection, 
   formData, 
+  connections = [],
   onFormChange,
   onSave 
 }) {
+  const [selectedIdpServer, setSelectedIdpServer] = useState('');
+
+  // Get IDP-Server connections
+  const idpServers = connections.filter(conn => conn.type === 'IDP-Server');
+
   const handleInputChange = (e) => {
     const { id, value, type } = e.target;
     onFormChange(prev => ({
       ...prev,
       [id]: type === 'number' ? parseInt(value) : value
     }));
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target.result;
+      onFormChange(prev => ({
+        ...prev,
+        auth_server_ca: content
+      }));
+    };
+    reader.readAsText(file);
   };
 
   // Sync ACSI and ws_mode when type changes or modal opens
@@ -37,6 +57,29 @@ function ConnectionModal({
   useEffect(() => {
     syncAcsiAndWsMode(formData.type, formData.acsi, formData.ws_mode);
   }, [formData.type, formData.acsi, formData.ws_mode]);
+
+  // Reset IDP fields when modal opens
+  useEffect(() => {
+    if (showModal) {
+      setSelectedIdpServer('');
+    }
+  }, [showModal]);
+
+  // Auto-populate certificate endpoint when IDP server is selected
+  // Update both state and formData in the onChange handler to avoid timing issues
+  const handleIdpServerChange = (e) => {
+    const serverName = e.target.value;
+    setSelectedIdpServer(serverName);
+    if (serverName) {
+      const selected = idpServers.find(server => server.name === serverName);
+      if (selected && selected.endpoint) {
+        onFormChange(prev => ({
+          ...prev,
+          certificate_endpoint: selected.endpoint
+        }));
+      }
+    }
+  };
 
   const handleTypeChange = (e) => {
     const { value } = e.target;
@@ -147,6 +190,111 @@ function ConnectionModal({
                       <option value="active">Active</option>
                       <option value="passive">Passive</option>
                     </select>
+                  </div>
+                </>
+              )}
+              
+              {/* IDP Server fields for SO and FSP types */}
+              {(formData.type === 'RTI-SO' || formData.type === 'RTI-FSP') && idpServers.length > 0 && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="idp_server">IDP Server</label>
+                    <select 
+                      id="idp_server"
+                      value={selectedIdpServer} 
+                      onChange={handleIdpServerChange}
+                    >
+                      <option value="">Select an IDP Server...</option>
+                      {idpServers.map(server => (
+                        <option key={server.name} value={server.name}>{server.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="certificate_endpoint">Certificate Endpoint</label>
+                    <input 
+                      type="text" 
+                      id="certificate_endpoint" 
+                      value={formData.certificate_endpoint || ''} 
+                      onChange={handleInputChange}
+                      placeholder="e.g., https://localhost:8443/certs"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="auth_server_ca">Auth Server CA</label>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+                      <input 
+                        type="file" 
+                        id="auth_server_ca_file" 
+                        accept=".pem,.crt,.cer" 
+                        onChange={handleFileUpload}
+                      />
+                    </div>
+                    <textarea 
+                      id="auth_server_ca"
+                      value={formData.auth_server_ca || ''}
+                      onChange={handleInputChange}
+                      placeholder="-----BEGIN CERTIFICATE-----..."
+                      style={{ minHeight: '80px', fontFamily: 'monospace' }}
+                    />
+                  </div>
+                </>
+              )}
+              
+              {/* FSP-specific OAuth fields when IDP server exists */}
+              {formData.type === 'RTI-FSP' && idpServers.length > 0 && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="realm">Realm</label>
+                    <input 
+                      type="text" 
+                      id="realm" 
+                      value={formData.realm || ''} 
+                      onChange={handleInputChange}
+                      placeholder="e.g., master"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="token_endpoint">Token Endpoint</label>
+                    <input 
+                      type="text" 
+                      id="token_endpoint" 
+                      value={formData.token_endpoint || ''} 
+                      onChange={handleInputChange}
+                      placeholder="e.g., https://localhost:8443/auth/realms/master/protocol/openid-connect/token"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="client_id">Client ID</label>
+                    <input 
+                      type="text" 
+                      id="client_id" 
+                      value={formData.client_id || ''} 
+                      onChange={handleInputChange}
+                      placeholder="e.g., rti-fsp-client"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="client_secret">Client Secret</label>
+                    <input 
+                      type="password" 
+                      id="client_secret" 
+                      value={formData.client_secret || ''} 
+                      onChange={handleInputChange}
+                      placeholder="Client secret"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="enable_token_refresh">Enable Token Refresh</label>
+                    <input 
+                      type="checkbox" 
+                      id="enable_token_refresh" 
+                      checked={formData.enable_token_refresh || false}
+                      onChange={(e) => onFormChange(prev => ({
+                        ...prev,
+                        enable_token_refresh: e.target.checked
+                      }))}
+                    />
                   </div>
                 </>
               )}
