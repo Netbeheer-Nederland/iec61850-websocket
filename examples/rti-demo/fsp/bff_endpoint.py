@@ -22,6 +22,35 @@ from pydantic import BaseModel, Field, ConfigDict
 import ssl
 from ws61850.security.tls import TLSConfig
 import asyncio
+import json
+
+# ==================== Helper Functions ====================
+
+def _find_connections_file() -> str:
+    """Find the connections.json file path using the same logic as BFF server."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.exists('/app'):
+        return '/app/connections.json'
+    elif os.path.exists(os.path.join(script_dir, 'connections.json')):
+        return os.path.join(script_dir, 'connections.json')
+    else:
+        parent_dir = os.path.dirname(script_dir)
+        if os.path.exists(os.path.join(parent_dir, 'connections.json')):
+            return os.path.join(parent_dir, 'connections.json')
+        return os.path.join(script_dir, 'connections.json')
+
+
+def _load_connections_from_file() -> list:
+    """Load connections from connections.json file."""
+    connections_file = _find_connections_file()
+    if os.path.exists(connections_file):
+        try:
+            with open(connections_file, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading connections: {e}")
+    return []
+
 
 # ==================== Pydantic Models ====================
 class WritevalueRequest(BaseModel):
@@ -130,60 +159,19 @@ class TLSConnectionCreateConfigRequest(BaseModel):
     ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
 
 class OAUTHCreateConfigRequest(BaseModel):
-    """Request body for creating a new connection."""
-
-    host: str = Field(
-        default="0.0.0.0",
-        description="Hostname or IP address to bind to",
-        json_schema_extra={"example": "0.0.0.0"}
-    )
-    port: str = Field(
-        default="8765",
-        description="Port number to listen on",
-        json_schema_extra={"example": "8765"}
-    )
-
-    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
-    enable_oauth: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
-
-    certificate_endpoint_url: str | None = Field(
-        default=None,
-        description="OAuth Certificate endpoint URL",
-        json_schema_extra={"example": "https://auth.example.com/certs"},
-    )
-    token_issuer_url: str | None = Field(
-        default=None,
-        description="token issuer url",
-        json_schema_extra={"example": "https://auth.example.com"},
-    )
-    ca_certificate: str | None = Field(
-        default=None,
-        description="Server CA certificate",
-        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
-    )
-
-    token_endpoint_url: str | None = Field(
-        default=None,
-        description="OAuth Token endpoint URL",
-        json_schema_extra={"example": "https://auth.example.com/token"},
-    )
-
-    client_id: str | None = Field(
-        default=None,
-        description="OAuth Client ID",
-        json_schema_extra={"example": "my-client-id"},
-    )
-
-    client_secret: str | None = Field(
-        default=None,
-        description="OAuth Client Secret",
-        json_schema_extra={"example": "my-client-secret"},
-    )
-
+    """Request body for OAuth reconfiguration."""
+    connection_name: Optional[str] = Field(default=None, description="Connection name (optional, auto-detected)", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_oauth: bool = Field(default=False, description="Enable OAuth authentication", json_schema_extra={"example": False})
+    host: str = Field(default="127.0.0.1", description="ws host", json_schema_extra={"example": "127.0.0.1"})
+    port: str = Field(default="8765", description="ws port", json_schema_extra={"example": "8765"})
+    cp: str = Field(default="cp1", description="Communication point identifier", json_schema_extra={"example": "cp1"})
+    ws_mode: str = Field(default="active", description="WebSocket mode (passive or active)", json_schema_extra={"example": "active"})
+    # OAuth settings for FSP (active mode)
+    token_endpoint_url: Optional[str] = Field(default=None, description="OAuth Token endpoint URL", json_schema_extra={"example": "https://auth.example.com/token"})
+    client_id: Optional[str] = Field(default=None, description="OAuth Client ID", json_schema_extra={"example": "my-client-id"})
+    client_secret: Optional[str] = Field(default=None, description="OAuth Client Secret", json_schema_extra={"example": "my-client-secret"})
+    ca_certificate: Optional[str] = Field(default=None, description="Server CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
     enable_token_refresh: bool = Field(default=False, description="Enable token refresh", json_schema_extra={"example": False})
-
-    ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
-
 
 def create_bff_router(
     factory_dir,
@@ -1096,54 +1084,59 @@ def create_bff_router(
         tags=["Client Status"]
     )
     async def api_reconfig_oauth(request: OAUTHCreateConfigRequest):
-        """Reconfigure the connection with a new communication point."""
+        """Reconfigure OAuth settings. OAuth config should be provided in the request by BFF."""
         try:
-            if request.ws_mode.lower() == "active":
-                cp = os.getenv("CP", "cp1")
+            cp = request.cp or os.getenv("CP", "cp1")
+            host = request.host
+            oauth_port = request.port
+            
+            # Get OAuth settings from request (BFF should provide these from connections.json)
+            token_endpoint = getattr(request, 'token_endpoint_url', None) or getattr(request, 'token_endpoint', None)
+            client_id = getattr(request, 'client_id', None)
+            client_secret = getattr(request, 'client_secret', None)
+            ca_certificate = getattr(request, 'ca_certificate', None)
+            enable_token_refresh = getattr(request, 'enable_token_refresh', False)
+            
+            connection_name = request.connection_name or "unknown"
+            
+            # Validate that required OAuth settings are provided
+            if request.enable_oauth and not token_endpoint:
+                raise ValueError(f"token_endpoint is required for OAuth but was not provided in request for connection: {connection_name}")
+            
+            print("Reconfiguring OAuth with connection: ", connection_name)
 
-                host = request.host
-                oauth_port = request.port
+            loop = rti_fsp.runtime.loop
+            if loop is None or not loop.is_running():
+                print("server not running, starting server instance")
+                rti_fsp.start_server(host, int(oauth_port))
+                loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
 
-                print("the received request is: ", request)
+            # Call reconfigure_oauth with settings from connection
+            fut = asyncio.run_coroutine_threadsafe(
+                rti_fsp.runtime.endpoint.reconfigure_oauth(
+                    host=host,
+                    port=str(oauth_port),
+                    cp=cp,
+                    oauth_enable=request.enable_oauth,
+                    token_endpoint=token_endpoint,
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    kc_cert=ca_certificate,
+                    enable_token_refresh=enable_token_refresh,
+                ),
+                loop,
+            )
+            await asyncio.wrap_future(fut)
+            rti_fsp.runtime.tasks["ws"] = rti_fsp.runtime.endpoint._connect_task
 
-                loop = rti_fsp.runtime.loop
-                if loop is None or not loop.is_running():
-                    print("server not running, starting server instance")
-                    rti_fsp.start_server(host, int(oauth_port))
-                    loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
-
-
-
-                fut = asyncio.run_coroutine_threadsafe(
-                    rti_fsp.runtime.endpoint.reconfigure_oauth(
-                        host=host,
-                        port=oauth_port,
-                        cp=cp,
-                        oauth_enable=request.enable_oauth,
-                        token_endpoint=request.token_endpoint_url,
-                        client_id=request.client_id,
-                        client_secret=request.client_secret,
-                        kc_cert=request.ca_certificate,
-                        enable_token_refresh=request.enable_token_refresh,
-                    ),
-                    loop,
-                )
-                await asyncio.wrap_future(fut)
-                rti_fsp.runtime.tasks["ws"] = rti_fsp.runtime.endpoint._connect_task
-
-                return JSONResponse(
-                    content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
-                             "enable_oauth": request.enable_oauth},
-                    status_code=200,
-                )
-            else:
-                return JSONResponse(
-                    content={"ok": False, "error": "Only active mode is supported for reconfiguration."},
-                    status_code=400,
-                )
+            return JSONResponse(
+                content={"ok": True, "status": "reconfigured", "ws_mode": "active",
+                         "enable_oauth": request.enable_oauth},
+                status_code=200,
+            )
         except Exception as exc:
-            print("entered here: ", exc)
-            rti_fsp._log_action(f"Reconfig connection failed: {exc}", "error")
+            print("Reconfig OAuth error: ", exc)
+            rti_fsp._log_action(f"Reconfig OAuth failed: {exc}", "error")
             return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
 
     @router.get(

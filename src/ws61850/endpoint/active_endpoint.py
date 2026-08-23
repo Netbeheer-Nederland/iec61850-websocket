@@ -190,14 +190,13 @@ class ActiveEndpoint:
                                 client_id=None, client_secret=None, kc_cert=None,
                                 enable_token_refresh=False):
 
-        print(f"### DIAG reconfigure_oauth called with enable_token_refresh={enable_token_refresh!r}")
-
         self._oauth_enable = oauth_enable
         self._assoc_handler._kc_cert = kc_cert
         self._assoc_handler._token_endpoint = token_endpoint
 
         cafile = None
         if kc_cert:
+            print(f"### DIAG kc_cert repr (first 80 chars): {kc_cert[:80]!r}")
             cert_file = tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False)
             cert_file.write(kc_cert)
             cert_file.flush()
@@ -209,13 +208,6 @@ class ActiveEndpoint:
             client_secret=client_secret, cafile=cafile,
         )
         access_token = await client_con_provider.get_access_token()
-        print("the access token:", access_token, "| refresh enabled:", enable_token_refresh)
-
-        payload_b64 = access_token.split(".")[1]
-        payload_b64 += "=" * (-len(payload_b64) % 4)
-        claims = json.loads(base64.urlsafe_b64decode(payload_b64))
-        print(f"### DIAG JWT exp={claims.get('exp')} iat={claims.get('iat')} now={int(_time.time())} "
-              f"seconds_until_expiry={claims.get('exp', 0) - int(_time.time())}")
 
         if oauth_enable:
             previous_task = self._connect_task  # capture BEFORE creating the new task

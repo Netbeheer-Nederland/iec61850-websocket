@@ -451,20 +451,78 @@ class ConnectionManager:
         connection_in_file = next((c for c in self.connections
                          if c['name'] == name), None)
         if connection_in_file:
-            # For IDP-Server, only update name, type, and endpoint
+            # Track old host:port for _bff_clients cleanup (for non-IDP-Server types)
+            old_key = f"{connection_in_file.get('host')}:{connection_in_file.get('port')}" if connection_in_file.get('host') and connection_in_file.get('port') else None
+            
             if conn_type == 'IDP-Server':
                 connection_in_file['type'] = conn_type
                 if endpoint is not None:
                     connection_in_file['endpoint'] = endpoint
-            else:
-                # Track old host:port for _bff_clients cleanup
-                old_key = f"{connection_in_file.get('host')}:{connection_in_file.get('port')}"
                 
+                # For IDP-Server, also update OAuth fields
+                # Create OAuth object if any OAuth fields are provided
+                oauth_fields = {}
+                if certificate_endpoint is not None:
+                    oauth_fields['certificate_endpoint'] = certificate_endpoint
+                if auth_server_ca is not None:
+                    oauth_fields['auth_server_ca'] = auth_server_ca
+                if realm is not None:
+                    oauth_fields['realm'] = realm
+                if token_endpoint is not None:
+                    oauth_fields['token_endpoint'] = token_endpoint
+                if client_id is not None:
+                    oauth_fields['client_id'] = client_id
+                if client_secret is not None:
+                    oauth_fields['client_secret'] = client_secret
+                if enable_token_refresh is not None:
+                    oauth_fields['enable_token_refresh'] = enable_token_refresh
+                
+                if oauth_fields:
+                    if 'OAuth' not in connection_in_file:
+                        connection_in_file['OAuth'] = {}
+                    connection_in_file['OAuth'].update(oauth_fields)
+                
+                # Clean up any OAuth fields that were previously at top level
+                top_level_oauth_fields = ['certificate_endpoint', 'auth_server_ca', 'realm', 
+                                           'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh']
+                for field in top_level_oauth_fields:
+                    if field in connection_in_file:
+                        del connection_in_file[field]
+            else:
                 connection_in_file['host'] = host
                 connection_in_file['port'] = port
                 connection_in_file['type'] = conn_type
                 connection_in_file['acsi'] = acsi
                 connection_in_file['ws_mode'] = ws_mode
+                
+                # Update OAuth fields for non-IDP-Server types
+                oauth_fields = {}
+                if certificate_endpoint is not None:
+                    oauth_fields['certificate_endpoint'] = certificate_endpoint
+                if auth_server_ca is not None:
+                    oauth_fields['auth_server_ca'] = auth_server_ca
+                if realm is not None:
+                    oauth_fields['realm'] = realm
+                if token_endpoint is not None:
+                    oauth_fields['token_endpoint'] = token_endpoint
+                if client_id is not None:
+                    oauth_fields['client_id'] = client_id
+                if client_secret is not None:
+                    oauth_fields['client_secret'] = client_secret
+                if enable_token_refresh is not None:
+                    oauth_fields['enable_token_refresh'] = enable_token_refresh
+                
+                if oauth_fields:
+                    if 'OAuth' not in connection_in_file:
+                        connection_in_file['OAuth'] = {}
+                    connection_in_file['OAuth'].update(oauth_fields)
+                
+                # Clean up any OAuth fields that were previously at top level
+                top_level_oauth_fields = ['certificate_endpoint', 'auth_server_ca', 'realm', 
+                                           'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh']
+                for field in top_level_oauth_fields:
+                    if field in connection_in_file:
+                        del connection_in_file[field]
                 
                 # Update _bff_clients if host or port changed
                 new_key = f"{host}:{port}"
@@ -493,23 +551,25 @@ class ConnectionManager:
         if conn_type == 'IDP-Server' and endpoint is not None:
             connection['endpoint'] = endpoint
         
-        # Add OAuth fields if provided
+        # Create OAuth object if any OAuth fields are provided
+        oauth_fields = {}
         if certificate_endpoint is not None:
-            connection['certificate_endpoint'] = certificate_endpoint
+            oauth_fields['certificate_endpoint'] = certificate_endpoint
         if auth_server_ca is not None:
-            connection['auth_server_ca'] = auth_server_ca
-        
-        # Add FSP-specific OAuth fields if provided
+            oauth_fields['auth_server_ca'] = auth_server_ca
         if realm is not None:
-            connection['realm'] = realm
+            oauth_fields['realm'] = realm
         if token_endpoint is not None:
-            connection['token_endpoint'] = token_endpoint
+            oauth_fields['token_endpoint'] = token_endpoint
         if client_id is not None:
-            connection['client_id'] = client_id
+            oauth_fields['client_id'] = client_id
         if client_secret is not None:
-            connection['client_secret'] = client_secret
+            oauth_fields['client_secret'] = client_secret
         if enable_token_refresh is not None:
-            connection['enable_token_refresh'] = enable_token_refresh
+            oauth_fields['enable_token_refresh'] = enable_token_refresh
+        
+        if oauth_fields:
+            connection['OAuth'] = oauth_fields
         
         self.connections.append(connection)
         self.save_connections()
@@ -1448,22 +1508,38 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         connection['ws_mode'] = request.ws_mode
     if request.endpoint is not None:
         connection['endpoint'] = request.endpoint
-    if request.certificate_endpoint is not None:
-        connection['certificate_endpoint'] = request.certificate_endpoint
-    if request.auth_server_ca is not None:
-        connection['auth_server_ca'] = request.auth_server_ca
-    if request.realm is not None:
-        connection['realm'] = request.realm
-    if request.token_endpoint is not None:
-        connection['token_endpoint'] = request.token_endpoint
-    if request.client_id is not None:
-        connection['client_id'] = request.client_id
-    if request.client_secret is not None:
-        connection['client_secret'] = request.client_secret
-    if request.enable_token_refresh is not None:
-        connection['enable_token_refresh'] = request.enable_token_refresh
     if request.status is not None:
         connection['status'] = request.status
+    
+    # Handle OAuth fields - nest them under OAuth object
+    oauth_fields = {}
+    if request.certificate_endpoint is not None:
+        oauth_fields['certificate_endpoint'] = request.certificate_endpoint
+    if request.auth_server_ca is not None:
+        oauth_fields['auth_server_ca'] = request.auth_server_ca
+    if request.realm is not None:
+        oauth_fields['realm'] = request.realm
+    if request.token_endpoint is not None:
+        oauth_fields['token_endpoint'] = request.token_endpoint
+    if request.client_id is not None:
+        oauth_fields['client_id'] = request.client_id
+    if request.client_secret is not None:
+        oauth_fields['client_secret'] = request.client_secret
+    if request.enable_token_refresh is not None:
+        oauth_fields['enable_token_refresh'] = request.enable_token_refresh
+    
+    # If we have OAuth fields, create/update the OAuth object
+    if oauth_fields:
+        if 'OAuth' not in connection:
+            connection['OAuth'] = {}
+        connection['OAuth'].update(oauth_fields)
+    
+    # Clean up any OAuth fields that were previously at top level
+    top_level_oauth_fields = ['certificate_endpoint', 'auth_server_ca', 'realm', 
+                               'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh']
+    for field in top_level_oauth_fields:
+        if field in connection:
+            del connection[field]
     
     # Update _bff_clients if host or port changed
     new_host = connection.get('host')
@@ -1687,6 +1763,47 @@ async def execute_dynamic_api(request: ExecuteRequest):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="target and path are required"
         )
+
+    # Special handling for OAuth reconfiguration
+    # When HMI calls /reconfig-oauth, BFF needs to enrich the request with OAuth settings from connections.json
+    if path == "/reconfig-oauth" and body and isinstance(body, dict):
+        connection_name = body.get("connection_name")
+        if connection_name:
+            # Look up the connection
+            connection = conn_manager.get_connection(connection_name)
+            if connection:
+                # Get OAuth config from connection
+                oauth_config = connection.get("OAuth", {})
+                
+                # Extract cp from connection
+                cp = connection.get("cp") or body.get("cp", "cp1")
+                
+                # Enrich the request body with OAuth fields from the connection
+                # Only add fields that exist in the OAuth config and are not already in the body
+                enriched_body = dict(body)
+                
+                # Add cp if not already present
+                if "cp" not in enriched_body:
+                    enriched_body["cp"] = cp
+                
+                # Add OAuth fields from connection if not already in body
+                # Map connection field names to request field names
+                oauth_fields = {
+                    "token_endpoint_url": oauth_config.get("token_endpoint") or oauth_config.get("token_issuer"),
+                    "certificate_endpoint_url": oauth_config.get("certificate_endpoint"),
+                    "token_issuer_url": oauth_config.get("token_issuer"),
+                    "client_id": oauth_config.get("client_id"),
+                    "client_secret": oauth_config.get("client_secret"),
+                    "ca_certificate": oauth_config.get("auth_server_ca"),
+                    "enable_token_refresh": oauth_config.get("enable_token_refresh", False),
+                }
+                
+                for field, value in oauth_fields.items():
+                    # Only add if value exists and not already in body
+                    if value is not None and field not in enriched_body:
+                        enriched_body[field] = value
+                
+                body = enriched_body
 
     try:
         # Get client from registry

@@ -7,7 +7,6 @@ import ControlModal from '../components/ControlModal';
 import WriteValueModal from '../components/WriteValueModal';
 import BrcbConfigModal from '../components/BrcbConfigModal';
 import TLSConfigModal from '../components/TLSConfigModal';
-import OAuthConfigModal from '../components/OAuthConfigModal';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
@@ -55,7 +54,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   }, [bffBaseUrl]);
   const [showBrcbConfigModal, setShowBrcbConfigModal] = useState(false);
   const [showTLSModal, setShowTLSModal] = useState(false);
-  const [showOAuthModal, setShowOAuthModal] = useState(false);
+  const [useOAuth, setUseOAuth] = useState(false);
   const [message, setMessage] = useState(null);
   const monitorIntervalRef = useRef(null);
 
@@ -872,15 +871,71 @@ const getContextMenuItems = () => {
         >
           <i className="fas fa-shield-alt" style={{ marginRight: '8px' }}></i>TLS Config
         </button>
-        <button
-          className="btn-secondary"
-          onClick={() => setShowOAuthModal(true)}
-          disabled={loading}
-          title="Configure OAuth settings"
-          id="acsi-client-oauth-btn"
-        >
-          <i className="fas fa-key" style={{ marginRight: '8px' }}></i>OAuth Config
-        </button>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={useOAuth}
+            onChange={async (e) => {
+              const newValue = e.target.checked;
+              setUseOAuth(newValue);
+              // Call reconfig-oauth immediately when checkbox is toggled
+              if (apiTarget && endpoint?.name) {
+                setLoading(true);
+                try {
+                  // Build OAuth config from endpoint
+                  const oauthConfig = endpoint?.OAuth || {};
+                  
+                  // For active mode connections, use the client's port for WebSocket connection
+                  let connectionPort = endpoint?.port || wsPort;
+                  if (endpoint?.ws_mode === 'active' || endpoint?.ws_mode === 'Active') {
+                      // Find corresponding client connection (SO) by replacing Server with Client in endpoint name
+                      const clientName = endpoint.name.replace('Server', 'Client');
+                      const clientConnection = propConnections.find(c => 
+                          (c.type === 'RTI-SO' || c.acsi === 'client') && 
+                          c.name === clientName
+                      );
+                      if (clientConnection) {
+                          connectionPort = clientConnection.port;
+                      }
+                  }
+                  
+                  // Use the connection's own host/port for the target endpoint
+                  const targetHost = endpoint?.host || wsHost;
+                  const targetPort = endpoint?.port || wsPort;
+                  const connectionTarget = buildTargetValue(targetHost, targetPort);
+                  
+                  const requestBody = {
+                    connection_name: endpoint?.name,
+                    enable_oauth: newValue,
+                    ws_mode: endpoint?.ws_mode || 'passive',
+                    host: endpoint?.host || wsHost,
+                    port: String(connectionPort),
+                    cp: wsCp
+                  };
+                  // ACSIClient.jsx is for SO (passive mode)
+                  requestBody.certificate_endpoint_url = oauthConfig.certificate_endpoint || '';
+                  requestBody.token_issuer_url = oauthConfig.token_issuer || oauthConfig.token_endpoint || '';
+                  requestBody.ca_certificate = (oauthConfig.auth_server_ca || '').trim();
+                  const result = await executeApiCall('reconfig-oauth', connectionTarget, requestBody);
+                  if (result?.ok) {
+                    setMessage({ type: 'success', text: `OAuth ${newValue ? 'enabled' : 'disabled'} successfully` });
+                  } else {
+                    setMessage({ type: 'error', text: result?.payload?.error || 'Failed to update OAuth' });
+                    setUseOAuth(!newValue); // Revert on failure
+                  }
+                } catch (error) {
+                  setMessage({ type: 'error', text: error.message });
+                  setUseOAuth(!newValue); // Revert on failure
+                } finally {
+                  setLoading(false);
+                }
+              }
+            }}
+            disabled={loading}
+            id="acsi-client-oauth-checkbox"
+          />
+          <span style={{ color: 'var(--text-primary)' }}>Enable OAuth</span>
+        </label>
       </div>
 
       {/* Action Buttons */}
@@ -1080,28 +1135,6 @@ const getContextMenuItems = () => {
         bffBaseUrl={bffBaseUrl}
         wsHost={wsHost}       // ← Add this
         wsPort={wsPort}       // ← Add this
-        onSuccess={(msg) => setMessage({ type: 'success', text: msg })}
-        onError={(msg) => setMessage({ type: 'error', text: msg })}
-      />
-
-      <OAuthConfigModal
-        isOpen={showOAuthModal}
-        onClose={() => {
-          setShowOAuthModal(false);
-          setTimeout(() => setMessage(null), 3000);
-        }}
-        connections={connections}
-        connection={{
-          name: endpoint?.name || wsHost,
-          host: endpoint?.host || wsHost,
-          port: endpoint?.port || wsPort,
-          properties_info: {
-            properties: {
-              ws_mode: 'passive'
-            }
-          }
-        }}
-        bffBaseUrl={bffBaseUrl}
         onSuccess={(msg) => setMessage({ type: 'success', text: msg })}
         onError={(msg) => setMessage({ type: 'error', text: msg })}
       />

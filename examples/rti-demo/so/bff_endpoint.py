@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import traceback
 import asyncio
+import os
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any, Dict, Optional
 from fastapi import FastAPI, APIRouter, Request, HTTPException
@@ -19,8 +20,38 @@ from acsi_client import ACSIClient
 
 from ws61850.security.tls import TLSConfig
 import ssl
+import json
 
 logger = logging.getLogger(__name__)
+
+
+# ==================== Helper Functions ====================
+
+def _find_connections_file() -> str:
+    """Find the connections.json file path using the same logic as BFF server."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.exists('/app'):
+        return '/app/connections.json'
+    elif os.path.exists(os.path.join(script_dir, 'connections.json')):
+        return os.path.join(script_dir, 'connections.json')
+    else:
+        parent_dir = os.path.dirname(script_dir)
+        if os.path.exists(os.path.join(parent_dir, 'connections.json')):
+            return os.path.join(parent_dir, 'connections.json')
+        return os.path.join(script_dir, 'connections.json')
+
+
+def _load_connections_from_file() -> list:
+    """Load connections from connections.json file."""
+    connections_file = _find_connections_file()
+    if os.path.exists(connections_file):
+        try:
+            with open(connections_file, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading connections: {e}")
+    return []
+
 
 # ==================== Pydantic Models ====================
 class ConnectRequest(BaseModel):
@@ -304,47 +335,14 @@ class TLSConnectionCreateConfigRequest(BaseModel):
     ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
 
 class OAUTHCreateConfigRequest(BaseModel):
-    """Request body for creating a new connection."""
-    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
-    enable_oauth: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
-
-    certificate_endpoint_url: str | None = Field(
-        default=None,
-        description="OAuth Certificate endpoint URL",
-        json_schema_extra={"example": "https://auth.example.com/certs"},
-    )
-    token_issuer_url: str | None = Field(
-        default=None,
-        description="token issuer url",
-        json_schema_extra={"example": "https://auth.example.com"},
-    )
-    ca_certificate: str | None = Field(
-        default=None,
-        description="Server CA certificate",
-        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
-    )
-
-    token_endpoint_url: str | None = Field(
-        default=None,
-        description="OAuth Token endpoint URL",
-        json_schema_extra={"example": "https://auth.example.com/token"},
-    )
-
-    client_id: str | None = Field(
-        default=None,
-        description="OAuth Client ID",
-        json_schema_extra={"example": "my-client-id"},
-    )
-
-    client_secret: str | None = Field(
-        default=None,
-        description="OAuth Client Secret",
-        json_schema_extra={"example": "my-client-secret"},
-    )
-
-    enable_token_refresh: bool = Field(default=False, description="Enable token refresh", json_schema_extra={"example": False})
-
-    ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+    """Request body for OAuth reconfiguration."""
+    connection_name: Optional[str] = Field(default=None, description="Connection name (optional, auto-detected)", json_schema_extra={"example": "RTI-SO-01"})
+    enable_oauth: bool = Field(default=False, description="Enable OAuth authentication", json_schema_extra={"example": False})
+    ws_mode: str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+    # OAuth settings for SO (passive mode)
+    certificate_endpoint_url: Optional[str] = Field(default=None, description="OAuth Certificate endpoint URL", json_schema_extra={"example": "https://auth.example.com/certs"})
+    token_issuer_url: Optional[str] = Field(default=None, description="token issuer url", json_schema_extra={"example": "https://auth.example.com"})
+    ca_certificate: Optional[str] = Field(default=None, description="Server CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
 
 
 class WriteValueRequest(BaseModel):
@@ -967,8 +965,24 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         tags=["Client Status"]
     )
     async def api_reconfig_oauth(request: OAUTHCreateConfigRequest):
-        """Reconfigure the connection with a new communication point."""
+        """Reconfigure OAuth settings. OAuth config should be provided in the request by BFF."""
         try:
+            # Get OAuth settings from request (BFF should provide these from connections.json)
+            certificate_endpoint = getattr(request, 'certificate_endpoint_url', None) or getattr(request, 'certificate_endpoint', None)
+            token_issuer_url = getattr(request, 'token_issuer_url', None) or getattr(request, 'token_issuer', None)
+            # If we have token_endpoint but not token_issuer, extract issuer from endpoint URL
+            token_endpoint_from_req = getattr(request, 'token_endpoint', None) or getattr(request, 'token_endpoint_url', None)
+            if token_endpoint_from_req and not token_issuer_url:
+                # token_endpoint is like: https://localhost:8443/realms/iec61850-websocket/protocol/openid-connect/token
+                # token_issuer should be: https://localhost:8443/realms/iec61850-websocket
+                token_issuer_url = token_endpoint_from_req.replace('/protocol/openid-connect/token', '')
+            ca_certificate = getattr(request, 'ca_certificate', None)
+            
+            # Validate that required OAuth settings are provided
+            connection_name = request.connection_name or "unknown"
+            if request.enable_oauth and (not certificate_endpoint or not token_issuer_url):
+                raise ValueError(f"certificate_endpoint and token_issuer_url are required for OAuth but were not provided in request for connection: {connection_name}")
+            
             if request.ws_mode.lower() == "passive":
                 loop = rti_so.runtime.loop
                 if loop is None or not loop.is_running():
@@ -977,9 +991,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 fut = asyncio.run_coroutine_threadsafe(
                     rti_so.runtime.endpoint.reconfigure_oauth(
                         request.enable_oauth,
-                        certificate_endpoint=request.certificate_endpoint_url,
-                        token_issuer=request.token_issuer_url,
-                        kc_cert=request.ca_certificate,
+                        certificate_endpoint=certificate_endpoint,
+                        token_issuer=token_issuer_url,
+                        kc_cert=ca_certificate,
                     ),
                     loop,
                 )
@@ -993,18 +1007,18 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     print("endpoint status is: ", rti_so.runtime.endpoint._is_endpoint_running)
 
                 return JSONResponse(
-                    content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
+                    content={"ok": True, "status": "reconfigured", "ws_mode": "passive",
                              "enable_oauth": request.enable_oauth},
                     status_code=200,
                 )
             else:
                 return JSONResponse(
-                    content={"ok": False, "error": "Only passive mode is supported for reconfiguration."},
+                    content={"ok": False, "error": "Only passive mode is supported for OAuth reconfiguration."},
                     status_code=400,
                 )
         except Exception as exc:
-            print("reconfig error: ", exc)
-            rti_so._log_action(f"Reconfig connection failed: {exc}", "error")
+            print("reconfig oauth error: ", exc)
+            rti_so._log_action(f"Reconfig OAuth failed: {exc}", "error")
             return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
 
     @router.get(
