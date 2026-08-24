@@ -195,19 +195,23 @@ class ActiveEndpoint:
         self._assoc_handler._token_endpoint = token_endpoint
 
         cafile = None
-        if kc_cert:
-            print(f"### DIAG kc_cert repr (first 80 chars): {kc_cert[:80]!r}")
-            cert_file = tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False)
-            cert_file.write(kc_cert)
-            cert_file.flush()
-            cert_file.close()
-            cafile = cert_file.name
+        client_con_provider = None
+        access_token = None
 
-        client_con_provider = ClientCredentialsProvider(
-            token_url=token_endpoint, client_id=client_id,
-            client_secret=client_secret, cafile=cafile,
-        )
-        access_token = await client_con_provider.get_access_token()
+        if oauth_enable:
+            if kc_cert:
+                print(f"### DIAG kc_cert repr (first 80 chars): {kc_cert[:80]!r}")
+                cert_file = tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False)
+                cert_file.write(kc_cert)
+                cert_file.flush()
+                cert_file.close()
+                cafile = cert_file.name
+
+            client_con_provider = ClientCredentialsProvider(
+                token_url=token_endpoint, client_id=client_id,
+                client_secret=client_secret, cafile=cafile,
+            )
+            access_token = await client_con_provider.get_access_token()
 
         if oauth_enable:
             previous_task = self._connect_task  # capture BEFORE creating the new task
