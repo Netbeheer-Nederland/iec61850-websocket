@@ -241,7 +241,7 @@ function ConnectionModal({
               )}
               
               {/* IDP Server fields for SO and FSP types */}
-              {(formData.type === 'RTI-SO' || formData.type === 'RTI-FSP') && idpServers.length > 0 && (
+              {(formData.type === 'RTI-SO' || formData.type === 'RTI-FSP') && (
                 <>
                   <div className="form-group">
                     <label htmlFor="idp_server">IDP Server</label>
@@ -288,7 +288,7 @@ function ConnectionModal({
               )}
               
               {/* FSP-specific OAuth fields when IDP server exists */}
-              {formData.type === 'RTI-FSP' && idpServers.length > 0 && (
+              {formData.type === 'RTI-FSP' && (
                 <>
                   <div className="form-group">
                     <label htmlFor="realm">Realm</label>
