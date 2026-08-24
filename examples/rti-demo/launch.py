@@ -12,9 +12,11 @@ Usage:
     python launch.py bff
     python launch.py fsp
     python launch.py so
+    python launch.py io
     
     # Launch with custom port
     python launch.py bff --port 5005
+    python launch.py io --port 8081
     
     # Launch with console kept alive (default)
     python launch.py bff --foreground
@@ -28,6 +30,7 @@ Services:
     bff:        Backend for Frontend Server (default: port 5000)
     fsp:        RTI-FSP (default: port 5001)
     so:         RTI-SO (default: port 5002)
+    io:         IO Device Control API (default: port 8080)
     
     Default: Running without arguments launches all services with --foreground -v
 """
@@ -61,6 +64,7 @@ class ServiceType(Enum):
     BFF = "bff"
     FSP = "fsp"
     SO = "so"
+    IO = "io"
 
 
 @dataclass
@@ -132,6 +136,23 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
             "rti.port": "5002"
         }
     ),
+    ServiceType.IO: ServiceConfig(
+        name="IO Device Control API",
+        service_type=ServiceType.IO,
+        module="demo_IO.io_api_server.main",
+        entry_point="demo_IO/io_api_server/main.py",
+        default_port=8080,
+        description="IO Device Control API - REST API for Raspberry Pi IO devices",
+        env_vars={"PORT": "8080"},
+        docker_image="rti-demo-io",
+        health_check_path="/api/io/health",
+        labels={
+            "rti.service": "io-server",
+            "rti.type": "IO-Device-Control",
+            "rti.host": "io-server",
+            "rti.port": "8080"
+        }
+    ),
 }
 
 
@@ -160,7 +181,7 @@ class RTILauncher:
             'service',
             nargs='*',
             default=[],
-            help='Service(s) to launch (bff, fsp, so, list, help). Default: all services'
+            help='Service(s) to launch (bff, fsp, so, io, list, help). Default: all services'
         )
         parser.add_argument(
             '--port',
@@ -258,7 +279,7 @@ class RTILauncher:
             "  python launch.py",
             "",
             "  # Launch all services explicitly",
-            "  python launch.py bff fsp so",
+            "  python launch.py bff fsp so io",
             "",
             "  # Launch BFF server on port 5000",
             "  python launch.py bff",

@@ -1157,7 +1157,7 @@ def create_bff_router(
         },
         tags=["Data Access"]
     )
-    def api_write_value(request: WritevalueRequest):
+    async def api_write_value(request: WritevalueRequest):
         """Write a value in the server IED model.
 
         Request Body:
@@ -1227,10 +1227,10 @@ def create_bff_router(
                     from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
                     
                     io_client = get_io_client()
-                    if io_client and io_client.is_healthy():
+                    if io_client and await io_client.is_healthy():
                         try:
                             # Try to sync LED state based on written value
-                            io_client.write_iec61850_value(obj_ref, value, data_type)
+                            await io_client.write_iec61850_value(obj_ref, value, data_type)
                             logger.info(f"Synced IEC61850 write to LED: {obj_ref}={value}")
                         except Exception as sync_exc:
                             logger.warning(f"LED sync failed for {obj_ref}: {sync_exc}")

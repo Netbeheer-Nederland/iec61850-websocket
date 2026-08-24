@@ -1,26 +1,28 @@
 """
-IO Router for FSP BFF - Provides LED control routes that proxy to demo_IO.
+IO Router for FSP BFF - Provides IO device control routes that proxy to demo_IO.
 
-This module creates a FastAPI router that provides IO/LED control endpoints
+This module creates a FastAPI router that provides IO/device control endpoints
 for the FSP service, which proxy requests to a connected demo_IO instance.
 
 The IO router allows FSP to:
-- Expose LED control endpoints to its clients
-- Proxy LED control requests to demo_IO
+- Expose device control endpoints to its clients (primarily LED control)
+- Proxy device control requests to demo_IO
 - Manage connection to demo_IO service
+- Manage IEC 61850 object mappings to IO devices
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .client_io import DemoIOClient
+from .async_client_io import AsyncDemoIOClient
 from .mapping_manager import IOMappingManager
 
 logger = logging.getLogger(__name__)
@@ -121,46 +123,56 @@ class MappingListResponse(BaseModel):
     count: int = Field(default=0, description="Total number of mappings")
 
 
-# Global demo_IO client instance (lazy initialized)
-_io_client: Optional[DemoIOClient] = None
+# ==================== Router State Management ====================
+# 
+# Using module-level state but with better encapsulation.
+# For production, consider using FastAPI's app.state or dependency injection.
+#
+# State container class to avoid global variable pollution
 
-# Global mapping manager instance
-_mapping_manager: Optional[IOMappingManager] = None
+class _IORouterState:
+    """Container for IO router state to avoid global variables."""
+    def __init__(self):
+        self.io_client: Optional[AsyncDemoIOClient] = None
+        self.mapping_manager: Optional[IOMappingManager] = None
+        self._lock = threading.Lock()
+
+# Module-level state instance
+_router_state = _IORouterState()
 
 
-def get_io_client() -> Optional[DemoIOClient]:
-    """Get or create the demo_IO client instance."""
-    global _io_client
-    return _io_client
+def get_io_client() -> Optional[AsyncDemoIOClient]:
+    """Get the demo_IO async client instance."""
+    return _router_state.io_client
 
 
-def set_io_client(client: DemoIOClient) -> None:
-    """Set the demo_IO client instance."""
-    global _io_client
-    _io_client = client
-    logger.info(f"DemoIOClient configured with base URL: {client.base_url}")
+def set_io_client(client: AsyncDemoIOClient) -> None:
+    """Set the demo_IO async client instance."""
+    with _router_state._lock:
+        _router_state.io_client = client
+        logger.info(f"AsyncDemoIOClient configured with base URL: {client.base_url}")
 
 
 def get_mapping_manager() -> IOMappingManager:
     """Get or create the mapping manager instance."""
-    global _mapping_manager
-    if _mapping_manager is None:
-        _mapping_manager = IOMappingManager()
-    return _mapping_manager
+    with _router_state._lock:
+        if _router_state.mapping_manager is None:
+            _router_state.mapping_manager = IOMappingManager()
+        return _router_state.mapping_manager
 
 
 def set_mapping_manager(manager: IOMappingManager) -> None:
     """Set the mapping manager instance."""
-    global _mapping_manager
-    _mapping_manager = manager
-    logger.info("IOMappingManager configured")
+    with _router_state._lock:
+        _router_state.mapping_manager = manager
+        logger.info("IOMappingManager configured")
 
 
 def create_io_router() -> APIRouter:
-    """Create a FastAPI router for IO/LED control via demo_IO proxy.
+    """Create a FastAPI router for IO/device control via demo_IO proxy.
     
-    This router provides endpoints that proxy LED control requests to a 
-    connected demo_IO service. The demo_IO connection is configured via
+    This router provides endpoints that proxy device control requests (primarily LEDs)
+    to a connected demo_IO service. The demo_IO connection is configured via
     environment variable DEMO_IO_URL or through the /api/io/connect endpoint.
     
     Note: If DEMO_IO_URL is set, the client will be auto-configured on router creation.
@@ -177,13 +189,13 @@ def create_io_router() -> APIRouter:
     # Initialize client from environment variable if explicitly set (not default)
     demo_io_url = os.getenv("DEMO_IO_URL")
     if demo_io_url:
-        set_io_client(DemoIOClient(base_url=demo_io_url))
-        logger.info(f"DemoIOClient auto-configured from DEMO_IO_URL: {demo_io_url}")
+        set_io_client(AsyncDemoIOClient(base_url=demo_io_url))
+        logger.info(f"AsyncDemoIOClient auto-configured from DEMO_IO_URL: {demo_io_url}")
     
     # ==================== Helper Functions ====================
     
-    def _get_client_or_error() -> DemoIOClient:
-        """Get demo_IO client or raise error if not configured."""
+    async def _get_client_or_error() -> AsyncDemoIOClient:
+        """Get demo_IO async client or raise error if not configured."""
         client = get_io_client()
         if client is None:
             raise HTTPException(
@@ -192,8 +204,8 @@ def create_io_router() -> APIRouter:
                        "Configure connection via POST /api/io/connect or set DEMO_IO_URL environment variable."
             )
         
-        # Check if service is healthy
-        if not client.is_healthy():
+        # Check if service is healthy (async call)
+        if not await client.is_healthy():
             raise HTTPException(
                 status_code=503,
                 detail=f"demo_IO service at {client.base_url} is not responding. "
@@ -203,11 +215,11 @@ def create_io_router() -> APIRouter:
         return client
     
     def _handle_io_error(func_name: str):
-        """Decorator to handle demo_IO client errors."""
+        """Decorator to handle demo_IO async client errors."""
         def decorator(func):
             async def wrapper(*args, **kwargs):
                 try:
-                    client = _get_client_or_error()
+                    client = await _get_client_or_error()
                     return await func(client, *args, **kwargs)
                 except HTTPException:
                     raise
@@ -246,10 +258,10 @@ def create_io_router() -> APIRouter:
             dict: Connection confirmation with health check
         """
         try:
-            client = DemoIOClient(base_url=config.base_url)
+            client = AsyncDemoIOClient(base_url=config.base_url)
             
-            # Test connection
-            if not client.is_healthy():
+            # Test connection (async)
+            if not await client.is_healthy():
                 raise HTTPException(
                     status_code=400,
                     detail=f"demo_IO service at {config.base_url} is not responding"
@@ -299,7 +311,7 @@ def create_io_router() -> APIRouter:
         return {
             "connected": True,
             "base_url": client.base_url,
-            "healthy": client.is_healthy()
+            "healthy": await client.is_healthy()
         }
     
     @router.post(
@@ -318,9 +330,12 @@ def create_io_router() -> APIRouter:
         Returns:
             dict: Disconnection confirmation
         """
-        global _io_client
-        old_url = _io_client.base_url if _io_client else None
-        _io_client = None
+        old_url = _router_state.io_client.base_url if _router_state.io_client else None
+        with _router_state._lock:
+            # Close the async client connection
+            if _router_state.io_client:
+                await _router_state.io_client.aclose()
+            _router_state.io_client = None
         
         logger.info(f"Disconnected from demo_IO at {old_url}")
         return {
@@ -345,8 +360,8 @@ def create_io_router() -> APIRouter:
     async def api_io_health(request: Request):
         """Check demo_IO service health."""
         try:
-            client = _get_client_or_error()
-            health = client.health_check()
+            client = await _get_client_or_error()
+            health = await client.health_check()
             return {
                 "status": "ok",
                 "demo_io_healthy": True,
@@ -374,8 +389,8 @@ def create_io_router() -> APIRouter:
     )
     async def api_io_status(request: Request):
         """Get current GPIO controller status from demo_IO."""
-        client = _get_client_or_error()
-        return client.get_status()
+        client = await _get_client_or_error()
+        return await client.get_status()
     
     # ==================== LED Configuration ====================
     
@@ -404,8 +419,8 @@ def create_io_router() -> APIRouter:
         Returns:
             dict: Confirmation of configuration
         """
-        client = _get_client_or_error()
-        return client.config_led(
+        client = await _get_client_or_error()
+        return await client.config_led(
             name=request.name,
             gpio_pin=request.gpio_pin,
             description=request.description,
@@ -436,8 +451,8 @@ def create_io_router() -> APIRouter:
         Returns:
             dict: Confirmation with resulting states of all LEDs
         """
-        client = _get_client_or_error()
-        return client.set_all_leds(request.state)
+        client = await _get_client_or_error()
+        return await client.set_all_leds(request.state)
     
     @router.post(
         "/leds/all/on",
@@ -452,8 +467,8 @@ def create_io_router() -> APIRouter:
     )
     async def api_all_on(request: Request):
         """Turn all LEDs ON on demo_IO."""
-        client = _get_client_or_error()
-        return client.all_leds_on()
+        client = await _get_client_or_error()
+        return await client.all_leds_on()
     
     @router.post(
         "/leds/all/off",
@@ -468,8 +483,8 @@ def create_io_router() -> APIRouter:
     )
     async def api_all_off(request: Request):
         """Turn all LEDs OFF on demo_IO."""
-        client = _get_client_or_error()
-        return client.all_leds_off()
+        client = await _get_client_or_error()
+        return await client.all_leds_off()
     
     # ==================== LED Status ====================
     
@@ -486,8 +501,8 @@ def create_io_router() -> APIRouter:
     )
     async def api_list_leds(request: Request):
         """Get state of all LEDs from demo_IO."""
-        client = _get_client_or_error()
-        return client.list_leds()
+        client = await _get_client_or_error()
+        return await client.list_leds()
     
     @router.get(
         "/leds/{name}",
@@ -510,8 +525,8 @@ def create_io_router() -> APIRouter:
         Returns:
             dict: LED name and its current state
         """
-        client = _get_client_or_error()
-        return client.get_led_state(name)
+        client = await _get_client_or_error()
+        return await client.get_led_state(name)
     
     # ==================== LED Control ====================
     
@@ -541,8 +556,8 @@ def create_io_router() -> APIRouter:
         Returns:
             dict: Confirmation with new state
         """
-        client = _get_client_or_error()
-        return client.set_led(name, request.state)
+        client = await _get_client_or_error()
+        return await client.set_led(name, request.state)
     
     @router.post(
         "/leds/{name}/toggle",
@@ -565,8 +580,8 @@ def create_io_router() -> APIRouter:
         Returns:
             dict: Confirmation with new state
         """
-        client = _get_client_or_error()
-        return client.toggle_led(name)
+        client = await _get_client_or_error()
+        return await client.toggle_led(name)
     
     @router.post(
         "/leds/{name}/on",
@@ -589,8 +604,8 @@ def create_io_router() -> APIRouter:
         Returns:
             dict: Confirmation with new state
         """
-        client = _get_client_or_error()
-        return client.turn_on(name)
+        client = await _get_client_or_error()
+        return await client.turn_on(name)
     
     @router.post(
         "/leds/{name}/off",
@@ -613,8 +628,8 @@ def create_io_router() -> APIRouter:
         Returns:
             dict: Confirmation with new state
         """
-        client = _get_client_or_error()
-        return client.turn_off(name)
+        client = await _get_client_or_error()
+        return await client.turn_off(name)
     
     # ==================== GPIO Management ====================
     
@@ -631,8 +646,8 @@ def create_io_router() -> APIRouter:
     )
     async def api_initialize(request: Request):
         """Initialize GPIO controller on demo_IO."""
-        client = _get_client_or_error()
-        return client.initialize()
+        client = await _get_client_or_error()
+        return await client.initialize()
     
     @router.post(
         "/cleanup",
@@ -647,8 +662,8 @@ def create_io_router() -> APIRouter:
     )
     async def api_cleanup(request: Request):
         """Clean up GPIO resources on demo_IO."""
-        client = _get_client_or_error()
-        return client.cleanup()
+        client = await _get_client_or_error()
+        return await client.cleanup()
     
     # ==================== Mapping Management ====================
     

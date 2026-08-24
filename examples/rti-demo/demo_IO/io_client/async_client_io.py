@@ -1,0 +1,626 @@
+"""
+Async Client for connecting to demo_IO IO Device Control API.
+
+This module provides an async HTTP client interface using httpx for
+asynchronous control of IO devices exposed by the demo_IO service.
+
+Perfect for use in async FastAPI applications or any async context.
+
+Usage:
+    import asyncio
+    from async_client_io import AsyncDemoIOClient
+    
+    async def main():
+        async with AsyncDemoIOClient(base_url="http://localhost:8080") as client:
+            # Configure an LED
+            await client.config_led(name="led1", gpio_pin=17)
+            
+            # Turn LED on
+            await client.set_led("led1", state=True)
+            
+            # Read state
+            state = await client.get_led_state("led1")
+            print(f"LED state: {state}")
+            
+            # Configure potentiometer
+            await client.config_potentiometer(
+                name="pot1",
+                adc_channel=0,
+                min_value=0,
+                max_value=100
+            )
+            
+            # Read potentiometer
+            value = await client.read_potentiometer_scaled("pot1")
+            print(f"Potentiometer value: {value}")
+    
+    asyncio.run(main())
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import re
+from typing import Any, Dict, List, Optional, Union
+
+import httpx
+
+from .mapping_manager import IOMappingManager
+
+logger = logging.getLogger(__name__)
+
+
+# ==================== DEFAULT CONFIGURATION ====================
+
+DEFAULT_TIMEOUT = 5.0  # seconds
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_BACKOFF_FACTOR = 0.5
+DEFAULT_RETRY_STATUS_CODES = [429, 500, 502, 503, 504]
+
+
+# ==================== RE-EXPORT EXCEPTIONS FROM client_io ====================
+# Import and re-export for convenience
+
+from .client_io import (
+    DemoIOClientError,
+    ConnectionError,
+    RequestTimeoutError,
+    APIError,
+    DeviceNotFoundError,
+    AuthenticationError,
+)
+
+__all__ = [
+    "AsyncDemoIOClient",
+    "DemoIOClientError",
+    "ConnectionError",
+    "RequestTimeoutError",
+    "APIError",
+    "DeviceNotFoundError",
+    "AuthenticationError",
+]
+
+
+class AsyncDemoIOClient:
+    """Async HTTP client for the demo_IO IO Device Control API.
+    
+    Uses httpx.AsyncClient for async HTTP requests, providing:
+    - Full async/await support
+    - Connection pooling
+    - Automatic retry with exponential backoff
+    - Context manager support
+    - Same interface as sync DemoIOClient
+    
+    Usage:
+        from async_client_io import AsyncDemoIOClient
+        
+        async with AsyncDemoIOClient(base_url="http://localhost:8080") as client:
+            await client.set_led("led1", True)
+            state = await client.get_led_state("led1")
+    """
+    
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8080",
+        mapping_file: Optional[str] = None,
+        timeout: float = DEFAULT_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
+        retry_status_codes: Optional[List[int]] = None,
+        api_key: Optional[str] = None,
+        # httpx specific options
+        follow_redirects: bool = True,
+        limits: Optional[httpx.Limits] = None
+    ):
+        """Initialize the async demo_IO client.
+        
+        Args:
+            base_url: Base URL of the demo_IO service (without /api/io suffix)
+            mapping_file: Optional path to io_mapping.json file
+            timeout: Request timeout in seconds (default: 5.0)
+            max_retries: Maximum number of retry attempts (default: 3)
+            backoff_factor: Exponential backoff factor (default: 0.5)
+            retry_status_codes: HTTP status codes to retry on
+            api_key: Optional API key for authentication
+            follow_redirects: Whether to follow HTTP redirects (default: True)
+            limits: httpx connection limits
+        """
+        self.base_url = base_url.rstrip('/')
+        self.io_base = f"{self.base_url}/api/io"
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self.backoff_factor = backoff_factor
+        self.retry_status_codes = retry_status_codes or DEFAULT_RETRY_STATUS_CODES
+        self.api_key = api_key
+        self.follow_redirects = follow_redirects
+        self.limits = limits or httpx.Limits(max_connections=10, max_keepalive_connections=5)
+        
+        self.mapping = IOMappingManager(mapping_file=mapping_file)
+        self._client: Optional[httpx.AsyncClient] = None
+        self._is_closed = True
+        
+        logger.info(f"Initialized AsyncDemoIOClient with base URL: {self.io_base}")
+    
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Get or create the httpx AsyncClient."""
+        if self._client is None or self._is_closed:
+            headers = {"X-API-Key": self.api_key} if self.api_key else {}
+            self._client = httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=self.timeout,
+                follow_redirects=self.follow_redirects,
+                limits=self.limits,
+                headers=headers
+            )
+            self._is_closed = False
+        return self._client
+    
+    async def _request(
+        self,
+        method: str,
+        endpoint: str,
+        json: Optional[dict] = None,
+        params: Optional[dict] = None,
+        raise_on_error: bool = True
+    ) -> Any:
+        """Make an async HTTP request to the demo_IO API.
+        
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            endpoint: API endpoint path (without /api/io prefix)
+            json: Request body as dict
+            params: Query parameters as dict
+            raise_on_error: If True, raise custom exceptions on error
+            
+        Returns:
+            Parsed JSON response
+            
+        Raises:
+            ConnectionError: If cannot connect to the service
+            RequestTimeoutError: If request times out
+            APIError: If API returns an error status code
+            AuthenticationError: If authentication fails
+        """
+        client = await self._get_client()
+        url = f"{self.io_base}{endpoint}"
+        
+        # Add API key header if configured (not already in client)
+        headers = {}
+        if self.api_key and not self._client.headers.get("X-API-Key"):
+            headers["X-API-Key"] = self.api_key
+        
+        attempt = 0
+        last_exception = None
+        
+        while attempt <= self.max_retries:
+            try:
+                response = await client.request(
+                    method=method,
+                    url=url,
+                    json=json,
+                    params=params,
+                    headers=headers,
+                    timeout=self.timeout
+                )
+                
+                # Check for authentication failure
+                if response.status_code == 401:
+                    if raise_on_error:
+                        raise AuthenticationError(f"Authentication failed for {url}")
+                    return None
+                
+                # Check for device not found
+                if response.status_code == 404:
+                    if raise_on_error:
+                        try:
+                            error_data = response.json()
+                            error_msg = error_data.get("detail", "")
+                            if "not found" in error_msg.lower():
+                                match = re.search(r"'([^']+)' not found", error_msg)
+                                if match:
+                                    raise DeviceNotFoundError(match.group(1))
+                        except:
+                            pass
+                        raise APIError(f"Not found", response.status_code, endpoint)
+                    return None
+                
+                # Retry on server errors
+                if response.status_code >= 400:
+                    if response.status_code in self.retry_status_codes and attempt < self.max_retries:
+                        attempt += 1
+                        delay = self.backoff_factor * (2 ** (attempt - 1))
+                        logger.warning(f"Request to {url} failed with {response.status_code}, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})")
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        if raise_on_error:
+                            try:
+                                error_data = response.json()
+                                error_msg = error_data.get("detail", "") or error_data.get("message", "")
+                            except:
+                                error_msg = response.text
+                            raise APIError(error_msg, response.status_code, endpoint)
+                        return None
+                
+                # Success
+                try:
+                    return response.json()
+                except ValueError:
+                    return response.text
+                    
+            except httpx.TimeoutException as e:
+                last_exception = e
+                if attempt < self.max_retries:
+                    attempt += 1
+                    delay = self.backoff_factor * (2 ** (attempt - 1))
+                    logger.warning(f"Request to {url} timed out, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    if raise_on_error:
+                        raise RequestTimeoutError(str(e), endpoint, self.timeout)
+                    return None
+                    
+            except httpx.ConnectError as e:
+                last_exception = e
+                if attempt < self.max_retries:
+                    attempt += 1
+                    delay = self.backoff_factor * (2 ** (attempt - 1))
+                    logger.warning(f"Connection to {url} failed, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    if raise_on_error:
+                        raise ConnectionError(str(e), self.base_url)
+                    return None
+                    
+            except httpx.RequestError as e:
+                last_exception = e
+                if raise_on_error:
+                    logger.error(f"Request to {url} failed: {e}")
+                raise
+        
+        if raise_on_error and last_exception:
+            raise last_exception
+        return None
+    
+    # ==================== HEALTH AND STATUS ====================
+    
+    async def health_check(self) -> Dict[str, Any]:
+        """Check the health of the demo_IO service."""
+        return await self._request("GET", "/health")
+    
+    async def is_healthy(self) -> bool:
+        """Check if the demo_IO service is healthy."""
+        try:
+            health = await self.health_check()
+            return health.get("status") == "ok"
+        except Exception:
+            return False
+    
+    async def get_status(self) -> Dict[str, Any]:
+        """Get the current IO controller status."""
+        return await self._request("GET", "/status")
+    
+    async def get_api_info(self) -> Dict[str, Any]:
+        """Get API information and available endpoints."""
+        return await self._request("GET", "/")
+    
+    async def get_auth_status(self) -> Dict[str, Any]:
+        """Check if API key authentication is enabled and configured."""
+        return await self._request("GET", "/auth/status")
+    
+    # ==================== LED METHODS (Convenience wrappers for device API) ====================
+    
+    async def config_led(self, name: str, gpio_pin: int, description: str = "", 
+                        initial_state: bool = False) -> Dict[str, Any]:
+        """Configure an LED on the demo_IO service.
+        
+        This is a convenience method that uses the device API internally.
+        """
+        data = {
+            "name": name,
+            "device_type": "led",
+            "identifier": gpio_pin,
+            "description": description,
+            "initial_state": initial_state
+        }
+        return await self._request("POST", "/devices/config", json=data)
+    
+    async def list_leds(self) -> Dict[str, Any]:
+        """List all configured LEDs and their states.
+        
+        This is a convenience method that filters devices by LED type.
+        """
+        all_devices = await self._request("GET", "/devices")
+        # Filter to only return LED devices
+        leds = {}
+        if "details" in all_devices:
+            for name, detail in all_devices["details"].items():
+                if detail.get("type") == "led":
+                    leds[name] = detail.get("value", False)
+        return leds
+    
+    async def get_led_state(self, name: str) -> Dict[str, Any]:
+        """Get the current state of a specific LED.
+        
+        This is a convenience method that uses the device API internally.
+        """
+        result = await self._request("POST", f"/devices/{name}/read")
+        if result and "value" in result:
+            return {"name": name, "state": bool(result["value"])}
+        return {"name": name, "state": False}
+    
+    async def set_led(self, name: str, state: bool) -> Dict[str, Any]:
+        """Set a specific LED to ON or OFF state.
+        
+        This is a convenience method that uses the device API internally.
+        """
+        data = {"state": state}
+        return await self._request("POST", f"/devices/{name}/set", json=data)
+    
+    async def toggle_led(self, name: str) -> Dict[str, Any]:
+        """Toggle the state of a specific LED.
+        
+        This is a convenience method that uses the device API internally.
+        """
+        return await self._request("POST", f"/devices/{name}/toggle", json={})
+    
+    async def set_all_leds(self, state: bool) -> Dict[str, Any]:
+        """Set all configured LEDs to a specific state.
+        
+        This is a convenience method that uses the device API internally.
+        Note: This affects ALL output devices, not just LEDs.
+        """
+        data = {"state": state}
+        result = await self._request("POST", "/devices/outputs/set-all", json=data)
+        led_results = {}
+        if "results" in result:
+            for name, value in result["results"].items():
+                led_results[name] = value
+        result["results"] = led_results
+        return result
+    
+    async def all_leds_on(self) -> Dict[str, Any]:
+        """Turn all configured LEDs ON.
+        
+        This is a convenience method that calls set_all_leds(True).
+        """
+        return await self.set_all_leds(True)
+    
+    async def all_leds_off(self) -> Dict[str, Any]:
+        """Turn all configured LEDs OFF.
+        
+        This is a convenience method that calls set_all_leds(False).
+        """
+        return await self.set_all_leds(False)
+    
+    async def initialize(self) -> Dict[str, Any]:
+        """Initialize the IO controller on the demo_IO service."""
+        return await self._request("POST", "/initialize")
+    
+    async def cleanup(self) -> Dict[str, Any]:
+        """Clean up IO resources on the demo_IO service."""
+        return await self._request("POST", "/cleanup")
+    
+    # ==================== CONVENIENCE METHODS (LEGACY) ====================
+    
+    async def turn_on(self, name: str) -> Dict[str, Any]:
+        """Turn an LED ON."""
+        return await self.set_led(name, state=True)
+    
+    async def turn_off(self, name: str) -> Dict[str, Any]:
+        """Turn an LED OFF."""
+        return await self.set_led(name, state=False)
+    
+    async def add_led(self, name: str, gpio_pin: int, description: str = "", 
+                     initial_state: bool = False) -> Dict[str, Any]:
+        """Add and configure an LED."""
+        return await self.config_led(name, gpio_pin, description, initial_state)
+    
+    async def get_all_states(self) -> Dict[str, bool]:
+        """Get the state of all LEDs."""
+        return await self.list_leds()
+    
+    # ==================== NEW DEVICE METHODS (v2.0+) ====================
+    
+    async def list_devices(self) -> Dict[str, Any]:
+        """List all configured devices."""
+        return await self._request("GET", "/devices")
+    
+    async def list_device_types(self) -> Dict[str, Any]:
+        """List supported device types."""
+        return await self._request("GET", "/devices/types")
+    
+    async def get_device_status(self, name: str) -> Dict[str, Any]:
+        """Get detailed status of a specific device."""
+        return await self._request("GET", f"/devices/{name}")
+    
+    async def config_device(
+        self,
+        name: str,
+        device_type: str,
+        identifier: Optional[int] = None,
+        description: str = "",
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Configure a new IO device."""
+        data = {
+            "name": name,
+            "device_type": device_type,
+            "identifier": identifier,
+            "description": description,
+            **kwargs
+        }
+        return await self._request("POST", "/devices/config", json=data)
+    
+    async def write_device(self, name: str, value: Union[bool, float]) -> Dict[str, Any]:
+        """Write a value to a device."""
+        data = {"value": value}
+        return await self._request("POST", f"/devices/{name}/write", json=data)
+    
+    async def read_device(self, name: str) -> Dict[str, Any]:
+        """Read the current value from a device."""
+        return await self._request("POST", f"/devices/{name}/read")
+    
+    async def toggle_device(self, name: str) -> Dict[str, Any]:
+        """Toggle a device state."""
+        return await self._request("POST", f"/devices/{name}/toggle")
+    
+    async def set_device(self, name: str, state: bool) -> Dict[str, Any]:
+        """Set a device to a specific boolean state."""
+        data = {"state": state}
+        return await self._request("POST", f"/devices/{name}/set", json=data)
+    
+    async def read_all_inputs(self) -> Dict[str, Any]:
+        """Read values from all input devices."""
+        return await self._request("POST", "/devices/inputs/read-all")
+    
+    async def set_all_outputs(self, state: bool) -> Dict[str, Any]:
+        """Set all output devices to a specific state."""
+        data = {"state": state}
+        return await self._request("POST", "/devices/outputs/set-all", json=data)
+    
+    # ==================== DEVICE-SPECIFIC CONVENIENCE METHODS ====================
+    
+    async def config_potentiometer(
+        self,
+        name: str,
+        adc_channel: int,
+        min_value: float = 0.0,
+        max_value: float = 100.0,
+        description: str = "",
+        is_inverted: bool = False
+    ) -> Dict[str, Any]:
+        """Configure a potentiometer device."""
+        return await self.config_device(
+            name=name,
+            device_type="potentiometer",
+            adc_channel=adc_channel,
+            min_value=min_value,
+            max_value=max_value,
+            description=description,
+            is_inverted=is_inverted
+        )
+    
+    async def read_potentiometer(self, name: str) -> Dict[str, Any]:
+        """Read the current value from a potentiometer."""
+        return await self.read_device(name)
+    
+    async def read_potentiometer_scaled(self, name: str) -> float:
+        """Read the scaled value from a potentiometer."""
+        result = await self.read_device(name)
+        if result and "value" in result:
+            return float(result["value"])
+        return 0.0
+    
+    async def config_button(
+        self,
+        name: str,
+        gpio_pin: int,
+        description: str = "",
+        debounce_time: float = 0.05,
+        pull_up: bool = True
+    ) -> Dict[str, Any]:
+        """Configure a button device."""
+        return await self.config_device(
+            name=name,
+            device_type="button",
+            gpio_pin=gpio_pin,
+            description=description,
+            debounce_time=debounce_time,
+            pull_up=pull_up
+        )
+    
+    async def read_button(self, name: str) -> bool:
+        """Read the current state of a button."""
+        result = await self.read_device(name)
+        if result and "value" in result:
+            return bool(result["value"])
+        return False
+    
+    # ==================== IEC 61850 MAPPING METHODS ====================
+    
+    async def config_led_with_mapping(
+        self,
+        led_name: str,
+        gpio_pin: int,
+        obj_ref: Optional[str] = None,
+        description: str = "",
+        initial_state: bool = False,
+        **extra_properties: Any
+    ) -> Dict[str, Any]:
+        """Configure an LED with IEC 61850 mapping."""
+        demoio_config = self.mapping.config_led_with_mapping(
+            led_name=led_name,
+            gpio_pin=gpio_pin,
+            obj_ref=obj_ref,
+            description=description,
+            initial_state=initial_state,
+            **extra_properties
+        )
+        
+        demo_io_result = await self.config_led(
+            name=led_name,
+            gpio_pin=gpio_pin,
+            description=description or f"Mapped to {obj_ref}" if obj_ref else "",
+            initial_state=initial_state
+        )
+        
+        self.mapping.save()
+        
+        return {
+            "demo_io": demo_io_result,
+            "mapping": demoio_config,
+            "led_name": led_name,
+            "objRef": obj_ref
+        }
+    
+    async def write_iec61850_value(
+        self,
+        obj_ref: str,
+        value: Any,
+        data_type: str = "unknown"
+    ) -> bool:
+        """Handle IEC 61850 write by syncing to mapped device."""
+        return self.mapping.sync_led_from_iec61850(obj_ref, value, client=self)
+    
+    def get_mapping_manager(self) -> IOMappingManager:
+        """Get the mapping manager instance."""
+        return self.mapping
+    
+    # ==================== SESSION MANAGEMENT ====================
+    
+    async def aclose(self) -> None:
+        """Close the async client session."""
+        if self._client and not self._is_closed:
+            await self._client.aclose()
+            self._is_closed = True
+            logger.info("AsyncDemoIOClient session closed")
+    
+    async def __aenter__(self):
+        """Async context manager entry."""
+        await self._get_client()  # Ensure client is created
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        await self.aclose()
+        return False
+    
+    def __del__(self):
+        """Destructor - ensure session is closed."""
+        # Note: In async contexts, prefer using async with or explicit aclose()
+        # This is a fallback for garbage collection
+        if hasattr(self, '_client') and self._client and not self._is_closed:
+            # We can't await in __del__, so we schedule the close
+            # This is not ideal but prevents resource leaks
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(self.aclose())
+                else:
+                    loop.run_until_complete(self.aclose())
+            except:
+                pass

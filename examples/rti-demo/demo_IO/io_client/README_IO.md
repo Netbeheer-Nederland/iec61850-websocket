@@ -1,16 +1,18 @@
-# FSP IO Client - LED Control via demo_IO
+# FSP IO Client - Device Control via demo_IO
 
-This directory provides the ability for FSP (RTI-FSP) to connect to and control the demo_IO service's GPIO LED functionality.
+This directory provides the ability for FSP (RTI-FSP) to connect to and control the demo_IO service's IO device functionality.
 
 ## Overview
 
-The demo_IO service provides a REST API for controlling GPIO-connected LEDs on a Raspberry Pi (or simulated LEDs for development). This integration allows FSP to:
+The demo_IO service provides a REST API for controlling IO devices (LEDs, potentiometers, buttons) on a Raspberry Pi (or simulated devices for development). This integration allows FSP to:
 
 - Connect to a running demo_IO instance
-- Configure and manage LEDs
-- Control individual or all LEDs (turn on/off, toggle)
-- Monitor LED states and GPIO status
+- Configure and manage IO devices (primarily LEDs)
+- Control individual or all devices (turn on/off, toggle)
+- Monitor device states and IO controller status
 - Expose these capabilities through FSP's BFF endpoints
+
+**Note:** The LED-specific methods in the client are convenience wrappers that use the underlying device API internally.
 
 ## Components
 
@@ -19,10 +21,12 @@ The demo_IO service provides a REST API for controlling GPIO-connected LEDs on a
 A Python client library for communicating with the demo_IO service's REST API.
 
 **Features:**
-- Full LED control API (configure, set, toggle, on/off)
-- Bulk operations (control all LEDs at once)
-- GPIO management (initialize, cleanup)
+- Full device control API (configure, read, write, toggle)
+- LED-specific convenience methods (configure LED, set LED, toggle LED, etc.)
+- Bulk operations (control all output devices at once)
+- IO controller management (initialize, cleanup)
 - Health checks and status monitoring
+- Device abstraction supporting multiple device types
 - Convenience methods for common operations
 
 **Usage:**
@@ -66,9 +70,10 @@ A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying 
 **Features:**
 - Automatic connection via `DEMO_IO_URL` environment variable
 - Programmatic connection management via API endpoints
-- Full LED control through REST endpoints
+- Full LED control through REST endpoints (proxied to demo_IO device API)
 - Connection status monitoring
 - Health checks
+- IEC 61850 object mapping to IO devices
 
 **Endpoints:**
 
@@ -78,19 +83,20 @@ A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying 
 | GET | `/api/io/connection` | Get connection status |
 | POST | `/api/io/disconnect` | Disconnect from demo_IO |
 | GET | `/api/io/health` | Check demo_IO health |
-| GET | `/api/io/status` | Get GPIO controller status |
-| POST | `/api/io/leds/config` | Configure an LED |
-| GET | `/api/io/leds` | List all LEDs and states |
-| GET | `/api/io/leds/{name}` | Get specific LED state |
-| POST | `/api/io/leds/{name}/set` | Set LED state |
-| POST | `/api/io/leds/{name}/toggle` | Toggle LED state |
-| POST | `/api/io/leds/{name}/on` | Turn LED on |
-| POST | `/api/io/leds/{name}/off` | Turn LED off |
-| POST | `/api/io/leds/all/set` | Set all LEDs state |
-| POST | `/api/io/leds/all/on` | Turn all LEDs on |
-| POST | `/api/io/leds/all/off` | Turn all LEDs off |
-| POST | `/api/io/initialize` | Initialize GPIO controller |
-| POST | `/api/io/cleanup` | Clean up GPIO resources |
+| GET | `/api/io/status` | Get IO controller status |
+| POST | `/api/io/leds/config` | Configure an LED (proxied to device API) |
+| GET | `/api/io/leds` | List all LEDs and states (proxied to device API) |
+| GET | `/api/io/leds/{name}` | Get specific LED state (proxied to device API) |
+| POST | `/api/io/leds/{name}/set` | Set LED state (proxied to device API) |
+| POST | `/api/io/leds/{name}/toggle` | Toggle LED state (proxied to device API) |
+| POST | `/api/io/leds/{name}/on` | Turn LED on (proxied to device API) |
+| POST | `/api/io/leds/{name}/off` | Turn LED off (proxied to device API) |
+| POST | `/api/io/leds/all/set` | Set all LEDs state (proxied to device API) |
+| POST | `/api/io/leds/all/on` | Turn all LEDs on (proxied to device API) |
+| POST | `/api/io/leds/all/off` | Turn all LEDs off (proxied to device API) |
+| POST | `/api/io/initialize` | Initialize IO controller |
+| POST | `/api/io/cleanup` | Clean up IO resources |
+| POST | `/api/io/mappings/add` | Add IEC 61850 to device mapping |
 
 ### 3. Integration with FSP BFF
 

@@ -1,12 +1,12 @@
-# Raspberry Pi GPIO LED Control API
+# Raspberry Pi IO Device Control API
 
-A FastAPI-based web service for controlling LEDs connected to a Raspberry Pi via GPIO pins. This project provides a REST API that allows you to remotely control LED states from any device on your network.
+A FastAPI-based web service for controlling IO devices (LEDs, potentiometers, buttons) connected to a Raspberry Pi. This project provides a REST API that allows you to remotely control device states from any device on your network.
 
 ## Features
 
-- **REST API** for LED control via FastAPI
-- **GPIO Abstraction** - Clean separation between hardware and API
-- **Multiple LEDs** - Control individual or all LEDs at once
+- **REST API** for IO device control via FastAPI
+- **Device Abstraction** - Clean separation between hardware and API
+- **Multiple Device Types** - Control LEDs, potentiometers, buttons, and more
 - **Mock Mode** - Works on any system (not just Raspberry Pi) for development
 - **Swagger UI** - Interactive API documentation
 - **CORS Support** - Accessible from web browsers and mobile apps
@@ -313,19 +313,28 @@ The easiest way to explore and test the API:
 ```
 demo_IO/
 ├── __init__.py              # Package initialization
-├── gpio_controller.py       # GPIO hardware abstraction
+├── io_controller.py         # IO device controller (replaces gpio_controller)
+├── devices.py              # Device configuration classes
 ├── api_endpoint.py          # FastAPI endpoints
 ├── main.py                  # Application entry point
 ├── README.md                # This file
-└── requirements.txt         # Python dependencies
+└── pyproject.toml           # Python dependencies and configuration
 ```
 
 ### Key Components
 
-#### gpio_controller.py
-- `GPIOController` - Main class for managing GPIO/LEDs
-- `LEDConfig` - Configuration for individual LEDs
-- Mock LED support for non-Pi systems
+#### io_controller.py
+- `IOController` - Main class for managing IO devices (LEDs, potentiometers, buttons)
+- Thread-safe device operations
+- Mock device support for non-Pi systems
+
+#### devices.py
+- `DeviceConfig` - Base configuration for all devices
+- `LEDConfig` - Configuration for LED devices
+- `PotentiometerConfig` - Configuration for potentiometer devices
+- `ButtonConfig` - Configuration for button devices
+- `DeviceType` - Enumeration of supported device types
+- `DeviceDirection` - Enumeration of device directions (INPUT/OUTPUT)
 
 #### api_endpoint.py
 - FastAPI application factory
@@ -334,7 +343,7 @@ demo_IO/
 - CORS middleware
 
 #### main.py
-- Creates GPIOController with default LEDs
+- Creates IOController with default devices (LEDs and potentiometer)
 - Initializes hardware
 - Starts FastAPI server
 - Platform-specific configuration (Windows vs Unix)
@@ -343,33 +352,50 @@ demo_IO/
 
 ## Customization
 
-### Adding More LEDs
+### Adding More Devices
 
-Edit `main.py` to add more LEDs:
+Edit `main.py` to add more devices:
 
 ```python
-gpio_controller.add_led(
+from devices import LEDConfig, PotentiometerConfig
+
+io_controller.add_device(LEDConfig(
     name="led4",
     gpio_pin=23,
     description="Additional LED on GPIO 23",
     initial_state=False
-)
+))
+
+# Add a potentiometer (if ADC hardware is available)
+io_controller.add_device(PotentiometerConfig(
+    name="pot2",
+    adc_channel=1,
+    description="Potentiometer on ADC channel 1",
+    min_value=0.0,
+    max_value=100.0
+))
 ```
 
 Or via API:
 ```bash
-curl -X POST http://localhost:8080/api/io/leds/config \
+# Add an LED
+curl -X POST http://localhost:8080/api/io/devices/config \
   -H "Content-Type: application/json" \
-  -d '{"name": "led4", "gpio_pin": 23, "description": "New LED", "initial_state": false}'
+  -d '{"name": "led4", "device_type": "led", "identifier": 23, "description": "New LED", "initial_state": false}'
+
+# Add a potentiometer
+curl -X POST http://localhost:8080/api/io/devices/config \
+  -H "Content-Type: application/json" \
+  -d '{"name": "pot2", "device_type": "potentiometer", "adc_channel": 1, "description": "New Potentiometer", "min_value": 0.0, "max_value": 100.0}'
 ```
 
 ### Changing GPIO Pins
 
-Modify the default LEDs in `main.py`:
+Modify the default devices in `main.py`:
 
 ```python
-gpio_controller.add_led("led1", gpio_pin=4, description="LED on GPIO 4")
-gpio_controller.add_led("led2", gpio_pin=27, description="LED on GPIO 27")
+io_controller.add_device(LEDConfig(name="led1", gpio_pin=4, description="LED on GPIO 4"))
+io_controller.add_device(LEDConfig(name="led2", gpio_pin=27, description="LED on GPIO 27"))
 ```
 
 ---
@@ -482,11 +508,11 @@ If this works, your wiring is correct.
 
 **Error:** `LED 'led4' not found`
 
-**Solution:** Configure the LED first:
+**Solution:** Configure the device first:
 ```bash
-curl -X POST http://localhost:8080/api/io/leds/config \
+curl -X POST http://localhost:8080/api/io/devices/config \
   -H "Content-Type: application/json" \
-  -d '{"name": "led4", "gpio_pin": 23}'
+  -d '{"name": "led4", "device_type": "led", "identifier": 23}'
 ```
 
 Or add it to `main.py` before running.
@@ -504,8 +530,8 @@ python test_imports.py
 ### Code Structure
 
 The code follows these principles:
-- **Separation of Concerns**: GPIO logic is separate from API logic
-- **Dependency Injection**: GPIOController can be injected into the API
+- **Separation of Concerns**: IO logic is separate from API logic
+- **Dependency Injection**: IOController can be injected into the API
 - **Mock Support**: Works without hardware for testing
 - **Type Hints**: Full PEP 484 type annotations
 - **Error Handling**: Proper HTTP status codes and error messages
@@ -514,8 +540,8 @@ The code follows these principles:
 
 To add a new endpoint:
 
-1. Add a Pydantic model if needed (in `api_endpoint.py`)
-2. Add a method to `GPIOController` if needed (in `gpio_controller.py`)
+1. Add a device config class if needed (in `devices.py`)
+2. Add a method to `IOController` if needed (in `io_controller.py`)
 3. Add the route handler (in `api_endpoint.py`)
 4. Add it to the router with proper documentation
 

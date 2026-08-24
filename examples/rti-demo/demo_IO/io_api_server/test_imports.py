@@ -24,14 +24,13 @@ except Exception as e:
     print(f"✗ Failed to import demo_IO: {e}")
     sys.exit(1)
 
-# Test 2: Import gpio_controller
+# Test 2: Import io_controller
 try:
-    from gpio_controller import GPIOController, LEDConfig
-    print("✓ Successfully imported from gpio_controller")
-    print(f"  - GPIOController: {GPIOController}")
-    print(f"  - LEDConfig: {LEDConfig}")
+    from io_controller import IOController
+    print("✓ Successfully imported from io_controller")
+    print(f"  - IOController: {IOController}")
 except Exception as e:
-    print(f"✗ Failed to import from gpio_controller: {e}")
+    print(f"✗ Failed to import from io_controller: {e}")
     sys.exit(1)
 
 # Test 3: Import api_endpoint
@@ -54,20 +53,27 @@ except Exception as e:
     print(f"✗ Failed to import from main: {e}")
     sys.exit(1)
 
-# Test 5: Create a GPIOController and test basic functionality
+# Test 5: Create a IOController and test basic functionality
 try:
-    controller = GPIOController()
-    print("✓ Created GPIOController instance")
+    from devices import LEDConfig
     
-    # Add an LED
-    controller.add_led("test_led", 17, "Test LED", False)
-    print("✓ Added test LED configuration")
+    controller = IOController()
+    print("✓ Created IOController instance")
+    
+    # Add an LED device
+    controller.add_device(LEDConfig(
+        name="test_led",
+        gpio_pin=17,
+        description="Test LED",
+        initial_state=False
+    ))
+    print("✓ Added test LED device configuration")
     
     # Initialize (should work in mock mode)
     if controller.initialize():
-        print("✓ GPIOController initialized (mock mode)")
+        print("✓ IOController initialized (mock mode)")
     else:
-        print("✗ GPIOController initialization failed")
+        print("✗ IOController initialization failed")
         sys.exit(1)
     
     # Get status
@@ -76,10 +82,10 @@ try:
     
     # Cleanup
     controller.cleanup()
-    print("✓ GPIOController cleaned up")
+    print("✓ IOController cleaned up")
     
 except Exception as e:
-    print(f"✗ Failed GPIOController test: {e}")
+    print(f"✗ Failed IOController test: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)
