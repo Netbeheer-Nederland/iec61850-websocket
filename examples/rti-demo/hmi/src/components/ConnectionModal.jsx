@@ -66,41 +66,37 @@ function ConnectionModal({
       oauthLoadedRef.current = true;
       const oauthConfig = currentConnection.OAuth || currentConnection.oauth || {};
       
-      // Load OAuth fields into formData
-      if (Object.keys(oauthConfig).length > 0 || currentConnection.certificate_endpoint || currentConnection.auth_server_ca) {
-        onFormChange(prev => {
-          const newData = { ...prev };
-          
-          // Load from OAuth object or direct connection fields
-          newData.certificate_endpoint = oauthConfig.certificate_endpoint || oauthConfig.certificate_endpoint_url || currentConnection.certificate_endpoint || '';
-          newData.token_issuer_url = oauthConfig.token_issuer || oauthConfig.token_issuer_url || '';
-          newData.auth_server_ca = oauthConfig.auth_server_ca || oauthConfig.ca_certificate || currentConnection.auth_server_ca || '';
-          
-          // FSP-specific OAuth fields
-          if (currentConnection.type === 'RTI-FSP' || prev.type === 'RTI-FSP') {
-            newData.realm = oauthConfig.realm || currentConnection.realm || '';
-            newData.token_endpoint = oauthConfig.token_endpoint || oauthConfig.token_endpoint_url || currentConnection.token_endpoint || '';
-            newData.client_id = oauthConfig.client_id || currentConnection.client_id || '';
-            newData.client_secret = oauthConfig.client_secret || currentConnection.client_secret || '';
-            newData.enable_token_refresh = oauthConfig.enable_token_refresh || currentConnection.enable_token_refresh || false;
-          }
-          
-          return newData;
-        });
+      // Always load OAuth fields into formData when editing
+      onFormChange(prev => {
+        const newData = { ...prev };
+        
+        // Load from OAuth object or direct connection fields
+        newData.certificate_endpoint = oauthConfig.certificate_endpoint || oauthConfig.certificate_endpoint_url || currentConnection.certificate_endpoint || '';
+        newData.token_issuer_url = oauthConfig.token_issuer || oauthConfig.token_issuer_url || '';
+        newData.auth_server_ca = oauthConfig.auth_server_ca || oauthConfig.ca_certificate || currentConnection.auth_server_ca || '';
+        
+        // FSP-specific OAuth fields
+        if (currentConnection.type === 'RTI-FSP' || prev.type === 'RTI-FSP') {
+          newData.realm = oauthConfig.realm || currentConnection.realm || '';
+          newData.token_endpoint = oauthConfig.token_endpoint || oauthConfig.token_endpoint_url || currentConnection.token_endpoint || '';
+          newData.client_id = oauthConfig.client_id || currentConnection.client_id || '';
+          newData.client_secret = oauthConfig.client_secret || currentConnection.client_secret || '';
+          newData.enable_token_refresh = oauthConfig.enable_token_refresh || currentConnection.enable_token_refresh || false;
+        }
+        
+        return newData;
+      });
         
         // Find matching IDP server for the certificate endpoint
-        if (oauthConfig.certificate_endpoint || oauthConfig.certificate_endpoint_url || currentConnection.certificate_endpoint) {
-          const certEndpoint = oauthConfig.certificate_endpoint || oauthConfig.certificate_endpoint_url || currentConnection.certificate_endpoint || '';
-          if (certEndpoint) {
-            const matchingIdp = idpServers.find(server => 
-              server.endpoint === certEndpoint || 
-              server.endpoint?.includes(certEndpoint) ||
-              certEndpoint?.includes(server.endpoint || '')
-            );
-            if (matchingIdp) {
-              setSelectedIdpServer(matchingIdp.name);
-            }
-          }
+      const certEndpoint = oauthConfig.certificate_endpoint || oauthConfig.certificate_endpoint_url || currentConnection.certificate_endpoint || '';
+      if (certEndpoint) {
+        const matchingIdp = idpServers.find(server => 
+          server.endpoint === certEndpoint || 
+          server.endpoint?.includes(certEndpoint) ||
+          certEndpoint?.includes(server.endpoint || '')
+        );
+        if (matchingIdp) {
+          setSelectedIdpServer(matchingIdp.name);
         }
       }
     }
