@@ -634,6 +634,44 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             raise HTTPException(status_code=500, detail=str(exc))
     
     @router.post(
+        "/devices/{name}/reset-latch",
+        summary="Reset Latch",
+        description="Reset the latched state of a latching button to False.",
+        response_description="Reset confirmation",
+        responses={
+            200: {"description": "Latch reset successfully"},
+            404: {"description": "Device not found or not a latching button"},
+            500: {"description": "Error resetting latch"}
+        },
+        tags=["Device Control"]
+    )
+    async def api_reset_latch(name: str, request: Request):
+        """Reset the latched state of a button to False."""
+        try:
+            _get_device_or_404(name)
+            if not _ensure_initialized():
+                raise HTTPException(status_code=500, detail="Failed to initialize IO")
+            
+            result = io_controller.reset_latch(name)
+            if result is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Device '{name}' not found or does not support latch reset"
+                )
+            
+            logger.info(f"Reset latch for device '{name}'")
+            return {
+                "ok": True,
+                "name": name,
+                "message": "Latch reset successfully"
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Reset latch for device '{name}' failed: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @router.post(
         "/devices/{name}/toggle",
         summary="Toggle Device",
         description="Toggle the state of a device (ON/OFF or High/Low).",
@@ -754,6 +792,138 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             }
         except Exception as exc:
             logger.error(f"Set all outputs failed: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    # ==================== Configuration Management ====================
+    
+    @router.post(
+        "/config/save",
+        summary="Save Configuration",
+        description="Save all device configurations to the JSON configuration file.",
+        response_description="Save confirmation",
+        responses={
+            200: {"description": "Configuration saved successfully"},
+            500: {"description": "Failed to save configuration"}
+        },
+        tags=["Configuration"]
+    )
+    async def api_save_config(request: Request):
+        """Save all device configurations to the io_config.json file."""
+        try:
+            success = io_controller.save_config()
+            if not success:
+                raise HTTPException(status_code=500, detail="Failed to save configuration")
+            
+            logger.info("IO configuration saved successfully")
+            return {
+                "ok": True,
+                "message": "Configuration saved successfully",
+                "device_count": len(io_controller.configs)
+            }
+        except Exception as exc:
+            logger.error(f"Save configuration failed: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    @router.post(
+        "/config/load",
+        summary="Load Configuration",
+        description="Load device configurations from the JSON configuration file. Replaces existing configurations.",
+        response_description="Load confirmation",
+        responses={
+            200: {"description": "Configuration loaded successfully"},
+            404: {"description": "Configuration file not found"},
+            500: {"description": "Failed to load configuration"}
+        },
+        tags=["Configuration"]
+    )
+    async def api_load_config(request: Request):
+        """Load device configurations from the io_config.json file."""
+        try:
+            # Clear existing configs first
+            io_controller.clear_config()
+            
+            success = io_controller.load_config()
+            if not success:
+                raise HTTPException(status_code=404, detail="Configuration file not found")
+            
+            # Re-initialize with loaded configs
+            io_controller.initialize()
+            
+            logger.info("IO configuration loaded successfully")
+            return {
+                "ok": True,
+                "message": "Configuration loaded successfully",
+                "device_count": len(io_controller.configs),
+                "devices": list(io_controller.configs.keys())
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Load configuration failed: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    @router.get(
+        "/config",
+        summary="Get Configuration",
+        description="Get the current device configuration as JSON.",
+        response_description="Current configuration",
+        responses={
+            200: {"description": "Configuration returned successfully"},
+            500: {"description": "Failed to get configuration"}
+        },
+        tags=["Configuration"]
+    )
+    async def api_get_config(request: Request):
+        """Get the current device configuration."""
+        try:
+            from io_config import _config_to_dict
+            
+            devices_list = []
+            for name, config in io_controller.configs.items():
+                devices_list.append(_config_to_dict(config))
+            
+            return {
+                "ok": True,
+                "devices": devices_list,
+                "count": len(devices_list)
+            }
+        except Exception as exc:
+            logger.error(f"Get configuration failed: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    @router.post(
+        "/config/reload",
+        summary="Reload Configuration",
+        description="Reload device configurations from the JSON file without clearing existing configs.",
+        response_description="Reload confirmation",
+        responses={
+            200: {"description": "Configuration reloaded successfully"},
+            404: {"description": "Configuration file not found"},
+            500: {"description": "Failed to reload configuration"}
+        },
+        tags=["Configuration"]
+    )
+    async def api_reload_config(request: Request):
+        """Reload device configurations from the io_config.json file (adds to existing)."""
+        try:
+            success = io_controller.load_config()
+            if not success:
+                raise HTTPException(status_code=404, detail="Configuration file not found")
+            
+            # Re-initialize with updated configs
+            io_controller.initialize()
+            
+            logger.info("IO configuration reloaded successfully")
+            return {
+                "ok": True,
+                "message": "Configuration reloaded successfully",
+                "device_count": len(io_controller.configs),
+                "devices": list(io_controller.configs.keys())
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Reload configuration failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
     
     return router
