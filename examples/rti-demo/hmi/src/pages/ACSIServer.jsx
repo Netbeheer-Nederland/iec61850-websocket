@@ -6,7 +6,7 @@ import { transformModelToTree } from '../utils/modelUtils';
 
 import TLSConfigModal from '../components/TLSConfigModal';
 
-function ACSIServer({ settings, updateModel, getModel, connections, bffBaseUrl = 'http://localhost:5000'}) {
+function ACSIServer({ settings, updateModel, getModel, connections: propConnections, bffBaseUrl = 'http://localhost:5000'}) {
   const location = useLocation();
   const navigate = useNavigate();
   const endpoint = location.state?.endpoint;
@@ -23,6 +23,7 @@ function ACSIServer({ settings, updateModel, getModel, connections, bffBaseUrl =
   const [protocolMessages, setProtocolMessages] = useState([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState({});
+  const [connections, setConnections] = useState(propConnections || []);
   const monitorIntervalRef = useRef(null);
 
   const [showTLSModal, setShowTLSModal] = useState(false);
@@ -35,6 +36,26 @@ function ACSIServer({ settings, updateModel, getModel, connections, bffBaseUrl =
       [ref]: expanded
     }));
   }, []);
+
+  // Fetch connections from BFF to get live TLS config
+  useEffect(() => {
+    const fetchConnections = async () => {
+      try {
+        const url = `${bffBaseUrl}/api/connections`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          setConnections(data.connections || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch connections:', error);
+      }
+    };
+    
+    if (bffBaseUrl) {
+      fetchConnections();
+    }
+  }, [bffBaseUrl]);
 
   // Helper to parse Python dict string to JS object
   const parsePythonDictString = useCallback((pythonStr) => {
@@ -59,6 +80,23 @@ function ACSIServer({ settings, updateModel, getModel, connections, bffBaseUrl =
     buildTargetValue(endpoint?.host || host, endpoint?.port || port),
     [endpoint, host, port]
   );
+
+  // Fetch OAuth status from the FSP server on page load
+  useEffect(() => {
+    const fetchOAuthStatus = async () => {
+      if (!endpointTarget) return;
+      try {
+        const result = await executeApiCall('oauth-status', endpointTarget, {});
+        if (result?.ok) {
+          const enableOAuth = result.payload?.result?.enable_oauth ?? result.payload?.enable_oauth ?? false;
+          setUseOAuth(enableOAuth);
+        }
+      } catch (error) {
+        console.error('Failed to fetch OAuth status:', error);
+      }
+    };
+    fetchOAuthStatus();
+  }, [endpointTarget]);
 
   const stopMonitoring = useCallback(() => {
     if (monitorIntervalRef.current) {
@@ -314,17 +352,39 @@ function ACSIServer({ settings, updateModel, getModel, connections, bffBaseUrl =
                     host: host || "127.0.0.1",
                     port: String(port) || "8675",
                     cp: cp,
-                    token_endpoint_url: oauthConfig.token_endpoint || '',
-                    client_id: oauthConfig.client_id || '',
-                    client_secret: oauthConfig.client_secret || '',
-                    ca_certificate: oauthConfig.auth_server_ca || '',
-                    enable_token_refresh: oauthConfig.enable_token_refresh || false
+                    // Always send OAuth config fields (null when disabling)
+                    token_endpoint_url: newValue ? (oauthConfig.token_endpoint || '') : null,
+                    client_id: newValue ? (oauthConfig.client_id || '') : null,
+                    client_secret: newValue ? (oauthConfig.client_secret || '') : null,
+                    ca_certificate: newValue ? (oauthConfig.auth_server_ca || '') : null,
+                    enable_token_refresh: newValue ? (oauthConfig.enable_token_refresh || false) : false
                   };
-                  const result = await executeApiCall('reconfig-oauth', connectionTarget, requestBody);
-                  if (result?.ok) {
+                  
+                  // Save to SO/FSP server
+                  const soResult = await executeApiCall('reconfig-oauth', connectionTarget, requestBody);
+                  
+                  // Also save to BFF's connections.json
+                  const bffOauthConfig = {
+                    connection_name: endpoint?.name || host,
+                    enable_oauth: newValue,
+                    ws_mode: endpoint?.ws_mode || 'Active',
+                    // Always send OAuth config fields (null when disabling)
+                    token_endpoint_url: newValue ? (oauthConfig.token_endpoint || '') : null,
+                    client_id: newValue ? (oauthConfig.client_id || '') : null,
+                    client_secret: newValue ? (oauthConfig.client_secret || '') : null,
+                    ca_certificate: newValue ? (oauthConfig.auth_server_ca || '') : null,
+                    enable_token_refresh: newValue ? (oauthConfig.enable_token_refresh || false) : false
+                  };
+                  const bffResult = await fetch(`${bffBaseUrl}/api/connections/oauth-config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bffOauthConfig)
+                  });
+                  
+                  if (soResult?.ok && bffResult.ok) {
                     setMessage({ type: 'success', text: `OAuth ${newValue ? 'enabled' : 'disabled'} successfully` });
                   } else {
-                    setMessage({ type: 'error', text: result?.payload?.error || 'Failed to update OAuth' });
+                    setMessage({ type: 'error', text: soResult?.payload?.error || bffResult.statusText || 'Failed to update OAuth' });
                     setUseOAuth(!newValue); // Revert on failure
                   }
                 } catch (error) {
@@ -423,20 +483,66 @@ function ACSIServer({ settings, updateModel, getModel, connections, bffBaseUrl =
           setShowTLSModal(false);
           setTimeout(() => setMessage(null), 3000);
         }}
-        connection={{
-          name: endpoint?.name || host,
-          host: endpoint?.host || host,
-          port: endpoint?.port || port,
-          properties_info: {
-            properties: {
-              ws_mode: 'Active'
+        connection={(
+          () => {
+            // Try to find matching connection from live connections (has updated TLS)
+            const liveConn = connections.find(c => 
+              (c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) ||
+              (c.host === host && String(c.port) === String(port))
+            );
+            if (liveConn) {
+              return liveConn;
             }
+            // Fallback to endpoint with TLS if available
+            if (endpoint?.TLS) {
+              return {
+                name: endpoint.name || host,
+                host: endpoint.host || host,
+                port: endpoint.port || port,
+                ws_mode: 'Active',
+                TLS: endpoint.TLS,
+                properties_info: {
+                  properties: {
+                    ws_mode: 'Active'
+                  }
+                }
+              };
+            }
+            // Final fallback
+            return {
+              name: endpoint?.name || host,
+              host: endpoint?.host || host,
+              port: endpoint?.port || port,
+              ws_mode: 'Active',
+              TLS: {},
+              properties_info: {
+                properties: {
+                  ws_mode: 'Active'
+                }
+              }
+            };
           }
-        }}
+        )()}
         bffBaseUrl={bffBaseUrl}
-        wsHost={host}       
-        wsPort={port}      
-        onSuccess={(msg) => setMessage({ type: 'success', text: msg })}
+        wsHost={host}
+        wsPort={port}
+        onSuccess={(msg) => {
+          setMessage({ type: 'success', text: msg });
+          // Refetch connections to get updated TLS config
+          const fetchConnections = async () => {
+            try {
+              const url = `${bffBaseUrl}/api/connections`;
+              const response = await fetch(url);
+              if (response.ok) {
+                const data = await response.json();
+                setConnections(data.connections || []);
+              }
+            } catch (error) {
+              console.error('Failed to refetch connections:', error);
+            }
+          };
+          fetchConnections();
+        }}
         onError={(msg) => setMessage({ type: 'error', text: msg })}
       />
     </section>

@@ -101,9 +101,24 @@ class TLSConnectionCreateConfigRequest(BaseModel):
     connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
     enable_tls: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
     tls_version: str = Field(default= "1.2", description="TLS version", json_schema_extra={"example": "1.2"})
-    server_key: str = Field(..., description="Server private key", json_schema_extra={"example": "-----BEGIN PRIVATE KEY-----..."})
-    server_cert: str = Field(..., description="Server certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    server_key: Optional[str] = Field(default=None, description="Server private key", json_schema_extra={"example": "-----BEGIN PRIVATE KEY-----..."})
+    server_cert: Optional[str] = Field(default=None, description="Server certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    server_ca: Optional[str] = Field(default=None, description="Server CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
     ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+
+class OAUTHConnectionCreateConfigRequest(BaseModel):
+    """Request body for OAuth configuration."""
+    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_oauth: bool = Field(default=False, description="Enable OAuth", json_schema_extra={"example": False})
+    ws_mode: str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+    certificate_endpoint_url: Optional[str] = Field(default=None, description="OAuth Certificate endpoint URL", json_schema_extra={"example": "https://auth.example.com/certs"})
+    token_issuer_url: Optional[str] = Field(default=None, description="Token issuer URL", json_schema_extra={"example": "https://auth.example.com"})
+    ca_certificate: Optional[str] = Field(default=None, description="Server CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    token_endpoint_url: Optional[str] = Field(default=None, description="Token endpoint URL", json_schema_extra={"example": "https://auth.example.com/token"})
+    client_id: Optional[str] = Field(default=None, description="Client ID", json_schema_extra={"example": "your-client-id"})
+    client_secret: Optional[str] = Field(default=None, description="Client secret", json_schema_extra={"example": "your-client-secret"})
+    client_ca_cert: Optional[str] = Field(default=None, description="Client CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    enable_token_refresh: Optional[bool] = Field(default=None, description="Enable token refresh", json_schema_extra={"example": False})
 
 class ConnectionUpdateRequest(BaseModel):
     """Request body for updating an existing connection."""
@@ -1288,73 +1303,171 @@ async def create_tls_connection(request: TLSConnectionCreateConfigRequest):
 
     ws_mode = request.ws_mode
     print("debug 1")
+    
+    # Validate required fields based on mode
     if ws_mode == "passive" or ws_mode == "Passive":
         if not request.server_key or not request.server_cert:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail='Missing required fields: server key or server cert for passive mode'
-        )
+                detail='Missing required fields: server_key and server_cert for passive mode'
+            )
+    elif ws_mode == "active" or ws_mode == "Active":
+        if not request.server_ca:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Missing required field: server_ca for active mode'
+            )
     print("debug 2")
 
     connection = conn_manager.get_connection(request.connection_name)
     print("debug 3")
 
-
     if connection:
-        connection['TLS'] = {}
-        connection['TLS']['server_key'] = request.server_key
-        connection['TLS']['server_cert'] = request.server_cert
+        if 'TLS' not in connection:
+            connection['TLS'] = {}
         connection['TLS']['enable_tls'] = request.enable_tls
         connection['TLS']['tls_version'] = request.tls_version
+        
+        # Store certificates based on mode
+        if ws_mode == "passive" or ws_mode == "Passive":
+            connection['TLS']['server_key'] = request.server_key
+            connection['TLS']['server_cert'] = request.server_cert
+            connection['TLS']['server_ca'] = None
+        elif ws_mode == "active" or ws_mode == "Active":
+            connection['TLS']['server_key'] = None
+            connection['TLS']['server_cert'] = None
+            connection['TLS']['server_ca'] = request.server_ca
+        
         conn_manager.save_connections()
         print("debug 4")
 
-        # target = request.target
-        # method = request.method.upper()
-        # path = request.path
-        # body = request.body
-        #
-        # if not target or not path:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_400_BAD_REQUEST,
-        #         detail="target and path are required"
-        #     )
-        #
-        # try:
-        #     # Get client from registry
-        #     client = _bff_clients.get(target)
-        #
-        #     if not client:
-        #         raise HTTPException(
-        #             status_code=status.HTTP_404_NOT_FOUND,
-        #             detail=f"Unknown target: {target}"
-        #         )
-        #
-        #     # Call API dynamically
-        #     result = client.request(
-        #         method=method,
-        #         path=path,
-        #         json=body
-        #     )
-        #
-        #     return {
-        #         "ok": True,
-        #         "target": target,
-        #         "method": method,
-        #         "path": path,
-        #         "result": result
-        #     }
-        # except Exception as e:
-        #     logger.error(f"Error calling API on target {target}: {e}")
-        #     raise HTTPException(
-        #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        #         detail=str(e)
-        #     )
+        return {
+            "ok": True,
+            "message": f"TLS config saved for {request.connection_name}"
+        }
 
     print("debug 5")
 
     return {
-        "ok": False
+        "ok": False,
+        "message": "Connection not found"
+    }
+
+
+@app.post(
+    "/api/connections/oauth-config",
+    summary="Update OAuth Config for a specific connection",
+    description="Update OAuth configuration for a connection.",
+    response_description="Apply result",
+    responses={
+        200: {"description": "OAuth config updated successfully"},
+        400: {"description": "Missing required fields"},
+        404: {"description": "Connection not found"}
+    },
+    tags=["OAuth"]
+)
+async def create_oauth_connection(request: OAUTHConnectionCreateConfigRequest):
+    """Update OAuth configuration for a connection.
+
+    Request Body:
+        OAUTHConnectionCreateConfigRequest with OAuth settings
+
+    Returns:
+        JSON with success status.
+
+    Raises:
+        HTTPException 400: If required fields are missing.
+        HTTPException 404: If connection is not found.
+    """
+    connection = conn_manager.get_connection(request.connection_name)
+
+    if connection:
+        if 'OAuth' not in connection:
+            connection['OAuth'] = {}
+        
+        connection['OAuth']['enable_oauth'] = request.enable_oauth
+        
+        # Store OAuth fields based on mode
+        if request.ws_mode == "passive" or request.ws_mode == "Passive":
+            # Server mode - store server OAuth config
+            if request.certificate_endpoint_url:
+                connection['OAuth']['certificate_endpoint'] = request.certificate_endpoint_url
+            if request.token_issuer_url:
+                connection['OAuth']['token_issuer'] = request.token_issuer_url
+            if request.ca_certificate:
+                connection['OAuth']['auth_server_ca'] = request.ca_certificate
+            # Clear client-specific fields for server mode
+            connection['OAuth'].pop('token_endpoint', None)
+            connection['OAuth'].pop('client_id', None)
+            connection['OAuth'].pop('client_secret', None)
+            connection['OAuth'].pop('client_ca_cert', None)
+        else:
+            # Client mode - store client OAuth config
+            if request.token_endpoint_url:
+                connection['OAuth']['token_endpoint'] = request.token_endpoint_url
+            if request.client_id:
+                connection['OAuth']['client_id'] = request.client_id
+            if request.client_secret:
+                connection['OAuth']['client_secret'] = request.client_secret
+            if request.ca_certificate:
+                connection['OAuth']['auth_server_ca'] = request.ca_certificate
+            if request.client_ca_cert:
+                connection['OAuth']['client_ca_cert'] = request.client_ca_cert
+            if request.enable_token_refresh is not None:
+                connection['OAuth']['enable_token_refresh'] = request.enable_token_refresh
+            # Clear server-specific fields for client mode
+            connection['OAuth'].pop('certificate_endpoint', None)
+            connection['OAuth'].pop('token_issuer', None)
+
+        conn_manager.save_connections()
+
+        return {
+            "ok": True,
+            "message": f"OAuth config saved for {request.connection_name}"
+        }
+
+    return {
+        "ok": False,
+        "message": "Connection not found"
+    }
+
+
+@app.get(
+    "/api/connections/oauth-status",
+    summary="Get OAuth Status for a specific connection",
+    description="Retrieve the OAuth enable/disable status for a connection.",
+    response_description="OAuth status",
+    responses={
+        200: {"description": "OAuth status returned successfully"},
+        404: {"description": "Connection not found"}
+    },
+    tags=["OAuth"]
+)
+async def get_oauth_status(connection_name: str):
+    """Get OAuth enable/disable status for a connection.
+
+    Query Parameters:
+        connection_name: Name of the connection to check
+
+    Returns:
+        JSON with enable_oauth status.
+
+    Raises:
+        HTTPException 404: If connection is not found.
+    """
+    connection = conn_manager.get_connection(connection_name)
+
+    if connection:
+        oauth_status = connection.get('OAuth', {}).get('enable_oauth', False)
+        return {
+            "ok": True,
+            "connection_name": connection_name,
+            "enable_oauth": oauth_status
+        }
+
+    return {
+        "ok": False,
+        "message": f"Connection '{connection_name}' not found"
     }
 
 

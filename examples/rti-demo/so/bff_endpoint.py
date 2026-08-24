@@ -985,6 +985,13 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             if request.enable_oauth and (not certificate_endpoint or not token_issuer_url):
                 raise ValueError(f"certificate_endpoint and token_issuer_url are required for OAuth but were not provided in request for connection: {connection_name}")
             
+            # When disabling OAuth, pass None to signal that OAuth should be disabled
+            # The underlying library should handle None properly
+            if not request.enable_oauth:
+                certificate_endpoint = None
+                token_issuer_url = None
+                ca_certificate = None
+            
             if request.ws_mode.lower() == "passive":
                 loop = rti_so.runtime.loop
                 if loop is None or not loop.is_running():
@@ -1019,9 +1026,45 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400,
                 )
         except Exception as exc:
-            print("reconfig oauth error: ", exc)
+            import traceback
+            print("reconfig oauth error:", exc)
+            print("Traceback:", traceback.format_exc())
             rti_so._log_action(f"Reconfig OAuth failed: {exc}", "error")
             return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
+
+    @router.get(
+        "/oauth-status",
+        summary="Get OAuth Status",
+        description="Returns whether OAuth is currently enabled or disabled for this SO client.",
+        response_description="OAuth enable status",
+        responses={
+            200: {"description": "OAuth status returned successfully"},
+            500: {"description": "Error retrieving OAuth status"}
+        },
+        tags=["OAuth"]
+    )
+    def api_get_oauth_status():
+        """Get current OAuth enable/disable status from the SO server.
+
+        Returns:
+            dict: {
+                "ok": True,
+                "enable_oauth": bool  # Current OAuth status
+            }
+        """
+        try:
+            # Check the runtime endpoint's OAuth enable status
+            if hasattr(rti_so.runtime, 'endpoint') and hasattr(rti_so.runtime.endpoint, '_oauth_enable'):
+                enable_oauth = rti_so.runtime.endpoint._oauth_enable
+                return {"ok": True, "enable_oauth": enable_oauth}
+            else:
+                # If endpoint not available or attribute not found, check if OAuth is configured
+                return {"ok": True, "enable_oauth": False}
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
 
     @router.get(
         "/properties",

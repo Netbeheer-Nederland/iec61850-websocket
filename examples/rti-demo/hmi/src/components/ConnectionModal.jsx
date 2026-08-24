@@ -198,6 +198,20 @@ function ConnectionModal({
               {(formData.type === 'RTI-SO' || formData.type === 'RTI-FSP') && idpServers.length > 0 && (
                 <>
                   <div className="form-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        id="enable_oauth"
+                        checked={formData.enable_oauth || false}
+                        onChange={(e) => onFormChange(prev => ({
+                          ...prev,
+                          enable_oauth: e.target.checked
+                        }))}
+                      />
+                      Enable OAuth
+                    </label>
+                  </div>
+                  <div className="form-group">
                     <label htmlFor="idp_server">IDP Server</label>
                     <select 
                       id="idp_server"
