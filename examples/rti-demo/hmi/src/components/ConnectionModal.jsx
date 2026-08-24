@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 function ConnectionModal({ 
   settings, 
@@ -58,9 +58,12 @@ function ConnectionModal({
     syncAcsiAndWsMode(formData.type, formData.acsi, formData.ws_mode);
   }, [formData.type, formData.acsi, formData.ws_mode]);
 
+  const oauthLoadedRef = useRef(false);
+
   // Load OAuth config from currentConnection when editing
   useEffect(() => {
-    if (showModal && currentConnection) {
+    if (showModal && currentConnection && !oauthLoadedRef.current) {
+      oauthLoadedRef.current = true;
       const oauthConfig = currentConnection.OAuth || currentConnection.oauth || {};
       
       // Load OAuth fields into formData
@@ -100,6 +103,11 @@ function ConnectionModal({
           }
         }
       }
+    }
+    
+    // Reset the ref when modal closes
+    if (!showModal) {
+      oauthLoadedRef.current = false;
     }
   }, [showModal, currentConnection, idpServers, onFormChange]);
 
