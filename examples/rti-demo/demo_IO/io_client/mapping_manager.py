@@ -1,10 +1,10 @@
 """
-IO Mapping Manager - Manages mapping between IEC 61850 object references and LED configurations.
+IO Mapping Manager - Manages mapping between IEC 61850 object references and IO device configurations.
 
 This module provides:
-- Loading/saving LED configurations with IEC 61850 objRef mappings from JSON
-- Querying mappings by objRef or LED name
-- Synchronizing LED states when IEC 61850 values change
+- Loading/saving IO device configurations with IEC 61850 objRef mappings from JSON
+- Querying mappings by objRef or device name
+- Synchronizing IO device states when IEC 61850 values change
 """
 
 from __future__ import annotations
@@ -18,28 +18,28 @@ logger = logging.getLogger(__name__)
 
 
 class IOMappingManager:
-    """Manages the bidirectional mapping between IEC 61850 object references and LED configurations.
+    """Manages the bidirectional mapping between IEC 61850 object references and IO device configurations.
 
-    The mapping file stores LED configurations with an optional objRef field
+    The mapping file stores IO device configurations with an optional objRef field
     for IEC 61850 integration. This allows:
-    - Configuring LEDs with their IEC 61850 counterpart
-    - Finding LEDs by objRef when writing IEC 61850 values
-    - Synchronizing LED states with IEC 61850 writes
+    - Configuring IO devices with their IEC 61850 counterpart
+    - Finding IO devices by objRef when writing IEC 61850 values
+    - Synchronizing IO device states with IEC 61850 writes
 
     Usage:
         manager = IOMappingManager(mapping_file="io_mapping.json")
 
         # Add a mapping
         manager.add_mapping(
-            led_name="led1",
+            device_name="device1",
             obj_ref="LD0/GGIO1$ST$Ind1",
             gpio_pin=17,
             description="GGIO Indication 1"
         )
 
-        # Find LED by objRef
-        led_config = manager.get_led_by_objref("LD0/GGIO1$ST$Ind1")
-        # Returns: {"led_name": "led1", "gpio_pin": 17, "objRef": "LD0/GGIO1$ST$Ind1", ...}
+        # Find IO device by objRef
+        device_config = manager.get_device_by_objref("LD0/GGIO1$ST$Ind1")
+        # Returns: {"device_name": "device1", "gpio_pin": 17, "objRef": "LD0/GGIO1$ST$Ind1", ...}
 
         # Get all mappings
         all_mappings = manager.get_all_mappings()
@@ -62,7 +62,7 @@ class IOMappingManager:
             self.mapping_path = module_dir / self.DEFAULT_MAPPING_FILE
 
         self._mappings: Dict[str, Dict[str, Any]] = {}
-        self._objref_index: Dict[str, str] = {}  # objRef -> led_name
+        self._objref_index: Dict[str, str] = {}  # objRef -> device_name
 
         # Load existing mappings
         self.load()
@@ -91,28 +91,48 @@ class IOMappingManager:
             # Handle both formats: flat dict or {"leds": {...}}
             if isinstance(data, dict):
                 if "leds" in data:
-                    self._mappings = data["leds"]
+                    # Normalize mappings to use device_name instead of led_name
+                    self._mappings = {}
+                    for key, config in data["leds"].items():
+                        device_name = key
+                        # Normalize the config to use device_name
+                        normalized_config = {k: v for k, v in config.items() if k != "led_name"}
+                        self._mappings[device_name] = {
+                            **normalized_config,
+                            "device_name": device_name
+                        }
                 elif "mappings" in data:
                     # Convert from objRef-indexed format
                     self._mappings = {}
-                    for objref, led_config in data["mappings"].items():
-                        led_name = led_config.get("led_name", objref)
-                        self._mappings[led_name] = {
-                            **led_config,
+                    for objref, device_config in data["mappings"].items():
+                        device_name = device_config.get("device_name") or device_config.get("led_name", objref)
+                        # Normalize the config to use device_name
+                        normalized_config = {k: v for k, v in device_config.items() if k != "led_name"}
+                        self._mappings[device_name] = {
+                            **normalized_config,
+                            "device_name": device_name,
                             "objRef": objref
                         }
                 else:
-                    # Assume it's already in led_name-indexed format
-                    self._mappings = data
+                    # Assume it's already in device_name-indexed format
+                    # Normalize each config to use device_name
+                    self._mappings = {}
+                    for key, config in data.items():
+                        device_name = key
+                        normalized_config = {k: v for k, v in config.items() if k != "led_name"}
+                        self._mappings[device_name] = {
+                            **normalized_config,
+                            "device_name": device_name
+                        }
 
             # Build objRef index
             self._objref_index = {}
-            for led_name, config in self._mappings.items():
+            for device_name, config in self._mappings.items():
                 objref = config.get("objRef")
                 if objref:
-                    self._objref_index[objref] = led_name
+                    self._objref_index[objref] = device_name
 
-            logger.info(f"Loaded {len(self._mappings)} LED mappings from {load_path}")
+            logger.info(f"Loaded {len(self._mappings)} IO device mappings from {load_path}")
             return True
 
         except json.JSONDecodeError as e:
@@ -138,7 +158,7 @@ class IOMappingManager:
         save_path = Path(path) if path else self.mapping_path
 
         try:
-            # Save in led_name-indexed format
+            # Save in device_name-indexed format (keeping "leds" key for backward compatibility)
             data = {"leds": self._mappings}
 
             # Ensure parent directory exists
@@ -147,7 +167,7 @@ class IOMappingManager:
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
-            logger.info(f"Saved {len(self._mappings)} LED mappings to {save_path}")
+            logger.info(f"Saved {len(self._mappings)} IO device mappings to {save_path}")
             return True
 
         except Exception as e:
@@ -158,7 +178,7 @@ class IOMappingManager:
 
     def add_mapping(
         self,
-        led_name: str,
+        device_name: str,
         obj_ref: Optional[str] = None,
         gpio_pin: Optional[int] = None,
         description: str = "",
@@ -168,18 +188,18 @@ class IOMappingManager:
         """Add or update a mapping.
 
         Args:
-            led_name: Unique LED identifier
+            device_name: Unique IO device identifier
             obj_ref: IEC 61850 object reference (optional)
             gpio_pin: GPIO pin number
-            description: LED description
-            initial_state: Initial LED state
+            description: IO device description
+            initial_state: Initial IO device state
             **extra_properties: Additional custom properties
 
         Returns:
             dict: The stored mapping configuration
         """
         config: Dict[str, Any] = {
-            "led_name": led_name,
+            "device_name": device_name,
         }
 
         if obj_ref is not None:
@@ -193,36 +213,36 @@ class IOMappingManager:
 
         config.update(extra_properties)
 
-        self._mappings[led_name] = config
+        self._mappings[device_name] = config
 
         # Update objRef index
         if obj_ref:
-            self._objref_index[obj_ref] = led_name
+            self._objref_index[obj_ref] = device_name
 
-        logger.info(f"Added/updated mapping: {led_name} -> {obj_ref or 'N/A'}")
+        logger.info(f"Added/updated mapping: {device_name} -> {obj_ref or 'N/A'}")
 
         return config
 
-    def remove_mapping(self, led_name: str) -> bool:
-        """Remove a mapping by LED name.
+    def remove_mapping(self, device_name: str) -> bool:
+        """Remove a mapping by IO device name.
 
         Args:
-            led_name: LED identifier to remove
+            device_name: IO device identifier to remove
 
         Returns:
             bool: True if removed, False if not found
         """
-        if led_name not in self._mappings:
+        if device_name not in self._mappings:
             return False
 
         # Remove from objRef index if present
-        config = self._mappings[led_name]
+        config = self._mappings[device_name]
         obj_ref = config.get("objRef")
         if obj_ref and obj_ref in self._objref_index:
             del self._objref_index[obj_ref]
 
-        del self._mappings[led_name]
-        logger.info(f"Removed mapping: {led_name}")
+        del self._mappings[device_name]
+        logger.info(f"Removed mapping: {device_name}")
 
         return True
 
@@ -235,47 +255,47 @@ class IOMappingManager:
         Returns:
             bool: True if removed, False if not found
         """
-        led_name = self._objref_index.get(obj_ref)
-        if not led_name:
+        device_name = self._objref_index.get(obj_ref)
+        if not device_name:
             return False
 
-        return self.remove_mapping(led_name)
+        return self.remove_mapping(device_name)
 
-    def get_mapping(self, led_name: str) -> Optional[Dict[str, Any]]:
-        """Get mapping configuration by LED name.
+    def get_mapping(self, device_name: str) -> Optional[Dict[str, Any]]:
+        """Get mapping configuration by IO device name.
 
         Args:
-            led_name: LED identifier
+            device_name: IO device identifier
 
         Returns:
             dict: Mapping configuration, or None if not found
         """
-        return self._mappings.get(led_name)
+        return self._mappings.get(device_name)
 
-    def get_led_by_objref(self, obj_ref: str) -> Optional[Dict[str, Any]]:
-        """Get LED configuration by IEC 61850 object reference.
+    def get_device_by_objref(self, obj_ref: str) -> Optional[Dict[str, Any]]:
+        """Get IO device configuration by IEC 61850 object reference.
 
         Args:
             obj_ref: IEC 61850 object reference
 
         Returns:
-            dict: LED configuration with led_name, or None if not found
+            dict: IO device configuration with device_name, or None if not found
         """
-        led_name = self._objref_index.get(obj_ref)
-        if not led_name:
+        device_name = self._objref_index.get(obj_ref)
+        if not device_name:
             return None
 
-        config = self._mappings.get(led_name)
+        config = self._mappings.get(device_name)
         if config:
-            # Return copy with led_name included
-            return {**config, "led_name": led_name}
+            # Return copy with device_name included
+            return {**config, "device_name": device_name}
         return None
 
     def get_all_mappings(self) -> Dict[str, Dict[str, Any]]:
         """Get all mappings.
 
         Returns:
-            dict: All mappings indexed by led_name
+            dict: All mappings indexed by device_name
         """
         return dict(self._mappings)
 
@@ -286,10 +306,10 @@ class IOMappingManager:
             dict: All mappings indexed by objRef (only those with objRef)
         """
         result = {}
-        for obj_ref, led_name in self._objref_index.items():
-            config = self._mappings.get(led_name)
+        for obj_ref, device_name in self._objref_index.items():
+            config = self._mappings.get(device_name)
             if config:
-                result[obj_ref] = {**config, "led_name": led_name}
+                result[obj_ref] = {**config, "device_name": device_name}
         return result
 
     def clear(self) -> None:
@@ -300,13 +320,13 @@ class IOMappingManager:
 
     # ==================== Sync Utilities ====================
 
-    def sync_led_from_iec61850(
+    def sync_device_from_iec61850(
         self,
         obj_ref: str,
         value: Any,
         client: Any = None
     ) -> bool:
-        """Synchronize LED state based on IEC 61850 value.
+        """Synchronize IO device state based on IEC 61850 value.
 
         Args:
             obj_ref: IEC 61850 object reference that was written
@@ -314,24 +334,51 @@ class IOMappingManager:
             client: Optional DemoIOClient instance for direct control
 
         Returns:
-            bool: True if LED was synced, False if no mapping found
+            bool: True if IO device was synced, False if no mapping found
         """
-        led_config = self.get_led_by_objref(obj_ref)
-        if not led_config:
+        device_config = self.get_device_by_objref(obj_ref)
+        if not device_config:
             return False
 
-        led_name = led_config["led_name"]
+        device_name = device_config["device_name"]
 
         # Convert IEC 61850 value to boolean
-        led_state = self._convert_to_bool(value)
+        device_state = self._convert_to_bool(value)
 
         if client:
             try:
-                client.set_led(led_name, led_state)
-                logger.info(f"Synced LED '{led_name}' to {led_state} (from {obj_ref}={value})")
+                # Call set_device - both sync and async clients have this method
+                # For async clients, the caller must handle awaiting
+                client.set_device(device_name, device_state)
+                logger.info(f"Synced IO device '{device_name}' to {device_state} (from {obj_ref}={value})")
                 return True
             except Exception as e:
-                logger.error(f"Failed to sync LED '{led_name}': {e}")
+                logger.error(f"Failed to sync IO device '{device_name}': {e}")
+                return False
+
+        return False
+    
+    async def sync_device_from_iec61850_async(
+        self,
+        obj_ref: str,
+        value: Any,
+        client: Any = None
+    ) -> bool:
+        """Async version of sync_device_from_iec61850 for async clients."""
+        device_config = self.get_device_by_objref(obj_ref)
+        if not device_config:
+            return False
+
+        device_name = device_config["device_name"]
+        device_state = self._convert_to_bool(value)
+
+        if client:
+            try:
+                await client.set_device(device_name, device_state)
+                logger.info(f"Synced IO device '{device_name}' to {device_state} (from {obj_ref}={value})")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to sync IO device '{device_name}': {e}")
                 return False
 
         return False
@@ -353,27 +400,27 @@ class IOMappingManager:
 
     # ==================== LED Configuration Sync ====================
 
-    def config_led_with_mapping(
+    def config_device_with_mapping(
         self,
-        led_name: str,
+        device_name: str,
         gpio_pin: int,
         obj_ref: Optional[str] = None,
         description: str = "",
         initial_state: bool = False,
         **extra_properties: Any
     ) -> Dict[str, Any]:
-        """Configure an LED and add it to the mapping.
+        """Configure an IO device and add it to the mapping.
 
         This is a convenience method that:
         1. Adds the mapping to the manager
         2. Returns the config that can be sent to demo_io
 
         Args:
-            led_name: Unique LED identifier
+            device_name: Unique IO device identifier
             gpio_pin: GPIO pin number
             obj_ref: IEC 61850 object reference (optional)
-            description: LED description
-            initial_state: Initial LED state
+            description: IO device description
+            initial_state: Initial IO device state
             **extra_properties: Additional custom properties
 
         Returns:
@@ -381,7 +428,7 @@ class IOMappingManager:
         """
         # Add to mapping
         demoio_config = self.add_mapping(
-            led_name=led_name,
+            device_name=device_name,
             obj_ref=obj_ref,
             gpio_pin=gpio_pin,
             description=description,
@@ -391,53 +438,53 @@ class IOMappingManager:
 
         # Return config for demo_io
         return {
-            "name": led_name,
+            "name": device_name,
             "gpio_pin": gpio_pin,
             "description": description or f"Mapped to {obj_ref}" if obj_ref else "",
             "initial_state": initial_state
         }
 
-    def get_led_config_for_demoio(self, led_name: str) -> Optional[Dict[str, Any]]:
-        """Get LED configuration in the format expected by demo_io.
+    def get_device_config_for_demoio(self, device_name: str) -> Optional[Dict[str, Any]]:
+        """Get IO device configuration in the format expected by demo_io.
 
         Args:
-            led_name: LED identifier
+            device_name: IO device identifier
 
         Returns:
             dict: Configuration for demo_io config_led, or None if not found
         """
-        config = self.get_mapping(led_name)
+        config = self.get_mapping(device_name)
         if not config:
             return None
 
         return {
-            "name": led_name,
+            "name": device_name,
             "gpio_pin": config.get("gpio_pin"),
             "description": config.get("description", ""),
             "initial_state": config.get("initial_state", False)
         }
 
-    def get_all_led_configs_for_demoio(self) -> List[Dict[str, Any]]:
-        """Get all LED configurations in demo_io format.
+    def get_all_device_configs_for_demoio(self) -> List[Dict[str, Any]]:
+        """Get all IO device configurations in demo_io format.
 
         Returns:
-            list: All LED configurations for bulk demo_io setup
+            list: All IO device configurations for bulk demo_io setup
         """
         configs = []
-        for led_name, config in self._mappings.items():
+        for device_name, config in self._mappings.items():
             configs.append({
-                "name": led_name,
+                "name": device_name,
                 "gpio_pin": config.get("gpio_pin"),
                 "description": config.get("description", ""),
                 "initial_state": config.get("initial_state", False)
             })
         return configs
 
-    def list_mapped_leds(self) -> List[str]:
-        """List all LED names that have mappings.
+    def list_mapped_devices(self) -> List[str]:
+        """List all IO device names that have mappings.
 
         Returns:
-            list: All LED names with configurations
+            list: All IO device names with configurations
         """
         return list(self._mappings.keys())
 
@@ -445,6 +492,6 @@ class IOMappingManager:
         """List all IEC 61850 object references that have mappings.
 
         Returns:
-            list: All objRefs with LED mappings
+            list: All objRefs with IO device mappings
         """
         return list(self._objref_index.keys())

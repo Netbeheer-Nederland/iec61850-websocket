@@ -62,7 +62,7 @@ class DeviceConfig:
     """Base configuration for any IO device."""
     name: str
     device_type: DeviceType
-    identifier: Union[int, str] = 0  # GPIO pin, ADC channel, I2C address, etc. (0 = unset, will be set by subclass)
+    identifier: Union[int, str] = 0
     description: str = ""
     direction: DeviceDirection = DeviceDirection.OUTPUT
     
@@ -93,7 +93,7 @@ class DigitalDeviceConfig(DeviceConfig):
     """Configuration for digital IO devices (LEDs, buttons, relays)."""
     gpio_pin: int = field(default=0)
     initial_state: bool = False
-    is_active_high: bool = True  # True = active high, False = active low
+    is_active_high: bool = True
     
     def __post_init__(self):
         if self.identifier == 0 and self.gpio_pin != 0:
@@ -114,7 +114,7 @@ class LEDConfig(DigitalDeviceConfig):
     """Configuration for LED devices."""
     device_type: DeviceType = field(default=DeviceType.LED, init=False)
     direction: DeviceDirection = field(default=DeviceDirection.OUTPUT, init=False)
-    brightness: float = 1.0  # 0.0-1.0, for PWM-capable LEDs
+    brightness: float = 1.0
 
 
 @dataclass
@@ -122,10 +122,10 @@ class PotentiometerConfig(DeviceConfig):
     """Configuration for potentiometer (analog input) devices."""
     device_type: DeviceType = field(default=DeviceType.POTENTIOMETER, init=False)
     adc_channel: int = 0
-    adc_reference_voltage: float = 3.3  # Reference voltage in volts
-    min_value: float = 0.0  # User-defined minimum value
-    max_value: float = 100.0  # User-defined maximum value
-    is_inverted: bool = False  # Whether to invert the reading
+    adc_reference_voltage: float = 3.3
+    min_value: float = 0.0
+    max_value: float = 100.0
+    is_inverted: bool = False
     
     def __post_init__(self):
         if self.identifier == 0 and self.adc_channel != 0:
@@ -149,16 +149,16 @@ class ButtonConfig(DigitalDeviceConfig):
     """Configuration for button (digital input) devices."""
     device_type: DeviceType = field(default=DeviceType.BUTTON, init=False)
     direction: DeviceDirection = field(default=DeviceDirection.INPUT, init=False)
-    debounce_time: float = 0.05  # Debounce time in seconds
-    pull_up: bool = True  # Use internal pull-up resistor
+    debounce_time: float = 0.05
+    pull_up: bool = True
 
 
 @dataclass
 class PWMConfig(DigitalDeviceConfig):
     """Configuration for PWM (pulse-width modulation) output devices."""
     device_type: DeviceType = field(default=DeviceType.PWM, init=False)
-    frequency: int = 1000  # PWM frequency in Hz
-    duty_cycle: float = 0.0  # Initial duty cycle 0.0-1.0
+    frequency: int = 1000
+    duty_cycle: float = 0.0
 
 
 # ==================== BASE DEVICE CLASS ====================
@@ -171,168 +171,148 @@ class IODevice(ABC):
     - read() - Read the current value from the device
     - write(value) - Write a value to the device
     - close() - Clean up resources
-    
-    Devices can be:
-    - INPUT: read() returns meaningful data, write() may fail
-    - OUTPUT: write() accepts data, read() returns last written value
-    - BIDIRECTIONAL: both read() and write() work
     """
     
     config: DeviceConfig
     
     @abstractmethod
     def read(self) -> Optional[Union[bool, float]]:
-        """
-        Read the current value from the device.
-        
-        Returns:
-            The current value (bool for digital, float for analog), or None on error
-        """
         pass
     
     @abstractmethod
     def write(self, value: Union[bool, float]) -> bool:
-        """
-        Write a value to the device.
-        
-        Args:
-            value: Value to write (bool for digital, float for analog)
-            
-        Returns:
-            True if successful, False on error
-        """
         pass
     
     @abstractmethod
     def close(self) -> None:
-        """Clean up device resources."""
         pass
     
     @property
     @abstractmethod
     def is_connected(self) -> bool:
-        """Check if device is properly initialized and connected."""
         pass
     
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.config.name}, type={self.config.device_type.value})"
 
 
+# ==================== GPIOZERO WRAPPER FOR LED ====================
+
+class _GpioZeroLED:
+    """Internal wrapper for gpiozero LED with proper error handling."""
+    
+    def __init__(self, gpio_pin: int, active_high: bool = True, initial_value: bool = False):
+        self._hardware_available = False
+        self._mock_state = initial_value
+        self._led = None
+        
+        try:
+            from gpiozero import LED
+            self._led = LED(gpio_pin, active_high=active_high, initial_value=initial_value)
+            self._hardware_available = True
+            logger.info(f"Initialized gpiozero LED on GPIO {gpio_pin}")
+        except Exception as e:
+            logger.warning(f"gpiozero not available for GPIO {gpio_pin}: {e}. Using mock mode.")
+            self._hardware_available = False
+    
+    @property
+    def value(self) -> bool:
+        if self._hardware_available:
+            try:
+                return self._led.value
+            except Exception:
+                return self._mock_state
+        return self._mock_state
+    
+    @value.setter
+    def value(self, val: bool) -> None:
+        if self._hardware_available:
+            try:
+                self._led.value = val
+            except Exception:
+                self._mock_state = val
+        else:
+            self._mock_state = val
+    
+    def on(self) -> None:
+        self.value = True
+    
+    def off(self) -> None:
+        self.value = False
+    
+    def toggle(self) -> None:
+        if self._hardware_available:
+            try:
+                self._led.toggle()
+            except Exception:
+                self._mock_state = not self._mock_state
+        else:
+            self._mock_state = not self._mock_state
+    
+    def close(self) -> None:
+        if self._hardware_available and self._led:
+            try:
+                if hasattr(self._led, 'close'):
+                    self._led.close()
+            except Exception:
+                pass
+
+
 # ==================== HARDWARE DEVICE IMPLEMENTATIONS ====================
 
 class LEDDevice(IODevice):
     """
-    LED device implementation using gpiod for hardware control.
+    LED device implementation using gpiozero for hardware control.
     
-    Falls back to mock mode if gpiod is not available.
+    Falls back to mock mode if gpiozero is not available.
     """
     
     def __init__(self, config: LEDConfig):
         self.config = config
-        self._gpiod_available = False
+        self._gpiozero_led = _GpioZeroLED(
+            gpio_pin=config.gpio_pin,
+            active_high=config.is_active_high,
+            initial_value=config.initial_state
+        )
         self._mock_state = config.initial_state
-        self._device = None
-        
-        try:
-            import gpiod
-            from gpiod.line import Direction, Value
-            
-            self._request = gpiod.request_lines(
-                "/dev/gpiochip0",
-                consumer="demo_io",
-                config={
-                    config.gpio_pin: gpiod.LineSettings(
-                        direction=Direction.OUTPUT,
-                        active_state=Value.ACTIVE if config.is_active_high else Value.INACTIVE
-                    )
-                }
-            )
-            self._gpiod_available = True
-            self._pin = config.gpio_pin
-            self._active_high = config.is_active_high
-            
-            # Set initial state
-            if config.initial_state:
-                self.write(True)
-            else:
-                self.write(False)
-            
-            logger.info(f"Initialized LED device '{config.name}' on GPIO {config.gpio_pin}")
-            
-        except (ImportError, OSError, ValueError, AttributeError) as e:
-            logger.warning(f"gpiod not available for LED '{config.name}': {e}. Using mock mode.")
-            self._gpiod_available = False
-            self._mock_state = config.initial_state
+        logger.info(f"Initialized LED device '{config.name}' on GPIO {config.gpio_pin}")
     
     def read(self) -> Optional[bool]:
         """Read the current LED state."""
-        if not self.is_connected:
-            return None
-        
-        if self._gpiod_available:
-            try:
-                import gpiod
-                from gpiod.line import Value
-                raw_value = self._request.get_value(self._pin)
-                # Handle active high/low
-                if self._active_high:
-                    return raw_value == Value.ACTIVE
-                else:
-                    return raw_value == Value.INACTIVE
-            except Exception as e:
-                logger.warning(f"Failed to read LED '{self.config.name}': {e}")
-                return None
-        else:
+        try:
+            return self._gpiozero_led.value
+        except Exception as e:
+            logger.warning(f"Failed to read LED '{self.config.name}': {e}")
             return self._mock_state
     
     def write(self, value: Union[bool, float]) -> bool:
         """Set the LED state (True=ON, False=OFF)."""
-        if not self.is_connected:
-            return False
-        
-        # Convert float to bool
         state = bool(value)
-        
-        if self._gpiod_available:
-            try:
-                import gpiod
-                from gpiod.line import Value
-                
-                target_value = Value.ACTIVE if state else Value.INACTIVE
-                if not self._active_high:
-                    target_value = Value.INACTIVE if state else Value.ACTIVE
-                
-                self._request.set_value(self._pin, target_value)
-                self._mock_state = state
-                return True
-            except Exception as e:
-                logger.warning(f"Failed to write to LED '{self.config.name}': {e}")
-                return False
-        else:
+        try:
+            self._gpiozero_led.value = state
             self._mock_state = state
             return True
+        except Exception as e:
+            logger.warning(f"Failed to write to LED '{self.config.name}': {e}")
+            self._mock_state = state
+            return False
     
     def close(self) -> None:
         """Clean up GPIO resources."""
-        if self._gpiod_available and self._request:
-            try:
-                self._request.release()
-            except Exception as e:
-                logger.warning(f"Failed to release LED '{self.config.name}': {e}")
+        self._gpiozero_led.close()
     
     @property
     def is_connected(self) -> bool:
-        return True  # Even mock devices are "connected"
+        return True
     
     def toggle(self) -> Optional[bool]:
         """Toggle the LED state and return new state."""
-        current = self.read()
-        if current is None:
-            return None
-        new_state = not current
-        if self.write(new_state):
-            return new_state
-        return None
+        self._gpiozero_led.toggle()
+        new_state = self.read()
+        if new_state is None:
+            self._mock_state = not self._mock_state
+            return self._mock_state
+        return new_state
 
 
 class PotentiometerDevice(IODevice):
@@ -340,48 +320,36 @@ class PotentiometerDevice(IODevice):
     Potentiometer (analog input) device implementation.
     
     Reads analog values from an ADC (Analog-to-Digital Converter).
-    Supports MCP3008 (10-bit, 8-channel) via SPI as a common ADC for Raspberry Pi.
-    
     Falls back to mock mode if hardware is not available.
     """
     
-    # Common ADC configurations
-    ADC_MCP3008 = "mcp3008"  # 10-bit, 8-channel ADC
-    ADC_ADS1115 = "ads1115"  # 16-bit, 4-channel ADC
+    ADC_MCP3008 = "mcp3008"
+    ADC_ADS1115 = "ads1115"
     
     def __init__(self, config: PotentiometerConfig):
         self.config = config
         self._hardware_available = False
-        self._mock_value: float = 0.5  # Default midpoint for mock
+        self._mock_value: float = 0.5
         self._adc = None
         self._spi = None
-        
-        # Try to initialize hardware
         self._init_hardware()
-        
         if not self._hardware_available:
             logger.warning(f"ADC not available for potentiometer '{config.name}'. Using mock mode.")
     
     def _init_hardware(self) -> None:
-        """Initialize ADC hardware if available."""
         try:
-            # Try MCP3008 first (SPI-based, common for RPi)
             try:
                 import spidev
                 import RPi.GPIO as GPIO
-                
-                # SPI configuration
                 self._spi = spidev.SpiDev()
-                self._spi.open(0, 0)  # CE0 on Raspberry Pi
+                self._spi.open(0, 0)
                 self._spi.max_speed_hz = 1000000
                 self._adc_type = self.ADC_MCP3008
                 self._channel = self.config.adc_channel
                 self._hardware_available = True
                 logger.info(f"Initialized potentiometer '{self.config.name}' on ADC channel {self.config.adc_channel}")
                 return
-                
             except (ImportError, AttributeError, OSError):
-                # Try ADS1115 (I2C-based)
                 try:
                     import Adafruit_ADS1x15
                     self._adc = Adafruit_ADS1x15.ADS1115()
@@ -392,63 +360,41 @@ class PotentiometerDevice(IODevice):
                     return
                 except (ImportError, AttributeError, OSError):
                     pass
-                    
         except Exception as e:
             logger.debug(f"ADC initialization failed: {e}")
-        
         self._hardware_available = False
     
     def _read_mcp3008(self, channel: int) -> int:
-        """Read raw value from MCP3008 ADC (0-1023)."""
         if not self._spi:
             return 0
-        
-        # MCP3008 command format: [start, SGL/DIF, ODD/SIGN, MSBF, channel, 0, 0, 0]
-        # Single-ended mode
-        cmd = 0b11 << 6  # Start bit + single-ended
-        cmd |= (channel & 0x07) << 3  # Channel bits
-        
-        # Send command and read response
+        cmd = 0b11 << 6
+        cmd |= (channel & 0x07) << 3
         adc = self._spi.xfer2([cmd, 0, 0])
         data = ((adc[1] & 0x03) << 8) | adc[2]
         return data
     
     def _read_ads1115(self, channel: int) -> int:
-        """Read raw value from ADS1115 ADC (0-32767)."""
         if not self._adc:
             return 0
         return self._adc.read_adc(channel, gain=1)
     
     def read(self) -> Optional[float]:
-        """
-        Read the current potentiometer value.
-        
-        Returns:
-            Normalized value between 0.0 and 1.0, or None on error
-        """
         if not self.is_connected:
             return None
-        
         if self._hardware_available:
             try:
                 if self._adc_type == self.ADC_MCP3008:
                     raw = self._read_mcp3008(self._channel)
-                    max_value = 1023  # 10-bit ADC
+                    max_value = 1023
                 elif self._adc_type == self.ADC_ADS1115:
                     raw = self._read_ads1115(self._channel)
-                    max_value = 32767  # 15-bit ADC
+                    max_value = 32767
                 else:
                     return None
-                
-                # Normalize to 0.0-1.0
                 normalized = max(0, min(1, raw / max_value))
-                
-                # Apply inversion if needed
                 if self.config.is_inverted:
                     normalized = 1.0 - normalized
-                
                 return normalized
-                
             except Exception as e:
                 logger.warning(f"Failed to read potentiometer '{self.config.name}': {e}")
                 return None
@@ -456,28 +402,16 @@ class PotentiometerDevice(IODevice):
             return self._mock_value
     
     def read_scaled(self) -> Optional[float]:
-        """
-        Read the potentiometer value scaled to user-defined range.
-        
-        Returns:
-            Value scaled between min_value and max_value, or None on error
-        """
         normalized = self.read()
         if normalized is None:
             return None
         return self.config.min_value + normalized * (self.config.max_value - self.config.min_value)
     
     def write(self, value: Union[bool, float]) -> bool:
-        """
-        Potentiometers are read-only devices.
-        
-        This method is provided for interface compatibility but always fails.
-        """
         logger.warning(f"Cannot write to read-only potentiometer '{self.config.name}'")
         return False
     
     def close(self) -> None:
-        """Clean up ADC resources."""
         if self._spi:
             try:
                 self._spi.close()
@@ -488,10 +422,9 @@ class PotentiometerDevice(IODevice):
     
     @property
     def is_connected(self) -> bool:
-        return True  # Even mock devices are "connected"
+        return True
     
     def set_mock_value(self, value: float) -> None:
-        """Set mock value for testing (0.0-1.0)."""
         self._mock_value = max(0.0, min(1.0, value))
 
 
@@ -499,94 +432,63 @@ class ButtonDevice(IODevice):
     """
     Button (digital input) device implementation.
     
-    Supports debouncing and pull-up/pull-down configuration.
-    Falls back to mock mode if gpiod is not available.
+    Falls back to mock mode if hardware is not available.
     """
     
     def __init__(self, config: ButtonConfig):
         self.config = config
-        self._gpiod_available = False
+        self._hardware_available = False
         self._mock_state = False
-        self._device = None
         self._last_read_time = 0
         self._last_read_value = False
         
         try:
-            import gpiod
-            from gpiod.line import Direction, Value
-            
-            # Configure pull direction
-            pull = gpiod.line.Pull.UP if config.pull_up else gpiod.line.Pull.DOWN
-            
-            self._request = gpiod.request_lines(
-                "/dev/gpiochip0",
-                consumer="demo_io",
-                config={
-                    config.gpio_pin: gpiod.LineSettings(
-                        direction=Direction.INPUT,
-                        pull=pull
-                    )
-                }
+            from gpiozero import Button as GpioZeroButton
+            from gpiozero import Device
+            Device.pin_factory = None
+            self._button = GpioZeroButton(
+                config.gpio_pin,
+                pull_up=config.pull_up,
+                bounce_time=config.debounce_time
             )
-            self._gpiod_available = True
-            self._pin = config.gpio_pin
+            self._hardware_available = True
             self._active_high = config.is_active_high
-            self._debounce_time = config.debounce_time
-            
             logger.info(f"Initialized button '{config.name}' on GPIO {config.gpio_pin}")
-            
-        except (ImportError, OSError, ValueError, AttributeError) as e:
-            logger.warning(f"gpiod not available for button '{config.name}': {e}. Using mock mode.")
-            self._gpiod_available = False
+        except Exception as e:
+            logger.warning(f"Hardware not available for button '{config.name}': {e}. Using mock mode.")
+            self._hardware_available = False
     
     def read(self) -> Optional[bool]:
-        """Read the current button state."""
         if not self.is_connected:
             return None
-        
-        if self._gpiod_available:
+        if self._hardware_available:
             try:
                 import time
-                import gpiod
-                from gpiod.line import Value
-                
-                # Debounce check
                 current_time = time.time()
-                if current_time - self._last_read_time < self._debounce_time:
+                if current_time - self._last_read_time < self.config.debounce_time:
                     return self._last_read_value
-                
-                raw_value = self._request.get_value(self._pin)
-                
-                # Handle active high/low
-                if self._active_high:
-                    state = raw_value == Value.ACTIVE
+                raw_value = self._button.is_pressed
+                if self.config.is_active_high:
+                    state = raw_value
                 else:
-                    state = raw_value == Value.INACTIVE
-                
+                    state = not raw_value
                 self._last_read_time = current_time
                 self._last_read_value = state
                 return state
-                
             except Exception as e:
                 logger.warning(f"Failed to read button '{self.config.name}': {e}")
-                return None
+                return self._mock_state
         else:
             return self._mock_state
     
     def write(self, value: Union[bool, float]) -> bool:
-        """
-        Buttons are read-only devices.
-        
-        This method is provided for interface compatibility but always fails.
-        """
         logger.warning(f"Cannot write to read-only button '{self.config.name}'")
         return False
     
     def close(self) -> None:
-        """Clean up GPIO resources."""
-        if self._gpiod_available and self._request:
+        if self._hardware_available and hasattr(self._button, 'close'):
             try:
-                self._request.release()
+                self._button.close()
             except Exception as e:
                 logger.warning(f"Failed to release button '{self.config.name}': {e}")
     
@@ -595,17 +497,15 @@ class ButtonDevice(IODevice):
         return True
     
     def set_mock_state(self, state: bool) -> None:
-        """Set mock state for testing."""
         self._mock_state = bool(state)
 
 
-# ==================== MOCK DEVICES (FOR TESTING) ====================
+# ==================== MOCK DEVICES ====================
 
 class MockLEDDevice(LEDDevice):
     """Mock LED device for testing without hardware."""
     
     def __init__(self, config: LEDConfig):
-        # Force mock mode
         config_copy = LEDConfig(
             name=config.name,
             gpio_pin=config.gpio_pin,
@@ -615,8 +515,8 @@ class MockLEDDevice(LEDDevice):
             brightness=config.brightness,
         )
         super().__init__(config_copy)
-        self._gpiod_available = False
-        self._mock_state = config.initial_state
+        self._gpiozero_led._hardware_available = False
+        self._gpiozero_led._mock_state = config.initial_state
 
 
 class MockPotentiometerDevice(PotentiometerDevice):
@@ -632,99 +532,59 @@ class MockPotentiometerDevice(PotentiometerDevice):
 class DeviceFactory:
     """
     Factory for creating IO devices from configurations.
-    
-    Usage:
-        factory = DeviceFactory()
-        led = factory.create_device(led_config)
-        pot = factory.create_device(pot_config)
     """
     
     @staticmethod
     def create_device(config: DeviceConfig) -> IODevice:
-        """
-        Create an IO device from a configuration.
-        
-        Args:
-            config: Device configuration
-            
-        Returns:
-            IODevice instance appropriate for the config type
-            
-        Raises:
-            ValueError: If device type is not supported
-        """
         device_classes = {
             DeviceType.LED: LEDDevice,
             DeviceType.POTENTIOMETER: PotentiometerDevice,
             DeviceType.BUTTON: ButtonDevice,
-            DeviceType.PWM: LEDDevice,  # PWM can use LEDDevice with brightness
-            DeviceType.DAC: LEDDevice,  # Placeholder - implement as needed
-            DeviceType.RELAY: LEDDevice,  # Relay acts like digital output
-            DeviceType.BUZZER: LEDDevice,  # Buzzer acts like digital output
-            DeviceType.SENSOR: PotentiometerDevice,  # Generic sensor like analog
+            DeviceType.PWM: LEDDevice,
+            DeviceType.DAC: LEDDevice,
+            DeviceType.RELAY: LEDDevice,
+            DeviceType.BUZZER: LEDDevice,
+            DeviceType.SENSOR: PotentiometerDevice,
         }
-        
         device_class = device_classes.get(config.device_type)
         if device_class is None:
             raise ValueError(f"Unsupported device type: {config.device_type}")
-        
         return device_class(config)
     
     @staticmethod
     def create_mock_device(config: DeviceConfig) -> IODevice:
-        """Create a mock device for testing."""
         mock_classes = {
             DeviceType.LED: MockLEDDevice,
             DeviceType.POTENTIOMETER: MockPotentiometerDevice,
-            DeviceType.BUTTON: ButtonDevice,  # ButtonDevice already has mock mode
+            DeviceType.BUTTON: ButtonDevice,
         }
-        
         device_class = mock_classes.get(config.device_type, LEDDevice)
         return device_class(config)
 
 
 # ==================== VALIDATION ====================
 
-# Valid GPIO pin ranges for Raspberry Pi models
-RASPBERRY_PI_VALID_GPIO = set(range(0, 28))  # GPIO 0-27
-
-# Valid ADC channels for common ADCs
-MCP3008_VALID_CHANNELS = set(range(0, 8))  # 8 channels (0-7)
-ADS1115_VALID_CHANNELS = set(range(0, 4))  # 4 channels (0-3)
+RASPBERRY_PI_VALID_GPIO = set(range(0, 28))
+MCP3008_VALID_CHANNELS = set(range(0, 8))
+ADS1115_VALID_CHANNELS = set(range(0, 4))
 
 
 def validate_device_config(config: DeviceConfig) -> bool:
-    """
-    Validate a device configuration.
-    
-    Args:
-        config: Device configuration to validate
-        
-    Returns:
-        True if valid, False otherwise
-        
-    Raises:
-        ValueError: If configuration is invalid
-    """
     if not config.name:
         raise ValueError("Device name cannot be empty")
-    
     if config.device_type == DeviceType.LED:
         if not isinstance(config, DigitalDeviceConfig):
             raise ValueError("LED config must be DigitalDeviceConfig")
         if config.gpio_pin not in RASPBERRY_PI_VALID_GPIO:
             raise ValueError(f"Invalid GPIO pin {config.gpio_pin}. Valid: {sorted(RASPBERRY_PI_VALID_GPIO)}")
-        
     elif config.device_type == DeviceType.POTENTIOMETER:
         if not isinstance(config, PotentiometerConfig):
             raise ValueError("Potentiometer config must be PotentiometerConfig")
         if config.adc_channel not in MCP3008_VALID_CHANNELS:
             raise ValueError(f"Invalid ADC channel {config.adc_channel}. Valid: {sorted(MCP3008_VALID_CHANNELS)}")
-        
     elif config.device_type == DeviceType.BUTTON:
         if not isinstance(config, ButtonConfig):
             raise ValueError("Button config must be ButtonConfig")
         if config.gpio_pin not in RASPBERRY_PI_VALID_GPIO:
             raise ValueError(f"Invalid GPIO pin {config.gpio_pin}. Valid: {sorted(RASPBERRY_PI_VALID_GPIO)}")
-    
     return True

@@ -1229,15 +1229,15 @@ def create_bff_router(
                     io_client = get_io_client()
                     if io_client and await io_client.is_healthy():
                         try:
-                            # Try to sync LED state based on written value
-                            await io_client.write_iec61850_value(obj_ref, value, data_type)
-                            logger.info(f"Synced IEC61850 write to LED: {obj_ref}={value}")
+                            # Try to sync device state based on written value
+                            await io_client.write_iec61850_value(obj_ref, value)
+                            logger.info(f"Synced IEC61850 write to device: {obj_ref}={value}")
                         except Exception as sync_exc:
-                            logger.warning(f"LED sync failed for {obj_ref}: {sync_exc}")
+                            logger.warning(f"Device sync failed for {obj_ref}: {sync_exc}")
                     else:
-                        logger.debug("IO client not available or not healthy for LED sync")
+                        logger.debug("IO client not available or not healthy for device sync")
                 except Exception as import_exc:
-                    logger.debug(f"IO client not available for LED sync: {import_exc}")
+                    logger.debug(f"IO client not available for device sync: {import_exc}")
                 
                 return {
                     "ok": True,

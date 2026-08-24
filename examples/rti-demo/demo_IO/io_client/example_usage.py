@@ -49,10 +49,10 @@ def example_direct_client_usage():
         )
         print(f"LED configuration result: {result}")
         
-        # Turn LED on
-        print("\nTurning LED ON...")
-        result = client.set_led("my_led", state=True)
-        print(f"Set LED result: {result}")
+        # Turn device on
+        print("\nTurning device ON...")
+        result = client.set_device("my_led", state=True)
+        print(f"Set device result: {result}")
         
         # Get LED state
         print("\nGetting LED state...")

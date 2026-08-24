@@ -1,64 +1,13 @@
 {
   "leds": {
-    "LD0/GGIO1$ST$Ind1": {
-      "led_name": "LD0/GGIO1$ST$Ind1",
-      "gpio_pin": 17,
-      "objRef": "LD0/GGIO1$ST$Ind1",
-      "description": "GGIO Indication 1 - Status Indicator",
-      "initial_state": false
-    },
-    "LD0/GGIO1$ST$Ind2": {
-      "led_name": "LD0/GGIO1$ST$Ind2",
-      "gpio_pin": 18,
-      "objRef": "LD0/GGIO1$ST$Ind2",
-      "description": "GGIO Indication 2 - Status Indicator",
-      "initial_state": false
-    },
-    "LD0/GGIO1$ST$Ind3": {
-      "led_name": "LD0/GGIO1$ST$Ind3",
-      "gpio_pin": 22,
-      "objRef": "LD0/GGIO1$ST$Ind3",
-      "description": "GGIO Indication 3 - Status Indicator",
-      "initial_state": false
-    },
-    "LD0/GGIO1$ST$Ind4": {
-      "led_name": "LD0/GGIO1$ST$Ind4",
-      "gpio_pin": 23,
-      "objRef": "LD0/GGIO1$ST$Ind4",
-      "description": "GGIO Indication 4 - Status Indicator",
-      "initial_state": false
-    },
-    "LD0/GGIO1$ST$Ind5": {
-      "led_name": "LD0/GGIO1$ST$Ind5",
-      "gpio_pin": 24,
-      "objRef": "LD0/GGIO1$ST$Ind5",
-      "description": "GGIO Indication 5 - Status Indicator",
-      "initial_state": false
-    },
-    "LD0/GGIO1$ST$Ind6": {
-      "led_name": "LD0/GGIO1$ST$Ind6",
-      "gpio_pin": 25,
-      "objRef": "LD0/GGIO1$ST$Ind6",
-      "description": "GGIO Indication 6 - Status Indicator",
-      "initial_state": false
-    },
-    "LD0/GGIO1$ST$Ind7": {
-      "led_name": "LD0/GGIO1$ST$Ind7",
-      "gpio_pin": 5,
-      "objRef": "LD0/GGIO1$ST$Ind7",
-      "description": "GGIO Indication 7 - Status Indicator",
-      "initial_state": false
-    },
-    "LD0/GGIO1$ST$Ind8": {
-      "led_name": "LD0/GGIO1$ST$Ind8",
-      "gpio_pin": 6,
-      "objRef": "LD0/GGIO1$ST$Ind8",
-      "description": "GGIO Indication 8 - Status Indicator",
-      "initial_state": false
-    },
     "led1": {
-      "led_name": "led1",
-      "objRef": "LD0/LLN0$Mod$stVal",
+      "device_name": "led1",
+      "objRef": "LD0/LPHD1.Proxy.stVal",
+      "gpio_pin": 17
+    },
+    "led2": {
+      "device_name": "led2",
+      "objRef": "LD0/LPHD1.PwrUp.stVal",
       "gpio_pin": 17
     }
   }

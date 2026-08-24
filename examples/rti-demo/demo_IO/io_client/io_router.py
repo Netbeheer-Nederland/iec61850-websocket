@@ -77,9 +77,9 @@ class IOConnectionConfig(BaseModel):
 
 class IOMappingRequest(BaseModel):
     """Request body for adding/updating an IO mapping."""
-    led_name: str = Field(
+    device_name: str = Field(
         ...,
-        description="Unique LED identifier",
+        description="Unique IO device identifier",
         json_schema_extra={"example": "LD0/GGIO1$ST$Ind1"}
     )
     objRef: Optional[str] = Field(
@@ -95,19 +95,19 @@ class IOMappingRequest(BaseModel):
     )
     description: str = Field(
         default="",
-        description="LED description",
+        description="IO device description",
         json_schema_extra={"example": "GGIO Indication 1"}
     )
     initial_state: bool = Field(
         default=False,
-        description="Initial LED state",
+        description="Initial IO device state",
         json_schema_extra={"example": False}
     )
 
 
 class IOMappingResponse(BaseModel):
     """Response for IO mapping operations."""
-    led_name: str
+    device_name: str
     objRef: Optional[str] = None
     gpio_pin: Optional[int] = None
     description: str = ""
@@ -118,7 +118,7 @@ class MappingListResponse(BaseModel):
     """Response for listing all IO mappings."""
     mappings: Dict[str, IOMappingResponse] = Field(
         default_factory=dict,
-        description="Dictionary of all LED mappings by led_name"
+        description="Dictionary of all IO device mappings by device_name"
     )
     count: int = Field(default=0, description="Total number of mappings")
 
@@ -171,7 +171,7 @@ def set_mapping_manager(manager: IOMappingManager) -> None:
 def create_io_router() -> APIRouter:
     """Create a FastAPI router for IO/device control via demo_IO proxy.
     
-    This router provides endpoints that proxy device control requests (primarily LEDs)
+    This router provides endpoints that proxy device control requests (IO devices)
     to a connected demo_IO service. The demo_IO connection is configured via
     environment variable DEMO_IO_URL or through the /api/io/connect endpoint.
     
@@ -557,7 +557,7 @@ def create_io_router() -> APIRouter:
             dict: Confirmation with new state
         """
         client = await _get_client_or_error()
-        return await client.set_led(name, request.state)
+        return await client.set_device(name, request.state)
     
     @router.post(
         "/leds/{name}/toggle",
@@ -670,7 +670,7 @@ def create_io_router() -> APIRouter:
     @router.post(
         "/mappings/add",
         summary="Add IO Mapping",
-        description="Add a new mapping between IEC 61850 object reference and LED.",
+        description="Add a new mapping between IEC 61850 object reference and IO device.",
         response_description="Mapping added successfully",
         responses={
             200: {"description": "Mapping added successfully"},
@@ -684,11 +684,11 @@ def create_io_router() -> APIRouter:
         
         Request Body:
             IOMappingRequest: {
-                "led_name": str,        # Required - LED identifier
-                "objRef": str,         # Optional - IEC 61850 object reference
-                "gpio_pin": int,       # Optional - GPIO pin number
-                "description": str,    # Optional - LED description
-                "initial_state": bool  # Optional - Initial state
+                "device_name": str,        # Required - IO device identifier
+                "objRef": str,           # Optional - IEC 61850 object reference
+                "gpio_pin": int,         # Optional - GPIO pin number
+                "description": str,      # Optional - IO device description
+                "initial_state": bool    # Optional - Initial state
             }
         
         Returns:
@@ -697,7 +697,7 @@ def create_io_router() -> APIRouter:
         try:
             manager = get_mapping_manager()
             mapping = manager.add_mapping(
-                led_name=request.led_name,
+                device_name=request.device_name,
                 obj_ref=request.objRef,
                 gpio_pin=request.gpio_pin,
                 description=request.description,
@@ -705,10 +705,10 @@ def create_io_router() -> APIRouter:
             )
             manager.save()
             
-            logger.info(f"Added mapping: {request.led_name} -> {request.objRef}")
+            logger.info(f"Added mapping: {request.device_name} -> {request.objRef}")
             return {
                 "ok": True,
-                "message": f"Mapping added for {request.led_name}",
+                "message": f"Mapping added for {request.device_name}",
                 "mapping": mapping
             }
         except Exception as exc:
@@ -718,7 +718,7 @@ def create_io_router() -> APIRouter:
     @router.get(
         "/mappings",
         summary="List All Mappings",
-        description="Returns all IO mappings between IEC 61850 references and LEDs.",
+        description="Returns all IO mappings between IEC 61850 references and IO devices.",
         response_description="List of all IO mappings",
         responses={
             200: {"description": "List of all mappings"}
@@ -737,9 +737,9 @@ def create_io_router() -> APIRouter:
             
             # Convert to response format
             response_mappings = {}
-            for led_name, config in mappings.items():
-                response_mappings[led_name] = IOMappingResponse(
-                    led_name=led_name,
+            for device_name, config in mappings.items():
+                response_mappings[device_name] = IOMappingResponse(
+                    device_name=device_name,
                     objRef=config.get("objRef"),
                     gpio_pin=config.get("gpio_pin"),
                     description=config.get("description", ""),
@@ -755,9 +755,9 @@ def create_io_router() -> APIRouter:
             raise HTTPException(status_code=500, detail=str(exc))
     
     @router.get(
-        "/mappings/{led_name}",
+        "/mappings/{device_name}",
         summary="Get Mapping",
-        description="Get a specific IO mapping by LED name.",
+        description="Get a specific IO mapping by device name.",
         response_description="Mapping configuration",
         responses={
             200: {"description": "Mapping found"},
@@ -765,27 +765,27 @@ def create_io_router() -> APIRouter:
         },
         tags=["IO Mapping"]
     )
-    async def api_get_mapping(led_name: str, request: Request):
-        """Get a specific IO mapping by LED name.
+    async def api_get_mapping(device_name: str, request: Request):
+        """Get a specific IO mapping by device name.
         
         Args:
-            led_name: LED identifier
+            device_name: IO device identifier
             
         Returns:
             dict: Mapping configuration
         """
         try:
             manager = get_mapping_manager()
-            mapping = manager.get_mapping(led_name)
+            mapping = manager.get_mapping(device_name)
             
             if not mapping:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"No mapping found for LED: {led_name}"
+                    detail=f"No mapping found for device: {device_name}"
                 )
             
             return IOMappingResponse(
-                led_name=led_name,
+                device_name=device_name,
                 objRef=mapping.get("objRef"),
                 gpio_pin=mapping.get("gpio_pin"),
                 description=mapping.get("description", ""),
@@ -794,7 +794,7 @@ def create_io_router() -> APIRouter:
         except HTTPException:
             raise
         except Exception as exc:
-            logger.error(f"Failed to get mapping for {led_name}: {exc}")
+            logger.error(f"Failed to get mapping for {device_name}: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
     
     @router.get(
@@ -815,11 +815,11 @@ def create_io_router() -> APIRouter:
             objRef: IEC 61850 object reference
             
         Returns:
-            dict: Mapping configuration with led_name
+            dict: Mapping configuration with device_name
         """
         try:
             manager = get_mapping_manager()
-            mapping = manager.get_led_by_objref(objRef)
+            mapping = manager.get_device_by_objref(objRef)
             
             if not mapping:
                 raise HTTPException(
@@ -829,9 +829,9 @@ def create_io_router() -> APIRouter:
             
             return {
                 "ok": True,
-                "led_name": mapping["led_name"],
+                "device_name": mapping["device_name"],
                 "mapping": IOMappingResponse(
-                    led_name=mapping["led_name"],
+                    device_name=mapping["device_name"],
                     objRef=mapping.get("objRef"),
                     gpio_pin=mapping.get("gpio_pin"),
                     description=mapping.get("description", ""),
@@ -845,9 +845,9 @@ def create_io_router() -> APIRouter:
             raise HTTPException(status_code=500, detail=str(exc))
     
     @router.delete(
-        "/mappings/{led_name}",
+        "/mappings/{device_name}",
         summary="Remove Mapping",
-        description="Remove an IO mapping by LED name.",
+        description="Remove an IO mapping by device name.",
         response_description="Deletion confirmation",
         responses={
             200: {"description": "Mapping removed successfully"},
@@ -856,33 +856,33 @@ def create_io_router() -> APIRouter:
         },
         tags=["IO Mapping"]
     )
-    async def api_remove_mapping(led_name: str, request: Request):
-        """Remove an IO mapping by LED name.
+    async def api_remove_mapping(device_name: str, request: Request):
+        """Remove an IO mapping by device name.
         
         Args:
-            led_name: LED identifier
+            device_name: IO device identifier
             
         Returns:
             dict: Deletion confirmation
         """
         try:
             manager = get_mapping_manager()
-            if not manager.remove_mapping(led_name):
+            if not manager.remove_mapping(device_name):
                 raise HTTPException(
                     status_code=404,
-                    detail=f"No mapping found for LED: {led_name}"
+                    detail=f"No mapping found for device: {device_name}"
                 )
             
             manager.save()
-            logger.info(f"Removed mapping: {led_name}")
+            logger.info(f"Removed mapping: {device_name}")
             return {
                 "ok": True,
-                "message": f"Mapping removed for {led_name}"
+                "message": f"Mapping removed for {device_name}"
             }
         except HTTPException:
             raise
         except Exception as exc:
-            logger.error(f"Failed to remove mapping for {led_name}: {exc}")
+            logger.error(f"Failed to remove mapping for {device_name}: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
     
     @router.post(
@@ -945,10 +945,41 @@ def create_io_router() -> APIRouter:
             logger.error(f"Failed to save mappings: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
     
+    @router.post(
+        "/mappings/clear",
+        summary="Clear All Mappings",
+        description="Remove all IO device mappings.",
+        response_description="Clear confirmation",
+        responses={
+            200: {"description": "All mappings cleared successfully"},
+            500: {"description": "Failed to clear mappings"}
+        },
+        tags=["IO Mapping"]
+    )
+    async def api_clear_mappings(request: Request):
+        """Clear all IO device mappings.
+        
+        Returns:
+            dict: Clear confirmation
+        """
+        try:
+            manager = get_mapping_manager()
+            manager.clear()
+            manager.save()
+            
+            logger.info("Cleared all IO device mappings")
+            return {
+                "ok": True,
+                "message": "All mappings cleared"
+            }
+        except Exception as exc:
+            logger.error(f"Failed to clear mappings: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
     @router.get(
         "/mappings/objrefs",
         summary="List All objRefs",
-        description="Returns all IEC 61850 object references that have LED mappings.",
+        description="Returns all IEC 61850 object references that have IO device mappings.",
         response_description="List of objRefs",
         responses={
             200: {"description": "List of objRefs"}
@@ -956,7 +987,7 @@ def create_io_router() -> APIRouter:
         tags=["IO Mapping"]
     )
     async def api_list_objrefs(request: Request):
-        """Get all IEC 61850 object references with LED mappings.
+        """Get all IEC 61850 object references with IO device mappings.
         
         Returns:
             dict: List of all objRefs with mappings

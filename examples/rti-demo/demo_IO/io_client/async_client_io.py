@@ -12,11 +12,11 @@ Usage:
     
     async def main():
         async with AsyncDemoIOClient(base_url="http://localhost:8080") as client:
-            # Configure an LED
+            # Configure a device
             await client.config_led(name="led1", gpio_pin=17)
             
-            # Turn LED on
-            await client.set_led("led1", state=True)
+            # Turn device on
+            await client.set_device("led1", state=True)
             
             # Read state
             state = await client.get_led_state("led1")
@@ -49,6 +49,12 @@ import httpx
 from .mapping_manager import IOMappingManager
 
 logger = logging.getLogger(__name__)
+
+# Lazy import to avoid circular dependencies
+def _get_shared_mapping_manager() -> IOMappingManager:
+    """Get the shared mapping manager instance from io_router."""
+    from .io_router import get_mapping_manager
+    return get_mapping_manager()
 
 
 # ==================== DEFAULT CONFIGURATION ====================
@@ -96,7 +102,7 @@ class AsyncDemoIOClient:
         from async_client_io import AsyncDemoIOClient
         
         async with AsyncDemoIOClient(base_url="http://localhost:8080") as client:
-            await client.set_led("led1", True)
+            await client.set_device("led1", True)
             state = await client.get_led_state("led1")
     """
     
@@ -136,7 +142,12 @@ class AsyncDemoIOClient:
         self.follow_redirects = follow_redirects
         self.limits = limits or httpx.Limits(max_connections=10, max_keepalive_connections=5)
         
-        self.mapping = IOMappingManager(mapping_file=mapping_file)
+        # Use shared mapping manager if available, otherwise create local instance
+        try:
+            self.mapping = _get_shared_mapping_manager()
+        except (ImportError, AttributeError):
+            # Fallback to local instance if io_router is not available
+            self.mapping = IOMappingManager(mapping_file=mapping_file)
         self._client: Optional[httpx.AsyncClient] = None
         self._is_closed = True
         
@@ -352,8 +363,8 @@ class AsyncDemoIOClient:
             return {"name": name, "state": bool(result["value"])}
         return {"name": name, "state": False}
     
-    async def set_led(self, name: str, state: bool) -> Dict[str, Any]:
-        """Set a specific LED to ON or OFF state.
+    async def set_device(self, name: str, state: bool) -> Dict[str, Any]:
+        """Set a specific device to ON or OFF state.
         
         This is a convenience method that uses the device API internally.
         """
@@ -407,12 +418,12 @@ class AsyncDemoIOClient:
     # ==================== CONVENIENCE METHODS (LEGACY) ====================
     
     async def turn_on(self, name: str) -> Dict[str, Any]:
-        """Turn an LED ON."""
-        return await self.set_led(name, state=True)
+        """Turn a device ON."""
+        return await self.set_device(name, state=True)
     
     async def turn_off(self, name: str) -> Dict[str, Any]:
-        """Turn an LED OFF."""
-        return await self.set_led(name, state=False)
+        """Turn a device OFF."""
+        return await self.set_device(name, state=False)
     
     async def add_led(self, name: str, gpio_pin: int, description: str = "", 
                      initial_state: bool = False) -> Dict[str, Any]:
@@ -542,18 +553,18 @@ class AsyncDemoIOClient:
     
     # ==================== IEC 61850 MAPPING METHODS ====================
     
-    async def config_led_with_mapping(
+    async def config_device_with_mapping(
         self,
-        led_name: str,
+        device_name: str,
         gpio_pin: int,
         obj_ref: Optional[str] = None,
         description: str = "",
         initial_state: bool = False,
         **extra_properties: Any
     ) -> Dict[str, Any]:
-        """Configure an LED with IEC 61850 mapping."""
-        demoio_config = self.mapping.config_led_with_mapping(
-            led_name=led_name,
+        """Configure an IO device with IEC 61850 mapping."""
+        demoio_config = self.mapping.config_device_with_mapping(
+            device_name=device_name,
             gpio_pin=gpio_pin,
             obj_ref=obj_ref,
             description=description,
@@ -562,7 +573,7 @@ class AsyncDemoIOClient:
         )
         
         demo_io_result = await self.config_led(
-            name=led_name,
+            name=device_name,
             gpio_pin=gpio_pin,
             description=description or f"Mapped to {obj_ref}" if obj_ref else "",
             initial_state=initial_state
@@ -573,18 +584,17 @@ class AsyncDemoIOClient:
         return {
             "demo_io": demo_io_result,
             "mapping": demoio_config,
-            "led_name": led_name,
+            "device_name": device_name,
             "objRef": obj_ref
         }
     
     async def write_iec61850_value(
         self,
         obj_ref: str,
-        value: Any,
-        data_type: str = "unknown"
+        value: Any
     ) -> bool:
         """Handle IEC 61850 write by syncing to mapped device."""
-        return self.mapping.sync_led_from_iec61850(obj_ref, value, client=self)
+        return await self.mapping.sync_device_from_iec61850_async(obj_ref, value, client=self)
     
     def get_mapping_manager(self) -> IOMappingManager:
         """Get the mapping manager instance."""

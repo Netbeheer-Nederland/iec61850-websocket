@@ -25,6 +25,12 @@ from .mapping_manager import IOMappingManager
 
 logger = logging.getLogger(__name__)
 
+# Lazy import to avoid circular dependencies
+def _get_shared_mapping_manager() -> IOMappingManager:
+    """Get the shared mapping manager instance from io_router."""
+    from .io_router import get_mapping_manager
+    return get_mapping_manager()
+
 
 # ==================== DEFAULT CONFIGURATION ====================
 
@@ -96,11 +102,11 @@ class DemoIOClient:
         # Basic usage
         client = DemoIOClient(base_url="http://localhost:8080")
         
-        # Configure an LED
+        # Configure a device
         client.config_led(name="led1", gpio_pin=17)
         
-        # Turn LED on
-        client.set_led("led1", state=True)
+        # Turn device on
+        client.set_device("led1", state=True)
         
         # Configure a potentiometer
         client.config_device(
@@ -158,7 +164,12 @@ class DemoIOClient:
         # Configure connection pooling and retry
         self._session = self._create_session()
         
-        self.mapping = IOMappingManager(mapping_file=mapping_file)
+        # Use shared mapping manager if available, otherwise create local instance
+        try:
+            self.mapping = _get_shared_mapping_manager()
+        except (ImportError, AttributeError):
+            # Fallback to local instance if io_router is not available
+            self.mapping = IOMappingManager(mapping_file=mapping_file)
         logger.info(f"Initialized DemoIOClient with base URL: {self.io_base}, timeout: {timeout}s, retries: {max_retries}")
     
     def _create_session(self) -> requests.Session:
@@ -452,22 +463,21 @@ class DemoIOClient:
             return {"name": name, "state": bool(result["value"])}
         return {"name": name, "state": False}
     
-    def set_led(self, name: str, state: bool) -> Dict[str, Any]:
-        """Set a specific LED to ON or OFF state.
+    def set_device(self, name: str, state: bool) -> Dict[str, Any]:
+        """Set a specific device to ON or OFF state.
         
         This is a convenience method that uses the device API internally.
         
         Args:
-            name: LED identifier
+            name: Device identifier
             state: True for ON, False for OFF
             
         Returns:
             Confirmation with new state
             
         Raises:
-            requests.HTTPError: If LED not found (404) or set fails (500)
+            requests.HTTPError: If device not found (404) or set fails (500)
         """
-        # Use set_device which accepts a state parameter
         data = {"state": state}
         return self._request("POST", f"/devices/{name}/set", json=data)
     
@@ -554,26 +564,26 @@ class DemoIOClient:
     # ==================== Convenience Methods ====================
     
     def turn_on(self, name: str) -> Dict[str, Any]:
-        """Convenience method to turn an LED ON.
+        """Convenience method to turn a device ON.
         
         Args:
-            name: LED identifier
+            name: Device identifier
             
         Returns:
             Confirmation with new state
         """
-        return self.set_led(name, state=True)
+        return self.set_device(name, state=True)
     
     def turn_off(self, name: str) -> Dict[str, Any]:
-        """Convenience method to turn an LED OFF.
+        """Convenience method to turn a device OFF.
         
         Args:
-            name: LED identifier
+            name: Device identifier
             
         Returns:
             Confirmation with new state
         """
-        return self.set_led(name, state=False)
+        return self.set_device(name, state=False)
     
     def add_led(self, name: str, gpio_pin: int, description: str = "", 
                 initial_state: bool = False) -> Dict[str, Any]:
@@ -615,31 +625,31 @@ class DemoIOClient:
 
     # ==================== IEC 61850 Mapping Methods ====================
 
-    def config_led_with_mapping(
+    def config_device_with_mapping(
         self,
-        led_name: str,
+        device_name: str,
         gpio_pin: int,
         obj_ref: Optional[str] = None,
         description: str = "",
         initial_state: bool = False,
         **extra_properties: Any
     ) -> Dict[str, Any]:
-        """Configure an LED with IEC 61850 mapping and send to demo_io.
+        """Configure an IO device with IEC 61850 mapping and send to demo_io.
         
         Args:
-            led_name: Unique LED identifier
+            device_name: Unique IO device identifier
             gpio_pin: GPIO pin number
             obj_ref: IEC 61850 object reference (optional)
-            description: LED description
-            initial_state: Initial LED state
+            description: IO device description
+            initial_state: Initial IO device state
             **extra_properties: Additional custom properties
             
         Returns:
             dict: Result with both mapping and demo_io configuration
         """
         # Get demo_io config from mapping manager
-        demoio_config = self.mapping.config_led_with_mapping(
-            led_name=led_name,
+        demoio_config = self.mapping.config_device_with_mapping(
+            device_name=device_name,
             gpio_pin=gpio_pin,
             obj_ref=obj_ref,
             description=description,
@@ -649,7 +659,7 @@ class DemoIOClient:
         
         # Configure on demo_io service
         demo_io_result = self.config_led(
-            name=led_name,
+            name=device_name,
             gpio_pin=gpio_pin,
             description=description or f"Mapped to {obj_ref}" if obj_ref else "",
             initial_state=initial_state
@@ -661,27 +671,25 @@ class DemoIOClient:
         return {
             "demo_io": demo_io_result,
             "mapping": demoio_config,
-            "led_name": led_name,
+            "device_name": device_name,
             "objRef": obj_ref
         }
 
     def write_iec61850_value(
         self,
         obj_ref: str,
-        value: Any,
-        data_type: str = "unknown"
+        value: Any
     ) -> bool:
-        """Handle IEC 61850 write by syncing to mapped LED if exists.
+        """Handle IEC 61850 write by syncing to mapped device if exists.
         
         Args:
             obj_ref: IEC 61850 object reference
             value: Value to write
-            data_type: Data type (unused for LED sync)
             
         Returns:
-            bool: True if LED was synced, False if no mapping found
+            bool: True if device was synced, False if no mapping found
         """
-        return self.mapping.sync_led_from_iec61850(obj_ref, value, client=self)
+        return self.mapping.sync_device_from_iec61850(obj_ref, value, client=self)
 
     def get_mapping_manager(self) -> IOMappingManager:
         """Get the mapping manager instance.

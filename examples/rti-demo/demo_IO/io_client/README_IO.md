@@ -40,11 +40,11 @@ client = DemoIOClient(base_url="http://localhost:8080")
 # Configure an LED
 client.config_led(name="led1", gpio_pin=17, description="Status LED")
 
-# Control LED
+# Control device
 client.turn_on("led1")
 client.turn_off("led1")
 client.toggle_led("led1")
-client.set_led("led1", state=True)
+client.set_device("led1", state=True)
 
 # Get LED state
 state = client.get_led_state("led1")
