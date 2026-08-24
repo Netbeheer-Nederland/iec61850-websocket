@@ -928,7 +928,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 # read_value/write_value/operate elsewhere in this router.
                 rti_so.invoke_on_runtime_loop(
                     rti_so.runtime.endpoint.reconfigure_endpoint(request.enable_tls, tls_config=tls_config),
-                    timeout=20,  # stop_passive + restart can take a few seconds
+                    timeout=30,  # stop_passive + restart can take a few seconds
                 )
 
                 if request.enable_tls:
@@ -949,7 +949,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400,
                 )
         except Exception as exc:
-            print("reconfig error: ", exc)
+            import traceback
+            print("reconfig error:", repr(exc))
+            traceback.print_exc()
             rti_so._log_action(f"Reconfig connection failed: {exc}", "error")
             return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
 
