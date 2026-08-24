@@ -94,6 +94,7 @@ class ConnectionCreateRequest(BaseModel):
     client_id: Optional[str] = Field(default=None, description="OAuth client ID for FSP", json_schema_extra={"example": "rti-fsp-client"})
     client_secret: Optional[str] = Field(default=None, description="OAuth client secret for FSP")
     enable_token_refresh: Optional[bool] = Field(default=None, description="Enable token refresh for FSP", json_schema_extra={"example": True})
+    idp_server: Optional[str] = Field(default=None, description="IDP Server name for OAuth", json_schema_extra={"example": "IDP-Server-01"})
     auto_discovered: bool = Field(default=False, description="Whether this connection was auto-discovered")
 
 class TLSConnectionCreateConfigRequest(BaseModel):
@@ -136,6 +137,7 @@ class ConnectionUpdateRequest(BaseModel):
     client_id: Optional[str] = Field(default=None, description="OAuth client ID for FSP")
     client_secret: Optional[str] = Field(default=None, description="OAuth client secret for FSP")
     enable_token_refresh: Optional[bool] = Field(default=None, description="Enable token refresh for FSP")
+    idp_server: Optional[str] = Field(default=None, description="IDP Server name for OAuth")
     status: Optional[str] = Field(default=None, description="Connection status")
 
 
@@ -440,7 +442,7 @@ class ConnectionManager:
                       certificate_endpoint: Optional[str] = None, auth_server_ca: Optional[str] = None, 
                       realm: Optional[str] = None, token_endpoint: Optional[str] = None, 
                       client_id: Optional[str] = None, client_secret: Optional[str] = None, 
-                      enable_token_refresh: Optional[bool] = None, auto_discovered: bool = False) -> Dict:
+                      enable_token_refresh: Optional[bool] = None, idp_server: Optional[str] = None, auto_discovered: bool = False) -> Dict:
         """Add a new connection.
         
         Args:
@@ -491,6 +493,8 @@ class ConnectionManager:
                     oauth_fields['client_secret'] = client_secret
                 if enable_token_refresh is not None:
                     oauth_fields['enable_token_refresh'] = enable_token_refresh
+                if idp_server is not None:
+                    oauth_fields['idp_server'] = idp_server
                 
                 if oauth_fields:
                     if 'OAuth' not in connection_in_file:
@@ -499,7 +503,7 @@ class ConnectionManager:
                 
                 # Clean up any OAuth fields that were previously at top level
                 top_level_oauth_fields = ['certificate_endpoint', 'auth_server_ca', 'realm', 
-                                           'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh']
+                                           'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh', 'idp_server']
                 for field in top_level_oauth_fields:
                     if field in connection_in_file:
                         del connection_in_file[field]
@@ -526,6 +530,8 @@ class ConnectionManager:
                     oauth_fields['client_secret'] = client_secret
                 if enable_token_refresh is not None:
                     oauth_fields['enable_token_refresh'] = enable_token_refresh
+                if idp_server is not None:
+                    oauth_fields['idp_server'] = idp_server
                 
                 if oauth_fields:
                     if 'OAuth' not in connection_in_file:
@@ -534,7 +540,7 @@ class ConnectionManager:
                 
                 # Clean up any OAuth fields that were previously at top level
                 top_level_oauth_fields = ['certificate_endpoint', 'auth_server_ca', 'realm', 
-                                           'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh']
+                                           'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh', 'idp_server']
                 for field in top_level_oauth_fields:
                     if field in connection_in_file:
                         del connection_in_file[field]
@@ -582,6 +588,8 @@ class ConnectionManager:
             oauth_fields['client_secret'] = client_secret
         if enable_token_refresh is not None:
             oauth_fields['enable_token_refresh'] = enable_token_refresh
+        if idp_server is not None:
+            oauth_fields['idp_server'] = idp_server
         
         if oauth_fields:
             connection['OAuth'] = oauth_fields
@@ -1503,16 +1511,14 @@ async def get_oauth_config(connection_name: str):
             "ok": True,
             "connection_name": connection_name,
             "certificate_endpoint": oauth_config.get('certificate_endpoint'),
-            "certificate_endpoint_url": oauth_config.get('certificate_endpoint'),
-            "token_issuer": oauth_config.get('token_issuer'),
             "token_issuer_url": oauth_config.get('token_issuer'),
             "token_endpoint": oauth_config.get('token_endpoint'),
-            "token_endpoint_url": oauth_config.get('token_endpoint'),
             "client_id": oauth_config.get('client_id'),
             "client_secret": oauth_config.get('client_secret'),
             "auth_server_ca": oauth_config.get('auth_server_ca'),
-            "ca_certificate": oauth_config.get('auth_server_ca'),
+            "ca_certificate": oauth_config.get('ca_certificate'),
             "realm": oauth_config.get('realm'),
+            "idp_server": oauth_config.get('idp_server'),
             "enable_oauth": oauth_config.get('enable_oauth', False),
             "enable_token_refresh": oauth_config.get('enable_token_refresh', False)
         }
@@ -1581,6 +1587,7 @@ async def create_connection(request: ConnectionCreateRequest):
         client_id=request.client_id,
         client_secret=request.client_secret,
         enable_token_refresh=request.enable_token_refresh,
+        idp_server=request.idp_server,
         auto_discovered=request.auto_discovered
     )
     conn_manager.save_connections()
@@ -1692,6 +1699,8 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         oauth_fields['client_secret'] = request.client_secret
     if request.enable_token_refresh is not None:
         oauth_fields['enable_token_refresh'] = request.enable_token_refresh
+    if request.idp_server is not None:
+        oauth_fields['idp_server'] = request.idp_server
     
     # If we have OAuth fields, create/update the OAuth object
     if oauth_fields:
@@ -1701,7 +1710,7 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
     
     # Clean up any OAuth fields that were previously at top level
     top_level_oauth_fields = ['certificate_endpoint', 'auth_server_ca', 'realm', 
-                               'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh']
+                               'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh', 'idp_server']
     for field in top_level_oauth_fields:
         if field in connection:
             del connection[field]

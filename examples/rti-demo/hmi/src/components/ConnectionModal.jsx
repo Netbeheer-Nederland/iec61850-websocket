@@ -105,9 +105,13 @@ function ConnectionModal({
             getField('token_endpoint_url', 'tokenEndpointUrl', 'token_endpoint');
             getField('client_id', 'clientId', 'client_id');
             getField('client_secret', 'clientSecret', 'client_secret');
+            getField('idp_server', 'idpServer', 'idp_server');
             
             if (obj.enable_token_refresh !== undefined) {
               updates.enable_token_refresh = obj.enable_token_refresh;
+            }
+            if (obj.enable_oauth !== undefined) {
+              updates.enable_oauth = obj.enable_oauth;
             }
           };
           
