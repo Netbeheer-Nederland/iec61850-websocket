@@ -1,0 +1,62 @@
+{
+  "devices": [
+    {
+      "name": "led1",
+      "type": "led",
+      "device_type": "led",
+      "identifier": 17,
+      "gpio_pin": 17,
+      "description": "LED 1 on GPIO 17 (Pin 11)",
+      "direction": "output",
+      "initial_state": false,
+      "is_active_high": true
+    },
+    {
+      "name": "led2",
+      "type": "led",
+      "device_type": "led",
+      "identifier": 18,
+      "gpio_pin": 18,
+      "description": "LED 2 on GPIO 18 (Pin 12)",
+      "direction": "output",
+      "initial_state": false,
+      "is_active_high": true
+    },
+    {
+      "name": "led3",
+      "type": "led",
+      "device_type": "led",
+      "identifier": 22,
+      "gpio_pin": 22,
+      "description": "LED 3 on GPIO 22 (Pin 15)",
+      "direction": "output",
+      "initial_state": false,
+      "is_active_high": true
+    },
+    {
+      "name": "pot1",
+      "type": "potentiometer",
+      "device_type": "potentiometer",
+      "identifier": 0,
+      "adc_channel": 0,
+      "description": "Potentiometer on ADC channel 0",
+      "direction": "input",
+      "min_value": 0.0,
+      "max_value": 100.0
+    },
+    {
+      "name": "button1",
+      "type": "button",
+      "device_type": "button",
+      "identifier": 10,
+      "gpio_pin": 10,
+      "description": "Button on GPIO 10 (Pin 19)",
+      "direction": "input",
+      "debounce_time": 0.05,
+      "pull_up": false,
+      "latching": true,
+      "is_active_high": true
+    }
+  ],
+  "version": 1
+}

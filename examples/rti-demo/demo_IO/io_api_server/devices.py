@@ -151,6 +151,7 @@ class ButtonConfig(DigitalDeviceConfig):
     direction: DeviceDirection = field(default=DeviceDirection.INPUT, init=False)
     debounce_time: float = 0.05
     pull_up: bool = True
+    latching: bool = False
 
 
 @dataclass
@@ -433,6 +434,10 @@ class ButtonDevice(IODevice):
     Button (digital input) device implementation.
     
     Falls back to mock mode if hardware is not available.
+    
+    When latching=True, the button toggles its state on each press (rising edge)
+    and maintains that state even after release. This is useful for momentary
+    buttons that should act like toggle switches.
     """
     
     def __init__(self, config: ButtonConfig):
@@ -441,6 +446,8 @@ class ButtonDevice(IODevice):
         self._mock_state = False
         self._last_read_time = 0
         self._last_read_value = False
+        self._latched_state = False
+        self._previous_physical_state = False
         
         try:
             from gpiozero import Button as GpioZeroButton
@@ -453,12 +460,14 @@ class ButtonDevice(IODevice):
             )
             self._hardware_available = True
             self._active_high = config.is_active_high
-            logger.info(f"Initialized button '{config.name}' on GPIO {config.gpio_pin}")
+            logger.info(f"Initialized button '{config.name}' on GPIO {config.gpio_pin}" + 
+                       (" (latching)" if config.latching else ""))
         except Exception as e:
             logger.warning(f"Hardware not available for button '{config.name}': {e}. Using mock mode.")
             self._hardware_available = False
     
-    def read(self) -> Optional[bool]:
+    def _get_physical_state(self) -> Optional[bool]:
+        """Read the actual physical state of the button (pressed/released)."""
         if not self.is_connected:
             return None
         if self._hardware_available:
@@ -480,6 +489,33 @@ class ButtonDevice(IODevice):
                 return self._mock_state
         else:
             return self._mock_state
+    
+    def read(self) -> Optional[bool]:
+        """Read button state.
+        
+        If latching=True: returns the latched state (toggles on press, stays until next press)
+        If latching=False: returns the current physical state (True=pressed, False=released)
+        """
+        physical_state = self._get_physical_state()
+        
+        if physical_state is None:
+            return None
+        
+        if self.config.latching:
+            # Latching mode: detect rising edge (press) and toggle latched state
+            if self._previous_physical_state == False and physical_state == True:
+                self._latched_state = not self._latched_state
+                logger.debug(f"Button '{self.config.name}' pressed - toggled latched state to {self._latched_state}")
+            self._previous_physical_state = physical_state
+            return self._latched_state
+        else:
+            # Normal mode: return current physical state
+            return physical_state
+    
+    def reset_latch(self) -> None:
+        """Reset latched state to False (for latching buttons)."""
+        self._latched_state = False
+        logger.info(f"Reset latched state for button '{self.config.name}'")
     
     def write(self, value: Union[bool, float]) -> bool:
         logger.warning(f"Cannot write to read-only button '{self.config.name}'")

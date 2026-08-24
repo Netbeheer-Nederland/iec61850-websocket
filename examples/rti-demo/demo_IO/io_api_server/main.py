@@ -17,8 +17,8 @@ Usage:
     # Run with custom port
     PORT=8080 python main.py
     
-    # Run with mock devices only (no hardware)
-    MOCK_MODE=true python main.py
+    # Use custom config file
+    IO_CONFIG_FILE=/path/to/io_config.json python main.py
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from typing import Optional
 from fastapi import FastAPI
 
 from io_controller import IOController
-from devices import LEDConfig, PotentiometerConfig, DeviceType
+from devices import LEDConfig, PotentiometerConfig, ButtonConfig, DeviceType
 
 from api_endpoint import create_fastapi_app
 
@@ -48,60 +48,80 @@ def create_app() -> FastAPI:
     
     This function:
     1. Creates an IOController instance
-    2. Configures default LEDs (GPIO 17, 18, 22)
-    3. Optionally configures a potentiometer (ADC channel 0)
+    2. Loads configurations from io_config.json if it exists
+    3. Otherwise configures default devices (led1, led2, led3, pot1, button1)
     4. Initializes the controller
     5. Creates and returns the FastAPI app
     
     Returns:
         FastAPI application instance
     """
-    # Check if we should use mock mode (from environment variable)
-    use_mock = os.getenv("MOCK_MODE", "false").lower() in ("true", "1", "yes")
-    
     # Create IO controller
     io_controller = IOController()
     
-    # Configure default LEDs
-    io_controller.add_device(LEDConfig(
-        name="led1",
-        gpio_pin=17,
-        description="LED 1 on GPIO 17 (Pin 11)",
-        initial_state=False
-    ))
-    io_controller.add_device(LEDConfig(
-        name="led2",
-        gpio_pin=18,
-        description="LED 2 on GPIO 18 (Pin 12)",
-        initial_state=False
-    ))
-    io_controller.add_device(LEDConfig(
-        name="led3",
-        gpio_pin=22,
-        description="LED 3 on GPIO 22 (Pin 15)",
-        initial_state=False
-    ))
+    # Try to load configuration from io_config.json
+    config_loaded = io_controller.load_config()
     
-    # Configure a default potentiometer (if ADC is available)
-    try:
-        io_controller.add_device(PotentiometerConfig(
-            name="pot1",
-            adc_channel=0,
-            description="Potentiometer on ADC channel 0",
-            min_value=0.0,
-            max_value=100.0
+    if config_loaded:
+        logger.info("Loaded IO configuration from io_config.json")
+    else:
+        # No config file found, use defaults
+        logger.info("No io_config.json found, using default device configuration")
+        
+        # Configure default LEDs
+        io_controller.add_device(LEDConfig(
+            name="led1",
+            gpio_pin=17,
+            description="LED 1 on GPIO 17 (Pin 11)",
+            initial_state=False
         ))
-        logger.info("Configured default potentiometer: pot1 (ADC channel 0)")
-    except Exception as e:
-        logger.warning(f"Failed to configure default potentiometer: {e}")
+        io_controller.add_device(LEDConfig(
+            name="led2",
+            gpio_pin=18,
+            description="LED 2 on GPIO 18 (Pin 12)",
+            initial_state=False
+        ))
+        io_controller.add_device(LEDConfig(
+            name="led3",
+            gpio_pin=22,
+            description="LED 3 on GPIO 22 (Pin 15)",
+            initial_state=False
+        ))
+        
+        # Configure a default potentiometer (if ADC is available)
+        try:
+            io_controller.add_device(PotentiometerConfig(
+                name="pot1",
+                adc_channel=0,
+                description="Potentiometer on ADC channel 0",
+                min_value=0.0,
+                max_value=100.0
+            ))
+            logger.info("Configured default potentiometer: pot1 (ADC channel 0)")
+        except Exception as e:
+            logger.warning(f"Failed to configure default potentiometer: {e}")
+        
+        # Configure a default button on GPIO 10
+        try:
+            io_controller.add_device(ButtonConfig(
+                name="button1",
+                gpio_pin=10,
+                description="Button on GPIO 10 (Pin 19)",
+                debounce_time=0.05,
+                pull_up=False,
+                latching=True  # Button toggles and maintains state on press
+            ))
+            logger.info("Configured default button: button1 (GPIO 10, latching)")
+        except Exception as e:
+            logger.warning(f"Failed to configure default button: {e}")
+        
+        logger.info("Configured default devices: led1 (GPIO 17), led2 (GPIO 18), led3 (GPIO 22), pot1 (ADC 0), button1 (GPIO 10)")
     
-    logger.info("Configured default devices: led1 (GPIO 17), led2 (GPIO 18), led3 (GPIO 22), pot1 (ADC 0)")
-    
-    # Initialize IO with optional mock mode
-    if not io_controller.initialize(use_mock=use_mock):
+    # Initialize IO
+    if not io_controller.initialize():
         logger.error("Failed to initialize IO controller")
     else:
-        logger.info("IO controller initialized successfully" + (" (mock mode)" if use_mock else ""))
+        logger.info("IO controller initialized successfully")
     
     # Create FastAPI app
     app = create_fastapi_app(io_controller)

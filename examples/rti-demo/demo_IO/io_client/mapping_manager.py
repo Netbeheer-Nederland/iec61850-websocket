@@ -180,7 +180,6 @@ class IOMappingManager:
         self,
         device_name: str,
         obj_ref: Optional[str] = None,
-        gpio_pin: Optional[int] = None,
         description: str = "",
         initial_state: bool = False,
         **extra_properties: Any
@@ -190,7 +189,6 @@ class IOMappingManager:
         Args:
             device_name: Unique IO device identifier
             obj_ref: IEC 61850 object reference (optional)
-            gpio_pin: GPIO pin number
             description: IO device description
             initial_state: Initial IO device state
             **extra_properties: Additional custom properties
@@ -204,8 +202,6 @@ class IOMappingManager:
 
         if obj_ref is not None:
             config["objRef"] = obj_ref
-        if gpio_pin is not None:
-            config["gpio_pin"] = gpio_pin
         if description:
             config["description"] = description
         if initial_state:
@@ -412,31 +408,30 @@ class IOMappingManager:
         """Configure an IO device and add it to the mapping.
 
         This is a convenience method that:
-        1. Adds the mapping to the manager
-        2. Returns the config that can be sent to demo_io
+        1. Adds the mapping to the manager (without gpio_pin - that's device-specific)
+        2. Returns the config that can be sent to demo_io (which includes gpio_pin)
 
         Args:
             device_name: Unique IO device identifier
-            gpio_pin: GPIO pin number
+            gpio_pin: GPIO pin number (for demo_io device config, not stored in mapping)
             obj_ref: IEC 61850 object reference (optional)
             description: IO device description
             initial_state: Initial IO device state
             **extra_properties: Additional custom properties
 
         Returns:
-            dict: Configuration suitable for demo_io config_led endpoint
+            dict: Configuration suitable for demo_io config_led endpoint (includes gpio_pin)
         """
-        # Add to mapping
+        # Add to mapping (without gpio_pin - that belongs to device config, not mapping)
         demoio_config = self.add_mapping(
             device_name=device_name,
             obj_ref=obj_ref,
-            gpio_pin=gpio_pin,
             description=description,
             initial_state=initial_state,
             **extra_properties
         )
 
-        # Return config for demo_io
+        # Return config for demo_io (includes gpio_pin for device configuration)
         return {
             "name": device_name,
             "gpio_pin": gpio_pin,
@@ -446,12 +441,15 @@ class IOMappingManager:
 
     def get_device_config_for_demoio(self, device_name: str) -> Optional[Dict[str, Any]]:
         """Get IO device configuration in the format expected by demo_io.
+        
+        Note: gpio_pin is NOT included as it's device-specific config stored in demo_io,
+        not in the mapping.
 
         Args:
             device_name: IO device identifier
 
         Returns:
-            dict: Configuration for demo_io config_led, or None if not found
+            dict: Configuration for demo_io config_led (without gpio_pin), or None if not found
         """
         config = self.get_mapping(device_name)
         if not config:
@@ -459,22 +457,23 @@ class IOMappingManager:
 
         return {
             "name": device_name,
-            "gpio_pin": config.get("gpio_pin"),
             "description": config.get("description", ""),
             "initial_state": config.get("initial_state", False)
         }
 
     def get_all_device_configs_for_demoio(self) -> List[Dict[str, Any]]:
         """Get all IO device configurations in demo_io format.
+        
+        Note: gpio_pin is NOT included as it's device-specific config stored in demo_io,
+        not in the mapping.
 
         Returns:
-            list: All IO device configurations for bulk demo_io setup
+            list: All IO device configurations for bulk demo_io setup (without gpio_pin)
         """
         configs = []
         for device_name, config in self._mappings.items():
             configs.append({
                 "name": device_name,
-                "gpio_pin": config.get("gpio_pin"),
                 "description": config.get("description", ""),
                 "initial_state": config.get("initial_state", False)
             })

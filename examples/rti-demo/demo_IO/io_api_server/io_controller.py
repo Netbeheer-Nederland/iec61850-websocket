@@ -326,6 +326,32 @@ class IOController:
     
     # ==================== Device-Specific Operations ====================
     
+    def reset_latch(self, name: str) -> Optional[bool]:
+        """
+        Reset the latched state of a latching button.
+        
+        Args:
+            name: Device name
+            
+        Returns:
+            True if successful, None on error
+        """
+        device = self.devices.get(name)
+        if device is None:
+            logger.error(f"Device '{name}' not found")
+            return None
+        
+        if hasattr(device, 'reset_latch'):
+            try:
+                device.reset_latch()
+                return True
+            except Exception as e:
+                logger.error(f"Failed to reset latch for device '{name}': {e}")
+                return None
+        else:
+            logger.warning(f"Device '{name}' does not support latch reset")
+            return None
+
     def toggle(self, name: str) -> Optional[bool]:
         """
         Toggle a device state (for devices that support it).
@@ -485,3 +511,54 @@ class IOController:
             "device_config": device_info,
             "states": self.read_all(),
         }
+    
+    # ==================== Configuration Persistence ====================
+    
+    def save_config(self, path: str = None) -> bool:
+        """
+        Save all device configurations to a JSON file.
+        
+        Args:
+            path: Path to save the configuration file (uses IO_CONFIG_FILE env var if not provided)
+            
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        from io_config import save_config as _save_config, get_config_path
+        
+        save_path = path or get_config_path()
+        return _save_config(self.configs, save_path)
+    
+    def load_config(self, path: str = None) -> bool:
+        """
+        Load device configurations from a JSON file and add them to the controller.
+        
+        Args:
+            path: Path to the configuration file (uses IO_CONFIG_FILE env var if not provided)
+            
+        Returns:
+            True if loaded successfully, False otherwise
+        """
+        from io_config import load_config as _load_config, get_config_path
+        
+        load_path = path or get_config_path()
+        configs = _load_config(load_path)
+        
+        if configs is None:
+            return False
+        
+        for name, config in configs.items():
+            try:
+                self.add_device(config)
+            except Exception as e:
+                logger.error(f"Failed to add device '{name}' from config: {e}")
+                return False
+        
+        logger.info(f"Loaded {len(configs)} device configurations")
+        return True
+    
+    def clear_config(self) -> None:
+        """Clear all device configurations."""
+        self.configs.clear()
+        self.devices.clear()
+        logger.info("Cleared all device configurations")
