@@ -58,37 +58,10 @@ function ConnectionModal({
     syncAcsiAndWsMode(formData.type, formData.acsi, formData.ws_mode);
   }, [formData.type, formData.acsi, formData.ws_mode]);
 
-  const oauthLoadedRef = useRef(false);
-
-  // Load OAuth config from currentConnection when editing
+  // Find matching IDP server for the certificate endpoint when modal opens
   useEffect(() => {
-    if (showModal && currentConnection && !oauthLoadedRef.current) {
-      oauthLoadedRef.current = true;
-      const oauthConfig = currentConnection.OAuth || currentConnection.oauth || {};
-      
-      // Always load OAuth fields into formData when editing
-      onFormChange(prev => {
-        const newData = { ...prev };
-        
-        // Load from OAuth object or direct connection fields
-        newData.certificate_endpoint = oauthConfig.certificate_endpoint || oauthConfig.certificate_endpoint_url || currentConnection.certificate_endpoint || '';
-        newData.token_issuer_url = oauthConfig.token_issuer || oauthConfig.token_issuer_url || '';
-        newData.auth_server_ca = oauthConfig.auth_server_ca || oauthConfig.ca_certificate || currentConnection.auth_server_ca || '';
-        
-        // FSP-specific OAuth fields
-        if (currentConnection.type === 'RTI-FSP' || prev.type === 'RTI-FSP') {
-          newData.realm = oauthConfig.realm || currentConnection.realm || '';
-          newData.token_endpoint = oauthConfig.token_endpoint || oauthConfig.token_endpoint_url || currentConnection.token_endpoint || '';
-          newData.client_id = oauthConfig.client_id || currentConnection.client_id || '';
-          newData.client_secret = oauthConfig.client_secret || currentConnection.client_secret || '';
-          newData.enable_token_refresh = oauthConfig.enable_token_refresh || currentConnection.enable_token_refresh || false;
-        }
-        
-        return newData;
-      });
-        
-        // Find matching IDP server for the certificate endpoint
-      const certEndpoint = oauthConfig.certificate_endpoint || oauthConfig.certificate_endpoint_url || currentConnection.certificate_endpoint || '';
+    if (showModal && currentConnection && formData.certificate_endpoint) {
+      const certEndpoint = formData.certificate_endpoint || '';
       if (certEndpoint) {
         const matchingIdp = idpServers.find(server => 
           server.endpoint === certEndpoint || 
@@ -100,12 +73,7 @@ function ConnectionModal({
         }
       }
     }
-    
-    // Reset the ref when modal closes
-    if (!showModal) {
-      oauthLoadedRef.current = false;
-    }
-  }, [showModal, currentConnection, idpServers, onFormChange]);
+  }, [showModal, currentConnection, formData.certificate_endpoint, idpServers]);
 
   // Auto-populate certificate endpoint when IDP server is selected
   // Update both state and formData in the onChange handler to avoid timing issues

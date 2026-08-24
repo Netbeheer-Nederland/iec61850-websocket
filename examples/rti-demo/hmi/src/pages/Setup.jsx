@@ -103,25 +103,17 @@ function Setup({ settings }) {
     setCurrentConnection(conn);
     const oauthConfig = conn.OAuth || conn.oauth || {};
     
-    // Load OAuth fields from OAuth object or top-level connection
+    // Load OAuth fields from OAuth object (primary) or fallback to top-level connection
     const certificateEndpoint = oauthConfig.certificate_endpoint || oauthConfig.certificate_endpoint_url || conn.certificate_endpoint || '';
     const authServerCa = oauthConfig.auth_server_ca || oauthConfig.ca_certificate || conn.auth_server_ca || '';
-    const tokenIssuerUrl = oauthConfig.token_issuer || oauthConfig.token_issuer_url || '';
+    const tokenIssuerUrl = oauthConfig.token_issuer || oauthConfig.token_issuer_url || conn.token_issuer_url || '';
     
-    // FSP-specific OAuth fields
-    let realm = conn.realm || '';
-    let tokenEndpoint = conn.token_endpoint || '';
-    let clientId = conn.client_id || '';
-    let clientSecret = conn.client_secret || '';
-    let enableTokenRefresh = conn.enable_token_refresh || false;
-    
-    if (conn.type === 'RTI-FSP') {
-      realm = oauthConfig.realm || conn.realm || '';
-      tokenEndpoint = oauthConfig.token_endpoint || oauthConfig.token_endpoint_url || conn.token_endpoint || '';
-      clientId = oauthConfig.client_id || conn.client_id || '';
-      clientSecret = oauthConfig.client_secret || conn.client_secret || '';
-      enableTokenRefresh = oauthConfig.enable_token_refresh || conn.enable_token_refresh || false;
-    }
+    // FSP-specific OAuth fields from OAuth object (primary) or fallback to top-level
+    const realm = oauthConfig.realm || conn.realm || '';
+    const tokenEndpoint = oauthConfig.token_endpoint || oauthConfig.token_endpoint_url || conn.token_endpoint || '';
+    const clientId = oauthConfig.client_id || conn.client_id || '';
+    const clientSecret = oauthConfig.client_secret || conn.client_secret || '';
+    const enableTokenRefresh = oauthConfig.enable_token_refresh || conn.enable_token_refresh || false;
     
     setFormData({
       name: conn.name || '',
