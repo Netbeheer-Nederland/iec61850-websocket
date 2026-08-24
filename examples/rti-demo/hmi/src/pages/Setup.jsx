@@ -18,6 +18,7 @@ function Setup({ settings }) {
     endpoint: '',
     certificate_endpoint: '',
     auth_server_ca: '',
+    token_issuer_url: '',
     realm: '',
     token_endpoint: '',
     client_id: '',
@@ -93,13 +94,35 @@ function Setup({ settings }) {
   // Add connection
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '', certificate_endpoint: '', auth_server_ca: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false });
+    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false });
     setShowModal(true);
   };
 
   // Edit connection
   const handleEditConnection = (conn) => {
     setCurrentConnection(conn);
+    const oauthConfig = conn.OAuth || conn.oauth || {};
+    
+    // Load OAuth fields from OAuth object or top-level connection
+    const certificateEndpoint = oauthConfig.certificate_endpoint || oauthConfig.certificate_endpoint_url || conn.certificate_endpoint || '';
+    const authServerCa = oauthConfig.auth_server_ca || oauthConfig.ca_certificate || conn.auth_server_ca || '';
+    const tokenIssuerUrl = oauthConfig.token_issuer || oauthConfig.token_issuer_url || '';
+    
+    // FSP-specific OAuth fields
+    let realm = conn.realm || '';
+    let tokenEndpoint = conn.token_endpoint || '';
+    let clientId = conn.client_id || '';
+    let clientSecret = conn.client_secret || '';
+    let enableTokenRefresh = conn.enable_token_refresh || false;
+    
+    if (conn.type === 'RTI-FSP') {
+      realm = oauthConfig.realm || conn.realm || '';
+      tokenEndpoint = oauthConfig.token_endpoint || oauthConfig.token_endpoint_url || conn.token_endpoint || '';
+      clientId = oauthConfig.client_id || conn.client_id || '';
+      clientSecret = oauthConfig.client_secret || conn.client_secret || '';
+      enableTokenRefresh = oauthConfig.enable_token_refresh || conn.enable_token_refresh || false;
+    }
+    
     setFormData({
       name: conn.name || '',
       host: conn.host || '',
@@ -108,13 +131,14 @@ function Setup({ settings }) {
       acsi: conn.acsi || 'server',
       ws_mode: conn.ws_mode || '',
       endpoint: conn.endpoint || '',
-      certificate_endpoint: conn.certificate_endpoint || '',
-      auth_server_ca: conn.auth_server_ca || '',
-      realm: conn.realm || '',
-      token_endpoint: conn.token_endpoint || '',
-      client_id: conn.client_id || '',
-      client_secret: conn.client_secret || '',
-      enable_token_refresh: conn.enable_token_refresh || false
+      certificate_endpoint: certificateEndpoint,
+      auth_server_ca: authServerCa,
+      token_issuer_url: tokenIssuerUrl,
+      realm: realm,
+      token_endpoint: tokenEndpoint,
+      client_id: clientId,
+      client_secret: clientSecret,
+      enable_token_refresh: enableTokenRefresh
     });
     setShowModal(true);
   };
