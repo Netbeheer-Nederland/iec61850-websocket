@@ -1221,7 +1221,7 @@ def create_bff_router(
             try:
                 result = rti_fsp.write_value(obj_ref, value, data_type)
                 
-                # Sync with mapped LED if mapping exists
+                # Sync with mapped device if mapping exists
                 try:
                     # Get the existing IO router's client and mapping manager
                     from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
@@ -1326,7 +1326,7 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     router, _server = create_bff_router(resolved_factory_dir)
     app.include_router(router)
     
-    # Include IO router for LED control via demo_IO
+    # Include IO router for device control via demo_IO
     try:
         import sys
         # Add parent directory to path so we can import from demo_IO
@@ -1337,7 +1337,7 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
         from demo_IO.io_client.io_router import create_io_router
         io_router = create_io_router()
         app.include_router(io_router)
-        logger.info("IO router included for demo_IO LED control")
+        logger.info("IO router included for demo_IO device control")
     except ImportError as e:
         logger.warning(f"IO router not available (missing dependencies): {e}")
     except Exception as e:
