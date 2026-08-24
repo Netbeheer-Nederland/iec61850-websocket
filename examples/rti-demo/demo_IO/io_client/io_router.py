@@ -87,21 +87,10 @@ class IOMappingRequest(BaseModel):
         description="IEC 61850 object reference (optional)",
         json_schema_extra={"example": "LD0/GGIO1$ST$Ind1"}
     )
-    gpio_pin: Optional[int] = Field(
-        default=None,
-        description="GPIO pin number (BCM numbering)",
-        ge=0,
-        json_schema_extra={"example": 17}
-    )
     description: str = Field(
         default="",
         description="IO device description",
         json_schema_extra={"example": "GGIO Indication 1"}
-    )
-    initial_state: bool = Field(
-        default=False,
-        description="Initial IO device state",
-        json_schema_extra={"example": False}
     )
 
 
@@ -109,7 +98,6 @@ class IOMappingResponse(BaseModel):
     """Response for IO mapping operations."""
     device_name: str
     objRef: Optional[str] = None
-    gpio_pin: Optional[int] = None
     description: str = ""
     initial_state: bool = False
 
@@ -631,6 +619,39 @@ def create_io_router() -> APIRouter:
         client = await _get_client_or_error()
         return await client.turn_off(name)
     
+    # ==================== Device Control (Generic) ====================
+    
+    @router.post(
+        "/devices/{name}/set",
+        summary="Set Device State",
+        description="Set a specific device to ON or OFF state on demo_IO. Generic endpoint for all devices.",
+        response_description="Set confirmation",
+        responses={
+            200: {"description": "Device state set successfully"},
+            404: {"description": "Device not found on demo_IO"},
+            503: {"description": "demo_IO not connected"}
+        },
+        tags=["Device Control"]
+    )
+    async def api_set_device(name: str, request: LEDStateRequest):
+        """Set a device to a specific state on demo_IO.
+        
+        This is a generic endpoint that works for all output devices (LEDs, etc.).
+        
+        Args:
+            name: Device identifier
+        
+        Request Body:
+            LEDStateRequest: {
+                "state": bool  # Required - True for ON, False for OFF
+            }
+        
+        Returns:
+            dict: Confirmation with new state
+        """
+        client = await _get_client_or_error()
+        return await client.set_device(name, request.state)
+    
     # ==================== GPIO Management ====================
     
     @router.post(
@@ -686,7 +707,6 @@ def create_io_router() -> APIRouter:
             IOMappingRequest: {
                 "device_name": str,        # Required - IO device identifier
                 "objRef": str,           # Optional - IEC 61850 object reference
-                "gpio_pin": int,         # Optional - GPIO pin number
                 "description": str,      # Optional - IO device description
                 "initial_state": bool    # Optional - Initial state
             }
@@ -699,7 +719,6 @@ def create_io_router() -> APIRouter:
             mapping = manager.add_mapping(
                 device_name=request.device_name,
                 obj_ref=request.objRef,
-                gpio_pin=request.gpio_pin,
                 description=request.description,
                 initial_state=request.initial_state
             )
@@ -741,7 +760,6 @@ def create_io_router() -> APIRouter:
                 response_mappings[device_name] = IOMappingResponse(
                     device_name=device_name,
                     objRef=config.get("objRef"),
-                    gpio_pin=config.get("gpio_pin"),
                     description=config.get("description", ""),
                     initial_state=config.get("initial_state", False)
                 )
@@ -787,7 +805,6 @@ def create_io_router() -> APIRouter:
             return IOMappingResponse(
                 device_name=device_name,
                 objRef=mapping.get("objRef"),
-                gpio_pin=mapping.get("gpio_pin"),
                 description=mapping.get("description", ""),
                 initial_state=mapping.get("initial_state", False)
             )
@@ -833,7 +850,6 @@ def create_io_router() -> APIRouter:
                 "mapping": IOMappingResponse(
                     device_name=mapping["device_name"],
                     objRef=mapping.get("objRef"),
-                    gpio_pin=mapping.get("gpio_pin"),
                     description=mapping.get("description", ""),
                     initial_state=mapping.get("initial_state", False)
                 )
