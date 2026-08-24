@@ -1103,13 +1103,34 @@ def create_bff_router(
             if request.enable_oauth and not token_endpoint:
                 raise ValueError(f"token_endpoint is required for OAuth but was not provided in request for connection: {connection_name}")
             
+            # When disabling OAuth, pass None to signal that OAuth should be disabled
+            # The underlying library should handle None properly
+            if not request.enable_oauth:
+                token_endpoint = None
+                client_id = None
+                client_secret = None
+                ca_certificate = None
+            
             print("Reconfiguring OAuth with connection: ", connection_name)
+            print(f"OAuth enable: {request.enable_oauth}, token_endpoint: {token_endpoint}")
 
             loop = rti_fsp.runtime.loop
             if loop is None or not loop.is_running():
                 print("server not running, starting server instance")
                 rti_fsp.start_server(host, int(oauth_port))
                 loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
+
+            # When disabling OAuth, stop the endpoint first to avoid issues with ClientCredentialsProvider
+            if not request.enable_oauth:
+                print("Disabling OAuth - stopping endpoint first")
+                # Stop the current connection if it exists
+                if hasattr(rti_fsp.runtime.endpoint, '_connect_task') and rti_fsp.runtime.endpoint._connect_task is not None:
+                    stop_fut = asyncio.run_coroutine_threadsafe(
+                        rti_fsp.runtime.endpoint._cancel_task(rti_fsp.runtime.endpoint._connect_task),
+                        loop,
+                    )
+                    await asyncio.wrap_future(stop_fut)
+                print("Endpoint stopped, now reconfiguring with OAuth disabled")
 
             # Call reconfigure_oauth with settings from connection
             fut = asyncio.run_coroutine_threadsafe(
@@ -1135,9 +1156,45 @@ def create_bff_router(
                 status_code=200,
             )
         except Exception as exc:
-            print("Reconfig OAuth error: ", exc)
+            import traceback
+            print("Reconfig OAuth error:", exc)
+            print("Traceback:", traceback.format_exc())
             rti_fsp._log_action(f"Reconfig OAuth failed: {exc}", "error")
             return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
+
+    @router.get(
+        "/oauth-status",
+        summary="Get OAuth Status",
+        description="Returns whether OAuth is currently enabled or disabled for this FSP server.",
+        response_description="OAuth enable status",
+        responses={
+            200: {"description": "OAuth status returned successfully"},
+            500: {"description": "Error retrieving OAuth status"}
+        },
+        tags=["OAuth"]
+    )
+    def api_get_oauth_status():
+        """Get current OAuth enable/disable status from the FSP server.
+
+        Returns:
+            dict: {
+                "ok": True,
+                "enable_oauth": bool  # Current OAuth status
+            }
+        """
+        try:
+            # Check the runtime endpoint's OAuth enable status
+            if hasattr(rti_fsp.runtime, 'endpoint') and hasattr(rti_fsp.runtime.endpoint, '_oauth_enable'):
+                enable_oauth = rti_fsp.runtime.endpoint._oauth_enable
+                return {"ok": True, "enable_oauth": enable_oauth}
+            else:
+                # If endpoint not available or attribute not found, check if OAuth is configured
+                return {"ok": True, "enable_oauth": False}
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
 
     @router.get(
         "/actions-logs",
