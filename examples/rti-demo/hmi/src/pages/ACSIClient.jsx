@@ -7,7 +7,6 @@ import ControlModal from '../components/ControlModal';
 import WriteValueModal from '../components/WriteValueModal';
 import BrcbConfigModal from '../components/BrcbConfigModal';
 import TLSConfigModal from '../components/TLSConfigModal';
-import OAuthConfigModal from '../components/OAuthConfigModal';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
@@ -72,7 +71,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   }, [apiTarget]);
   const [showBrcbConfigModal, setShowBrcbConfigModal] = useState(false);
   const [showTLSModal, setShowTLSModal] = useState(false);
-  const [showOAuthModal, setShowOAuthModal] = useState(false);
   const [useOAuth, setUseOAuth] = useState(false);
   const [message, setMessage] = useState(null);
   const monitorIntervalRef = useRef(null);
@@ -890,15 +888,6 @@ const getContextMenuItems = () => {
         >
           <i className="fas fa-shield-alt" style={{ marginRight: '8px' }}></i>TLS Config
         </button>
-        <button
-          className="btn-secondary"
-          onClick={() => setShowOAuthModal(true)}
-          disabled={loading}
-          title="Configure OAuth settings"
-          id="acsi-client-oauth-btn"
-        >
-          <i className="fas fa-key" style={{ marginRight: '8px' }}></i>OAuth Config
-        </button>
         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
           <input
             type="checkbox"
@@ -1215,76 +1204,6 @@ const getContextMenuItems = () => {
         onSuccess={(msg) => {
           setMessage({ type: 'success', text: msg });
           // Refetch connections to get updated TLS config
-          const fetchConnections = async () => {
-            try {
-              const url = `${bffBaseUrl}/api/connections`;
-              const response = await fetch(url);
-              if (response.ok) {
-                const data = await response.json();
-                setConnections(data.connections || []);
-              }
-            } catch (error) {
-              console.error('Failed to refetch connections:', error);
-            }
-          };
-          fetchConnections();
-        }}
-        onError={(msg) => setMessage({ type: 'error', text: msg })}
-      />
-
-      <OAuthConfigModal
-        isOpen={showOAuthModal}
-        onClose={() => {
-          setShowOAuthModal(false);
-          setTimeout(() => setMessage(null), 3000);
-        }}
-        connection={(
-          () => {
-            // Try to find matching connection from live connections (has updated OAuth)
-            const liveConn = connections.find(c => 
-              (c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) ||
-              (c.host === wsHost && String(c.port) === String(wsPort))
-            );
-            if (liveConn) {
-              return liveConn;
-            }
-            // Fallback to endpoint with OAuth if available
-            if (endpoint?.OAuth) {
-              return {
-                name: endpoint.name || wsHost,
-                host: endpoint.host || wsHost,
-                port: endpoint.port || wsPort,
-                ws_mode: endpoint.ws_mode || 'active',
-                OAuth: endpoint.OAuth,
-                properties_info: {
-                  properties: {
-                    ws_mode: endpoint.ws_mode || 'active'
-                  }
-                }
-              };
-            }
-            // Final fallback
-            return {
-              name: endpoint?.name || wsHost,
-              host: endpoint?.host || wsHost,
-              port: endpoint?.port || wsPort,
-              ws_mode: 'active',
-              OAuth: {},
-              properties_info: {
-                properties: {
-                  ws_mode: 'active'
-                }
-              }
-            };
-          }
-        )()}
-        connections={connections}
-        bffBaseUrl={bffBaseUrl}
-        wsHost={wsHost}
-        wsPort={wsPort}
-        onSuccess={(msg) => {
-          setMessage({ type: 'success', text: msg });
-          // Refetch connections to get updated OAuth config
           const fetchConnections = async () => {
             try {
               const url = `${bffBaseUrl}/api/connections`;
