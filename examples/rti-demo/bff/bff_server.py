@@ -1471,6 +1471,58 @@ async def get_oauth_status(connection_name: str):
     }
 
 
+@app.get(
+    "/api/connections/oauth-config",
+    summary="Get OAuth Config for a specific connection",
+    description="Retrieve the full OAuth configuration for a connection.",
+    response_description="OAuth configuration",
+    responses={
+        200: {"description": "OAuth config returned successfully"},
+        404: {"description": "Connection not found"}
+    },
+    tags=["OAuth"]
+)
+async def get_oauth_config(connection_name: str):
+    """Get full OAuth configuration for a connection.
+
+    Query Parameters:
+        connection_name: Name of the connection to get config for
+
+    Returns:
+        JSON with full OAuth configuration including certificate_endpoint,
+        token_issuer_url, client_id, client_secret, etc.
+
+    Raises:
+        HTTPException 404: If connection is not found.
+    """
+    connection = conn_manager.get_connection(connection_name)
+
+    if connection:
+        oauth_config = connection.get('OAuth', {})
+        return {
+            "ok": True,
+            "connection_name": connection_name,
+            "certificate_endpoint": oauth_config.get('certificate_endpoint'),
+            "certificate_endpoint_url": oauth_config.get('certificate_endpoint'),
+            "token_issuer": oauth_config.get('token_issuer'),
+            "token_issuer_url": oauth_config.get('token_issuer'),
+            "token_endpoint": oauth_config.get('token_endpoint'),
+            "token_endpoint_url": oauth_config.get('token_endpoint'),
+            "client_id": oauth_config.get('client_id'),
+            "client_secret": oauth_config.get('client_secret'),
+            "auth_server_ca": oauth_config.get('auth_server_ca'),
+            "ca_certificate": oauth_config.get('auth_server_ca'),
+            "realm": oauth_config.get('realm'),
+            "enable_oauth": oauth_config.get('enable_oauth', False),
+            "enable_token_refresh": oauth_config.get('enable_token_refresh', False)
+        }
+
+    return {
+        "ok": False,
+        "message": f"Connection '{connection_name}' not found"
+    }
+
+
 @app.post(
     "/api/add-connection",
     summary="Create Connection",

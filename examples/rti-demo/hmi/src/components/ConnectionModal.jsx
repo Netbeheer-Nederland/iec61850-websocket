@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 function ConnectionModal({ 
   settings, 
@@ -58,22 +58,126 @@ function ConnectionModal({
     syncAcsiAndWsMode(formData.type, formData.acsi, formData.ws_mode);
   }, [formData.type, formData.acsi, formData.ws_mode]);
 
+  // Fetch OAuth config from BFF for the connection being edited
+  useEffect(() => {
+    const fetchBffOAuthConfig = async () => {
+      if (!showModal || !currentConnection) return;
+      
+      // Only for connections that might have OAuth config
+      const connType = currentConnection.type || formData.type || '';
+      if (connType !== 'RTI-SO' && connType !== 'RTI-FSP' && connType !== 'Generic') return;
+      
+      const connName = currentConnection.name || formData.name;
+      if (!connName) return;
+      
+      try {
+        // Try to get OAuth config from BFF - use the same endpoint used for saving
+        const bffHost = localStorage.getItem('bffHost') || settings?.bffHost || 'localhost';
+        const bffPort = localStorage.getItem('bffPort') || settings?.bffPort || '5000';
+        const url = `http://${bffHost}:${bffPort}/api/connections/oauth-config?connection_name=${encodeURIComponent(connName)}`;
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const updates = {};
+          
+          // Extract OAuth fields from response - try both snake_case and camelCase variants
+          const extractFields = (obj) => {
+            const getField = (snake, camel, formField) => {
+              const value = obj[snake] || obj[camel];
+              if (value !== undefined && value !== null && value !== '') {
+                updates[formField] = value;
+              }
+            };
+            
+            getField('certificate_endpoint', 'certificateEndpoint', 'certificate_endpoint');
+            getField('certificate_endpoint_url', 'certificateEndpointUrl', 'certificate_endpoint');
+            getField('token_issuer', 'tokenIssuer', 'token_issuer_url');
+            getField('token_issuer_url', 'tokenIssuerUrl', 'token_issuer_url');
+            getField('auth_server_ca', 'authServerCa', 'auth_server_ca');
+            getField('ca_certificate', 'caCertificate', 'auth_server_ca');
+            getField('realm', 'realm', 'realm');
+            getField('token_endpoint', 'tokenEndpoint', 'token_endpoint');
+            getField('token_endpoint_url', 'tokenEndpointUrl', 'token_endpoint');
+            getField('client_id', 'clientId', 'client_id');
+            getField('client_secret', 'clientSecret', 'client_secret');
+            
+            if (obj.enable_token_refresh !== undefined) {
+              updates.enable_token_refresh = obj.enable_token_refresh;
+            }
+          };
+          
+          // Try to extract from root level
+          extractFields(data);
+          
+          // Also check nested config
+          if (data.config) {
+            extractFields(data.config);
+          }
+          
+          // Also check if wrapped in a connection object
+          if (data.connection) {
+            extractFields(data.connection);
+          }
+          
+          // Only update if we have values
+          if (Object.keys(updates).length > 0) {
+            onFormChange(prev => ({ ...prev, ...updates }));
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch OAuth config from BFF:', error);
+      }
+    };
+    
+    fetchBffOAuthConfig();
+  }, [showModal, currentConnection, formData.name, formData.type, onFormChange, settings]);
+
+
   // Find matching IDP server for the certificate endpoint when modal opens
   useEffect(() => {
-    if (showModal && currentConnection && formData.certificate_endpoint) {
+    if (showModal && currentConnection) {
+      // Try to find IDP server by name from formData (set by Setup.jsx or fetched from backend)
+      const idpServerName = formData.idp_server || 
+                           currentConnection.idp_server || 
+                           (currentConnection.OAuth || {}).idp_server ||
+                           (currentConnection.oauth || {}).idp_server ||
+                           '';
+      
+      if (idpServerName) {
+        const matchingByName = idpServers.find(server => server.name === idpServerName);
+        if (matchingByName) {
+          setSelectedIdpServer(matchingByName.name);
+          // Also ensure certificate_endpoint is populated from IDP server
+          if (matchingByName.endpoint && !formData.certificate_endpoint) {
+            onFormChange(prev => ({
+              ...prev,
+              certificate_endpoint: matchingByName.endpoint
+            }));
+          }
+          return;
+        }
+      }
+      
+      // Fall back to matching by certificate endpoint
       const certEndpoint = formData.certificate_endpoint || '';
       if (certEndpoint) {
-        const matchingIdp = idpServers.find(server => 
-          server.endpoint === certEndpoint || 
-          server.endpoint?.includes(certEndpoint) ||
-          certEndpoint?.includes(server.endpoint || '')
-        );
+        const matchingIdp = idpServers.find(server => {
+          const serverEndpoint = server.endpoint || '';
+          return serverEndpoint === certEndpoint ||
+                 (serverEndpoint.includes(certEndpoint) && certEndpoint.length > 0) ||
+                 (certEndpoint.includes(serverEndpoint) && serverEndpoint.length > 0);
+        });
         if (matchingIdp) {
           setSelectedIdpServer(matchingIdp.name);
         }
       }
     }
-  }, [showModal, currentConnection, formData.certificate_endpoint, idpServers]);
+  }, [showModal, currentConnection, formData.certificate_endpoint, formData.idp_server, idpServers, onFormChange]);
 
   // Auto-populate certificate endpoint when IDP server is selected
   // Update both state and formData in the onChange handler to avoid timing issues
@@ -204,8 +308,8 @@ function ConnectionModal({
                 </>
               )}
               
-              {/* IDP Server fields for SO and FSP types */}
-              {(formData.type === 'RTI-SO' || formData.type === 'RTI-FSP') && (
+              {/* IDP Server fields for SO and FSP types (and Generic) */}
+              {(formData.type === 'RTI-SO' || formData.type === 'RTI-FSP' || formData.type === 'Generic') && (
                 <>
                   <div className="form-group">
                     <label htmlFor="idp_server">IDP Server</label>

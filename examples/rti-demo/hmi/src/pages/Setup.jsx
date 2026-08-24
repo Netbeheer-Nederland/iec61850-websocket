@@ -23,7 +23,8 @@ function Setup({ settings }) {
     token_endpoint: '',
     client_id: '',
     client_secret: '',
-    enable_token_refresh: false
+    enable_token_refresh: false,
+    idp_server: ''
   });
   const [loading, setLoading] = useState(true);
   const [bffError, setBffError] = useState(null);
@@ -94,26 +95,85 @@ function Setup({ settings }) {
   // Add connection
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false });
+    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false, idp_server: '' });
     setShowModal(true);
   };
 
   // Edit connection
   const handleEditConnection = (conn) => {
     setCurrentConnection(conn);
-    const oauthConfig = conn.OAuth || conn.oauth || {};
+    
+    // Try to find OAuth config in multiple possible locations
+    const oauthConfig = conn.OAuth || conn.oauth || conn.oauth_config || conn.OAuthConfig || conn.oauthConfig || {};
+    
+    // Also check if OAuth config is nested differently
+    const propertiesOauth = (conn.properties_info || {}).properties || {};
+    const oauthFromProps = propertiesOauth.OAuth || propertiesOauth.oauth || {};
     
     // Load OAuth fields from OAuth object (primary) or fallback to top-level connection
-    const certificateEndpoint = oauthConfig.certificate_endpoint || oauthConfig.certificate_endpoint_url || conn.certificate_endpoint || '';
-    const authServerCa = oauthConfig.auth_server_ca || oauthConfig.ca_certificate || conn.auth_server_ca || '';
-    const tokenIssuerUrl = oauthConfig.token_issuer || oauthConfig.token_issuer_url || conn.token_issuer_url || '';
+    // Check all possible field names for certificate endpoint
+    let certificateEndpoint = oauthConfig.certificate_endpoint || 
+                                  oauthConfig.certificate_endpoint_url || 
+                                  oauthFromProps.certificate_endpoint || 
+                                  oauthFromProps.certificate_endpoint_url || 
+                                  oauthConfig.cert_endpoint || 
+                                  oauthConfig.cert_endpoint_url || 
+                                  conn.certificate_endpoint || 
+                                  conn.certificate_endpoint_url || 
+                                  conn.cert_endpoint || 
+                                  conn.cert_endpoint_url || 
+                                  '';
+    
+    const authServerCa = oauthConfig.auth_server_ca || 
+                         oauthFromProps.auth_server_ca || 
+                         oauthConfig.ca_certificate || 
+                         oauthFromProps.ca_certificate || 
+                         conn.auth_server_ca || '';
+    
+    const tokenIssuerUrl = oauthConfig.token_issuer || 
+                           oauthFromProps.token_issuer || 
+                           oauthConfig.token_issuer_url || 
+                           oauthFromProps.token_issuer_url || 
+                           conn.token_issuer_url || '';
     
     // FSP-specific OAuth fields from OAuth object (primary) or fallback to top-level
-    const realm = oauthConfig.realm || conn.realm || '';
-    const tokenEndpoint = oauthConfig.token_endpoint || oauthConfig.token_endpoint_url || conn.token_endpoint || '';
-    const clientId = oauthConfig.client_id || conn.client_id || '';
-    const clientSecret = oauthConfig.client_secret || conn.client_secret || '';
-    const enableTokenRefresh = oauthConfig.enable_token_refresh || conn.enable_token_refresh || false;
+    const realm = oauthConfig.realm || oauthFromProps.realm || conn.realm || '';
+    const tokenEndpoint = oauthConfig.token_endpoint || 
+                          oauthFromProps.token_endpoint || 
+                          oauthConfig.token_endpoint_url || 
+                          oauthFromProps.token_endpoint_url || 
+                          conn.token_endpoint || '';
+    const clientId = oauthConfig.client_id || oauthFromProps.client_id || conn.client_id || '';
+    const clientSecret = oauthConfig.client_secret || oauthFromProps.client_secret || conn.client_secret || '';
+    const enableTokenRefresh = oauthConfig.enable_token_refresh || oauthFromProps.enable_token_refresh || conn.enable_token_refresh || false;
+    
+    // IDP Server name reference (to help with dropdown selection)
+    // Try many possible locations and field names
+    let idpServer = oauthConfig.idp_server || 
+                   oauthFromProps.idp_server || 
+                   conn.idp_server || 
+                   oauthConfig.idpServer || 
+                   oauthFromProps.idpServer || 
+                   conn.idpServer || 
+                   // Maybe it's stored as the IDP server name directly
+                   (conn.OAuth || {}).idp_server_name || 
+                   (conn.oauth || {}).idp_server_name || 
+                   conn.idp_server_name || 
+                   // Or maybe it's the endpoint URL which we can match to an IDP server
+                   '';
+    
+    // If certificate_endpoint is empty but we have an idp_server name, try to get it from the IDP server's endpoint
+    if (!certificateEndpoint && idpServer) {
+      const idpServers = connections.filter(c => c.type === 'IDP-Server');
+      const matchingIdp = idpServers.find(server => server.name === idpServer);
+      if (matchingIdp && matchingIdp.endpoint) {
+        certificateEndpoint = matchingIdp.endpoint;
+        // If idp_server wasn't set, set it now
+        if (!idpServer) {
+          idpServer = matchingIdp.name;
+        }
+      }
+    }
     
     setFormData({
       name: conn.name || '',
@@ -130,7 +190,8 @@ function Setup({ settings }) {
       token_endpoint: tokenEndpoint,
       client_id: clientId,
       client_secret: clientSecret,
-      enable_token_refresh: enableTokenRefresh
+      enable_token_refresh: enableTokenRefresh,
+      idp_server: idpServer
     });
     setShowModal(true);
   };
