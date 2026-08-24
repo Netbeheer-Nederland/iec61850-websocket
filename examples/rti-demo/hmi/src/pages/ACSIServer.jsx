@@ -5,6 +5,7 @@ import Tree from '../components/Tree';
 import { transformModelToTree } from '../utils/modelUtils';
 
 import TLSConfigModal from '../components/TLSConfigModal';
+import OAuthConfigModal from '../components/OAuthConfigModal';
 
 function ACSIServer({ settings, updateModel, getModel, connections: propConnections, bffBaseUrl = 'http://localhost:5000'}) {
   const location = useLocation();
@@ -27,6 +28,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const monitorIntervalRef = useRef(null);
 
   const [showTLSModal, setShowTLSModal] = useState(false);
+  const [showOAuthModal, setShowOAuthModal] = useState(false);
   const [useOAuth, setUseOAuth] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -312,6 +314,15 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         >
           <i className="fas fa-shield-alt" style={{ marginRight: '8px' }}></i>TLS Config
         </button>
+        <button
+          className="btn-secondary"
+          onClick={() => setShowOAuthModal(true)}
+          disabled={loading}
+          title="Configure OAuth settings"
+          id="acsi-oauth-btn"
+        >
+          <i className="fas fa-key" style={{ marginRight: '8px' }}></i>OAuth Config
+        </button>
         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
           <input
             type="checkbox"
@@ -529,6 +540,76 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         onSuccess={(msg) => {
           setMessage({ type: 'success', text: msg });
           // Refetch connections to get updated TLS config
+          const fetchConnections = async () => {
+            try {
+              const url = `${bffBaseUrl}/api/connections`;
+              const response = await fetch(url);
+              if (response.ok) {
+                const data = await response.json();
+                setConnections(data.connections || []);
+              }
+            } catch (error) {
+              console.error('Failed to refetch connections:', error);
+            }
+          };
+          fetchConnections();
+        }}
+        onError={(msg) => setMessage({ type: 'error', text: msg })}
+      />
+
+      <OAuthConfigModal
+        isOpen={showOAuthModal}
+        onClose={() => {
+          setShowOAuthModal(false);
+          setTimeout(() => setMessage(null), 3000);
+        }}
+        connection={(
+          () => {
+            // Try to find matching connection from live connections (has updated OAuth)
+            const liveConn = connections.find(c => 
+              (c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) ||
+              (c.host === host && String(c.port) === String(port))
+            );
+            if (liveConn) {
+              return liveConn;
+            }
+            // Fallback to endpoint with OAuth if available
+            if (endpoint?.OAuth) {
+              return {
+                name: endpoint.name || host,
+                host: endpoint.host || host,
+                port: endpoint.port || port,
+                ws_mode: 'Active',
+                OAuth: endpoint.OAuth,
+                properties_info: {
+                  properties: {
+                    ws_mode: 'Active'
+                  }
+                }
+              };
+            }
+            // Final fallback
+            return {
+              name: endpoint?.name || host,
+              host: endpoint?.host || host,
+              port: endpoint?.port || port,
+              ws_mode: 'Active',
+              OAuth: {},
+              properties_info: {
+                properties: {
+                  ws_mode: 'Active'
+                }
+              }
+            };
+          }
+        )()}
+        connections={connections}
+        bffBaseUrl={bffBaseUrl}
+        wsHost={host}
+        wsPort={port}
+        onSuccess={(msg) => {
+          setMessage({ type: 'success', text: msg });
+          // Refetch connections to get updated OAuth config
           const fetchConnections = async () => {
             try {
               const url = `${bffBaseUrl}/api/connections`;
