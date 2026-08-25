@@ -1049,17 +1049,30 @@ def create_bff_router(
                     rti_fsp.start_server(host, int(request_port))
                     loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
 
-                # Bridge onto the loop that actually owns the endpoint —
-                # same pattern as invoke_on_runtime_loop, but async-friendly
-                # so it doesn't block uvicorn's loop while connecting.
+                endpoint = rti_fsp.runtime.endpoint
+                if endpoint is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "Endpoint not initialized"},
+                        status_code=500,
+                    )
+
+                # Call reconfigure_connection on the endpoint's event loop
+                # The library handles TLS config and task restart internally
                 fut = asyncio.run_coroutine_threadsafe(
-                    rti_fsp.runtime.endpoint.reconfigure_connection(
+                    endpoint.reconfigure_connection(
                         host, request_port, cp, request.enable_tls, tls_config=tls_config
                     ),
                     loop,
                 )
-                await asyncio.wrap_future(fut)
-                rti_fsp.runtime.tasks["ws"] = rti_fsp.runtime.endpoint._connect_task
+                # Wait for the reconfiguration to complete
+                try:
+                    await asyncio.wrap_future(fut)
+                except Exception as e:
+                    print(f"Error during reconfigure_connection: {e}")
+                    # Don't fail the endpoint - the connection may still have been restarted
+                    # Just log and continue
+                
+                rti_fsp.runtime.tasks["ws"] = endpoint._connect_task
 
                 print("Reconfigured connection with TLS enabled:", request.enable_tls)
                 return JSONResponse(

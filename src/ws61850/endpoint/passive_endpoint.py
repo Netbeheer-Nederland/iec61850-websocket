@@ -240,36 +240,38 @@ class PassiveEndpoint:
         self._tls_config = tls_config
         self._oauth_enable = oauth_enable
 
-        if tls_enable:
-            if self._is_endpoint_running:
+        # Always stop existing server if running, regardless of TLS state change
+        # This ensures we reconnect with the new TLS configuration
+        if self._is_endpoint_running:
+            try:
+                await asyncio.wait_for(self.stop_passive(), timeout=10.0)
+            except Exception as e:
+                logger.error(f"stop_passive failed during reconfigure: {e}", exc_info=True)
+                raise RuntimeError(f"Cannot reconfigure: failed to stop existing server: {e}")
+
+            if hasattr(self, '_server_task') and self._server_task and not self._server_task.done():
                 try:
-                    await asyncio.wait_for(self.stop_passive(), timeout=10.0)
-                except Exception as e:
-                    logger.error(f"stop_passive failed during reconfigure: {e}", exc_info=True)
-                    raise RuntimeError(f"Cannot enable TLS: failed to stop existing server: {e}")
+                    await asyncio.wait_for(self._server_task, timeout=10.0)
+                except asyncio.CancelledError:
+                    # Expected: closing the server cancels its serve_forever() future,
+                    # which surfaces here as CancelledError. This means the old
+                    # server shut down successfully, not that something failed.
+                    logger.info("Old server task ended via close()-triggered cancellation (expected)")
+                except asyncio.TimeoutError:
+                    logger.error("Old server task did not exit within timeout")
+                    raise RuntimeError("Cannot reconfigure: port 8765 still in use (old task didn't exit)")
 
-                if hasattr(self, '_server_task') and self._server_task and not self._server_task.done():
-                    try:
-                        await asyncio.wait_for(self._server_task, timeout=10.0)
-                    except asyncio.CancelledError:
-                        # Expected: closing the server cancels its serve_forever() future,
-                        # which surfaces here as CancelledError. This means the old
-                        # server shut down successfully, not that something failed.
-                        logger.info("Old server task ended via close()-triggered cancellation (expected)")
-                    except asyncio.TimeoutError:
-                        logger.error("Old server task did not exit within timeout")
-                        raise RuntimeError("Cannot enable TLS: port 8765 still in use (old task didn't exit)")
+            # Wait for port to be released from TIME_WAIT state (critical on Windows)
+            await asyncio.sleep(3.0)
 
-                # Wait for port to be released from TIME_WAIT state (critical on Windows)
-                await asyncio.sleep(3.0)
-
-            if not self._is_endpoint_running:
-                logger.info("Starting WebSocket server with TLS on")
-                self._server_task = asyncio.create_task(
-                    self._run_server("0.0.0.0", 8765)
-                )
-            else:
-                raise RuntimeError("Cannot start TLS server: old server still running")
+        # Start server with new configuration
+        if not self._is_endpoint_running:
+            logger.info("Starting WebSocket server with new configuration")
+            self._server_task = asyncio.create_task(
+                self._run_server("0.0.0.0", 8765)
+            )
+        else:
+            raise RuntimeError("Cannot start server: old server still running")
 
     async def _run_server(self, hostname: str, port: int):
         """Internal method that actually runs the server."""

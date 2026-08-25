@@ -179,11 +179,12 @@ class ActiveEndpoint:
         """Reconfigure TLS settings and (re)start the connection."""
         self._tls_config = tls_config
         print("entering reconfigure_connection with tls_enable:", tls_enable)
+        # Always restart the connection regardless of TLS enable state
+        # run_in_background cancels any existing loop and schedules the
+        # new one — never await start() directly, it runs forever.
+        self.run_in_background(host, port, cp)
         if tls_enable:
             print("entered reconfigure_connection with tls_enable True, tls_config:", tls_config)
-            # run_in_background cancels any existing loop and schedules the
-            # new one — never await start() directly, it runs forever.
-            self.run_in_background(host, port, cp)
 
 
     async def reconfigure_oauth(self, host, port, cp, oauth_enable, token_endpoint=None,

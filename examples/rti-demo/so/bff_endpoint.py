@@ -924,15 +924,32 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             print("Reconfiguring connection with TLS version: ", tls_version)
             if request.ws_mode.lower() == "passive":
                 print("Reconfiguring passive endpoint with TLS: ", request.enable_tls)
-                tls_config = TLSConfig(
-                    mode="server",
-                    certfile=request.server_cert,
-                    keyfile=request.server_key,
-                    min_version=tls_version,
-                    max_version=tls_version,
-                    keylog_file=os.path.join("tlskeys.log"),
-                )
+                # Only create TLSConfig if TLS is enabled
+                tls_config = None
+                if request.enable_tls:
+                    tls_config = TLSConfig(
+                        mode="server",
+                        certfile=request.server_cert,
+                        keyfile=request.server_key,
+                        min_version=tls_version,
+                        max_version=tls_version,
+                        keylog_file=os.path.join("tlskeys.log"),
+                    )
                 print("TLS Config: ", tls_config)
+
+                # Explicitly clear the endpoint's TLS config if TLS is being disabled
+                endpoint = rti_so.runtime.endpoint
+                if endpoint is not None and not request.enable_tls:
+                    if hasattr(endpoint, '_tls_config'):
+                        endpoint._tls_config = None
+                    print("Cleared endpoint TLS config")
+
+                # Cancel existing connection task before reconnecting
+                if endpoint is not None and hasattr(endpoint, '_connect_task'):
+                    connect_task = endpoint._connect_task
+                    if connect_task and not connect_task.done():
+                        print("Cancelling endpoint's _connect_task")
+                        connect_task.cancel()
 
                 # Run on the loop that actually owns the endpoint (runtime.loop),
                 # not uvicorn's own loop — matches the pattern used by
