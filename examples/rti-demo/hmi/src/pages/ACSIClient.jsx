@@ -6,11 +6,12 @@ import ContextMenu from '../components/ContextMenu';
 import ControlModal from '../components/ControlModal';
 import WriteValueModal from '../components/WriteValueModal';
 import BrcbConfigModal from '../components/BrcbConfigModal';
+import TLSConfigModal from '../components/TLSConfigModal';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
-const ACSIClient = ({ updateModel }) => {
+const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connections: propConnections = [] }) => {
   const location = useLocation();
   const endpoint = location.state?.endpoint;
   // Store the original API endpoint (BFF) - this is used for all API calls
@@ -30,7 +31,48 @@ const ACSIClient = ({ updateModel }) => {
   const [contextMenuTarget, setContextMenuTarget] = useState(null);
   const [showControlModal, setShowControlModal] = useState(false);
   const [showWriteModal, setShowWriteModal] = useState(false);
+  const [connections, setConnections] = useState([]);
+
+  // Fetch connections from BFF to get IDP-Server instances
+  useEffect(() => {
+    const fetchConnections = async () => {
+      try {
+        const url = `${bffBaseUrl}/api/connections`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          setConnections(data.connections || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch connections:', error);
+      }
+    };
+    
+    if (bffBaseUrl) {
+      fetchConnections();
+    }
+  }, [bffBaseUrl]);
+
+  // Fetch OAuth status from the SO server on page load
+  useEffect(() => {
+    const fetchOAuthStatus = async () => {
+      if (!apiTarget) return;
+      try {
+        const result = await executeApiCall('oauth-status', apiTarget, {});
+        if (result?.ok) {
+          const enableOAuth = result.payload?.result?.enable_oauth ?? result.payload?.enable_oauth ?? false;
+          setUseOAuth(enableOAuth);
+        }
+      } catch (error) {
+        console.error('Failed to fetch OAuth status:', error);
+      }
+    };
+    fetchOAuthStatus();
+  }, [apiTarget]);
   const [showBrcbConfigModal, setShowBrcbConfigModal] = useState(false);
+  const [showTLSModal, setShowTLSModal] = useState(false);
+  const [useOAuth, setUseOAuth] = useState(false);
+  const [message, setMessage] = useState(null);
   const monitorIntervalRef = useRef(null);
 
   useEffect(() => {
@@ -835,6 +877,103 @@ const getContextMenuItems = () => {
         </button>
       </div>
 
+      {/* Security Configuration Buttons */}
+      <div style={{ display: 'flex', gap: '16px', marginLeft: 'auto', marginBottom: '24px' }}>
+        <button
+          className="btn-secondary"
+          onClick={() => setShowTLSModal(true)}
+          disabled={loading}
+          title="Configure TLS settings"
+          id="acsi-client-tls-btn"
+        >
+          <i className="fas fa-shield-alt" style={{ marginRight: '8px' }}></i>TLS Config
+        </button>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={useOAuth}
+            onChange={async (e) => {
+              const newValue = e.target.checked;
+              setUseOAuth(newValue);
+              // Call reconfig-oauth immediately when checkbox is toggled
+              if (apiTarget && endpoint?.name) {
+                setLoading(true);
+                try {
+                  // Build OAuth config from endpoint
+                  const oauthConfig = endpoint?.OAuth || {};
+                  
+                  // For active mode connections, use the client's port for WebSocket connection
+                  let connectionPort = endpoint?.port || wsPort;
+                  if (endpoint?.ws_mode === 'active' || endpoint?.ws_mode === 'Active') {
+                      // Find corresponding client connection (SO) by replacing Server with Client in endpoint name
+                      const clientName = endpoint.name.replace('Server', 'Client');
+                      const clientConnection = propConnections.find(c => 
+                          (c.type === 'RTI-SO' || c.acsi === 'client') && 
+                          c.name === clientName
+                      );
+                      if (clientConnection) {
+                          connectionPort = clientConnection.port;
+                      }
+                  }
+                  
+                  // Use the connection's own host/port for the target endpoint
+                  const targetHost = endpoint?.host || wsHost;
+                  const targetPort = endpoint?.port || wsPort;
+                  const connectionTarget = buildTargetValue(targetHost, targetPort);
+                  
+                  const requestBody = {
+                    connection_name: endpoint?.name,
+                    enable_oauth: newValue,
+                    ws_mode: endpoint?.ws_mode || 'passive',
+                    host: endpoint?.host || wsHost,
+                    port: String(connectionPort),
+                    cp: wsCp,
+                    // Always send OAuth config fields (null when disabling)
+                    certificate_endpoint_url: newValue ? (oauthConfig.certificate_endpoint || '') : null,
+                    token_issuer_url: newValue ? (oauthConfig.token_issuer || oauthConfig.token_endpoint || '') : null,
+                    ca_certificate: newValue ? (oauthConfig.auth_server_ca || '').trim() : null
+                  };
+                  
+                  // Save to SO server
+                  const soResult = await executeApiCall('reconfig-oauth', connectionTarget, requestBody);
+                  
+                  // Also save to BFF's connections.json
+                  const bffOauthConfig = {
+                    connection_name: endpoint?.name || wsHost,
+                    enable_oauth: newValue,
+                    ws_mode: endpoint?.ws_mode || 'passive',
+                    // Always send OAuth config fields (null when disabling)
+                    certificate_endpoint_url: newValue ? (oauthConfig.certificate_endpoint || '') : null,
+                    token_issuer_url: newValue ? (oauthConfig.token_issuer || oauthConfig.token_endpoint || '') : null,
+                    ca_certificate: newValue ? (oauthConfig.auth_server_ca || '').trim() : null
+                  };
+                  const bffResult = await fetch(`${bffBaseUrl}/api/connections/oauth-config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bffOauthConfig)
+                  });
+                  
+                  if (soResult?.ok && bffResult.ok) {
+                    setMessage({ type: 'success', text: `OAuth ${newValue ? 'enabled' : 'disabled'} successfully` });
+                  } else {
+                    setMessage({ type: 'error', text: soResult?.payload?.error || bffResult.statusText || 'Failed to update OAuth' });
+                    setUseOAuth(!newValue); // Revert on failure
+                  }
+                } catch (error) {
+                  setMessage({ type: 'error', text: error.message });
+                  setUseOAuth(!newValue); // Revert on failure
+                } finally {
+                  setLoading(false);
+                }
+              }
+            }}
+            disabled={loading}
+            id="acsi-client-oauth-checkbox"
+          />
+          <span style={{ color: 'var(--text-primary)' }}>Enable OAuth</span>
+        </label>
+      </div>
+
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
         <button id="acsi-read-data-btn" className="btn-primary" onClick={loadClientTree} disabled={loading || !connected}>
@@ -853,6 +992,21 @@ const getContextMenuItems = () => {
           Clear Logs
         </button>
       </div>
+
+      {message && (
+        <div className="alert" style={{
+          marginBottom: '16px',
+          padding: '12px',
+          background: message.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+          color: message.type === 'success' ? 'var(--success-color)' : 'var(--danger-color)',
+          borderRadius: '4px',
+          display: 'flex',
+          alignItems: 'center'
+        }}>
+          <i className={`fas fa-${message.type === 'success' ? 'check-circle' : 'exclamation-circle'}`} style={{ marginRight: '8px' }}></i>
+          {message.text}
+        </div>
+      )}
 
       {/* Error Display */}
       {error && (
@@ -997,6 +1151,77 @@ const getContextMenuItems = () => {
           }}
         />
       )}
+
+      <TLSConfigModal
+        isOpen={showTLSModal}
+        onClose={() => {
+          setShowTLSModal(false);
+          setTimeout(() => setMessage(null), 3000);
+        }}
+        connection={(
+          () => {
+            // Try to find matching connection from live connections (has updated TLS)
+            const liveConn = connections.find(c => 
+              (c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) ||
+              (c.host === wsHost && String(c.port) === String(wsPort))
+            );
+            if (liveConn) {
+              return liveConn;
+            }
+            // Fallback to endpoint with TLS if available
+            if (endpoint?.TLS) {
+              return {
+                name: endpoint.name || wsHost,
+                host: endpoint.host || wsHost,
+                port: endpoint.port || wsPort,
+                type: 'RTI-FSP',
+                ws_mode: 'passive',
+                TLS: endpoint.TLS,
+                properties_info: {
+                  properties: {
+                    ws_mode: 'passive'
+                  }
+                }
+              };
+            }
+            // Final fallback
+            return {
+              name: endpoint?.name || wsHost,
+              host: endpoint?.host || wsHost,
+              port: endpoint?.port || wsPort,
+              type: 'RTI-FSP',
+              ws_mode: 'passive',
+              TLS: {},
+              properties_info: {
+                properties: {
+                  ws_mode: 'passive'
+                }
+              }
+            };
+          }
+        )()}
+        bffBaseUrl={bffBaseUrl}
+        wsHost={wsHost}
+        wsPort={wsPort}
+        onSuccess={(msg) => {
+          setMessage({ type: 'success', text: msg });
+          // Refetch connections to get updated TLS config
+          const fetchConnections = async () => {
+            try {
+              const url = `${bffBaseUrl}/api/connections`;
+              const response = await fetch(url);
+              if (response.ok) {
+                const data = await response.json();
+                setConnections(data.connections || []);
+              }
+            } catch (error) {
+              console.error('Failed to refetch connections:', error);
+            }
+          };
+          fetchConnections();
+        }}
+        onError={(msg) => setMessage({ type: 'error', text: msg })}
+      />
     </section>
   );
 };
