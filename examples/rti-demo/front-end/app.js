@@ -2,6 +2,16 @@
    RTI Demo UI - Application JavaScript
    ============================================== */
 
+ const apiDefinitions = [
+    { id: 'reconfig-connection', label: 'POST /api/reconfig-connection', method: 'POST', path: '/api/reconfig-connection' },
+    { id: 'reconfig-oauth', label: 'POST /api/reconfig-oauth', method: 'POST', path: '/api/reconfig-oauth' },
+
+];
+
+function getApiById(id) {
+    return apiDefinitions.find(api => api.id === id);
+}
+
 class RTIDemoApp {
     constructor() {
         this.bffHost = localStorage.getItem('bffHost') || 'localhost';
@@ -101,6 +111,62 @@ class RTIDemoApp {
         if (acsiConnectBtn) {
             acsiConnectBtn.addEventListener('click', () => this.connectACSIClient());
         }
+
+        // TLS Certificate file input
+        const tlsCertInput = document.getElementById('tls-ca-cert');
+        if (tlsCertInput) {
+            tlsCertInput.addEventListener('change', (e) => this.handleFileInput(e, 'tls'));
+        }
+
+        // OAuth Certificate file input
+        const oauthCertInput = document.getElementById('oauth-ca-cert');
+        if (oauthCertInput) {
+            oauthCertInput.addEventListener('change', (e) => this.handleFileInput(e, 'oauth'));
+        }
+        const securityConfigRefreshBtn = document.getElementById('refresh-security-configs-btn');
+        if (securityConfigRefreshBtn) {
+            securityConfigRefreshBtn.addEventListener('click', () => this.loadTLSOAuthPage());
+        }
+        document.getElementById('tls-save').addEventListener('click', () => this.saveTLSConfig());
+
+        document.getElementById('tls-private-key').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            // Read file content
+            const reader = new FileReader();
+            reader.onload = function(e) {
+            const content = e.target.result;
+            document.getElementById('tls-key-content').value = content;
+            };
+            reader.readAsText(file);
+        });
+
+        document.getElementById('tls-server-cert').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            // Read file content
+            const reader = new FileReader();
+            reader.onload = function(e) {
+            const content = e.target.result;
+            document.getElementById('tls-server-cert-content').value = content;
+            };
+            reader.readAsText(file);
+        });
+
+        document.getElementById('tls-ca-cert').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            // Read file content
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                document.getElementById('tls-ca-cert-content').value = content;
+            };
+            reader.readAsText(file);
+        });
+
+
+
     }
 
     // =============================================
@@ -332,6 +398,281 @@ class RTIDemoApp {
             case 'acsi':
                 this.loadACSI();
                 break;
+            case 'tls-oauth':
+                this.loadTLSOAuthPage();
+                break;
+        }
+    }
+
+    async loadTLSOAuthPage() {
+        const container = document.getElementById('tls-oauth-container');
+        if (!container) return;
+
+        // Show loading state
+        container.innerHTML = '<div class="spinner"></div>';
+
+        // Load connections
+        const result = await this.callBFF('/api/connections');
+        if (!result || !result.connections) {
+            container.innerHTML = '<p style="color: var(--text-muted);">No connections found</p>';
+            return;
+        }
+        this.connections = result.connections;
+        this.renderTLSOAuthConnections(result.connections);
+    }
+
+    renderTLSOAuthConnections(connections) {
+        const container = document.getElementById('tls-oauth-container');
+
+        if (connections.length === 0) {
+            container.innerHTML = '<p style="padding: 20px; color: var(--text-muted);">No connections configured</p>';
+            return;
+        }
+
+        let html = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 20px;">
+        `;
+
+        connections.forEach(conn => {
+            html += `
+                <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px;">
+                    <h3 style="margin-bottom: 15px; color: var(--text-primary);">${conn.name}</h3>
+                    <div style="margin-bottom: 15px;">
+                        <p style="margin: 5px 0; color: var(--text-muted);">
+                            <strong>Host:</strong>
+                                <span id="targetEndpoint-${conn.name}">${conn.host}:${conn.port}</span>
+                        </p>
+                        <p style="margin: 5px 0; color: var(--text-muted);">
+                            <strong>Type:</strong> ${conn.type}
+                        </p>
+                        <p style="margin: 5px 0; color: var(--text-muted);">
+                            <strong>WS Mode:</strong>
+                            <span id="ws-mode-${conn.name}">${conn?.properties_info?.properties?.ws_mode ?? 'N/A'}</span>
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-primary" style="flex: 1;"
+                                onclick="app.openOAuthConfig('${conn.name}')">
+                            <i class="fas fa-key"></i> OAuth Config
+                        </button>
+                        <button class="btn-secondary" style="flex: 1;"
+                                onclick="app.openTLSConfig('${conn.name}')">
+                            <i class="fas fa-shield-alt"></i> TLS Config
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        container.innerHTML = html;
+    }
+
+    openOAuthConfig(connectionName) {
+        const conn = this.connections.find(c => c.name === connectionName);
+        if (!conn) return;
+
+        this.selectedConnection = conn;
+        this.showOAuthModal();
+    }
+
+    openTLSConfig(connectionName) {
+        const conn = this.connections.find(c => c.name === connectionName);
+        if (!conn) return;
+
+        this.selectedConnection = conn;
+        this.showTLSModal();
+    }
+
+    // =============================================
+    // TLS/OAuth Modal Methods
+    // =============================================
+
+    // Show TLS Modal
+    showTLSModal() {
+        const modal = document.getElementById('modal-tls');
+        const ws_mode = this.selectedConnection?.properties_info?.properties?.ws_mode || 'N/A';
+
+        console.log("Modal before:", modal.className);
+        if (modal && ws_mode !== 'N/A') {
+            modal.classList.add('active');
+
+            console.log("Modal after:", modal.className);
+
+
+            let isServer = false;
+
+            if (ws_mode === "passive" || ws_mode === "Passive")
+                isServer = true;
+
+            const serverFields = document.getElementById('tls-server-fields');
+            const clientFields = document.getElementById('tls-client-fields');
+
+            if(isServer)
+            {
+                serverFields.hidden = false;
+                clientFields.hidden = true;
+            }
+            else
+            {
+                clientFields.hidden = false;
+                serverFields.hidden = true;
+            }
+        }
+    }
+
+    // Close TLS Modal
+    closeTLSModal() {
+        document.getElementById('modal-tls').classList.remove('active');
+    }
+
+    // Show OAuth Modal
+    showOAuthModal() {
+        const modal = document.getElementById('modal-oauth');
+        const ws_mode = this.selectedConnection?.properties_info?.properties?.ws_mode || 'N/A';
+
+        if (modal&& ws_mode !== 'N/A') {
+            modal.classList.add('active');
+            let isServer = false;
+            if (ws_mode === "passive" || ws_mode === "Passive")
+                isServer = true;
+
+            const serverFields = document.getElementById('oauth-server-fields');
+            const clientFields = document.getElementById('oauth-client-fields');
+
+            if (isServer) {
+                serverFields.hidden = false;
+                clientFields.hidden = true;
+            }
+            else {
+                serverFields.hidden = true;
+                clientFields.hidden = false;
+            }
+        }
+    }
+
+    // Close OAuth Modal
+    closeOAuthModal() {
+        document.getElementById('modal-oauth').classList.remove('active');
+    }
+
+    // Handle file input for both modals
+    handleFileInput(event, type) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const fileNameSpan = document.getElementById(`${type}-cert-file-name`);
+        const contentTextarea = document.getElementById(`${type}-cert-content`);
+
+        if (fileNameSpan) {
+            fileNameSpan.textContent = file.name;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            if (contentTextarea) {
+                contentTextarea.value = e.target.result;
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // Save TLS Config
+    async saveTLSConfig()
+    {
+        if (!this.selectedConnection) {
+            this.addDiagnosticMessage('No connection selected', 'error');
+            return;
+        }
+
+        const targetEndpoint = document.getElementById(`targetEndpoint-${this.selectedConnection.name}`).textContent;
+        const enableTLS = document.getElementById('tls-enable').checked;
+        const tlsVersion = document.getElementById('tls-version').value;
+        const serverKey = document.getElementById('tls-key-content').value;  // FIXED: was tls-server-cert-content
+        const serverCert = document.getElementById('tls-server-cert-content').value;
+        const ws_mode = this.selectedConnection?.properties_info?.properties?.ws_mode || 'N/A';
+        const serverCACert = document.getElementById('tls-ca-cert-content')?.value || null;
+
+        console.log("Saving TLS Config for connection:", this.selectedConnection.name);
+        console.log("Enable TLS:", enableTLS);
+        console.log("TLS Version:", tlsVersion);
+        console.log("Server Key:", serverKey);
+        console.log("Server Cert:", serverCert);
+
+        let config = null;
+        if (ws_mode === 'passive' || ws_mode === 'Passive') {
+            config = {
+                connection_name: this.selectedConnection.name,
+                enable_tls: enableTLS,
+                tls_version: tlsVersion,
+                server_key: serverKey,
+                server_cert: serverCert,
+                server_ca: null,
+                ws_mode: ws_mode
+            };
+        }
+        else if (ws_mode === 'active' || ws_mode === 'Active') {
+            config = {
+                connection_name: this.selectedConnection.name,
+                enable_tls: enableTLS,
+                tls_version: tlsVersion,
+                server_key: null,
+                server_cert: null,
+                server_ca: serverCACert,
+                ws_mode: ws_mode
+            }
+        }
+
+        try {
+            const result = await this.executeApiCall(getApiById('reconfig-connection'), targetEndpoint, config);
+            if (result) {
+                this.addDiagnosticMessage(`TLS config saved for ${this.selectedConnection.name}`, 'success');
+                this.closeTLSModal();
+            }
+        } catch (error) {
+            this.addDiagnosticMessage(`Failed to save TLS config: ${error.message}`, 'error');
+        }
+    }
+    async saveOAuthConfig() {
+        const targetEndpoint = document.getElementById(`targetEndpoint-${this.selectedConnection.name}`).textContent;
+        const enableOAuth = document.getElementById('oauth-enable').checked;
+        const ws_mode = this.selectedConnection?.properties_info?.properties?.ws_mode || 'N/A';
+        const isServer = ws_mode === 'active' || ws_mode === 'Active';
+
+        let config = {
+            connection_name: this.selectedConnection.name,
+            enable_oauth: enableOAuth,
+            ws_mode: ws_mode
+        };
+
+        if (isServer) {
+            // Active mode (WS Server - RTI-FSP)
+            config = {
+                ...config,
+                certificate_endpoint_url: document.getElementById('oauth-cert-url').value,
+                token_issuer_url: document.getElementById('oauth-issuer-url').value,
+                ca_certificate: document.getElementById('oauth-cert-content').value
+            };
+        } else {
+            // Passive mode (WS Client - RTI-SO)
+            config = {
+                ...config,
+                token_endpoint_url: document.getElementById('oauth-token-url').value,
+                client_id: document.getElementById('oauth-client-id').value,
+                client_secret: document.getElementById('oauth-client-secret').value,
+                ca_certificate: document.getElementById('oauth-cert-content-client').value,
+                enable_token_refresh: document.getElementById('oauth-enable-refresh').checked
+            };
+        }
+
+        try {
+            const result = await this.executeApiCall(getApiById('reconfig-oauth'), targetEndpoint, config);
+            if (result) {
+                this.addDiagnosticMessage(`OAuth config saved for ${this.selectedConnection.name}`, 'success');
+                this.closeOAuthModal();
+            }
+        } catch (error) {
+            this.addDiagnosticMessage(`Failed to save OAuth config: ${error.message}`, 'error');
         }
     }
 

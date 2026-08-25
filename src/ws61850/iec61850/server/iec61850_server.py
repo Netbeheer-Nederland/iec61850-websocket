@@ -143,6 +143,15 @@ class IEC61850Server:
             return None
         return tree_item.mmsValue
 
+    async def get_data_value_and_type(self, obj_ref):
+        tree_item = self.find_object_in_tree(obj_ref)
+        if tree_item is None:
+            return None
+        if isinstance(tree_item, DataAttribute):
+            return {"type": tree_item.attr_type.name, "value": tree_item.mmsValue}
+
+        return None
+
     async def set_quality_to_good(self, control_do):
         quality_item = next((da for da in control_do.get_da_from_do_or_da_list() if da.name == "q"), None)
         value = quality_item.mmsValue.copy()

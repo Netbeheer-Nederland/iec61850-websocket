@@ -38,12 +38,15 @@ from ws61850.endpoint.connection_router import ConnectionRouter
 from ws61850.iec61850.client.request_handling import create_tpaa_associate_request
 from ws61850.security.oauth2.jwks import JwksCache
 from ws61850.security.oauth2.validator import JwtValidator
-from ws61850.security.tls import build_tls_context
+from ws61850.security.tls import build_tls_context, build_tls_context_from_strings
 from ws61850.shared.extractors import (
     extract_associate_request_type,
     retrieve_associate_id_from_decoded_msg,
     retrieve_max_outstanding_calls_from_decoded_msg,
 )
+
+import tempfile
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +98,7 @@ class PassiveEndpoint:
         self.recv_msg_callback = None
         self.server = None  # websockets.Server set in start()
         self._is_endpoint_running = False
+        self._endpoint_running_event = asyncio.Event()
 
         self._tls_config = tls_config
         self._oauth_enable = oauth_enable
@@ -104,12 +108,16 @@ class PassiveEndpoint:
         self._cert_endpoint = cert_endpoint
         self._token_issuer = token_issuer
 
+        # Define close_on_expiry as a bound method that can be passed safely
+        # We'll set it up after the object is fully initialized
+        self._close_on_expiry_bound = lambda ws, exp: self._close_on_expiry_impl(ws, exp)
+        
         self._assoc_handler = AssociationHandler(
             kc_cert=kc_cert,
             own_cert=own_cert,
             cert_endpoint=cert_endpoint,
             token_issuer=token_issuer,
-            close_on_expiry_fn=self.close_on_expiry,
+            close_on_expiry_fn=self._close_on_expiry_bound,
         )
         self._router = ConnectionRouter(self.server_list, self.client_list)
         self._websocket_server_logger = _WebSocketServerLogger(
@@ -123,20 +131,21 @@ class PassiveEndpoint:
             self._jwt_validator = None
 
     # ------------------------------------------------------------------
+    # Internal helpers (defined early to avoid reference issues)
+    # ------------------------------------------------------------------
+    async def _close_on_expiry_impl(self, websocket, exp_timestamp: int) -> None:
+        """Implementation of close_on_expiry that can be safely referenced."""
+        delay = exp_timestamp - int(time.time())
+        if delay > 0:
+            await asyncio.sleep(delay)
+        await websocket.close(code=4401, reason="Token expired")
+
+    # ------------------------------------------------------------------
     # Public interface (EndpointProtocol)
     # ------------------------------------------------------------------
     def get_endpoint_status(self):
         return self._is_endpoint_running
 
-    def get_websocket_info(self, iec61850_client) -> WebSocketInfo | None:
-        return next(
-            (
-                ws_info
-                for ws_info in self.websocket_info_list
-                if ws_info.websocket.request.path.lstrip("/") == iec61850_client.cp
-            ),
-            None,
-        )
     def add_iec61850_client(self, client) -> None:
         self.client_list.append(client)
         if self.send_msg_callback is not None:
@@ -171,9 +180,125 @@ class PassiveEndpoint:
             None,
         )
 
+    async def reconfigure_oauth(self, oauth_enable, certificate_endpoint=None, token_issuer=None, kc_cert=None):
+        self._oauth_enable = oauth_enable
+
+        self._cert_endpoint = certificate_endpoint
+        self._token_issuer = token_issuer
+
+        cert_file = None
+
+        try:
+            # kc_cert contains the certificate CONTENT, not a filename
+            if kc_cert:
+                cert_file = tempfile.NamedTemporaryFile(
+                    mode="w",
+                    suffix=".pem",
+                    delete=False,
+                )
+                cert_file.write(kc_cert)
+                cert_file.flush()
+                cert_file.close()
+
+                cafile = cert_file.name
+            else:
+                cafile = None
+
+            self._kc_cert = cafile
+
+            if oauth_enable and certificate_endpoint and token_issuer:
+                _cache = JwksCache(jwks_uri=certificate_endpoint, cafile=cafile)
+                self._jwt_validator = JwtValidator(_cache, issuer=token_issuer, audience="account")
+            else:
+                self._jwt_validator = None
+
+            if oauth_enable:
+                if self._is_endpoint_running:
+                    try:
+                        await asyncio.wait_for(self.stop_passive(), timeout=10.0)  # ← Add timeout
+                    except asyncio.TimeoutError:
+                        logger.warning("Server stop timed out, continuing reconfigure")
+                # Start server in background without blocking
+                logger.info("Starting WebSocket server with TLS on")
+                self._server_task = asyncio.create_task(
+                    self._run_server("0.0.0.0", 8765)
+                )
+        except Exception  as e:
+            logger.error(f"Error during reconfigure_oauth: {e}", exc_info=True)
+            raise
+
+
+        #finally:
+            # Remove the temporary certificate file
+        #    if cert_file is not None:
+        #        try:
+        #            os.unlink(cert_file.name)
+        #        except FileNotFoundError:
+        #            pass
+
+    async def reconfigure_endpoint(self, tls_enable, tls_config=None, oauth_enable=False):
+        self._tls_config = tls_config
+        self._oauth_enable = oauth_enable
+
+        # Always stop existing server if running, regardless of TLS state change
+        # This ensures we reconnect with the new TLS configuration
+        if self._is_endpoint_running:
+            try:
+                await asyncio.wait_for(self.stop_passive(), timeout=10.0)
+            except Exception as e:
+                logger.error(f"stop_passive failed during reconfigure: {e}", exc_info=True)
+                raise RuntimeError(f"Cannot reconfigure: failed to stop existing server: {e}")
+
+            if hasattr(self, '_server_task') and self._server_task and not self._server_task.done():
+                try:
+                    await asyncio.wait_for(self._server_task, timeout=10.0)
+                except asyncio.CancelledError:
+                    # Expected: closing the server cancels its serve_forever() future,
+                    # which surfaces here as CancelledError. This means the old
+                    # server shut down successfully, not that something failed.
+                    logger.info("Old server task ended via close()-triggered cancellation (expected)")
+                except asyncio.TimeoutError:
+                    logger.error("Old server task did not exit within timeout")
+                    raise RuntimeError("Cannot reconfigure: port 8765 still in use (old task didn't exit)")
+
+            # Wait for port to be released from TIME_WAIT state (critical on Windows)
+            await asyncio.sleep(3.0)
+
+        # Start server with new configuration
+        if not self._is_endpoint_running:
+            logger.info("Starting WebSocket server with new configuration")
+            self._server_task = asyncio.create_task(
+                self._run_server("0.0.0.0", 8765)
+            )
+        else:
+            raise RuntimeError("Cannot start server: old server still running")
+
+    async def _run_server(self, hostname: str, port: int):
+        """Internal method that actually runs the server."""
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                await self.start(hostname, port)
+                return  # Success - exit
+            except OSError as e:
+                if e.errno in (98, 10048):  # Address already in use
+                    delay = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                    logger.warning(
+                        f"Port {port} in use (attempt {attempt + 1}/{max_retries}), "
+                        f"retrying in {delay}s..."
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error("Error running WebSocket server: %s", e, exc_info=True)
+                    raise
+        # If all retries fail
+        raise RuntimeError(f"Failed to start server on {hostname}:{port} after {max_retries} attempts")
+
+
     async def start(self, hostname: str, port: int, protocol=None) -> None:
-        ssl_ctx = build_tls_context(self._tls_config) if self._tls_config else None
+        ssl_ctx = build_tls_context_from_strings(self._tls_config) if self._tls_config else None
         scheme = "wss" if ssl_ctx else "ws"
+        print("the scheme is: ", scheme)
 
         serve_kwargs = dict(
             subprotocols=protocol if protocol is not None else None,
@@ -182,13 +307,15 @@ class PassiveEndpoint:
             ping_timeout=30,
             logger=self._websocket_server_logger,
         )
+        print("serve_kwargs: ", serve_kwargs)
         if ssl_ctx:
             serve_kwargs["ssl"] = ssl_ctx
-
-        self._is_endpoint_running = True
+        print("serve_kwargs after ssl: ", serve_kwargs)
 
         async with serve(self.handle_client, hostname, port, **serve_kwargs) as server:
             self.server = server
+            self._is_endpoint_running = True
+            self._endpoint_running_event.set()
             logger.info("WebSocket server started on %s://%s:%s", scheme, hostname, port)
             await server.serve_forever()
 
@@ -196,15 +323,26 @@ class PassiveEndpoint:
         try:
             if self.server is not None:
                 self.server.close()
-                await self.server.wait_closed()
-
+                try:
+                    await self.server.wait_closed()
+                except RuntimeError as e:
+                    if "attached to a different loop" in str(e):
+                        await asyncio.sleep(0.5)
+                    else:
+                        raise
                 self._is_endpoint_running = False
+                self._endpoint_running_event.clear()
+                # Clear stale per-connection state so nothing carries loop-bound
+                # asyncio primitives (Events/Locks) into the next server lifetime.
+                self.client_list.clear()
+                self.access_token_list.clear()
+                self.websocket_info_list.clear()
                 logger.info("WebSocket passive server stopped")
             else:
                 logger.info("Passive server stop requested but server reference is None")
         except Exception as e:
-            logger.error("Error stopping passive server: %s", e)
-
+            logger.error(f"Error stopping passive server: {e}")
+            raise
     # ------------------------------------------------------------------
     # WebSocket callbacks
     # ------------------------------------------------------------------
@@ -245,7 +383,7 @@ class PassiveEndpoint:
                             None,
                         )
                         websocket_info.expiry_task = asyncio.create_task(
-                            self.close_on_expiry(websocket, current_access_token["access_token"]["exp"])
+                            self._close_on_expiry_impl(websocket, current_access_token["access_token"]["exp"])
                         )
                         logger.debug("Token expiry task scheduled for cp=%r", clean_path)
 
@@ -292,7 +430,7 @@ class PassiveEndpoint:
                             None,
                         )
                         websocket_info.expiry_task = asyncio.create_task(
-                            self.close_on_expiry(websocket, current_access_token["access_token"]["exp"])
+                            self._close_on_expiry_impl(websocket, current_access_token["access_token"]["exp"])
                         )
                         logger.debug("Token expiry task scheduled for cp=%r", clean_path)
 
@@ -374,22 +512,18 @@ class PassiveEndpoint:
         headers = request.headers
         auth_header = headers.get("Authorization")
 
-        # create IEC61850 client using cp
+        self.client_list[:] = [c for c in self.client_list if c.cp != cp]
         self.client_list.append(IEC61850Client(cp))
-
         if self._oauth_enable:
             if not auth_header or not auth_header.startswith("Bearer "):
                 logger.warning("OAuth: missing or malformed Authorization header for cp=%r", cp)
                 return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Missing or invalid token\n")
-
             token = auth_header[len("Bearer "):]
-
             if self._jwt_validator is None:
                 logger.error("OAuth: JWT validator not configured but oauth_enable=True for cp=%r", cp)
                 return self._http_error_response(
                     HTTPStatus.SERVICE_UNAVAILABLE, b"Token verification unavailable\n"
                 )
-
             try:
                 is_valid, claims = self._jwt_validator.validate(token)
             except (KeyError, Exception) as e:
@@ -397,12 +531,14 @@ class PassiveEndpoint:
                 return self._http_error_response(
                     HTTPStatus.SERVICE_UNAVAILABLE, b"Token verification unavailable\n"
                 )
-
             if not is_valid or claims is None:
                 logger.warning("OAuth: token rejected (invalid or expired) for cp=%r", cp)
                 return self._http_error_response(HTTPStatus.UNAUTHORIZED, b"Invalid or expired token\n")
-
             logger.info("OAuth: token accepted for cp=%r expires_at=%s", cp, claims.expiry)
+            # Replace any stale entry for this cp so handle_client always sees
+            # the token that was just validated for THIS connection attempt,
+            # not a leftover from an earlier one.
+            self.access_token_list = [item for item in self.access_token_list if item["cp"] != cp]
             self.access_token_list.append(
                 {"access_token": {"exp": claims.expiry}, "cp": cp, "access_token_raw": token}
             )
@@ -417,12 +553,6 @@ class PassiveEndpoint:
     def _is_report(self, message: bytes, is_ber: bool) -> bool:
         decoded = decode_tpaa_message(message, is_ber)
         return decoded[0] == "unconfirmed"
-
-    async def close_on_expiry(self, websocket, exp_timestamp: int) -> None:
-        delay = exp_timestamp - int(time.time())
-        if delay > 0:
-            await asyncio.sleep(delay)
-        await websocket.close(code=4401, reason="Token expired")
 
     async def _on_connection_closed(self, cp: str) -> None:
         try:
