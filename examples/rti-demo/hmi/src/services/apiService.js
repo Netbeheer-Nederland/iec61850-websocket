@@ -45,6 +45,11 @@ const API_DEFINITIONS = [
   { id: 'model', label: 'GET /api/model', method: 'GET', path: '/api/model' },
   { id: 'update-iedmodel', label: 'POST /api/update-iedmodel', method: 'POST', path: '/api/update-iedmodel' },
   
+  // OAuth configuration
+  { id: 'reconfig-oauth', label: 'POST /api/reconfig-oauth', method: 'POST', path: '/api/reconfig-oauth' },
+  { id: 'reconfig-connection', label: 'POST /api/reconfig-connection', method: 'POST', path: '/api/reconfig-connection' },
+  { id: 'oauth-status', label: 'GET /api/oauth-status', method: 'GET', path: '/api/oauth-status' },
+  
   // Messages operations
   { id: 'messages', label: 'GET /api/messages', method: 'GET', path: '/api/messages' },
   { id: 'clear-messages', label: 'POST /api/clear_messages', method: 'POST', path: '/api/clear_messages' },

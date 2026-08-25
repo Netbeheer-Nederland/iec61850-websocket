@@ -7,12 +7,15 @@ function Connections({ connections, setConnections }) {
     name: '',
     host: '',
     port: 5000,
-    type: 'RTI-SO'
+    type: 'RTI-SO',
+    acsi: 'server',
+    ws_mode: '',
+    endpoint: ''
   });
 
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO' });
+    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '' });
     setShowModal(true);
   };
 
@@ -79,6 +82,7 @@ function Connections({ connections, setConnections }) {
                 <th>Host</th>
                 <th>Port</th>
                 <th>Type</th>
+                <th>Endpoint</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -87,9 +91,10 @@ function Connections({ connections, setConnections }) {
               {connections.map((conn, index) => (
                 <tr key={index}>
                   <td>{conn.name}</td>
-                  <td>{conn.host}</td>
-                  <td>{conn.port}</td>
+                  <td>{conn.type === 'IDP-Server' ? '-' : conn.host}</td>
+                  <td>{conn.type === 'IDP-Server' ? '-' : conn.port}</td>
                   <td>{conn.type}</td>
+                  <td>{conn.type === 'IDP-Server' ? conn.endpoint : '-'}</td>
                   <td>
                     <span className="endpoint-card-status">
                       {conn.connected ? 'Connected' : 'Disconnected'}
@@ -137,24 +142,28 @@ function Connections({ connections, setConnections }) {
                   onChange={handleInputChange}
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="conn-host">Host</label>
-                <input 
-                  type="text" 
-                  id="conn-host" 
-                  value={formData.host} 
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="conn-port">Port</label>
-                <input 
-                  type="number" 
-                  id="conn-port" 
-                  value={formData.port} 
-                  onChange={handleInputChange}
-                />
-              </div>
+              {formData.type !== 'IDP-Server' && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="conn-host">Host</label>
+                    <input 
+                      type="text" 
+                      id="conn-host" 
+                      value={formData.host} 
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="conn-port">Port</label>
+                    <input 
+                      type="number" 
+                      id="conn-port" 
+                      value={formData.port} 
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </>
+              )}
               <div className="form-group">
                 <label htmlFor="conn-type">Type</label>
                 <select 
@@ -162,10 +171,24 @@ function Connections({ connections, setConnections }) {
                   value={formData.type} 
                   onChange={handleInputChange}
                 >
+                  <option value="Generic">Generic</option>
                   <option value="RTI-SO">RTI-SO (WS Passive/ACSI Client)</option>
                   <option value="RTI-FSP">RTI-FSP (WS Active/ACSI Server)</option>
+                  <option value="IDP-Server">IDP-Server</option>
                 </select>
               </div>
+              {formData.type === 'IDP-Server' && (
+                <div className="form-group">
+                  <label htmlFor="conn-endpoint">Endpoint</label>
+                  <input 
+                    type="text" 
+                    id="conn-endpoint" 
+                    value={formData.endpoint || ''} 
+                    onChange={handleInputChange}
+                    placeholder="e.g., /idp"
+                  />
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowModal(false)}>

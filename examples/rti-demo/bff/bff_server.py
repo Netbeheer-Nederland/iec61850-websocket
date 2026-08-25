@@ -81,13 +81,45 @@ DISCOVERED_FILE = os.path.join(BASE_DIR, 'discovered_endpoints.json')
 class ConnectionCreateRequest(BaseModel):
     """Request body for creating a new connection."""
     name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
-    host: str = Field(..., description="Hostname or IP address of the endpoint", json_schema_extra={"example": "localhost"})
-    port: int = Field(..., description="Port number of the endpoint", json_schema_extra={"example": 5000})
-    type: str = Field(..., description="Type of the endpoint (e.g., RTI-FSP, RTI-SO)", json_schema_extra={"example": "RTI-FSP"})
-    acsi: str = Field(default="server", description="ACSI role (server/client)", json_schema_extra={"example": "server"})
-    ws_mode: str = Field(default="", description="WebSocket mode", json_schema_extra={"example": ""})
+    host: Optional[str] = Field(default=None, description="Hostname or IP address of the endpoint", json_schema_extra={"example": "localhost"})
+    port: Optional[int] = Field(default=None, description="Port number of the endpoint", json_schema_extra={"example": 5000})
+    type: str = Field(..., description="Type of the endpoint (e.g., RTI-FSP, RTI-SO, IDP-Server)", json_schema_extra={"example": "RTI-FSP"})
+    acsi: Optional[str] = Field(default=None, description="ACSI role (server/client)", json_schema_extra={"example": "server"})
+    ws_mode: Optional[str] = Field(default=None, description="WebSocket mode", json_schema_extra={"example": ""})
+    endpoint: Optional[str] = Field(default=None, description="Endpoint path for IDP-Server", json_schema_extra={"example": "/idp"})
+    certificate_endpoint: Optional[str] = Field(default=None, description="Certificate endpoint for OAuth", json_schema_extra={"example": "https://localhost:8443/certs"})
+    auth_server_ca: Optional[str] = Field(default=None, description="Auth server CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    realm: Optional[str] = Field(default=None, description="OAuth realm for FSP", json_schema_extra={"example": "master"})
+    token_endpoint: Optional[str] = Field(default=None, description="OAuth token endpoint for FSP", json_schema_extra={"example": "https://localhost:8443/auth/realms/master/protocol/openid-connect/token"})
+    client_id: Optional[str] = Field(default=None, description="OAuth client ID for FSP", json_schema_extra={"example": "rti-fsp-client"})
+    client_secret: Optional[str] = Field(default=None, description="OAuth client secret for FSP")
+    enable_token_refresh: Optional[bool] = Field(default=None, description="Enable token refresh for FSP", json_schema_extra={"example": True})
+    idp_server: Optional[str] = Field(default=None, description="IDP Server name for OAuth", json_schema_extra={"example": "IDP-Server-01"})
     auto_discovered: bool = Field(default=False, description="Whether this connection was auto-discovered")
 
+class TLSConnectionCreateConfigRequest(BaseModel):
+    """Request body for creating a new connection."""
+    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_tls: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
+    tls_version: str = Field(default= "1.2", description="TLS version", json_schema_extra={"example": "1.2"})
+    server_key: Optional[str] = Field(default=None, description="Server private key", json_schema_extra={"example": "-----BEGIN PRIVATE KEY-----..."})
+    server_cert: Optional[str] = Field(default=None, description="Server certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    server_ca: Optional[str] = Field(default=None, description="Server CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+
+class OAUTHConnectionCreateConfigRequest(BaseModel):
+    """Request body for OAuth configuration."""
+    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_oauth: bool = Field(default=False, description="Enable OAuth", json_schema_extra={"example": False})
+    ws_mode: str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+    certificate_endpoint_url: Optional[str] = Field(default=None, description="OAuth Certificate endpoint URL", json_schema_extra={"example": "https://auth.example.com/certs"})
+    token_issuer_url: Optional[str] = Field(default=None, description="Token issuer URL", json_schema_extra={"example": "https://auth.example.com"})
+    ca_certificate: Optional[str] = Field(default=None, description="Server CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    token_endpoint_url: Optional[str] = Field(default=None, description="Token endpoint URL", json_schema_extra={"example": "https://auth.example.com/token"})
+    client_id: Optional[str] = Field(default=None, description="Client ID", json_schema_extra={"example": "your-client-id"})
+    client_secret: Optional[str] = Field(default=None, description="Client secret", json_schema_extra={"example": "your-client-secret"})
+    client_ca_cert: Optional[str] = Field(default=None, description="Client CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    enable_token_refresh: Optional[bool] = Field(default=None, description="Enable token refresh", json_schema_extra={"example": False})
 
 class ConnectionUpdateRequest(BaseModel):
     """Request body for updating an existing connection."""
@@ -97,6 +129,15 @@ class ConnectionUpdateRequest(BaseModel):
     type: Optional[str] = Field(default=None, description="Type of the endpoint")
     acsi: Optional[str] = Field(default=None, description="ACSI role (server/client)")
     ws_mode: Optional[str] = Field(default=None, description="WebSocket mode")
+    endpoint: Optional[str] = Field(default=None, description="Endpoint path for IDP-Server")
+    certificate_endpoint: Optional[str] = Field(default=None, description="Certificate endpoint for OAuth")
+    auth_server_ca: Optional[str] = Field(default=None, description="Auth server CA certificate")
+    realm: Optional[str] = Field(default=None, description="OAuth realm for FSP")
+    token_endpoint: Optional[str] = Field(default=None, description="OAuth token endpoint for FSP")
+    client_id: Optional[str] = Field(default=None, description="OAuth client ID for FSP")
+    client_secret: Optional[str] = Field(default=None, description="OAuth client secret for FSP")
+    enable_token_refresh: Optional[bool] = Field(default=None, description="Enable token refresh for FSP")
+    idp_server: Optional[str] = Field(default=None, description="IDP Server name for OAuth")
     status: Optional[str] = Field(default=None, description="Connection status")
 
 
@@ -396,8 +437,12 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"Error saving connections: {e}")
     
-    def add_connection(self, name: str, host: str, port: int, conn_type: str, 
-                      acsi: str = "server", ws_mode: str = "", auto_discovered: bool = False) -> Dict:
+    def add_connection(self, name: str, host: Optional[str] = None, port: Optional[int] = None, conn_type: str = "", 
+                      acsi: Optional[str] = None, ws_mode: Optional[str] = None, endpoint: Optional[str] = None, 
+                      certificate_endpoint: Optional[str] = None, auth_server_ca: Optional[str] = None, 
+                      realm: Optional[str] = None, token_endpoint: Optional[str] = None, 
+                      client_id: Optional[str] = None, client_secret: Optional[str] = None, 
+                      enable_token_refresh: Optional[bool] = None, idp_server: Optional[str] = None, auto_discovered: bool = False) -> Dict:
         """Add a new connection.
         
         Args:
@@ -412,32 +457,101 @@ class ConnectionManager:
         Returns:
             The created connection dictionary.
         """
-        # Check if connection already exists
-        existing = next((c for c in self.connections 
-                        if c['host'] == host and c['port'] == port and c['name'] == name), None)
-        if existing:
-            logger.warning(f"Connection already exists: {host}:{port}")
-            return existing
+        # Check if connection already exists (for non-IDP-Server types)
+        if conn_type != 'IDP-Server' and host and port:
+            existing = next((c for c in self.connections 
+                            if c.get('host') == host and c.get('port') == port and c['name'] == name), None)
+            if existing:
+                logger.warning(f"Connection already exists: {host}:{port}")
+                return existing
 
         connection_in_file = next((c for c in self.connections
                          if c['name'] == name), None)
         if connection_in_file:
-            # Track old host:port for _bff_clients cleanup
-            old_key = f"{connection_in_file.get('host')}:{connection_in_file.get('port')}"
+            # Track old host:port for _bff_clients cleanup (for non-IDP-Server types)
+            old_key = f"{connection_in_file.get('host')}:{connection_in_file.get('port')}" if connection_in_file.get('host') and connection_in_file.get('port') else None
             
-            connection_in_file['host'] = host
-            connection_in_file['port'] = port
-            connection_in_file['type'] = conn_type
-            connection_in_file['acsi'] = acsi
-            connection_in_file['ws_mode'] = ws_mode
-            
-            # Update _bff_clients if host or port changed
-            new_key = f"{host}:{port}"
-            if old_key != new_key:
-                if old_key in _bff_clients:
-                    del _bff_clients[old_key]
-                if new_key not in _bff_clients:
-                    _bff_clients[new_key] = BffClient(f"http://{host}:{port}")
+            if conn_type == 'IDP-Server':
+                connection_in_file['type'] = conn_type
+                if endpoint is not None:
+                    connection_in_file['endpoint'] = endpoint
+                
+                # For IDP-Server, also update OAuth fields
+                # Create OAuth object if any OAuth fields are provided
+                oauth_fields = {}
+                if certificate_endpoint is not None:
+                    oauth_fields['certificate_endpoint'] = certificate_endpoint
+                if auth_server_ca is not None:
+                    oauth_fields['auth_server_ca'] = auth_server_ca
+                if realm is not None:
+                    oauth_fields['realm'] = realm
+                if token_endpoint is not None:
+                    oauth_fields['token_endpoint'] = token_endpoint
+                if client_id is not None:
+                    oauth_fields['client_id'] = client_id
+                if client_secret is not None:
+                    oauth_fields['client_secret'] = client_secret
+                if enable_token_refresh is not None:
+                    oauth_fields['enable_token_refresh'] = enable_token_refresh
+                if idp_server is not None:
+                    oauth_fields['idp_server'] = idp_server
+                
+                if oauth_fields:
+                    if 'OAuth' not in connection_in_file:
+                        connection_in_file['OAuth'] = {}
+                    connection_in_file['OAuth'].update(oauth_fields)
+                
+                # Clean up any OAuth fields that were previously at top level
+                top_level_oauth_fields = ['certificate_endpoint', 'auth_server_ca', 'realm', 
+                                           'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh', 'idp_server']
+                for field in top_level_oauth_fields:
+                    if field in connection_in_file:
+                        del connection_in_file[field]
+            else:
+                connection_in_file['host'] = host
+                connection_in_file['port'] = port
+                connection_in_file['type'] = conn_type
+                connection_in_file['acsi'] = acsi
+                connection_in_file['ws_mode'] = ws_mode
+                
+                # Update OAuth fields for non-IDP-Server types
+                oauth_fields = {}
+                if certificate_endpoint is not None:
+                    oauth_fields['certificate_endpoint'] = certificate_endpoint
+                if auth_server_ca is not None:
+                    oauth_fields['auth_server_ca'] = auth_server_ca
+                if realm is not None:
+                    oauth_fields['realm'] = realm
+                if token_endpoint is not None:
+                    oauth_fields['token_endpoint'] = token_endpoint
+                if client_id is not None:
+                    oauth_fields['client_id'] = client_id
+                if client_secret is not None:
+                    oauth_fields['client_secret'] = client_secret
+                if enable_token_refresh is not None:
+                    oauth_fields['enable_token_refresh'] = enable_token_refresh
+                if idp_server is not None:
+                    oauth_fields['idp_server'] = idp_server
+                
+                if oauth_fields:
+                    if 'OAuth' not in connection_in_file:
+                        connection_in_file['OAuth'] = {}
+                    connection_in_file['OAuth'].update(oauth_fields)
+                
+                # Clean up any OAuth fields that were previously at top level
+                top_level_oauth_fields = ['certificate_endpoint', 'auth_server_ca', 'realm', 
+                                           'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh', 'idp_server']
+                for field in top_level_oauth_fields:
+                    if field in connection_in_file:
+                        del connection_in_file[field]
+                
+                # Update _bff_clients if host or port changed
+                new_key = f"{host}:{port}"
+                if old_key != new_key:
+                    if old_key in _bff_clients:
+                        del _bff_clients[old_key]
+                    if new_key not in _bff_clients:
+                        _bff_clients[new_key] = BffClient(f"http://{host}:{port}")
             
             self.save_connections()
             return connection_in_file
@@ -453,12 +567,41 @@ class ConnectionManager:
             'auto_discovered': auto_discovered,
             'created_at': datetime.now().isoformat()
         }
+        
+        # Add endpoint for IDP-Server
+        if conn_type == 'IDP-Server' and endpoint is not None:
+            connection['endpoint'] = endpoint
+        
+        # Create OAuth object if any OAuth fields are provided
+        oauth_fields = {}
+        if certificate_endpoint is not None:
+            oauth_fields['certificate_endpoint'] = certificate_endpoint
+        if auth_server_ca is not None:
+            oauth_fields['auth_server_ca'] = auth_server_ca
+        if realm is not None:
+            oauth_fields['realm'] = realm
+        if token_endpoint is not None:
+            oauth_fields['token_endpoint'] = token_endpoint
+        if client_id is not None:
+            oauth_fields['client_id'] = client_id
+        if client_secret is not None:
+            oauth_fields['client_secret'] = client_secret
+        if enable_token_refresh is not None:
+            oauth_fields['enable_token_refresh'] = enable_token_refresh
+        if idp_server is not None:
+            oauth_fields['idp_server'] = idp_server
+        
+        if oauth_fields:
+            connection['OAuth'] = oauth_fields
+        
         self.connections.append(connection)
         self.save_connections()
 
-        key = f"{host}:{port}"
-        if key not in _bff_clients:
-            _bff_clients[key] = BffClient(f"http://{host}:{port}")
+        # Only create BFF client for non-IDP-Server types with host and port
+        if conn_type != 'IDP-Server' and host and port:
+            key = f"{host}:{port}"
+            if key not in _bff_clients:
+                _bff_clients[key] = BffClient(f"http://{host}:{port}")
 
         logger.info(f"Connection added: {name} ({host}:{port})")
         return connection
@@ -531,6 +674,16 @@ class ConnectionManager:
         return registered
 
     async def check_connection(self, con, client):
+        # IDP-Server is a local server, always mark as connected
+        if con.get('type') == 'IDP-Server':
+            con["status"] = "connected"
+            return
+        
+        # For other types, check connectivity via host:port
+        if not con.get('host') or not con.get('port'):
+            con["status"] = "disconnected"
+            return
+            
         try:
             response = await client.get(
                 f"http://{con['host']}:{con['port']}",
@@ -1113,11 +1266,313 @@ async def get_connections():
     Returns:
         JSON with list of connections and their count.
     """
+    # Ensure all connections have a status field
+    connections_with_status = []
+    for conn in conn_manager.connections:
+        if 'status' not in conn:
+            # Set default status based on type
+            if conn.get('type') == 'IDP-Server':
+                conn['status'] = 'connected'
+            else:
+                conn['status'] = 'disconnected'
+        connections_with_status.append(conn)
 
     return {
-        "connections": conn_manager.connections,
-        "count": len(conn_manager.connections)
+        "connections": connections_with_status,
+        "count": len(connections_with_status)
     }
+
+
+@app.post(
+    "/api/connections/tls-config",
+    summary="update TLS Config for a specific connection",
+    description="update TLS Config for a specific connectio",
+    response_description="apply result",
+    responses={
+        201: {"description": "Connection with TLS config created successfully"},
+        400: {"description": "Missing required fields"}
+    },
+    tags=["TLS"]
+)
+async def create_tls_connection(request: TLSConnectionCreateConfigRequest):
+    """Create a new connection to a remote RTI endpoint.
+
+    Request Body:
+        ConnectionCreateRequest with name, host, port, type
+
+    Returns:
+        JSON with the created connection details.
+
+    Raises:
+        HTTPException 400: If required fields are missing.
+    """
+    print("server_key: ", request.server_key)
+    print("server_cert: ", request.server_cert)
+
+    ws_mode = request.ws_mode
+    print("debug 1")
+    
+    # Validate required fields based on mode
+    if ws_mode == "passive" or ws_mode == "Passive":
+        if not request.server_key or not request.server_cert:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Missing required fields: server_key and server_cert for passive mode'
+            )
+    elif ws_mode == "active" or ws_mode == "Active":
+        if not request.server_ca:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Missing required field: server_ca for active mode'
+            )
+    print("debug 2")
+
+    connection = conn_manager.get_connection(request.connection_name)
+    print("debug 3")
+
+    if connection:
+        if 'TLS' not in connection:
+            connection['TLS'] = {}
+        connection['TLS']['enable_tls'] = request.enable_tls
+        connection['TLS']['tls_version'] = request.tls_version
+        
+        # Store certificates based on mode
+        if ws_mode == "passive" or ws_mode == "Passive":
+            connection['TLS']['server_key'] = request.server_key
+            connection['TLS']['server_cert'] = request.server_cert
+            connection['TLS']['server_ca'] = None
+        elif ws_mode == "active" or ws_mode == "Active":
+            connection['TLS']['server_key'] = None
+            connection['TLS']['server_cert'] = None
+            connection['TLS']['server_ca'] = request.server_ca
+        
+        conn_manager.save_connections()
+        print("debug 4")
+
+        return {
+            "ok": True,
+            "message": f"TLS config saved for {request.connection_name}"
+        }
+
+    print("debug 5")
+
+    return {
+        "ok": False,
+        "message": "Connection not found"
+    }
+
+
+@app.get(
+    "/api/connections/tls-config",
+    summary="Get TLS Config for a specific connection",
+    description="Retrieve the TLS configuration for a connection.",
+    response_description="TLS configuration",
+    responses={
+        200: {"description": "TLS config returned successfully"},
+        404: {"description": "Connection not found"}
+    },
+    tags=["TLS"]
+)
+async def get_tls_config(connection_name: str):
+    """Get TLS configuration for a connection.
+
+    Query Parameters:
+        connection_name: Name of the connection to get TLS config for
+
+    Returns:
+        JSON with TLS configuration including enable_tls, tls_version,
+        server_key, server_cert, server_ca.
+
+    Raises:
+        HTTPException 404: If connection is not found.
+    """
+    connection = conn_manager.get_connection(connection_name)
+
+    if connection:
+        tls_config = connection.get('TLS', {})
+        return {
+            "ok": True,
+            "connection_name": connection_name,
+            "enable_tls": tls_config.get('enable_tls', False),
+            "tls_version": tls_config.get('tls_version'),
+            "server_key": tls_config.get('server_key'),
+            "server_cert": tls_config.get('server_cert'),
+            "server_ca": tls_config.get('server_ca'),
+            "ws_mode": connection.get('ws_mode')
+        }
+
+    return {
+        "ok": False,
+        "message": f"Connection '{connection_name}' not found"
+    }
+
+
+@app.post(
+    "/api/connections/oauth-config",
+    summary="Update OAuth Config for a specific connection",
+    description="Update OAuth configuration for a connection.",
+    response_description="Apply result",
+    responses={
+        200: {"description": "OAuth config updated successfully"},
+        400: {"description": "Missing required fields"},
+        404: {"description": "Connection not found"}
+    },
+    tags=["OAuth"]
+)
+async def create_oauth_connection(request: OAUTHConnectionCreateConfigRequest):
+    """Update OAuth configuration for a connection.
+
+    Request Body:
+        OAUTHConnectionCreateConfigRequest with OAuth settings
+
+    Returns:
+        JSON with success status.
+
+    Raises:
+        HTTPException 400: If required fields are missing.
+        HTTPException 404: If connection is not found.
+    """
+    connection = conn_manager.get_connection(request.connection_name)
+
+    if connection:
+        if 'OAuth' not in connection:
+            connection['OAuth'] = {}
+        
+        connection['OAuth']['enable_oauth'] = request.enable_oauth
+        
+        # Store OAuth fields based on mode
+        if request.ws_mode == "passive" or request.ws_mode == "Passive":
+            # Server mode - store server OAuth config
+            if request.certificate_endpoint_url:
+                connection['OAuth']['certificate_endpoint'] = request.certificate_endpoint_url
+            if request.token_issuer_url:
+                connection['OAuth']['token_issuer'] = request.token_issuer_url
+            if request.ca_certificate:
+                connection['OAuth']['auth_server_ca'] = request.ca_certificate
+            # Clear client-specific fields for server mode
+            connection['OAuth'].pop('token_endpoint', None)
+            connection['OAuth'].pop('client_id', None)
+            connection['OAuth'].pop('client_secret', None)
+            connection['OAuth'].pop('client_ca_cert', None)
+        else:
+            # Client mode - store client OAuth config
+            if request.token_endpoint_url:
+                connection['OAuth']['token_endpoint'] = request.token_endpoint_url
+            if request.client_id:
+                connection['OAuth']['client_id'] = request.client_id
+            if request.client_secret:
+                connection['OAuth']['client_secret'] = request.client_secret
+            if request.ca_certificate:
+                connection['OAuth']['auth_server_ca'] = request.ca_certificate
+            if request.client_ca_cert:
+                connection['OAuth']['client_ca_cert'] = request.client_ca_cert
+            if request.enable_token_refresh is not None:
+                connection['OAuth']['enable_token_refresh'] = request.enable_token_refresh
+            # Clear server-specific fields for client mode
+            connection['OAuth'].pop('certificate_endpoint', None)
+            connection['OAuth'].pop('token_issuer', None)
+
+        conn_manager.save_connections()
+
+        return {
+            "ok": True,
+            "message": f"OAuth config saved for {request.connection_name}"
+        }
+
+    return {
+        "ok": False,
+        "message": "Connection not found"
+    }
+
+
+@app.get(
+    "/api/connections/oauth-status",
+    summary="Get OAuth Status for a specific connection",
+    description="Retrieve the OAuth enable/disable status for a connection.",
+    response_description="OAuth status",
+    responses={
+        200: {"description": "OAuth status returned successfully"},
+        404: {"description": "Connection not found"}
+    },
+    tags=["OAuth"]
+)
+async def get_oauth_status(connection_name: str):
+    """Get OAuth enable/disable status for a connection.
+
+    Query Parameters:
+        connection_name: Name of the connection to check
+
+    Returns:
+        JSON with enable_oauth status.
+
+    Raises:
+        HTTPException 404: If connection is not found.
+    """
+    connection = conn_manager.get_connection(connection_name)
+
+    if connection:
+        oauth_status = connection.get('OAuth', {}).get('enable_oauth', False)
+        return {
+            "ok": True,
+            "connection_name": connection_name,
+            "enable_oauth": oauth_status
+        }
+
+    return {
+        "ok": False,
+        "message": f"Connection '{connection_name}' not found"
+    }
+
+
+@app.get(
+    "/api/connections/oauth-config",
+    summary="Get OAuth Config for a specific connection",
+    description="Retrieve the full OAuth configuration for a connection.",
+    response_description="OAuth configuration",
+    responses={
+        200: {"description": "OAuth config returned successfully"},
+        404: {"description": "Connection not found"}
+    },
+    tags=["OAuth"]
+)
+async def get_oauth_config(connection_name: str):
+    """Get full OAuth configuration for a connection.
+
+    Query Parameters:
+        connection_name: Name of the connection to get config for
+
+    Returns:
+        JSON with full OAuth configuration including certificate_endpoint,
+        token_issuer_url, client_id, client_secret, etc.
+
+    Raises:
+        HTTPException 404: If connection is not found.
+    """
+    connection = conn_manager.get_connection(connection_name)
+
+    if connection:
+        oauth_config = connection.get('OAuth', {})
+        return {
+            "ok": True,
+            "connection_name": connection_name,
+            "certificate_endpoint": oauth_config.get('certificate_endpoint'),
+            "token_issuer_url": oauth_config.get('token_issuer'),
+            "token_endpoint": oauth_config.get('token_endpoint'),
+            "client_id": oauth_config.get('client_id'),
+            "client_secret": oauth_config.get('client_secret'),
+            "auth_server_ca": oauth_config.get('auth_server_ca'),
+            "ca_certificate": oauth_config.get('ca_certificate'),
+            "realm": oauth_config.get('realm'),
+            "idp_server": oauth_config.get('idp_server'),
+            "enable_oauth": oauth_config.get('enable_oauth', False),
+            "enable_token_refresh": oauth_config.get('enable_token_refresh', False)
+        }
+
+    return {
+        "ok": False,
+        "message": f"Connection '{connection_name}' not found"
+    }
+
 
 @app.post(
     "/api/add-connection",
@@ -1142,11 +1597,26 @@ async def create_connection(request: ConnectionCreateRequest):
     Raises:
         HTTPException 400: If required fields are missing.
     """
-    if not request.name or not request.host or not request.port or not request.type:
+    if not request.name or not request.type:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail='Missing required fields: name, host, port, type'
+            detail='Missing required fields: name, type'
         )
+    
+    # For IDP-Server, host and port are not required but endpoint is
+    if request.type == 'IDP-Server':
+        if not request.endpoint:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Missing required field: endpoint'
+            )
+    else:
+        # For other types, host and port are required
+        if not request.host or not request.port:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Missing required fields: host, port'
+            )
     connection = conn_manager.add_connection(
         name=request.name,
         host=request.host,
@@ -1154,6 +1624,15 @@ async def create_connection(request: ConnectionCreateRequest):
         conn_type=request.type,
         acsi=request.acsi,
         ws_mode=request.ws_mode,
+        endpoint=request.endpoint,
+        certificate_endpoint=request.certificate_endpoint,
+        auth_server_ca=request.auth_server_ca,
+        realm=request.realm,
+        token_endpoint=request.token_endpoint,
+        client_id=request.client_id,
+        client_secret=request.client_secret,
+        enable_token_refresh=request.enable_token_refresh,
+        idp_server=request.idp_server,
         auto_discovered=request.auto_discovered
     )
     conn_manager.save_connections()
@@ -1244,8 +1723,42 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         connection['acsi'] = request.acsi
     if request.ws_mode is not None:
         connection['ws_mode'] = request.ws_mode
+    if request.endpoint is not None:
+        connection['endpoint'] = request.endpoint
     if request.status is not None:
         connection['status'] = request.status
+    
+    # Handle OAuth fields - nest them under OAuth object
+    oauth_fields = {}
+    if request.certificate_endpoint is not None:
+        oauth_fields['certificate_endpoint'] = request.certificate_endpoint
+    if request.auth_server_ca is not None:
+        oauth_fields['auth_server_ca'] = request.auth_server_ca
+    if request.realm is not None:
+        oauth_fields['realm'] = request.realm
+    if request.token_endpoint is not None:
+        oauth_fields['token_endpoint'] = request.token_endpoint
+    if request.client_id is not None:
+        oauth_fields['client_id'] = request.client_id
+    if request.client_secret is not None:
+        oauth_fields['client_secret'] = request.client_secret
+    if request.enable_token_refresh is not None:
+        oauth_fields['enable_token_refresh'] = request.enable_token_refresh
+    if request.idp_server is not None:
+        oauth_fields['idp_server'] = request.idp_server
+    
+    # If we have OAuth fields, create/update the OAuth object
+    if oauth_fields:
+        if 'OAuth' not in connection:
+            connection['OAuth'] = {}
+        connection['OAuth'].update(oauth_fields)
+    
+    # Clean up any OAuth fields that were previously at top level
+    top_level_oauth_fields = ['certificate_endpoint', 'auth_server_ca', 'realm', 
+                               'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh', 'idp_server']
+    for field in top_level_oauth_fields:
+        if field in connection:
+            del connection[field]
     
     # Update _bff_clients if host or port changed
     new_host = connection.get('host')
@@ -1469,6 +1982,47 @@ async def execute_dynamic_api(request: ExecuteRequest):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="target and path are required"
         )
+
+    # Special handling for OAuth reconfiguration
+    # When HMI calls /reconfig-oauth, BFF needs to enrich the request with OAuth settings from connections.json
+    if path == "/reconfig-oauth" and body and isinstance(body, dict):
+        connection_name = body.get("connection_name")
+        if connection_name:
+            # Look up the connection
+            connection = conn_manager.get_connection(connection_name)
+            if connection:
+                # Get OAuth config from connection
+                oauth_config = connection.get("OAuth", {})
+                
+                # Extract cp from connection
+                cp = connection.get("cp") or body.get("cp", "cp1")
+                
+                # Enrich the request body with OAuth fields from the connection
+                # Only add fields that exist in the OAuth config and are not already in the body
+                enriched_body = dict(body)
+                
+                # Add cp if not already present
+                if "cp" not in enriched_body:
+                    enriched_body["cp"] = cp
+                
+                # Add OAuth fields from connection if not already in body
+                # Map connection field names to request field names
+                oauth_fields = {
+                    "token_endpoint_url": oauth_config.get("token_endpoint") or oauth_config.get("token_issuer"),
+                    "certificate_endpoint_url": oauth_config.get("certificate_endpoint"),
+                    "token_issuer_url": oauth_config.get("token_issuer"),
+                    "client_id": oauth_config.get("client_id"),
+                    "client_secret": oauth_config.get("client_secret"),
+                    "ca_certificate": oauth_config.get("auth_server_ca"),
+                    "enable_token_refresh": oauth_config.get("enable_token_refresh", False),
+                }
+                
+                for field, value in oauth_fields.items():
+                    # Only add if value exists and not already in body
+                    if value is not None and field not in enriched_body:
+                        enriched_body[field] = value
+                
+                body = enriched_body
 
     try:
         # Get client from registry
