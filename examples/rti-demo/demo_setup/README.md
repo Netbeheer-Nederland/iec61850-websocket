@@ -149,7 +149,7 @@ bff-server:
 
 | Service | URL | Device |
 |---------|-----|--------|
-| HMI/Frontend | `http://<PC_IP>:8080` | PC |
+| HMI (React) | `http://<PC_IP>:8080` | PC |
 | BFF REST API | `http://<PC_IP>:5000` | PC |
 | FSP REST API | `http://<RPI1_IP>:5001` | Raspberry Pi 1 |
 | FSP WebSocket | `ws://<RPI1_IP>:8765` | Raspberry Pi 1 |
@@ -178,7 +178,7 @@ bff-server:
 1. **Docker** installed on all devices
 2. **Dockerfiles** exist in the correct locations:
    - `Dockerfile.bff` (in rti-demo/)
-   - `Dockerfile.frontend` (in rti-demo/)
+   - `hmi/Dockerfile` (in rti-demo/hmi/) - for React HMI
    - `Dockerfile.IO` (in rti-demo/)
    - `examples/rti-demo/Dockerfile.rti-fsp` (relative to repo root)
    - `examples/rti-demo/Dockerfile.rti-so` (relative to repo root)
