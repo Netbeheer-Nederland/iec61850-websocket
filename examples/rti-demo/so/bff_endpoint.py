@@ -920,8 +920,13 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_reconfig_connection(request: TLSConnectionCreateConfigRequest):
         """Reconfigure the connection with a new communication point."""
         try:
-            tls_version = ssl.TLSVersion.TLSv1_2 if request.tls_version == "1.2" else ssl.TLSVersion.TLSv1_3
-            print("Reconfiguring connection with TLS version: ", tls_version)
+            # Normalize tls_version to handle "1.2", "1.3", "TLSv1_2", "TLSv1_3" formats
+            tls_version_str = (request.tls_version or "1.3").lower()
+            if "1.2" in tls_version_str or "1_2" in tls_version_str:
+                tls_version = ssl.TLSVersion.TLSv1_2
+            else:
+                tls_version = ssl.TLSVersion.TLSv1_3
+            print("Reconfiguring connection with TLS version: ", tls_version, "(from request:", request.tls_version, ")")
             if request.ws_mode.lower() == "passive":
                 print("Reconfiguring passive endpoint with TLS: ", request.enable_tls)
                 # Only create TLSConfig if TLS is enabled
