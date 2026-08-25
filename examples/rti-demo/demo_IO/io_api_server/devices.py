@@ -29,7 +29,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -200,40 +200,31 @@ class IODevice(ABC):
 # ==================== GPIOZERO WRAPPER FOR LED ====================
 
 class _GpioZeroLED:
-    """Internal wrapper for gpiozero LED with proper error handling."""
+    """Internal wrapper for gpiozero LED. Requires GPIO hardware."""
     
     def __init__(self, gpio_pin: int, active_high: bool = True, initial_value: bool = False):
-        self._hardware_available = False
-        self._mock_state = initial_value
         self._led = None
         
         try:
             from gpiozero import LED
             self._led = LED(gpio_pin, active_high=active_high, initial_value=initial_value)
-            self._hardware_available = True
             logger.info(f"Initialized gpiozero LED on GPIO {gpio_pin}")
         except Exception as e:
-            logger.warning(f"gpiozero not available for GPIO {gpio_pin}: {e}. Using mock mode.")
-            self._hardware_available = False
+            raise RuntimeError(f"gpiozero not available for GPIO {gpio_pin}: {e}. LED requires GPIO hardware.")
     
     @property
     def value(self) -> bool:
-        if self._hardware_available:
-            try:
-                return self._led.value
-            except Exception:
-                return self._mock_state
-        return self._mock_state
+        try:
+            return self._led.value
+        except Exception:
+            raise RuntimeError(f"Failed to read LED value. Hardware may be disconnected.")
     
     @value.setter
     def value(self, val: bool) -> None:
-        if self._hardware_available:
-            try:
-                self._led.value = val
-            except Exception:
-                self._mock_state = val
-        else:
-            self._mock_state = val
+        try:
+            self._led.value = val
+        except Exception:
+            raise RuntimeError(f"Failed to write LED value. Hardware may be disconnected.")
     
     def on(self) -> None:
         self.value = True
@@ -242,16 +233,13 @@ class _GpioZeroLED:
         self.value = False
     
     def toggle(self) -> None:
-        if self._hardware_available:
-            try:
-                self._led.toggle()
-            except Exception:
-                self._mock_state = not self._mock_state
-        else:
-            self._mock_state = not self._mock_state
+        try:
+            self._led.toggle()
+        except Exception:
+            raise RuntimeError(f"Failed to toggle LED. Hardware may be disconnected.")
     
     def close(self) -> None:
-        if self._hardware_available and self._led:
+        if self._led:
             try:
                 if hasattr(self._led, 'close'):
                     self._led.close()
@@ -259,13 +247,102 @@ class _GpioZeroLED:
                 pass
 
 
+# ==================== INPUT DEVICE BASE CLASS WITH EDGE DETECTION ====================
+
+class InputDevice(IODevice):
+    """
+    Base class for input devices with edge/change detection support.
+    
+    Provides:
+    - Callback-based edge detection for hardware that supports it (gpiozero)
+    - Polling-based edge detection for devices that don't support interrupts
+    - Unified interface for all input device types
+    """
+    
+    def __init__(self, config: DeviceConfig):
+        self.config = config
+        self._hardware_available = False
+        self._value_history: List[Optional[Union[bool, float]]] = []
+        self._change_callbacks: List[Callable[[Any, Any], None]] = []
+        self._monitoring_thread = None
+        self._stop_monitoring = False
+        self._last_reported_value = None
+        self._poll_threshold = None
+    
+    def register_change_callback(self, callback: callable) -> None:
+        """Register a callback to be called when the input value changes."""
+        self._change_callbacks.append(callback)
+    
+    def _notify_change(self, old_value: Any, new_value: Any) -> None:
+        """Notify all registered callbacks of a value change."""
+        for callback in self._change_callbacks:
+            try:
+                callback(old_value, new_value)
+            except Exception as e:
+                logger.warning(f"Error in change callback: {e}")
+    
+    def _start_polling_monitor(self, poll_interval: float = 0.1, threshold: Optional[float] = None) -> None:
+        """Start a background thread to monitor for value changes (for devices without hardware interrupts).
+        
+        Args:
+            poll_interval: Time between polls in seconds
+            threshold: Minimum change required to trigger notification (for analog values)
+        """
+        if self._monitoring_thread is not None:
+            return
+        
+        self._stop_monitoring = False
+        self._poll_threshold = threshold
+        import threading
+        
+        def monitor_loop():
+            import time
+            while not self._stop_monitoring:
+                current_value = self.read()
+                if current_value is not None:
+                    # For analog values, check if change exceeds threshold
+                    if self._poll_threshold is not None and isinstance(current_value, (int, float)):
+                        if self._last_reported_value is not None and isinstance(self._last_reported_value, (int, float)):
+                            if abs(current_value - self._last_reported_value) >= self._poll_threshold:
+                                old_value = self._last_reported_value
+                                self._last_reported_value = current_value
+                                self._notify_change(old_value, current_value)
+                        elif self._last_reported_value is None:
+                            # First read
+                            self._last_reported_value = current_value
+                    # For digital/boolean values or no threshold, check for any change
+                    elif current_value != self._last_reported_value:
+                        old_value = self._last_reported_value
+                        self._last_reported_value = current_value
+                        self._notify_change(old_value, current_value)
+                time.sleep(poll_interval)
+        
+        self._monitoring_thread = threading.Thread(target=monitor_loop, daemon=True)
+        self._monitoring_thread.start()
+    
+    def _stop_polling_monitor(self) -> None:
+        """Stop the background monitoring thread."""
+        self._stop_monitoring = True
+        if self._monitoring_thread is not None:
+            self._monitoring_thread.join(timeout=1.0)
+            self._monitoring_thread = None
+    
+    @property
+    def is_connected(self) -> bool:
+        """Check if the device is connected and operational."""
+        return self._hardware_available
+    
+    def close(self) -> None:
+        """Clean up resources including monitoring thread."""
+        self._stop_polling_monitor()
+
+
 # ==================== HARDWARE DEVICE IMPLEMENTATIONS ====================
 
 class LEDDevice(IODevice):
     """
     LED device implementation using gpiozero for hardware control.
-    
-    Falls back to mock mode if gpiozero is not available.
+    Requires GPIO hardware.
     """
     
     def __init__(self, config: LEDConfig):
@@ -275,28 +352,17 @@ class LEDDevice(IODevice):
             active_high=config.is_active_high,
             initial_value=config.initial_state
         )
-        self._mock_state = config.initial_state
         logger.info(f"Initialized LED device '{config.name}' on GPIO {config.gpio_pin}")
     
     def read(self) -> Optional[bool]:
         """Read the current LED state."""
-        try:
-            return self._gpiozero_led.value
-        except Exception as e:
-            logger.warning(f"Failed to read LED '{self.config.name}': {e}")
-            return self._mock_state
+        return self._gpiozero_led.value
     
     def write(self, value: Union[bool, float]) -> bool:
         """Set the LED state (True=ON, False=OFF)."""
         state = bool(value)
-        try:
-            self._gpiozero_led.value = state
-            self._mock_state = state
-            return True
-        except Exception as e:
-            logger.warning(f"Failed to write to LED '{self.config.name}': {e}")
-            self._mock_state = state
-            return False
+        self._gpiozero_led.value = state
+        return True
     
     def close(self) -> None:
         """Clean up GPIO resources."""
@@ -309,33 +375,35 @@ class LEDDevice(IODevice):
     def toggle(self) -> Optional[bool]:
         """Toggle the LED state and return new state."""
         self._gpiozero_led.toggle()
-        new_state = self.read()
-        if new_state is None:
-            self._mock_state = not self._mock_state
-            return self._mock_state
-        return new_state
+        return self.read()
 
 
-class PotentiometerDevice(IODevice):
+class PotentiometerDevice(InputDevice):
     """
     Potentiometer (analog input) device implementation.
     
     Reads analog values from an ADC (Analog-to-Digital Converter).
-    Falls back to mock mode if hardware is not available.
+    Requires ADC hardware.
+    
+    Supports change detection via polling for value changes.
     """
     
     ADC_MCP3008 = "mcp3008"
     ADC_ADS1115 = "ads1115"
     
     def __init__(self, config: PotentiometerConfig):
-        self.config = config
-        self._hardware_available = False
-        self._mock_value: float = 0.5
+        super().__init__(config)
         self._adc = None
         self._spi = None
+        self._adc_type = None
+        self._channel = 0
+        self._value_change_threshold = 0.01  # 1% change to trigger callback
         self._init_hardware()
         if not self._hardware_available:
-            logger.warning(f"ADC not available for potentiometer '{config.name}'. Using mock mode.")
+            raise RuntimeError(f"ADC not available for potentiometer '{config.name}'. Hardware required.")
+        # Start polling-based change detection for analog inputs
+        # Uses threshold to avoid noise-triggered false changes
+        self._start_polling_monitor(poll_interval=0.2, threshold=self._value_change_threshold)
     
     def _init_hardware(self) -> None:
         try:
@@ -382,25 +450,22 @@ class PotentiometerDevice(IODevice):
     def read(self) -> Optional[float]:
         if not self.is_connected:
             return None
-        if self._hardware_available:
-            try:
-                if self._adc_type == self.ADC_MCP3008:
-                    raw = self._read_mcp3008(self._channel)
-                    max_value = 1023
-                elif self._adc_type == self.ADC_ADS1115:
-                    raw = self._read_ads1115(self._channel)
-                    max_value = 32767
-                else:
-                    return None
-                normalized = max(0, min(1, raw / max_value))
-                if self.config.is_inverted:
-                    normalized = 1.0 - normalized
-                return normalized
-            except Exception as e:
-                logger.warning(f"Failed to read potentiometer '{self.config.name}': {e}")
+        try:
+            if self._adc_type == self.ADC_MCP3008:
+                raw = self._read_mcp3008(self._channel)
+                max_value = 1023
+            elif self._adc_type == self.ADC_ADS1115:
+                raw = self._read_ads1115(self._channel)
+                max_value = 32767
+            else:
                 return None
-        else:
-            return self._mock_value
+            normalized = max(0, min(1, raw / max_value))
+            if self.config.is_inverted:
+                normalized = 1.0 - normalized
+            return normalized
+        except Exception as e:
+            logger.warning(f"Failed to read potentiometer '{self.config.name}': {e}")
+            return None
     
     def read_scaled(self) -> Optional[float]:
         normalized = self.read()
@@ -413,6 +478,9 @@ class PotentiometerDevice(IODevice):
         return False
     
     def close(self) -> None:
+        # Stop monitoring thread
+        super().close()
+        # Clean up hardware
         if self._spi:
             try:
                 self._spi.close()
@@ -420,97 +488,129 @@ class PotentiometerDevice(IODevice):
                 pass
         self._spi = None
         self._adc = None
-    
-    @property
-    def is_connected(self) -> bool:
-        return True
-    
-    def set_mock_value(self, value: float) -> None:
-        self._mock_value = max(0.0, min(1.0, value))
 
 
-class ButtonDevice(IODevice):
+class ButtonDevice(InputDevice):
     """
     Button (digital input) device implementation.
-    
-    Falls back to mock mode if hardware is not available.
+    Requires GPIO hardware.
     
     When latching=True, the button toggles its state on each press (rising edge)
     and maintains that state even after release. This is useful for momentary
     buttons that should act like toggle switches.
+    
+    Supports:
+    - Hardware interrupt-based edge detection (via gpiozero callbacks)
+    - Change detection callbacks
     """
     
     def __init__(self, config: ButtonConfig):
-        self.config = config
-        self._hardware_available = False
-        self._mock_state = False
+        super().__init__(config)
         self._last_read_time = 0
         self._last_read_value = False
         self._latched_state = False
         self._previous_physical_state = False
+        self._button = None
+        self._active_high = config.is_active_high
         
         try:
             from gpiozero import Button as GpioZeroButton
-            from gpiozero import Device
-            Device.pin_factory = None
             self._button = GpioZeroButton(
                 config.gpio_pin,
                 pull_up=config.pull_up,
                 bounce_time=config.debounce_time
             )
             self._hardware_available = True
-            self._active_high = config.is_active_high
+            
+            # === Edge Detection Callbacks ===
+            if config.latching and self._hardware_available:
+                # Use gpiozero callbacks for immediate edge detection
+                # This works even when not actively polling
+                button_self = self
+                def on_press():
+                    button_self._latched_state = not button_self._latched_state
+                    logger.info(f"Button '{config.name}' pressed - toggled to {button_self._latched_state}")
+                    button_self._notify_change(not button_self._latched_state, button_self._latched_state)
+                def on_release():
+                    # Track release for debugging/state management
+                    logger.debug(f"Button '{config.name}' released")
+                self._button.when_pressed = on_press
+                self._button.when_released = on_release
+            
+            # Initialize previous state to current physical state
+            # This prevents false edge detection on first read
+            if self._hardware_available:
+                try:
+                    # Wait briefly for hardware to stabilize
+                    import time
+                    time.sleep(0.1)
+                    raw_value = self._button.is_pressed
+                    if self.config.is_active_high:
+                        self._previous_physical_state = raw_value
+                        self._last_reported_value = raw_value if config.latching else None
+                    else:
+                        self._previous_physical_state = not raw_value
+                        self._last_reported_value = not raw_value if config.latching else None
+                except Exception:
+                    self._previous_physical_state = False
+                    self._last_reported_value = None
+            
             logger.info(f"Initialized button '{config.name}' on GPIO {config.gpio_pin}" + 
                        (" (latching)" if config.latching else ""))
         except Exception as e:
-            logger.warning(f"Hardware not available for button '{config.name}': {e}. Using mock mode.")
-            self._hardware_available = False
+            raise RuntimeError(f"Hardware not available for button '{config.name}': {e}. Button requires GPIO hardware.")
     
-    def _get_physical_state(self) -> Optional[bool]:
-        """Read the actual physical state of the button (pressed/released)."""
+    def _read_physical_raw(self) -> Optional[bool]:
+        """Read the raw physical state directly from hardware without debounce caching.
+        
+        This is used for latching mode edge detection where we need to see
+        actual state transitions, not debounced values.
+        """
         if not self.is_connected:
             return None
-        if self._hardware_available:
-            try:
-                import time
-                current_time = time.time()
-                if current_time - self._last_read_time < self.config.debounce_time:
-                    return self._last_read_value
-                raw_value = self._button.is_pressed
-                if self.config.is_active_high:
-                    state = raw_value
-                else:
-                    state = not raw_value
-                self._last_read_time = current_time
-                self._last_read_value = state
-                return state
-            except Exception as e:
-                logger.warning(f"Failed to read button '{self.config.name}': {e}")
-                return self._mock_state
-        else:
-            return self._mock_state
+        try:
+            raw_value = self._button.is_pressed
+            if self.config.is_active_high:
+                return raw_value
+            else:
+                return not raw_value
+        except Exception as e:
+            logger.warning(f"Failed to read button '{self.config.name}': {e}")
+            return None
+    
+    def _get_physical_state(self) -> Optional[bool]:
+        """Read the actual physical state of the button (pressed/released) with debounce."""
+        if not self.is_connected:
+            return None
+        try:
+            import time
+            current_time = time.time()
+            if current_time - self._last_read_time < self.config.debounce_time:
+                return self._last_read_value
+            raw_value = self._button.is_pressed
+            if self.config.is_active_high:
+                state = raw_value
+            else:
+                state = not raw_value
+            self._last_read_time = current_time
+            self._last_read_value = state
+            return state
+        except Exception as e:
+            logger.warning(f"Failed to read button '{self.config.name}': {e}")
+            return None
     
     def read(self) -> Optional[bool]:
         """Read button state.
         
-        If latching=True: returns the latched state (toggles on press, stays until next press)
+        If latching=True: returns the latched state (toggles on press via callback)
         If latching=False: returns the current physical state (True=pressed, False=released)
         """
-        physical_state = self._get_physical_state()
-        
-        if physical_state is None:
-            return None
-        
         if self.config.latching:
-            # Latching mode: detect rising edge (press) and toggle latched state
-            if self._previous_physical_state == False and physical_state == True:
-                self._latched_state = not self._latched_state
-                logger.debug(f"Button '{self.config.name}' pressed - toggled latched state to {self._latched_state}")
-            self._previous_physical_state = physical_state
+            # Latched state is updated automatically by gpiozero callbacks
             return self._latched_state
         else:
-            # Normal mode: return current physical state
-            return physical_state
+            # Normal mode: use debounced reading
+            return self._get_physical_state()
     
     def reset_latch(self) -> None:
         """Reset latched state to False (for latching buttons)."""
@@ -522,46 +622,19 @@ class ButtonDevice(IODevice):
         return False
     
     def close(self) -> None:
+        # Stop monitoring thread
+        super().close()
+        # Clean up gpiozero button
         if self._hardware_available and hasattr(self._button, 'close'):
             try:
                 self._button.close()
             except Exception as e:
                 logger.warning(f"Failed to release button '{self.config.name}': {e}")
     
-    @property
-    def is_connected(self) -> bool:
-        return True
-    
-    def set_mock_state(self, state: bool) -> None:
-        self._mock_state = bool(state)
+
 
 
 # ==================== MOCK DEVICES ====================
-
-class MockLEDDevice(LEDDevice):
-    """Mock LED device for testing without hardware."""
-    
-    def __init__(self, config: LEDConfig):
-        config_copy = LEDConfig(
-            name=config.name,
-            gpio_pin=config.gpio_pin,
-            description=config.description,
-            initial_state=config.initial_state,
-            is_active_high=config.is_active_high,
-            brightness=config.brightness,
-        )
-        super().__init__(config_copy)
-        self._gpiozero_led._hardware_available = False
-        self._gpiozero_led._mock_state = config.initial_state
-
-
-class MockPotentiometerDevice(PotentiometerDevice):
-    """Mock potentiometer device for testing without hardware."""
-    
-    def __init__(self, config: PotentiometerConfig):
-        super().__init__(config)
-        self._hardware_available = False
-
 
 # ==================== DEVICE FACTORY ====================
 
@@ -587,17 +660,6 @@ class DeviceFactory:
             raise ValueError(f"Unsupported device type: {config.device_type}")
         return device_class(config)
     
-    @staticmethod
-    def create_mock_device(config: DeviceConfig) -> IODevice:
-        mock_classes = {
-            DeviceType.LED: MockLEDDevice,
-            DeviceType.POTENTIOMETER: MockPotentiometerDevice,
-            DeviceType.BUTTON: ButtonDevice,
-        }
-        device_class = mock_classes.get(config.device_type, LEDDevice)
-        return device_class(config)
-
-
 # ==================== VALIDATION ====================
 
 RASPBERRY_PI_VALID_GPIO = set(range(0, 28))

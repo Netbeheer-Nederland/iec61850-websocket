@@ -847,7 +847,9 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
                 raise HTTPException(status_code=404, detail="Configuration file not found")
             
             # Re-initialize with loaded configs
-            io_controller.initialize()
+            init_success = io_controller.initialize()
+            if not init_success:
+                raise HTTPException(status_code=500, detail="Failed to initialize devices from configuration")
             
             logger.info("IO configuration loaded successfully")
             return {
@@ -911,7 +913,9 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
                 raise HTTPException(status_code=404, detail="Configuration file not found")
             
             # Re-initialize with updated configs
-            io_controller.initialize()
+            init_success = io_controller.initialize()
+            if not init_success:
+                raise HTTPException(status_code=500, detail="Failed to initialize devices from configuration")
             
             logger.info("IO configuration reloaded successfully")
             return {

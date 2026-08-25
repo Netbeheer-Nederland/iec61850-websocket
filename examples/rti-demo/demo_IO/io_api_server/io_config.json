@@ -53,7 +53,7 @@
       "description": "Button on GPIO 10 (Pin 19)",
       "direction": "input",
       "debounce_time": 0.05,
-      "pull_up": false,
+      "pull_up": true,
       "latching": true,
       "is_active_high": true
     }

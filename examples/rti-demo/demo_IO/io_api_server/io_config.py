@@ -63,6 +63,22 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONFIG_FILE = "io_config.json"
 
 
+def get_default_config_path() -> str:
+    """Get the default config path, first checking script directory, then current directory."""
+    import os
+    from pathlib import Path
+    
+    # Try to get the script directory
+    script_dir = Path(__file__).parent
+    script_config = script_dir / DEFAULT_CONFIG_FILE
+    
+    if script_config.exists():
+        return str(script_config)
+    
+    # Fall back to current directory
+    return DEFAULT_CONFIG_FILE
+
+
 def _config_to_dict(config: DeviceConfig) -> Dict[str, Any]:
     """Convert a device config object to a dictionary for JSON serialization."""
     base_dict = {
@@ -228,7 +244,10 @@ def load_config(path: str = DEFAULT_CONFIG_FILE) -> Optional[Dict[str, DeviceCon
 
 def get_config_path() -> str:
     """Get the path to the IO configuration file from environment or default."""
-    return os.getenv("IO_CONFIG_FILE", DEFAULT_CONFIG_FILE)
+    env_path = os.getenv("IO_CONFIG_FILE")
+    if env_path:
+        return env_path
+    return get_default_config_path()
 
 
 def create_default_config() -> Dict[str, DeviceConfig]:

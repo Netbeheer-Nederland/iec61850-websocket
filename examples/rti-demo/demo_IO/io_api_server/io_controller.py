@@ -8,8 +8,7 @@ This module provides a unified interface for managing various IO devices:
 - PWM outputs
 - And more
 
-It uses the devices module for device-specific implementations,
-with fallback to mock devices for non-Pi environments.
+It uses the devices module for device-specific implementations.
 
 Usage:
     from io_controller import IOController
@@ -95,24 +94,21 @@ class IOController:
     devices: Dict[str, IODevice] = field(default_factory=dict)  # name -> IODevice
     configs: Dict[str, DeviceConfig] = field(default_factory=dict)  # name -> DeviceConfig
     _initialized: bool = False
-    _use_mock: bool = False  # Force mock mode for testing
     
     def __post_init__(self):
         """Initialize the controller."""
         self.devices = {}
         self.configs = {}
         self._initialized = False
-        self._use_mock = False
     
     # ==================== Device Management ====================
     
-    def add_device(self, config: DeviceConfig, use_mock: bool = False) -> None:
+    def add_device(self, config: DeviceConfig) -> None:
         """
         Add a device to the controller configuration.
         
         Args:
             config: Device configuration
-            use_mock: If True, create a mock device instead of hardware
             
         Raises:
             ValueError: If device name already exists or config is invalid
@@ -168,13 +164,10 @@ class IOController:
     
     # ==================== Initialization ====================
     
-    def initialize(self, use_mock: bool = False) -> bool:
+    def initialize(self) -> bool:
         """
         Initialize all configured devices.
         
-        Args:
-            use_mock: If True, force all devices to use mock mode
-            
         Returns:
             True if initialization succeeded, False otherwise
         """
@@ -182,32 +175,31 @@ class IOController:
             logger.warning("IO already initialized")
             return True
         
-        self._use_mock = use_mock
         self._initialized = True
         
         factory = DeviceFactory()
         
+        init_errors = []
         for name, config in self.configs.items():
             try:
-                if use_mock:
-                    device = factory.create_mock_device(config)
-                else:
-                    device = factory.create_device(config)
+                device = factory.create_device(config)
                 
                 self.devices[name] = device
                 logger.info(f"Initialized device '{name}' (type: {config.device_type.value})")
                 
             except Exception as e:
-                logger.error(f"Failed to initialize device '{name}': {e}")
-                # Clean up any partially initialized devices
-                for device in self.devices.values():
-                    device.close()
-                self.devices.clear()
-                self._initialized = False
-                return False
+                error_msg = f"Failed to initialize device '{name}': {e}"
+                logger.error(error_msg)
+                init_errors.append(error_msg)
         
-        logger.info(f"IO Controller initialized with {len(self.devices)} devices")
-        return True
+        if init_errors:
+            for error in init_errors:
+                logger.error(error)
+            logger.warning(f"Initialized {len(self.devices)}/{len(self.configs)} devices (some failed)")
+        else:
+            logger.info(f"IO Controller initialized with {len(self.devices)} devices")
+        
+        return len(self.devices) > 0
     
     def cleanup(self) -> None:
         """Clean up all device resources."""
@@ -561,4 +553,5 @@ class IOController:
         """Clear all device configurations."""
         self.configs.clear()
         self.devices.clear()
+        self._initialized = False
         logger.info("Cleared all device configurations")
