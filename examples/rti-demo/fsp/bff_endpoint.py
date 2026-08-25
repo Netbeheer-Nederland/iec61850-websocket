@@ -7,9 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
-print("\n\n=== DEBUG: Checking /models directory ===")
-os.system("ls -la /models/ 2>&1 || echo 'Directory does not exist'")
-print("=== DEBUG: End ===\n\n")
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -18,18 +16,48 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from acsi_server import ACSIServer
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
-import os
-from typing import Any, Dict
 from fastapi import FastAPI, APIRouter, Request, HTTPException, status, UploadFile, File
 from fastapi.responses import JSONResponse, RedirectResponse
-from typing import Optional
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
+import ssl
+from ws61850.security.tls import TLSConfig
+import asyncio
+import json
+
+# ==================== Helper Functions ====================
+
+def _find_connections_file() -> str:
+    """Find the connections.json file path using the same logic as BFF server."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.exists('/app'):
+        return '/app/connections.json'
+    elif os.path.exists(os.path.join(script_dir, 'connections.json')):
+        return os.path.join(script_dir, 'connections.json')
+    else:
+        parent_dir = os.path.dirname(script_dir)
+        if os.path.exists(os.path.join(parent_dir, 'connections.json')):
+            return os.path.join(parent_dir, 'connections.json')
+        return os.path.join(script_dir, 'connections.json')
+
+
+def _load_connections_from_file() -> list:
+    """Load connections from connections.json file."""
+    connections_file = _find_connections_file()
+    if os.path.exists(connections_file):
+        try:
+            with open(connections_file, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading connections: {e}")
+    return []
+
 
 # ==================== Pydantic Models ====================
 class WritevalueRequest(BaseModel):
 
     """Request body for writing a value to the ACSI server model."""
-    obj_ref: str = Field(
+    objRef: str = Field(
         ...,
         description="Object reference in ACSI format (e.g., 'LD0/LLN0$ST$Mod')",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
@@ -44,7 +72,7 @@ class WritevalueRequest(BaseModel):
         description="Value to write as string representation",
         json_schema_extra={"example": "ON"}
     )
-    data_type: str = Field(
+    dataType: str = Field(
         default="",
         description="Optional data type for value coercion",
         json_schema_extra={"example": "BOOLEAN"}
@@ -84,7 +112,7 @@ class StartRequest(BaseModel):
 class ReadvalueRequest(BaseModel):
 
     """Request body for reading a value from the ACSI server model."""
-    obj_ref: str = Field(
+    objRef: str = Field(
         ...,
         description="Object reference in ACSI format",
         json_schema_extra={"example": "LD0/MMXU1$MX$volA"}
@@ -94,6 +122,57 @@ class ReadvalueRequest(BaseModel):
         description="Functional constraint (optional)",
         json_schema_extra={"example": "MX"}
     )
+
+class TLSConnectionCreateConfigRequest(BaseModel):
+    """Request body for creating a new connection."""
+
+    host: str = Field(
+        default="0.0.0.0",
+        description="Hostname or IP address to bind to",
+        json_schema_extra={"example": "0.0.0.0"}
+    )
+    port: str = Field(
+        default="8765",
+        description="Port number to listen on",
+        json_schema_extra={"example": "8765"}
+    )
+
+    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_tls: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
+    tls_version: str = Field(default= "1.2", description="TLS version", json_schema_extra={"example": "1.2"})
+
+    server_key: str | None = Field(
+        default=None,
+        description="Server private key",
+        json_schema_extra={"example": "-----BEGIN PRIVATE KEY-----..."},
+    )
+    server_cert: str | None = Field(
+        default=None,
+        description="Server certificate",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+    server_ca: str | None = Field(
+        default=None,
+        description="Server CA certificate",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+
+    ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+
+class OAUTHCreateConfigRequest(BaseModel):
+    """Request body for OAuth reconfiguration."""
+    connection_name: Optional[str] = Field(default=None, description="Connection name (optional, auto-detected)", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_oauth: bool = Field(default=False, description="Enable OAuth authentication", json_schema_extra={"example": False})
+    host: str = Field(default="127.0.0.1", description="ws host", json_schema_extra={"example": "127.0.0.1"})
+    port: str = Field(default="8765", description="ws port", json_schema_extra={"example": "8765"})
+    cp: str = Field(default="cp1", description="Communication point identifier", json_schema_extra={"example": "cp1"})
+    ws_mode: str = Field(default="active", description="WebSocket mode (passive or active)", json_schema_extra={"example": "active"})
+    # OAuth settings for FSP (active mode)
+    token_endpoint_url: Optional[str] = Field(default=None, description="OAuth Token endpoint URL", json_schema_extra={"example": "https://auth.example.com/token"})
+    client_id: Optional[str] = Field(default=None, description="OAuth Client ID", json_schema_extra={"example": "my-client-id"})
+    client_secret: Optional[str] = Field(default=None, description="OAuth Client Secret", json_schema_extra={"example": "my-client-secret"})
+    ca_certificate: Optional[str] = Field(default=None, description="Server CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+    enable_token_refresh: bool = Field(default=False, description="Enable token refresh", json_schema_extra={"example": False})
 
 def create_bff_router(
     factory_dir,
@@ -121,9 +200,10 @@ def create_bff_router(
         """Serialize a DataAttribute to JSON-compatible dict."""
         return {
             "kind": "DA",
+            "type": "DA",
             "name": da.name,
             "fc": da.fc.name if da.fc is not None else None,
-            "type": da.type.name if da.type is not None else None,
+            "bType": da.type.name if da.type is not None else None,
             "children": [serialize_data_attribute(child) for child in (da.data_attributes or [])],
         }
 
@@ -138,6 +218,7 @@ def create_bff_router(
 
         return {
             "kind": "DO",
+            "type": "DO",
             "name": do.name,
             "cdc": do.cdc,
             "children": children,
@@ -147,19 +228,56 @@ def create_bff_router(
         """Serialize an IED model tree to JSON-compatible dict."""
         return {
             "kind": "IED",
+            "type": "IED",
             "name": ied.name,
             "children": [
                 {
                     "kind": "LD",
+                    "type": "LDevice",
                     "name": ld.name,
                     "ldName": ld.ldName,
                     "children": [
                         {
                             "kind": "LN",
+                            "type": "LogicalNode",
                             "name": ln.name,
-                            "children": [
+                            "children": (
+                                [
+                                    {
+                                        "kind": "Group",
+                                        "type": "Group",
+                                        "name": "DataSets",
+                                        "children": [
+                                            {
+                                                "kind": "DataSet",
+                                                "type": "DataSet",
+                                                "name": ds.name,
+                                                "ref": f"{ld.name}/{ln.name}.{ds.name}"
+                                            }
+                                            for ds in (ln.data_sets or [])
+                                        ]
+                                    }
+                                ] if (ln.data_sets or []) else []
+                            ) + (
+                                [
+                                    {
+                                        "kind": "Group",
+                                        "type": "Group",
+                                        "name": "ReportControls",
+                                        "children": [
+                                            {
+                                                "kind": "BRCB" if rcb.buffered else "URCB",
+                                                "type": "ReportControl",
+                                                "name": rcb.name,
+                                                "ref": f"{ld.name}/{ln.name}.{rcb.name}"
+                                            }
+                                            for rcb in (ln.rcbs or [])
+                                        ]
+                                    }
+                                ] if (ln.rcbs or []) else []
+                            ) + [
                                 serialize_data_object(do) for do in (ln.data_objects or [])
-                            ],
+                            ]
                         }
                         for ln in (ld.logical_nodes or [])
                     ],
@@ -203,22 +321,42 @@ def create_bff_router(
                 data_objects: List[Dict[str, Any]] = []
                 data_attributes: List[str] = []
                 da_fc_map: Dict[str, str] = {}
+                report_control_blocks: List[Dict[str, Any]] = []
+                datasets: List[Dict[str, Any]] = []
                 ln_prefix = f"{ld.name}/{ln.name}."
 
                 for data_object in (ln.data_objects or []):
-                    data_objects.append({"name": data_object.name, "cdc": data_object.cdc})
+                    cdc = (data_object.cdc or "").lower()
+                    obj_info = {"name": data_object.name, "cdc": data_object.cdc}
+                    
+                    # Collect DataSets (from DataObjects with cdc="dataset")
+                    if cdc == "dataset":
+                        datasets.append(obj_info)
+                    # Collect Report Control Blocks (RCB, BRCB, URCB) from DataObjects
+                    elif cdc in ("rcb", "brcb", "urcb"):
+                        report_control_blocks.append(obj_info)
+                    
+                    data_objects.append(obj_info)
                     for da_path, fc_name in collect_da_paths_from_do(data_object, data_object.name):
                         data_attributes.append(da_path)
                         if fc_name:
                             da_fc_map[f"{ln_prefix}{da_path}"] = fc_name
+
+                # Also collect DataSets from ln.data_sets
+                for ds in (ln.data_sets or []):
+                    datasets.append({"name": ds.name, "cdc": "dataset"})
+
+                # Also collect ReportControls from ln.rcbs
+                for rcb in (ln.rcbs or []):
+                    report_control_blocks.append({"name": rcb.name, "cdc": "rcb"})
 
                 ln_key = f"{ld.name}/{ln.name}"
                 details[ln_key] = {
                     "dataObjects": data_objects,
                     "dataAttributes": sorted(set(data_attributes)),
                     "dataAttributeFcs": da_fc_map,
-                    "reportControlBlocks": [],
-                    "dataSets": [],
+                    "reportControlBlocks": report_control_blocks,
+                    "dataSets": datasets,
                 }
 
         return details
@@ -862,8 +1000,301 @@ def create_bff_router(
                 status_code=500
             )
 
+    async def _wait_for_runtime_loop(rti_fsp, timeout: float = 5.0) -> asyncio.AbstractEventLoop:
+        """Poll until the server's background event loop is created and running,
+        or raise if it doesn't show up within `timeout` seconds."""
+        deadline = asyncio.get_event_loop().time() + timeout
+        while True:
+            loop = rti_fsp.runtime.loop
+            if loop is not None and loop.is_running():
+                return loop
+            if asyncio.get_event_loop().time() >= deadline:
+                raise RuntimeError("server-failed-to-start")
+            await asyncio.sleep(0.05)
+
+    @router.post(
+        "/reconfig-connection",
+        summary="Get Connection Info",
+        description="Returns detailed information about the current WebSocket connection, including peer address, port, and connection status.",
+        response_description="Connection details",
+        responses={
+            200: {"description": "Connection information returned successfully"},
+            500: {"description": "Error retrieving connection info"}
+        },
+        tags=["Client Status"]
+    )
+    async def api_reconfig_connection(request: TLSConnectionCreateConfigRequest):
+        """Reconfigure the connection with a new communication point."""
+        try:
+            # Normalize tls_version to handle "1.2", "1.3", "TLSv1_2", "TLSv1_3" formats
+            tls_version_str = (request.tls_version or "1.3").lower()
+            if "1.2" in tls_version_str or "1_2" in tls_version_str:
+                tls_version = ssl.TLSVersion.TLSv1_2
+            else:
+                tls_version = ssl.TLSVersion.TLSv1_3
+            print("tls_version in reconfig connection: ", tls_version, "(from request:", request.tls_version, ")")
+            host = request.host
+            request_port = request.port
+            if request.ws_mode.lower() == "active":
+                # Only create TLSConfig if TLS is enabled
+                tls_config = None
+                if request.enable_tls:
+                    tls_config = TLSConfig(
+                        mode="client",
+                        cafile=request.server_ca,
+                        min_version=tls_version,
+                        max_version=tls_version,
+                        keylog_file=os.path.join("tlskeys.log"),
+                    )
+                cp = os.getenv("CP", "cp1")
+
+                loop = rti_fsp.runtime.loop
+                if loop is None or not loop.is_running():
+                    print("server not running, starting server instance")
+                    rti_fsp.start_server(host, int(request_port))
+                    loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
+
+                endpoint = rti_fsp.runtime.endpoint
+                if endpoint is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "Endpoint not initialized"},
+                        status_code=500,
+                    )
+
+                # Call reconfigure_connection on the endpoint's event loop
+                # The library handles TLS config and task restart internally
+                fut = asyncio.run_coroutine_threadsafe(
+                    endpoint.reconfigure_connection(
+                        host, request_port, cp, request.enable_tls, tls_config=tls_config
+                    ),
+                    loop,
+                )
+                # Wait for the reconfiguration to complete
+                try:
+                    await asyncio.wrap_future(fut)
+                except Exception as e:
+                    print(f"Error during reconfigure_connection: {e}")
+                    # Don't fail the endpoint - the connection may still have been restarted
+                    # Just log and continue
+                
+                rti_fsp.runtime.tasks["ws"] = endpoint._connect_task
+
+                print("Reconfigured connection with TLS enabled:", request.enable_tls)
+                return JSONResponse(
+                    content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
+                             "enable_tls": request.enable_tls},
+                    status_code=200,
+                )
+            else:
+                return JSONResponse(
+                    content={"ok": False, "error": "Only active mode is supported for reconfiguration."},
+                    status_code=400,
+                )
+        except Exception as exc:
+            rti_fsp._log_action(f"Reconfig connection failed: {exc}", "error")
+            return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
+
     @router.get(
-        "/actions_logs",
+        "/tls-config",
+        summary="Get TLS Configuration",
+        description="Returns the current TLS configuration from runtime variables.",
+        response_description="TLS configuration from runtime",
+        responses={
+            200: {"description": "TLS configuration returned successfully"},
+            500: {"description": "Error retrieving TLS configuration"}
+        },
+        tags=["TLS"]
+    )
+    def api_get_tls_config():
+        """Get current TLS configuration from runtime.
+
+        Returns: TLS configuration from the endpoint's runtime state including:
+        - enable_tls: Whether TLS is enabled
+        - tls_version: TLS version (1.2 or 1.3)
+        - server_key: Server private key (for server mode)
+        - server_cert: Server certificate (for server mode)
+        - server_ca: CA certificate (for client mode)
+        - ws_mode: WebSocket mode (active or passive)
+        """
+        try:
+            endpoint = rti_fsp.runtime.endpoint
+            if endpoint is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "Endpoint not available"},
+                    status_code=500
+                )
+
+            # Get TLS config from runtime
+            enable_tls = False
+            tls_version = "1.2"
+            server_key = None
+            server_cert = None
+            server_ca = None
+
+            if hasattr(endpoint, '_tls_config') and endpoint._tls_config is not None:
+                tls_config = endpoint._tls_config
+                enable_tls = True
+                # Extract TLS version from config
+                if hasattr(tls_config, 'min_version'):
+                    if tls_config.min_version == ssl.TLSVersion.TLSv1_3:
+                        tls_version = "1.3"
+                    elif tls_config.min_version == ssl.TLSVersion.TLSv1_2:
+                        tls_version = "1.2"
+                if hasattr(tls_config, 'cafile'):
+                    server_ca = tls_config.cafile
+                if hasattr(tls_config, 'certfile'):
+                    server_cert = tls_config.certfile
+                if hasattr(tls_config, 'keyfile'):
+                    server_key = tls_config.keyfile
+            
+            # Get ws_mode
+            ws_mode = "active"
+            if hasattr(endpoint, 'ws_mode'):
+                ws_mode = endpoint.ws_mode
+            elif hasattr(rti_fsp.runtime, 'ws_mode'):
+                ws_mode = rti_fsp.runtime.ws_mode
+
+            return {
+                "ok": True,
+                "enable_tls": enable_tls,
+                "tls_version": tls_version,
+                "server_key": server_key,
+                "server_cert": server_cert,
+                "server_ca": server_ca,
+                "ws_mode": ws_mode
+            }
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/reconfig-oauth",
+        summary="Get Connection Info",
+        description="Returns detailed information about the current WebSocket connection, including peer address, port, and connection status.",
+        response_description="Connection details",
+        responses={
+            200: {"description": "Connection information returned successfully"},
+            500: {"description": "Error retrieving connection info"}
+        },
+        tags=["Client Status"]
+    )
+    async def api_reconfig_oauth(request: OAUTHCreateConfigRequest):
+        """Reconfigure OAuth settings. OAuth config should be provided in the request by BFF."""
+        try:
+            cp = request.cp or os.getenv("CP", "cp1")
+            host = request.host
+            oauth_port = request.port
+            
+            # Get OAuth settings from request (BFF should provide these from connections.json)
+            token_endpoint = getattr(request, 'token_endpoint_url', None) or getattr(request, 'token_endpoint', None)
+            client_id = getattr(request, 'client_id', None)
+            client_secret = getattr(request, 'client_secret', None)
+            ca_certificate = getattr(request, 'ca_certificate', None)
+            enable_token_refresh = getattr(request, 'enable_token_refresh', False)
+            
+            connection_name = request.connection_name or "unknown"
+            
+            # Validate that required OAuth settings are provided
+            if request.enable_oauth and not token_endpoint:
+                raise ValueError(f"token_endpoint is required for OAuth but was not provided in request for connection: {connection_name}")
+            
+            # When disabling OAuth, pass None to signal that OAuth should be disabled
+            # The underlying library should handle None properly
+            if not request.enable_oauth:
+                token_endpoint = None
+                client_id = None
+                client_secret = None
+                ca_certificate = None
+            
+            print("Reconfiguring OAuth with connection: ", connection_name)
+            print(f"OAuth enable: {request.enable_oauth}, token_endpoint: {token_endpoint}")
+
+            loop = rti_fsp.runtime.loop
+            if loop is None or not loop.is_running():
+                print("server not running, starting server instance")
+                rti_fsp.start_server(host, int(oauth_port))
+                loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
+
+            # When disabling OAuth, stop the endpoint first to avoid issues with ClientCredentialsProvider
+            if not request.enable_oauth:
+                print("Disabling OAuth - stopping endpoint first")
+                # Stop the current connection if it exists
+                if hasattr(rti_fsp.runtime.endpoint, '_connect_task') and rti_fsp.runtime.endpoint._connect_task is not None:
+                    stop_fut = asyncio.run_coroutine_threadsafe(
+                        rti_fsp.runtime.endpoint._cancel_task(rti_fsp.runtime.endpoint._connect_task),
+                        loop,
+                    )
+                    await asyncio.wrap_future(stop_fut)
+                print("Endpoint stopped, now reconfiguring with OAuth disabled")
+
+            # Call reconfigure_oauth with settings from connection
+            fut = asyncio.run_coroutine_threadsafe(
+                rti_fsp.runtime.endpoint.reconfigure_oauth(
+                    host=host,
+                    port=str(oauth_port),
+                    cp=cp,
+                    oauth_enable=request.enable_oauth,
+                    token_endpoint=token_endpoint,
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    kc_cert=ca_certificate,
+                    enable_token_refresh=enable_token_refresh,
+                ),
+                loop,
+            )
+            await asyncio.wrap_future(fut)
+            rti_fsp.runtime.tasks["ws"] = rti_fsp.runtime.endpoint._connect_task
+
+            return JSONResponse(
+                content={"ok": True, "status": "reconfigured", "ws_mode": "active",
+                         "enable_oauth": request.enable_oauth},
+                status_code=200,
+            )
+        except Exception as exc:
+            import traceback
+            print("Reconfig OAuth error:", exc)
+            print("Traceback:", traceback.format_exc())
+            rti_fsp._log_action(f"Reconfig OAuth failed: {exc}", "error")
+            return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
+
+    @router.get(
+        "/oauth-status",
+        summary="Get OAuth Status",
+        description="Returns whether OAuth is currently enabled or disabled for this FSP server.",
+        response_description="OAuth enable status",
+        responses={
+            200: {"description": "OAuth status returned successfully"},
+            500: {"description": "Error retrieving OAuth status"}
+        },
+        tags=["OAuth"]
+    )
+    def api_get_oauth_status():
+        """Get current OAuth enable/disable status from the FSP server.
+
+        Returns:
+            dict: {
+                "ok": True,
+                "enable_oauth": bool  # Current OAuth status
+            }
+        """
+        try:
+            # Check the runtime endpoint's OAuth enable status
+            if hasattr(rti_fsp.runtime, 'endpoint') and hasattr(rti_fsp.runtime.endpoint, '_oauth_enable'):
+                enable_oauth = rti_fsp.runtime.endpoint._oauth_enable
+                return {"ok": True, "enable_oauth": enable_oauth}
+            else:
+                # If endpoint not available or attribute not found, check if OAuth is configured
+                return {"ok": True, "enable_oauth": False}
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.get(
+        "/actions-logs",
         summary="Get Action Log",
         description="Retrieves the logged server actions for debugging and auditing purposes.",
         response_description="List of logged actions",
@@ -888,7 +1319,7 @@ def create_bff_router(
             )
 
     @router.post(
-        "/clear_logs",
+        "/clear-logs",
         summary="Clear Action Log",
         description="Clears all logged server actions.",
         response_description="Action log clear confirmation",
@@ -939,7 +1370,7 @@ def create_bff_router(
             )
 
     @router.post(
-        "/clear_messages",
+        "/clear-messages",
         summary="Clear Message Log",
         description="Clears all logged protocol messages.",
         response_description="Message log clear confirmation",
@@ -1002,7 +1433,7 @@ def create_bff_router(
             HTTPException 404: If instance not available or timeout
         """
         try:
-            obj_ref = request.obj_ref  # Fixed typo from request,object
+            obj_ref = request.objRef  # Fixed typo from request,object
             fc = request.fc
 
             if not obj_ref:
@@ -1037,16 +1468,11 @@ def create_bff_router(
                         status_code=404
                     )
 
-                if isinstance(result, dict):
-                    normalized = result
-                else:
-                    normalized = {"type": type(result).__name__, "value": result}
 
-                values = [normalized]
 
                 print(
                     f"[POST /ap/readvalue] SUCCESS objRef={obj_ref!r} "
-                    f"fc={fc!r} type={normalized.get('type')!r} value={normalized.get('value')!r}"
+                    f"fc={fc!r} type={result.get('type')!r} value={result.get('value')!r}"
                 )
 
                 rti_fsp._log_action(
@@ -1054,8 +1480,8 @@ def create_bff_router(
                     detail={
                         "objRef": obj_ref,
                         "fc": fc,
-                        "type": normalized.get("type"),
-                        "value": normalized.get("value"),
+                        "type": result.get("type"),
+                        "value": result.get("value"),
                     },
                 )
                 return {
@@ -1063,7 +1489,7 @@ def create_bff_router(
                     "success": True,
                     "objRef": obj_ref,
                     "fc": fc,
-                    "values": values,
+                    "values": result,
                 }
 
             except FuturesTimeoutError:
@@ -1135,10 +1561,10 @@ def create_bff_router(
             HTTPException 404: If write timeout occurs
         """
         try:
-            obj_ref = request.obj_ref
+            obj_ref = request.objRef
             fc = request.fc
             value = request.value
-            data_type = request.data_type
+            data_type = request.dataType
 
             if not obj_ref:
                 rti_fsp._log_action("Server writevalue rejected: missing objRef", "warn")
@@ -1273,10 +1699,18 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
         ]
     )
 
-    #resolved_factory_dir = factory_dir or Path(__file__).parent
-    resolved_factory_dir = os.getenv('MODELPATH')
+    resolved_factory_dir = os.getenv('MODELPATH') or factory_dir or Path(__file__).parent
     router, _server = create_bff_router(resolved_factory_dir)
     app.include_router(router)
+    
+    # Add CORS middleware to allow requests from frontend
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     
     # Include IO router for LED control via demo_IO
     try:

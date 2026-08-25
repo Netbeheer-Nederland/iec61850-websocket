@@ -88,6 +88,9 @@ class ACSIServer:
         #self.factory_dir = factory_dir
         #self.model_file = factory_dir / "model.py"
         self.model_file = Path(model_path)
+        # If model_path is a directory, append model.py
+        if self.model_file.is_dir():
+            self.model_file = self.model_file / "model.py"
         factory_dir = str(self.model_file.parent)
 
         # Ensure `import model` resolves to the expected fsp/model.py directory.
@@ -505,8 +508,8 @@ class ACSIServer:
             self.runtime.old_server_cp = None
 
         self._set_runtime_state(
-            endpoint=None,
-            server_cp=None,
+            #endpoint=None,
+            #server_cp=None,
             tasks={},
             status="stopped",
             error=None,
@@ -520,6 +523,14 @@ class ACSIServer:
 
         cp = self.runtime.cp or "cp1"
 
+        # ready_event is bound to whichever loop is running when it's created.
+        # Since self.runtime.server is a long-lived singleton reused across
+        # stop/start cycles, but each start_server() spins up a brand-new event
+        # loop, we must recreate ready_event here — on the loop that will
+        # actually use it — rather than relying on the one created once in
+        # IEC61850Server.__init__ (which becomes stale after the first restart).
+        self.runtime.server.ready_event = asyncio.Event()
+
         report_task = asyncio.create_task(
             self.runtime.server.periodic_report_start(), name=f"{cp}-periodic-report"
         )
@@ -531,9 +542,7 @@ class ACSIServer:
                 name="toggle-value",
             )
 
-        ws_task = asyncio.create_task(
-            self.runtime.endpoint.start(host, port, cp), name="ws-active"
-        )
+        ws_task = self.runtime.endpoint.run_in_background(host, port, cp)
         tasks["ws"] = ws_task
 
         self._set_runtime_state(
@@ -684,7 +693,7 @@ class ACSIServer:
         if server is None:
             raise RuntimeError("Server is not running")
 
-        result = self.invoke_on_runtime_loop(server.read_value(obj_ref), timeout=10)
+        result = self.invoke_on_runtime_loop(server.get_data_value_and_type(obj_ref), timeout=10)
         #result = server.read_value(obj_ref)
 
         if result is None:

@@ -9,15 +9,50 @@ from __future__ import annotations
 import logging
 import traceback
 import asyncio
+import os
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any, Dict, Optional
 from fastapi import FastAPI, APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
 
 from acsi_client import ACSIClient
 
+from ws61850.security.tls import TLSConfig
+import ssl
+import json
+
 logger = logging.getLogger(__name__)
+
+
+# ==================== Helper Functions ====================
+
+def _find_connections_file() -> str:
+    """Find the connections.json file path using the same logic as BFF server."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.exists('/app'):
+        return '/app/connections.json'
+    elif os.path.exists(os.path.join(script_dir, 'connections.json')):
+        return os.path.join(script_dir, 'connections.json')
+    else:
+        parent_dir = os.path.dirname(script_dir)
+        if os.path.exists(os.path.join(parent_dir, 'connections.json')):
+            return os.path.join(parent_dir, 'connections.json')
+        return os.path.join(script_dir, 'connections.json')
+
+
+def _load_connections_from_file() -> list:
+    """Load connections from connections.json file."""
+    connections_file = _find_connections_file()
+    if os.path.exists(connections_file):
+        try:
+            with open(connections_file, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading connections: {e}")
+    return []
+
 
 # ==================== Pydantic Models ====================
 class ConnectRequest(BaseModel):
@@ -43,6 +78,80 @@ class ModelRequest(BaseModel):
 
     Used by: POST /api/model
     """
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
+class ServerDirectoryRequest(BaseModel):
+    """Request body for getting server directory.
+
+    Used by: POST /api/server-directory
+    """
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
+class LogicalDeviceRequest(BaseModel):
+    """Request body for getting logical device directory.
+
+    Used by: POST /api/logical-device
+    """
+    ld_inst: str = Field(
+        ...,
+        description="Logical Device instance name (e.g., 'LD0')",
+        json_schema_extra={"example": "LD0"}
+    )
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
+class LogicalNodeRequest(BaseModel):
+    """Request body for getting logical node tree.
+
+    Used by: POST /api/logical-node
+    """
+    ld_inst: str = Field(
+        ...,
+        description="Logical Device instance name (e.g., 'LD0')",
+        json_schema_extra={"example": "LD0"}
+    )
+    ln_inst: str = Field(
+        ...,
+        description="Logical Node instance name (e.g., 'LLN0')",
+        json_schema_extra={"example": "LLN0"}
+    )
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"}
+    )
+
+class DataObjectRequest(BaseModel):
+    """Request body for getting data object details.
+
+    Used by: POST /api/data-object
+    """
+    ld_inst: str = Field(
+        ...,
+        description="Logical Device instance name (e.g., 'LD0')",
+        json_schema_extra={"example": "LD0"}
+    )
+    ln_inst: str = Field(
+        ...,
+        description="Logical Node instance name (e.g., 'LLN0')",
+        json_schema_extra={"example": "LLN0"}
+    )
+    do_name: str = Field(
+        ...,
+        description="Data Object name (e.g., 'Mod')",
+        json_schema_extra={"example": "Mod"}
+    )
     cp: str = Field(
         default="cp1",
         description="Communication point identifier",
@@ -202,6 +311,41 @@ class OperateRequest(BaseModel):
     })
 
 
+class TLSConnectionCreateConfigRequest(BaseModel):
+    """Request body for creating a new connection."""
+    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
+    enable_tls: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
+    tls_version: str = Field(default= "1.2", description="TLS version", json_schema_extra={"example": "1.2"})
+
+    server_key: str | None = Field(
+        default=None,
+        description="Server private key",
+        json_schema_extra={"example": "-----BEGIN PRIVATE KEY-----..."},
+    )
+    server_cert: str | None = Field(
+        default=None,
+        description="Server certificate",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+    server_ca: str | None = Field(
+        default=None,
+        description="Server CA certificate",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+
+    ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+
+class OAUTHCreateConfigRequest(BaseModel):
+    """Request body for OAuth reconfiguration."""
+    connection_name: Optional[str] = Field(default=None, description="Connection name (optional, auto-detected)", json_schema_extra={"example": "RTI-SO-01"})
+    enable_oauth: bool = Field(default=False, description="Enable OAuth authentication", json_schema_extra={"example": False})
+    ws_mode: str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+    # OAuth settings for SO (passive mode)
+    certificate_endpoint_url: Optional[str] = Field(default=None, description="OAuth Certificate endpoint URL", json_schema_extra={"example": "https://auth.example.com/certs"})
+    token_issuer_url: Optional[str] = Field(default=None, description="token issuer url", json_schema_extra={"example": "https://auth.example.com"})
+    ca_certificate: Optional[str] = Field(default=None, description="Server CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
+
+
 class WriteValueRequest(BaseModel):
     """Request body for writing a value to the connected server.
 
@@ -222,7 +366,7 @@ class WriteValueRequest(BaseModel):
         description="Value to write (will be converted to appropriate type)",
         json_schema_extra={"example": "ON"}
     )
-    value_type: Optional[str] = Field(
+    dataType: Optional[str] = Field(
         default=None,
         description="Optional value type hint for coercion",
         json_schema_extra={"example": "BOOLEAN"}
@@ -269,6 +413,16 @@ def create_fastapi_app() -> FastAPI:
     router, _client = create_bff_router(app)
     app.include_router(router)
     app.state.client = _client
+    
+    # Add CORS middleware to allow requests from frontend
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
     return app
 
 def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
@@ -285,6 +439,16 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     rti_so = ACSIClient()
 
     # ==================== Helper Functions ====================
+    def _check_websocket_connection():
+        """Verify that an active WebSocket connection exists.
+
+        Raises:
+            HTTPException 503: If no WebSocket connection is established
+        """
+        endpoint = rti_so.runtime.endpoint
+        if endpoint is None or len(endpoint.websocket_info_list) == 0:
+            raise HTTPException(status_code=503, detail="no-active-websocket-connection")
+
     def _convert_bytes_to_hex(obj: Any) -> Any:
         """Recursively convert bytes objects to hex strings for JSON serialization."""
         if isinstance(obj, bytes):
@@ -418,7 +582,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
     # ================ Background Model Build ================
     async def _abuild_full_model(cp) -> None:
-        """Build full model sequentially with progress updates."""
+        """Build full model with PARALLEL websocket calls for better performance."""
         endpoint = rti_so.runtime.endpoint
         loop = rti_so.runtime.loop
         acsi_client = rti_so.get_iec61850_client(cp)
@@ -438,10 +602,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
         if ws_info is None:
             raise RuntimeError('no-websocket-info')
-
-        logical_node_details = {}
-        logical_device_map = {}
-        logical_device_status = {}
 
         model_info = rti_so.get_model_info(cp)
 
@@ -480,15 +640,44 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     model_info.model_progress['lds_done'] += 1
                     model_info.model_progress['current_ln'] = None
 
-        async def _process_ld(ld):
-            try:
-                _set_current_ld(ld)
-                ln_list = await acsi_client.get_logical_device_directory(ld, ws_info, None, None)
-                if not isinstance(ln_list, list):
-                    raise RuntimeError('unexpected-ln-list')
+        try:
+            # Step 1: Get all LDs
+            ld_list = await acsi_client.get_server_directory(ws_info, None, None)
+            if not isinstance(ld_list, list):
+                raise RuntimeError('unexpected-server-directory')
+            
+            _init_progress(ld_list)
+            
+            # Step 2: Fetch all LD directories in PARALLEL
+            async def fetch_ld_directory(ld):
+                try:
+                    _set_current_ld(ld)
+                    ln_list = await acsi_client.get_logical_device_directory(ld, ws_info, None, None)
+                    if not isinstance(ln_list, list):
+                        raise RuntimeError('unexpected-ln-list')
+                    return {'ld': ld, 'ln_list': ln_list, 'status': 'ok'}
+                except Exception as e:
+                    logger.error(f"Failed to get directory for {ld}: {e}")
+                    return {'ld': ld, 'ln_list': [], 'status': 'error'}
+                finally:
+                    _finish_ld()
+            
+            ld_coros = [fetch_ld_directory(ld) for ld in ld_list]
+            ld_results = await asyncio.gather(*ld_coros)
+            
+            # Build maps from results
+            logical_device_map = {}
+            logical_device_status = {}
+            all_ln_tasks = []  # List of (ld, ln_inst) tuples
+            
+            for result in ld_results:
+                ld = result['ld']
+                ln_list = result['ln_list']
                 logical_device_map[ld] = ln_list
-                logical_device_status[ld] = 'ok'
+                logical_device_status[ld] = result['status']
                 _add_lns_total(len(ln_list))
+                
+                # Collect all LNs for parallel fetching
                 for ln_full in ln_list:
                     if '/' in ln_full:
                         ln_inst = ln_full.split('/')[-1]
@@ -496,30 +685,30 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         ln_inst = ln_full.split(':')[-1]
                     else:
                         ln_inst = ln_full
+                    all_ln_tasks.append((ld, ln_inst))
+            
+            # Step 3: Fetch all LN details in PARALLEL
+            async def fetch_ln_details(task):
+                ld, ln_inst = task
+                try:
                     _set_current_ln(ln_inst)
-                    try:
-                        details = await _aget_ln_details(ld, ln_inst, acsi_client, ws_info)
-                        logical_node_details[f"{ld}/{ln_inst}"] = details
-                    except Exception as e:
-                        print(f"Failed to get details for {ld}/{ln_inst}: {e}")
-                        #pass
-                    finally:
-                        _inc_ln_done()
-            except Exception as e:
-                logger.error(f"Failed to get directory for {ld}: {e}")
-
-                logical_device_map[ld] = []
-                logical_device_status[ld] = 'error'
-            finally:
-                _finish_ld()
-
-        try:
-            ld_list = await acsi_client.get_server_directory(ws_info, None, None)
-            if not isinstance(ld_list, list):
-                raise RuntimeError('unexpected-server-directory')
-            _init_progress(ld_list)
-            for ld in ld_list:
-                await _process_ld(ld)
+                    details = await _aget_ln_details(ld, ln_inst, acsi_client, ws_info)
+                    _inc_ln_done()
+                    return {'ld': ld, 'ln_inst': ln_inst, 'details': details}
+                except Exception as e:
+                    print(f"Failed to get details for {ld}/{ln_inst}: {e}")
+                    _inc_ln_done()
+                    return {'ld': ld, 'ln_inst': ln_inst, 'details': None}
+            
+            ln_coros = [fetch_ln_details(task) for task in all_ln_tasks]
+            ln_results = await asyncio.gather(*ln_coros)
+            
+            # Build logical_node_details
+            logical_node_details = {}
+            for result in ln_results:
+                if result['details']:
+                    logical_node_details[f"{result['ld']}/{result['ln_inst']}"] = result['details']
+            
             model = {
                 'server': {'logicalDevices': ld_list},
                 'logicalDeviceMap': logical_device_map,
@@ -532,7 +721,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 model_info.model_error = None
                 model_info.model_status = 'ready'
                 model_info.model_ready_event.set()
-
 
         except Exception as e:
             with rti_so.runtime.lock:
@@ -718,6 +906,274 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 status_code=500
             )
 
+    @router.post(
+        "/reconfig-connection",
+        summary="Get Connection Info",
+        description="Returns detailed information about the current WebSocket connection, including peer address, port, and connection status.",
+        response_description="Connection details",
+        responses={
+            200: {"description": "Connection information returned successfully"},
+            500: {"description": "Error retrieving connection info"}
+        },
+        tags=["Client Status"]
+    )
+    async def api_reconfig_connection(request: TLSConnectionCreateConfigRequest):
+        """Reconfigure the connection with a new communication point."""
+        try:
+            # Normalize tls_version to handle "1.2", "1.3", "TLSv1_2", "TLSv1_3" formats
+            tls_version_str = (request.tls_version or "1.3").lower()
+            if "1.2" in tls_version_str or "1_2" in tls_version_str:
+                tls_version = ssl.TLSVersion.TLSv1_2
+            else:
+                tls_version = ssl.TLSVersion.TLSv1_3
+            print("Reconfiguring connection with TLS version: ", tls_version, "(from request:", request.tls_version, ")")
+            if request.ws_mode.lower() == "passive":
+                print("Reconfiguring passive endpoint with TLS: ", request.enable_tls)
+                # Only create TLSConfig if TLS is enabled
+                tls_config = None
+                if request.enable_tls:
+                    tls_config = TLSConfig(
+                        mode="server",
+                        certfile=request.server_cert,
+                        keyfile=request.server_key,
+                        min_version=tls_version,
+                        max_version=tls_version,
+                        keylog_file=os.path.join("tlskeys.log"),
+                    )
+                print("TLS Config: ", tls_config)
+
+                # Explicitly clear the endpoint's TLS config if TLS is being disabled
+                endpoint = rti_so.runtime.endpoint
+                if endpoint is not None and not request.enable_tls:
+                    if hasattr(endpoint, '_tls_config'):
+                        endpoint._tls_config = None
+                    print("Cleared endpoint TLS config")
+
+                # Cancel existing connection task before reconnecting
+                if endpoint is not None and hasattr(endpoint, '_connect_task'):
+                    connect_task = endpoint._connect_task
+                    if connect_task and not connect_task.done():
+                        print("Cancelling endpoint's _connect_task")
+                        connect_task.cancel()
+
+                # Run on the loop that actually owns the endpoint (runtime.loop),
+                # not uvicorn's own loop — matches the pattern used by
+                # read_value/write_value/operate elsewhere in this router.
+                rti_so.invoke_on_runtime_loop(
+                    rti_so.runtime.endpoint.reconfigure_endpoint(request.enable_tls, tls_config=tls_config),
+                    timeout=30,  # stop_passive + restart can take a few seconds
+                )
+
+                if request.enable_tls:
+                    rti_so.invoke_on_runtime_loop(
+                        rti_so.runtime.endpoint._endpoint_running_event.wait(),
+                        timeout=20,
+                    )
+                    print("endpoint status is: ", rti_so.runtime.endpoint._is_endpoint_running)
+
+                return JSONResponse(
+                    content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
+                             "enable_tls": request.enable_tls},
+                    status_code=200,
+                )
+            else:
+                return JSONResponse(
+                    content={"ok": False, "error": "Only passive mode is supported for reconfiguration."},
+                    status_code=400,
+                )
+        except Exception as exc:
+            import traceback
+            print("reconfig error:", repr(exc))
+            traceback.print_exc()
+            rti_so._log_action(f"Reconfig connection failed: {exc}", "error")
+            return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
+
+    @router.get(
+        "/tls-config",
+        summary="Get TLS Configuration",
+        description="Returns the current TLS configuration from runtime variables.",
+        response_description="TLS configuration from runtime",
+        responses={
+            200: {"description": "TLS configuration returned successfully"},
+            500: {"description": "Error retrieving TLS configuration"}
+        },
+        tags=["TLS"]
+    )
+    def api_get_tls_config():
+        """Get current TLS configuration from runtime.
+
+        Returns: TLS configuration from the endpoint's runtime state including:
+        - enable_tls: Whether TLS is enabled
+        - tls_version: TLS version (1.2 or 1.3)
+        - server_key: Server private key (for server mode)
+        - server_cert: Server certificate (for server mode)
+        - server_ca: CA certificate (for client mode)
+        - ws_mode: WebSocket mode (active or passive)
+        """
+        try:
+            endpoint = rti_so.runtime.endpoint
+            if endpoint is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "Endpoint not available"},
+                    status_code=500
+                )
+
+            # Get TLS config from runtime
+            enable_tls = False
+            tls_version = "1.2"
+            server_key = None
+            server_cert = None
+            server_ca = None
+
+            if hasattr(endpoint, '_tls_config') and endpoint._tls_config is not None:
+                tls_config = endpoint._tls_config
+                enable_tls = True
+                # Extract TLS version from config
+                if hasattr(tls_config, 'min_version'):
+                    if tls_config.min_version == ssl.TLSVersion.TLSv1_3:
+                        tls_version = "1.3"
+                    elif tls_config.min_version == ssl.TLSVersion.TLSv1_2:
+                        tls_version = "1.2"
+                if hasattr(tls_config, 'cafile'):
+                    server_ca = tls_config.cafile
+                if hasattr(tls_config, 'certfile'):
+                    server_cert = tls_config.certfile
+                if hasattr(tls_config, 'keyfile'):
+                    server_key = tls_config.keyfile
+            
+            # Get ws_mode
+            ws_mode = "passive"
+            if hasattr(endpoint, 'ws_mode'):
+                ws_mode = endpoint.ws_mode
+            elif hasattr(rti_so.runtime, 'ws_mode'):
+                ws_mode = rti_so.runtime.ws_mode
+
+            return {
+                "ok": True,
+                "enable_tls": enable_tls,
+                "tls_version": tls_version,
+                "server_key": server_key,
+                "server_cert": server_cert,
+                "server_ca": server_ca,
+                "ws_mode": ws_mode
+            }
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/reconfig-oauth",
+        summary="Get Connection Info",
+        description="Returns detailed information about the current WebSocket connection, including peer address, port, and connection status.",
+        response_description="Connection details",
+        responses={
+            200: {"description": "Connection information returned successfully"},
+            500: {"description": "Error retrieving connection info"}
+        },
+        tags=["Client Status"]
+    )
+    async def api_reconfig_oauth(request: OAUTHCreateConfigRequest):
+        """Reconfigure OAuth settings. OAuth config should be provided in the request by BFF."""
+        try:
+            # Get OAuth settings from request (BFF should provide these from connections.json)
+            certificate_endpoint = getattr(request, 'certificate_endpoint_url', None) or getattr(request, 'certificate_endpoint', None)
+            token_issuer_url = getattr(request, 'token_issuer_url', None) or getattr(request, 'token_issuer', None)
+            # If we have token_endpoint but not token_issuer, extract issuer from endpoint URL
+            token_endpoint_from_req = getattr(request, 'token_endpoint', None) or getattr(request, 'token_endpoint_url', None)
+            if token_endpoint_from_req and not token_issuer_url:
+                # token_endpoint is like: https://localhost:8443/realms/iec61850-websocket/protocol/openid-connect/token
+                # token_issuer should be: https://localhost:8443/realms/iec61850-websocket
+                token_issuer_url = token_endpoint_from_req.replace('/protocol/openid-connect/token', '')
+            ca_certificate = getattr(request, 'ca_certificate', None)
+            
+            # Validate that required OAuth settings are provided
+            connection_name = request.connection_name or "unknown"
+            if request.enable_oauth and (not certificate_endpoint or not token_issuer_url):
+                raise ValueError(f"certificate_endpoint and token_issuer_url are required for OAuth but were not provided in request for connection: {connection_name}")
+            
+            # When disabling OAuth, pass None to signal that OAuth should be disabled
+            # The underlying library should handle None properly
+            if not request.enable_oauth:
+                certificate_endpoint = None
+                token_issuer_url = None
+                ca_certificate = None
+            
+            if request.ws_mode.lower() == "passive":
+                loop = rti_so.runtime.loop
+                if loop is None or not loop.is_running():
+                    raise HTTPException(status_code=503, detail="client-not-connected")
+
+                fut = asyncio.run_coroutine_threadsafe(
+                    rti_so.runtime.endpoint.reconfigure_oauth(
+                        request.enable_oauth,
+                        certificate_endpoint=certificate_endpoint,
+                        token_issuer=token_issuer_url,
+                        kc_cert=ca_certificate,
+                    ),
+                    loop,
+                )
+                await asyncio.wrap_future(fut)
+
+                if request.enable_oauth:
+                    wait_fut = asyncio.run_coroutine_threadsafe(
+                        rti_so.runtime.endpoint._endpoint_running_event.wait(), loop
+                    )
+                    await asyncio.wrap_future(wait_fut)
+                    print("endpoint status is: ", rti_so.runtime.endpoint._is_endpoint_running)
+
+                return JSONResponse(
+                    content={"ok": True, "status": "reconfigured", "ws_mode": "passive",
+                             "enable_oauth": request.enable_oauth},
+                    status_code=200,
+                )
+            else:
+                return JSONResponse(
+                    content={"ok": False, "error": "Only passive mode is supported for OAuth reconfiguration."},
+                    status_code=400,
+                )
+        except Exception as exc:
+            import traceback
+            print("reconfig oauth error:", exc)
+            print("Traceback:", traceback.format_exc())
+            rti_so._log_action(f"Reconfig OAuth failed: {exc}", "error")
+            return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
+
+    @router.get(
+        "/oauth-status",
+        summary="Get OAuth Status",
+        description="Returns whether OAuth is currently enabled or disabled for this SO client.",
+        response_description="OAuth enable status",
+        responses={
+            200: {"description": "OAuth status returned successfully"},
+            500: {"description": "Error retrieving OAuth status"}
+        },
+        tags=["OAuth"]
+    )
+    def api_get_oauth_status():
+        """Get current OAuth enable/disable status from the SO server.
+
+        Returns:
+            dict: {
+                "ok": True,
+                "enable_oauth": bool  # Current OAuth status
+            }
+        """
+        try:
+            # Check the runtime endpoint's OAuth enable status
+            if hasattr(rti_so.runtime, 'endpoint') and hasattr(rti_so.runtime.endpoint, '_oauth_enable'):
+                enable_oauth = rti_so.runtime.endpoint._oauth_enable
+                return {"ok": True, "enable_oauth": enable_oauth}
+            else:
+                # If endpoint not available or attribute not found, check if OAuth is configured
+                return {"ok": True, "enable_oauth": False}
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
     @router.get(
         "/properties",
         summary="Get Client Properties",
@@ -847,8 +1303,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         cp = request.cp
         model_info = rti_so.get_model_info(cp)
 
-
-
         if refresh:
                 with rti_so.runtime.lock:
                     model_info.model_status = 'idle'
@@ -860,6 +1314,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             loop = rti_so.runtime.loop
             if loop is None or not getattr(loop, "is_running", lambda: False)():
                 raise HTTPException(status_code=503, detail="client-not-connected")
+
+            _check_websocket_connection()
 
             with rti_so.runtime.lock:
                 model_status = model_info.model_status
@@ -880,6 +1336,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     return {"status": "ready", "model": data}
 
             return {'status': 'error', 'model': None}
+        except HTTPException:
+            raise
         except Exception as exc:
             rti_so._log_action(f"Get model failed (outer): {exc}", "error")
             logger.exception("Unhandled outer exception in api_model")
@@ -888,8 +1346,313 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 detail={"error": str(exc), "traceback": traceback.format_exc()}
             )
 
+    @router.post(
+        "/server-directory",
+        summary="Get Server Directory",
+        description="Retrieves the list of all Logical Devices from the connected IEC61850 server. This is a modular endpoint for incremental model building.",
+        response_description="Server directory with list of logical devices",
+        responses={
+            200: {"description": "Server directory returned successfully"},
+            503: {"description": "Client not connected"},
+            500: {"description": "Error retrieving server directory"}
+        },
+        tags=["Model Access"]
+    )
+    async def api_server_directory(request: ServerDirectoryRequest):
+        """Get the server directory (list of Logical Devices) from the connected server."""
+        try:
+            _check_websocket_connection()
+
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.get_server_directory_tree(cp), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "serverDirectory": result,
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/logical-device",
+        summary="Get Logical Device Directory",
+        description="Retrieves the list of all Logical Nodes for a specific Logical Device from the connected IEC61850 server. This is a modular endpoint for incremental model building.",
+        response_description="Logical Device directory with list of logical nodes",
+        responses={
+            200: {"description": "Logical Device directory returned successfully"},
+            400: {"description": "Missing ld_inst parameter"},
+            503: {"description": "Client not connected"},
+            500: {"description": "Error retrieving logical device directory"}
+        },
+        tags=["Model Access"]
+    )
+    async def api_logical_device(request: LogicalDeviceRequest):
+        """Get the Logical Node list for a specific Logical Device from the connected server."""
+        try:
+            _check_websocket_connection()
+
+            ld_inst = request.ld_inst
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            if not ld_inst:
+                return JSONResponse(
+                    content={"ok": False, "error": "ld_inst is required"},
+                    status_code=400
+                )
+
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.get_logical_device_tree(ld_inst, cp), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "logicalDevice": result,
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/logical-node",
+        summary="Get Logical Node Tree",
+        description="Retrieves the complete tree (Data Objects, Data Attributes, RCBs, DataSets) for a specific Logical Node from the connected IEC61850 server. This is a modular endpoint for incremental model building.",
+        response_description="Logical Node tree with all child elements",
+        responses={
+            200: {"description": "Logical Node tree returned successfully"},
+            400: {"description": "Missing ld_inst or ln_inst parameter"},
+            503: {"description": "Client not connected"},
+            500: {"description": "Error retrieving logical node tree"}
+        },
+        tags=["Model Access"]
+    )
+    async def api_logical_node(request: LogicalNodeRequest):
+        """Get the complete tree for a specific Logical Node from the connected server."""
+        try:
+            _check_websocket_connection()
+
+            ld_inst = request.ld_inst
+            ln_inst = request.ln_inst
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            if not ld_inst:
+                return JSONResponse(
+                    content={"ok": False, "error": "ld_inst is required"},
+                    status_code=400
+                )
+
+            if not ln_inst:
+                return JSONResponse(
+                    content={"ok": False, "error": "ln_inst is required"},
+                    status_code=400
+                )
+
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.get_logical_node_tree(ld_inst, ln_inst, cp), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "logicalNode": result,
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
+    @router.post(
+        "/data-object",
+        summary="Get Data Object Details",
+        description="Retrieves complete details for a specific Data Object including its definition and data attributes from the connected IEC61850 server. This is a modular endpoint for incremental model building.",
+        response_description="Data Object details with definition and data attributes",
+        responses={
+            200: {"description": "Data Object details returned successfully"},
+            400: {"description": "Missing ld_inst, ln_inst, or do_name parameter"},
+            503: {"description": "Client not connected"},
+            500: {"description": "Error retrieving data object details"}
+        },
+        tags=["Model Access"]
+    )
+    async def api_data_object(request: DataObjectRequest):
+        """Get the complete details for a specific Data Object from the connected server."""
+        try:
+            _check_websocket_connection()
+
+            ld_inst = request.ld_inst
+            ln_inst = request.ln_inst
+            do_name = request.do_name
+            cp = request.cp
+            acsi_client = rti_so.get_iec61850_client(cp)
+            if acsi_client is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "ACSI client not found!"},
+                    status_code=500
+                )
+
+            if not ld_inst:
+                return JSONResponse(
+                    content={"ok": False, "error": "ld_inst is required"},
+                    status_code=400
+                )
+
+            if not ln_inst:
+                return JSONResponse(
+                    content={"ok": False, "error": "ln_inst is required"},
+                    status_code=400
+                )
+
+            if not do_name:
+                return JSONResponse(
+                    content={"ok": False, "error": "do_name is required"},
+                    status_code=400
+                )
+
+            try:
+                result = rti_so.invoke_on_runtime_loop(
+                    rti_so.get_data_object_details(ld_inst, ln_inst, do_name, cp), timeout=10
+                )
+
+                if result is None:
+                    return JSONResponse(
+                        content={"ok": False, "error": "instanceNotAvailable"},
+                        status_code=404
+                    )
+
+                return {
+                    "ok": True,
+                    "success": True,
+                    "dataObject": result,
+                }
+
+            except FuturesTimeoutError:
+                return JSONResponse(
+                    content={"ok": False, "error": "read timeout"},
+                    status_code=504
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=404
+                )
+            except Exception as exc:
+                return JSONResponse(
+                    content={"ok": False, "error": str(exc)},
+                    status_code=500
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
+
     @router.get(
-        "/actions_logs",
+        "/actions-logs",
         summary="Get Action Log",
         description="Retrieves the logged client actions for debugging and auditing. Actions include connection events, model builds, and data operations.",
         response_description="List of logged actions",
@@ -944,7 +1707,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             raise HTTPException(status_code=500, detail=str(exc))
 
     @router.post(
-        "/messages/clear",
+        "/clear-messages",
         summary="Clear Message Log",
         description="Clears all logged protocol messages.",
         response_description="Clear confirmation",
@@ -999,6 +1762,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             HTTPException 404: If instance not available or timeout
         """
         try:
+            # ✅ Check WebSocket connection before attempting to read
+            _check_websocket_connection()
+
             obj_ref = request.objRef
             fc = request.fc
 
@@ -1069,6 +1835,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
+        except HTTPException:
+            raise
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
@@ -1112,6 +1880,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             HTTPException 404: If instance not available or timeout
         """
         try:
+            # ✅ Check WebSocket connection before attempting to get data definition
+            _check_websocket_connection()
+
             ld_inst = request.ld_inst
             ln_inst = request.ln_inst
             do_path = request.do_path
@@ -1138,25 +1909,12 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     rti_so.get_data_definition(obj_ref, cp), timeout=10
                 )
 
-
                 if result is None:
-                    #client._log_action(
-                    #    "Client readvalue failed: instanceNotAvailable",
-                    #    "warn",
-                    #   detail={"objRef": obj_ref, "fc": fc}
-                    #)
                     return JSONResponse(
                         content={"ok": False, "error": "instanceNotAvailable"},
                         status_code=404
                     )
 
-                #client._log_action(
-                #    "Client readvalue",
-                #    detail={
-                #       "objRef": obj_ref,
-                #        "value": result.get("value"),
-                #    },
-                #)
                 return {
                     "ok": True,
                     "success": True,
@@ -1165,23 +1923,16 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 }
 
             except FuturesTimeoutError:
-                #client._log_action(
-                #    "Client readvalue timeout",
-                #    "warn",
-                #    detail={"objRef": obj_ref},
-                #)
                 return JSONResponse(
                     content={"ok": False, "error": "read timeout"},
                     status_code=504
                 )
             except ValueError as exc:
-                #client._log_action(f"Client readvalue failed: {exc}", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=404
                 )
             except Exception as exc:
-                #client._log_action(f"Client readvalue failed: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
@@ -1210,6 +1961,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_get_brcb_values(request: ReadRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
+            # ✅ Check WebSocket connection before attempting to read BRCB
+            _check_websocket_connection()
+
             obj_ref = request.objRef
 
             cp = request.cp
@@ -1221,7 +1975,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
 
             if not obj_ref:
-                # client._log_action("Client readvalue rejected: missing objRef", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
@@ -1260,6 +2013,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
+        except HTTPException:
+            raise
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
@@ -1283,6 +2038,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_set_brcb_values(request: WriteRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
+            # ✅ Check WebSocket connection before attempting to write BRCB
+            _check_websocket_connection()
+
             obj_ref = request.objRef
 
             cp = request.cp
@@ -1357,6 +2115,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_get_urcb_values(request: ReadRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
+            # ✅ Check WebSocket connection before attempting to read URCB
+            _check_websocket_connection()
+
             obj_ref = request.objRef
 
             cp = request.cp
@@ -1368,7 +2129,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
 
             if not obj_ref:
-                # client._log_action("Client readvalue rejected: missing objRef", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
@@ -1407,6 +2167,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
+        except HTTPException:
+            raise
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
@@ -1430,6 +2192,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_set_urcb_values(request: WriteRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
+            # ✅ Check WebSocket connection before attempting to write URCB
+            _check_websocket_connection()
+
             obj_ref = request.objRef
 
             cp = request.cp
@@ -1504,6 +2269,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_get_dataset_directory(request: GetDataSetDirectory):
 
         try:
+            # ✅ Check WebSocket connection before attempting to get dataset directory
+            _check_websocket_connection()
+
             ld_inst = request.ld_inst
             ln_inst = request.ln_inst
             ds_inst = request.ds_inst
@@ -1518,11 +2286,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=500
                 )
 
-            # obj_ref = request.objRef
-            # fc = request.fc
-
             if not obj_ref:
-                # client._log_action("Client readvalue rejected: missing objRef", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
@@ -1536,23 +2300,11 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 print("get ds result: ", result)
 
                 if result is None:
-                    # client._log_action(
-                    #    "Client readvalue failed: instanceNotAvailable",
-                    #    "warn",
-                    #   detail={"objRef": obj_ref, "fc": fc}
-                    # )
                     return JSONResponse(
                         content={"ok": False, "error": "instanceNotAvailable"},
                         status_code=404
                     )
 
-                # client._log_action(
-                #    "Client readvalue",
-                #    detail={
-                #       "objRef": obj_ref,
-                #        "value": result.get("value"),
-                #    },
-                # )
                 return {
                     "ok": True,
                     "success": True,
@@ -1561,27 +2313,22 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 }
 
             except FuturesTimeoutError:
-                # client._log_action(
-                #    "Client readvalue timeout",
-                #    "warn",
-                #    detail={"objRef": obj_ref},
-                # )
                 return JSONResponse(
                     content={"ok": False, "error": "read timeout"},
                     status_code=504
                 )
             except ValueError as exc:
-                # client._log_action(f"Client readvalue failed: {exc}", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=404
                 )
             except Exception as exc:
-                # client._log_action(f"Client readvalue failed: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
+        except HTTPException:
+            raise
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
@@ -1666,10 +2413,13 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     HTTPException 500: If write operation fails
                 """
         try:
+            # ✅ Check WebSocket connection before attempting to write value
+            _check_websocket_connection()
+
             obj_ref = request.objRef
             fc = request.fc
             value = request.value
-            value_type = request.value_type
+            value_type = request.dataType
 
             cp = request.cp
             acsi_client = rti_so.get_iec61850_client(cp)
@@ -1791,6 +2541,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     HTTPException 500: If write operation fails
                 """
         try:
+            # ✅ Check WebSocket connection before attempting to operate
+            _check_websocket_connection()
+
             obj_ref = request.objRef
             value = request.value
             value_type = request.value_type
@@ -1849,6 +2602,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
+        except HTTPException:
+            raise
         except Exception as exc:
             print("entered here 2")
             return JSONResponse(

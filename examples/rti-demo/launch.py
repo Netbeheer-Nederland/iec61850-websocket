@@ -12,7 +12,6 @@ Usage:
     python launch.py bff
     python launch.py fsp
     python launch.py so
-    python launch.py frontend
     
     # Launch with custom port
     python launch.py bff --port 5005
@@ -29,7 +28,6 @@ Services:
     bff:        Backend for Frontend Server (default: port 5000)
     fsp:        RTI-FSP (default: port 5001)
     so:         RTI-SO (default: port 5002)
-    frontend:   Web-based HMI (default: port 8080)
     
     Default: Running without arguments launches all services with --foreground -v
 """
@@ -63,7 +61,6 @@ class ServiceType(Enum):
     BFF = "bff"
     FSP = "fsp"
     SO = "so"
-    FRONTEND = "frontend"
 
 
 @dataclass
@@ -135,17 +132,6 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
             "rti.port": "5002"
         }
     ),
-    ServiceType.FRONTEND: ServiceConfig(
-        name="Frontend",
-        service_type=ServiceType.FRONTEND,
-        module="",
-        entry_point="front-end/index.html",
-        default_port=8080,
-        description="Web-based Human Machine Interface",
-        docker_image="rti-demo-frontend",
-        health_check_path="/",
-        working_dir="front-end"
-    ),
 }
 
 
@@ -174,7 +160,7 @@ class RTILauncher:
             'service',
             nargs='*',
             default=[],
-            help='Service(s) to launch (bff, fsp, so, frontend, list, help). Default: all services'
+            help='Service(s) to launch (bff, fsp, so, list, help). Default: all services'
         )
         parser.add_argument(
             '--port',
@@ -272,7 +258,7 @@ class RTILauncher:
             "  python launch.py",
             "",
             "  # Launch all services explicitly",
-            "  python launch.py bff fsp so frontend",
+            "  python launch.py bff fsp so",
             "",
             "  # Launch BFF server on port 5000",
             "  python launch.py bff",
@@ -390,56 +376,6 @@ class RTILauncher:
 
         return process
 
-    def _launch_frontend(self, config: ServiceConfig, background: bool = False) -> subprocess.Popen:
-        """Launch the frontend service."""
-        frontend_dir = self.base_dir / "front-end"
-
-        if not frontend_dir.exists():
-            logger.error(f"Frontend directory not found: {frontend_dir}")
-            raise FileNotFoundError(f"Cannot find front-end directory")
-
-        port = config.default_port
-        try:
-            # Use -u for unbuffered output
-            cmd = [sys.executable, "-u", "-m", "http.server", str(port), "--directory", str(frontend_dir)]
-        except:
-            cmd = [sys.executable, "-u", "-m", "http.server", str(port)]
-
-        logger.info(f"Starting {config.name} on port {config.default_port}")
-        logger.info(f"  Command: {' '.join(cmd)}")
-
-        env = os.environ.copy()
-        env["PYTHONUNBUFFERED"] = "1"
-
-        process = subprocess.Popen(
-            cmd,
-            cwd=str(frontend_dir),
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            start_new_session=True  # Creates process group on all platforms
-        )
-
-        self.running_services[ServiceType.FRONTEND] = process
-        self.service_ports[ServiceType.FRONTEND] = config.default_port
-
-        # Start thread to prefix frontend output
-        service_name = config.name
-        def log_reader():
-            try:
-                for line in process.stdout:
-                    if line.strip():
-                        print(f"[{service_name}] {line.strip()}", flush=True)
-            except:
-                pass
-
-        reader_thread = threading.Thread(target=log_reader, daemon=True)
-        reader_thread.start()
-
-        return process
-    
     def launch_service(self, svc_type: ServiceType, port: Optional[int] = None,
                        docker: bool = False, background: bool = False) -> subprocess.Popen:
         """Launch a single service.
@@ -458,10 +394,7 @@ class RTILauncher:
         if docker:
             return self._launch_docker_service(config, background)
         else:
-            if svc_type == ServiceType.FRONTEND:
-                return self._launch_frontend(config, background)
-            else:
-                return self._launch_python_service(svc_type, config, background)
+            return self._launch_python_service(svc_type, config, background)
     
     def _launch_docker_service(self, config: ServiceConfig, background: bool) -> subprocess.Popen:
         """Launch a service in Docker."""
@@ -775,10 +708,7 @@ def main():
         print("\nAccess URLs:")
         for svc_type, port in launcher.service_ports.items():
             config = SERVICES[svc_type]
-            if svc_type == ServiceType.FRONTEND:
-                print(f"  http://localhost:{port}")
-            else:
-                print(f"  http://localhost:{port}{config.health_check_path}")
+            print(f"  http://localhost:{port}{config.health_check_path}")
         
         print("=" * 60)
         

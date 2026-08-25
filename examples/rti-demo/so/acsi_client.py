@@ -413,6 +413,138 @@ class ACSIClient:
             #"modelError": model_info.model_error,
         }
 
+    async def get_server_directory_tree(self, cp: str, ws_info: Optional[Any] = None) -> Dict[str, Any]:
+        """Get list of all Logical Devices on the server.
+        
+        Args:
+            cp: Communication point identifier
+            ws_info: Optional WebSocketInfo (auto-fetched if None)
+            
+        Returns:
+            dict: {"logicalDevices": [...], "source": "live"}
+        """
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found")
+        
+        if ws_info is None:
+            ws_info = self.runtime.endpoint.get_websocket_info(client)
+        if not ws_info:
+            raise RuntimeError('no-websocket-info')
+        
+        ld_list = await client.get_server_directory(ws_info, None, None)
+        if not isinstance(ld_list, list):
+            raise RuntimeError('unexpected-server-directory')
+        
+        return {"logicalDevices": ld_list, "source": "live"}
+
+    async def get_logical_device_tree(self, ld_inst: str, cp: str, ws_info: Optional[Any] = None) -> Dict[str, Any]:
+        """Get all Logical Nodes for a specific Logical Device.
+        
+        Args:
+            ld_inst: Logical Device instance name (e.g., "LD0")
+            cp: Communication point identifier
+            ws_info: Optional WebSocketInfo (auto-fetched if None)
+            
+        Returns:
+            dict: {"logicalDevice": str, "logicalNodes": [...], "source": "live"}
+        """
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found")
+        
+        if ws_info is None:
+            ws_info = self.runtime.endpoint.get_websocket_info(client)
+        if not ws_info:
+            raise RuntimeError('no-websocket-info')
+        
+        ln_list = await client.get_logical_device_directory(ld_inst, ws_info, None, None)
+        if not isinstance(ln_list, list):
+            raise RuntimeError('unexpected-ln-list')
+        
+        return {"logicalDevice": ld_inst, "logicalNodes": ln_list, "source": "live"}
+
+    async def get_logical_node_tree(self, ld_inst: str, ln_inst: str, cp: str, ws_info: Optional[Any] = None) -> Dict[str, Any]:
+        """Get complete tree for a specific Logical Node.
+        
+        Fetches DO, DA, BRCB, URCB, and DataSet directories in parallel.
+        
+        Args:
+            ld_inst: Logical Device instance name (e.g., "LD0")
+            ln_inst: Logical Node instance name (e.g., "LLN0")
+            cp: Communication point identifier
+            ws_info: Optional WebSocketInfo (auto-fetched if None)
+            
+        Returns:
+            dict: {"logicalNode": str, "dataObjects": [...], "dataAttributes": [...], 
+                   "reportControlBlocks": [...], "dataSets": [...], "source": "live"}
+        """
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found")
+        
+        if ws_info is None:
+            ws_info = self.runtime.endpoint.get_websocket_info(client)
+        if not ws_info:
+            raise RuntimeError('no-websocket-info')
+        
+        # Fetch all directory types in parallel
+        directory_types = ['dataObject', 'brcb', 'urcb', 'dataset']
+        
+        async def fetch_directory(directory_type):
+            try:
+                items = await client.get_logical_node_directory(ld_inst, ln_inst, directory_type, ws_info, None, None)
+                return directory_type, items if items else []
+            except Exception:
+                return directory_type, []
+        
+        dir_tasks = [fetch_directory(dt) for dt in directory_types]
+        dir_results = await asyncio.gather(*dir_tasks)
+        
+        result = {"logicalNode": f"{ld_inst}/{ln_inst}", "source": "live"}
+        for dir_type, items in dir_results:
+            result[dir_type] = items
+        
+        return result
+
+    async def get_data_object_details(self, ld_inst: str, ln_inst: str, do_name: str, cp: str, ws_info: Optional[Any] = None) -> Dict[str, Any]:
+        """Get complete details for a specific Data Object including its data attributes.
+        
+        Args:
+            ld_inst: Logical Device instance name (e.g., 'LD0')
+            ln_inst: Logical Node instance name (e.g., 'LLN0')
+            do_name: Data Object name (e.g., 'Mod')
+            cp: Communication point identifier
+            ws_info: Optional WebSocketInfo (auto-fetched if None)
+            
+        Returns:
+            dict: Data object details including data attributes
+        """
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found")
+        
+        if ws_info is None:
+            ws_info = self.runtime.endpoint.get_websocket_info(client)
+        if not ws_info:
+            raise RuntimeError('no-websocket-info')
+        
+        obj_ref = f"{ld_inst}/{ln_inst}.{do_name}"
+        
+        # Get the data definition for this data object
+        defn = await client.get_data_definition(obj_ref, ws_info, None, None)
+        
+        # Build result with the data definition
+        # The data definition typically includes: cdc, fc, type, etc.
+        result = {
+            "dataObject": do_name,
+            "objRef": obj_ref,
+            "definition": defn if isinstance(defn, dict) else {},
+            "source": "live"
+        }
+        
+        return result
+
     def get_actions(self) -> List[Dict[str, Any]]:
         """Get logged actions."""
         with self.runtime.lock:

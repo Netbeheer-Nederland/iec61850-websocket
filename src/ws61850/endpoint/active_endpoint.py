@@ -22,6 +22,7 @@ import logging
 import websockets
 import websockets.exceptions
 
+from ws61850.security.oauth import get_access_token
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
 from ws61850.endpoint.association_handler import (
     ACTION_ABORT,
@@ -36,8 +37,14 @@ from ws61850.shared.extractors import (
     retrieve_associate_id_from_decoded_msg,
     retrieve_max_outstanding_calls_from_decoded_msg,
 )
-from ws61850.security.tls import build_tls_context
+from ws61850.security.tls import build_tls_context, build_tls_context_from_strings
 from ws61850.transport.reconnect import ReconnectPolicy
+from ws61850.security.oauth2.client_credentials import ClientCredentialsProvider
+
+import tempfile
+import os
+
+import base64, json, time as _time
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +87,7 @@ class ActiveEndpoint:
             max_retries=max_retries,
             delay_seconds=retry_connection_delay,
         )
+        self._oauth_enable = oauth_enable
         self._assoc_handler = AssociationHandler(
             kc_cert=kc_cert,
             own_cert=own_cert,
@@ -87,6 +95,13 @@ class ActiveEndpoint:
             token_issuer=token_issuer,
         )
         self._router = ConnectionRouter(self.server_list, self.client_list)
+
+        # Tracks whichever connection/reconnect loop is currently running,
+        # regardless of whether it was started via run_in_background() from
+        # the initial /api/start call or from a later reconfigure_* call.
+        # This is the single source of truth so reconfigure calls can always
+        # find and cleanly cancel "whatever's running" before starting anew.
+        self._connect_task: asyncio.Task | None = None
 
     # ------------------------------------------------------------------
     # Public interface (EndpointProtocol)
@@ -126,17 +141,144 @@ class ActiveEndpoint:
             None,
         )
 
-    async def start(self, hostname: str, port: int, cp: str, *, access_token=None, protocol=None) -> None:
-        """Connect to ws[s]://hostname:port/cp, with automatic reconnection."""
+    # ------------------------------------------------------------------
+    # Background task management
+    # ------------------------------------------------------------------
+
+    async def _cancel_task(self, task: asyncio.Task | None) -> None:
+        """Cancel and await a specific task reference, if it's still running."""
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    def run_in_background(self, host: str, port: int, cp: str, *, access_token=None, protocol=None) -> asyncio.Task:
+        """Start the connect/reconnect loop as a tracked background task.
+
+        Captures whatever was previously running BEFORE scheduling the new
+        task, so the new task cancels the correct prior loop instead of
+        racing to overwrite self._connect_task before it can read it.
+        """
+        previous_task = self._connect_task
+
+        async def _runner():
+            await self._cancel_task(previous_task)
+            await self.start(host, int(port), cp, access_token=access_token, protocol=protocol)
+
+        task = asyncio.create_task(_runner(), name=f"{cp}-active-connect")
+        self._connect_task = task
+        return task
+
+    # ------------------------------------------------------------------
+    # Reconfiguration
+    # ------------------------------------------------------------------
+
+    async def reconfigure_connection(self, host, port, cp, tls_enable, tls_config=None):
+        """Reconfigure TLS settings and (re)start the connection."""
+        self._tls_config = tls_config
+        print("entering reconfigure_connection with tls_enable:", tls_enable)
+        # Always restart the connection regardless of TLS enable state
+        # run_in_background cancels any existing loop and schedules the
+        # new one — never await start() directly, it runs forever.
+        self.run_in_background(host, port, cp)
+        if tls_enable:
+            print("entered reconfigure_connection with tls_enable True, tls_config:", tls_config)
+
+
+    async def reconfigure_oauth(self, host, port, cp, oauth_enable, token_endpoint=None,
+                                client_id=None, client_secret=None, kc_cert=None,
+                                enable_token_refresh=False):
+
+        self._oauth_enable = oauth_enable
+        self._assoc_handler._kc_cert = kc_cert
+        self._assoc_handler._token_endpoint = token_endpoint
+
+        cafile = None
+        client_con_provider = None
+        access_token = None
+
+        if oauth_enable:
+            if kc_cert:
+                print(f"### DIAG kc_cert repr (first 80 chars): {kc_cert[:80]!r}")
+                cert_file = tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False)
+                cert_file.write(kc_cert)
+                cert_file.flush()
+                cert_file.close()
+                cafile = cert_file.name
+
+            client_con_provider = ClientCredentialsProvider(
+                token_url=token_endpoint, client_id=client_id,
+                client_secret=client_secret, cafile=cafile,
+            )
+            access_token = await client_con_provider.get_access_token()
+
+        if oauth_enable:
+            previous_task = self._connect_task  # capture BEFORE creating the new task
+
+            async def _run_and_cleanup():
+                try:
+                    await self._cancel_task(previous_task)
+                    if enable_token_refresh:
+                        # Provider is handed to start() — every reconnect fetches
+                        # a fresh token via the provider's own expiry-aware cache.
+                        await self.start(host, int(port), cp, credentials_provider=client_con_provider)
+                    else:
+                        # Static token — once it expires, every reconnect keeps
+                        # presenting the same dead token and will keep failing,
+                        # by design (demo mode).
+                        await self.start(host, int(port), cp, access_token=access_token)
+                finally:
+                    if cafile is not None:
+                        try:
+                            os.unlink(cafile)
+                        except FileNotFoundError:
+                            pass
+
+            task = asyncio.create_task(_run_and_cleanup(), name=f"{cp}-active-connect-oauth")
+            self._connect_task = task
+        else:
+            if cafile is not None:
+                try:
+                    os.unlink(cafile)
+                except FileNotFoundError:
+                    pass
+
+    async def start(self, hostname: str, port: int, cp: str, *,
+                    access_token: str | None = None,
+                    credentials_provider: "ClientCredentialsProvider | None" = None,
+                    protocol=None) -> None:
+        """Connect to ws[s]://hostname:port/cp, with automatic reconnection.
+
+        If credentials_provider is given, a fresh access token is fetched on
+        every connection attempt (including reconnects). Otherwise, a single
+        static access_token is reused for the lifetime of this task — once it
+        expires, reconnect attempts will keep failing with the same auth error
+        (by design, when token refresh is disabled).
+        """
         self._reconnect_policy.reset()
         first = True
         while first or self._reconnect_policy.should_reconnect():
             first = False
             try:
-                await self._connect_once(hostname, port, cp, access_token=access_token, protocol=protocol)
+                token = await credentials_provider.get_access_token() if credentials_provider else access_token
+
+                print(
+                    f"### DIAG task_id={id(asyncio.current_task())} has_provider={credentials_provider is not None} token_tail={token[-12:] if token else None}")
+                await self._connect_once(hostname, port, cp, access_token=token, protocol=protocol)
                 self._reconnect_policy.reset()
             except (ConnectionRefusedError, OSError) as e:
                 logger.warning("Connection failed cp=%r: %s", cp, e)
+                await self._on_connection_closed(cp)
+                if self._reconnect_policy.should_reconnect():
+                    await self._reconnect_policy.wait()
+                else:
+                    logger.warning("Reconnection disabled or max retries reached for cp=%r, giving up", cp)
+                    break
+            except (websockets.exceptions.InvalidMessage, EOFError) as e:
+                logger.warning("Connection failed cp=%r: protocol mismatch or server unavailable (%s)", cp,
+                               str(e).split('\n')[0])
                 await self._on_connection_closed(cp)
                 if self._reconnect_policy.should_reconnect():
                     await self._reconnect_policy.wait()
@@ -160,11 +302,15 @@ class ActiveEndpoint:
 
     async def _connect_once(self, hostname: str, port: int, cp: str, *, access_token=None, protocol=None) -> None:
         scheme = "wss" if self._tls_config else "ws"
+        print("schema in fsp active endpoint _connect_once:", scheme)
         print(f"Connecting to {scheme}://{hostname}:{port}/{cp} with protocol={protocol}")
         uri = f"{scheme}://{hostname}:{int(port)}/{cp}"
 
+        print("fsp is connecting with tls_config:", self._tls_config)
+        print("fsp is connecting to uri: ", uri)
+
         connect_kwargs = dict(
-            ssl=build_tls_context(self._tls_config) if self._tls_config else None,
+            ssl=build_tls_context_from_strings(self._tls_config) if self._tls_config else None,
             subprotocols=protocol if protocol is not None else None,
             additional_headers={"Authorization": f"Bearer {access_token}"} if access_token else None,
             compression=None,

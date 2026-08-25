@@ -861,14 +861,26 @@
     }
 
     async function writeDataValue(objRef, fc, endpoint, value, value_type, cp) {
-      console.log('[writeDataValue] Writing:', objRef, 'FC:', fc, 'Value:', value);
+      console.log('[writeDataValue] Writing:', objRef, 'FC:', fc, 'Value:', value, 'Type:', value_type);
       const endpointTarget = getDefaultTargetFromEndpoint(endpoint);
+
+      // Coerce value to the correct JS type before sending
+      let coercedValue = value;
+      if (value_type === 'boolean') {
+        coercedValue = (value === 'true' || value === true || value === 1 || value === '1');
+      } else if (value_type === 'enumerated' || value_type === 'integer' ||
+                 value_type === 'int8' || value_type === 'int16' || value_type === 'int32' || value_type === 'int64' ||
+                 value_type === 'int8u' || value_type === 'int16u' || value_type === 'int32u') {
+        coercedValue = parseInt(value, 10);
+      } else if (value_type === 'float32') {
+        coercedValue = parseFloat(value);
+      }
 
       try {
         const res = await executeApiCall(
             getApiById('write'),
             endpointTarget,
-            { objRef, fc, value, value_type, cp }
+            { objRef, fc, value: coercedValue, dataType: value_type, cp }
         );
 
         const data = res?.payload || { error: 'No response payload' };
@@ -1180,7 +1192,7 @@
                         if (data.values[0]?.data) {
                             const dataObj = data.values[0].data;
                             if (Array.isArray(dataObj) && dataObj.length === 2 && typeof dataObj[0] === 'string') {
-                                ctlModelValue = dataObj[1];
+                                ctlModelValue = dataObj[1]; // The actual value is at index 1
                             } else if (dataObj?.enumerated) {
                                 ctlModelValue = dataObj.enumerated;
                             } else if (typeof dataObj === 'object') {
@@ -1990,7 +2002,6 @@
                     daUl.appendChild(sdaLi);
                 });
                 daLi.appendChild(daUl);
-
             }
                 ul.appendChild(daLi);
             });
@@ -2171,10 +2182,6 @@
           return;
         }
 
-        item.classList.add('has-children', 'expanded');
-        toggle.textContent = '▾';
-
-        toggle.classList.remove('hidden');
         item.classList.add('has-children', 'expanded');
         toggle.textContent = '▾';
 
