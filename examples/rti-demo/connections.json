@@ -7,7 +7,7 @@
     "type": "RTI-SO",
     "auto_discovered": false,
     "created_at": "2026-07-09T09:46:19.806408",
-    "status": "connected",
+    "status": "disconnected",
     "properties_info": {
       "available": false,
       "error": "HTTPConnectionPool(host='127.0.0.1', port=5002): Max retries exceeded with url: /api/properties (Caused by NewConnectionError(\"HTTPConnection(host='127.0.0.1', port=5002): Failed to establish a new connection: [Errno 111] Connection refused\"))"
@@ -39,7 +39,7 @@
     "type": "RTI-FSP",
     "auto_discovered": false,
     "created_at": "2026-07-09T12:56:34.933320",
-    "status": "disconnected",
+    "status": "disdisconnected",
     "properties_info": {
       "available": false,
       "error": "HTTPConnectionPool(host='127.0.0.1', port=5001): Max retries exceeded with url: /api/properties (Caused by NewConnectionError(\"HTTPConnection(host='127.0.0.1', port=5001): Failed to establish a new connection: [Errno 111] Connection refused\"))"
@@ -147,5 +147,16 @@
     "created_at": "2026-08-20T17:33:37.544481",
     "endpoint": "https://localhost:8443",
     "status": "connected"
+  },
+  {
+    "id": 7,
+    "name": "Resp-FSP",
+    "host": "192.168.1.129",
+    "port": 5001,
+    "type": "RTI-FSP",
+    "acsi": "server",
+    "ws_mode": "active",
+    "auto_discovered": false,
+    "created_at": "2026-08-25T20:31:57.475366"
   }
 ]
