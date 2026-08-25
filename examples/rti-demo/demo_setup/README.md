@@ -2,6 +2,8 @@
 
 This folder contains Docker Compose configuration files for deploying the RTI demo system across multiple physical devices.
 
+> **Windows users**: Start Docker Desktop before running any docker-compose commands. The error `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine` means Docker Desktop is not running.
+
 ## Device Setup
 
 | Device | Docker Compose File | Services | Exposed Ports |
@@ -28,7 +30,7 @@ docker-compose -f docker-compose.HMI.yml up -d
 docker-compose -f docker-compose.HMI.yml down
 
 # Build + Start in one command
-docker-compose -f docker-compose.HMI.yml up -d --build --no-cache
+docker-compose -f docker-compose.HMI.yml build --no-cache && docker-compose -f docker-compose.HMI.yml up -d
 ```
 
 ### On Raspberry Pi 1 (FSP + IO Server)
@@ -45,7 +47,7 @@ docker-compose -f docker-compose.FSP.yml up -d
 docker-compose -f docker-compose.FSP.yml down
 
 # Build + Start in one command
-docker-compose -f docker-compose.FSP.yml up -d --build --no-cache
+docker-compose -f docker-compose.FSP.yml build --no-cache && docker-compose -f docker-compose.FSP.yml up -d
 ```
 
 ### On Raspberry Pi 2 (SO + IO Server)
@@ -62,7 +64,7 @@ docker-compose -f docker-compose.SO.yml up -d
 docker-compose -f docker-compose.SO.yml down
 
 # Build + Start in one command
-docker-compose -f docker-compose.SO.yml up -d --build --no-cache
+docker-compose -f docker-compose.SO.yml build --no-cache && docker-compose -f docker-compose.SO.yml up -d
 ```
 
 ---
@@ -89,7 +91,7 @@ docker-compose -f docker-compose.HMI.yml up -d
 docker-compose -f docker-compose.HMI.yml up -d --build
 
 # Start with fresh build (no cache)
-docker-compose -f docker-compose.HMI.yml up -d --build --no-cache
+docker-compose -f docker-compose.HMI.yml build --no-cache && docker-compose -f docker-compose.HMI.yml up -d
 ```
 
 ### Stop Commands
@@ -175,10 +177,10 @@ bff-server:
 
 ## Prerequisites
 
-1. **Docker** installed on all devices
+1. **Docker Desktop** (Windows) or **Docker Engine** (Linux/RPi) installed and running on all devices
 2. **Dockerfiles** exist in the correct locations:
    - `Dockerfile.bff` (in rti-demo/)
-   - `hmi/Dockerfile` (in rti-demo/hmi/) - for React HMI
+   - `hmi/Dockerfile` (in rti-demo/hmi/) - for React HMI (multi-stage: node + nginx)
    - `Dockerfile.IO` (in rti-demo/)
    - `examples/rti-demo/Dockerfile.rti-fsp` (relative to repo root)
    - `examples/rti-demo/Dockerfile.rti-so` (relative to repo root)

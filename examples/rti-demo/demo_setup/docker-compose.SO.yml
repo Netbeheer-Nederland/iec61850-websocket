@@ -1,15 +1,12 @@
-version: '3.8'
-
 services:
-  # RTI SO (ACSI-Client)
   rti-so:
     build:
-      context: ../..
+      context: ../../../
       dockerfile: examples/rti-demo/Dockerfile.rti-so
     container_name: rti-so
     ports:
       - "5002:5002"
-      - "8765:8765"  # WebSocket port
+      - "8765:8765"
     environment:
       - PORT=5002
       - PYTHONUNBUFFERED=1
@@ -28,9 +25,8 @@ services:
       - "rti.host=rti-so"
       - "rti.port=5002"
     volumes:
-      - ../so:/app/so
+      - ../../../examples/rti-demo/so:/app/so
 
-  # GPIO LED Control API (demo_IO) for SO
   demo_io:
     build:
       context: ..
@@ -66,6 +62,7 @@ services:
       - "rti.port=8000"
     volumes:
       - ../demo_IO:/app/demo_IO
+    command: ["./.venv/bin/python", "-u", "demo_IO/io_api_server/main.py"]
 
 networks:
   rti-network:

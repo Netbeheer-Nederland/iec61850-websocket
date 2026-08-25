@@ -1,10 +1,7 @@
-version: '3.8'
-
 services:
-  # RTI-FSP (ACSI-Server)
   rti-fsp:
     build:
-      context: ../..
+      context: ../../../
       dockerfile: examples/rti-demo/Dockerfile.rti-fsp
     container_name: rti-fsp
     ports:
@@ -29,11 +26,10 @@ services:
       - "rti.host=rti-fsp"
       - "rti.port=5001"
     volumes:
-      - ../fsp:/app/fsp
-      - ../models:/models
-      - ../demo_IO:/app/demo_IO
+      - ../../../examples/rti-demo/fsp:/app/fsp
+      - ../../../examples/rti-demo/models:/models
+      - ../../../examples/rti-demo/demo_IO:/app/demo_IO
 
-  # GPIO LED Control API (demo_IO)
   demo_io:
     build:
       context: ..
@@ -70,6 +66,7 @@ services:
       - "rti.port=8000"
     volumes:
       - ../demo_IO:/app/demo_IO
+    command: ["./.venv/bin/python", "-u", "demo_IO/io_api_server/main.py"]
 
 networks:
   rti-network:
