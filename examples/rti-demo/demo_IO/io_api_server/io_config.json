@@ -58,5 +58,15 @@
       "is_active_high": true
     }
   ],
-  "version": 1
+  "version": 1,
+  "acsi_server": {
+    "url": "http://localhost:5001",
+    "enabled": false
+  },
+  "mappings": {
+    "button1": {
+      "objRef": "LD0/LLN0$ST$Mod",
+      "fc": "ST"
+    }
+  }
 }

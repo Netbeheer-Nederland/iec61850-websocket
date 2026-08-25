@@ -144,6 +144,35 @@ class DeviceSetStateRequest(BaseModel):
     )
 
 
+# ==================== ACSI Integration Models ====================
+
+class ACSIMappingRequest(BaseModel):
+    """Request body for setting ACSI mapping for a device."""
+    objRef: str = Field(
+        ...,
+        description="IEC61850 object reference to map to",
+        json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
+    )
+    fc: str = Field(
+        default="ST",
+        description="Functional constraint",
+        json_schema_extra={"example": "ST"}
+    )
+
+
+class ACSIConfigRequest(BaseModel):
+    """Request body for configuring ACSI server connection."""
+    url: str = Field(
+        default="http://localhost:5001",
+        description="ACSI server URL",
+        json_schema_extra={"example": "http://localhost:5001"}
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Whether ACSI sync is enabled"
+    )
+
+
 # ==================== FastAPI Application ====================
 
 
@@ -176,6 +205,7 @@ def create_fastapi_app(io_controller: Optional[IOController] = None) -> FastAPI:
             {"name": "Device Control", "description": "Control individual IO device states"},
             {"name": "Bulk Operations", "description": "Control multiple devices at once"},
             {"name": "Device Status", "description": "Get IO controller and device status"},
+            {"name": "ACSI Integration", "description": "IEC61850 ACSI server integration"},
         ]
     )
     
@@ -866,9 +896,9 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
     
     @router.get(
         "/config",
-        summary="Get Configuration",
-        description="Get the current device configuration as JSON.",
-        response_description="Current configuration",
+        summary="Get Full Configuration",
+        description="Get the full IO configuration including devices, ACSI server settings, and mappings.",
+        response_description="Full configuration",
         responses={
             200: {"description": "Configuration returned successfully"},
             500: {"description": "Failed to get configuration"}
@@ -876,18 +906,27 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         tags=["Configuration"]
     )
     async def api_get_config(request: Request):
-        """Get the current device configuration."""
+        """Get the full IO configuration."""
         try:
             from io_config import _config_to_dict
+            from io_controller import get_acsi_config, _device_mappings as global_mappings
             
             devices_list = []
             for name, config in io_controller.configs.items():
                 devices_list.append(_config_to_dict(config))
             
+            # Get ACSI configuration
+            acsi_config = get_acsi_config()
+            acsi_dict = None
+            if acsi_config:
+                acsi_dict = {"url": acsi_config.url, "enabled": acsi_config.enabled}
+            
             return {
                 "ok": True,
                 "devices": devices_list,
-                "count": len(devices_list)
+                "device_count": len(devices_list),
+                "acsi_server": acsi_dict,
+                "mappings": dict(global_mappings)
             }
         except Exception as exc:
             logger.error(f"Get configuration failed: {exc}")
@@ -930,6 +969,344 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             logger.error(f"Reload configuration failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
     
+    @router.post(
+        "/config/update",
+        summary="Update Full Configuration",
+        description="Update the full IO configuration including devices, ACSI server settings, and mappings. "
+                    "This endpoint saves all changes to the io_config.json file.",
+        response_description="Update confirmation",
+        responses={
+            200: {"description": "Configuration updated successfully"},
+            400: {"description": "Invalid configuration"},
+            500: {"description": "Failed to update configuration"}
+        },
+        tags=["Configuration"]
+    )
+    async def api_update_full_config(request: Request):
+        """Update the full IO configuration from request body and save to file."""
+        try:
+            body = await request.json()
+            
+            # Update device configurations if provided
+            if "devices" in body:
+                from io_config import _dict_to_config
+                new_configs = body["devices"]
+                for device_dict in new_configs:
+                    config = _dict_to_config(device_dict)
+                    if config:
+                        # Add or update device
+                        if config.name in io_controller.configs:
+                            io_controller.remove_device(config.name)
+                        io_controller.add_device(config)
+            
+            # Update ACSI configuration if provided
+            if "acsi_server" in body:
+                acsi_data = body["acsi_server"]
+                from io_controller import configure_acsi, ACSIConfig
+                acsi_config = ACSIConfig(
+                    url=acsi_data.get("url", "http://localhost:5001"),
+                    enabled=acsi_data.get("enabled", False)
+                )
+                configure_acsi(acsi_config)
+            
+            # Update mappings if provided
+            if "mappings" in body:
+                from io_controller import _device_mappings as global_mappings
+                new_mappings = body["mappings"]
+                for device_name, mapping in new_mappings.items():
+                    global_mappings[device_name] = mapping
+            
+            # Save full configuration to file
+            from io_config import save_full_config, get_config_path
+            from io_controller import _acsi_config, _device_mappings as global_mappings
+            config_path = get_config_path()
+            acsi_dict = {"url": _acsi_config.url, "enabled": _acsi_config.enabled} if _acsi_config else None
+            success = save_full_config(
+                devices_config=io_controller.configs,
+                acsi_config=acsi_dict,
+                device_mappings=global_mappings,
+                path=config_path
+            )
+            
+            if not success:
+                raise HTTPException(status_code=500, detail="Failed to save configuration to file")
+            
+            # Re-initialize with updated configs
+            init_success = io_controller.initialize()
+            if not init_success:
+                raise HTTPException(status_code=500, detail="Failed to initialize devices from configuration")
+            
+            logger.info("Full IO configuration updated and saved successfully")
+            return {
+                "ok": True,
+                "message": "Full configuration updated and saved",
+                "device_count": len(io_controller.configs),
+                "devices": list(io_controller.configs.keys())
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Update full configuration failed: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    # ==================== ACSI Mappings ====================
+
+    @router.post(
+        "/acsi/mappings/{device_name}",
+        summary="Set ACSI Mapping",
+        description="Set the IEC61850 object reference mapping for an IO device. "
+                    "When the device value changes, it will be written to the ACSI server at the mapped objRef.",
+        response_description="Mapping set confirmation",
+        responses={
+            200: {"description": "Mapping set successfully"},
+            404: {"description": "Device not found"},
+            500: {"description": "Failed to set mapping"}
+        },
+        tags=["ACSI Integration"]
+    )
+    async def api_set_acsi_mapping(
+        device_name: str,
+        request: ACSIMappingRequest
+    ):
+        """Set ACSI mapping for a specific device.
+        
+        Args:
+            device_name: Name of the IO device
+            request: ACSIMappingRequest with objRef and fc
+            
+        Returns:
+            JSONResponse: {"ok": True, "device": str, "objRef": str, "fc": str}
+        """
+        from io_controller import _device_mappings as global_mappings
+        
+        # Check if device exists
+        if device_name not in io_controller.configs:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Device '{device_name}' not found"
+            )
+        
+        # Update the global device mappings
+        global_mappings[device_name] = {
+            "objRef": request.objRef,
+            "fc": request.fc
+        }
+        
+        # Persist mappings to file
+        from io_controller import _acsi_config
+        from io_config import save_full_config, get_config_path
+        config_path = get_config_path()
+        acsi_dict = {"url": _acsi_config.url, "enabled": _acsi_config.enabled} if _acsi_config else None
+        save_full_config(
+            devices_config=io_controller.configs,
+            device_mappings=global_mappings,
+            acsi_config=acsi_dict,
+            path=config_path
+        )
+        
+        logger.info(f"Set ACSI mapping: {device_name} -> {request.objRef} (fc={request.fc})")
+        return {
+            "ok": True,
+            "device": device_name,
+            "objRef": request.objRef,
+            "fc": request.fc,
+            "message": "Mapping set and saved to config file"
+        }
+
+    @router.get(
+        "/acsi/mappings",
+        summary="Get All ACSI Mappings",
+        description="Returns all device-to-ACSI mappings.",
+        response_description="All ACSI mappings",
+        responses={
+            200: {"description": "List of all ACSI mappings"}
+        },
+        tags=["ACSI Integration"]
+    )
+    async def api_get_acsi_mappings(request: Request):
+        """Get all device-to-ACSI mappings."""
+        from io_controller import _device_mappings as global_mappings
+        return {
+            "ok": True,
+            "mappings": dict(global_mappings),
+            "count": len(global_mappings)
+        }
+
+    @router.get(
+        "/acsi/mappings/{device_name}",
+        summary="Get ACSI Mapping",
+        description="Get the ACSI mapping for a specific device.",
+        response_description="ACSI mapping for device",
+        responses={
+            200: {"description": "Mapping found"},
+            404: {"description": "Device or mapping not found"}
+        },
+        tags=["ACSI Integration"]
+    )
+    async def api_get_acsi_mapping(device_name: str):
+        """Get ACSI mapping for a specific device."""
+        from io_controller import get_device_mapping
+        
+        mapping = get_device_mapping(device_name)
+        if not mapping:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No ACSI mapping found for device '{device_name}'"
+            )
+        
+        return {
+            "ok": True,
+            "device": device_name,
+            "mapping": mapping
+        }
+
+    @router.delete(
+        "/acsi/mappings/{device_name}",
+        summary="Remove ACSI Mapping",
+        description="Remove the ACSI mapping for a device.",
+        response_description="Mapping removed confirmation",
+        responses={
+            200: {"description": "Mapping removed"},
+            404: {"description": "Device or mapping not found"}
+        },
+        tags=["ACSI Integration"]
+    )
+    async def api_remove_acsi_mapping(device_name: str):
+        """Remove ACSI mapping for a specific device."""
+        from io_controller import _device_mappings as global_mappings
+        
+        if device_name not in global_mappings:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No ACSI mapping found for device '{device_name}'"
+            )
+        
+        del global_mappings[device_name]
+        logger.info(f"Removed ACSI mapping for device: {device_name}")
+        return {
+            "ok": True,
+            "device": device_name,
+            "message": "ACSI mapping removed"
+        }
+
+    @router.post(
+        "/acsi/config",
+        summary="Configure ACSI Server",
+        description="Configure the ACSI server connection for automatic device sync.",
+        response_description="ACSI configuration confirmation",
+        responses={
+            200: {"description": "ACSI server configured"},
+            500: {"description": "Failed to configure ACSI server"}
+        },
+        tags=["ACSI Integration"]
+    )
+    async def api_configure_acsi(request: ACSIConfigRequest):
+        """Configure ACSI server connection."""
+        from io_controller import configure_acsi, ACSIConfig, _acsi_config, _device_mappings
+        from io_config import save_full_config, get_config_path
+        
+        acsi_config = ACSIConfig(url=request.url, enabled=request.enabled)
+        configure_acsi(acsi_config)
+        
+        # Persist ACSI config to file along with current devices and mappings
+        acsi_dict = {"url": request.url, "enabled": request.enabled}
+        config_path = get_config_path()
+        save_full_config(
+            devices_config=io_controller.configs,
+            acsi_config=acsi_dict,
+            device_mappings=_device_mappings,
+            path=config_path
+        )
+        
+        logger.info(f"ACSI server configured: {request.url} (enabled={request.enabled})")
+        return {
+            "ok": True,
+            "url": request.url,
+            "enabled": request.enabled,
+            "message": "ACSI server configuration updated and saved to file"
+        }
+
+    @router.get(
+        "/acsi/config",
+        summary="Get ACSI Configuration",
+        description="Get the current ACSI server configuration.",
+        response_description="ACSI configuration",
+        responses={
+            200: {"description": "ACSI configuration"}
+        },
+        tags=["ACSI Integration"]
+    )
+    async def api_get_acsi_config(request: Request):
+        """Get current ACSI server configuration."""
+        from io_controller import get_acsi_config
+        
+        config = get_acsi_config()
+        if not config:
+            return {
+                "ok": True,
+                "configured": False,
+                "message": "ACSI server not configured"
+            }
+        
+        return {
+            "ok": True,
+            "configured": True,
+            "url": config.url,
+            "enabled": config.enabled
+        }
+
+    @router.post(
+        "/acsi/sync-mappings",
+        summary="Sync All ACSI Mappings",
+        description="Replace all ACSI mappings with the provided mappings.",
+        response_description="Mappings synced confirmation",
+        responses={
+            200: {"description": "Mappings synced successfully"},
+            500: {"description": "Failed to sync mappings"}
+        },
+        tags=["ACSI Integration"]
+    )
+    async def api_sync_acsi_mappings(request: Request):
+        """Replace all ACSI mappings with mappings from the request body.
+        
+        Request body should be: {"mappings": {"device_name": {"objRef": "...", "fc": "..."}, ...}}
+        """
+        from io_controller import _device_mappings as global_mappings
+        
+        try:
+            body = await request.json()
+            new_mappings = body.get("mappings", {})
+            
+            # Clear existing mappings
+            global_mappings.clear()
+            
+            # Add new mappings
+            for device_name, mapping in new_mappings.items():
+                global_mappings[device_name] = mapping
+            
+            # Persist mappings to file
+            from io_controller import _acsi_config
+            from io_config import save_full_config, get_config_path
+            config_path = get_config_path()
+            acsi_dict = {"url": _acsi_config.url, "enabled": _acsi_config.enabled} if _acsi_config else None
+            save_full_config(
+                devices_config=io_controller.configs,
+                device_mappings=global_mappings,
+                acsi_config=acsi_dict,
+                path=config_path
+            )
+            
+            logger.info(f"Synced {len(new_mappings)} ACSI mappings")
+            return {
+                "ok": True,
+                "count": len(global_mappings),
+                "mappings": new_mappings,
+                "message": "ACSI mappings synced successfully and saved to file"
+            }
+        except Exception as exc:
+            logger.error(f"Failed to sync ACSI mappings: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+
     return router
 
 

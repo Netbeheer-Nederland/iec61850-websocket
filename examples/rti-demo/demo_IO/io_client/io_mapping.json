@@ -3,12 +3,16 @@
     "led1": {
       "device_name": "led1",
       "objRef": "LD0/LPHD1.Proxy.stVal",
-      "gpio_pin": 17
-    },
-    "led2": {
-      "device_name": "led2",
-      "objRef": "LD0/LPHD1.PwrUp.stVal",
-      "gpio_pin": 17
+      "direction": "output",
+      "device_type": "led"
+    }
+  },
+  "buttons": {
+    "button1": {
+      "device_name": "button1",
+      "objRef": "LD0/LPHD1.Proxy.stVal",
+      "direction": "input",
+      "device_type": "button"
     }
   }
 }

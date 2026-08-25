@@ -331,7 +331,7 @@ def create_bff_router(
 
     # ==================== Helper Methods ====================
 
-    async def _sync_to_io_device(self, io_client, obj_ref: str, value: str):
+    async def _sync_to_io_device(io_client, obj_ref: str, value: str):
         """Background task to sync a write to IO devices. Fire-and-forget."""
         try:
             # Check if client is healthy before attempting sync
@@ -1305,16 +1305,19 @@ def create_bff_router(
                         from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
                         
                         io_client = get_io_client()
+                        logger.info(f"IO client for sync: {io_client}")
                         if io_client:
                             # Fire-and-forget: don't wait for IO sync to complete
                             # Check health and sync in background
                             asyncio.create_task(
-                                self._sync_to_io_device(io_client, obj_ref, value)
+                                _sync_to_io_device(io_client, obj_ref, value)
                             )
                         else:
-                            logger.debug("IO client not available for device sync")
-                    except Exception as import_exc:
-                        logger.debug(f"IO client not available for device sync: {import_exc}")
+                            logger.warning("IO client is None - cannot sync to device. Call /api/io/connect first.")
+                    except ImportError as e:
+                        logger.error(f"ImportError - Cannot import IO client: {e}")
+                    except Exception as e:
+                        logger.error(f"Exception in IO sync setup: {e}")
                 
                 return {
                     "ok": True,

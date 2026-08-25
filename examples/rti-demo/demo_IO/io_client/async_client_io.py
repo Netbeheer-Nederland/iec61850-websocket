@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 from typing import Any, Dict, List, Optional, Union
 
@@ -117,7 +118,9 @@ class AsyncDemoIOClient:
         api_key: Optional[str] = None,
         # httpx specific options
         follow_redirects: bool = True,
-        limits: Optional[httpx.Limits] = None
+        limits: Optional[httpx.Limits] = None,
+        # ACSI server URL for IEC61850 writes
+        acsi_base_url: Optional[str] = None
     ):
         """Initialize the async demo_IO client.
         
@@ -131,6 +134,7 @@ class AsyncDemoIOClient:
             api_key: Optional API key for authentication
             follow_redirects: Whether to follow HTTP redirects (default: True)
             limits: httpx connection limits
+            acsi_base_url: Base URL of ACSI server for IEC61850 writes (optional)
         """
         self.base_url = base_url.rstrip('/')
         self.io_base = f"{self.base_url}/api/io"
@@ -141,6 +145,9 @@ class AsyncDemoIOClient:
         self.api_key = api_key
         self.follow_redirects = follow_redirects
         self.limits = limits or httpx.Limits(max_connections=10, max_keepalive_connections=5)
+        
+        # ACSI server configuration for IEC61850 writes
+        self._acsi_base_url = acsi_base_url or os.getenv("ACSI_BASE_URL", "http://localhost:5001")
         
         # Use shared mapping manager if available, otherwise create local instance
         try:
@@ -595,6 +602,66 @@ class AsyncDemoIOClient:
     ) -> bool:
         """Handle IEC 61850 write by syncing to mapped device."""
         return await self.mapping.sync_device_from_iec61850_async(obj_ref, value, client=self)
+    
+    async def write_to_iec61850(
+        self,
+        obj_ref: str,
+        value: Any,
+        fc: str = "ST"
+    ) -> bool:
+        """Write to IEC61850 server via standard /writevalue endpoint.
+        
+        This method allows IO input devices to write to the ACSI server's IEC61850 model.
+        It makes an HTTP POST to the ACSI's /api/writevalue endpoint with no special handling.
+        
+        Args:
+            obj_ref: IEC61850 object reference to write to
+            value: Value to write (will be converted to string)
+            fc: Functional constraint (default: "ST")
+            
+        Returns:
+            bool: True if write succeeded, False otherwise
+        """
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as http_client:
+                response = await http_client.post(
+                    f"{self._acsi_base_url}/api/writevalue",
+                    json={
+                        "objRef": obj_ref,
+                        "fc": fc,
+                        "value": str(value),
+                        "dataType": ""
+                    }
+                )
+                if response.status_code == 200:
+                    logger.info(f"IEC61850 write successful: {obj_ref}={value}")
+                    return True
+                logger.error(f"IEC61850 write failed: {response.status_code} - {response.text}")
+                return False
+        except Exception as e:
+            logger.error(f"IEC61850 write error: {e}")
+            return False
+    
+    def set_acsi_base_url(self, url: str) -> None:
+        """Set the ACSI server base URL at runtime.
+        
+        This allows changing the ACSI server URL without restarting the service.
+        Input device callbacks will use this URL for IEC61850 writes.
+        
+        Args:
+            url: Base URL of the ACSI server (e.g., "http://localhost:5001")
+        """
+        self._acsi_base_url = url.rstrip('/')
+        logger.info(f"ACSI base URL updated to: {self._acsi_base_url}")
+    
+    def get_acsi_base_url(self) -> str:
+        """Get the currently configured ACSI server base URL.
+        
+        Returns:
+            str: The ACSI base URL
+        """
+        return self._acsi_base_url
     
     def get_mapping_manager(self) -> IOMappingManager:
         """Get the mapping manager instance."""

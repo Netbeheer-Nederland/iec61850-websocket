@@ -1,16 +1,16 @@
-# FSP IO Client - Device Control via demo_IO
+# ACSI IO Client - Device Control via demo_IO
 
-This directory provides the ability for FSP (RTI-FSP) to connect to and control the demo_IO service's IO device functionality.
+This directory provides the ability for ACSI to connect to and control the demo_IO service's IO device functionality.
 
 ## Overview
 
-The demo_IO service provides a REST API for controlling IO devices (LEDs, potentiometers, buttons) on a Raspberry Pi (or simulated devices for development). This integration allows FSP to:
+The demo_IO service provides a REST API for controlling IO devices (LEDs, potentiometers, buttons) on a Raspberry Pi (or simulated devices for development). This integration allows ACSI to:
 
 - Connect to a running demo_IO instance
 - Configure and manage IO devices (primarily LEDs)
 - Control individual or all devices (turn on/off, toggle)
 - Monitor device states and IO controller status
-- Expose these capabilities through FSP's BFF endpoints
+- Expose these capabilities through ACSI's BFF endpoints
 
 **Note:** The LED-specific methods in the client are convenience wrappers that use the underlying device API internally.
 
@@ -98,31 +98,33 @@ A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying 
 | POST | `/api/io/cleanup` | Clean up IO resources |
 | POST | `/api/io/mappings/add` | Add IEC 61850 to device mapping |
 
-### 3. Integration with FSP BFF
+### 3. Integration with ACSI BFF
 
-The IO router is automatically included in FSP's BFF when the `bff_endpoint.py` is imported (if the dependencies are available).
+The IO router is automatically included in ACSI's BFF when the `bff_endpoint.py` is imported (if the dependencies are available).
 
 ## Quick Start
 
 ### Option 1: Using Environment Variable (Recommended)
 
-Set the `DEMO_IO_URL` environment variable before starting FSP:
+Set the `DEMO_IO_URL` and `ACSI_BASE_URL` environment variables before starting ACSI:
 
 ```bash
 # Linux/macOS
 export DEMO_IO_URL=http://demo-io:8080
-python fsp/bff_endpoint.py
+export ACSI_BASE_URL=http://localhost:5001
+python acsi/bff_endpoint.py
 
 # Windows
 set DEMO_IO_URL=http://demo-io:8080
-python fsp/bff_endpoint.py
+set ACSI_BASE_URL=http://localhost:5001
+python acsi/bff_endpoint.py
 ```
 
-Now FSP will automatically connect to demo_IO on startup.
+Now ACSI will automatically connect to demo_IO on startup.
 
 ### Option 2: Using API Endpoints
 
-1. Start FSP normally
+1. Start ACSI normally
 2. Connect to demo_IO via API:
 
 ```bash
@@ -146,12 +148,12 @@ curl http://localhost:5001/api/io/leds/led1
 curl http://localhost:5001/api/io/leds
 ```
 
-### Option 3: Direct Client Usage in FSP Code
+### Option 3: Direct Client Usage in ACSI Code
 
 ```python
-from fsp.client_io import DemoIOClient
+from acsi.client_io import DemoIOClient
 
-# In your FSP code, create a client and use it directly
+# In your ACSI code, create a client and use it directly
 client = DemoIOClient(base_url="http://demo-io:8080")
 
 # Use the client methods
@@ -184,21 +186,21 @@ PORT=8000 python examples/rti-demo/demo_IO/main.py
 # See Dockerfile.IO in examples/rti-demo/
 ```
 
-### FSP Service
+### ACSI Service
 
-FSP runs on port 5001 by default.
+ACSI runs on port 5001 by default.
 
-**Starting FSP:**
+**Starting ACSI:**
 
 ```bash
 # With IO router enabled (default in this integration)
-python examples/rti-demo/fsp/bff_endpoint.py
+python examples/rti-demo/acsi/bff_endpoint.py
 
 # With custom port
-PORT=5005 python examples/rti-demo/fsp/bff_endpoint.py
+PORT=5005 python examples/rti-demo/acsi/bff_endpoint.py
 
 # With Docker
-# See Dockerfile.rti-fsp in examples/rti-demo/
+# See Dockerfile.rti-acsi in examples/rti-demo/
 ```
 
 ## Usage Examples
@@ -265,14 +267,15 @@ curl http://localhost:5001/api/io/connection
 version: '3.8'
 
 services:
-  rti-fsp:
+  rti-acsi:
     build:
       context: examples/rti-demo
-      dockerfile: Dockerfile.rti-fsp
+      dockerfile: Dockerfile.rti-acsi
     ports:
       - "5001:5001"
     environment:
       - DEMO_IO_URL=http://demo-io:8080
+      - ACSI_BASE_URL=http://localhost:5001
     depends_on:
       - demo-io
 
@@ -294,7 +297,7 @@ docker network create rti-network
 
 # Run services on the network
 docker run --network rti-network --name demo-io -p 8080:8080 rti-demo-io
-docker run --network rti-network --name rti-fsp -p 5001:5001 -e DEMO_IO_URL=http://demo-io:8080 rti-demo-fsp
+docker run --network rti-network --name rti-acsi -p 5001:5001 -e DEMO_IO_URL=http://demo-io:8080 -e ACSI_BASE_URL=http://localhost:5001 rti-demo-acsi
 ```
 
 ## Development
@@ -305,20 +308,20 @@ Run the test scripts:
 
 ```bash
 # Test client_io and io_router
-python examples/rti-demo/fsp/test_client_io.py
+python examples/rti-demo/acsi/test_client_io.py
 
 # Run standalone io_router tests
-python examples/rti-demo/fsp/test_io_router_standalone.py
+python examples/rti-demo/acsi/test_io_router_standalone.py
 
 # Run usage examples
-python examples/rti-demo/fsp/example_usage.py
+python examples/rti-demo/acsi/example_usage.py
 ```
 
 ### Adding New IO Functionality
 
 1. **Extend DemoIOClient**: Add new methods to `client_io.py` for additional demo_IO API calls
 2. **Add New Endpoints**: Add new routes to `io_router.py` to expose new functionality
-3. **Update BFF**: The IO router is automatically included in FSP's BFF via `bff_endpoint.py`
+3. **Update BFF**: The IO router is automatically included in ACSI's BFF via `bff_endpoint.py`
 
 ## Troubleshooting
 
@@ -339,7 +342,7 @@ python examples/rti-demo/fsp/example_usage.py
 ### Port Conflicts
 
 - demo_IO uses port 8080 by default
-- FSP uses port 5001 by default
+- ACSI uses port 5001 by default
 - Change ports using `PORT` environment variable
 
 ### GPIO Issues (on Raspberry Pi)
@@ -386,7 +389,7 @@ python examples/rti-demo/fsp/example_usage.py
 ## Files
 
 - `client_io.py` - DemoIOClient HTTP client
-- `io_router.py` - FastAPI IO router for FSP BFF
+- `io_router.py` - FastAPI IO router for ACSI BFF
 - `test_client_io.py` - Test script for client and router
 - `test_io_router_standalone.py` - Standalone router tests
 - `example_usage.py` - Usage examples

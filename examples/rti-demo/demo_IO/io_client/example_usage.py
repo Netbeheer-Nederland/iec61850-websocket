@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """
-Example usage of client_io and io_router for connecting FSP to demo_IO.
+Example usage of client_io and io_router for connecting ACSI to demo_IO.
 
 This example demonstrates how to:
-1. Use DemoIOClient directly to control LEDs from FSP
-2. Use the IO router to expose LED control endpoints through FSP's BFF
-3. Connect FSP to demo_IO for integrated LED control
+1. Use DemoIOClient directly to control LEDs from ACSI
+2. Use the IO router to expose LED control endpoints through ACSI's BFF
+3. Connect ACSI to demo_IO for integrated LED control
 """
 
 import os
 import sys
 import time
 
-# Add the fsp directory to the path
+# Add the acsi directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 def example_direct_client_usage():
-    """Example 1: Using DemoIOClient directly from FSP code."""
+    """Example 1: Using DemoIOClient directly from ACSI code."""
     print("=" * 70)
     print("Example 1: Direct DemoIOClient Usage")
     print("=" * 70)
@@ -135,9 +135,9 @@ def example_environment_config():
 
 
 def example_router_integration():
-    """Example 3: Integrating IO router with FSP's BFF."""
+    """Example 3: Integrating IO router with ACSI's BFF."""
     print("\n" + "=" * 70)
-    print("Example 3: IO Router Integration with FSP BFF")
+    print("Example 3: IO Router Integration with ACSI BFF")
     print("=" * 70)
     
     from fastapi import FastAPI
@@ -145,8 +145,8 @@ def example_router_integration():
     
     # Create FastAPI app
     app = FastAPI(
-        title="FSP with IO Control",
-        description="FSP service with integrated IO/LED control via demo_IO",
+        title="ACSI with IO Control",
+        description="ACSI service with integrated IO/LED control via demo_IO",
         version="1.0.0"
     )
     
@@ -154,8 +154,8 @@ def example_router_integration():
     io_router = create_io_router()
     app.include_router(io_router)
     
-    # Now FSP has additional endpoints:
-    print("FSP now has the following IO endpoints:")
+    # Now ACSI has additional endpoints:
+    print("ACSI now has the following IO endpoints:")
     print("  POST /api/io/connect - Connect to demo_IO service")
     print("  GET  /api/io/connection - Get connection status")
     print("  POST /api/io/disconnect - Disconnect from demo_IO")
@@ -184,7 +184,7 @@ def example_router_integration():
 
 
 def example_programmatic_connection():
-    """Example 4: Programmatically connecting to demo_IO in FSP."""
+    """Example 4: Programmatically connecting to demo_IO in ACSI."""
     print("\n" + "=" * 70)
     print("Example 4: Programmatic Connection Management")
     print("=" * 70)

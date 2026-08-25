@@ -250,6 +250,84 @@ def get_config_path() -> str:
     return get_default_config_path()
 
 
+def load_full_config(path: str = DEFAULT_CONFIG_FILE) -> Optional[Dict[str, Any]]:
+    """
+    Load full IO configuration from a JSON file, including devices, ACSI server, and mappings.
+    
+    Args:
+        path: Path to the JSON file
+        
+    Returns:
+        Full configuration dictionary or None on error
+    """
+    if not os.path.exists(path):
+        logger.warning(f"IO configuration file not found: {path}")
+        return None
+    
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in IO configuration file {path}: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to load IO configuration from {path}: {e}")
+        return None
+
+
+def save_full_config(
+    devices_config: Optional[Dict[str, DeviceConfig]] = None,
+    acsi_config: Optional[Dict[str, Any]] = None,
+    device_mappings: Optional[Dict[str, Dict[str, Any]]] = None,
+    path: str = DEFAULT_CONFIG_FILE
+) -> bool:
+    """
+    Save full IO configuration to a JSON file, including devices, ACSI server, and mappings.
+    
+    Args:
+        devices_config: Dictionary of device name to DeviceConfig objects
+        acsi_config: ACSI server configuration dict with 'url' and 'enabled' keys
+        device_mappings: Dictionary of device name to mapping dict
+        path: Path to the JSON file
+        
+    Returns:
+        True if saved successfully, False otherwise
+    """
+    try:
+        config_data: Dict[str, Any] = {}
+        
+        # Save devices
+        if devices_config:
+            devices_list = []
+            for name, config in devices_config.items():
+                devices_list.append(_config_to_dict(config))
+            config_data["devices"] = devices_list
+        
+        # Save version
+        config_data["version"] = 1
+        
+        # Save ACSI config if provided
+        if acsi_config:
+            config_data["acsi_server"] = acsi_config
+        
+        # Save mappings if provided
+        if device_mappings:
+            config_data["mappings"] = device_mappings
+        
+        # Ensure directory exists
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"Saved full IO configuration to {path}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to save full IO configuration: {e}")
+        return False
+
+
 def create_default_config() -> Dict[str, DeviceConfig]:
     """Create a default IO configuration with common devices."""
     from devices import DeviceType, DeviceDirection

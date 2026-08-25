@@ -1,10 +1,10 @@
 """
-IO Router for FSP BFF - Provides IO device control routes that proxy to demo_IO.
+IO Router for ACSI BFF - Provides IO device control routes that proxy to demo_IO.
 
 This module creates a FastAPI router that provides IO/device control endpoints
-for the FSP service, which proxy requests to a connected demo_IO instance.
+for the ACSI service, which proxy requests to a connected demo_IO instance.
 
-The IO router allows FSP to:
+The IO router allows ACSI to:
 - Expose device control endpoints to its clients (primarily LED control)
 - Proxy device control requests to demo_IO
 - Manage connection to demo_IO service
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # ==================== Pydantic Models ====================
 
 class LEDConfigRequest(BaseModel):
-    """Request body for configuring an LED via FSP IO proxy."""
+    """Request body for configuring an LED via ACSI IO proxy."""
     name: str = Field(
         ...,
         description="Unique identifier for the LED",
@@ -56,7 +56,7 @@ class LEDConfigRequest(BaseModel):
 
 
 class LEDStateRequest(BaseModel):
-    """Request body for setting LED state via FSP IO proxy."""
+    """Request body for setting LED state via ACSI IO proxy."""
     state: bool = Field(
         ...,
         description="True for ON, False for OFF",
@@ -71,9 +71,23 @@ class IOConnectionConfig(BaseModel):
         description="Base URL of the demo_IO service",
         json_schema_extra={"example": "http://demo-io:8080"}
     )
+    acsi_url: Optional[str] = Field(
+        default=None,
+        description="Optional: ACSI server URL to pass to IO server. If not provided, will be auto-detected from FSP's host.",
+        json_schema_extra={"example": "http://192.168.1.91:5001"}
+    )
 
 
 # ==================== Mapping Models ====================
+
+class ACSIConfigRequest(BaseModel):
+    """Request body for configuring ACSI server URL."""
+    base_url: str = Field(
+        ...,
+        description="Base URL of the ACSI server",
+        json_schema_extra={"example": "http://localhost:5001"}
+    )
+
 
 class IOMappingRequest(BaseModel):
     """Request body for adding/updating an IO mapping."""
@@ -92,6 +106,21 @@ class IOMappingRequest(BaseModel):
         description="IO device description",
         json_schema_extra={"example": "GGIO Indication 1"}
     )
+    direction: str = Field(
+        default="output",
+        description="Device direction: input, output, or bidirectional",
+        json_schema_extra={"example": "input"}
+    )
+    device_type: Optional[str] = Field(
+        default=None,
+        description="Device type: led, button, potentiometer, etc.",
+        json_schema_extra={"example": "button"}
+    )
+    initial_state: Optional[bool] = Field(
+        default=None,
+        description="Initial state (optional)",
+        json_schema_extra={"example": False}
+    )
 
 
 class IOMappingResponse(BaseModel):
@@ -99,6 +128,8 @@ class IOMappingResponse(BaseModel):
     device_name: str
     objRef: Optional[str] = None
     description: str = ""
+    direction: str = "output"
+    device_type: Optional[str] = None
     initial_state: bool = False
 
 
@@ -176,9 +207,17 @@ def create_io_router() -> APIRouter:
     
     # Initialize client from environment variable if explicitly set (not default)
     demo_io_url = os.getenv("DEMO_IO_URL")
+    acsi_base_url = os.getenv("ACSI_BASE_URL", "http://localhost:5001")
     if demo_io_url:
-        set_io_client(AsyncDemoIOClient(base_url=demo_io_url))
+        set_io_client(AsyncDemoIOClient(base_url=demo_io_url, acsi_base_url=acsi_base_url))
         logger.info(f"AsyncDemoIOClient auto-configured from DEMO_IO_URL: {demo_io_url}")
+    
+    # ==================== Startup Event ====================
+    
+    @router.on_event("startup")
+    async def startup_event():
+        """Register input device callbacks on startup."""
+        _register_all_input_callbacks()
     
     # ==================== Helper Functions ====================
     
@@ -201,6 +240,101 @@ def create_io_router() -> APIRouter:
             )
         
         return client
+    
+    # ==================== Input Device Callback Registration ====================
+    
+    def _register_input_callback(device_name: str, obj_ref: str, fc: str = "ST") -> bool:
+        """Register callback for a specific input device to write to IEC61850.
+        
+        When the input device value changes, it will write to the ACSI server's
+        IEC61850 model via the standard /api/writevalue endpoint.
+        
+        NOTE: This only works when io_api_server and io_client are in the same
+        Python process. For separate services, use WebSocket/SSE or polling instead.
+        
+        Args:
+            device_name: Name of the input device
+            obj_ref: IEC61850 object reference to write to
+            fc: Functional constraint (default: "ST")
+            
+        Returns:
+            bool: True if callback was registered successfully
+        """
+        import asyncio
+        from demo_IO.io_api_server.io_controller import get_io_controller
+        
+        controller = get_io_controller()
+        io_client = get_io_client()
+        if not controller or not io_client:
+            logger.warning("IO controller or client not available - input device callbacks require same-process operation")
+            return False
+        
+        device = controller.devices.get(device_name)
+        if not device:
+            logger.warning(f"Device '{device_name}' not found in local IO controller - "
+                          f"device may be in a separate io_api_server process. "
+                          f"Callback registration skipped for objRef: {obj_ref}")
+            return False
+            
+        if not hasattr(device, 'register_change_callback'):
+            logger.warning(f"Device '{device_name}' does not support change callbacks")
+            return False
+        
+        # Clear existing callbacks for this device to avoid duplicates
+        if hasattr(device, 'clear_change_callbacks'):
+            device.clear_change_callbacks()
+        
+        # Create callback that writes to IEC61850 via ACSI endpoint
+        async def io_to_iec_callback(old_value, new_value):
+            logger.info(f"Device {device_name}: {old_value} -> {new_value}, writing to {obj_ref}")
+            try:
+                success = await io_client.write_to_iec61850(obj_ref, new_value, fc)
+                if success:
+                    logger.info(f"Successfully wrote {device_name}={new_value} to {obj_ref}")
+                else:
+                    logger.warning(f"Failed to write {device_name}={new_value} to {obj_ref}")
+            except Exception as e:
+                logger.error(f"Error writing {device_name} to {obj_ref}: {e}")
+        
+        device.register_change_callback(io_to_iec_callback)
+        logger.info(f"Registered IEC61850 callback: {device_name} -> {obj_ref}")
+        return True
+    
+    def _register_all_input_callbacks():
+        """Register callbacks for all input devices with IEC61850 mappings.
+        
+        Scans all mappings and registers callbacks for devices with direction=input.
+        
+        NOTE: Callbacks only work when io_api_server and io_client are in the same
+        Python process. For separate services, you need to implement WebSocket/SSE
+        or polling for input device state changes.
+        """
+        manager = get_mapping_manager()
+        if not manager:
+            logger.warning("Mapping manager not available")
+            return
+        
+        all_mappings = manager.get_all_mappings()
+        registered_count = 0
+        skipped_count = 0
+        
+        for device_name, mapping in all_mappings.items():
+            if mapping.get("direction") == "input" and mapping.get("objRef"):
+                success = _register_input_callback(
+                    device_name,
+                    mapping["objRef"],
+                    mapping.get("fc", "ST")
+                )
+                if success:
+                    registered_count += 1
+                else:
+                    skipped_count += 1
+        
+        if registered_count > 0:
+            logger.info(f"Registered {registered_count} input device callback(s)")
+        if skipped_count > 0:
+            logger.warning(f"Skipped {skipped_count} input device callback(s) - "
+                          f"devices may be in separate io_api_server process")
     
     def _handle_io_error(func_name: str):
         """Decorator to handle demo_IO async client errors."""
@@ -246,7 +380,45 @@ def create_io_router() -> APIRouter:
             dict: Connection confirmation with health check
         """
         try:
-            client = AsyncDemoIOClient(base_url=config.base_url)
+            # Get ACSI base URL: first from request, then environment, then auto-detect
+            # This URL will be passed to IO server so it knows where to write ACSI data
+            acsi_base_url = config.acsi_url  # From request body
+            if not acsi_base_url:
+                acsi_base_url = os.getenv("ACSI_BASE_URL")  # From environment variable
+            
+            if not acsi_base_url:
+                # Auto-detect FSP's LAN IP
+                import socket
+                
+                ip_address = None
+                hostname = socket.gethostname()
+                
+                try:
+                    addr_info = socket.getaddrinfo(hostname, None)
+                    for info in addr_info:
+                        ip = info[4][0]
+                        if not ip.startswith("127.") and not ip.startswith("169.254.") and not ip.startswith("::"):
+                            if ip.startswith("192.168."):
+                                ip_address = ip
+                                break
+                    
+                    if ip_address:
+                        acsi_base_url = f"http://{ip_address}:5001"
+                    else:
+                        for info in addr_info:
+                            ip = info[4][0]
+                            if not ip.startswith("127.") and not ip.startswith("::"):
+                                ip_address = ip
+                                acsi_base_url = f"http://{ip_address}:5001"
+                                break
+                except:
+                    pass
+            
+            if not acsi_base_url:
+                acsi_base_url = "http://localhost:5001"
+            
+            logger.info(f"Using ACSI base URL for IO server: {acsi_base_url}")
+            client = AsyncDemoIOClient(base_url=config.base_url, acsi_base_url=acsi_base_url)
             
             # Test connection (async)
             if not await client.is_healthy():
@@ -257,11 +429,15 @@ def create_io_router() -> APIRouter:
             
             set_io_client(client)
             
-            logger.info(f"Connected to demo_IO at {config.base_url}")
+            # Register input callbacks after connecting
+            _register_all_input_callbacks()
+            
+            logger.info(f"Connected to demo_IO at {config.base_url} with ACSI URL: {acsi_base_url}")
             return {
                 "ok": True,
                 "message": f"Connected to demo_IO at {config.base_url}",
                 "base_url": config.base_url,
+                "acsi_base_url": acsi_base_url,
                 "healthy": True
             }
         except HTTPException:
@@ -330,6 +506,82 @@ def create_io_router() -> APIRouter:
             "ok": True,
             "message": "Disconnected from demo_IO",
             "old_base_url": old_url
+        }
+    
+    # ==================== ACSI Configuration ====================
+    
+    @router.post(
+        "/acsi-config",
+        summary="Configure ACSI Server URL",
+        description="Set the ACSI server base URL for IEC61850 writes from IO devices. "
+                    "Input device callbacks will use this URL to write to the IEC61850 server. "
+                    "Changing this URL also re-registers all input device callbacks.",
+        response_description="ACSI configuration confirmation",
+        responses={
+            200: {"description": "ACSI URL configured successfully"},
+            500: {"description": "Configuration failed - client not connected"}
+        },
+        tags=["IO Configuration"]
+    )
+    async def api_set_acsi_config(request: ACSIConfigRequest):
+        """Set the ACSI server base URL for IO→IEC61850 writes.
+        
+        When IO input devices change, they write to this ACSI URL.
+        Updating this URL also re-registers all input device callbacks.
+        
+        Request Body:
+            ACSIConfigRequest: {"base_url": "http://host:port"}
+        
+        Returns:
+            dict: {"ok": True, "base_url": str, "message": str}
+        """
+        client = get_io_client()
+        if client is None:
+            return JSONResponse(
+                content={"ok": False, "error": "demo_IO client not configured"},
+                status_code=500
+            )
+        
+        # Update ACSI URL
+        client.set_acsi_base_url(request.base_url)
+        
+        # Re-register all input callbacks with the new URL
+        _register_all_input_callbacks()
+        
+        logger.info(f"ACSI base URL set to: {request.base_url}")
+        return {
+            "ok": True,
+            "base_url": request.base_url,
+            "message": f"ACSI base URL set to {request.base_url}, input callbacks updated"
+        }
+    
+    @router.get(
+        "/acsi-config",
+        summary="Get ACSI Server URL",
+        description="Get the currently configured ACSI server base URL for IEC61850 writes.",
+        response_description="Current ACSI configuration",
+        responses={
+            200: {"description": "ACSI URL returned successfully"},
+            500: {"description": "Client not configured"}
+        },
+        tags=["IO Configuration"]
+    )
+    async def api_get_acsi_config():
+        """Get the currently configured ACSI server base URL.
+        
+        Returns:
+            dict: {"ok": True, "base_url": str}
+        """
+        client = get_io_client()
+        if client is None:
+            return JSONResponse(
+                content={"ok": False, "error": "demo_IO client not configured"},
+                status_code=500
+            )
+        
+        return {
+            "ok": True,
+            "base_url": client.get_acsi_base_url()
         }
     
     # ==================== Health and Status ====================
@@ -708,6 +960,8 @@ def create_io_router() -> APIRouter:
                 "device_name": str,        # Required - IO device identifier
                 "objRef": str,           # Optional - IEC 61850 object reference
                 "description": str,      # Optional - IO device description
+                "direction": str,        # Optional - Device direction (input/output/bidirectional), default: output
+                "device_type": str,      # Optional - Device type (led, button, potentiometer, etc.)
                 "initial_state": bool    # Optional - Initial state
             }
         
@@ -720,7 +974,9 @@ def create_io_router() -> APIRouter:
                 device_name=request.device_name,
                 obj_ref=request.objRef,
                 description=request.description,
-                initial_state=request.initial_state
+                initial_state=request.initial_state,
+                direction=request.direction,
+                device_type=request.device_type
             )
             manager.save()
             
@@ -761,6 +1017,8 @@ def create_io_router() -> APIRouter:
                     device_name=device_name,
                     objRef=config.get("objRef"),
                     description=config.get("description", ""),
+                    direction=config.get("direction", "output"),
+                    device_type=config.get("device_type"),
                     initial_state=config.get("initial_state", False)
                 )
             
@@ -1019,6 +1277,177 @@ def create_io_router() -> APIRouter:
             }
         except Exception as exc:
             logger.error(f"Failed to list objRefs: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    # ==================== ACSI Server Sync ====================
+
+    @router.post(
+        "/acsi/sync-to-server",
+        summary="Sync Mappings to IO Server",
+        description="Send all IO device mappings to the IO server so it can write to ACSI. "
+                    "This allows the IO server to automatically write input device changes to ACSI.",
+        response_description="Sync confirmation",
+        responses={
+            200: {"description": "Mappings synced successfully"},
+            500: {"description": "Failed to sync mappings"}
+        },
+        tags=["ACSI Integration"]
+    )
+    async def api_sync_mappings_to_server(request: Request):
+        """Sync all IO device mappings to the IO server.
+        
+        This endpoint sends all mappings from the io_client to the io_server,
+        so the io_server knows which ACSI objRefs to write to when input devices change.
+        
+        Returns:
+            dict: Sync confirmation with count of mappings sent
+        """
+        try:
+            manager = get_mapping_manager()
+            io_client = get_io_client()
+            
+            if not io_client:
+                raise HTTPException(
+                    status_code=500,
+                    detail="IO client not configured. Connect to IO server first."
+                )
+            
+            all_mappings = manager.get_all_mappings()
+            
+            # Build the mappings dict for the IO server
+            # IO server expects: {"mappings": {"device_name": {"objRef": "...", "fc": "..."}, ...}}
+            server_mappings = {}
+            for device_name, mapping in all_mappings.items():
+                # Only include mappings that have an objRef
+                if mapping.get("objRef"):
+                    server_mappings[device_name] = {
+                        "objRef": mapping["objRef"],
+                        "fc": mapping.get("fc", "ST")
+                    }
+            
+            if not server_mappings:
+                logger.warning("No mappings with objRef found to sync to IO server")
+                return {
+                    "ok": True,
+                    "message": "No mappings with objRef to sync",
+                    "count": 0
+                }
+            
+            # Send mappings to IO server
+            try:
+                response = await io_client._request(
+                    "POST",
+                    "/acsi/sync-mappings",
+                    json={"mappings": server_mappings}
+                )
+                
+                if response.get("ok"):
+                    logger.info(f"Synced {len(server_mappings)} mappings to IO server")
+                    return {
+                        "ok": True,
+                        "message": "Mappings synced to IO server",
+                        "count": len(server_mappings),
+                        "mappings_sent": len(server_mappings)
+                    }
+                else:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"IO server rejected mappings: {response}"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to send mappings to IO server: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to sync mappings to IO server: {e}"
+                )
+                
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Failed to sync mappings to server: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+    
+    @router.post(
+        "/acsi/enable-server-sync",
+        summary="Enable ACSI Sync on IO Server",
+        description="Configure and enable ACSI server sync on the IO server.",
+        response_description="Enable confirmation",
+        responses={
+            200: {"description": "ACSI sync enabled successfully"},
+            500: {"description": "Failed to enable ACSI sync"}
+        },
+        tags=["ACSI Integration"]
+    )
+    async def api_enable_acsi_server_sync(request: Request):
+        """Enable ACSI server sync on the IO server.
+        
+        This configures the IO server with the ACSI server URL and enables
+        automatic syncing of input device changes to ACSI.
+        
+        Returns:
+            dict: Enable confirmation
+        """
+        try:
+            io_client = get_io_client()
+            
+            if not io_client:
+                raise HTTPException(
+                    status_code=500,
+                    detail="IO client not configured. Connect to IO server first."
+                )
+            
+            # Get the ACSI base URL from the io_client's configuration
+            acsi_url = getattr(io_client, '_acsi_base_url', 'http://localhost:5001')
+            
+            # Configure ACSI on the IO server
+            try:
+                response = await io_client._request(
+                    "POST",
+                    "/acsi/config",
+                    json={"url": acsi_url, "enabled": True}
+                )
+                
+                if response.get("ok"):
+                    # Now sync all mappings
+                    manager = get_mapping_manager()
+                    all_mappings = manager.get_all_mappings()
+                    server_mappings = {}
+                    for device_name, mapping in all_mappings.items():
+                        if mapping.get("objRef"):
+                            server_mappings[device_name] = {
+                                "objRef": mapping["objRef"],
+                                "fc": mapping.get("fc", "ST")
+                            }
+                    
+                    if server_mappings:
+                        await io_client._request(
+                            "POST",
+                            "/acsi/sync-mappings",
+                            json={"mappings": server_mappings}
+                        )
+                        logger.info(f"Enabled ACSI sync on IO server and synced {len(server_mappings)} mappings")
+                    
+                    return {
+                        "ok": True,
+                        "message": "ACSI sync enabled on IO server",
+                        "acsi_url": acsi_url
+                    }
+                else:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"IO server rejected ACSI config: {response}"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to enable ACSI sync on IO server: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to enable ACSI sync: {e}"
+                )
+                
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Failed to enable ACSI sync: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
     
     return router

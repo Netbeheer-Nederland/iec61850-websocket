@@ -273,8 +273,18 @@ class InputDevice(IODevice):
         """Register a callback to be called when the input value changes."""
         self._change_callbacks.append(callback)
     
+    def clear_change_callbacks(self) -> None:
+        """Clear all registered change callbacks."""
+        self._change_callbacks = []
+        logger.debug(f"Cleared all change callbacks for {self.config.name}")
+    
     def _notify_change(self, old_value: Any, new_value: Any) -> None:
         """Notify all registered callbacks of a value change."""
+        # Sync to ACSI server if mapping exists
+        from io_controller import sync_device_to_acsi
+        sync_device_to_acsi(self.config.name, new_value)
+        
+        # Notify registered callbacks
         for callback in self._change_callbacks:
             try:
                 callback(old_value, new_value)

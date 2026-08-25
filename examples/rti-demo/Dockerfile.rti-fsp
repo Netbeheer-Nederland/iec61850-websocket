@@ -26,6 +26,8 @@ COPY examples/rti-demo/pyproject.toml examples/rti-demo/uv.lock /app/
 
 # Copy FSP modules
 COPY examples/rti-demo/fsp/ /app/fsp/
+# Copy demo_IO modules (needed for IO client sync)
+COPY examples/rti-demo/demo_IO/ /app/demo_IO/
 
 # Install dependencies from uv.lock (ONLY once, AFTER pyproject.toml is copied)
 RUN uv sync --frozen --no-dev

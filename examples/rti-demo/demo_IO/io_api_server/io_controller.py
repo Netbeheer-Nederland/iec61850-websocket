@@ -33,23 +33,42 @@ Usage:
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
-from devices import (
-    DeviceConfig,
-    DeviceFactory,
-    DeviceType,
-    DeviceDirection,
-    IODevice,
-    LEDConfig,
-    PotentiometerConfig,
-    ButtonConfig,
-    DigitalDeviceConfig,
-    PWMConfig,
-    validate_device_config,
-    RASPBERRY_PI_VALID_GPIO,
-)
+# Handle both relative and absolute imports
+try:
+    from .devices import (
+        DeviceConfig,
+        DeviceFactory,
+        DeviceType,
+        DeviceDirection,
+        IODevice,
+        LEDConfig,
+        PotentiometerConfig,
+        ButtonConfig,
+        DigitalDeviceConfig,
+        PWMConfig,
+        validate_device_config,
+        RASPBERRY_PI_VALID_GPIO,
+    )
+except ImportError:
+    # Fallback to absolute import when running as standalone
+    from devices import (
+        DeviceConfig,
+        DeviceFactory,
+        DeviceType,
+        DeviceDirection,
+        IODevice,
+        LEDConfig,
+        PotentiometerConfig,
+        ButtonConfig,
+        DigitalDeviceConfig,
+        PWMConfig,
+        validate_device_config,
+        RASPBERRY_PI_VALID_GPIO,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -555,3 +574,187 @@ class IOController:
         self.devices.clear()
         self._initialized = False
         logger.info("Cleared all device configurations")
+
+
+# ==================== ACSI Server Integration ====================
+
+
+class ACSIConfig:
+    """Configuration for ACSI server connection."""
+    
+    def __init__(self, url: str = "http://localhost:5001", enabled: bool = False):
+        self.url = url
+        self.enabled = enabled
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {"url": self.url, "enabled": self.enabled}
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ACSIConfig":
+        return cls(
+            url=data.get("url", "http://localhost:5001"),
+            enabled=data.get("enabled", False)
+        )
+
+
+# Global ACSI configuration
+_acsi_config: Optional[ACSIConfig] = None
+_device_mappings: Dict[str, Dict[str, Any]] = {}  # device_name -> {"objRef": ..., "fc": ...}
+
+
+def configure_acsi(acsi_config: ACSIConfig, device_mappings: Optional[Dict[str, Dict[str, Any]]] = None) -> None:
+    """Configure ACSI server connection and device mappings.
+    
+    Args:
+        acsi_config: ACSI server configuration
+        device_mappings: Optional dict mapping device names to {"objRef": ..., "fc": ...}
+    """
+    global _acsi_config, _device_mappings
+    _acsi_config = acsi_config
+    if device_mappings:
+        _device_mappings = device_mappings
+    logger.info(f"ACSI server configured: {acsi_config.url} (enabled={acsi_config.enabled})")
+    if device_mappings:
+        logger.info(f"Loaded {len(device_mappings)} device mappings for ACSI")
+
+
+def get_acsi_config() -> Optional[ACSIConfig]:
+    """Get the current ACSI configuration."""
+    return _acsi_config
+
+
+def get_device_mapping(device_name: str) -> Optional[Dict[str, Any]]:
+    """Get the ACSI mapping for a device."""
+    return _device_mappings.get(device_name)
+
+
+async def write_to_acsi_async(obj_ref: str, value: Any, fc: str = "ST") -> bool:
+    """Write a value to the ACSI server via HTTP POST (async version).
+    
+    Args:
+        obj_ref: IEC61850 object reference
+        value: Value to write
+        fc: Functional constraint
+        
+    Returns:
+        True if write succeeded, False otherwise
+    """
+    if not _acsi_config or not _acsi_config.enabled:
+        logger.debug("ACSI server not configured or disabled, skipping write")
+        return False
+    
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5.0) as http_client:
+            response = await http_client.post(
+                f"{_acsi_config.url}/api/writevalue",
+                json={
+                    "objRef": obj_ref,
+                    "fc": fc,
+                    "value": str(value),
+                    "dataType": ""
+                }
+            )
+            if response.status_code == 200:
+                logger.info(f"ACSI write successful: {obj_ref}={value}")
+                return True
+            logger.error(f"ACSI write failed: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        logger.error(f"ACSI write error: {e}")
+        return False
+
+
+def write_to_acsi(obj_ref: str, value: Any, fc: str = "ST") -> bool:
+    """Write a value to the ACSI server via HTTP POST (synchronous version).
+    
+    Args:
+        obj_ref: IEC61850 object reference
+        value: Value to write
+        fc: Functional constraint
+        
+    Returns:
+        True if write succeeded, False otherwise
+    """
+    if not _acsi_config or not _acsi_config.enabled:
+        logger.debug("ACSI server not configured or disabled, skipping write")
+        return False
+    
+    try:
+        import httpx
+        with httpx.Client(timeout=5.0) as http_client:
+            response = http_client.post(
+                f"{_acsi_config.url}/api/writevalue",
+                json={
+                    "objRef": obj_ref,
+                    "fc": fc,
+                    "value": str(value),
+                    "dataType": ""
+                }
+            )
+            if response.status_code == 200:
+                logger.info(f"ACSI write successful: {obj_ref}={value}")
+                return True
+            logger.error(f"ACSI write failed: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        logger.error(f"ACSI write error: {e}")
+        return False
+
+
+def sync_device_to_acsi(device_name: str, value: Any) -> bool:
+    """Sync an IO device change to ACSI server if mapping exists (synchronous version).
+    
+    Args:
+        device_name: Name of the IO device that changed
+        value: New value of the device
+        
+    Returns:
+        True if sync succeeded, False otherwise
+    """
+    mapping = get_device_mapping(device_name)
+    if not mapping:
+        return False
+    
+    obj_ref = mapping.get("objRef")
+    fc = mapping.get("fc", "ST")
+    
+    if not obj_ref:
+        return False
+    
+    return write_to_acsi(obj_ref, value, fc)
+
+
+async def sync_device_to_acsi_async(device_name: str, value: Any) -> bool:
+    """Sync an IO device change to ACSI server if mapping exists (async version).
+    
+    Args:
+        device_name: Name of the IO device that changed
+        value: New value of the device
+        
+    Returns:
+        True if sync succeeded, False otherwise
+    """
+    mapping = get_device_mapping(device_name)
+    if not mapping:
+        return False
+    
+    obj_ref = mapping.get("objRef")
+    fc = mapping.get("fc", "ST")
+    
+    if not obj_ref:
+        return False
+    
+    return await write_to_acsi_async(obj_ref, value, fc)
+
+
+# Global IOController instance
+_io_controller: Optional[IOController] = None
+
+
+def get_io_controller() -> Optional[IOController]:
+    """Get the global IOController instance, creating it if necessary."""
+    global _io_controller
+    if _io_controller is None:
+        _io_controller = IOController()
+    return _io_controller

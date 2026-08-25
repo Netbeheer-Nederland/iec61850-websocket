@@ -23,13 +23,15 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI
 
-from io_controller import IOController
+from io_controller import IOController, configure_acsi, ACSIConfig
 from devices import LEDConfig, PotentiometerConfig, ButtonConfig, DeviceType
 
 from api_endpoint import create_fastapi_app
@@ -40,6 +42,40 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def load_acsi_config(config_path: Path) -> Optional[ACSIConfig]:
+    """Load ACSI configuration from JSON config file."""
+    if not config_path.exists():
+        return None
+    
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        acsi_data = data.get("acsi_server", {})
+        if acsi_data:
+            return ACSIConfig.from_dict(acsi_data)
+    except Exception as e:
+        logger.warning(f"Failed to load ACSI config from {config_path}: {e}")
+    
+    return None
+
+
+def load_device_mappings(config_path: Path) -> Optional[Dict[str, Dict[str, Any]]]:
+    """Load device mappings from JSON config file."""
+    if not config_path.exists():
+        return None
+    
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        return data.get("mappings", {})
+    except Exception as e:
+        logger.warning(f"Failed to load device mappings from {config_path}: {e}")
+    
+    return None
 
 
 def create_app() -> FastAPI:
@@ -59,8 +95,25 @@ def create_app() -> FastAPI:
     # Create IO controller
     io_controller = IOController()
     
+    # Get config file path
+    config_path = Path(__file__).parent / "io_config.json"
+    
     # Try to load configuration from io_config.json
-    config_loaded = io_controller.load_config()
+    config_loaded = io_controller.load_config(str(config_path))
+    
+    # Load and configure ACSI server integration
+    acsi_config = load_acsi_config(config_path)
+    device_mappings = load_device_mappings(config_path)
+    if acsi_config and (device_mappings or acsi_config.enabled):
+        configure_acsi(acsi_config, device_mappings)
+        if acsi_config.enabled:
+            logger.info(f"ACSI server integration enabled: {acsi_config.url}")
+            if device_mappings:
+                logger.info(f"Loaded {len(device_mappings)} device-to-ACSI mappings")
+        else:
+            logger.info("ACSI server integration configured but disabled")
+    else:
+        logger.debug("ACSI server integration not configured")
     
     if config_loaded:
         logger.info("Loaded IO configuration from io_config.json")
