@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { executeApiCall, buildTargetValue } from '../services/apiService';
 
 /**
@@ -17,20 +17,23 @@ import { executeApiCall, buildTargetValue } from '../services/apiService';
  * @param {Object} props.settings - BFF settings with bffHost and bffPort
  * @param {string} props.cp - The control point/access point identifier
  */
-function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
+function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'cp1' }) {
   // State for selections
   const [selectedTarget, setSelectedTarget] = useState('');
   const [selectedLD, setSelectedLD] = useState('');
   const [selectedLN, setSelectedLN] = useState('');
   const [selectedDO, setSelectedDO] = useState('');
-  const [selectedDA, setSelectedDA] = useState('');
   const [selectedFC, setSelectedFC] = useState('');
   
   // State for available options (populated from model)
   const [availableLDs, setAvailableLDs] = useState([]);
   const [availableLNs, setAvailableLNs] = useState([]);
   const [availableDOs, setAvailableDOs] = useState([]);
-  const [availableDAs, setAvailableDAs] = useState([]);
+
+  // State for complex structures
+  const [doChildren, setDoChildren] = useState([]);
+  const [attributePath, setAttributePath] = useState([]);
+  const dataDefinitionCacheRef= useRef({});
   
   // State for data operations
   const [readResult, setReadResult] = useState(null);
@@ -38,14 +41,116 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
   const [writeValue, setWriteValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
-  // Local cache for fetched DAs (DO reference -> array of DA names)
-  const [daCache, setDaCache] = useState({});
+
+  const [modelFetched, setModelFetched] = useState(false);
+  const [fetchingModel, setFetchingModel] = useState(false);
+
+  // Recursively parse a nested structure DA
+  const buildSdaNode = (sda, parentRef, fc) => {
+    const name = sda.cmpName || sda.name || 'SDA';
+    const ref = `${parentRef}.${name}`;
+    const bType = Array.isArray(sda.cmpType) ? sda.cmpType[0] : (sda.bType || '');
+    const nestedSda = Array.isArray(sda.cmpType) && sda.cmpType[0] === 'structure' && Array.isArray(sda.cmpType[1])
+      ? sda.cmpType[1] : [];
+    return { name, type: 'SDA', ref, fc, bType, children: nestedSda.map(c => buildSdaNode(c, ref, fc))};
+  };
+
+  // Parse a DA
+  const buildDaNode = (da, parentRef) => {
+    const name = da.name || da.daRef?.split('.').pop() || 'DA';
+    const ref = `${parentRef}.${name}`;
+    const fc = da.fc || da.Fc || da.FC || '';
+    const bType = Array.isArray(da.daType) ? da.daType[0] : (da.bType || '');
+    const nestedSda = Array.isArray(da.daType) && da.daType[0] === 'structure' && Array.isArray(da.daType[1])
+      ? da.daType[1] : (da.subDataAttributes || da.sub_attributes || da.sda || []);
+    return { name, type: 'DA', ref, fc, bType, children: nestedSda.map(c => buildSdaNode(c, ref, fc)) };
+  };
+
+  // Parse an SDO
+  const buildSdoNode = (sdo, parentRef) => {
+    const name = sdo.name || 'SDO';
+    const ref = `${parentRef}.${name}`;
+    const inlineDas = sdo.dataAttributes || sdo.data_attributes || [];
+    const children = inlineDas.length > 0 ? inlineDas.map(da => buildDaNode(da, ref)) : null;
+    return {name, type: 'SDO', ref, cdc: sdo.cdc || '', fc: null, bType: null, children  };
+  };
+
+  // Top-level children of a DO
+  const buildDoChildren = (parentRef, definitionValue) => {
+    const dataAttributes = definitionValue?.dataAttributeDefinition || [];
+    const subDataObjects = definitionValue?.subDataDefinition || [];
+    return [
+        ...dataAttributes.map(da => buildDaNode(da, parentRef)),
+        ...subDataObjects.map(sdo => buildSdoNode(sdo, parentRef)),
+    ];
+  };
+
+  //fetchDAsForDO but return the whole value object
+  const extractDataDefinitionValue = (payload) => {
+    if (payload.result?.value?.dataAttributeDefinition || payload.result?.value?.subDataDefinition) return payload.result.value;
+    if (payload.value?.dataAttributeDefinition || payload.value?.subDataDefinition) return payload.value;
+    if (payload.dataAttributeDefinition || payload.subDataDefinition) return payload;
+    if (payload.result?.dataAttributeDefintion || payload.result?.sudDataDefinition) return payload.result;
+    if (payload.data?.dataAttributeDefinition || payload.data?.subDataDefinition) return payload.data;
+    return payload.result?.value || payload.value || payload.result || payload;
+  };
+
+  // Walk a path of selected names down the tree to find the node at that depth
+  const findNodeAtPath = (nodes, path) => {
+    let currentNodes = nodes, node = null;
+    for (const name of path) {
+      node = currentNodes.find(n => n.name === name);
+      if (!node) return null;
+      currentNodes = node.children || [];
+    }
+    return node;
+  };
+
+  const setChildrenAtPath = (nodes, path, newChildren) => {
+    if (path.length === 0) return nodes;
+    const [name, ...rest] = path;
+    return nodes.map(n => {
+      if (n.name !== name) return n;
+      if (rest.length === 0) return { ...n, children: newChildren };
+      return { ...n, children: setChildrenAtPath(n.children || [], rest, newChildren) };
+    });
+  };
+
+  // FC helper
+  const WRITABLE_FCS = ['CF', 'SP'];
+  const isWritableFc =(fc) => WRITABLE_FCS.includes((fc || '').toUpperCase());
 
   // Get connected endpoints
   const connectedEndpoints = useMemo(() => {
     return connections.filter(conn => conn.status === 'connected');
   }, [connections]);
+
+  // Currently selected connection object
+  const selectedConnection = useMemo (() => {
+    return connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
+  }, [connectedEndpoints, selectedTarget]);
+
+  // Derive ACSI role from the connection type
+  const getAcsiRole = (conn) => {
+    if (!conn) return null;
+    if (conn.acsi === 'client' || conn.acsi === 'server') return conn.acsi;
+    const t = (conn.type || '').toUpperCase();
+    if (t.includes('SO')) return 'client';
+    if (t.includes('FSP')) return 'server';
+    return null;
+  };
+
+  // FSP endpoints have no write restriction; SO endpoints only allows CF/SP
+  const isServerEndpoint = useMemo(() => {
+    return getAcsiRole(selectedConnection) === 'server';
+  }, [selectedConnection]);
+
+  // Effective writable check
+  const canWriteFc = useCallback((fc) => {
+    if (isServerEndpoint) return true;
+    return isWritableFc(fc);
+  }, [isServerEndpoint]);
+
 
   // Extract hierarchy from model data
   const extractHierarchyFromModel = useCallback((modelData) => {
@@ -397,6 +502,92 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
     });
   }, []);
 
+  const parsePythonDictString = useCallback((pythonStr) => {
+    if (!pythonStr || typeof pythonStr !== 'string') return pythonStr;
+    try {
+      const jsonStr = pythonStr
+          .replace(/'/g, '"')
+          .replace(/True/g, 'true')
+          .replace(/False/g, 'false')
+          .replace(/None/g, 'null')
+          .replace(/""+/g, '"');
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      return pythonStr;
+    }
+  }, []);
+
+  const handleFetchModel = useCallback(async () => {
+    if (!selectedTarget || !selectedConnection || !updateModel) return;
+
+    setFetchingModel(true);
+    setError(null);
+
+    try {
+      const effectiveCp = selectedConnection?.cp || cp || 'cp1';
+
+      if (getAcsiRole(selectedConnection) === 'client') {
+        // ACSI Client endpoint = same call as ACSIClient.jsx's loadClientTree
+        const result = await executeApiCall('model-tree', selectedTarget, {cp: effectiveCp});
+        if (result?.ok) {
+          updateModel(selectedTarget, result.payload);
+          const hierarchy = extractHierarchyFromModel(result.payload);
+          setAvailableLDs(hierarchy.lds);
+          setSelectedLD(''); setSelectedLN(''); setSelectedDO('');
+          setDoChildren([]); setAttributePath([]);
+          setModelFetched(true);
+        } else {
+          setError(result?.payload?.error || result?.rawText || 'Failed to fetch model');
+        }
+      } else {
+        // ACSI Server endpoint - same normalization as ACSIServer.jsx's loadServerModel
+        const result = await executeApiCall('model', selectedTarget, {});
+        if (result?.ok) {
+          let modelData = result.payload;
+
+          if (modelData?.result?.model) modelData = modelData.result.model;
+          else if (modelData?.model) modelData = modelData.model;
+
+          if (modelData?.tree) modelData = modelData.tree;
+
+          if (typeof modelData === 'string') {
+            try {
+              modelData = JSON.parse(modelData);
+            } catch (e) {
+              modelData = parsePythonDictString(modelData);
+            }
+          }
+
+          if (modelData === result.payload && modelData?.result) modelData = modelData.result;
+
+          if (modelData?.accessPoints && !modelData.children && !modelData.ieds && !modelData.kind) {
+            modelData = {
+              iedName: modelData.iedName || selectedConnection.name || 'Server',
+              accessPoints: modelData.accessPoints.map(apName => ({ name: apName, ldevices: [] })),
+            };
+          }
+
+          if (modelData && Object.keys(modelData).length > 0) {
+            updateModel(selectedTarget, modelData);
+            const hierarchy = extractHierarchyFromModel(modelData);
+            setAvailableLDs(hierarchy.lds);
+            setSelectedLD(''); setSelectedLN(''); setSelectedDO('');
+            setDoChildren([]); setAttributePath([]);
+            setModelFetched(true);
+          } else {
+            setError('No model data found in response');
+          }
+        } else {
+          setError(result?.payload?.error || result?.rawText || 'Failed to fetch model');
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setFetchingModel(false);
+    }
+  }, [selectedTarget, selectedConnection, cp, updateModel, extractHierarchyFromModel, parsePythonDictString]);
+
   // Populate dropdowns when endpoint or parent selection changes
   useEffect(() => {
     const updateDropdowns = () => {
@@ -404,22 +595,25 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
         setAvailableLDs([]);
         setAvailableLNs([]);
         setAvailableDOs([]);
-        setAvailableDAs([]);
+        setDoChildren([]);
+        setAttributePath([])
+        setModelFetched(false);
         return;
       }
       
       // Get model for this endpoint
       const modelData = getModel ? getModel(selectedTarget) : null;
-      
+      setModelFetched(!!modelData);
+
       const hierarchy = extractHierarchyFromModel(modelData);
-      
       setAvailableLDs(hierarchy.lds);
       
       // Reset selections when endpoint changes
       setSelectedLD('');
       setSelectedLN('');
       setSelectedDO('');
-      setSelectedDA('');
+      setDoChildren([]);
+      setAttributePath([]);
     };
     
     updateDropdowns();
@@ -431,7 +625,8 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
       setAvailableLNs([]);
       setSelectedLN('');
       setSelectedDO('');
-      setSelectedDA('');
+      setDoChildren([]);
+      setAttributePath([]);
       return;
     }
     
@@ -446,7 +641,8 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
     if (!selectedLN || !selectedLD || !selectedTarget) {
       setAvailableDOs([]);
       setSelectedDO('');
-      setSelectedDA('');
+      setDoChildren([]);
+      setAttributePath([]);
       return;
     }
     
@@ -460,231 +656,102 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
   // Update DA dropdown when DO changes
   useEffect(() => {
     if (!selectedDO || !selectedLN || !selectedLD || !selectedTarget) {
-      setAvailableDAs([]);
-      setSelectedDA('');
-      setSelectedFC('');
+      setDoChildren([]);
+      setAttributePath([]);
       return;
     }
     
     const doRef = `${selectedLD}/${selectedLN}.${selectedDO}`;
-    const modelData = getModel ? getModel(selectedTarget) : null;
-    const hierarchy = extractHierarchyFromModel(modelData);
-    
-    // Check hierarchy first (from model tree structure)
-    const cachedDas = hierarchy.das[doRef] || [];
-    if (cachedDas.length > 0) {
-      setAvailableDAs(cachedDas);
+    setAttributePath([]);
+
+    if (dataDefinitionCacheRef.current[doRef]) {
+      setDoChildren(dataDefinitionCacheRef.current[doRef]);
       return;
     }
-    
-    // Check local DA cache
-    if (daCache[doRef]) {
-      setAvailableDAs(daCache[doRef].map(d => d.name));
-      return;
-    }
-    
-    // Otherwise, fetch DA definition from API
-    const fetchDAsForDO = async () => {
+
+    const fetchDoDefinition = async () => {
       try {
-        // Extract path components for API call
-        const ldName = selectedLD;
-        const lnName = selectedLN;
-        const doPath = selectedDO;
-        
-        // Try to get cp from the selected connection, fall back to prop or default
         const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
         const effectiveCp = selectedConnection?.cp || cp || 'cp1';
-        
-        // Use the standard BFF execute endpoint - it will add method, path, target automatically
+
         const result = await executeApiCall('data-definition', selectedTarget, {
           cp: effectiveCp,
-          ld_inst: ldName,
-          ln_inst: lnName,
-          do_path: doPath,
+          ld_inst: selectedLD,
+          ln_inst: selectedLN,
+          do_path: selectedDO,
         });
-        
+
         if (result?.ok && result.payload) {
-          // Extract DAs from various possible response structures
-          let dataAttributes = [];
-          
-          // Debug logging
-          console.log('[DataAccessPanel] DA definition API response:', result.payload);
-          console.log('[DataAccessPanel] Full result:', result);
-          
-          // Try different paths for dataAttributeDefinition
-          const payload = result.payload;
-          
-          // Path 1: payload.result.value.dataAttributeDefinition
-          if (payload.result?.value?.dataAttributeDefinition) {
-            dataAttributes = payload.result.value.dataAttributeDefinition;
-          }
-          // Path 2: payload.value.dataAttributeDefinition
-          else if (payload.value?.dataAttributeDefinition) {
-            dataAttributes = payload.value.dataAttributeDefinition;
-          }
-          // Path 3: payload.dataAttributeDefinition (direct at payload level)
-          else if (payload.dataAttributeDefinition) {
-            dataAttributes = payload.dataAttributeDefinition;
-          }
-          // Path 4: payload.result.dataAttributeDefinition
-          else if (payload.result?.dataAttributeDefinition) {
-            dataAttributes = payload.result.dataAttributeDefinition;
-          }
-          // Path 5: payload.data (sometimes the data is wrapped in a data field)
-          else if (payload.data?.dataAttributeDefinition) {
-            dataAttributes = payload.data.dataAttributeDefinition;
-          }
-          // Path 6: payload.value is an array of DA objects
-          else if (Array.isArray(payload.value)) {
-            dataAttributes = payload.value;
-          }
-          // Path 7: payload is an array of DA objects
-          else if (Array.isArray(payload)) {
-            dataAttributes = payload;
-          }
-          // Path 8: Check if payload.value has a different structure
-          else if (payload.value && typeof payload.value === 'object' && !Array.isArray(payload.value)) {
-            // Maybe the DAs are in a different field
-            dataAttributes = payload.value.dataAttributes || 
-                           payload.value.daList || 
-                           payload.value.das || 
-                           payload.value.attributes || [];
-          }
-          // Path 9: Check payload.result.value as array
-          else if (Array.isArray(payload.result?.value)) {
-            dataAttributes = payload.result.value;
-          }
-          
-          console.log('[DataAccessPanel] Extracted dataAttributes:', dataAttributes);
-          
-          // Extract DA names and types
-          const das = dataAttributes.map(da => {
-            if (typeof da === 'string') return { name: da, daType: null };
-            if (typeof da === 'object' && da !== null) {
-              const daName = da.name || da.daRef?.split('.').pop() || da.id || 'DA';
-              const daType = Array.isArray(da.daType) ? da.daType[0] : da.daType;
-              return { name: daName, daType: daType || null };
-            }
-            return { name: 'DA', daType: null };
-          });
-          
-          console.log('[DataAccessPanel] Extracted DAs:', das);
-          
-          // Cache the DAs locally with type information
-          setDaCache(prev => ({ ...prev, [doRef]: das }));
-          setAvailableDAs(das.map(d => d.name));
+          const value = extractDataDefinitionValue(result.payload);
+          const children = buildDoChildren(doRef, value);
+          dataDefinitionCacheRef.current[doRef] = children;
+          setDoChildren(children);
         } else {
-          console.log('[DataAccessPanel] API call failed or no payload');
-          setAvailableDAs([]);
+          setDoChildren([]);
         }
       } catch (error) {
-        setAvailableDAs([]);
+        setDoChildren([]);
       }
     };
-    
-    fetchDAsForDO();
-  }, [selectedDO, selectedLN, selectedLD, selectedTarget, getModel, extractHierarchyFromModel, cp, connectedEndpoints, daCache]);
 
-  // Update FC when DA changes
+    fetchDoDefinition();
+  }, [selectedDO, selectedLN, selectedLD, selectedTarget, cp, connectedEndpoints]);
+
+  const selectedNode = useMemo(() => {
+    if (!attributePath.length) return null;
+    return findNodeAtPath(doChildren, attributePath);
+  }, [doChildren, attributePath]);
+
+  // If the currently selected node is an SDO whose children haven't been fetched yet, fetch them
   useEffect(() => {
-    if (!selectedDA || !selectedDO || !selectedLN || !selectedLD || !selectedTarget) {
-      setSelectedFC('');
-      return;
-    }
-    
-    const modelData = getModel ? getModel(selectedTarget) : null;
-    if (!modelData) {
-      setSelectedFC('');
-      return;
-    }
-    
-    // Try to find the DA node in the model and extract its fc
-    const fc = findNodeFC(modelData, selectedLD, selectedLN, selectedDO, selectedDA);
-    setSelectedFC(fc || '');
-  }, [selectedDA, selectedDO, selectedLN, selectedLD, selectedTarget, getModel]);
+    if (!selectedNode || selectedNode.type !== 'SDO' || selectedNode.children !== null) return;
 
-  // Helper to find the fc of a specific DA in the model tree
-  const findNodeFC = useCallback((modelData, ldName, lnName, doName, daName) => {
-    if (!modelData) return null;
-    
-    try {
-      let data = modelData;
-      
-      // Normalize to the actual model object
-      if (data?.result?.model) {
-        data = data.result.model;
-      } else if (data?.model) {
-        data = data.model;
-      } else if (data?.tree) {
-        data = data.tree;
-      }
-      
-      // Handle tree structure with children
-      if (data?.children) {
-        // Find the LD
-        const ldNode = data.children?.find(n => (n.name === ldName) || (n.kind === 'LD' && n.name === ldName));
-        if (ldNode) {
-          // Find the LN under LD
-          const lnNode = ldNode.children?.find(n => n.name === lnName);
-          if (lnNode) {
-            // Find the DO under LN
-            const doNode = lnNode.children?.find(n => n.name === doName);
-            if (doNode) {
-              // Find the DA under DO
-              const daNode = doNode.children?.find(n => n.name === daName);
-              if (daNode) {
-                return daNode.fc || daNode.Fc || daNode.FC || '';
-              }
-            }
-          }
-        }
-        
-        // Also try if the root is the IED/Server directly
-        if (data.name === ldName || data.kind === 'IED') {
-          const lnNode = data.children?.find(n => n.name === lnName);
-          if (lnNode) {
-            const doNode = lnNode.children?.find(n => n.name === doName);
-            if (doNode) {
-              const daNode = doNode.children?.find(n => n.name === daName);
-              if (daNode) {
-                return daNode.fc || daNode.Fc || daNode.FC || '';
-              }
-            }
-          }
-        }
-      }
-      
-      // Handle server.logicalDevices structure
-      if (data?.server?.logicalDevices) {
-        const ld = data.server.logicalDevices.find(ld => ld.name === ldName || ld === ldName);
-        if (ld) {
-          const ldNameActual = typeof ld === 'object' ? ld.name : ld;
-          const logicalDeviceMap = data.logicalDeviceMap || {};
-          const logicalNodeDetails = data.logicalNodeDetails || {};
-          const lns = logicalDeviceMap[ldNameActual] || [];
-          const ln = lns.find(ln => ln.name === lnName || ln === lnName);
-          if (ln) {
-            const lnNameActual = typeof ln === 'object' ? ln.name : ln;
-            const lnRef = `${ldNameActual}/${lnNameActual}`;
-            const details = logicalNodeDetails[lnRef] || {};
-            const dos = details.dataObjects || ln.dataObjects || ln.do || [];
-            const doObj = dos.find(doItem => doItem.name === doName || doItem === doName);
-            if (doObj) {
-              const das = doObj.dataAttributes || doObj.data_attributes || doObj.da || [];
-              const daObj = das.find(daItem => daItem.name === daName || daItem === daName);
-              if (daObj) {
-                return daObj.fc || daObj.Fc || daObj.FC || '';
-              }
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to find node FC:', e);
-      return null;
+    const doPath = [selectedDO, ...attributePath].join('.');
+    const definitionPath = `${selectedLD}/${selectedLN}.${doPath}`;
+
+    if (dataDefinitionCacheRef.current[definitionPath]) {
+      setDoChildren(prev => setChildrenAtPath(prev, attributePath, dataDefinitionCacheRef.current[definitionPath]));
+      return;
     }
-    
-    return null;
+
+    const fetchSdoDefinition = async () => {
+      try {
+        const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
+        const effectiveCp = selectedConnection?.cp || cp || 'cp1';
+
+        const result = await executeApiCall('data-definition', selectedTarget, {
+          cp: effectiveCp,
+          ld_inst: selectedLD,
+          ln_inst: selectedLN,
+          do_path: doPath,
+        });
+
+        if (result?.ok && result.payload) {
+          const value = extractDataDefinitionValue(result.payload);
+          const children = buildDoChildren(selectedNode.ref, value);
+          dataDefinitionCacheRef.current[definitionPath] = children;
+          setDoChildren(prev => setChildrenAtPath(prev, attributePath, children));
+        } else {
+          setDoChildren(prev => setChildrenAtPath(prev, attributePath, []));
+        }
+      } catch (error) {
+        setDoChildren(prev => setChildrenAtPath(prev, attributePath, []));
+      }
+    };
+
+    fetchSdoDefinition();
+  }, [selectedNode, attributePath, selectedLD, selectedLN, selectedDO, selectedTarget, cp, connectedEndpoints]);
+
+  useEffect(() => {
+    setSelectedFC(selectedNode?.fc ? String(selectedNode.fc).toUpperCase() : '');
+  }, [selectedNode]);
+
+  const handleAttributeLevelSelect = useCallback((depth, name) => {
+    setAttributePath(prev => {
+      const next = prev.slice(0, depth);
+      if (name) next.push(name);
+      return next;
+    });
   }, []);
 
   // Format values for display
@@ -716,11 +783,11 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
 
   // Build object reference from selections
   const buildObjectRef = useCallback(() => {
-    if (!selectedLD || !selectedLN || !selectedDO || !selectedDA) {
-      return '';
-    }
-    return `${selectedLD}/${selectedLN}.${selectedDO}.${selectedDA}`;
-  }, [selectedLD, selectedLN, selectedDO, selectedDA]);
+    if (!selectedLD || !selectedLN || !selectedDO || !selectedNode) return '';
+    if (selectedNode.type !== 'DA' && selectedNode.type !== 'SDA') return '';
+    if (selectedNode.children && selectedNode.children.length > 0) return '';
+    return selectedNode.ref;
+  }, [selectedLD, selectedLN, selectedDO, selectedNode]);
 
   // Handle read operation
   const handleRead = useCallback(async () => {
@@ -745,7 +812,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
       const effectiveCp = selectedConnection?.cp || cp || 'cp1';
      
       // Add cp to body for ACSI client endpoints
-      const isAcsiClient = selectedConnection?.acsi === 'client';
+      const isAcsiClient = getAcsiRole(selectedConnection) === 'client';
       const body = {
         objRef: objRef,
         fc: selectedFC.toLowerCase() || 'st'
@@ -774,6 +841,11 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
       setError('Please select an endpoint first');
       return;
     }
+
+    if (!canWriteFc(selectedFC)) {
+      setError(`Writing not allowed for FC "${selectedFC || 'unknown'}". Only CF and SP are writable.`);
+      return;
+    }
     
     const objRef = buildObjectRef();
     if (!objRef) {
@@ -796,12 +868,12 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
       const effectiveCp = selectedConnection?.cp || cp || 'cp1';
       
       // Add cp to body for ACSI client endpoints
-      const isAcsiClient = selectedConnection?.acsi === 'client';
+      const isAcsiClient = getAcsiRole(selectedConnection) === 'client';
       
       // Get the daType for the selected DA
-      const doRef = `${selectedLD}/${selectedLN}.${selectedDO}`;
-      const daInfo = daCache[doRef]?.find(da => da.name === selectedDA);
-      const valueType = daInfo?.daType;
+      //const doRef = `${selectedLD}/${selectedLN}.${selectedDO}`;
+      //const daInfo = daCache[doRef]?.find(da => da.name === selectedDA);
+      const valueType = selectedNode?.bType || null;
       
       const body = {
         objRef: objRef,
@@ -827,7 +899,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedTarget, buildObjectRef, writeValue, selectedFC, connections, cp, daCache, selectedLD, selectedLN, selectedDO, selectedDA]);
+  }, [selectedTarget, buildObjectRef, writeValue, selectedFC, connections, cp, selectedNode]);
 
   // Reset selections and results
   const handleReset = useCallback(() => {
@@ -835,7 +907,8 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
     setSelectedLD('');
     setSelectedLN('');
     setSelectedDO('');
-    setSelectedDA('');
+    setDoChildren([]);
+    setAttributePath([]);
     setWriteValue('');
     setReadResult(null);
     setWriteResult(null);
@@ -850,11 +923,9 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
       background: 'var(--bg-card)'
     }}>
       <h3 style={{ margin: 0, marginBottom: '16px', color: 'var(--text-secondary)' }}>
-        {selectedTarget ? (
-          connectedEndpoints.find(c => buildTargetValue(c.host, c.port) === selectedTarget)?.acsi === 'client' 
+        {getAcsiRole(selectedConnection) === 'client'
             ? 'ACSI Client - Read or write to ACSI Server'
-            : 'Read or write to ACSI Server'
-        ) : 'Data Access'}
+            : 'Read or write to ACSI Server' }
       </h3>
       
       {/* Endpoint Selection */}
@@ -882,33 +953,40 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
             color: 'var(--text-muted)',
             fontStyle: 'italic'
           }}>
-            ACSI: {connectedEndpoints.find(c => buildTargetValue(c.host, c.port) === selectedTarget)?.acsi || 'Unknown'}
+            ACSI: {getAcsiRole(selectedConnection) || 'Unknown'}
           </div>
         )}
       </div>
-      
-      {/* Cascading Dropdowns */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '12px' }}>
-        {/* LD - Logical Device */}
-        <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
+
+      {selectedTarget && (
+          <button
+            onClick={handleFetchModel}
+            disabled={modelFetched || fetchingModel}
+            className="btn-secondary"
+            style={{ marginBottom: '12px', width: '100%' }}
+          >
+            {fetchingModel ? 'Fetching Model...' : modelFetched ? 'Model Loaded ✓' : 'Fetch Model'}
+          </button>
+      )}
+
+      {/* Cascading Selection Row */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '12px'}}>
+        <div style={{ minWidth: '160px', flex: '1 1 160px' }}>
+          <label style={{ display: 'block', marginBottom: '4px', fontSize:'12px', color: 'var(--text-muted)'}}>
             LD (Logical Device)
           </label>
           <select
             value={selectedLD}
             onChange={(e) => setSelectedLD(e.target.value)}
-            style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)' }}
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)'}}
             disabled={!selectedTarget || availableLDs.length === 0}
           >
             <option value="">Select LD...</option>
-            {availableLDs.map(ld => (
-              <option key={String(ld)} value={ld}>{ld}</option>
-            ))}
+            {availableLDs.map(ld => <option key={String(ld)} value={ld}>{ld}</option>)}
           </select>
         </div>
-        
-        {/* LN - Logical Node */}
-        <div>
+
+        <div style={{ minWidth: '160px', flex: '1 1 160px' }}>
           <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
             LN (Logical Node)
           </label>
@@ -919,14 +997,11 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
             disabled={!selectedLD || availableLNs.length === 0}
           >
             <option value="">Select LN...</option>
-            {availableLNs.map(ln => (
-              <option key={String(ln)} value={ln}>{ln}</option>
-            ))}
+            {availableLNs.map(ln => <option key={String(ln)} value={ln}>{ln}</option>)}
           </select>
         </div>
-        
-        {/* DO - Data Object */}
-        <div>
+
+         <div style={{ minWidth: '160px', flex: '1 1 160px' }}>
           <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
             DO (Data Object)
           </label>
@@ -937,33 +1012,51 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
             disabled={!selectedLN || availableDOs.length === 0}
           >
             <option value="">Select DO...</option>
-            {availableDOs.map(doObj => (
-              <option key={String(doObj)} value={doObj}>{doObj}</option>
-            ))}
+            {availableDOs.map(doObj => <option key={String(doObj)} value={doObj}>{doObj}</option>)}
           </select>
         </div>
-        
-        {/* DA - Data Attribute */}
-        <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
-            DA (Data Attribute)
-          </label>
-          <select
-            value={selectedDA}
-            onChange={(e) => setSelectedDA(e.target.value)}
-            style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)' }}
-            disabled={!selectedDO || availableDAs.length === 0}
-          >
-            <option value="">Select DA...</option>
-            {availableDAs.map(da => (
-              <option key={String(da)} value={da}>{da}</option>
-            ))}
-          </select>
-        </div>
+
+        {selectedDO && (() => {
+          const levels = [];
+          let nodes = doChildren;
+          for (let depth = 0; depth <= attributePath.length; depth++) {
+            levels.push({depth, nodes});
+            const name = attributePath[depth];
+            if (!name) break;
+            const chosen = nodes.find(n => n.name === name);
+            if (!chosen) break;
+            if (chosen.children === null) {
+              levels.push({depth: depth + 1, nodes: null});
+              break;
+            }
+            nodes = chosen.children;
+            if (nodes.length === 0) break;
+          }
+          return levels.map(({depth, nodes: levelNodes}) => (
+              <div key={depth} style={{ minWidth: '160px', flex: '1 1 160px'}}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-muted)'}}>
+                  {depth === 0 ? 'DA / SDO' : 'DA / SDA'}
+                </label>
+                <select
+                  value={attributePath[depth] || ''}
+                  onChange={(e) => handleAttributeLevelSelect(depth, e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)'}}
+                  disabled={levelNodes === null || levelNodes.length === 0}
+                >
+                  <option value="">{levelNodes === null ? 'Loading...' : 'Select...'}</option>
+                  {levelNodes?.map(n => (
+                      <option key={n.ref} value={n.name}>
+                        {n.name} [{n.type}{n.fc ? `, ${n.fc.toUpperCase()}` : ''}]
+                      </option>
+                  ))}
+                </select>
+              </div>
+          ));
+        })()}
       </div>
-      
+
       {/* Object Reference Display */}
-      {selectedLD && selectedLN && selectedDO && selectedDA && (
+      {selectedLD && selectedLN && selectedDO && buildObjectRef() && (
         <div style={{ 
           marginBottom: '16px', 
           padding: '8px 12px', 
@@ -974,34 +1067,55 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
           color: 'var(--text-secondary)'
         }}>
           Object Reference: {buildObjectRef()}
+          {selectedFC && (
+              <span style={{ marginLeft: '8px', color: 'var(--text-muted)' }}>
+                [{selectedFC}]
+                {isServerEndpoint ? (
+                    <span style={{ color: 'var(--success-color)', marginLeft: '6px' }}>
+                      (unrestricted - ACSI Server)
+                    </span>
+                ) : !isWritableFc(selectedFC) ? (
+                    <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>
+                      (read-only - ACSI Client)
+                    </span>
+                ) : null}
+              </span>
+          )}
         </div>
       )}
       
-      {/* Write Value Input */}
-      <div style={{ marginBottom: '16px' }}>
-        <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
-          Value to Write
-        </label>
-        <input
-          type="text"
-          value={writeValue}
-          onChange={(e) => setWriteValue(e.target.value)}
-          placeholder="Enter value (e.g., true, 100, 'text')"
-          style={{ 
-            width: '100%', 
-            padding: '8px', 
-            borderRadius: '4px', 
-            background: 'var(--bg-hover)', 
-            border: '1px solid var(--border-color)'
-          }}
-        />
-      </div>
-      
+      {/* Write Value Input - only for writable FCs */}
+      {buildObjectRef() && canWriteFc(selectedFC) && (
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
+            Value to Write
+          </label>
+          <input
+            type="text"
+            value={writeValue}
+            onChange={(e) => setWriteValue(e.target.value)}
+            placeholder="Enter value (e.g., true, 100, 'text')"
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '4px',
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--border-color)'
+            }}
+          />
+        </div>
+      )}
+      {buildObjectRef() && !canWriteFc(selectedFC) && (
+          <div style={{ marginBottom: '16px', fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic'}}>
+            Read-only attribute (FC: {selectedFC || 'unknown'}) - writing is only enabled for CF/SP.
+          </div>
+      )}
+
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         <button
           onClick={handleRead}
-          disabled={!selectedDA || loading}
+          disabled={!buildObjectRef() || loading}
           className="btn-primary"
           style={{ flex: 1 }}
         >
@@ -1009,7 +1123,7 @@ function DataAccessPanel({ connections, getModel, settings, cp = 'cp1' }) {
         </button>
         <button
           onClick={handleWrite}
-          disabled={!selectedDA || !writeValue || loading}
+          disabled={!buildObjectRef() || !writeValue || loading || !canWriteFc(selectedFC)}
           className="btn-secondary"
           style={{ flex: 1 }}
         >

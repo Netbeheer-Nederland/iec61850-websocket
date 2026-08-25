@@ -124,7 +124,7 @@ function App() {
             <Route path="/setup" element={<Setup settings={settings} />} />
             <Route path="/connections" element={<Connections connections={connections} setConnections={setConnections} />} />
             <Route path="/model" element={<Model settings={settings} connections={connections} updateModel={updateModel} getModel={getModel} />} />
-            <Route path="/traffic" element={<Traffic settings={settings} connections={connections} getModel={getModel} />} />
+            <Route path="/traffic" element={<Traffic settings={settings} updateModel={updateModel} connections={connections} getModel={getModel} />} />
             <Route path="/data" element={<Data />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/diagnostics" element={<Diagnostics />} />

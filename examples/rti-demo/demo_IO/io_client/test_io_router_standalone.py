@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Standalone test for io_router without requiring FSP model files."""
+"""Standalone test for io_router without requiring ACSI model files."""
 
 import os
 import sys
 
-# Add the fsp directory to the path
+# Add the acsi directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI

@@ -11,6 +11,9 @@ import sys
 
 logger = logging.getLogger(__name__)
 
+# Global flag to control io_client usage
+_use_io_client = True
+
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -107,6 +110,15 @@ class StartRequest(BaseModel):
         default="cp1",
         description="Communication point identifier",
         json_schema_extra={"example": "cp1"}
+    )
+
+
+class IoClientConfigRequest(BaseModel):
+    """Request body for enabling/disabling io_client usage."""
+    enabled: bool = Field(
+        ...,
+        description="Whether to enable io_client for device sync",
+        json_schema_extra={"example": True}
     )
 
 class ReadvalueRequest(BaseModel):
@@ -400,6 +412,20 @@ def create_bff_router(
             pass
 
         return info
+
+    # ==================== Helper Methods ====================
+
+    async def _sync_to_io_device(io_client, obj_ref: str, value: str):
+        """Background task to sync a write to IO devices. Fire-and-forget."""
+        try:
+            # Check if client is healthy before attempting sync
+            if await io_client.is_healthy():
+                await io_client.write_iec61850_value(obj_ref, value)
+                logger.info(f"Synced IEC61850 write to device: {obj_ref}={value}")
+            else:
+                logger.debug("IO client not healthy, skipping device sync")
+        except Exception as sync_exc:
+            logger.warning(f"Device sync failed for {obj_ref}: {sync_exc}")
 
     # ==================== Route Handlers ====================
 
@@ -1294,6 +1320,56 @@ def create_bff_router(
             )
 
     @router.get(
+        "/io-client",
+        summary="Get IO Client Status",
+        description="Returns whether io_client is enabled for device sync.",
+        response_description="IO client status",
+        responses={
+            200: {"description": "IO client status returned successfully"}
+        },
+        tags=["IO Client"]
+    )
+    def api_get_io_client_status():
+        """Get current io_client usage status.
+        
+        Returns:
+            dict: {"enabled": bool}
+        """
+        return {"enabled": _use_io_client}
+
+    @router.post(
+        "/io-client",
+        summary="Set IO Client Usage",
+        description="Enable or disable io_client for syncing writes to physical IO devices.",
+        response_description="IO client configuration confirmation",
+        responses={
+            200: {"description": "IO client configuration updated successfully"},
+            500: {"description": "Error updating configuration"}
+        },
+        tags=["IO Client"]
+    )
+    def api_set_io_client(request: IoClientConfigRequest):
+        """Enable or disable io_client usage.
+        
+        When enabled, writes to the ACSI server will be synced to physical IO devices.
+        When disabled, writes will only affect the ACSI server model.
+        
+        Request Body:
+            IoClientConfigRequest: {"enabled": bool}
+        
+        Returns:
+            dict: {"ok": True, "enabled": bool, "message": str}
+        """
+        global _use_io_client
+        _use_io_client = request.enabled
+        logger.info(f"IO client usage set to: {_use_io_client}")
+        return {
+            "ok": True,
+            "enabled": _use_io_client,
+            "message": f"IO client {'enabled' if _use_io_client else 'disabled'}"
+        }
+
+    @router.get(
         "/actions-logs",
         summary="Get Action Log",
         description="Retrieves the logged server actions for debugging and auditing purposes.",
@@ -1534,7 +1610,7 @@ def create_bff_router(
         },
         tags=["Data Access"]
     )
-    def api_write_value(request: WritevalueRequest):
+    async def api_write_value(request: WritevalueRequest):
         """Write a value in the server IED model.
 
         Request Body:
@@ -1598,23 +1674,27 @@ def create_bff_router(
             try:
                 result = rti_fsp.write_value(obj_ref, value, data_type)
                 
-                # Sync with mapped LED if mapping exists
-                try:
-                    # Get the existing IO router's client and mapping manager
-                    from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
-                    
-                    io_client = get_io_client()
-                    if io_client and io_client.is_healthy():
-                        try:
-                            # Try to sync LED state based on written value
-                            io_client.write_iec61850_value(obj_ref, value, data_type)
-                            logger.info(f"Synced IEC61850 write to LED: {obj_ref}={value}")
-                        except Exception as sync_exc:
-                            logger.warning(f"LED sync failed for {obj_ref}: {sync_exc}")
-                    else:
-                        logger.debug("IO client not available or not healthy for LED sync")
-                except Exception as import_exc:
-                    logger.debug(f"IO client not available for LED sync: {import_exc}")
+                # Sync with mapped device if io_client is enabled (fire-and-forget)
+                if _use_io_client:
+                    import asyncio
+                    try:
+                        # Get the existing IO router's client and mapping manager
+                        from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                        
+                        io_client = get_io_client()
+                        logger.info(f"IO client for sync: {io_client}")
+                        if io_client:
+                            # Fire-and-forget: don't wait for IO sync to complete
+                            # Check health and sync in background
+                            asyncio.create_task(
+                                _sync_to_io_device(io_client, obj_ref, value)
+                            )
+                        else:
+                            logger.warning("IO client is None - cannot sync to device. Call /api/io/connect first.")
+                    except ImportError as e:
+                        logger.error(f"ImportError - Cannot import IO client: {e}")
+                    except Exception as e:
+                        logger.error(f"Exception in IO sync setup: {e}")
                 
                 return {
                     "ok": True,
@@ -1695,6 +1775,10 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
             {
                 "name": "Discovery",
                 "description": "API introspection and endpoint discovery"
+            },
+            {
+                "name": "IO Client",
+                "description": "Enable/disable and check IO client sync with physical devices"
             }
         ]
     )
@@ -1703,6 +1787,7 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     router, _server = create_bff_router(resolved_factory_dir)
     app.include_router(router)
     
+    # Include IO router for device control via demo_IO
     # Add CORS middleware to allow requests from frontend
     app.add_middleware(
         CORSMiddleware,
@@ -1723,7 +1808,7 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
         from demo_IO.io_client.io_router import create_io_router
         io_router = create_io_router()
         app.include_router(io_router)
-        logger.info("IO router included for demo_IO LED control")
+        logger.info("IO router included for demo_IO device control")
     except ImportError as e:
         logger.warning(f"IO router not available (missing dependencies): {e}")
     except Exception as e:

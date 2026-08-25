@@ -1,8 +1,14 @@
 """
-Main entry point for the Raspberry Pi GPIO LED Control API
+Main entry point for the Raspberry Pi IO Device Control API
 
-This module demonstrates how to use the gpio_controller and api_endpoint
-modules to create a complete LED control service.
+This module demonstrates how to use the io_controller and api_endpoint
+modules to create a complete IO device control service.
+
+Supports:
+- LEDs (digital output)
+- Potentiometers (analog input)
+- Buttons (digital input)
+- And more
 
 Usage:
     # Run with default port (8000)
@@ -10,16 +16,24 @@ Usage:
     
     # Run with custom port
     PORT=8080 python main.py
+    
+    # Use custom config file
+    IO_CONFIG_FILE=/path/to/io_config.json python main.py
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI
-from gpio_controller import GPIOController
+
+from io_controller import IOController, configure_acsi, ACSIConfig
+from devices import LEDConfig, PotentiometerConfig, ButtonConfig, DeviceType
+
 from api_endpoint import create_fastapi_app
 
 # Configure logging
@@ -30,57 +44,140 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def load_acsi_config(config_path: Path) -> Optional[ACSIConfig]:
+    """Load ACSI configuration from JSON config file."""
+    if not config_path.exists():
+        return None
+    
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        acsi_data = data.get("acsi_server", {})
+        if acsi_data:
+            return ACSIConfig.from_dict(acsi_data)
+    except Exception as e:
+        logger.warning(f"Failed to load ACSI config from {config_path}: {e}")
+    
+    return None
+
+
+def load_device_mappings(config_path: Path) -> Optional[Dict[str, Dict[str, Any]]]:
+    """Load device mappings from JSON config file."""
+    if not config_path.exists():
+        return None
+    
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        return data.get("mappings", {})
+    except Exception as e:
+        logger.warning(f"Failed to load device mappings from {config_path}: {e}")
+    
+    return None
+
+
 def create_app() -> FastAPI:
     """
-    Create and configure the FastAPI application with pre-configured LEDs.
+    Create and configure the FastAPI application with pre-configured devices.
     
     This function:
-    1. Creates a GPIOController instance
-    2. Configures default LEDs (GPIO 17, 18, 22)
-    3. Initializes the controller
-    4. Creates and returns the FastAPI app
+    1. Creates an IOController instance
+    2. Loads configurations from io_config.json if it exists
+    3. Otherwise configures default devices (led1, led2, led3, pot1, button1)
+    4. Initializes the controller
+    5. Creates and returns the FastAPI app
     
     Returns:
         FastAPI application instance
     """
-    # Create GPIO controller
-    gpio_controller = GPIOController()
+    # Create IO controller
+    io_controller = IOController()
     
-    # Configure default LEDs
-    # These are common GPIO pins on Raspberry Pi
-    # Physical pin numbers:
-    # - GPIO 17 = Pin 11
-    # - GPIO 18 = Pin 12
-    # - GPIO 22 = Pin 15
-    gpio_controller.add_led(
-        name="led1",
-        gpio_pin=17,
-        description="LED 1 on GPIO 17 (Pin 11)",
-        initial_state=False
-    )
-    gpio_controller.add_led(
-        name="led2",
-        gpio_pin=18,
-        description="LED 2 on GPIO 18 (Pin 12)",
-        initial_state=False
-    )
-    gpio_controller.add_led(
-        name="led3",
-        gpio_pin=22,
-        description="LED 3 on GPIO 22 (Pin 15)",
-        initial_state=False
-    )
+    # Get config file path
+    config_path = Path(__file__).parent / "io_config.json"
     
-    logger.info("Configured default LEDs: led1 (GPIO 17), led2 (GPIO 18), led3 (GPIO 22)")
+    # Try to load configuration from io_config.json
+    config_loaded = io_controller.load_config(str(config_path))
     
-    # Initialize GPIO (will use mock LEDs if gpiozero is not available)
-    if not gpio_controller.initialize():
-        logger.error("Failed to initialize GPIO controller")
+    # Load and configure ACSI server integration
+    acsi_config = load_acsi_config(config_path)
+    device_mappings = load_device_mappings(config_path)
+    if acsi_config and (device_mappings or acsi_config.enabled):
+        configure_acsi(acsi_config, device_mappings)
+        if acsi_config.enabled:
+            logger.info(f"ACSI server integration enabled: {acsi_config.url}")
+            if device_mappings:
+                logger.info(f"Loaded {len(device_mappings)} device-to-ACSI mappings")
+        else:
+            logger.info("ACSI server integration configured but disabled")
     else:
-        logger.info("GPIO controller initialized successfully")
+        logger.debug("ACSI server integration not configured")
+    
+    if config_loaded:
+        logger.info("Loaded IO configuration from io_config.json")
+    else:
+        # No config file found, use defaults
+        logger.info("No io_config.json found, using default device configuration")
+        
+        # Configure default LEDs
+        io_controller.add_device(LEDConfig(
+            name="led1",
+            gpio_pin=17,
+            description="LED 1 on GPIO 17 (Pin 11)",
+            initial_state=False
+        ))
+        io_controller.add_device(LEDConfig(
+            name="led2",
+            gpio_pin=18,
+            description="LED 2 on GPIO 18 (Pin 12)",
+            initial_state=False
+        ))
+        io_controller.add_device(LEDConfig(
+            name="led3",
+            gpio_pin=22,
+            description="LED 3 on GPIO 22 (Pin 15)",
+            initial_state=False
+        ))
+        
+        # Configure a default potentiometer (if ADC is available)
+        try:
+            io_controller.add_device(PotentiometerConfig(
+                name="pot1",
+                adc_channel=0,
+                description="Potentiometer on ADC channel 0",
+                min_value=0.0,
+                max_value=100.0
+            ))
+            logger.info("Configured default potentiometer: pot1 (ADC channel 0)")
+        except Exception as e:
+            logger.warning(f"Failed to configure default potentiometer: {e}")
+        
+        # Configure a default button on GPIO 10
+        try:
+            io_controller.add_device(ButtonConfig(
+                name="button1",
+                gpio_pin=10,
+                description="Button on GPIO 10 (Pin 19)",
+                debounce_time=0.05,
+                pull_up=False,
+                latching=True  # Button toggles and maintains state on press
+            ))
+            logger.info("Configured default button: button1 (GPIO 10, latching)")
+        except Exception as e:
+            logger.warning(f"Failed to configure default button: {e}")
+        
+        logger.info("Configured default devices: led1 (GPIO 17), led2 (GPIO 18), led3 (GPIO 22), pot1 (ADC 0), button1 (GPIO 10)")
+    
+    # Initialize IO
+    if not io_controller.initialize():
+        logger.error("Failed to initialize IO controller")
+    else:
+        logger.info("IO controller initialized successfully")
     
     # Create FastAPI app
-    app = create_fastapi_app(gpio_controller)
+    app = create_fastapi_app(io_controller)
     
     return app
 
@@ -104,7 +201,7 @@ def main():
     else:
         host = "0.0.0.0"
     
-    logger.info(f"Starting GPIO LED Control API on port {port}")
+    logger.info(f"Starting IO Device Control API on port {port}")
     logger.info(f"Access the API documentation at: http://{host}:{port}/api/io/docs")
     logger.info(f"Access the health endpoint at: http://{host}:{port}/api/io/health")
     

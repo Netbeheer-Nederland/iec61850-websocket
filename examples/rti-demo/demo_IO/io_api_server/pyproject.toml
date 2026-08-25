@@ -1,7 +1,7 @@
 [project]
 name = "demo_io"
-version = "0.1.0"
-description = "Raspberry Pi GPIO LED Control API"
+version = "2.0.0"
+description = "Raspberry Pi IO Device Control API (LEDs, Potentiometers, Buttons)"
 readme = "README.md"
 requires-python = ">=3.10"
 
@@ -9,5 +9,30 @@ dependencies = [
     "fastapi>=0.95.0",
     "uvicorn[standard]>=0.21.0",
     "pydantic>=1.10.0",
-    "gpiod>=2.0.0"
+    "gpiod>=2.0.0",
+    # Optional ADC dependencies (for potentiometer support)
+    # Install with: pip install demo_io[adc]
+    # spidev>=0.2.0,  # For MCP3008 SPI ADC
+    # Adafruit-PureIO>=1.1.9,  # For ADS1115 I2C ADC
+    # Adafruit_ADS1x15>=2.0.0,  # For ADS1115 I2C ADC
 ]
+
+[project.optional-dependencies]
+adc = [
+    "spidev>=0.2.0",
+    "Adafruit-PureIO>=1.1.9",
+    "Adafruit_ADS1x15>=2.0.0",
+]
+
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "httpx>=0.23.0",
+]
+
+[tool.demo_io]
+# API Key Authentication Configuration
+# Set DEMO_IO_API_KEY environment variable to enable authentication
+# or DEMO_IO_API_KEY_FILE to specify a file containing the API key
+api_key_env = "DEMO_IO_API_KEY"
+api_key_file_env = "DEMO_IO_API_KEY_FILE"

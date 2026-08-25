@@ -1,0 +1,69 @@
+services:
+  rti-so:
+    build:
+      context: ../../../
+      dockerfile: examples/rti-demo/Dockerfile.rti-so
+    container_name: rti-so
+    ports:
+      - "5002:5002"
+      - "8765:8765"
+    environment:
+      - PORT=5002
+      - PYTHONUNBUFFERED=1
+      - DEMO_IO_URL=http://demo_io:8000
+    networks:
+      - rti-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "rti.service=rti-so"
+      - "rti.type=RTI-SO"
+      - "rti.host=rti-so"
+      - "rti.port=5002"
+    volumes:
+      - ../../../examples/rti-demo/so:/app/so
+
+  demo_io:
+    build:
+      context: ..
+      dockerfile: Dockerfile.IO
+    container_name: demo_io_so
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+    devices:
+      - "/dev/gpiochip0:/dev/gpiochip0"
+      - "/dev/gpiochip1:/dev/gpiochip1"
+      - "/dev/gpiochip2:/dev/gpiochip2"
+    privileged: true
+    ipc: host
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_RAWIO
+    networks:
+      - rti-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/io/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "rti.service=demo_io"
+      - "rti.type=GPIO-LED-Control"
+      - "rti.host=demo_io_so"
+      - "rti.port=8000"
+    volumes:
+      - ../demo_IO:/app/demo_IO
+    command: ["./.venv/bin/python", "-u", "demo_IO/io_api_server/main.py"]
+
+networks:
+  rti-network:
+    driver: bridge
