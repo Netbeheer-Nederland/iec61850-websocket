@@ -55,7 +55,7 @@
       "debounce_time": 0.05,
       "pull_up": true,
       "latching": true,
-      "is_active_high": true
+      "is_active_high": false
     }
   ],
   "version": 1,

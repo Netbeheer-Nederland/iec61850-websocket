@@ -638,8 +638,11 @@ class ButtonDevice(InputDevice):
             
             # === Edge Detection Callbacks ===
             # With gpiod 2.x, we use polling-based edge detection since it doesn't support interrupts
-            # Start polling monitor for latching behavior
+            # For latching buttons, use custom polling that reads physical state
             if config.latching:
+                self._start_latching_polling(poll_interval=0.05)
+            else:
+                # For non-latching buttons, use base class polling
                 self._start_polling_monitor(poll_interval=0.05)
             
             # Initialize previous state to current physical state
@@ -672,11 +675,7 @@ class ButtonDevice(InputDevice):
         if not self.is_connected:
             return None
         try:
-            raw_value = self._gpiozero_button.is_pressed
-            if self.config.is_active_high:
-                return raw_value
-            else:
-                return not raw_value
+            return self._gpiozero_button.is_pressed
         except Exception as e:
             logger.warning(f"Failed to read button '{self.config.name}': {e}")
             return None
@@ -690,17 +689,34 @@ class ButtonDevice(InputDevice):
             current_time = time.time()
             if current_time - self._last_read_time < self.config.debounce_time:
                 return self._last_read_value
-            raw_value = self._gpiozero_button.is_pressed
-            if self.config.is_active_high:
-                state = raw_value
-            else:
-                state = not raw_value
+            state = self._gpiozero_button.is_pressed
             self._last_read_time = current_time
             self._last_read_value = state
             return state
         except Exception as e:
             logger.warning(f"Failed to read button '{self.config.name}': {e}")
             return None
+    
+    def _start_latching_polling(self, poll_interval: float = 0.05) -> None:
+        """Start polling for latching button edge detection."""
+        self._stop_monitoring = False
+        import threading
+
+        def monitor():
+            last_physical = self._read_physical_raw()
+            while not self._stop_monitoring:
+                current_physical = self._read_physical_raw()
+                if current_physical is not None and last_physical is not None:
+                    if current_physical and not last_physical:
+                        # Rising edge: toggle latched state
+                        old = self._latched_state
+                        self._latched_state = not self._latched_state
+                        self._notify_change(old, self._latched_state)
+                last_physical = current_physical
+                time.sleep(poll_interval)
+
+        self._monitoring_thread = threading.Thread(target=monitor, daemon=True)
+        self._monitoring_thread.start()
     
     def read(self) -> Optional[bool]:
         """Read button state.
