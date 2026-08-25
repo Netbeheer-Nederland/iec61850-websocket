@@ -7,9 +7,12 @@ handling connection management and value operations.
 from __future__ import annotations
 
 import logging
+import os
+import sys
 import traceback
 import asyncio
 from concurrent.futures import TimeoutError as FuturesTimeoutError
+from pathlib import Path
 from typing import Any, Dict, Optional
 from fastapi import FastAPI, APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
@@ -18,6 +21,9 @@ from pydantic import BaseModel, Field, ConfigDict
 from acsi_client import ACSIClient
 
 logger = logging.getLogger(__name__)
+
+# Global flag to control io_client usage for writevalue sync
+_use_io_client = True
 
 # ==================== Pydantic Models ====================
 class ConnectRequest(BaseModel):
@@ -276,6 +282,15 @@ class OperateRequest(BaseModel):
     })
 
 
+class IoClientConfigRequest(BaseModel):
+    """Request body for enabling/disabling io_client usage for writevalue sync."""
+    enabled: bool = Field(
+        ...,
+        description="Whether to enable io_client for device sync in writevalue",
+        json_schema_extra={"example": True}
+    )
+
+
 class WriteValueRequest(BaseModel):
     """Request body for writing a value to the connected server.
 
@@ -337,12 +352,30 @@ def create_fastapi_app() -> FastAPI:
             {"name": "Logging", "description": "View and clear action and message logs"},
             {"name": "Health", "description": "Service health checks and status monitoring"},
             {"name": "Discovery", "description": "API introspection and endpoint discovery"},
-            {"name": "Diagnostics", "description": "Internal diagnostic endpoints"}
+            {"name": "Diagnostics", "description": "Internal diagnostic endpoints"},
+            {"name": "IO Client", "description": "Enable/disable and check IO client sync with physical devices"}
         ]
     )
     router, _client = create_bff_router(app)
     app.include_router(router)
     app.state.client = _client
+    
+    # Include IO router for device control via demo_IO
+    try:
+        # Add parent directory to path so we can import from demo_IO
+        demo_io_parent = Path(__file__).parent.parent
+        if str(demo_io_parent) not in sys.path:
+            sys.path.insert(0, str(demo_io_parent))
+        
+        from demo_IO.io_client.io_router import create_io_router
+        io_router = create_io_router()
+        app.include_router(io_router)
+        logger.info("[SO] IO router included for demo_IO device control")
+    except ImportError as e:
+        logger.warning(f"[SO] IO router not available (missing dependencies): {e}")
+    except Exception as e:
+        logger.error(f"[SO] Failed to include IO router: {e}")
+    
     return app
 
 def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
@@ -709,6 +742,24 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
            # client._log_action(f"Failed to attach model task callback: {e}", "warn")
 
         return 'building'
+
+    # ==================== Helper Methods ====================
+
+    async def _sync_to_io_device(io_client, obj_ref: str, value: Any):
+        """Background task to sync a write to IO devices from SO. Fire-and-forget.
+        
+        This is used only in the /writevalue endpoint to sync IEC61850 writes
+        to physical IO devices when io_client is enabled.
+        """
+        try:
+            # Check if client is healthy before attempting sync
+            if await io_client.is_healthy():
+                await io_client.write_iec61850_value(obj_ref, value)
+                logger.info(f"[SO] Synced IEC61850 write to device: {obj_ref}={value}")
+            else:
+                logger.debug("[SO] IO client not healthy, skipping device sync")
+        except Exception as sync_exc:
+            logger.warning(f"[SO] Device sync failed for {obj_ref}: {sync_exc}")
 
     # ==================== Route Handlers ====================
     @router.get(
@@ -2110,6 +2161,28 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 result = rti_so.invoke_on_runtime_loop(
                     rti_so.write_value(obj_ref, value, fc, value_type, cp), timeout=10
                 )
+                
+                # Sync with mapped device if io_client is enabled (fire-and-forget)
+                if _use_io_client:
+                    try:
+                        # Get the existing IO router's client and mapping manager
+                        from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                        
+                        io_client = get_io_client()
+                        logger.info(f"[SO] IO client for sync: {io_client}")
+                        if io_client:
+                            # Fire-and-forget: don't wait for IO sync to complete
+                            # Check health and sync in background
+                            asyncio.create_task(
+                                _sync_to_io_device(io_client, obj_ref, value)
+                            )
+                        else:
+                            logger.warning("[SO] IO client is None - cannot sync to device. Call /api/io/connect first.")
+                    except ImportError as e:
+                        logger.error(f"[SO] ImportError - Cannot import IO client: {e}")
+                    except Exception as e:
+                        logger.error(f"[SO] Exception in IO sync setup: {e}")
+                
                 if result is None:
                     #client._log_action(
                     #    "Client writevalue failed: instanceNotAvailable",
@@ -2310,11 +2383,63 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     #         rti_so._log_action(f"Internal model status failed: {exc}", 'error')
     #         raise HTTPException(status_code=500, detail=str(exc))
 
+    # ==================== IO Client Endpoints ====================
+
+    @router.get(
+        "/io-client",
+        summary="Get IO Client Status",
+        description="Returns whether io_client is enabled for device sync in writevalue.",
+        response_description="IO client status",
+        responses={
+            200: {"description": "IO client status returned successfully"}
+        },
+        tags=["IO Client"]
+    )
+    def api_get_io_client_status():
+        """Get current io_client usage status for writevalue sync.
+        
+        Returns:
+            dict: {"enabled": bool}
+        """
+        return {"enabled": _use_io_client}
+
+    @router.post(
+        "/io-client",
+        summary="Set IO Client Usage",
+        description="Enable or disable io_client for syncing writes to physical IO devices in writevalue endpoint.",
+        response_description="IO client configuration confirmation",
+        responses={
+            200: {"description": "IO client configuration updated successfully"},
+            500: {"description": "Error updating configuration"}
+        },
+        tags=["IO Client"]
+    )
+    def api_set_io_client(request: IoClientConfigRequest):
+        """Enable or disable io_client usage for writevalue sync.
+        
+        When enabled, writes to the ACSI server via /writevalue will be synced 
+        to physical IO devices. When disabled, writes will only affect the ACSI 
+        server model.
+        
+        Request Body:
+            IoClientConfigRequest: {"enabled": bool}
+        
+        Returns:
+            dict: {"ok": True, "enabled": bool, "message": str}
+        """
+        global _use_io_client
+        _use_io_client = request.enabled
+        logger.info(f"[SO] IO client usage set to: {_use_io_client}")
+        return {
+            "ok": True,
+            "enabled": _use_io_client,
+            "message": f"IO client {'enabled' if _use_io_client else 'disabled'} for writevalue sync"
+        }
+
     return router, rti_so
 
 if __name__ == "__main__":
     import uvicorn
-    import os
     app = create_fastapi_app()
     port = int(os.getenv("PORT", "5003"))
     uvicorn.run(app, host="0.0.0.0", port=port)
