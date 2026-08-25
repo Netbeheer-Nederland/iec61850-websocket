@@ -1174,6 +1174,7 @@ const getContextMenuItems = () => {
                 name: endpoint.name || wsHost,
                 host: endpoint.host || wsHost,
                 port: endpoint.port || wsPort,
+                type: 'RTI-FSP',
                 ws_mode: 'passive',
                 TLS: endpoint.TLS,
                 properties_info: {
@@ -1188,6 +1189,7 @@ const getContextMenuItems = () => {
               name: endpoint?.name || wsHost,
               host: endpoint?.host || wsHost,
               port: endpoint?.port || wsPort,
+              type: 'RTI-FSP',
               ws_mode: 'passive',
               TLS: {},
               properties_info: {

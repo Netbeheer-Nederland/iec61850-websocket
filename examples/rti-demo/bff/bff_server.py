@@ -1362,6 +1362,51 @@ async def create_tls_connection(request: TLSConnectionCreateConfigRequest):
     }
 
 
+@app.get(
+    "/api/connections/tls-config",
+    summary="Get TLS Config for a specific connection",
+    description="Retrieve the TLS configuration for a connection.",
+    response_description="TLS configuration",
+    responses={
+        200: {"description": "TLS config returned successfully"},
+        404: {"description": "Connection not found"}
+    },
+    tags=["TLS"]
+)
+async def get_tls_config(connection_name: str):
+    """Get TLS configuration for a connection.
+
+    Query Parameters:
+        connection_name: Name of the connection to get TLS config for
+
+    Returns:
+        JSON with TLS configuration including enable_tls, tls_version,
+        server_key, server_cert, server_ca.
+
+    Raises:
+        HTTPException 404: If connection is not found.
+    """
+    connection = conn_manager.get_connection(connection_name)
+
+    if connection:
+        tls_config = connection.get('TLS', {})
+        return {
+            "ok": True,
+            "connection_name": connection_name,
+            "enable_tls": tls_config.get('enable_tls', False),
+            "tls_version": tls_config.get('tls_version'),
+            "server_key": tls_config.get('server_key'),
+            "server_cert": tls_config.get('server_cert'),
+            "server_ca": tls_config.get('server_ca'),
+            "ws_mode": connection.get('ws_mode')
+        }
+
+    return {
+        "ok": False,
+        "message": f"Connection '{connection_name}' not found"
+    }
+
+
 @app.post(
     "/api/connections/oauth-config",
     summary="Update OAuth Config for a specific connection",

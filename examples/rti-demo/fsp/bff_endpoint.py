@@ -18,6 +18,7 @@ from acsi_server import ACSIServer
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
 from fastapi import FastAPI, APIRouter, Request, HTTPException, status, UploadFile, File
 from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
 import ssl
 from ws61850.security.tls import TLSConfig
@@ -1030,13 +1031,16 @@ def create_bff_router(
             host = request.host
             request_port = request.port
             if request.ws_mode.lower() == "active":
-                tls_config = TLSConfig(
-                    mode="client",
-                    cafile=request.server_ca,
-                    min_version=tls_version,
-                    max_version=tls_version,
-                    keylog_file=os.path.join("tlskeys.log"),
-                )
+                # Only create TLSConfig if TLS is enabled
+                tls_config = None
+                if request.enable_tls:
+                    tls_config = TLSConfig(
+                        mode="client",
+                        cafile=request.server_ca,
+                        min_version=tls_version,
+                        max_version=tls_version,
+                        keylog_file=os.path.join("tlskeys.log"),
+                    )
                 cp = os.getenv("CP", "cp1")
 
                 loop = rti_fsp.runtime.loop
@@ -1071,6 +1075,81 @@ def create_bff_router(
         except Exception as exc:
             rti_fsp._log_action(f"Reconfig connection failed: {exc}", "error")
             return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
+
+    @router.get(
+        "/tls-config",
+        summary="Get TLS Configuration",
+        description="Returns the current TLS configuration from runtime variables.",
+        response_description="TLS configuration from runtime",
+        responses={
+            200: {"description": "TLS configuration returned successfully"},
+            500: {"description": "Error retrieving TLS configuration"}
+        },
+        tags=["TLS"]
+    )
+    def api_get_tls_config():
+        """Get current TLS configuration from runtime.
+
+        Returns: TLS configuration from the endpoint's runtime state including:
+        - enable_tls: Whether TLS is enabled
+        - tls_version: TLS version (1.2 or 1.3)
+        - server_key: Server private key (for server mode)
+        - server_cert: Server certificate (for server mode)
+        - server_ca: CA certificate (for client mode)
+        - ws_mode: WebSocket mode (active or passive)
+        """
+        try:
+            endpoint = rti_fsp.runtime.endpoint
+            if endpoint is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "Endpoint not available"},
+                    status_code=500
+                )
+
+            # Get TLS config from runtime
+            enable_tls = False
+            tls_version = "1.2"
+            server_key = None
+            server_cert = None
+            server_ca = None
+
+            if hasattr(endpoint, '_tls_config') and endpoint._tls_config is not None:
+                tls_config = endpoint._tls_config
+                enable_tls = True
+                # Extract TLS version from config
+                if hasattr(tls_config, 'min_version'):
+                    if tls_config.min_version == ssl.TLSVersion.TLSv1_3:
+                        tls_version = "1.3"
+                    elif tls_config.min_version == ssl.TLSVersion.TLSv1_2:
+                        tls_version = "1.2"
+                if hasattr(tls_config, 'cafile'):
+                    server_ca = tls_config.cafile
+                if hasattr(tls_config, 'certfile'):
+                    server_cert = tls_config.certfile
+                if hasattr(tls_config, 'keyfile'):
+                    server_key = tls_config.keyfile
+            
+            # Get ws_mode
+            ws_mode = "active"
+            if hasattr(endpoint, 'ws_mode'):
+                ws_mode = endpoint.ws_mode
+            elif hasattr(rti_fsp.runtime, 'ws_mode'):
+                ws_mode = rti_fsp.runtime.ws_mode
+
+            return {
+                "ok": True,
+                "enable_tls": enable_tls,
+                "tls_version": tls_version,
+                "server_key": server_key,
+                "server_cert": server_cert,
+                "server_ca": server_ca,
+                "ws_mode": ws_mode
+            }
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
 
     @router.post(
         "/reconfig-oauth",
@@ -1605,6 +1684,15 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     resolved_factory_dir = os.getenv('MODELPATH') or factory_dir or Path(__file__).parent
     router, _server = create_bff_router(resolved_factory_dir)
     app.include_router(router)
+    
+    # Add CORS middleware to allow requests from frontend
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     
     # Include IO router for LED control via demo_IO
     try:

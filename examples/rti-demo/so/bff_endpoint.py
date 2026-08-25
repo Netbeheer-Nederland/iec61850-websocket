@@ -14,6 +14,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any, Dict, Optional
 from fastapi import FastAPI, APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
 
 from acsi_client import ACSIClient
@@ -412,6 +413,16 @@ def create_fastapi_app() -> FastAPI:
     router, _client = create_bff_router(app)
     app.include_router(router)
     app.state.client = _client
+    
+    # Add CORS middleware to allow requests from frontend
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
     return app
 
 def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
@@ -954,6 +965,81 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             traceback.print_exc()
             rti_so._log_action(f"Reconfig connection failed: {exc}", "error")
             return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
+
+    @router.get(
+        "/tls-config",
+        summary="Get TLS Configuration",
+        description="Returns the current TLS configuration from runtime variables.",
+        response_description="TLS configuration from runtime",
+        responses={
+            200: {"description": "TLS configuration returned successfully"},
+            500: {"description": "Error retrieving TLS configuration"}
+        },
+        tags=["TLS"]
+    )
+    def api_get_tls_config():
+        """Get current TLS configuration from runtime.
+
+        Returns: TLS configuration from the endpoint's runtime state including:
+        - enable_tls: Whether TLS is enabled
+        - tls_version: TLS version (1.2 or 1.3)
+        - server_key: Server private key (for server mode)
+        - server_cert: Server certificate (for server mode)
+        - server_ca: CA certificate (for client mode)
+        - ws_mode: WebSocket mode (active or passive)
+        """
+        try:
+            endpoint = rti_so.runtime.endpoint
+            if endpoint is None:
+                return JSONResponse(
+                    content={"ok": False, "error": "Endpoint not available"},
+                    status_code=500
+                )
+
+            # Get TLS config from runtime
+            enable_tls = False
+            tls_version = "1.2"
+            server_key = None
+            server_cert = None
+            server_ca = None
+
+            if hasattr(endpoint, '_tls_config') and endpoint._tls_config is not None:
+                tls_config = endpoint._tls_config
+                enable_tls = True
+                # Extract TLS version from config
+                if hasattr(tls_config, 'min_version'):
+                    if tls_config.min_version == ssl.TLSVersion.TLSv1_3:
+                        tls_version = "1.3"
+                    elif tls_config.min_version == ssl.TLSVersion.TLSv1_2:
+                        tls_version = "1.2"
+                if hasattr(tls_config, 'cafile'):
+                    server_ca = tls_config.cafile
+                if hasattr(tls_config, 'certfile'):
+                    server_cert = tls_config.certfile
+                if hasattr(tls_config, 'keyfile'):
+                    server_key = tls_config.keyfile
+            
+            # Get ws_mode
+            ws_mode = "passive"
+            if hasattr(endpoint, 'ws_mode'):
+                ws_mode = endpoint.ws_mode
+            elif hasattr(rti_so.runtime, 'ws_mode'):
+                ws_mode = rti_so.runtime.ws_mode
+
+            return {
+                "ok": True,
+                "enable_tls": enable_tls,
+                "tls_version": tls_version,
+                "server_key": server_key,
+                "server_cert": server_cert,
+                "server_ca": server_ca,
+                "ws_mode": ws_mode
+            }
+        except Exception as exc:
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)},
+                status_code=500
+            )
 
     @router.post(
         "/reconfig-oauth",

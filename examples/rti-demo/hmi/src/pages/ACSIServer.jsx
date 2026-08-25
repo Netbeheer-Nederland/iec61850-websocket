@@ -499,6 +499,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
                 name: endpoint.name || host,
                 host: endpoint.host || host,
                 port: endpoint.port || port,
+                type: 'RTI-SO',
                 ws_mode: 'Active',
                 TLS: endpoint.TLS,
                 properties_info: {
@@ -513,6 +514,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
               name: endpoint?.name || host,
               host: endpoint?.host || host,
               port: endpoint?.port || port,
+              type: 'RTI-SO',
               ws_mode: 'Active',
               TLS: {},
               properties_info: {
