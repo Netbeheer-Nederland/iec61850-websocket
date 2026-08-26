@@ -26,6 +26,7 @@ services:
       - "rti.port=5002"
     volumes:
       - ../../../examples/rti-demo/so:/app/so
+      - ../../../examples/rti-demo/demo_IO:/app/demo_IO
 
   demo_io:
     build:

@@ -2,7 +2,7 @@
   "leds": {
     "led1": {
       "device_name": "led1",
-      "objRef": "LD0/LPHD1.Proxy.stVal",
+      "objRef": "LD0/LLN0.Mod.ctlModel",
       "direction": "output",
       "device_type": "led"
     }

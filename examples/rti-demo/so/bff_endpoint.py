@@ -401,7 +401,7 @@ class WriteValueRequest(BaseModel):
         }
     })
 
-def create_fastapi_app() -> FastAPI:
+def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     """Create and configure the FastAPI application for Acsi-Client BFF."""
     app = FastAPI(
         title="ACSI Client WS Passive",
@@ -424,7 +424,9 @@ def create_fastapi_app() -> FastAPI:
             {"name": "IO Client", "description": "Enable/disable and check IO client sync with physical devices"}
         ]
     )
-    router, _client = create_bff_router(app)
+
+    resolved_factory_dir = os.getenv('MODELPATH') or factory_dir or Path(__file__).parent
+    router, _client = create_bff_router(resolved_factory_dir)
     app.include_router(router)
     app.state.client = _client
     
@@ -469,6 +471,27 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
     def on_write_callback(obj_ref, value, fc, data_type, result):
         logger.info(f"[WRITE] {obj_ref}={value} fc={fc} type={data_type} result={result}")
+        # Sync with mapped device if io_client is enabled (fire-and-forget)
+        if _use_io_client and result:
+            try:
+                # Get the existing IO router's client and mapping manager
+                from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                
+                io_client = get_io_client()
+                logger.info(f"[SO] IO client for sync: {io_client}")
+                if io_client:
+                    # Fire-and-forget: don't wait for IO sync to complete
+                    # Check health and sync in background
+                    asyncio.create_task(
+                        _sync_to_io_device(io_client, obj_ref, value)
+                    )
+                else:
+                    logger.warning("[SO] IO client is None - cannot sync to device. Call /api/io/connect first.")
+            except ImportError as e:
+                logger.error(f"[SO] ImportError - Cannot import IO client: {e}")
+            except Exception as e:
+                logger.error(f"[SO] Exception in IO sync setup: {e}")
+        
 
     rti_so.install_write_callback(on_write_callback)
 
@@ -2511,27 +2534,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     rti_so.write_value(obj_ref, value, fc, value_type, cp), timeout=10
                 )
                 
-                # Sync with mapped device if io_client is enabled (fire-and-forget)
-                if _use_io_client:
-                    try:
-                        # Get the existing IO router's client and mapping manager
-                        from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
-                        
-                        io_client = get_io_client()
-                        logger.info(f"[SO] IO client for sync: {io_client}")
-                        if io_client:
-                            # Fire-and-forget: don't wait for IO sync to complete
-                            # Check health and sync in background
-                            asyncio.create_task(
-                                _sync_to_io_device(io_client, obj_ref, value)
-                            )
-                        else:
-                            logger.warning("[SO] IO client is None - cannot sync to device. Call /api/io/connect first.")
-                    except ImportError as e:
-                        logger.error(f"[SO] ImportError - Cannot import IO client: {e}")
-                    except Exception as e:
-                        logger.error(f"[SO] Exception in IO sync setup: {e}")
-                
                 if result is None:
                     #client._log_action(
                     #    "Client writevalue failed: instanceNotAvailable",
@@ -2789,7 +2791,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
 if __name__ == "__main__":
     import uvicorn
-    app = create_fastapi_app()
+    factory_dir = Path(__file__).parent
+    app = create_fastapi_app(factory_dir)
     port = int(os.getenv("PORT", "5003"))
     uvicorn.run(app, host="0.0.0.0", port=port)
 
