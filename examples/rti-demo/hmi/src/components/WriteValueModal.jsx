@@ -70,7 +70,7 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
         coercedValue = parseFloat(newValue);
       }
 
-      await executeApiCall('write', endpointTarget, {
+      let result = await executeApiCall('write', endpointTarget, {
         objRef,
         fc,
         value: coercedValue,
@@ -78,7 +78,12 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
         cp,
       });
 
-      setResult({ visible: true, success: true, message: '✓ Write successful!' });
+      if (!result?.ok) {
+        setResult({ visible: true, success: false, message: 'x Write unsuccessful!' });
+      }
+      else {
+        setResult({ visible: true, success: true, message: '✓ Write successful!' });
+      }
       setTimeout(() => {
         if (onSuccess) onSuccess();
         onClose();
