@@ -58,6 +58,8 @@ class ACSIClientRuntime:
         self.recv_msg_callback: Optional[Callable] = None
         self.send_msg_callback: Optional[Callable] = None
 
+        self.write_callback: Optional[Callable] = None
+
 
 class ACSIClient:
     """IEC 61850 WebSocket client controller."""
@@ -81,7 +83,9 @@ class ACSIClient:
         #start Websocket Passive instance
         self.connect("0.0.0.0", 8765)
 
-
+    def install_write_callback(self, callback):
+       self.runtime.write_callback = callback;
+       
     def _update_model_info_dict(self):
         """Sync ModelInfo dict with current client_list, preserving existing objects"""
         current_cps = {client.cp for client in self.runtime.client_list}
@@ -712,7 +716,7 @@ class ACSIClient:
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
         if data_type == "boolean":
             value = bool(value)
-        result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
+        result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, self.runtime.write_callback, None)
         print(result)
         print("Write operation completed successfully.")
         print("new value:", value)

@@ -467,6 +467,11 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     )
     rti_so = ACSIClient()
 
+    def on_write_callback(obj_ref, value, fc, data_type, result):
+        logger.info(f"[WRITE] {obj_ref}={value} fc={fc} type={data_type} result={result}")
+
+    rti_so.install_write_callback(on_write_callback)
+
     # ==================== Helper Functions ====================
     def _check_websocket_connection():
         """Verify that an active WebSocket connection exists.
