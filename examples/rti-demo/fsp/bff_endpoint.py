@@ -413,20 +413,6 @@ def create_bff_router(
 
         return info
 
-    # ==================== Helper Methods ====================
-
-    async def _sync_to_io_device(io_client, obj_ref: str, value: str):
-        """Background task to sync a write to IO devices. Fire-and-forget."""
-        try:
-            # Check if client is healthy before attempting sync
-            if await io_client.is_healthy():
-                await io_client.write_iec61850_value(obj_ref, value)
-                logger.info(f"Synced IEC61850 write to device: {obj_ref}={value}")
-            else:
-                logger.debug("IO client not healthy, skipping device sync")
-        except Exception as sync_exc:
-            logger.warning(f"Device sync failed for {obj_ref}: {sync_exc}")
-
     # ==================== Route Handlers ====================
 
     @router.get(
@@ -1676,10 +1662,10 @@ def create_bff_router(
                 
                 # Sync with mapped device if io_client is enabled (fire-and-forget)
                 if _use_io_client:
-                    import asyncio
                     try:
                         # Get the existing IO router's client and mapping manager
                         from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                        from demo_IO.io_client.io_utils import sync_to_io_device
                         
                         io_client = get_io_client()
                         logger.info(f"IO client for sync: {io_client}")
@@ -1687,7 +1673,7 @@ def create_bff_router(
                             # Fire-and-forget: don't wait for IO sync to complete
                             # Check health and sync in background
                             asyncio.create_task(
-                                _sync_to_io_device(io_client, obj_ref, value)
+                                sync_to_io_device(io_client, obj_ref, value)
                             )
                         else:
                             logger.warning("IO client is None - cannot sync to device. Call /api/io/connect first.")
