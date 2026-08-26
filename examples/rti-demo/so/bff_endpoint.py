@@ -2526,7 +2526,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         logger.error(f"[SO] ImportError - Cannot import IO client: {e}")
                     except Exception as e:
                         logger.error(f"[SO] Exception in IO sync setup: {e}")
-                
+
+                print("write value result in so: ", result)
+
                 if result is None:
                     #client._log_action(
                     #    "Client writevalue failed: instanceNotAvailable",
@@ -2538,13 +2540,19 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         status_code=404
                     )
                 else:
-                    return {
-                        "ok": True,
-                        "success": True,
-                        "objRef": obj_ref,
-                        "fc": fc,
-                        "value": result.get("value"),
-                    }
+                    if result.get("error") is None:
+                        return {
+                            "ok": True,
+                            "success": True,
+                            "objRef": obj_ref,
+                            "fc": fc,
+                            "value": result.get("value"),
+                        }
+                    else:
+                        return JSONResponse(
+                            content={"ok": False, "error": result.get("error")},
+                            status_code=500
+                        )
             except FuturesTimeoutError:
                 #client._log_action(
                 #    "Client writevalue timeout",

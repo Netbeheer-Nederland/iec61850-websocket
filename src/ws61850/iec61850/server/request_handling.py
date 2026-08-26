@@ -409,6 +409,50 @@ def set_check_val(item, value):
     for da_index, da_item in enumerate(item.data_attributes):
         da_item.mmsValue = value[1][da_item.name]
 
+def convert_value(type_name, raw_str, TYPE_MAP):
+    expected_type = TYPE_MAP.get(type_name)
+    if expected_type is None:
+        print(f"Unknown type: {type_name}")
+        return False
+
+    if expected_type is bool:
+        if raw_str.lower() in ("true", "1"):
+            return True
+        elif raw_str.lower() in ("false", "0"):
+            return False
+        else:
+            print(f"Cannot convert '{raw_str}' to bool")
+            return False
+
+    if expected_type is int:
+        try:
+            return int(raw_str)
+        except (ValueError, TypeError):
+            print(f"Cannot convert '{raw_str}' to int")
+            return False
+
+    if expected_type is float:
+        try:
+            return float(raw_str)
+        except (ValueError, TypeError):
+            print(f"Cannot convert '{raw_str}' to float")
+            return False
+
+    if expected_type is bytes:
+        try:
+            return bytes.fromhex(raw_str)  # adjust if not hex-encoded
+        except (ValueError, TypeError):
+            print(f"Cannot convert '{raw_str}' to bytes")
+            return False
+
+    if expected_type is str:
+        return raw_str  # already a string
+
+    if expected_type is list:
+        print(f"No defined conversion for {type_name} (list) from string '{raw_str}'")
+        return False
+
+    return False
 
 def assign_da_item(item, value, fc):
     """
@@ -416,8 +460,44 @@ def assign_da_item(item, value, fc):
     """
     if len(item.data_attributes) == 0:
         if value[0] != "structure" and value[0] != "check":
+            print("checking item_attr_type: ", item.attr_type.name, " and value: ", value[0])
             if item.attr_type.name == value[0] and item.fc.wire_name == fc:
-                item.mms_value = value[1]
+
+                TYPE_MAP = {
+                    "boolean": bool,
+                    "int8": int,
+                    "int16": int,
+                    "int24": int,
+                    "int32": int,
+                    "int64": int,
+                    "int8u": int,
+                    "int16u": int,
+                    "int24u": int,
+                    "int32u": int,
+                    "float32": float,
+                    "octetString": bytes,
+                    "visString64": str,
+                    "visString129": str,
+                    "visString255": str,
+                    "array": list,
+                    "bitstring": list,  # or int/str depending on how you represent bits
+                    "generalizedtime": str,  # or datetime, depending on how you parse it
+                    "binarytime": str,  # or datetime/time
+                    "quality": int,  # or a custom Quality class/bitmask
+                    "timeStamp": str,  # or datetime
+                    "enumerated": int,
+                }
+
+                converted = convert_value(item.attr_type.name, value[1], TYPE_MAP)
+
+                if converted is False:
+                    print(f"Type mismatch: '{value[1]}' is not valid for {item.attr_type.name}")
+                    return False
+                else:
+                    if item.attr_type.name == value[0] and item.fc.wire_name == fc:
+                        item.mms_value = converted
+                print("printing value type: ", type(value[1]), " and expected type: ", TYPE_MAP[value[0]])
+
             else:
                 return False
         elif value[0] == "structure":
