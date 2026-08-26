@@ -2559,6 +2559,29 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     rti_so.write_value(obj_ref, value, fc, value_type, cp), timeout=10
                 )
                 
+                # Sync with mapped device if io_client is enabled (fire-and-forget)
+                if _use_io_client:
+                    try:
+                        # Get the existing IO router's client and mapping manager
+                        from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                        
+                        io_client = get_io_client()
+                        logger.info(f"[SO] IO client for sync: {io_client}")
+                        if io_client:
+                            # Fire-and-forget: don't wait for IO sync to complete
+                            # Check health and sync in background
+                            asyncio.create_task(
+                                _sync_to_io_device(io_client, obj_ref, value)
+                            )
+                        else:
+                            logger.warning("[SO] IO client is None - cannot sync to device. Call /api/io/connect first.")
+                    except ImportError as e:
+                        logger.error(f"[SO] ImportError - Cannot import IO client: {e}")
+                    except Exception as e:
+                        logger.error(f"[SO] Exception in IO sync setup: {e}")
+
+                print("write value result in so: ", result)
+
                 if result is None:
                     #client._log_action(
                     #    "Client writevalue failed: instanceNotAvailable",
@@ -2570,13 +2593,19 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         status_code=404
                     )
                 else:
-                    return {
-                        "ok": True,
-                        "success": True,
-                        "objRef": obj_ref,
-                        "fc": fc,
-                        "value": result.get("value"),
-                    }
+                    if result.get("error") is None:
+                        return {
+                            "ok": True,
+                            "success": True,
+                            "objRef": obj_ref,
+                            "fc": fc,
+                            "value": result.get("value"),
+                        }
+                    else:
+                        return JSONResponse(
+                            content={"ok": False, "error": result.get("error")},
+                            status_code=500
+                        )
             except FuturesTimeoutError:
                 #client._log_action(
                 #    "Client writevalue timeout",

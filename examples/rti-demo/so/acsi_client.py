@@ -785,7 +785,10 @@ class ACSIClient:
         print("Write operation completed successfully.")
         print("new value:", value)
         print("obj_ref:", obj_ref)
-        return {"objRef": obj_ref, "value": value}
+        if result is True:
+            return {"objRef": obj_ref, "value": value}
+        else:
+            return {"objRef": obj_ref, "value": None, "error": result}
 
     async def operate(self, obj_ref, oper_val, val_type: str, cp: str) -> Dict[str, Any]:
         """Perform an operate command on the server."""
