@@ -28,34 +28,6 @@ from ws61850.security.tls import TLSConfig
 import asyncio
 import json
 
-# ==================== Helper Functions ====================
-
-def _find_connections_file() -> str:
-    """Find the connections.json file path using the same logic as BFF server."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    if os.path.exists('/app'):
-        return '/app/connections.json'
-    elif os.path.exists(os.path.join(script_dir, 'connections.json')):
-        return os.path.join(script_dir, 'connections.json')
-    else:
-        parent_dir = os.path.dirname(script_dir)
-        if os.path.exists(os.path.join(parent_dir, 'connections.json')):
-            return os.path.join(parent_dir, 'connections.json')
-        return os.path.join(script_dir, 'connections.json')
-
-
-def _load_connections_from_file() -> list:
-    """Load connections from connections.json file."""
-    connections_file = _find_connections_file()
-    if os.path.exists(connections_file):
-        try:
-            with open(connections_file, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Error loading connections: {e}")
-    return []
-
-
 # ==================== Pydantic Models ====================
 class WritevalueRequest(BaseModel):
 

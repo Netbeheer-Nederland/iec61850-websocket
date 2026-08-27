@@ -1,37 +1,59 @@
-# RTI Demo UI BFF Server Docker Image
+# RTI Demo UI Server - Multi-stage Docker Image
 
-FROM python:3.11-slim
+# ============================================================
+# Stage 1: Builder
+# ============================================================
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
 
-# Set working directory
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_PREFERENCE=only-system
+
 WORKDIR /app
 
-# Set environment variables
+# Install dependencies from the lock file
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --no-dev
+
+# Copy application files
+COPY . /app
+
+# Install the project and dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev
+
+
+# ============================================================
+# Stage 2: Runtime
+# ============================================================
+FROM python:3.11-slim-bookworm AS runtime
+
+WORKDIR /app
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PORT=5000 \
+    PATH="/app/.venv/bin:$PATH"
 
-# Install system dependencies
+# curl is required for the health check
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
+# Create non-root user
+RUN useradd --create-home --shell /usr/sbin/nologin app
 
-# Copy application files
-COPY . .
+# Copy application and virtual environment
+COPY --from=builder --chown=app:app /app /app
 
-# Create data directory for connections file
-RUN mkdir -p /app/data
+USER app
 
-# Expose port
 EXPOSE 5000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:5000/api/health || exit 1
 
-# Run the application
-CMD ["python", "bff/bff_server.py"]
+CMD ["python", "-u", "bff/bff_server.py"]
+
