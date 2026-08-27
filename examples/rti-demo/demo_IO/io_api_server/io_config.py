@@ -23,6 +23,7 @@ from devices import (
     ButtonConfig,
     PotentiometerConfig,
     PWMConfig,
+    LCDConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,17 @@ def _config_to_dict(config: DeviceConfig) -> Dict[str, Any]:
         base_dict["frequency"] = getattr(config, "frequency", 100)
         base_dict["initial_duty_cycle"] = getattr(config, "initial_duty_cycle", 0.0)
     
+    elif config.device_type == DeviceType.LCD:
+        base_dict["type"] = "lcd"
+        base_dict["gpio_rs"] = getattr(config, "gpio_rs", 26)
+        base_dict["gpio_e"] = getattr(config, "gpio_e", 19)
+        base_dict["gpio_data"] = getattr(config, "gpio_data", [13, 12, 16, 20])
+        base_dict["gpio_rw"] = getattr(config, "gpio_rw", None)
+        base_dict["columns"] = getattr(config, "columns", 16)
+        base_dict["rows"] = getattr(config, "rows", 2)
+        base_dict["backlight"] = getattr(config, "backlight", True)
+        base_dict["backlight_pin"] = getattr(config, "backlight_pin", None)
+    
     return base_dict
 
 
@@ -160,6 +172,20 @@ def _dict_to_config(device_dict: Dict[str, Any]) -> Optional[DeviceConfig]:
                 description=device_dict.get("description", ""),
                 frequency=device_dict.get("frequency", 100),
                 initial_duty_cycle=device_dict.get("initial_duty_cycle", 0.0),
+            )
+        
+        elif device_type_str == "lcd" or device_dict.get("type") == "lcd":
+            return LCDConfig(
+                name=device_dict.get("name", ""),
+                gpio_rs=device_dict.get("gpio_rs", 26),
+                gpio_e=device_dict.get("gpio_e", 19),
+                gpio_data=device_dict.get("gpio_data", [13, 12, 16, 20]),
+                gpio_rw=device_dict.get("gpio_rw", None),
+                columns=device_dict.get("columns", 16),
+                rows=device_dict.get("rows", 2),
+                backlight=device_dict.get("backlight", True),
+                backlight_pin=device_dict.get("backlight_pin", None),
+                description=device_dict.get("description", ""),
             )
         
         else:

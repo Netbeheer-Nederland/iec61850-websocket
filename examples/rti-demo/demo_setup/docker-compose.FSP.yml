@@ -41,7 +41,7 @@ services:
       - PORT=8000
       - PYTHONUNBUFFERED=1
       - ACSI_BASE_URL=http://rti-fsp:5001
-    #user: "1000:986"  # Run as pi user (uid 1000) with gpio group (gid 986)
+    user: "1000:986"  # Run as pi user (uid 1000) with gpio group (gid 986)
     devices:
       - "/dev/gpiochip0:/dev/gpiochip0"
       - "/dev/gpiochip4:/dev/gpiochip4"

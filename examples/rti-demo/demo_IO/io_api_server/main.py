@@ -175,6 +175,21 @@ def create_app() -> FastAPI:
         logger.error("Failed to initialize IO controller")
     else:
         logger.info("IO controller initialized successfully")
+        
+        # Blink all LEDs at startup for visual confirmation
+        import time
+        led_names = io_controller.get_output_devices()
+        led_names = [name for name in led_names if io_controller.get_config(name).device_type.value == "led"]
+        if led_names:
+            logger.info(f"Blinking {len(led_names)} LEDs at startup...")
+            for _ in range(3):
+                for name in led_names:
+                    io_controller.write(name, True)
+                time.sleep(0.3)
+                for name in led_names:
+                    io_controller.write(name, False)
+                time.sleep(0.3)
+            logger.info("LED blink sequence complete")
     
     # Create FastAPI app
     app = create_fastapi_app(io_controller)

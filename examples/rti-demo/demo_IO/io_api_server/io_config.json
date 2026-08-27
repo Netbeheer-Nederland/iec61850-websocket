@@ -56,6 +56,22 @@
       "pull_up": true,
       "latching": true,
       "is_active_high": false
+    },
+    {
+      "name": "lcd1",
+      "type": "lcd",
+      "device_type": "lcd",
+      "identifier": 0,
+      "gpio_rs": 26,
+      "gpio_e": 19,
+      "gpio_data": [13, 12, 16, 20],
+      "gpio_rw": null,
+      "columns": 16,
+      "rows": 2,
+      "backlight": true,
+      "backlight_pin": null,
+      "description": "16x2 LCD Display with HD44780 controller (4-bit mode)",
+      "direction": "output"
     }
   ],
   "version": 1,
