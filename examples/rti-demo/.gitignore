@@ -31,7 +31,6 @@ __pycache__/
 # Service state files
 bff/connections.json
 stats.json
-discovered_endpoints.json
 
 # Temporary files
 *.tmp
