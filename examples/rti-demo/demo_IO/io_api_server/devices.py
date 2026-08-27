@@ -907,7 +907,16 @@ class LCDDevice(IODevice):
             logger.warning(f"Failed to pulse enable: {e}")
     
     def _write4bits(self, value: int) -> None:
-        """Write 4 bits to the data lines."""
+        """Write 4 bits to the data lines.
+        
+        GPIO data pins are mapped as:
+        - Pin 0 (GPIO 13) = D4 (LSB)
+        - Pin 1 (GPIO 12) = D5
+        - Pin 2 (GPIO 16) = D6
+        - Pin 3 (GPIO 20) = D7 (MSB)
+        
+        So bit i of the nibble goes to pin i, which is D(i+4).
+        """
         if not self._hardware_available:
             return
         try:
@@ -982,21 +991,25 @@ class LCDDevice(IODevice):
             # Function Set: 4-bit, 2 lines, 5x8 dots
             self._display_function = self.LCD_FUNCTIONSET | self.LCD_4BITMODE | self.LCD_2LINE | self.LCD_5x8DOTS
             self._send_byte(self._display_function, 0)
-            time.sleep(0.001)
+            time.sleep(0.0016)  # >1.52ms for Function Set command
 
             # Display ON
             self._display_control = self.LCD_DISPLAYCONTROL | self.LCD_DISPLAYON | self.LCD_CURSOROFF | self.LCD_BLINKOFF
             self._send_byte(self._display_control, 0)
-            time.sleep(0.001)
+            time.sleep(0.0016)  # >1.52ms for Display Control command
 
             # Clear display
             self._send_byte(self.LCD_CLEARDISPLAY, 0)
-            time.sleep(0.002)  # 2ms for clear
+            time.sleep(0.0021)  # >2ms for clear display
+
+            # Return Home
+            self._send_byte(self.LCD_RETURNHOME, 0)
+            time.sleep(0.0021)  # >2ms for return home
 
             # Entry mode: increment, no shift
             self._display_mode = self.LCD_ENTRYMODESET | self.LCD_ENTRYLEFT | self.LCD_ENTRYSHIFTDECREMENT
             self._send_byte(self._display_mode, 0)
-            time.sleep(0.001)
+            time.sleep(0.0016)  # >1.52ms for Entry Mode Set command
             
             # Write startup message
             self.write(["RTI", "DEMO"])
@@ -1027,6 +1040,7 @@ class LCDDevice(IODevice):
         try:
             logger.info(f"[LCD DEBUG] Writing: {value}")
             self.clear()
+            time.sleep(0.0021)  # >2ms delay after clear display
             
             if isinstance(value, str):
                 lines = [value]
