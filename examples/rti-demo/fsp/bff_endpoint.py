@@ -213,6 +213,65 @@ def create_bff_router(
 
     rti_fsp.install_connected_callback(on_connected_callback)
 
+    def on_operate_received_callback(operate_data):
+        """Callback for received operate request messages - blinks LED."""
+        logger.info(f"[FSP OPERATE RECEIVED] operate request: {operate_data}")
+        
+        # Blink LED on operate
+        if _use_io_client:
+            try:
+                from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                from demo_IO.io_client.io_utils import blink_led_task
+                
+                io_client = get_io_client()
+                mapping_manager = get_mapping_manager()
+                if io_client:
+                
+                    asyncio.create_task(
+                        blink_led_task(io_client, "oper_rcv", interval=0.2, count=1, mapping_manager=mapping_manager)
+                    )
+                else:
+                    logger.warning("[FSP] IO client is None - cannot blink LED. Call /api/io/connect first.")
+            except ImportError as e:
+                logger.error(f"[FSP] ImportError - Cannot import IO client: {e}")
+            except Exception as e:
+                logger.error(f"[FSP] Exception in operate received callback: {e}")
+
+    def on_operate_response_callback(operate_response):
+        """Callback for sent operate response messages - prints to LCD."""
+        logger.info(f"[FSP OPERATE RESPONSE] operate response: {operate_response}")
+        
+        # Print operation result to LCD
+        if _use_io_client:
+            try:
+                from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                from demo_IO.io_client.io_utils import write_to_lcd
+                
+                io_client = get_io_client()
+                if io_client:
+                    mapping_manager = get_mapping_manager()
+
+                    success = operate_response.get("success", False)
+                    add_cause = operate_response.get("addCause", "")
+                    
+                    if success:
+                        value = "Operation: SUCCESS"
+                    else:
+                        value = f"Operation: FAILED - {add_cause}" if add_cause else "Operation: FAILED"
+                    
+                    asyncio.create_task(
+                        write_to_lcd(io_client, "oper_send", value, mapping_manager=mapping_manager)
+                    )
+                else:
+                    logger.warning("[FSP] IO client is None - cannot write to LCD. Call /api/io/connect first.")
+            except ImportError as e:
+                logger.error(f"[FSP] ImportError - Cannot import IO client: {e}")
+            except Exception as e:
+                logger.error(f"[FSP] Exception in operate response callback: {e}")
+
+    rti_fsp.install_operate_received_callback(on_operate_received_callback)
+    rti_fsp.install_operate_response_callback(on_operate_response_callback)
+
     # ==================== Helper Functions ====================
     def serialize_data_attribute(da: DataAttribute) -> Dict[str, Any]:
         """Serialize a DataAttribute to JSON-compatible dict."""
