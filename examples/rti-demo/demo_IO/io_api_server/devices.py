@@ -55,6 +55,7 @@ class DeviceType(Enum):
     RELAY = "relay"          # Relay switch
     BUZZER = "buzzer"        # Buzzer/speaker
     SENSOR = "sensor"        # Generic sensor
+    LCD = "lcd"              # LCD display (HD44780 controller)
 
 
 class DeviceDirection(Enum):
@@ -149,6 +150,39 @@ class PotentiometerConfig(DeviceConfig):
             "min_value": self.min_value,
             "max_value": self.max_value,
             "is_inverted": self.is_inverted,
+        })
+        return result
+
+
+@dataclass
+class LCDConfig(DeviceConfig):
+    """Configuration for LCD display devices with HD44780 controller."""
+    device_type: DeviceType = field(default=DeviceType.LCD, init=False)
+    direction: DeviceDirection = field(default=DeviceDirection.OUTPUT, init=False)
+    # GPIO pins for HD44780 in 4-bit mode
+    gpio_rs: int = 26
+    gpio_e: int = 19
+    gpio_data: List[int] = field(default_factory=lambda: [13, 12, 16, 20])  # D4, D5, D6, D7
+    gpio_rw: Optional[int] = None  # RW pin (optional, tie to GND if not used)
+    columns: int = 16
+    rows: int = 2
+    backlight: bool = True
+    backlight_pin: Optional[int] = None  # Optional backlight control pin
+    
+    def __post_init__(self):
+        self.direction = DeviceDirection.OUTPUT
+        
+    def to_dict(self) -> Dict[str, Any]:
+        result = super().to_dict()
+        result.update({
+            "gpio_rs": self.gpio_rs,
+            "gpio_e": self.gpio_e,
+            "gpio_data": self.gpio_data,
+            "gpio_rw": self.gpio_rw,
+            "columns": self.columns,
+            "rows": self.rows,
+            "backlight": self.backlight,
+            "backlight_pin": self.backlight_pin,
         })
         return result
 
@@ -750,7 +784,372 @@ class ButtonDevice(InputDevice):
                 self._gpiozero_button.close()
             except Exception as e:
                 logger.warning(f"Failed to release button '{self.config.name}': {e}")
+
+
+class LCDDevice(IODevice):
+    """
+    LCD display device implementation for HD44780 controller (16x2, 20x4, etc.).
     
+    Uses GPIO in 4-bit mode for communication with the HD44780 controller.
+    Supports writing text to the display, clearing, and cursor positioning.
+    Requires GPIO hardware (RPi.GPIO or gpiod).
+    """
+    
+    LCD_CLEARDISPLAY = 0x01
+    LCD_RETURNHOME = 0x02
+    LCD_ENTRYMODESET = 0x04
+    LCD_DISPLAYCONTROL = 0x08
+    LCD_CURSORSHIFT = 0x10
+    LCD_FUNCTIONSET = 0x20
+    LCD_SETCGRAMADDR = 0x40
+    LCD_SETDDRAMADDR = 0x80
+    
+    LCD_ENTRYRIGHT = 0x00
+    LCD_ENTRYLEFT = 0x02
+    LCD_ENTRYSHIFTINCREMENT = 0x01
+    LCD_ENTRYSHIFTDECREMENT = 0x00
+    
+    LCD_DISPLAYON = 0x04
+    LCD_DISPLAYOFF = 0x00
+    LCD_CURSORON = 0x02
+    LCD_CURSOROFF = 0x00
+    LCD_BLINKON = 0x01
+    LCD_BLINKOFF = 0x00
+    
+    LCD_DISPLAYMOVE = 0x08
+    LCD_CURSORMOVE = 0x00
+    LCD_MOVERIGHT = 0x04
+    LCD_MOVELEFT = 0x00
+    
+    LCD_8BITMODE = 0x10
+    LCD_4BITMODE = 0x00
+    LCD_2LINE = 0x08
+    LCD_1LINE = 0x00
+    LCD_5x10DOTS = 0x04
+    LCD_5x8DOTS = 0x00
+    
+    def __init__(self, config: LCDConfig):
+        self.config = config
+        self._gpio_rs = config.gpio_rs
+        self._gpio_e = config.gpio_e
+        self._gpio_data = config.gpio_data
+        self._gpio_rw = config.gpio_rw
+        self._columns = config.columns
+        self._rows = config.rows
+        self._backlight = config.backlight
+        self._backlight_pin = config.backlight_pin
+        
+        self._hardware_available = False
+        self._gpio_chip = None
+        self._gpio_lines = {}
+        self._display_function = 0
+        self._display_control = 0
+        self._display_mode = 0
+        
+        self._init_hardware()
+        if self._hardware_available:
+            self._initialize_display()
+            logger.info(f"Initialized LCD device '{config.name}' ({config.columns}x{config.rows}) on GPIO RS={config.gpio_rs}, E={config.gpio_e}, D4-D7={config.gpio_data}")
+        else:
+            logger.warning(f"GPIO hardware not available for LCD '{config.name}'. Using mock mode.")
+    
+    def _init_hardware(self) -> None:
+        """Initialize GPIO hardware for LCD."""
+        try:
+            if not GPOD_AVAILABLE:
+                raise RuntimeError("gpiod library not available")
+            
+            self._gpio_chip = gpiod.Chip('/dev/gpiochip0')
+            
+            output_pins = [self._gpio_rs, self._gpio_e] + self._gpio_data
+            if self._gpio_rw is not None:
+                output_pins.append(self._gpio_rw)
+            if self._backlight_pin is not None:
+                output_pins.append(self._backlight_pin)
+            
+            settings = gpiod.line_settings.LineSettings(
+                direction=gpiod.line_settings.Direction.OUTPUT,
+                active_low=False,
+                output_value=gpiod.line.Value.INACTIVE
+            )
+            
+            all_pins = set(output_pins)
+            self._gpio_lines = self._gpio_chip.request_lines({pin: settings for pin in all_pins})
+            
+            if self._backlight_pin is not None:
+                self._set_backlight(self._backlight)
+            
+            self._hardware_available = True
+            
+        except Exception as e:
+            logger.debug(f"LCD hardware initialization failed: {e}")
+            self._hardware_available = False
+    
+    def _set_backlight(self, state: bool) -> None:
+        """Set the backlight on/off."""
+        if self._backlight_pin is not None and self._hardware_available:
+            try:
+                value = gpiod.line.Value.ACTIVE if state else gpiod.line.Value.INACTIVE
+                self._gpio_lines.set_values({self._backlight_pin: value})
+            except Exception as e:
+                logger.warning(f"Failed to set backlight: {e}")
+    
+    def _pulse_enable(self) -> None:
+        """Pulse the enable pin to latch data. HD44780 requires >450ns pulse."""
+        if not self._hardware_available:
+            return
+        try:
+            self._gpio_lines.set_values({self._gpio_e: gpiod.line.Value.ACTIVE})
+            time.sleep(0.000005)   # 5 microseconds (was 1us - too short)
+            self._gpio_lines.set_values({self._gpio_e: gpiod.line.Value.INACTIVE})
+            time.sleep(0.000050)   # 50 microseconds (was 45us)
+        except Exception as e:
+            logger.warning(f"Failed to pulse enable: {e}")
+    
+    def _write4bits(self, value: int) -> None:
+        """Write 4 bits to the data lines."""
+        if not self._hardware_available:
+            return
+        try:
+            pin_values = {}
+            for i, pin in enumerate(self._gpio_data):
+                bit = (value >> i) & 0x01
+                pin_values[pin] = gpiod.line.Value.ACTIVE if bit else gpiod.line.Value.INACTIVE
+            self._gpio_lines.set_values(pin_values)
+        except Exception as e:
+            logger.warning(f"Failed to write 4 bits: {e}")
+    
+    def _send_byte(self, value: int, mode: int) -> None:
+        """Send a byte to the LCD in 4-bit mode."""
+        if not self._hardware_available:
+            return
+        
+        try:
+            mode_str = "DATA" if mode else "COMMAND"
+            logger.info(f"[LCD SEND] {mode_str} 0x{value:02X} ({value})")
+            rs_value = gpiod.line.Value.ACTIVE if mode else gpiod.line.Value.INACTIVE
+            self._gpio_lines.set_values({self._gpio_rs: rs_value})
+            
+            high = value >> 4
+            self._write4bits(high)
+            logger.info(f"[LCD SEND] High nibble: 0x{high:01X}")
+            self._pulse_enable()
+            
+            low = value & 0x0F
+            self._write4bits(low)
+            logger.info(f"[LCD SEND] Low nibble: 0x{low:01X}")
+            self._pulse_enable()
+            
+            self._gpio_lines.set_values({self._gpio_rs: gpiod.line.Value.INACTIVE})
+            logger.info(f"[LCD SEND] RS reset to LOW")
+        except Exception as e:
+            logger.warning(f"Failed to send byte: {e}")
+    
+    def _initialize_display(self) -> None:
+        """Initialize the LCD with proper HD44780 timing."""
+        if not self._hardware_available:
+            return
+        
+        try:
+            time.sleep(0.05)  # Wait 50ms for power-on
+
+            # Set all control pins low initially
+            self._gpio_lines.set_values({
+                self._gpio_rs: gpiod.line.Value.INACTIVE,
+                self._gpio_e: gpiod.line.Value.INACTIVE
+            })
+
+            # D4-D7 must be 0 for init
+            self._write4bits(0b0000)
+
+            # Initialization sequence for 4-bit mode
+            # First: Try 8-bit mode 3 times
+            self._write4bits(0b0011)  # 0x30 - Function set (8-bit)
+            self._pulse_enable()
+            time.sleep(0.005)  # 5ms
+
+            self._pulse_enable()
+            time.sleep(0.001)  # 1ms
+
+            self._pulse_enable()
+            time.sleep(0.001)
+
+            # Switch to 4-bit mode
+            self._write4bits(0b0010)  # 0x20 - 4-bit mode
+            self._pulse_enable()
+            time.sleep(0.001)
+
+            # Function Set: 4-bit, 2 lines, 5x8 dots
+            self._display_function = self.LCD_FUNCTIONSET | self.LCD_4BITMODE | self.LCD_2LINE | self.LCD_5x8DOTS
+            self._send_byte(self._display_function, 0)
+            time.sleep(0.001)
+
+            # Display ON
+            self._display_control = self.LCD_DISPLAYCONTROL | self.LCD_DISPLAYON | self.LCD_CURSOROFF | self.LCD_BLINKOFF
+            self._send_byte(self._display_control, 0)
+            time.sleep(0.001)
+
+            # Clear display
+            self._send_byte(self.LCD_CLEARDISPLAY, 0)
+            time.sleep(0.002)  # 2ms for clear
+
+            # Entry mode: increment, no shift
+            self._display_mode = self.LCD_ENTRYMODESET | self.LCD_ENTRYLEFT | self.LCD_ENTRYSHIFTDECREMENT
+            self._send_byte(self._display_mode, 0)
+            time.sleep(0.001)
+            
+            # Write startup message
+            self.write(["RTI", "DEMO"])
+            
+        except Exception as e:
+            logger.warning(f"Failed to initialize LCD display: {e}")
+        finally:
+            logger.info(f"[LCD DEBUG] Hardware available: {self._hardware_available}")
+    
+    def read(self) -> Optional[str]:
+        """Read from LCD - not supported for output-only display."""
+        logger.warning(f"Read not supported for LCD '{self.config.name}'")
+        return None
+    
+    def write(self, value: Union[bool, float, str, List[str]]) -> bool:
+        """
+        Write to the LCD display.
+        
+        Args:
+            value: Can be:
+                - str: Text to display on first line
+                - List[str]: Multiple lines of text
+        """
+        if not self._hardware_available:
+            logger.warning(f"Cannot write to LCD '{self.config.name}': hardware not available")
+            return False
+        
+        try:
+            logger.info(f"[LCD DEBUG] Writing: {value}")
+            self.clear()
+            
+            if isinstance(value, str):
+                lines = [value]
+            elif isinstance(value, list):
+                lines = value
+            else:
+                lines = [str(value)]
+            
+            for i, line in enumerate(lines[:self._rows]):
+                row_offsets = [0x00, 0x40, 0x14, 0x54]
+                self._send_byte(self.LCD_SETDDRAMADDR | row_offsets[i], 0)
+                
+                for char in line[:self._columns]:
+                    self._send_byte(ord(char), 1)
+            
+            logger.info(f"[LCD DEBUG] Write complete")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to write to LCD '{self.config.name}': {e}")
+            return False
+    
+    def write_line(self, line_number: int, text: str) -> bool:
+        """Write text to a specific line (0-indexed)."""
+        if line_number < 0 or line_number >= self._rows:
+            logger.warning(f"Invalid line number {line_number} for LCD with {self._rows} rows")
+            return False
+        
+        if not self._hardware_available:
+            return False
+        
+        try:
+            row_offsets = [0x00, 0x40, 0x14, 0x54]
+            self._send_byte(self.LCD_SETDDRAMADDR | row_offsets[line_number], 0)
+            
+            for char in text[:self._columns]:
+                self._send_byte(ord(char), 1)
+            
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to write to line {line_number}: {e}")
+            return False
+    
+    def clear(self) -> bool:
+        """Clear the LCD display."""
+        if not self._hardware_available:
+            return False
+        
+        try:
+            self._send_byte(self.LCD_CLEARDISPLAY, 0)
+            time.sleep(0.002)
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to clear LCD '{self.config.name}': {e}")
+            return False
+    
+    def set_cursor(self, row: int, col: int) -> bool:
+        """Set cursor position (0-indexed row and column)."""
+        if row < 0 or row >= self._rows or col < 0 or col >= self._columns:
+            logger.warning(f"Invalid cursor position ({row}, {col}) for {self._columns}x{self._rows} LCD")
+            return False
+        
+        if not self._hardware_available:
+            return False
+        
+        try:
+            row_offsets = [0x00, 0x40, 0x14, 0x54]
+            address = row_offsets[row] + col
+            self._send_byte(self.LCD_SETDDRAMADDR | address, 0)
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to set cursor: {e}")
+            return False
+    
+    def display_on(self, state: bool = True) -> bool:
+        """Turn display on or off."""
+        if not self._hardware_available:
+            return False
+        
+        try:
+            if state:
+                self._display_control |= self.LCD_DISPLAYON
+            else:
+                self._display_control &= ~self.LCD_DISPLAYON
+            self._send_byte(self._display_control, 0)
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to set display state: {e}")
+            return False
+    
+    def backlight_on(self, state: bool = True) -> bool:
+        """Turn backlight on or off."""
+        self._backlight = state
+        self._set_backlight(state)
+        return True
+    
+    def close(self) -> None:
+        """Clean up GPIO resources."""
+        try:
+            self.clear()
+            self.display_on(False)
+            self.backlight_on(False)
+        except Exception:
+            pass
+        
+        if self._gpio_lines:
+            try:
+                self._gpio_lines.release()
+            except Exception:
+                pass
+            self._gpio_lines = {}
+        
+        if self._gpio_chip:
+            try:
+                self._gpio_chip.close()
+            except Exception:
+                pass
+            self._gpio_chip = None
+        
+        self._hardware_available = False
+    
+    @property
+    def is_connected(self) -> bool:
+        return self._hardware_available
 
 
 
@@ -769,6 +1168,7 @@ class DeviceFactory:
             DeviceType.LED: LEDDevice,
             DeviceType.POTENTIOMETER: PotentiometerDevice,
             DeviceType.BUTTON: ButtonDevice,
+            DeviceType.LCD: LCDDevice,
             DeviceType.PWM: LEDDevice,
             DeviceType.DAC: LEDDevice,
             DeviceType.RELAY: LEDDevice,
@@ -805,4 +1205,20 @@ def validate_device_config(config: DeviceConfig) -> bool:
             raise ValueError("Button config must be ButtonConfig")
         if config.gpio_pin not in RASPBERRY_PI_VALID_GPIO:
             raise ValueError(f"Invalid GPIO pin {config.gpio_pin}. Valid: {sorted(RASPBERRY_PI_VALID_GPIO)}")
+    elif config.device_type == DeviceType.LCD:
+        if not isinstance(config, LCDConfig):
+            raise ValueError("LCD config must be LCDConfig")
+        # Validate all GPIO pins
+        all_pins = [config.gpio_rs, config.gpio_e] + config.gpio_data
+        if config.gpio_rw is not None:
+            all_pins.append(config.gpio_rw)
+        if config.backlight_pin is not None:
+            all_pins.append(config.backlight_pin)
+        for pin in all_pins:
+            if pin not in RASPBERRY_PI_VALID_GPIO:
+                raise ValueError(f"Invalid GPIO pin {pin} for LCD. Valid: {sorted(RASPBERRY_PI_VALID_GPIO)}")
+        if config.columns not in [8, 16, 20, 24, 40]:
+            raise ValueError(f"Invalid LCD columns {config.columns}. Valid: [8, 16, 20, 24, 40]")
+        if config.rows not in [1, 2, 4]:
+            raise ValueError(f"Invalid LCD rows {config.rows}. Valid: [1, 2, 4]")
     return True

@@ -50,6 +50,7 @@ try:
         ButtonConfig,
         DigitalDeviceConfig,
         PWMConfig,
+        LCDConfig,
         validate_device_config,
         RASPBERRY_PI_VALID_GPIO,
     )
@@ -66,6 +67,7 @@ except ImportError:
         ButtonConfig,
         DigitalDeviceConfig,
         PWMConfig,
+        LCDConfig,
         validate_device_config,
         RASPBERRY_PI_VALID_GPIO,
     )
@@ -217,6 +219,21 @@ class IOController:
             logger.warning(f"Initialized {len(self.devices)}/{len(self.configs)} devices (some failed)")
         else:
             logger.info(f"IO Controller initialized with {len(self.devices)} devices")
+        
+        # Blink all LEDs at startup for visual confirmation
+        import time
+        led_devices = [name for name, config in self.configs.items() 
+                       if config.device_type == DeviceType.LED]
+        if led_devices:
+            logger.info(f"Blinking {len(led_devices)} LEDs at startup...")
+            for _ in range(3):  # Blink 3 times
+                for name in led_devices:
+                    self.write(name, True)
+                time.sleep(0.3)
+                for name in led_devices:
+                    self.write(name, False)
+                time.sleep(0.3)
+            logger.info("LED blink sequence complete")
         
         return len(self.devices) > 0
     

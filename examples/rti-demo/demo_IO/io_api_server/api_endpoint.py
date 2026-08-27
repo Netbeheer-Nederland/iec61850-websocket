@@ -26,7 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from io_controller import IOController
-from devices import DeviceType, LEDConfig, PotentiometerConfig, ButtonConfig
+from devices import DeviceType, LEDConfig, PotentiometerConfig, ButtonConfig, LCDConfig
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +140,68 @@ class DeviceSetStateRequest(BaseModel):
     state: bool = Field(
         ...,
         description="True for ON/High, False for OFF/Low",
+        json_schema_extra={"example": True}
+    )
+
+
+class LCDWriteRequest(BaseModel):
+    """Request body for writing text to an LCD display."""
+    text: Union[str, List[str]] = Field(
+        ...,
+        description="Text to display. Can be a single string or list of strings (one per line)",
+        json_schema_extra={"example": ["Hello, World!", "Line 2"]}
+    )
+
+
+class LCDWriteLineRequest(BaseModel):
+    """Request body for writing text to a specific LCD line."""
+    line_number: int = Field(
+        ...,
+        description="Line number (0-indexed)",
+        ge=0,
+        le=3,
+        json_schema_extra={"example": 0}
+    )
+    text: str = Field(
+        ...,
+        description="Text to display on the line",
+        json_schema_extra={"example": "Hello, World!"}
+    )
+
+
+class LCDCursorRequest(BaseModel):
+    """Request body for setting LCD cursor position."""
+    row: int = Field(
+        ...,
+        description="Row position (0-indexed)",
+        ge=0,
+        le=3,
+        json_schema_extra={"example": 0}
+    )
+    col: int = Field(
+        ...,
+        description="Column position (0-indexed)",
+        ge=0,
+        le=39,
+        json_schema_extra={"example": 0}
+    )
+
+
+class LCDControlRequest(BaseModel):
+    """Request body for controlling LCD display and backlight."""
+    display_on: Optional[bool] = Field(
+        default=None,
+        description="Turn display on/off",
+        json_schema_extra={"example": True}
+    )
+    backlight_on: Optional[bool] = Field(
+        default=None,
+        description="Turn backlight on/off",
+        json_schema_extra={"example": True}
+    )
+    clear: Optional[bool] = Field(
+        default=None,
+        description="Clear the display",
         json_schema_extra={"example": True}
     )
 
@@ -1306,6 +1368,155 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         except Exception as exc:
             logger.error(f"Failed to sync ACSI mappings: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
+
+
+    # ==================== LCD SPECIFIC ENDPOINTS ====================
+
+    @router.post(
+        "/lcd/{device_name}/write",
+        summary="Write Text to LCD",
+        description="Write text to an LCD display. Can send single string or multiple lines.",
+        response_description="Write confirmation",
+        responses={
+            200: {"description": "Text written successfully"},
+            404: {"description": "Device not found or not LCD"},
+            500: {"description": "Failed to write to LCD"}
+        },
+        tags=["LCD Display"]
+    )
+    async def api_lcd_write(device_name: str, request: LCDWriteRequest):
+        """Write text to an LCD display."""
+        device = io_controller.get_device(device_name)
+        if device is None:
+            raise HTTPException(status_code=404, detail=f"Device '{device_name}' not found")
+        
+        if not hasattr(device, 'write_line') and not hasattr(device, 'write'):
+            raise HTTPException(status_code=400, detail=f"Device '{device_name}' is not an LCD display")
+        
+        try:
+            result = device.write(request.text)
+            return {
+                "ok": result,
+                "device": device_name,
+                "message": f"Text written to LCD '{device_name}'"
+            }
+        except Exception as exc:
+            logger.error(f"Failed to write to LCD '{device_name}': {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+
+
+    @router.post(
+        "/lcd/{device_name}/write-line",
+        summary="Write Text to LCD Line",
+        description="Write text to a specific line on an LCD display.",
+        response_description="Write confirmation",
+        responses={
+            200: {"description": "Text written to line successfully"},
+            404: {"description": "Device not found or not LCD"},
+            500: {"description": "Failed to write to LCD"}
+        },
+        tags=["LCD Display"]
+    )
+    async def api_lcd_write_line(device_name: str, request: LCDWriteLineRequest):
+        """Write text to a specific line on an LCD display."""
+        device = io_controller.get_device(device_name)
+        if device is None:
+            raise HTTPException(status_code=404, detail=f"Device '{device_name}' not found")
+        
+        if not hasattr(device, 'write_line'):
+            raise HTTPException(status_code=400, detail=f"Device '{device_name}' is not an LCD display")
+        
+        try:
+            result = device.write_line(request.line_number, request.text)
+            return {
+                "ok": result,
+                "device": device_name,
+                "line": request.line_number,
+                "message": f"Text written to line {request.line_number} on LCD '{device_name}'"
+            }
+        except Exception as exc:
+            logger.error(f"Failed to write to LCD line: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+
+
+    @router.post(
+        "/lcd/{device_name}/control",
+        summary="Control LCD Display",
+        description="Control LCD display settings (display on/off, backlight, clear).",
+        response_description="Control confirmation",
+        responses={
+            200: {"description": "LCD controlled successfully"},
+            404: {"description": "Device not found or not LCD"},
+            500: {"description": "Failed to control LCD"}
+        },
+        tags=["LCD Display"]
+    )
+    async def api_lcd_control(device_name: str, request: LCDControlRequest):
+        """Control LCD display and backlight."""
+        device = io_controller.get_device(device_name)
+        if device is None:
+            raise HTTPException(status_code=404, detail=f"Device '{device_name}' not found")
+        
+        if not hasattr(device, 'display_on') and not hasattr(device, 'backlight_on') and not hasattr(device, 'clear'):
+            raise HTTPException(status_code=400, detail=f"Device '{device_name}' is not an LCD display")
+        
+        try:
+            results = {}
+            
+            if request.clear is not None and request.clear:
+                results["clear"] = device.clear()
+            
+            if request.display_on is not None:
+                results["display_on"] = device.display_on(request.display_on)
+            
+            if request.backlight_on is not None:
+                results["backlight_on"] = device.backlight_on(request.backlight_on)
+            
+            return {
+                "ok": True,
+                "device": device_name,
+                "results": results,
+                "message": f"LCD '{device_name}' controlled successfully"
+            }
+        except Exception as exc:
+            logger.error(f"Failed to control LCD '{device_name}': {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+
+
+    @router.post(
+        "/lcd/{device_name}/cursor",
+        summary="Set LCD Cursor Position",
+        description="Set the cursor position on an LCD display.",
+        response_description="Cursor set confirmation",
+        responses={
+            200: {"description": "Cursor set successfully"},
+            404: {"description": "Device not found or not LCD"},
+            500: {"description": "Failed to set cursor"}
+        },
+        tags=["LCD Display"]
+    )
+    async def api_lcd_cursor(device_name: str, request: LCDCursorRequest):
+        """Set cursor position on an LCD display."""
+        device = io_controller.get_device(device_name)
+        if device is None:
+            raise HTTPException(status_code=404, detail=f"Device '{device_name}' not found")
+        
+        if not hasattr(device, 'set_cursor'):
+            raise HTTPException(status_code=400, detail=f"Device '{device_name}' is not an LCD display")
+        
+        try:
+            result = device.set_cursor(request.row, request.col)
+            return {
+                "ok": result,
+                "device": device_name,
+                "row": request.row,
+                "col": request.col,
+                "message": f"Cursor set to ({request.row}, {request.col}) on LCD '{device_name}'"
+            }
+        except Exception as exc:
+            logger.error(f"Failed to set LCD cursor: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+
 
     return router
 
