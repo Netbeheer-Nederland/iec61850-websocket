@@ -69,6 +69,8 @@ class ACSIServerRuntime:
         # Service-specific callbacks
         self.write_callback: Optional[Callable] = None
         self.connected_callback: Optional[Callable] = None
+        self.operate_received_callback: Optional[Callable] = None
+        self.operate_response_callback: Optional[Callable] = None
 
 
 class ACSIServer:
@@ -168,6 +170,20 @@ class ACSIServer:
         The callback receives: associateResponse data (dict)
         """
         self.runtime.connected_callback = callback
+
+    def install_operate_received_callback(self, callback):
+        """Install a callback to be invoked when operate request messages are received.
+        
+        The callback receives: operate request data (dict)
+        """
+        self.runtime.operate_received_callback = callback
+
+    def install_operate_response_callback(self, callback):
+        """Install a callback to be invoked when operate response messages are sent.
+        
+        The callback receives: operate response data (dict)
+        """
+        self.runtime.operate_response_callback = callback
 
     def load_current_runtime_model(self) -> IedModel:
         """Load the current runtime model from model.py."""
@@ -358,7 +374,7 @@ class ACSIServer:
 
     def _on_send_message(self, message: Any, timestamp: Any) -> None:
         """Callback for sent WebSocket messages."""
-        # Check for associateResponse in sent messages
+        # Check for associateResponse and operate response in sent messages
         msg_dict = message
         if isinstance(message, bytes):
             try:
@@ -372,7 +388,7 @@ class ACSIServer:
                 msg_dict = {}
         
         if isinstance(msg_dict, dict):
-            # Get service_data from associate path for sent messages
+            # Check for associateResponse in sent messages
             service_data = msg_dict.get("associate", {}).get("service", {})
             
             if isinstance(service_data, dict):
@@ -381,11 +397,39 @@ class ACSIServer:
                     associate_response = service_data.get("associateResponse", {})
                     if self.runtime.connected_callback is not None:
                         self.runtime.connected_callback(associate_response)
+            
+            # Check for operate response in sent messages
+            response_service_data = msg_dict.get("response", {}).get("service", {})
+            if isinstance(response_service_data, dict) and "operate" in response_service_data:
+                operate_response = response_service_data.get("operate", {})
+                if self.runtime.operate_response_callback is not None:
+                    self.runtime.operate_response_callback(operate_response)
         
         self._log_message("send", message, timestamp)
 
     def _on_recv_message(self, msg, ts):
         """Callback for received WebSocket messages."""
+        # Check for operate requests in received messages
+        msg_dict = msg
+        if isinstance(msg, bytes):
+            try:
+                msg_dict = json.loads(msg.decode("utf-8", errors="replace"))
+            except (json.JSONDecodeError, AttributeError):
+                msg_dict = {}
+        elif isinstance(msg, str):
+            try:
+                msg_dict = json.loads(msg)
+            except (json.JSONDecodeError, AttributeError):
+                msg_dict = {}
+        
+        if isinstance(msg_dict, dict):
+            # Check for operate request
+            service_data = msg_dict.get("request", {}).get("service", {})
+            if isinstance(service_data, dict) and "operate" in service_data:
+                operate_data = service_data.get("operate", {})
+                if self.runtime.operate_received_callback is not None:
+                    self.runtime.operate_received_callback(operate_data)
+        
         self._log_message("recv", msg, ts)
 
     def _log_message(self, direction: str, message: Any, timestamp: Any) -> None:

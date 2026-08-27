@@ -5,14 +5,18 @@
       "objRef": [
         "MinMaxAvg",
         "Setpoints",
-        "cp1"
+        "cp1",
+        "oper_send"
       ],
       "direction": "output",
       "device_type": "lcd"
     },
     "led2": {
       "device_name": "led2",
-      "objRef": "MinMaxAvg",
+      "objRef": [
+        "MinMaxAvg",
+        "oper_rcv"
+      ],
       "direction": "output",
       "device_type": "led"
     },
