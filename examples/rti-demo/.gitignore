@@ -29,7 +29,7 @@ __pycache__/
 .docker/
 
 # Service state files
-connections.json
+bff/connections.json
 stats.json
 discovered_endpoints.json
 

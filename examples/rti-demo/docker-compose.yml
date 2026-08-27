@@ -69,7 +69,7 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./bff:/app/bff
-      - ./connections.json:/app/connections.json
+      - ./bff/connections.json:/app/connections.json
       - //var/run/docker.sock:/var/run/docker.sock
     networks:
       - rti-network

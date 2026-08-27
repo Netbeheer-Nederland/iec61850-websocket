@@ -54,7 +54,7 @@ ENV PYTHONUNBUFFERED=1 \
 # (curl was missing from the original single-stage file, so the
 # HEALTHCHECK below was likely failing silently before this fix)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgpiod2 \
+    libgpiod3 \
     gpiod \
     sudo \
     curl \
