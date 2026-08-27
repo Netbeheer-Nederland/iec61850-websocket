@@ -183,6 +183,79 @@ function ConnectionModal({
     }
   }, [showModal, currentConnection, formData.certificate_endpoint, formData.idp_server, idpServers, onFormChange]);
 
+  // Auto-construct token endpoint from selected IDP server and realm
+  useEffect(() => {
+    if (selectedIdpServer && formData.realm && formData.ws_mode === 'active') {
+      const selected = idpServers.find(server => server.name === selectedIdpServer);
+      if (selected && selected.endpoint) {
+        try {
+          // Extract base URL from the IDP server's endpoint
+          const url = new URL(selected.endpoint);
+          const baseUrl = `${url.protocol}//${url.host}`;
+
+          // Construct token endpoint using Keycloak standard path
+          const constructedTokenEndpoint = `${baseUrl}/realms/${formData.realm}/protocol/openid-connect/token`;
+
+          onFormChange(prev => ({
+            ...prev,
+            token_endpoint: constructedTokenEndpoint
+          }));
+        } catch (e) {
+          console.warn('Could not construct token endpoint from IDP server:', e);
+        }
+      }
+    }
+  }, [selectedIdpServer, formData.realm, formData.type, idpServers, onFormChange]);
+
+  // Auto-populate certificate endpoint from selected IDP server
+  useEffect(() => {
+    if (selectedIdpServer && formData.realm && (formData.ws_mode == "active")) {
+      const selected = idpServers.find(server => server.name === selectedIdpServer);
+      if (selected && selected.endpoint) {
+        try {
+          // Extract base URL from the IDP server's endpoint
+          const url = new URL(selected.endpoint);
+          const baseUrl = `${url.protocol}//${url.host}`;
+
+          // Construct certificate endpoint using Keycloak standard path
+          const constructedCertEndpoint = `${baseUrl}/realms/${formData.realm}/protocol/openid-connect/certs`;
+
+          onFormChange(prev => ({
+            ...prev,
+            certificate_endpoint: constructedCertEndpoint
+          }));
+        } catch (e) {
+          console.warn('Could not construct certificate endpoint from IDP server:', e);
+        }
+      }
+    }
+  }, [selectedIdpServer, formData.realm, formData.type, idpServers, onFormChange]);
+
+  // Auto-construct token issuer URL for RTI-SO (passive mode)
+  useEffect(() => {
+    if (selectedIdpServer && formData.realm && formData.ws_mode === "passive") {
+      const selected = idpServers.find(server => server.name === selectedIdpServer);
+      if (selected && selected.endpoint) {
+        try {
+          const url = new URL(selected.endpoint);
+          const baseUrl = `${url.protocol}//${url.host}`;
+
+          // Construct token issuer URL (OIDC discovery endpoint)
+          const constructedTokenIssuer = `${baseUrl}/realms/${formData.realm}`;
+          const constructedCertEndpoint = `${baseUrl}/realms/${formData.realm}/protocol/openid-connect/certs`;
+
+          onFormChange(prev => ({
+            ...prev,
+            token_issuer_url: constructedTokenIssuer, 
+            certificate_endpoint: constructedCertEndpoint
+          }));
+        } catch (e) {
+          console.warn('Could not construct token issuer URL from IDP server:', e);
+        }
+      }
+    }
+  }, [selectedIdpServer, formData.realm, formData.ws_mode, idpServers, onFormChange]);
+
   // Auto-populate certificate endpoint when IDP server is selected
   // Update both state and formData in the onChange handler to avoid timing issues
   const handleIdpServerChange = (e) => {
@@ -329,15 +402,38 @@ function ConnectionModal({
                     </select>
                   </div>
                   <div className="form-group">
-                    <label htmlFor="certificate_endpoint">Certificate Endpoint</label>
-                    <input 
-                      type="text" 
-                      id="certificate_endpoint" 
-                      value={formData.certificate_endpoint || ''} 
+                    <label htmlFor="realm">Realm</label>
+                    <input
+                      type="text"
+                      id="realm"
+                      value={formData.realm || ''}
                       onChange={handleInputChange}
-                      placeholder="e.g., https://localhost:8443/certs"
+                      placeholder="e.g., master"
                     />
                   </div>
+                  <div className="form-group">
+                    <label htmlFor="token_issuer_url">Token Issuer URL</label>
+                    <input
+                      type="text"
+                      id="token_issuer_url"
+                      value={formData.token_issuer_url || ''}
+                      onChange={handleInputChange}
+                      placeholder="Auto-constructed from IDP server and realm"
+                      readOnly
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="certificate_endpoint">Certificate Endpoint</label>
+                    <input
+                      type="text"
+                      id="certificate_endpoint"
+                      value={formData.certificate_endpoint || ''}
+                      onChange={handleInputChange}
+                      placeholder="Auto-constructed from IDP server and realm"
+                      readOnly
+                    />
+                  </div>
+
                   <div className="form-group">
                     <label htmlFor="auth_server_ca">Auth Server CA</label>
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
@@ -377,10 +473,22 @@ function ConnectionModal({
                     <input 
                       type="text" 
                       id="token_endpoint" 
-                      value={formData.token_endpoint || ''} 
+                      value={formData.token_endpoint || ''}
                       onChange={handleInputChange}
-                      placeholder="e.g., https://localhost:8443/auth/realms/master/protocol/openid-connect/token"
+                      placeholder="Auto-constructed from certificate endpoint and realm"
+                      readOnly
                     />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="certificate_endpoint">Certificate Endpoint</label>
+                    <input 
+                      type="text" 
+                      id="certificate_endpoint" 
+                      value={formData.certificate_endpoint || ''}
+                      onChange={handleInputChange}
+                      placeholder="Auto-constructed from IDP server and realm"
+                      readOnly
+                    />  
                   </div>
                   <div className="form-group">
                     <label htmlFor="client_id">Client ID</label>
