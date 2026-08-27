@@ -1,21 +1,16 @@
-# RTI Demo IEC 61850 Client Docker Image
-# Build context: iec61850-websocket/ (repo root)
+# RTI Demo IEC 61850 Client Docker Image - Multi-stage
+# Build context: repo root (see docker-compose.yml: context ../.., dockerfile examples/rti-demo/Dockerfile.acsi-ws-client)
 
-FROM python:3.13-slim
+# ============================================================
+# Stage 1: Builder
+# ============================================================
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_PREFERENCE=only-system
 
 WORKDIR /app
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PORT=5002
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 # Copy ws61850 as local module (must be before dependency install)
 COPY src/ws61850 /app/ws61850
@@ -27,14 +22,42 @@ COPY examples/rti-demo/pyproject.toml examples/rti-demo/uv.lock /app/
 ENV PYTHONPATH="/app:${PYTHONPATH}"
 
 # Install dependencies from lockfile
-RUN uv sync --frozen --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 # Copy application code
 COPY examples/rti-demo/acsi_ws_client/ /app/acsi_ws_client/
+
+
+# ============================================================
+# Stage 2: Runtime
+# ============================================================
+FROM python:3.13-slim AS runtime
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=5003 \
+    PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app:${PYTHONPATH}"
+
+# curl is required for the health check
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd --create-home --shell /usr/sbin/nologin app
+
+# Copy application and virtual environment
+COPY --from=builder --chown=app:app /app /app
+
+USER app
 
 EXPOSE 5003
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:5003/api/status || exit 1
 
-CMD ["./.venv/bin/python", "-u", "acsi_ws_client/bff_endpoint.py"]
+CMD ["python", "-u", "acsi_ws_client/bff_endpoint.py"]
