@@ -60,6 +60,7 @@ class ACSIClientRuntime:
 
         self.write_callback: Optional[Callable] = None
         self.report_callback: Optional[Callable] = None
+        self.connected_callback: Optional[Callable] = None
 
 
 class ACSIClient:
@@ -94,6 +95,13 @@ class ACSIClient:
         """
         self.runtime.report_callback = callback;
 
+    def install_connected_callback(self, callback):
+        """Install a callback to be invoked when associateResponse messages are received.
+        
+        The callback receives: associateResponse data (dict)
+        """
+        self.runtime.connected_callback = callback;
+
     def _on_recv_message(self, msg, ts):
         """Callback for received WebSocket messages."""
         # Check if this is a report service message
@@ -114,9 +122,14 @@ class ACSIClient:
                 msg_dict = {}
         
         if isinstance(msg_dict, dict):
+            # Get service_data from either unconfirmed or associate path
             service_data = msg_dict.get("unconfirmed", {}).get("service", {})
+            if not service_data:
+                service_data = msg_dict.get("associate", {}).get("service", {})
+            
             if isinstance(service_data, dict):
-                is_report = "report" in service_data
+                service_name = next(iter(service_data.keys())) if service_data else None
+                is_report = service_name == "report"
                 if is_report:
                     report_data = service_data.get("report", {})
                     report_info = {
@@ -143,6 +156,11 @@ class ACSIClient:
                             report_info["dataSet"],
                             report_info["data"]
                         )
+                elif service_name == "associateResponse":
+                    # Handle associateResponse service
+                    associate_response = service_data.get("associateResponse", {})
+                    if self.runtime.connected_callback is not None:
+                        self.runtime.connected_callback(associate_response)
         
         self._log_message("recv", msg, ts)
 

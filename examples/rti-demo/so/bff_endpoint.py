@@ -515,7 +515,42 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
     rti_so.install_report_callback(on_report_callback)
 
+    def on_connected_callback(associate_response):
+        """Callback for received associateResponse messages."""
+        logger.info(f"[CONNECTED] associateResponse: {associate_response}")
+        
+        if _use_io_client:
+            try:
+                from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                from demo_IO.io_client.io_utils import blink_led_task, write_to_lcd
+                
+                io_client = get_io_client()
+                mapping_manager = get_mapping_manager()
+                logger.info(f"IO client for connected: {io_client}")
+                if io_client:
+                    # Use associateId as identifier, or a default
+                    associate_id = associate_response.get("associateId", "connected")
+                    # Blink LED to indicate connection
+                    asyncio.create_task(
+                        blink_led_task(io_client, associate_id, interval=0.5, count=2, mapping_manager=mapping_manager)
+                    )
+                    
+                    # Write connection info to LCD
+                    value = f"Connected: {associate_id}"
+                    asyncio.create_task(
+                        write_to_lcd(io_client, associate_id, value, mapping_manager=mapping_manager)
+                    )
+                else:
+                    logger.warning("IO client is None - cannot turn on LED. Call /api/io/connect first.")
+            except ImportError as e:
+                logger.error(f"ImportError - Cannot import IO client: {e}")
+            except Exception as e:
+                logger.error(f"Exception in IO connected callback: {e}")
+
+    rti_so.install_connected_callback(on_connected_callback)
+
     # ==================== Helper Functions ====================
+
     def _check_websocket_connection():
         """Verify that an active WebSocket connection exists.
 
