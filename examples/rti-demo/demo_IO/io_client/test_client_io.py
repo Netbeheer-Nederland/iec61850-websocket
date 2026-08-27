@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test script for client_io and io_router functionality.
+"""Test script for async_client_io and io_router functionality.
 
 This script tests:
 1. DemoIOClient direct usage
@@ -19,7 +19,7 @@ def test_demo_io_client():
     print("Testing DemoIOClient")
     print("=" * 60)
     
-    from .client_io import DemoIOClient
+    from .async_client_io import DemoIOClient
     
     # Test client creation
     client = DemoIOClient(base_url="http://localhost:8080")
@@ -129,7 +129,7 @@ async def test_io_router_endpoints():
 
 def main():
     """Run all tests."""
-    print("Running client_io and io_router tests...\n")
+    print("Running async_client_io and io_router tests...\n")
     
     results = []
     

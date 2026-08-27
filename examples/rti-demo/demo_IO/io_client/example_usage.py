@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Example usage of client_io and io_router for connecting ACSI to demo_IO.
+Example usage of async_client_io and io_router for connecting ACSI to demo_IO.
 
 This example demonstrates how to:
 1. Use DemoIOClient directly to control LEDs from ACSI
@@ -22,7 +22,7 @@ def example_direct_client_usage():
     print("Example 1: Direct DemoIOClient Usage")
     print("=" * 70)
     
-    from .client_io import DemoIOClient
+    from .async_client_io import DemoIOClient
     
     # Create client pointing to demo_IO service
     # demo_IO typically runs on port 8080
@@ -192,7 +192,7 @@ def example_programmatic_connection():
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
     from .io_router import create_io_router, set_io_client, get_io_client
-    from .client_io import DemoIOClient
+    from .async_client_io import DemoIOClient
     
     # Create app with IO router
     app = FastAPI()
@@ -234,7 +234,7 @@ def example_programmatic_connection():
 
 def main():
     """Run all examples."""
-    print("Running client_io usage examples...\n")
+    print("Running async_client_io usage examples...\n")
     
     examples = [
         ("Direct Client Usage", example_direct_client_usage),

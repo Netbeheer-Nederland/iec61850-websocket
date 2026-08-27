@@ -16,7 +16,7 @@ The demo_IO service provides a REST API for controlling IO devices (LEDs, potent
 
 ## Components
 
-### 1. `client_io.py` - DemoIOClient
+### 1. `async_client_io.py` - DemoIOClient & AsyncDemoIOClient
 
 A Python client library for communicating with the demo_IO service's REST API.
 
@@ -28,11 +28,12 @@ A Python client library for communicating with the demo_IO service's REST API.
 - Health checks and status monitoring
 - Device abstraction supporting multiple device types
 - Convenience methods for common operations
+- Both synchronous (`DemoIOClient`) and asynchronous (`AsyncDemoIOClient`) interfaces
 
-**Usage:**
+**Usage (Synchronous):**
 
 ```python
-from demo_IO.io_client.client_io import DemoIOClient
+from demo_IO.io_client.async_client_io import DemoIOClient
 
 # Create client
 client = DemoIOClient(base_url="http://localhost:8080")
@@ -151,7 +152,7 @@ curl http://localhost:5001/api/io/leds
 ### Option 3: Direct Client Usage in ACSI Code
 
 ```python
-from acsi.client_io import DemoIOClient
+from acsi.demo_IO.io_client.async_client_io import DemoIOClient
 
 # In your ACSI code, create a client and use it directly
 client = DemoIOClient(base_url="http://demo-io:8080")
@@ -307,8 +308,8 @@ docker run --network rti-network --name rti-acsi -p 5001:5001 -e DEMO_IO_URL=htt
 Run the test scripts:
 
 ```bash
-# Test client_io and io_router
-python examples/rti-demo/acsi/test_client_io.py
+# Test async_client_io and io_router
+python examples/rti-demo/demo_IO/io_client/test_client_io.py
 
 # Run standalone io_router tests
 python examples/rti-demo/acsi/test_io_router_standalone.py
@@ -319,7 +320,7 @@ python examples/rti-demo/acsi/example_usage.py
 
 ### Adding New IO Functionality
 
-1. **Extend DemoIOClient**: Add new methods to `client_io.py` for additional demo_IO API calls
+1. **Extend DemoIOClient**: Add new methods to `async_client_io.py` for additional demo_IO API calls
 2. **Add New Endpoints**: Add new routes to `io_router.py` to expose new functionality
 3. **Update BFF**: The IO router is automatically included in ACSI's BFF via `bff_endpoint.py`
 
@@ -388,7 +389,7 @@ python examples/rti-demo/acsi/example_usage.py
 
 ## Files
 
-- `client_io.py` - DemoIOClient HTTP client
+- `async_client_io.py` - DemoIOClient & AsyncDemoIOClient HTTP clients
 - `io_router.py` - FastAPI IO router for ACSI BFF
 - `test_client_io.py` - Test script for client and router
 - `test_io_router_standalone.py` - Standalone router tests
