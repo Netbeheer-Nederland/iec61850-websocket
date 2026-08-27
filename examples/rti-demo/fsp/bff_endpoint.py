@@ -179,6 +179,40 @@ def create_bff_router(
 
     rti_fsp = ACSIServer(factory_dir)
 
+    def on_connected_callback(associate_response):
+        """Callback for sent associateResponse messages."""
+        logger.info(f"[FSP CONNECTED] associateResponse: {associate_response}")
+        
+        if _use_io_client:
+            try:
+                from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                from demo_IO.io_client.io_utils import sync_to_io_device, write_to_lcd
+                
+                io_client = get_io_client()
+                mapping_manager = get_mapping_manager()
+                logger.info(f"[FSP] IO client for connected: {io_client}")
+                if io_client:
+                    # Use associateId as identifier, or a default
+                    associate_id = associate_response.get("associateId", "fsp_connected")
+                    # Turn LED ON (write True/1 to the LED reference)
+                    asyncio.create_task(
+                        sync_to_io_device(io_client, associate_id, True)
+                    )
+                    
+                    # Write connection info to LCD
+                    value = f"FSP Connected: {associate_id}"
+                    asyncio.create_task(
+                        write_to_lcd(io_client, associate_id, value, mapping_manager=mapping_manager)
+                    )
+                else:
+                    logger.warning("[FSP] IO client is None - cannot turn on LED. Call /api/io/connect first.")
+            except ImportError as e:
+                logger.error(f"[FSP] ImportError - Cannot import IO client: {e}")
+            except Exception as e:
+                logger.error(f"[FSP] Exception in IO connected callback: {e}")
+
+    rti_fsp.install_connected_callback(on_connected_callback)
+
     # ==================== Helper Functions ====================
     def serialize_data_attribute(da: DataAttribute) -> Dict[str, Any]:
         """Serialize a DataAttribute to JSON-compatible dict."""

@@ -66,6 +66,10 @@ class ACSIServerRuntime:
         self.recv_msg_callback: Optional[Callable] = None
         self.send_msg_callback: Optional[Callable] = None
 
+        # Service-specific callbacks
+        self.write_callback: Optional[Callable] = None
+        self.connected_callback: Optional[Callable] = None
+
 
 class ACSIServer:
     """IEC 61850 WebSocket server controller."""
@@ -78,8 +82,8 @@ class ACSIServer:
         self.runtime.model_version = 0
 
         self.runtime.endpoint = ActiveEndpoint()
-        self.runtime.endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
-        self.runtime.endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
+        self.runtime.endpoint.recv_msg_callback = self._on_recv_message
+        self.runtime.endpoint.send_msg_callback = self._on_send_message
 
         print(f"[DEBUG] New ACSIServer instance: model_path={model_path}, id={id(self.runtime)}")
 
@@ -153,6 +157,17 @@ class ACSIServer:
         iec61850_instance.recv_msg_callback = self.runtime.endpoint.recv_msg_callback
         self.runtime.server = iec61850_instance
         self.runtime.endpoint.add_iec61850_server(self.runtime.server)
+
+    def install_write_callback(self, callback):
+        """Install a callback to be invoked when write messages are received."""
+        self.runtime.write_callback = callback
+
+    def install_connected_callback(self, callback):
+        """Install a callback to be invoked when associateResponse messages are received.
+        
+        The callback receives: associateResponse data (dict)
+        """
+        self.runtime.connected_callback = callback
 
     def load_current_runtime_model(self) -> IedModel:
         """Load the current runtime model from model.py."""
@@ -340,6 +355,38 @@ class ACSIServer:
             category = "parse-error"
 
         return {"service_type": service_type, "category": category}
+
+    def _on_send_message(self, message: Any, timestamp: Any) -> None:
+        """Callback for sent WebSocket messages."""
+        # Check for associateResponse in sent messages
+        msg_dict = message
+        if isinstance(message, bytes):
+            try:
+                msg_dict = json.loads(message.decode("utf-8", errors="replace"))
+            except (json.JSONDecodeError, AttributeError):
+                msg_dict = {}
+        elif isinstance(message, str):
+            try:
+                msg_dict = json.loads(message)
+            except (json.JSONDecodeError, AttributeError):
+                msg_dict = {}
+        
+        if isinstance(msg_dict, dict):
+            # Get service_data from associate path for sent messages
+            service_data = msg_dict.get("associate", {}).get("service", {})
+            
+            if isinstance(service_data, dict):
+                service_name = next(iter(service_data.keys())) if service_data else None
+                if service_name == "associateResponse":
+                    associate_response = service_data.get("associateResponse", {})
+                    if self.runtime.connected_callback is not None:
+                        self.runtime.connected_callback(associate_response)
+        
+        self._log_message("send", message, timestamp)
+
+    def _on_recv_message(self, msg, ts):
+        """Callback for received WebSocket messages."""
+        self._log_message("recv", msg, ts)
 
     def _log_message(self, direction: str, message: Any, timestamp: Any) -> None:
         """Log a message (request/response) to the runtime messages deque."""
