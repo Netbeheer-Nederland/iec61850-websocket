@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
@@ -124,9 +124,12 @@ class IOMappingRequest(BaseModel):
 
 
 class IOMappingResponse(BaseModel):
-    """Response for IO mapping operations."""
+    """Response for IO mapping operations.
+    
+    objRef can be a string (single objRef) or list of strings (multiple objRefs per device).
+    """
     device_name: str
-    objRef: Optional[str] = None
+    objRef: Optional[Union[str, List[str]]] = None
     description: str = ""
     direction: str = "output"
     device_type: Optional[str] = None

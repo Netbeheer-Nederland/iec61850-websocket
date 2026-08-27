@@ -1,14 +1,23 @@
 {
   "leds": {
-    "led1": {
-      "device_name": "led1",
+    "lcd1": {
+      "device_name": "lcd1",
+      "objRef": [
+        "MinMaxAvg",
+        "Setpoints"
+      ],
+      "direction": "output",
+      "device_type": "lcd"
+    },
+    "led2": {
+      "device_name": "led2",
       "objRef": "MinMaxAvg",
       "direction": "output",
       "device_type": "led"
     },
-    "led2": {
-      "device_name": "led2",
-      "objRef": "LD0/LPHD1.Proxy.stVal",
+    "led3": {
+      "device_name": "led3",
+      "objRef": "Setpoints",
       "direction": "output",
       "device_type": "led"
     }

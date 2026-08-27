@@ -456,7 +456,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         if _use_io_client and result:
             try:
                 # Get the existing IO router's client and mapping manager
-                from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                from demo_IO.io_client.io_router import get_io_client
                 from demo_IO.io_client.io_utils import sync_to_io_device
                 
                 io_client = get_io_client()
@@ -487,15 +487,22 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             try:
                 # Get the existing IO router's client and mapping manager
                 from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
-                from demo_IO.io_client.io_utils import blink_led_task
+                from demo_IO.io_client.io_utils import blink_led_task, write_to_lcd
                 
                 io_client = get_io_client()
+                mapping_manager = get_mapping_manager()
                 logger.info(f"IO client for sync: {io_client}")
                 if io_client:
                     # Fire-and-forget: don't wait for LED blink to complete
                     # Check health and blink LED in background
                     asyncio.create_task(
-                        blink_led_task(io_client, rptID, interval=0.2, count=1)
+                        blink_led_task(io_client, rptID, interval=0.2, count=1, mapping_manager=mapping_manager)
+                    )
+
+                    value = f"rptID={rptID} dataSet={dataSet}"
+
+                    asyncio.create_task(
+                        write_to_lcd(io_client, rptID, value, mapping_manager=mapping_manager)
                     )
 
                 else:
@@ -2568,15 +2575,16 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 if _use_io_client:
                     try:
                         # Get the existing IO router's client and mapping manager
-                        from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
-                        
+                        from demo_IO.io_client.io_router import get_io_client
+                        from demo_IO.io_client.io_utils import sync_to_io_device
+
                         io_client = get_io_client()
                         logger.info(f"[SO] IO client for sync: {io_client}")
                         if io_client:
                             # Fire-and-forget: don't wait for IO sync to complete
                             # Check health and sync in background
                             asyncio.create_task(
-                                _sync_to_io_device(io_client, obj_ref, value)
+                                sync_to_io_device(io_client, obj_ref, value)
                             )
                         else:
                             logger.warning("[SO] IO client is None - cannot sync to device. Call /api/io/connect first.")

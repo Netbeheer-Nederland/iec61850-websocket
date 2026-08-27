@@ -66,20 +66,36 @@ DEFAULT_BACKOFF_FACTOR = 0.5
 DEFAULT_RETRY_STATUS_CODES = [429, 500, 502, 503, 504]
 
 
-# ==================== RE-EXPORT EXCEPTIONS FROM client_io ====================
-# Import and re-export for convenience
+# ==================== EXCEPTION CLASSES ====================
+# Define exception classes locally (previously imported from client_io)
 
-from .client_io import (
-    DemoIOClientError,
-    ConnectionError,
-    RequestTimeoutError,
-    APIError,
-    DeviceNotFoundError,
-    AuthenticationError,
-)
+class DemoIOClientError(Exception):
+    """Base exception for demo_IO client errors."""
+    pass
+
+class ConnectionError(Exception):
+    """Connection to demo_IO server failed."""
+    pass
+
+class RequestTimeoutError(Exception):
+    """Request to demo_IO server timed out."""
+    pass
+
+class APIError(Exception):
+    """API error from demo_IO server."""
+    pass
+
+class DeviceNotFoundError(Exception):
+    """Requested device not found in demo_IO."""
+    pass
+
+class AuthenticationError(Exception):
+    """Authentication failed for demo_IO."""
+    pass
 
 __all__ = [
     "AsyncDemoIOClient",
+    "DemoIOClient",
     "DemoIOClientError",
     "ConnectionError",
     "RequestTimeoutError",
@@ -595,6 +611,55 @@ class AsyncDemoIOClient:
             "objRef": obj_ref
         }
     
+    # ==================== LCD SPECIFIC METHODS ====================
+    
+    async def write_lcd(
+        self,
+        device_name: str,
+        text: Union[str, List[str]]
+    ) -> Dict[str, Any]:
+        """Write text to an LCD display.
+        
+        Args:
+            device_name: Name of the LCD device (e.g., "lcd1")
+            text: Text to display. Can be a single string or list of strings (one per line)
+        
+        Returns:
+            Write confirmation
+        """
+        data = {"text": text}
+        return await self._request("POST", f"/lcd/{device_name}/write", json=data)
+    
+    async def write_lcd_line(
+        self,
+        device_name: str,
+        line_number: int,
+        text: str
+    ) -> Dict[str, Any]:
+        """Write text to a specific line on an LCD display.
+        
+        Args:
+            device_name: Name of the LCD device
+            line_number: Line number (0-indexed)
+            text: Text to write to the specified line
+        
+        Returns:
+            Write confirmation
+        """
+        data = {"line_number": line_number, "text": text}
+        return await self._request("POST", f"/lcd/{device_name}/write-line", json=data)
+    
+    async def clear_lcd(self, device_name: str) -> Dict[str, Any]:
+        """Clear an LCD display.
+        
+        Args:
+            device_name: Name of the LCD device
+        
+        Returns:
+            Clear confirmation
+        """
+        return await self._request("POST", f"/lcd/{device_name}/clear")
+    
     async def write_iec61850_value(
         self,
         obj_ref: str,
@@ -701,3 +766,262 @@ class AsyncDemoIOClient:
                     loop.run_until_complete(self.aclose())
             except:
                 pass
+
+
+class DemoIOClient:
+    """Synchronous wrapper for AsyncDemoIOClient.
+    
+    This class provides a synchronous interface to the demo_IO API by wrapping
+    the async methods of AsyncDemoIOClient. It uses asyncio.run() to execute
+    async code synchronously.
+    
+    Note: This should only be used in synchronous contexts. For async applications,
+    use AsyncDemoIOClient directly.
+    
+    Usage:
+        from demo_IO.io_client.async_client_io import DemoIOClient
+        
+        client = DemoIOClient(base_url="http://localhost:8080")
+        # Use synchronous methods
+        state = client.get_led_state("led1")
+        client.set_device("led1", state=True)
+    """
+    
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8080",
+        mapping_file: Optional[str] = None,
+        timeout: float = DEFAULT_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
+        retry_status_codes: Optional[List[int]] = None,
+        api_key: Optional[str] = None,
+        follow_redirects: bool = True,
+        limits: Optional[httpx.Limits] = None,
+        acsi_base_url: Optional[str] = None
+    ):
+        """Initialize the synchronous demo_IO client.
+        
+        This creates an AsyncDemoIOClient internally and wraps its methods.
+        
+        Args:
+            base_url: Base URL of the demo_IO service
+            mapping_file: Optional path to io_mapping.json file
+            timeout: Request timeout in seconds
+            max_retries: Maximum number of retry attempts
+            backoff_factor: Exponential backoff factor
+            retry_status_codes: HTTP status codes to retry on
+            api_key: Optional API key for authentication
+            follow_redirects: Whether to follow HTTP redirects
+            limits: httpx connection limits
+            acsi_base_url: Base URL of ACSI server for IEC61850 writes
+        """
+        self._async_client = AsyncDemoIOClient(
+            base_url=base_url,
+            mapping_file=mapping_file,
+            timeout=timeout,
+            max_retries=max_retries,
+            backoff_factor=backoff_factor,
+            retry_status_codes=retry_status_codes,
+            api_key=api_key,
+            follow_redirects=follow_redirects,
+            limits=limits,
+            acsi_base_url=acsi_base_url
+        )
+    
+    def _sync(self, coro):
+        """Run an async coroutine synchronously."""
+        return asyncio.run(coro)
+    
+    # Properties that delegate to async client
+    @property
+    def base_url(self):
+        return self._async_client.base_url
+    
+    @property
+    def io_base(self):
+        return self._async_client.io_base
+    
+    @property
+    def timeout(self):
+        return self._async_client.timeout
+    
+    @timeout.setter
+    def timeout(self, value):
+        self._async_client.timeout = value
+    
+    @property
+    def max_retries(self):
+        return self._async_client.max_retries
+    
+    @max_retries.setter
+    def max_retries(self, value):
+        self._async_client.max_retries = value
+    
+    @property
+    def api_key(self):
+        return self._async_client.api_key
+    
+    @api_key.setter
+    def api_key(self, value):
+        self._async_client.api_key = value
+    
+    @property
+    def mapping(self):
+        return self._async_client.mapping
+    
+    def get_mapping_manager(self):
+        return self._async_client.get_mapping_manager()
+    
+    def set_acsi_base_url(self, url: str):
+        return self._async_client.set_acsi_base_url(url)
+    
+    def get_acsi_base_url(self) -> str:
+        return self._async_client.get_acsi_base_url()
+    
+    # Synchronous wrapper methods for all async methods
+    def health_check(self) -> Dict[str, Any]:
+        return self._sync(self._async_client.health_check())
+    
+    def is_healthy(self) -> bool:
+        return self._sync(self._async_client.is_healthy())
+    
+    def get_status(self) -> Dict[str, Any]:
+        return self._sync(self._async_client.get_status())
+    
+    def get_api_info(self) -> Dict[str, Any]:
+        return self._sync(self._async_client.get_api_info())
+    
+    def get_auth_status(self) -> Dict[str, Any]:
+        return self._sync(self._async_client.get_auth_status())
+    
+    def config_led(self, name: str, gpio_pin: int, description: str = "", 
+                  initial_state: bool = False) -> Dict[str, Any]:
+        return self._sync(self._async_client.config_led(name, gpio_pin, description, initial_state))
+    
+    def list_leds(self) -> Dict[str, Any]:
+        return self._sync(self._async_client.list_leds())
+    
+    def get_led_state(self, name: str) -> Dict[str, Any]:
+        return self._sync(self._async_client.get_led_state(name))
+    
+    def set_led(self, name: str, state: bool) -> Dict[str, Any]:
+        return self._sync(self._async_client.set_led(name, state))
+    
+    def toggle_led(self, name: str) -> Dict[str, Any]:
+        return self._sync(self._async_client.toggle_led(name))
+    
+    def set_all_leds(self, state: bool) -> Dict[str, Any]:
+        return self._sync(self._async_client.set_all_leds(state))
+    
+    def all_leds_on(self) -> Dict[str, Any]:
+        return self._sync(self._async_client.all_leds_on())
+    
+    def all_leds_off(self) -> Dict[str, Any]:
+        return self._sync(self._async_client.all_leds_off())
+    
+    def initialize(self) -> Dict[str, Any]:
+        return self._sync(self._async_client.initialize())
+    
+    def cleanup(self) -> Dict[str, Any]:
+        return self._sync(self._async_client.cleanup())
+    
+    def get_device(self, name: str) -> Dict[str, Any]:
+        return self._sync(self._async_client.get_device(name))
+    
+    def set_device(self, name: str, state: Union[bool, int, float]) -> Dict[str, Any]:
+        return self._sync(self._async_client.set_device(name, state))
+    
+    def get_device_state(self, name: str) -> Dict[str, Any]:
+        return self._sync(self._async_client.get_device_state(name))
+    
+    def set_all_devices(self, state: Union[bool, int, float]) -> Dict[str, Any]:
+        return self._sync(self._async_client.set_all_devices(state))
+    
+    def get_all_states(self) -> Dict[str, Any]:
+        return self._sync(self._async_client.get_all_states())
+    
+    def list_devices(self) -> List[str]:
+        return self._sync(self._async_client.list_devices())
+    
+    def get_device_info(self, name: str) -> Dict[str, Any]:
+        return self._sync(self._async_client.get_device_info(name))
+    
+    def delete_device(self, name: str) -> Dict[str, Any]:
+        return self._sync(self._async_client.delete_device(name))
+    
+    # Convenience methods
+    def turn_on(self, name: str) -> Dict[str, Any]:
+        return self.set_device(name, True)
+    
+    def turn_off(self, name: str) -> Dict[str, Any]:
+        return self.set_device(name, False)
+    
+    def add_led(self, name: str, gpio_pin: int, description: str = "", initial_state: bool = False) -> Dict[str, Any]:
+        return self.config_led(name, gpio_pin, description, initial_state)
+    
+    def create_led(self, name: str, gpio_pin: int, description: str = "", initial_state: bool = False) -> Dict[str, Any]:
+        return self.config_led(name, gpio_pin, description, initial_state)
+    
+    # Potentiometer methods
+    def config_potentiometer(self, name: str, adc_channel: int, min_value: float = 0.0, 
+                            max_value: float = 100.0, description: str = "") -> Dict[str, Any]:
+        return self._sync(self._async_client.config_potentiometer(name, adc_channel, min_value, max_value, description))
+    
+    def read_potentiometer(self, name: str) -> Dict[str, Any]:
+        return self._sync(self._async_client.read_potentiometer(name))
+    
+    def read_potentiometer_scaled(self, name: str) -> float:
+        return self._sync(self._async_client.read_potentiometer_scaled(name))
+    
+    def list_potentiometers(self) -> List[str]:
+        return self._sync(self._async_client.list_potentiometers())
+    
+    # Button methods
+    def config_button(self, name: str, gpio_pin: int, description: str = "", 
+                     debounce_ms: int = 50) -> Dict[str, Any]:
+        return self._sync(self._async_client.config_button(name, gpio_pin, description, debounce_ms))
+    
+    def get_button_state(self, name: str) -> Dict[str, Any]:
+        return self._sync(self._async_client.get_button_state(name))
+    
+    def list_buttons(self) -> List[str]:
+        return self._sync(self._async_client.list_buttons())
+    
+    # Generic IO methods
+    def read_analog(self, channel: int) -> Dict[str, Any]:
+        return self._sync(self._async_client.read_analog(channel))
+    
+    def read_digital(self, pin: int) -> Dict[str, Any]:
+        return self._sync(self._async_client.read_digital(pin))
+    
+    def write_digital(self, pin: int, state: bool) -> Dict[str, Any]:
+        return self._sync(self._async_client.write_digital(pin, state))
+    
+    def write_pwm(self, pin: int, duty_cycle: float) -> Dict[str, Any]:
+        return self._sync(self._async_client.write_pwm(pin, duty_cycle))
+    
+    # IEC61850 write method
+    def write_iec61850(self, obj_ref: str, value: Any, fc: str = "ST") -> bool:
+        return self._sync(self._async_client.write_iec61850(obj_ref, value, fc))
+    
+    # Session management
+    def close(self):
+        """Close the underlying async client."""
+        self._sync(self._async_client.aclose())
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.close()
+        return False
+    
+    def __del__(self):
+        """Destructor - ensure session is closed."""
+        try:
+            self.close()
+        except:
+            pass
