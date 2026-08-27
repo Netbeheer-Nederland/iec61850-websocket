@@ -58,6 +58,9 @@ class ACSIClientRuntime:
         self.recv_msg_callback: Optional[Callable] = None
         self.send_msg_callback: Optional[Callable] = None
 
+        self.write_callback: Optional[Callable] = None
+        self.report_callback: Optional[Callable] = None
+
 
 class ACSIClient:
     """IEC 61850 WebSocket client controller."""
@@ -65,8 +68,8 @@ class ACSIClient:
     def __init__(self):
         self.runtime = ACSIClientRuntime()
         self.runtime.endpoint = PassiveEndpoint()
-        self.runtime.endpoint.recv_msg_callback = lambda msg, ts: self._log_message("recv", msg, ts)
-        self.runtime.endpoint.send_msg_callback = lambda msg, ts: self._log_message("send", msg, ts)
+        self.runtime.endpoint.recv_msg_callback = self._on_recv_message
+        self.runtime.endpoint.send_msg_callback = self._on_send_message
         #self.runtime.client = IEC61850Client(self.runtime.cp)
         #self.runtime.endpoint.add_iec61850_client(self.runtime.client)
         self.runtime.client_list = self.runtime.endpoint.client_list
@@ -81,6 +84,71 @@ class ACSIClient:
         #start Websocket Passive instance
         self.connect("0.0.0.0", 8765)
 
+    def install_write_callback(self, callback):
+       self.runtime.write_callback = callback;
+
+    def install_report_callback(self, callback):
+        """Install a callback to be invoked when report messages are received.
+        
+        The callback receives: rptID, dataSet, data (list of {dataRef, value})
+        """
+        self.runtime.report_callback = callback;
+
+    def _on_recv_message(self, msg, ts):
+        """Callback for received WebSocket messages."""
+        # Check if this is a report service message
+        is_report = False
+        report_info = {}
+        
+        # Parse msg if it's a string or bytes
+        msg_dict = msg
+        if isinstance(msg, bytes):
+            try:
+                msg_dict = json.loads(msg.decode("utf-8", errors="replace"))
+            except (json.JSONDecodeError, AttributeError):
+                msg_dict = {}
+        elif isinstance(msg, str):
+            try:
+                msg_dict = json.loads(msg)
+            except (json.JSONDecodeError, AttributeError):
+                msg_dict = {}
+        
+        if isinstance(msg_dict, dict):
+            service_data = msg_dict.get("unconfirmed", {}).get("service", {})
+            if isinstance(service_data, dict):
+                is_report = "report" in service_data
+                if is_report:
+                    report_data = service_data.get("report", {})
+                    report_info = {
+                        "rptID": report_data.get("rptID"),
+                        "dataSet": report_data.get("dataSet"),
+                        "data": []
+                    }
+                    # Extract dataRef + values from entryData
+                    entry_data = report_data.get("entryData", [])
+                    if isinstance(entry_data, list):
+                        for entry in entry_data:
+                            if isinstance(entry, dict):
+                                data_ref = entry.get("dataRef")
+                                value = entry.get("value")
+                                report_info["data"].append({
+                                    "dataRef": data_ref,
+                                    "value": value
+                                })
+                    
+                    # Call external report callback if installed
+                    if self.runtime.report_callback is not None:
+                        self.runtime.report_callback(
+                            report_info["rptID"],
+                            report_info["dataSet"],
+                            report_info["data"]
+                        )
+        
+        self._log_message("recv", msg, ts)
+
+    def _on_send_message(self, msg, ts):
+        """Callback for sent WebSocket messages."""
+        self._log_message("send", msg, ts)
 
     def _update_model_info_dict(self):
         """Sync ModelInfo dict with current client_list, preserving existing objects"""
@@ -712,7 +780,7 @@ class ACSIClient:
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
         if data_type == "boolean":
             value = bool(value)
-        result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, None, None)
+        result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, self.runtime.write_callback, None)
         print(result)
         print("Write operation completed successfully.")
         print("new value:", value)
