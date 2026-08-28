@@ -40,6 +40,13 @@ try:
 except ImportError:
     GPOD_AVAILABLE = False
 
+# Import smbus2 at module level for I2C LCD
+try:
+    import smbus2
+    SMBUS2_AVAILABLE = True
+except ImportError:
+    SMBUS2_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,6 +63,7 @@ class DeviceType(Enum):
     BUZZER = "buzzer"        # Buzzer/speaker
     SENSOR = "sensor"        # Generic sensor
     LCD = "lcd"              # LCD display (HD44780 controller)
+    LCD_I2C = "lcd_i2c"      # LCD display (HD44780 with I2C backpack)
 
 
 class DeviceDirection(Enum):
@@ -185,6 +193,74 @@ class LCDConfig(DeviceConfig):
             "backlight_pin": self.backlight_pin,
         })
         return result
+
+
+@dataclass
+class LCDI2CConfig(DeviceConfig):
+    """Configuration for LCD display devices with I2C backpack (PCF8574, etc.)."""
+    device_type: DeviceType = field(default=DeviceType.LCD_I2C, init=False)
+    direction: DeviceDirection = field(default=DeviceDirection.OUTPUT, init=False)
+    # I2C configuration
+    i2c_address: int = 0x27  # Common addresses: 0x27, 0x3F for PCF8574 backpacks
+    i2c_bus: int = 1        # Raspberry Pi I2C bus (usually 1)
+    columns: int = 16
+    rows: int = 2
+    backlight: bool = True
+    # PCF8574 pin mapping (bit positions in the I2C byte)
+    # Typically: P0=RS, P1=RW, P2=E, P3=BL, P4=D4, P5=D5, P6=D6, P7=D7
+    # These can be customized if backpack uses different mapping
+    rs_bit: int = 0
+    rw_bit: int = 1
+    e_bit: int = 2
+    backlight_bit: int = 3
+    d4_bit: int = 4
+    d5_bit: int = 5
+    d6_bit: int = 6
+    d7_bit: int = 7
+    
+    def __post_init__(self):
+        self.direction = DeviceDirection.OUTPUT
+        
+    def to_dict(self) -> Dict[str, Any]:
+        result = super().to_dict()
+        result.update({
+            "i2c_address": self.i2c_address,
+            "i2c_bus": self.i2c_bus,
+            "columns": self.columns,
+            "rows": self.rows,
+            "backlight": self.backlight,
+            "rs_bit": self.rs_bit,
+            "rw_bit": self.rw_bit,
+            "e_bit": self.e_bit,
+            "backlight_bit": self.backlight_bit,
+            "d4_bit": self.d4_bit,
+            "d5_bit": self.d5_bit,
+            "d6_bit": self.d6_bit,
+            "d7_bit": self.d7_bit,
+        })
+        return result
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LCDI2CConfig":
+        """Create config from dictionary, handling device_type properly."""
+        return cls(
+            name=data.get("name", ""),
+            identifier=data.get("identifier", 0),
+            description=data.get("description", ""),
+            i2c_address=data.get("i2c_address", 0x27),
+            i2c_bus=data.get("i2c_bus", 1),
+            columns=data.get("columns", 16),
+            rows=data.get("rows", 2),
+            backlight=data.get("backlight", True),
+            rs_bit=data.get("rs_bit", 0),
+            rw_bit=data.get("rw_bit", 1),
+            e_bit=data.get("e_bit", 2),
+            backlight_bit=data.get("backlight_bit", 3),
+            d4_bit=data.get("d4_bit", 4),
+            d5_bit=data.get("d5_bit", 5),
+            d6_bit=data.get("d6_bit", 6),
+            d7_bit=data.get("d7_bit", 7),
+        )
 
 
 @dataclass
@@ -1166,6 +1242,391 @@ class LCDDevice(IODevice):
         return self._hardware_available
 
 
+class LCDI2CDevice(IODevice):
+    """
+    LCD display device with I2C backpack (PCF8574) for HD44780 controller.
+    Communicates via I2C instead of GPIO.
+    
+    Most I2C LCD backpacks use PCF8574 I/O expander with this pin mapping:
+    - P0 (bit 0): RS (Register Select)
+    - P1 (bit 1): RW (Read/Write) - usually tied LOW for write-only
+    - P2 (bit 2): E (Enable)
+    - P3 (bit 3): BL (Backlight control)
+    - P4 (bit 4): D4 (Data bit 4)
+    - P5 (bit 5): D5 (Data bit 5)
+    - P6 (bit 6): D6 (Data bit 6)
+    - P7 (bit 7): D7 (Data bit 7)
+    """
+    
+    # LCD command constants (same as LCDDevice)
+    LCD_CLEARDISPLAY = 0x01
+    LCD_RETURNHOME = 0x02
+    LCD_ENTRYMODESET = 0x04
+    LCD_DISPLAYCONTROL = 0x08
+    LCD_CURSORSHIFT = 0x10
+    LCD_FUNCTIONSET = 0x20
+    LCD_SETCGRAMADDR = 0x40
+    LCD_SETDDRAMADDR = 0x80
+    
+    LCD_ENTRYRIGHT = 0x00
+    LCD_ENTRYLEFT = 0x02
+    LCD_ENTRYSHIFTINCREMENT = 0x01
+    LCD_ENTRYSHIFTDECREMENT = 0x00
+    
+    LCD_DISPLAYON = 0x04
+    LCD_DISPLAYOFF = 0x00
+    LCD_CURSORON = 0x02
+    LCD_CURSOROFF = 0x00
+    LCD_BLINKON = 0x01
+    LCD_BLINKOFF = 0x00
+    
+    LCD_DISPLAYMOVE = 0x08
+    LCD_CURSORMOVE = 0x00
+    LCD_MOVERIGHT = 0x04
+    LCD_MOVELEFT = 0x00
+    
+    LCD_8BITMODE = 0x10
+    LCD_4BITMODE = 0x00
+    LCD_2LINE = 0x08
+    LCD_1LINE = 0x00
+    LCD_5x10DOTS = 0x04
+    LCD_5x8DOTS = 0x00
+    
+    def __init__(self, config: LCDI2CConfig):
+        self.config = config
+        self._i2c_address = config.i2c_address
+        self._i2c_bus = config.i2c_bus
+        self._columns = config.columns
+        self._rows = config.rows
+        self._backlight = config.backlight
+        
+        # Bit positions for PCF8574 backpack
+        self._rs_bit = config.rs_bit
+        self._rw_bit = config.rw_bit
+        self._e_bit = config.e_bit
+        self._backlight_bit = config.backlight_bit
+        self._d4_bit = config.d4_bit
+        self._d5_bit = config.d5_bit
+        self._d6_bit = config.d6_bit
+        self._d7_bit = config.d7_bit
+        
+        self._hardware_available = False
+        self._bus = None
+        self._display_function = 0
+        self._display_control = 0
+        self._display_mode = 0
+        
+        self._init_hardware()
+        if self._hardware_available:
+            self._initialize_display()
+            logger.info(f"Initialized I2C LCD device '{config.name}' ({config.columns}x{config.rows}) at 0x{config.i2c_address:02X} on bus {config.i2c_bus}")
+        else:
+            logger.warning(f"I2C hardware not available for LCD '{config.name}'. Using mock mode.")
+    
+    def _init_hardware(self) -> None:
+        """Initialize I2C bus using smbus2."""
+        if not SMBUS2_AVAILABLE:
+            logger.warning("smbus2 library not available. I2C LCD requires smbus2. Install with: pip install smbus2")
+            self._hardware_available = False
+            return
+        
+        try:
+            self._bus = smbus2.SMBus(self._i2c_bus)
+            # Test communication with the device
+            self._bus.read_byte(self._i2c_address)
+            self._hardware_available = True
+        except Exception as e:
+            logger.warning(f"I2C initialization failed for LCD '{self.config.name}': {e}")
+            self._hardware_available = False
+    
+    def _write_byte_to_bus(self, byte_value: int) -> None:
+        """Write a single byte to the I2C device."""
+        if not self._hardware_available or self._bus is None:
+            return
+        try:
+            self._bus.write_byte(self._i2c_address, byte_value)
+        except Exception as e:
+            logger.warning(f"Failed to write to I2C bus: {e}")
+    
+    def _pulse_enable(self, data_byte: int) -> None:
+        """Pulse the enable pin to latch data."""
+        if not self._hardware_available:
+            return
+        try:
+            # Send with E low
+            self._write_byte_to_bus(data_byte & ~(1 << self._e_bit))
+            time.sleep(0.000005)  # 5 microseconds
+            # Send with E high
+            self._write_byte_to_bus(data_byte | (1 << self._e_bit))
+            time.sleep(0.000005)  # 5 microseconds pulse width
+            # Send with E low
+            self._write_byte_to_bus(data_byte & ~(1 << self._e_bit))
+            time.sleep(0.000050)  # 50 microseconds delay
+        except Exception as e:
+            logger.warning(f"Failed to pulse enable: {e}")
+    
+    def _write_nibble(self, nibble: int, mode: int) -> None:
+        """
+        Write 4 bits to the LCD via I2C.
+        mode: 0=command, 1=data (controls RS bit)
+        """
+        if not self._hardware_available:
+            return
+        
+        try:
+            # Build the byte for PCF8574
+            # Start with all bits low
+            byte_out = 0
+            
+            # Set RS bit based on mode
+            if mode:
+                byte_out |= (1 << self._rs_bit)
+            
+            # RW is always low for writing
+            byte_out &= ~(1 << self._rw_bit)
+            
+            # Set backlight bit
+            if self._backlight:
+                byte_out |= (1 << self._backlight_bit)
+            
+            # Set data bits D4-D7 from the nibble
+            if (nibble >> 0) & 0x01:
+                byte_out |= (1 << self._d4_bit)
+            if (nibble >> 1) & 0x01:
+                byte_out |= (1 << self._d5_bit)
+            if (nibble >> 2) & 0x01:
+                byte_out |= (1 << self._d6_bit)
+            if (nibble >> 3) & 0x01:
+                byte_out |= (1 << self._d7_bit)
+            
+            # Pulse enable with this byte
+            self._pulse_enable(byte_out)
+            
+        except Exception as e:
+            logger.warning(f"Failed to write nibble via I2C: {e}")
+    
+    def _send_byte(self, value: int, mode: int) -> None:
+        """
+        Send a byte to the LCD in 4-bit mode via I2C.
+        mode: 0=command, 1=data
+        """
+        if not self._hardware_available:
+            return
+        
+        try:
+            mode_str = "DATA" if mode else "COMMAND"
+            logger.info(f"[I2C LCD SEND] {mode_str} 0x{value:02X} ({value})")
+            
+            # Send high nibble
+            high = value >> 4
+            self._write_nibble(high, mode)
+            
+            # Send low nibble
+            low = value & 0x0F
+            self._write_nibble(low, mode)
+            
+        except Exception as e:
+            logger.warning(f"Failed to send byte via I2C: {e}")
+    
+    def _initialize_display(self) -> None:
+        """Initialize the LCD with proper HD44780 timing via I2C."""
+        if not self._hardware_available:
+            return
+        
+        try:
+            time.sleep(0.05)  # Wait 50ms for power-on
+            
+            # Initialization sequence for 4-bit mode
+            # First: Try 8-bit mode 3 times (as per HD44780 datasheet)
+            self._write_nibble(0b0011, 0)  # 0x3 - Function set (8-bit)
+            time.sleep(0.005)  # 5ms
+            
+            self._write_nibble(0b0011, 0)
+            time.sleep(0.001)  # 1ms
+            
+            self._write_nibble(0b0011, 0)
+            time.sleep(0.001)
+            
+            # Switch to 4-bit mode
+            self._write_nibble(0b0010, 0)  # 0x2 - 4-bit mode
+            time.sleep(0.001)
+            
+            # Function Set: 4-bit, 2 lines, 5x8 dots
+            self._display_function = self.LCD_FUNCTIONSET | self.LCD_4BITMODE | self.LCD_2LINE | self.LCD_5x8DOTS
+            self._send_byte(self._display_function, 0)
+            time.sleep(0.0016)  # >1.52ms for Function Set command
+            
+            # Display ON
+            self._display_control = self.LCD_DISPLAYCONTROL | self.LCD_DISPLAYON | self.LCD_CURSOROFF | self.LCD_BLINKOFF
+            self._send_byte(self._display_control, 0)
+            time.sleep(0.0016)  # >1.52ms for Display Control command
+            
+            # Clear display
+            self._send_byte(self.LCD_CLEARDISPLAY, 0)
+            time.sleep(0.0021)  # >2ms for clear display
+            
+            # Return Home
+            self._send_byte(self.LCD_RETURNHOME, 0)
+            time.sleep(0.0021)  # >2ms for return home
+            
+            # Entry mode: increment, no shift
+            self._display_mode = self.LCD_ENTRYMODESET | self.LCD_ENTRYLEFT | self.LCD_ENTRYSHIFTDECREMENT
+            self._send_byte(self._display_mode, 0)
+            time.sleep(0.0016)  # >1.52ms for Entry Mode Set command
+            
+            # Write startup message
+            self.write(["RTI", "DEMO"])
+            
+        except Exception as e:
+            logger.warning(f"Failed to initialize I2C LCD display: {e}")
+    
+    def read(self) -> Optional[str]:
+        """Read from LCD - not supported for output-only display."""
+        logger.warning(f"Read not supported for I2C LCD '{self.config.name}'")
+        return None
+    
+    def write(self, value: Union[bool, float, str, List[str]]) -> bool:
+        """
+        Write to the I2C LCD display.
+        
+        Args:
+            value: Can be:
+                - str: Text to display on first line
+                - List[str]: Multiple lines of text
+        """
+        if not self._hardware_available:
+            logger.debug(f"I2C LCD '{self.config.name}' in mock mode - write simulated")
+            # In mock mode, still return True to allow API testing
+            return True
+        
+        try:
+            logger.info(f"[I2C LCD DEBUG] Writing: {value}")
+            self.clear()
+            time.sleep(0.0021)  # >2ms delay after clear display
+            
+            if isinstance(value, str):
+                lines = [value]
+            elif isinstance(value, list):
+                lines = value
+            else:
+                lines = [str(value)]
+            
+            for i, line in enumerate(lines[:self._rows]):
+                row_offsets = [0x00, 0x40, 0x14, 0x54]
+                self._send_byte(self.LCD_SETDDRAMADDR | row_offsets[i], 0)
+                
+                for char in line[:self._columns]:
+                    self._send_byte(ord(char), 1)
+            
+            logger.info(f"[I2C LCD DEBUG] Write complete")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to write to I2C LCD '{self.config.name}': {e}")
+            return False
+    
+    def write_line(self, line_number: int, text: str) -> bool:
+        """Write text to a specific line (0-indexed)."""
+        if line_number < 0 or line_number >= self._rows:
+            logger.warning(f"Invalid line number {line_number} for I2C LCD with {self._rows} rows")
+            return False
+        
+        if not self._hardware_available:
+            logger.debug(f"I2C LCD '{self.config.name}' in mock mode - write_line simulated")
+            return True
+        
+        try:
+            row_offsets = [0x00, 0x40, 0x14, 0x54]
+            self._send_byte(self.LCD_SETDDRAMADDR | row_offsets[line_number], 0)
+            
+            for char in text[:self._columns]:
+                self._send_byte(ord(char), 1)
+            
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to write to I2C LCD line {line_number}: {e}")
+            return False
+    
+    def clear(self) -> bool:
+        """Clear the I2C LCD display."""
+        if not self._hardware_available:
+            logger.debug(f"I2C LCD '{self.config.name}' in mock mode - clear simulated")
+            return True
+        
+        try:
+            self._send_byte(self.LCD_CLEARDISPLAY, 0)
+            time.sleep(0.002)
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to clear I2C LCD '{self.config.name}': {e}")
+            return False
+    
+    def set_cursor(self, row: int, col: int) -> bool:
+        """Set cursor position (0-indexed row and column)."""
+        if row < 0 or row >= self._rows or col < 0 or col >= self._columns:
+            logger.warning(f"Invalid cursor position ({row}, {col}) for {self._columns}x{self._rows} I2C LCD")
+            return False
+        
+        if not self._hardware_available:
+            logger.debug(f"I2C LCD '{self.config.name}' in mock mode - set_cursor simulated")
+            return True
+        
+        try:
+            row_offsets = [0x00, 0x40, 0x14, 0x54]
+            address = row_offsets[row] + col
+            self._send_byte(self.LCD_SETDDRAMADDR | address, 0)
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to set I2C LCD cursor: {e}")
+            return False
+    
+    def display_on(self, state: bool = True) -> bool:
+        """Turn display on or off."""
+        if not self._hardware_available:
+            logger.debug(f"I2C LCD '{self.config.name}' in mock mode - display_on simulated")
+            return True
+        
+        try:
+            if state:
+                self._display_control |= self.LCD_DISPLAYON
+            else:
+                self._display_control &= ~self.LCD_DISPLAYON
+            self._send_byte(self._display_control, 0)
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to set I2C LCD display state: {e}")
+            return False
+    
+    def backlight_on(self, state: bool = True) -> bool:
+        """Turn backlight on or off."""
+        self._backlight = state
+        if self._hardware_available:
+            # Update backlight by sending any command (this will trigger backlight update)
+            self._send_byte(self._display_control, 0)
+        return True
+    
+    def close(self) -> None:
+        """Clean up I2C resources."""
+        try:
+            self.clear()
+            self.display_on(False)
+            self.backlight_on(False)
+        except Exception:
+            pass
+        
+        if self._bus is not None:
+            try:
+                self._bus.close()
+            except Exception:
+                pass
+            self._bus = None
+        
+        self._hardware_available = False
+    
+    @property
+    def is_connected(self) -> bool:
+        return self._hardware_available
+
+
 
 # ==================== MOCK DEVICES ====================
 
@@ -1183,6 +1644,7 @@ class DeviceFactory:
             DeviceType.POTENTIOMETER: PotentiometerDevice,
             DeviceType.BUTTON: ButtonDevice,
             DeviceType.LCD: LCDDevice,
+            DeviceType.LCD_I2C: LCDI2CDevice,
             DeviceType.PWM: LEDDevice,
             DeviceType.DAC: LEDDevice,
             DeviceType.RELAY: LEDDevice,
@@ -1235,4 +1697,24 @@ def validate_device_config(config: DeviceConfig) -> bool:
             raise ValueError(f"Invalid LCD columns {config.columns}. Valid: [8, 16, 20, 24, 40]")
         if config.rows not in [1, 2, 4]:
             raise ValueError(f"Invalid LCD rows {config.rows}. Valid: [1, 2, 4]")
+    elif config.device_type == DeviceType.LCD_I2C:
+        if not isinstance(config, LCDI2CConfig):
+            raise ValueError("I2C LCD config must be LCDI2CConfig")
+        # Validate I2C address (7-bit addresses: 0x08 to 0x77)
+        if config.i2c_address < 0x08 or config.i2c_address > 0x77:
+            raise ValueError(f"Invalid I2C address 0x{config.i2c_address:02X}. Valid range: 0x08-0x77")
+        # Validate I2C bus (typically 0 or 1 on Raspberry Pi)
+        if config.i2c_bus not in [0, 1]:
+            raise ValueError(f"Invalid I2C bus {config.i2c_bus}. Valid: [0, 1]")
+        # Validate bit positions (0-7 for PCF8574)
+        all_bits = [config.rs_bit, config.rw_bit, config.e_bit, config.backlight_bit,
+                    config.d4_bit, config.d5_bit, config.d6_bit, config.d7_bit]
+        for bit in all_bits:
+            if bit < 0 or bit > 7:
+                raise ValueError(f"Invalid bit position {bit}. Valid range: 0-7")
+        # Validate display dimensions
+        if config.columns not in [8, 16, 20, 24, 40]:
+            raise ValueError(f"Invalid I2C LCD columns {config.columns}. Valid: [8, 16, 20, 24, 40]")
+        if config.rows not in [1, 2, 4]:
+            raise ValueError(f"Invalid I2C LCD rows {config.rows}. Valid: [1, 2, 4]")
     return True

@@ -10,6 +10,21 @@
       "direction": "output",
       "device_type": "lcd"
     },
+    "lcd_i2c": {
+      "device_name": "lcd_i2c",
+      "objRef": [
+        "rc_rcv",
+        "connected",
+        "oper_send"
+      ],
+      "direction": "output",
+      "device_type": "lcd_i2c",
+      "i2c_address": 39,
+      "i2c_bus": 1,
+      "columns": 16,
+      "rows": 2,
+      "backlight": true
+    },
     "led2": {
       "device_name": "led2",
       "objRef": [
