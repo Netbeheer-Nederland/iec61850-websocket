@@ -120,9 +120,9 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
   const WRITABLE_FCS = ['CF', 'SP'];
   const isWritableFc =(fc) => WRITABLE_FCS.includes((fc || '').toUpperCase());
 
-  // Get connected endpoints
+  // Get connected endpoints (excluding IDP-Server type)
   const connectedEndpoints = useMemo(() => {
-    return connections.filter(conn => conn.status === 'connected');
+    return connections.filter(conn => conn.status === 'connected' && conn.type !== 'IDP-Server');
   }, [connections]);
 
   // Currently selected connection object
