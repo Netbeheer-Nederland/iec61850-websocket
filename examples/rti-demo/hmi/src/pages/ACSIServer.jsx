@@ -15,7 +15,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [port, setPort] = useState(String(8765));
   const [cp, setCp] = useState(endpoint?.cp || 'cp1');
   const [mode, setMode] = useState(endpoint?.mode || 'server');
-  const [connected, setConnected] = useState(false);
+  
+  // Create instance-specific storage key
+  const instanceId = endpoint?.name || `${endpoint?.host || host}:${endpoint?.port || port}`;
+  const storageKey = `acsi-server-connected-${instanceId}`;
+  
+  const [connected, setConnected] = useState(() => localStorage.getItem(storageKey) === 'true');
   const [treeData, setTreeData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -29,6 +34,10 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [showTLSModal, setShowTLSModal] = useState(false);
   const [useOAuth, setUseOAuth] = useState(false);
   const [message, setMessage] = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, String(connected));
+  }, [connected, storageKey]);
 
   const handleExpandToggle = useCallback((ref, expanded) => {
     setExpandedNodes(prev => ({
@@ -141,12 +150,15 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     setLoading(true); setError(null);
     try {
       const result = await executeApiCall('stop', endpointTarget, {});
-      if (!result?.ok) {
+      if (result?.ok) {
+        setConnected(false);
+        await loadStatus();
+      } else {
         setError(result?.payload?.error || result?.rawText || 'Failed to stop server');
       }
     } catch (error) { setError(error.message); }
     finally { setLoading(false); }
-  }, [endpointTarget, executeApiCall]);
+  }, [endpointTarget, executeApiCall, loadStatus]);
 
   const fetchActionLogs = useCallback(async () => {
     if (!endpointTarget) return;
@@ -293,10 +305,10 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           <label>WS Mode</label>
           <input type="text" value={mode} placeholder="server" onChange={(e) => setMode(e.target.value)} disabled={loading} />
         </div>
-        <button id="acsi-start-btn" className="btn-primary" onClick={handleStartServer} disabled={loading}>
+        <button id="acsi-start-btn" className="btn-primary" onClick={handleStartServer} disabled={loading || connected}>
           {loading ? 'Starting...' : 'Start Server'}
         </button>
-        <button id="acsi-stop-btn" className="btn-secondary" onClick={handleStopServer} disabled={loading}>
+        <button id="acsi-stop-btn" className="btn-secondary" onClick={handleStopServer} disabled={loading || !connected}>
           {loading ? 'Stopping...' : 'Stop Server'}
         </button>
       </div>
