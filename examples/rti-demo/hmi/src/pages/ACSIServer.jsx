@@ -11,8 +11,8 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const navigate = useNavigate();
   const endpoint = location.state?.endpoint;
   
-  const [host, setHost] = useState('rti-so');
-  const [port, setPort] = useState(String(8765));
+  const [host, setHost] = useState(endpoint?.host || 'rti-so');
+  const [port, setPort] = useState(String(endpoint?.port || 8765));
   const [cp, setCp] = useState(endpoint?.cp || 'cp1');
   const [mode, setMode] = useState(endpoint?.mode || 'server');
   
@@ -30,6 +30,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [expandedNodes, setExpandedNodes] = useState({});
   const [connections, setConnections] = useState(propConnections || []);
   const monitorIntervalRef = useRef(null);
+  const statusIntervalRef = useRef(null);
 
   const [showTLSModal, setShowTLSModal] = useState(false);
   const [useOAuth, setUseOAuth] = useState(false);
@@ -90,29 +91,19 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     [endpoint, host, port]
   );
 
-  // Fetch OAuth status from the FSP server on page load
-  useEffect(() => {
-    const fetchOAuthStatus = async () => {
-      if (!endpointTarget) return;
-      try {
-        const result = await executeApiCall('oauth-status', endpointTarget, {});
-        if (result?.ok) {
-          const enableOAuth = result.payload?.result?.enable_oauth ?? result.payload?.enable_oauth ?? false;
-          setUseOAuth(enableOAuth);
-        }
-      } catch (error) {
-        console.error('Failed to fetch OAuth status:', error);
-      }
-    };
-    fetchOAuthStatus();
-  }, [endpointTarget]);
-
   const stopMonitoring = useCallback(() => {
     if (monitorIntervalRef.current) {
       clearInterval(monitorIntervalRef.current);
       monitorIntervalRef.current = null;
     }
     setIsMonitoring(false);
+  }, []);
+
+  const stopStatusPolling = useCallback(() => {
+    if (statusIntervalRef.current) {
+      clearInterval(statusIntervalRef.current);
+      statusIntervalRef.current = null;
+    }
   }, []);
 
   const loadStatus = useCallback(async () => {
@@ -126,9 +117,46 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           parsedPayload.result.status = parsePythonDictString(parsedPayload.result.status);
         }
         setStatusInfo(parsedPayload);
+        
+        // Update form fields with actual server configuration
+        const serverConfig = parsedPayload.result?.status;
+        if (serverConfig) {
+          if (serverConfig.host) setHost(serverConfig.host);
+          if (serverConfig.port) setPort(String(serverConfig.port));
+          if (serverConfig.cp) setCp(serverConfig.cp);
+          if (serverConfig.mode) setMode(serverConfig.mode);
+        }
+        
+        // Sync connected state with actual server status
+        const serverStatus = parsedPayload.result?.status?.status;
+        if (serverStatus) {
+          // Server is considered connected if status is 'running', 'listening', 'connected', or 'starting'
+          setConnected(['running', 'listening', 'connected', 'starting'].includes(serverStatus));
+        }
       }
     } catch (error) { console.error('Failed to load status:', error); }
   }, [endpointTarget, executeApiCall, parsePythonDictString]);
+
+  // Load server status and OAuth status on page load
+  useEffect(() => {
+    if (!endpointTarget) return;
+    const fetchInitialData = async () => {
+      try {
+        // Load server status
+        await loadStatus();
+        
+        // Fetch OAuth status
+        const result = await executeApiCall('oauth-status', endpointTarget, {});
+        if (result?.ok) {
+          const enableOAuth = result.payload?.result?.enable_oauth ?? result.payload?.enable_oauth ?? false;
+          setUseOAuth(enableOAuth);
+        }
+      } catch (error) {
+        console.error('Failed to fetch initial data:', error);
+      }
+    };
+    fetchInitialData();
+  }, [endpointTarget, loadStatus]);
 
   const handleStartServer = useCallback(async () => {
     if (!endpointTarget) { setError('No endpoint configured'); return; }
@@ -136,7 +164,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     try {
       const result = await executeApiCall('start', endpointTarget, { host, port, mode, cp });
       if (result?.ok) {
-        setConnected(true);
         await loadStatus();
       } else {
         setError(result?.payload?.error || result?.rawText || 'Failed to start server');
@@ -151,7 +178,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     try {
       const result = await executeApiCall('stop', endpointTarget, {});
       if (result?.ok) {
-        setConnected(false);
         await loadStatus();
       } else {
         setError(result?.payload?.error || result?.rawText || 'Failed to stop server');
@@ -273,7 +299,17 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     finally { setLoading(false); }
   }, [endpointTarget, executeApiCall, endpoint]);
 
-  useEffect(() => () => { stopMonitoring(); }, [stopMonitoring]);
+  // Auto-poll server status when endpoint is available
+  useEffect(() => {
+    if (!endpointTarget) return;
+    statusIntervalRef.current = setInterval(loadStatus, 10000);
+    return () => stopStatusPolling();
+  }, [endpointTarget, loadStatus]);
+
+  useEffect(() => () => { 
+    stopMonitoring(); 
+    stopStatusPolling(); 
+  }, [stopMonitoring, stopStatusPolling]);
 
   return (
     <section className="page">
@@ -457,7 +493,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           <h3 style={{ margin: 0, marginBottom: '12px', fontSize: '16px' }}>Server Status</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Server Address</span><div style={{ fontWeight: '500' }}>{statusInfo.result?.status?.host}:{statusInfo.result?.status?.port}</div></div>
-            <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>State</span><div style={{ fontWeight: '500', color: statusInfo.result?.status?.status === 'running' ? 'var(--success-color)' : 'var(--text-secondary)' }}>{statusInfo.result?.status?.status || 'N/A'}</div></div>
+            <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>State</span><div style={{ fontWeight: '500', color: ['running', 'listening', 'connected', 'starting'].includes(statusInfo.result?.status?.status) ? 'var(--success-color)' : 'var(--text-secondary)' }}>{statusInfo.result?.status?.status || 'N/A'}</div></div>
             <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Model</span><div style={{ fontWeight: '500' }}>{statusInfo.result?.status?.modelName || 'N/A'}</div></div>
             <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Clients</span><div style={{ fontWeight: '500' }}>{statusInfo.result?.status?.connectedClients || 0}</div></div>
           </div>

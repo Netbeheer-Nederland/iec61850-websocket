@@ -146,7 +146,7 @@
     "auto_discovered": false,
     "created_at": "2026-08-20T17:33:37.544481",
     "endpoint": "https://localhost:8443",
-    "status": "connected"
+    "status": "disconnected"
   },
   {
     "id": 7,
@@ -159,5 +159,26 @@
     "auto_discovered": false,
     "created_at": "2026-08-25T20:31:57.475366",
     "status": "disconnected"
+  },
+  {
+    "id": 8,
+    "name": "TEST",
+    "host": "127.0.0.2",
+    "port": 5000,
+    "type": "RTI-FSP",
+    "acsi": "server",
+    "ws_mode": "active",
+    "auto_discovered": false,
+    "created_at": "2026-08-28T18:07:45.851111",
+    "OAuth": {
+      "certificate_endpoint": "",
+      "auth_server_ca": "",
+      "realm": "",
+      "token_endpoint": "",
+      "client_id": "",
+      "client_secret": "",
+      "enable_token_refresh": false,
+      "idp_server": ""
+    }
   }
 ]
