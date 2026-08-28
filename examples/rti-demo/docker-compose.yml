@@ -92,7 +92,7 @@ services:
       dockerfile: Dockerfile
     container_name: rti-hmi
     ports:
-      - "8080:80"
+      - "3001:80"
     depends_on:
       bff-server:
         condition: service_healthy

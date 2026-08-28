@@ -41,6 +41,73 @@
       "client_secret": "",
       "enable_token_refresh": false,
       "idp_server": ""
+    },
+    "status": "disconnected"
+  },
+  {
+    "id": 3,
+    "name": "rti-fsp",
+    "host": "192.168.100.40",
+    "port": 5001,
+    "type": "RTI-FSP",
+    "acsi": "server",
+    "ws_mode": "active",
+    "auto_discovered": false,
+    "created_at": "2026-08-28T14:54:39.927806",
+    "OAuth": {
+      "certificate_endpoint": "",
+      "auth_server_ca": "",
+      "realm": "",
+      "token_endpoint": "",
+      "client_id": "",
+      "client_secret": "",
+      "enable_token_refresh": false,
+      "idp_server": ""
+    },
+    "status": "connected"
+  },
+  {
+    "id": 4,
+    "name": "rti-fsp-2",
+    "host": "192.168.100.41",
+    "port": 5005,
+    "type": "RTI-FSP",
+    "acsi": "server",
+    "ws_mode": "active",
+    "auto_discovered": false,
+    "created_at": "2026-08-28T14:55:07.646501",
+    "OAuth": {
+      "certificate_endpoint": "",
+      "auth_server_ca": "",
+      "realm": "",
+      "token_endpoint": "",
+      "client_id": "",
+      "client_secret": "",
+      "enable_token_refresh": false,
+      "idp_server": ""
+    },
+    "status": "connected"
+  },
+  {
+    "id": 5,
+    "name": "keycloak",
+    "host": "",
+    "port": 5000,
+    "type": "IDP-Server",
+    "acsi": "",
+    "ws_mode": "",
+    "auto_discovered": false,
+    "created_at": "2026-08-28T14:55:23.814988",
+    "endpoint": "https://192.168.100.14:8443",
+    "OAuth": {
+      "certificate_endpoint": "",
+      "auth_server_ca": "",
+      "realm": "",
+      "token_endpoint": "",
+      "client_id": "",
+      "client_secret": "",
+      "enable_token_refresh": false,
+      "idp_server": ""
     }
   }
 ]
