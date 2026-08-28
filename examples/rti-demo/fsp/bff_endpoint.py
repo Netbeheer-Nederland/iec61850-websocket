@@ -9,6 +9,15 @@ import logging
 import os
 import sys
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(threadName)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # Force stdout for Docker
+    ],
+    force=True  # Override any existing config
+)
+
 logger = logging.getLogger(__name__)
 
 # Global flag to control io_client usage
