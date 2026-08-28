@@ -6,7 +6,7 @@ import asyncio
 import httpx
 import os
 import json
-import datetime
+from datetime import datetime
 
 class ConnectionManager:
     """Manages connections to remote RTI endpoints."""

@@ -162,6 +162,114 @@ bff-server:
 
 ---
 
+## Demo IO Setup
+
+### Services to Demonstrate
+- Reports
+- Operation Control
+- Setpoints
+
+### I/O Demo
+
+#### SO → ACSI Client
+- **WebSocket (WS)**: Passive
+- **Indicators**:
+  - LED 1 → Connection status
+  - LED 2 → Report received
+  - LED 3 → stVal (Boolean)
+    - Mapping of the report value change of the data attribute stVal received in the RCB
+- **Inputs**:
+  - **Potentiometer 1**:
+    - Input for Oper Float
+    - Monitor displays the value
+  - **Potentiometer 2**:
+    - Input for Oper Int
+    - Monitor displays the value
+
+#### FSP → ACSI Server
+- **WebSocket (WS)**: Active
+- **Indicators**:
+  - LED 1 → Connection status
+  - LED 2 → Operation control received
+- **Monitoring**:
+  - Monitor displays Operation Float value
+- **Input**:
+  - **Button**:
+    - Input to stVal (Boolean)
+    - Triggers the RCB
+
+### Demo Flow
+1. Establish communication between FSP (ACSI Server) and SO (ACSI Client).
+2. Verify LED 1 on both sides indicates connection status.
+3. Change Potentiometer 1 and observe the Oper Float value on the monitor.
+4. Change Potentiometer 2 and observe the Oper Int value on the monitor.
+5. Verify report reception:
+   - LED 2 on SO indicates report received.
+   - LED 2 on FSP indicates operation control received.
+6. Press the button to change stVal.
+7. Verify LED 3 reflects the report value change corresponding to the stVal data attribute received in the RCB.
+8. Confirm the RCB is triggered and the report is transmitted successfully.
+
+### Signal Mapping
+```
+BUTTON (FSP)
+    │
+    ▼
+stVal (Boolean)
+    │
+    ▼
+RCB Triggered
+    │
+    ▼
+Report Sent
+    │
+    ▼
+SO receives report
+    │
+    ▼
+LED3 indicates change of stVal
+```
+
+### Operation Control Demo
+```
+SO Potentiometer 1 (Oper Float)
+           │
+           ▼
+      Operation Control
+           │
+           ▼
+         FSP
+           │
+           ▼
+      Monitor Value
+```
+
+### Physical Devices
+
+**P1 (SO)**
+```
+├─ LED1 Connection
+├─ LED2 Report Received
+├─ LED3 stVal Mapping
+├─ Pot 1 Oper Float
+└─ Pot 2 Oper Int
+```
+
+**P2 (FSP)**
+```
+├─ LED1 Connection
+├─ LED2 Operation Received
+├─ Button → stVal
+└─ Monitor → Oper Float
+```
+
+**P3**
+```
+└─ Status/Display Module (optional)
+```
+
+---
+
 ## Docker Network Notes
 
 - Each device has its own `rti-network` bridge network
