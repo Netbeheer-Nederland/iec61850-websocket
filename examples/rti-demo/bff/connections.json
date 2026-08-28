@@ -41,6 +41,7 @@
       "client_secret": "",
       "enable_token_refresh": false,
       "idp_server": ""
-    }
+    },
+    "status": "connected"
   }
 ]
