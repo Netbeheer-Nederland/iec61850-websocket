@@ -179,6 +179,7 @@ services:
     environment:
       - PORT=5002
       - PYTHONUNBUFFERED=1
+      - DEMO_IO_URL=http://demo_io:8000
     networks:
       - rti-network
     healthcheck:
@@ -194,7 +195,7 @@ services:
       - "rti.port=5002"
     volumes:
         - ./so:/app/so
-
+        - ./demo_IO:/app/demo_IO
   # RTI WS Client (Acsi-Client)
   active-ws-acsi-client:
     build:
@@ -251,7 +252,7 @@ services:
       - ./acsi_ws_server:/app/acsi_ws_server
 
   # GPIO LED Control API (demo_IO)
-  demo_io:
+  rti-io:
     build:
       context: .
       dockerfile: Dockerfile.IO
@@ -261,10 +262,14 @@ services:
     environment:
       - PORT=8000
       - PYTHONUNBUFFERED=1
+    user: "1000:986"  # Run as pi user (uid 1000) with gpio group (gid 986)
     devices:
       - "/dev/gpiochip0:/dev/gpiochip0"
-      - "/dev/gpiochip1:/dev/gpiochip1"
-      - "/dev/gpiochip2:/dev/gpiochip2"
+      - "/dev/gpiochip4:/dev/gpiochip4"
+      - "/dev/gpiochip10:/dev/gpiochip10"
+      - "/dev/gpiochip11:/dev/gpiochip11"
+      - "/dev/gpiochip12:/dev/gpiochip12"
+      - "/dev/gpiochip13:/dev/gpiochip13"
     privileged: true
     ipc: host
     security_opt:
@@ -286,6 +291,7 @@ services:
       - "rti.port=8000"
     volumes:
       - ./demo_IO:/app/demo_IO
+    command: ["./.venv/bin/python", "-u", "demo_IO/io_api_server/main.py"]
 
 
 
