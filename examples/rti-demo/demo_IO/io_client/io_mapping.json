@@ -3,9 +3,8 @@
     "lcd1": {
       "device_name": "lcd1",
       "objRef": [
-        "MinMaxAvg",
-        "Setpoints",
-        "cp1",
+        "rc_rcv",
+        "connected",
         "oper_send"
       ],
       "direction": "output",
@@ -14,7 +13,7 @@
     "led2": {
       "device_name": "led2",
       "objRef": [
-        "MinMaxAvg",
+        "rc_rcv",
         "oper_rcv"
       ],
       "direction": "output",
@@ -28,7 +27,7 @@
     },
     "led1": {
       "device_name": "led1",
-      "objRef": "cp1",
+      "objRef": "connected",
       "direction": "output",
       "device_type": "led"
     }
