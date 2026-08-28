@@ -1,12 +1,12 @@
 # SO: IEC 61850 ACSI Client Implementation
 
-This folder contains the **SO (System Operator)** implementation - an **IEC 61850 ACSI Client** that connects to ACSI servers for substation automation monitoring and control.
+This folder contains the **SO (System Operator)** implementation - an **IEC 61850 ACSI Client** that uses WebSocket in passive mode to connect to ACSI servers for substation automation monitoring and control.
 
 ## Overview
 
 The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication Service Interface) Client** that:
 
-- Connects to IEC 61850 WebSocket servers (FSP or other ACSI servers)
+- Connects to IEC 61850 servers via WebSocket (passive mode)
 - Provides REST API endpoints for client management (BFF - Backend for Frontend)
 - Retrieves and navigates server directory structures
 - Reads data values from connected servers
@@ -22,7 +22,7 @@ The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication 
 |   External       |<--->|   bff_endpoint.py   |<--->|   acsi_client.py  |
 |   Client/API     |     |   (REST API)        |     |   (WebSocket)     |
 |   (Port 5002)    |     |   FastAPI           |     |   IEC 61850 Client|
-|                  |     |                     |     |                  |
+|                  |     |                     |     |   (Passive Mode)  |
 +------------------+     +----------+----------+     +----------+----------+
                                     |                        |
                                     v                        v
@@ -36,7 +36,7 @@ The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication 
 
 ```
 so/
-├── acsi_client.py                      # Core IEC 61850 WebSocket client implementation
+├── acsi_client.py                      # Core IEC 61850 WebSocket client implementation (passive mode)
 │                                        # - ACSIClientRuntime: Runtime state management
 │                                        # - ACSIClient: Main client controller
 │                                        # - WebSocket connection management
@@ -51,17 +51,12 @@ so/
 │                                        # - Action/message logging
 │                                        # - IO client integration
 │
-├── BFF_API.md                          # Complete REST API documentation
-│                                        # - All endpoint specifications
-│                                        # - Curl examples
-│                                        # - Request/response formats
-│
 └── README.md                           # This file
 ```
 
 ## Key Components
 
-### 1. acsi_client.py - IEC 61850 WebSocket Client
+### 1. acsi_client.py - IEC 61850 WebSocket Client (Passive Mode)
 
 The core client implementation that handles:
 
@@ -83,52 +78,9 @@ The core client implementation that handles:
 | `ACSIClientRuntime` | Manages client runtime state, connections, model, actions, messages |
 | `ACSIClient` | Main client controller with WebSocket endpoint integration |
 
-#### Client Status Flow
-
-```
-disconnected --> connecting --> connected --> disconnecting --> disconnected
-                          ^
-                          |
-                          v
-                     (error state)
-```
-
 ### 2. bff_endpoint.py - REST API (Backend for Frontend)
 
-A **FastAPI** application that provides REST endpoints for managing the ACSI client. Acts as a bridge between HTTP clients and the WebSocket-based IEC 61850 client.
-
-#### Key Features
-
-- **Connection management** (connect, disconnect, connection status)
-- **Server directory operations** (get server directory, logical device directory, logical node directory)
-- **Model operations** (get model tree, get model data)
-- **Data operations** (read values, write values)
-- **Message/action logging** (view, clear logs)
-- **IO client integration** (connect to demo_IO service)
-- **CORS support** for web-based clients
-- **Pydantic validation** for request bodies
-
-#### API Endpoint Categories
-
-| Category | Endpoints | Purpose |
-|----------|-----------|---------|
-| **Status** | GET `/api/iec61850client/status` | Client status |
-| | GET `/api/iec61850client/connections` | Connection info |
-| **Connection** | POST `/api/iec61850client/connect` | Connect to server |
-| | POST `/api/iec61850client/disconnect` | Disconnect from server |
-| **Directory** | POST `/api/iec61850client/server-directory` | Get server directory |
-| | POST `/api/iec61850client/logical-device` | Get LD directory |
-| | POST `/api/iec61850client/logical-node` | Get LN directory |
-| **Model** | POST `/api/iec61850client/model` | Get model tree |
-| **Operations** | POST `/api/iec61850client/readvalue` | Read value |
-| | POST `/api/iec61850client/writevalue` | Write value |
-| **Logging** | GET `/api/iec61850client/actions` | View actions |
-| | POST `/api/iec61850client/actions/clear` | Clear actions |
-| | GET `/api/iec61850client/messages` | View messages |
-| | POST `/api/iec61850client/messages/clear` | Clear messages |
-| **IO Client** | POST `/api/io/connect` | Connect to demo_IO |
-| | GET `/api/io/connection` | IO connection status |
-| | POST `/api/io/disconnect` | Disconnect from demo_IO |
+A **FastAPI** application that provides REST endpoints for managing the ACSI client. Acts as a bridge between HTTP clients and the WebSocket-based IEC 61850 client in passive mode. For complete API documentation, see [BFF_API.md](./BFF_API.md).
 
 ---
 
@@ -209,202 +161,6 @@ curl http://localhost:5002/api/iec61850client/status
 
 ---
 
-## API Usage
-
-### Connection Management
-
-#### Connect to IEC 61850 Server
-
-```bash
-curl -X POST http://localhost:5002/api/iec61850client/connect \
-  -H "Content-Type: application/json" \
-  -d '{
-    "host": "localhost",
-    "port": 8765,
-    "cp": "cp1"
-  }'
-```
-
-Parameters are optional (defaults: localhost, 8765, cp1).
-
-**Response:**
-```json
-{
-  "ok": true,
-  "status": "connecting",
-  "host": "localhost",
-  "port": 8765,
-  "cp": "cp1"
-}
-```
-
-#### Disconnect from Server
-
-```bash
-curl -X POST http://localhost:5002/api/iec61850client/disconnect
-```
-
-**Response:**
-```json
-{
-  "ok": true,
-  "status": "disconnected"
-}
-```
-
-#### Check Client Status
-
-```bash
-curl http://localhost:5002/api/iec61850client/status
-```
-
-**Response:**
-```json
-{
-  "status": "connected",
-  "host": "192.168.1.100",
-  "port": 8765,
-  "cp": "cp1",
-  "error": null,
-  "modelStatus": "ready",
-  "modelError": null
-}
-```
-
-#### List Connections
-
-```bash
-curl http://localhost:5002/api/iec61850client/connections
-```
-
-**Response:**
-```json
-{
-  "ok": true,
-  "status": "connected",
-  "connected": true,
-  "server_role": "ACSI_Client",
-  "ws_mode": "passive",
-  "connection": {
-    "peer_address": "192.168.1.100",
-    "peer_port": 8765,
-    "local_role": "ACSI_Client",
-    "ws_mode": "passive",
-    "remote_role": "ACSI_Server",
-    "cp": "cp1"
-  }
-}
-```
-
-### Server Directory Operations
-
-#### Get Server Directory
-
-```bash
-curl -X POST http://localhost:5002/api/iec61850client/server-directory \
-  -H "Content-Type: application/json" \
-  -d '{"cp": "cp1"}'
-```
-
-#### Get Logical Device Directory
-
-```bash
-curl -X POST http://localhost:5002/api/iec61850client/logical-device \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ld_inst": "LD0",
-    "cp": "cp1"
-  }'
-```
-
-#### Get Logical Node Directory
-
-```bash
-curl -X POST http://localhost:5002/api/iec61850client/logical-node \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ld_inst": "LD0",
-    "ln_inst": "LLN0",
-    "cp": "cp1"
-  }'
-```
-
-### Model Operations
-
-#### Get Model Tree
-
-```bash
-curl -X POST http://localhost:5002/api/iec61850client/model \
-  -H "Content-Type: application/json" \
-  -d '{"cp": "cp1"}'
-```
-
-Returns the complete model tree structure from the connected server.
-
-### Data Operations
-
-#### Read Value
-
-```bash
-curl -X POST http://localhost:5002/api/iec61850client/readvalue \
-  -H "Content-Type: application/json" \
-  -d '{
-    "objRef": "LD0/LLN0$ST$Mod",
-    "fc": "ST"
-  }'
-```
-
-**Response:**
-```json
-{
-  "ok": true,
-  "success": true,
-  "objRef": "LD0/LLN0$ST$Mod",
-  "value": "ON"
-}
-```
-
-#### Write Value
-
-```bash
-curl -X POST http://localhost:5002/api/iec61850client/writevalue \
-  -H "Content-Type: application/json" \
-  -d '{
-    "objRef": "LD0/LLN0$ST$Mod",
-    "value": "ON"
-  }'
-```
-
-**Response:**
-```json
-{
-  "ok": true,
-  "success": true,
-  "objRef": "LD0/LLN0$ST$Mod",
-  "value": "ON"
-}
-```
-
-### Logging
-
-#### Get/Clear Actions and Messages
-
-```bash
-# Get actions
-curl http://localhost:5002/api/iec61850client/actions
-
-# Clear actions
-curl -X POST http://localhost:5002/api/iec61850client/actions/clear
-
-# Get messages
-curl http://localhost:5002/api/iec61850client/messages
-
-# Clear messages
-curl -X POST http://localhost:5002/api/iec61850client/messages/clear
-```
-
----
-
 ## IO Client Integration
 
 The SO client integrates with the `demo_IO` service for controlling physical IO devices through IEC 61850 objects.
@@ -457,44 +213,6 @@ python -m pytest -q rti-demo/tests/unit/
 
 ---
 
-## Docker Deployment
-
-### Docker Compose Example
-
-```yaml
-version: '3.8'
-
-services:
-  rti-so:
-    build:
-      context: .
-      dockerfile: examples/rti-demo/so/Dockerfile
-    ports:
-      - "5002:5002"
-    environment:
-      - PORT=5002
-    networks:
-      - rti-network
-    depends_on:
-      - rti-fsp
-
-  rti-fsp:
-    build:
-      context: .
-      dockerfile: examples/rti-demo/fsp/Dockerfile
-    ports:
-      - "5001:5001"
-      - "8765:8765"
-    networks:
-      - rti-network
-
-networks:
-  rti-network:
-    driver: bridge
-```
-
----
-
 ## Model Status Values
 
 | Status | Description |
@@ -520,11 +238,11 @@ networks:
 
 ### With FSP (Server)
 
-SO connects to FSP as a WebSocket client:
+FSP connects to SO as a WebSocket client (SO in passive mode):
 
 ```
-SO (Client, Port 5002) <--HTTP--> External Clients
-SO (WS Client) <--WebSocket--> FSP (Server, Port 8765)
+SO (Server, Port 5002) <--HTTP--> External Clients
+SO (WS Server, Passive) <--WebSocket--> FSP (Client)
 ```
 
 ### With demo_IO
@@ -538,10 +256,18 @@ SO integrates with `demo_IO` to control physical IO devices through IEC 61850 ob
 ```
 +-----------+    +-----------+    +-----------+
 |           |    |           |    |           |
-|  Client   +--->+   SO      +--->+   FSP     +---> Physical Devices
-|  (HTTP)   |    | (BFF)     |    | (Server)  |    | via demo_IO
-|           |    | Port 5002 |    | Port 5001 |    |
-+-----------+    +-----------+    +-----------+    +------------------
+|  Client   +--->+   SO      +--->+   FSP     |
+|  (HTTP)   |    | (BFF)     |    | (Server)  |
+|           |    | Port 5002 |    | Port 5001 |
++-----------+    +-----+-----+    +-----+-----+
+                  |                 |           |
+                  +-----------------+           |
+                                    |           |
+                                    v           v
+                              +-----------+-----------+
+                              | Physical Devices   |
+                              +-----------+-----------+
+                                    (via demo_IO or direct)
 ```
 
 ---
@@ -550,26 +276,10 @@ SO integrates with `demo_IO` to control physical IO devices through IEC 61850 ob
 
 | File | Purpose | Key Classes/Functions |
 |------|---------|---------------------|
-| `acsi_client.py` | WebSocket client | ModelInfo, ACSIClientRuntime, ACSIClient |
+| `acsi_client.py` | WebSocket client (passive mode) | ModelInfo, ACSIClientRuntime, ACSIClient |
 | `bff_endpoint.py` | REST API | FastAPI app, endpoint routes |
 | `BFF_API.md` | API docs | Endpoint specifications |
 | `Dockerfile` | Container | Multi-stage build (if exists) |
-
----
-
-## API Documentation
-
-Complete API documentation: [BFF_API.md](./BFF_API.md)
-
-Related documentation:
-- [FSP README](../fsp/README.md) - Server implementation
-- [demo_IO README](../demo_IO/README.md) - IO device control
-
----
-
-## Version History
-
-- **v1.0.0** - Complete ACSI Client with REST API, server directory navigation, data operations, IO integration
 
 ---
 
