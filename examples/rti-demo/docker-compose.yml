@@ -144,7 +144,7 @@ services:
       dockerfile: examples/rti-demo/Dockerfile.rti-fsp
     container_name: rti-fsp-2
     ports:
-      - "5005:5001"  # Map to different host port, same container port
+      - "5005:5005"  # Map to different host port, same container port
     networks:
       - rti-network
     environment:
@@ -162,7 +162,7 @@ services:
       - "rti.service=rti-fsp-2"
       - "rti.type=RTI-FSP"
       - "rti.host=rti-fsp-2"
-      - "rti.port=5001"
+      - "rti.port=5005"
     volumes: # ✅ Add volumes if needed
       - ./fsp:/app/fsp
       - ./models:/models
