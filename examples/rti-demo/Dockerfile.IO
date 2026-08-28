@@ -64,7 +64,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # UID 1000 = pi, GID 1000 = pi's primary group, GID 986 = gpio on Raspberry Pi
 RUN groupadd -g 1000 pi && \
     groupadd -g 986 gpio && \
-    useradd -m -u 1000 -g 1000 -G gpio pi && \
+    groupadd -g 988 i2c && \
+    useradd -m -u 1000 -g 1000 -G gpio,i2c  pi && \
     echo 'pi ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers.d/pi
 
 # Copy application and virtual environment

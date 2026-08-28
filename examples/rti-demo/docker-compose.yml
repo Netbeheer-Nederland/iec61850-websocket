@@ -263,7 +263,9 @@ services:
     environment:
       - PORT=8000
       - PYTHONUNBUFFERED=1
-    user: "1000:986"  # Run as pi user (uid 1000) with gpio group (gid 986)
+    user: "1000:986"  # pi user with gpio group
+    group_add:
+      - "988"
     devices:
       - "/dev/gpiochip0:/dev/gpiochip0"
       - "/dev/gpiochip4:/dev/gpiochip4"
@@ -271,6 +273,7 @@ services:
       - "/dev/gpiochip11:/dev/gpiochip11"
       - "/dev/gpiochip12:/dev/gpiochip12"
       - "/dev/gpiochip13:/dev/gpiochip13"
+      - "/dev/i2c-1:/dev/i2c-1"
     privileged: true
     ipc: host
     security_opt:
