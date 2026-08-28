@@ -39,7 +39,7 @@ class ConnectionManager:
     def get_client(self) -> httpx.AsyncClient:
         """Return a shared AsyncClient, creating it lazily."""
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=0.5)
+            self._client = httpx.AsyncClient(timeout=2.0)
         return self._client
 
     async def aclose(self) -> None:
@@ -314,9 +314,53 @@ class ConnectionManager:
         return registered
 
     async def check_connection(self, con, client):
-        # IDP-Server is a local server, always mark as connected
+        # For IDP-Server, check via endpoint or host:port
         if con.get('type') == 'IDP-Server':
-            con["status"] = "connected"
+            # Create a client that doesn't verify SSL for IDP servers
+            # (Keycloak often uses self-signed certs)
+            idp_client = httpx.AsyncClient(timeout=2.0, verify=False)
+            
+            try:
+                # Try to use host:port first if available (for local IDP servers)
+                host = con.get('host')
+                port = con.get('port')
+                endpoint = con.get('endpoint')
+                
+                if host and port:
+                    # Use host:port if both are defined
+                    url = f"http://{host}:{port}"
+                elif endpoint:
+                    # Otherwise, use the endpoint
+                    if endpoint.startswith('http://') or endpoint.startswith('https://'):
+                        url = endpoint
+                    else:
+                        # If it's just a path, try localhost with common IDP ports
+                        # Try HTTPS first (common for Keycloak)
+                        url = f"https://localhost{endpoint if endpoint.startswith('/') else '/' + endpoint}"
+                else:
+                    # No endpoint or host/port defined, mark as disconnected
+                    con["status"] = "disconnected"
+                    return
+                
+                response = await idp_client.get(url)
+                con["status"] = "connected" if response.status_code < 500 else "disconnected"
+            except httpx.RequestError as e:
+                # Try HTTP if HTTPS failed
+                if endpoint and not endpoint.startswith('http://') and not endpoint.startswith('https://'):
+                    try:
+                        url = f"http://localhost{endpoint if endpoint.startswith('/') else '/' + endpoint}"
+                        response = await idp_client.get(url)
+                        con["status"] = "connected" if response.status_code < 500 else "disconnected"
+                        await idp_client.aclose()
+                        return
+                    except httpx.RequestError as e2:
+                        self.logger.debug(f"IDP-Server connection check failed for {con.get('name')}: {e2}")
+                        con["status"] = "disconnected"
+                else:
+                    self.logger.debug(f"IDP-Server connection check failed for {con.get('name')}: {e}")
+                    con["status"] = "disconnected"
+            finally:
+                await idp_client.aclose()
             return
 
         # For other types, check connectivity via host:port
