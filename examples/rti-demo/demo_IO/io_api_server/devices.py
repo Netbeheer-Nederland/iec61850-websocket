@@ -1704,8 +1704,8 @@ def validate_device_config(config: DeviceConfig) -> bool:
         if config.i2c_address < 0x08 or config.i2c_address > 0x77:
             raise ValueError(f"Invalid I2C address 0x{config.i2c_address:02X}. Valid range: 0x08-0x77")
         # Validate I2C bus (typically 0 or 1 on Raspberry Pi)
-        if config.i2c_bus not in [0, 1]:
-            raise ValueError(f"Invalid I2C bus {config.i2c_bus}. Valid: [0, 1]")
+        if config.i2c_bus not in [0, 1, 13, 14]:
+            raise ValueError(f"Invalid I2C bus {config.i2c_bus}. Valid: [0, 1, 13, 14]")
         # Validate bit positions (0-7 for PCF8574)
         all_bits = [config.rs_bit, config.rw_bit, config.e_bit, config.backlight_bit,
                     config.d4_bit, config.d5_bit, config.d6_bit, config.d7_bit]
