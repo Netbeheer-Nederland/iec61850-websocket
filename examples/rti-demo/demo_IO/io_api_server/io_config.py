@@ -111,6 +111,9 @@ def _config_to_dict(config: DeviceConfig) -> Dict[str, Any]:
         base_dict["adc_channel"] = config.identifier if isinstance(config.identifier, int) else 0
         base_dict["min_value"] = getattr(config, "min_value", 0.0)
         base_dict["max_value"] = getattr(config, "max_value", 100.0)
+        base_dict["i2c_address"] = getattr(config, "i2c_address", 0x48)
+        base_dict["i2c_bus"] = getattr(config, "i2c_bus", 1)
+        base_dict["adc_type"] = getattr(config, "adc_type", "ads1115")
     
     elif config.device_type == DeviceType.PWM:
         base_dict["type"] = "pwm"
@@ -180,6 +183,9 @@ def _dict_to_config(device_dict: Dict[str, Any]) -> Optional[DeviceConfig]:
                 description=device_dict.get("description", ""),
                 min_value=device_dict.get("min_value", 0.0),
                 max_value=device_dict.get("max_value", 100.0),
+                i2c_address=device_dict.get("i2c_address", 0x48),
+                i2c_bus=device_dict.get("i2c_bus", 1),
+                adc_type=device_dict.get("adc_type", "ads1115"),
             )
         
         elif device_type_str == "pwm" or device_dict.get("type") == "pwm":

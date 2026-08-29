@@ -12,11 +12,12 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
-# libgpiod-dev + gcc are needed here only to build the gpiod Python bindings.
+# libgpiod-dev + gcc + python3-dev are needed here to build the gpiod and spidev Python bindings.
 # They are NOT copied into the runtime stage.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgpiod-dev \
     gcc \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv (same approach as the original file)
@@ -73,6 +74,9 @@ COPY --from=builder --chown=pi:gpio /app /app
 
 # Fix permissions so pi user (1000:986) can access everything
 RUN chmod -R g+rwX /app
+
+# Fix I2C permissions for all users (Adafruit library needs this)
+RUN chmod a+rw /dev/i2c-1 /dev/i2c-13 /dev/i2c-14 2>/dev/null || true
 
 # NOTE: kept running as root, matching the original file (no USER
 # directive there). The pi/gpio user is set up and owns /app, but the

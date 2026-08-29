@@ -144,6 +144,9 @@ class PotentiometerConfig(DeviceConfig):
     min_value: float = 0.0
     max_value: float = 100.0
     is_inverted: bool = False
+    i2c_address: int = 0x48
+    i2c_bus: int = 1
+    adc_type: str = "ads1115"
     
     def __post_init__(self):
         if self.identifier == 0 and self.adc_channel != 0:
@@ -158,6 +161,9 @@ class PotentiometerConfig(DeviceConfig):
             "min_value": self.min_value,
             "max_value": self.max_value,
             "is_inverted": self.is_inverted,
+            "i2c_address": self.i2c_address,
+            "i2c_bus": self.i2c_bus,
+            "adc_type": self.adc_type,
         })
         return result
 
@@ -624,31 +630,48 @@ class PotentiometerDevice(InputDevice):
     
     def _init_hardware(self) -> None:
         try:
-            try:
-                import spidev
-                import RPi.GPIO as GPIO
-                self._spi = spidev.SpiDev()
-                self._spi.open(0, 0)
-                self._spi.max_speed_hz = 1000000
-                self._adc_type = self.ADC_MCP3008
-                self._channel = self.config.adc_channel
-                self._hardware_available = True
-                logger.info(f"Initialized potentiometer '{self.config.name}' on ADC channel {self.config.adc_channel}")
-                return
-            except (ImportError, AttributeError, OSError):
+            adc_type_config = getattr(self.config, 'adc_type', 'ads1115').lower()
+            
+            # If MCP3008 is explicitly configured, try SPI first
+            if adc_type_config == 'mcp3008':
+                try:
+                    import spidev
+                    import RPi.GPIO as GPIO
+                    self._spi = spidev.SpiDev()
+                    self._spi.open(0, 0)
+                    self._spi.max_speed_hz = 1000000
+                    self._adc_type = self.ADC_MCP3008
+                    self._channel = self.config.adc_channel
+                    self._hardware_available = True
+                    logger.info(f"Initialized potentiometer '{self.config.name}' on MCP3008 ADC channel {self.config.adc_channel}")
+                    return
+                except (ImportError, AttributeError, OSError) as e:
+                    logger.warning(f"MCP3008 initialization failed for '{self.config.name}': {e}")
+                    self._hardware_available = False
+            
+            # If ADS1115 is configured or MCP3008 failed, try ADS1115
+            if adc_type_config == 'ads1115' or not self._hardware_available:
                 try:
                     import Adafruit_ADS1x15
-                    self._adc = Adafruit_ADS1x15.ADS1115()
+                    self._adc = Adafruit_ADS1x15.ADS1115(
+                        address=self.config.i2c_address,
+                        busnum=self.config.i2c_bus
+                    )
                     self._adc_type = self.ADC_ADS1115
                     self._channel = self.config.adc_channel
                     self._hardware_available = True
-                    logger.info(f"Initialized potentiometer '{self.config.name}' on ADS1115 channel {self.config.adc_channel}")
+                    logger.info(f"Initialized potentiometer '{self.config.name}' on ADS1115 channel {self.config.adc_channel} (bus={self.config.i2c_bus}, address=0x{self.config.i2c_address:02X})")
                     return
-                except (ImportError, AttributeError, OSError):
-                    pass
+                except (ImportError, AttributeError, OSError) as e:
+                    logger.warning(f"ADS1115 initialization failed for '{self.config.name}': {e}")
+                    self._hardware_available = False
+                    
         except Exception as e:
             logger.debug(f"ADC initialization failed: {e}")
-        self._hardware_available = False
+        
+        if not self._hardware_available:
+            logger.warning(f"No ADC hardware available for potentiometer '{self.config.name}'. Using mock mode.")
+        self._hardware_available = self._hardware_available or True  # Allow operation in mock mode
     
     def _read_mcp3008(self, channel: int) -> int:
         if not self._spi:
