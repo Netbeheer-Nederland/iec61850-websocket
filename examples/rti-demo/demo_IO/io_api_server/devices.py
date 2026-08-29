@@ -618,56 +618,74 @@ class PotentiometerDevice(InputDevice):
         self._spi = None
         self._adc_type = None
         self._channel = 0
-        self._value_change_threshold = 0.01  # 1% change to trigger callback
-        self._mock_value = 0.5  # Default midpoint value for mock mode
+        self._value_change_threshold = 0.01  # 1% change to trigger callback (as a fraction of the range)
+        self._mock_value = 0.5  # Default midpoint value for mock mode (normalized 0-1)
         self._init_hardware()
         if not self._hardware_available:
             logger.warning(f"ADC not available for potentiometer '{config.name}'. Using mock mode.")
             self._hardware_available = True  # Allow operation in mock mode
         # Start polling-based change detection for analog inputs
         # Uses threshold to avoid noise-triggered false changes
-        self._start_polling_monitor(poll_interval=0.2, threshold=self._value_change_threshold)
+        # Calculate threshold in scaled units: 1% of the value range
+        value_range = config.max_value - config.min_value
+        scaled_threshold = self._value_change_threshold * value_range
+        self._start_polling_monitor(poll_interval=0.2, threshold=scaled_threshold)
     
     def _init_hardware(self) -> None:
-        try:
-            adc_type_config = getattr(self.config, 'adc_type', 'ads1115').lower()
-            
-            # If MCP3008 is explicitly configured, try SPI first
-            if adc_type_config == 'mcp3008':
-                try:
-                    import spidev
-                    import RPi.GPIO as GPIO
-                    self._spi = spidev.SpiDev()
-                    self._spi.open(0, 0)
-                    self._spi.max_speed_hz = 1000000
-                    self._adc_type = self.ADC_MCP3008
-                    self._channel = self.config.adc_channel
-                    self._hardware_available = True
-                    logger.info(f"Initialized potentiometer '{self.config.name}' on MCP3008 ADC channel {self.config.adc_channel}")
-                    return
-                except (ImportError, AttributeError, OSError) as e:
-                    logger.warning(f"MCP3008 initialization failed for '{self.config.name}': {e}")
-                    self._hardware_available = False
-            
-            # If ADS1115 is configured or MCP3008 failed, try ADS1115
-            if adc_type_config == 'ads1115' or not self._hardware_available:
-                try:
-                    import Adafruit_ADS1x15
-                    self._adc = Adafruit_ADS1x15.ADS1115(
-                        address=self.config.i2c_address,
-                        busnum=self.config.i2c_bus
-                    )
-                    self._adc_type = self.ADC_ADS1115
-                    self._channel = self.config.adc_channel
-                    self._hardware_available = True
-                    logger.info(f"Initialized potentiometer '{self.config.name}' on ADS1115 channel {self.config.adc_channel} (bus={self.config.i2c_bus}, address=0x{self.config.i2c_address:02X})")
-                    return
-                except (ImportError, AttributeError, OSError) as e:
-                    logger.warning(f"ADS1115 initialization failed for '{self.config.name}': {e}")
-                    self._hardware_available = False
-                    
-        except Exception as e:
-            logger.debug(f"ADC initialization failed: {e}")
+        import time
+        
+        max_retries = 3
+        retry_delay = 1.0  # seconds between retries
+        
+        for attempt in range(max_retries):
+            try:
+                adc_type_config = getattr(self.config, 'adc_type', 'ads1115').lower()
+                
+                # If MCP3008 is explicitly configured, try SPI first
+                if adc_type_config == 'mcp3008':
+                    try:
+                        import spidev
+                        import RPi.GPIO as GPIO
+                        self._spi = spidev.SpiDev()
+                        self._spi.open(0, 0)
+                        self._spi.max_speed_hz = 1000000
+                        self._adc_type = self.ADC_MCP3008
+                        self._channel = self.config.adc_channel
+                        self._hardware_available = True
+                        logger.info(f"Initialized potentiometer '{self.config.name}' on MCP3008 ADC channel {self.config.adc_channel}")
+                        return
+                    except (ImportError, AttributeError, OSError) as e:
+                        logger.warning(f"MCP3008 initialization failed for '{self.config.name}': {e}")
+                        self._hardware_available = False
+                
+                # If ADS1115 is configured or MCP3008 failed, try ADS1115
+                if adc_type_config == 'ads1115' or not self._hardware_available:
+                    try:
+                        import Adafruit_ADS1x15
+                        self._adc = Adafruit_ADS1x15.ADS1115(
+                            address=self.config.i2c_address,
+                            busnum=self.config.i2c_bus
+                        )
+                        self._adc_type = self.ADC_ADS1115
+                        self._channel = self.config.adc_channel
+                        self._hardware_available = True
+                        logger.info(f"Initialized potentiometer '{self.config.name}' on ADS1115 channel {self.config.adc_channel} (bus={self.config.i2c_bus}, address=0x{self.config.i2c_address:02X})")
+                        return
+                    except (ImportError, AttributeError, OSError) as e:
+                        logger.warning(f"ADS1115 initialization failed for '{self.config.name}' (attempt {attempt + 1}/{max_retries}): {e}")
+                        self._hardware_available = False
+                        
+                        # Wait before retrying (except on last attempt)
+                        if attempt < max_retries - 1:
+                            time.sleep(retry_delay)
+                            continue
+                
+            except Exception as e:
+                logger.debug(f"ADC initialization failed (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                else:
+                    break
         
         if not self._hardware_available:
             logger.warning(f"No ADC hardware available for potentiometer '{self.config.name}'. Using mock mode.")
@@ -687,7 +705,17 @@ class PotentiometerDevice(InputDevice):
             return 0
         return self._adc.read_adc(channel, gain=1)
     
-    def read(self) -> Optional[float]:
+    def read(self, scaled: bool = True) -> Optional[float]:
+        """
+        Read the current value from the potentiometer.
+        
+        Args:
+            scaled: If True (default), returns value scaled to min_value/max_value range.
+                   If False, returns normalized value (0.0-1.0).
+        
+        Returns:
+            Scaled or normalized value, or None on error
+        """
         if not self.is_connected:
             return None
         try:
@@ -699,27 +727,52 @@ class PotentiometerDevice(InputDevice):
                 max_value = 32767
             elif self._adc_type is None:
                 # Mock mode - return stored mock value
-                return self._mock_value
+                normalized = self._mock_value
             else:
                 return None
-            normalized = max(0, min(1, raw / max_value))
-            if self.config.is_inverted:
-                normalized = 1.0 - normalized
-            return normalized
+            
+            if self._adc_type is None:
+                normalized = self._mock_value
+            else:
+                normalized = max(0, min(1, raw / max_value))
+                if self.config.is_inverted:
+                    normalized = 1.0 - normalized
+            
+            if scaled:
+                # Return scaled value based on min_value/max_value from config
+                return self.config.min_value + normalized * (self.config.max_value - self.config.min_value)
+            else:
+                # Return normalized value (0.0-1.0)
+                return normalized
+                
         except Exception as e:
             logger.warning(f"Failed to read potentiometer '{self.config.name}': {e}")
-            return self._mock_value
+            if scaled:
+                # Return scaled mock value in case of error
+                return self.config.min_value + self._mock_value * (self.config.max_value - self.config.min_value)
+            else:
+                return self._mock_value
     
     def read_scaled(self) -> Optional[float]:
-        normalized = self.read()
-        if normalized is None:
-            return None
-        return self.config.min_value + normalized * (self.config.max_value - self.config.min_value)
+        """Read and return scaled value (convenience method, equivalent to read(scaled=True))."""
+        return self.read(scaled=True)
+    
+    def read_normalized(self) -> Optional[float]:
+        """Read and return normalized value (0.0-1.0) (convenience method, equivalent to read(scaled=False))."""
+        return self.read(scaled=False)
     
     def write(self, value: Union[bool, float]) -> bool:
         # In mock mode, allow setting the value for testing
         if self._adc_type is None:
-            self._mock_value = float(value)
+            # Normalize the value to 0-1 for internal storage
+            # If value is in scaled range, convert it to normalized (0-1)
+            value_range = self.config.max_value - self.config.min_value
+            if value_range > 0:
+                # Assume value is in scaled range and normalize it
+                normalized_value = max(0, min(1, (float(value) - self.config.min_value) / value_range))
+                self._mock_value = normalized_value
+            else:
+                self._mock_value = float(value)
             return True
         logger.warning(f"Cannot write to read-only potentiometer '{self.config.name}'")
         return False
