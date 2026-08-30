@@ -24,6 +24,7 @@ from devices import (
     PotentiometerConfig,
     PWMConfig,
     LCDConfig,
+    LCDI2CConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,22 @@ def _config_to_dict(config: DeviceConfig) -> Dict[str, Any]:
         base_dict["backlight"] = getattr(config, "backlight", True)
         base_dict["backlight_pin"] = getattr(config, "backlight_pin", None)
     
+    elif config.device_type == DeviceType.LCD_I2C:
+        base_dict["type"] = "lcd_i2c"
+        base_dict["i2c_address"] = getattr(config, "i2c_address", 0x27)
+        base_dict["i2c_bus"] = getattr(config, "i2c_bus", 1)
+        base_dict["columns"] = getattr(config, "columns", 16)
+        base_dict["rows"] = getattr(config, "rows", 2)
+        base_dict["backlight"] = getattr(config, "backlight", True)
+        base_dict["rs_bit"] = getattr(config, "rs_bit", 0)
+        base_dict["rw_bit"] = getattr(config, "rw_bit", 1)
+        base_dict["e_bit"] = getattr(config, "e_bit", 2)
+        base_dict["backlight_bit"] = getattr(config, "backlight_bit", 3)
+        base_dict["d4_bit"] = getattr(config, "d4_bit", 4)
+        base_dict["d5_bit"] = getattr(config, "d5_bit", 5)
+        base_dict["d6_bit"] = getattr(config, "d6_bit", 6)
+        base_dict["d7_bit"] = getattr(config, "d7_bit", 7)
+    
     return base_dict
 
 
@@ -186,6 +203,26 @@ def _dict_to_config(device_dict: Dict[str, Any]) -> Optional[DeviceConfig]:
                 backlight=device_dict.get("backlight", True),
                 backlight_pin=device_dict.get("backlight_pin", None),
                 description=device_dict.get("description", ""),
+            )
+        
+        elif device_type_str == "lcd_i2c" or device_dict.get("type") == "lcd_i2c":
+            return LCDI2CConfig(
+                name=device_dict.get("name", ""),
+                identifier=device_dict.get("identifier", 0),
+                description=device_dict.get("description", ""),
+                i2c_address=device_dict.get("i2c_address", 0x27),
+                i2c_bus=device_dict.get("i2c_bus", 1),
+                columns=device_dict.get("columns", 16),
+                rows=device_dict.get("rows", 2),
+                backlight=device_dict.get("backlight", True),
+                rs_bit=device_dict.get("rs_bit", 0),
+                rw_bit=device_dict.get("rw_bit", 1),
+                e_bit=device_dict.get("e_bit", 2),
+                backlight_bit=device_dict.get("backlight_bit", 3),
+                d4_bit=device_dict.get("d4_bit", 4),
+                d5_bit=device_dict.get("d5_bit", 5),
+                d6_bit=device_dict.get("d6_bit", 6),
+                d7_bit=device_dict.get("d7_bit", 7),
             )
         
         else:
