@@ -10,6 +10,7 @@ import { executeApiCall, buildTargetValue } from '../services/apiService';
  * - Read button to fetch data value
  * - Write button to write data value
  * - Displays results of operations
+ * - Manual cp entry box (shown only for WebSocket Passive endpoints), used wherever cp is needed
  * 
  * @param {Object} props
  * @param {Object[]} props.connections - Array of connection objects with host, port, name, type, status
@@ -33,7 +34,12 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
   // State for complex structures
   const [doChildren, setDoChildren] = useState([]);
   const [attributePath, setAttributePath] = useState([]);
-  const dataDefinitionCacheRef= useRef({});
+  const dataDefinitionCacheRef = useRef({});
+
+  // Tracks the previously-selected target so the dropdown-populate effect can
+  // tell "target actually changed" apart from "getModel/extractHierarchyFromModel
+  // got a new function identity from a parent re-render".
+  const prevTargetRef = useRef('');
   
   // State for data operations
   const [readResult, setReadResult] = useState(null);
@@ -44,6 +50,17 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
 
   const [modelFetched, setModelFetched] = useState(false);
   const [fetchingModel, setFetchingModel] = useState(false);
+
+  // Manual cp entry, shown next to "Fetch Model" for WebSocket Passive endpoints.
+  // Its value takes priority over selectedConnection?.cp / the cp prop wherever
+  // effectiveCp is computed in this file.
+  const [manualCp, setManualCp] = useState('');
+
+  // The cp value that the currently-loaded model (for the selected target) was
+  // fetched with. getModel/updateModel are keyed only by target (host:port), not
+  // cp, so this local tracker is what lets us tell "model loaded for cp1" apart
+  // from "model loaded for cp2" and re-enable Fetch Model when cp changes.
+  const [fetchedCp, setFetchedCp] = useState(null);
 
   // Recursively parse a nested structure DA
   const buildSdaNode = (sda, parentRef, fc) => {
@@ -283,6 +300,25 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
   const isServerEndpoint = useMemo(() => {
     return getAcsiRole(selectedConnection) === 'server';
   }, [selectedConnection]);
+
+  // Check if this is a TRUE ACSI Server (has acsi='server'), not just FSP
+  const isTrueAcsiServer = useMemo(() => {
+    return selectedConnection?.acsi === 'server';
+  }, [selectedConnection]);
+
+  // True for "passive" websocket endpoints (e.g. RTI-SO). These need cp entered
+  // manually here rather than inferred from a client-side connection object.
+  // NOTE: adjust this check if your connection `type` strings differ from "RTI-SO",
+  // or if another connection type also happens to contain "SO" as a substring.
+  const isWebsocketPassiveEndpoint = useMemo(() => {
+    const t = (selectedConnection?.type || '').toUpperCase();
+    return t.includes('SO');
+  }, [selectedConnection]);
+
+  // Compute effective cp - used for all endpoint types
+  const effectiveCp = useMemo(() => {
+    return (isWebsocketPassiveEndpoint && manualCp) || selectedConnection?.cp || cp || 'cp1';
+  }, [isWebsocketPassiveEndpoint, manualCp, selectedConnection, cp]);
 
   // Effective writable check
   const canWriteFc = useCallback((fc) => {
@@ -659,12 +695,15 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
   const handleFetchModel = useCallback(async () => {
     if (!selectedTarget || !selectedConnection || !updateModel) return;
 
+    if (isWebsocketPassiveEndpoint && !manualCp.trim()) {
+      setError('Please enter a cp value for this WebSocket Passive endpoint');
+      return;
+    }
+
     setFetchingModel(true);
     setError(null);
 
     try {
-      const effectiveCp = selectedConnection?.cp || cp || 'cp1';
-
       if (getAcsiRole(selectedConnection) === 'client') {
         // ACSI Client endpoint = same call as ACSIClient.jsx's loadClientTree
         const result = await executeApiCall('model-tree', selectedTarget, {cp: effectiveCp});
@@ -675,12 +714,13 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
           setSelectedLD(''); setSelectedLN(''); setSelectedDO('');
           setDoChildren([]); setAttributePath([]);
           setModelFetched(true);
+          setFetchedCp(effectiveCp);
         } else {
           setError(result?.payload?.error || result?.rawText || 'Failed to fetch model');
         }
       } else {
         // ACSI Server endpoint - same normalization as ACSIServer.jsx's loadServerModel
-        const result = await executeApiCall('model', selectedTarget, {});
+        const result = await executeApiCall('model', selectedTarget, {cp: effectiveCp});
         if (result?.ok) {
           let modelData = result.payload;
 
@@ -713,6 +753,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
             setSelectedLD(''); setSelectedLN(''); setSelectedDO('');
             setDoChildren([]); setAttributePath([]);
             setModelFetched(true);
+            setFetchedCp(effectiveCp);
           } else {
             setError('No model data found in response');
           }
@@ -725,38 +766,62 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     } finally {
       setFetchingModel(false);
     }
-  }, [selectedTarget, selectedConnection, cp, updateModel, extractHierarchyFromModel, parsePythonDictString]);
+  }, [selectedTarget, selectedConnection, cp, updateModel, extractHierarchyFromModel, parsePythonDictString, manualCp, isWebsocketPassiveEndpoint, effectiveCp]);
 
   // Populate dropdowns when endpoint or parent selection changes
   useEffect(() => {
-    const updateDropdowns = () => {
-      if (!selectedTarget) {
-        setAvailableLDs([]);
-        setAvailableLNs([]);
-        setAvailableDOs([]);
-        setDoChildren([]);
-        setAttributePath([])
-        setModelFetched(false);
-        return;
-      }
-      
-      // Get model for this endpoint
-      const modelData = getModel ? getModel(selectedTarget) : null;
-      setModelFetched(!!modelData);
+    const targetChanged = prevTargetRef.current !== selectedTarget;
+    prevTargetRef.current = selectedTarget;
 
-      const hierarchy = extractHierarchyFromModel(modelData);
-      setAvailableLDs(hierarchy.lds);
-      
-      // Reset selections when endpoint changes
+    if (!selectedTarget) {
+      setAvailableLDs([]);
+      setAvailableLNs([]);
+      setAvailableDOs([]);
+      setDoChildren([]);
+      setAttributePath([]);
+      setModelFetched(false);
+      if (targetChanged) {
+        setManualCp('');
+        setFetchedCp(null);
+      }
+      return;
+    }
+
+    // Get model for this endpoint
+    const modelData = getModel ? getModel(selectedTarget) : null;
+    setModelFetched(!!modelData);
+
+    const hierarchy = extractHierarchyFromModel(modelData);
+    setAvailableLDs(hierarchy.lds);
+
+    // Only reset selections/cp when the endpoint actually changed - not when
+    // this effect re-runs because getModel/extractHierarchyFromModel got new
+    // identities from a parent re-render (e.g. after picking LD/LN/DO).
+    if (targetChanged) {
       setSelectedLD('');
       setSelectedLN('');
       setSelectedDO('');
       setDoChildren([]);
       setAttributePath([]);
-    };
-    
-    updateDropdowns();
+      setManualCp('');
+      setFetchedCp(null);
+    }
   }, [selectedTarget, getModel, extractHierarchyFromModel]);
+
+  // Invalidate model state when effective cp changes
+  useEffect(() => {
+    if (fetchedCp === null) return;  // No model fetched yet for this target
+    if (effectiveCp === fetchedCp) return;  // Still matches what's loaded
+
+    // cp changed - invalidate model state
+    setModelFetched(false);
+    setAvailableLDs([]);
+    setSelectedLD('');
+    setSelectedLN('');
+    setSelectedDO('');
+    setDoChildren([]);
+    setAttributePath([]);
+  }, [effectiveCp, fetchedCp]);
 
   // Update LN dropdown when LD changes
   useEffect(() => {
@@ -810,8 +875,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
 
     const fetchDoDefinition = async () => {
       try {
-        const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
-        const effectiveCp = selectedConnection?.cp || cp || 'cp1';
         const lnRef = `${selectedLD}/${selectedLN}`;
 
         // For ACSI Client endpoints (SO), use data-definition API
@@ -854,7 +917,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     };
 
     fetchDoDefinition();
-  }, [selectedDO, selectedLN, selectedLD, selectedTarget, cp, connectedEndpoints]);
+  }, [selectedDO, selectedLN, selectedLD, selectedTarget, cp, connectedEndpoints, manualCp, isWebsocketPassiveEndpoint]);
 
   const selectedNode = useMemo(() => {
     if (!attributePath.length) return null;
@@ -875,8 +938,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
 
     const fetchSdoDefinition = async () => {
       try {
-        const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
-        const effectiveCp = selectedConnection?.cp || cp || 'cp1';
         const lnRef = `${selectedLD}/${selectedLN}`;
 
         // For ACSI Client endpoints, use data-definition API
@@ -920,7 +981,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     };
 
     fetchSdoDefinition();
-  }, [selectedNode, attributePath, selectedLD, selectedLN, selectedDO, selectedTarget, cp, connectedEndpoints]);
+  }, [selectedNode, attributePath, selectedLD, selectedLN, selectedDO, selectedTarget, cp, connectedEndpoints, manualCp, isWebsocketPassiveEndpoint]);
 
   useEffect(() => {
     setSelectedFC(selectedNode?.fc ? String(selectedNode.fc).toUpperCase() : '');
@@ -987,17 +1048,13 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     setReadResult(null);
     
     try {
-      // Get cp from the selected connection if it's an ACSI client
-      const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
-      const effectiveCp = selectedConnection?.cp || cp || 'cp1';
-     
-      // Add cp to body for ACSI client endpoints
+      // Add cp to body for ACSI client endpoints and WebSocket Passive endpoints
       const isAcsiClient = getAcsiRole(selectedConnection) === 'client';
       const body = {
         objRef: objRef,
         fc: selectedFC.toLowerCase() || 'st'
       };
-      if (isAcsiClient) {
+      if (isAcsiClient || isWebsocketPassiveEndpoint) {
         body.cp = effectiveCp;
       }
       
@@ -1013,7 +1070,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     } finally {
       setLoading(false);
     }
-  }, [selectedTarget, buildObjectRef, selectedFC, connections, cp]);
+  }, [selectedTarget, buildObjectRef, selectedFC, connections, cp, manualCp, isWebsocketPassiveEndpoint, effectiveCp]);
 
   // Handle write operation
   const handleWrite = useCallback(async () => {
@@ -1043,16 +1100,10 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     setWriteResult(null);
     
     try {
-      // Get cp from the selected connection if it's an ACSI client
-      const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
-      const effectiveCp = selectedConnection?.cp || cp || 'cp1';
-      
-      // Add cp to body for ACSI client endpoints
+      // Add cp to body for ACSI client endpoints and WebSocket Passive endpoints
       const isAcsiClient = getAcsiRole(selectedConnection) === 'client';
       
       // Get the daType for the selected DA
-      //const doRef = `${selectedLD}/${selectedLN}.${selectedDO}`;
-      //const daInfo = daCache[doRef]?.find(da => da.name === selectedDA);
       const valueType = selectedNode?.bType || null;
       
       const body = {
@@ -1063,7 +1114,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
       if (valueType) {
         body.dataType = valueType;
       }
-      if (isAcsiClient) {
+      if (isAcsiClient || isWebsocketPassiveEndpoint) {
         body.cp = effectiveCp;
       }
       
@@ -1079,7 +1130,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     } finally {
       setLoading(false);
     }
-  }, [selectedTarget, buildObjectRef, writeValue, selectedFC, connections, cp, selectedNode]);
+  }, [selectedTarget, buildObjectRef, writeValue, selectedFC, connections, cp, selectedNode, manualCp, isWebsocketPassiveEndpoint, effectiveCp]);
 
   // Reset selections and results
   const handleReset = useCallback(() => {
@@ -1093,6 +1144,8 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     setReadResult(null);
     setWriteResult(null);
     setError(null);
+    setManualCp('');
+    setFetchedCp(null);
   }, []);
 
   return (
@@ -1139,14 +1192,45 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
       </div>
 
       {selectedTarget && (
-          <button
-            onClick={handleFetchModel}
-            disabled={modelFetched || fetchingModel}
-            className="btn-secondary"
-            style={{ marginBottom: '12px', width: '100%' }}
-          >
-            {fetchingModel ? 'Fetching Model...' : modelFetched ? 'Model Loaded ✓' : 'Fetch Model'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <button
+              onClick={handleFetchModel}
+              disabled={modelFetched || fetchingModel || (isWebsocketPassiveEndpoint && !manualCp.trim())}
+              className="btn-secondary"
+              style={{ flex: 1 }}
+            >
+              {fetchingModel ? 'Fetching Model...' : modelFetched ? 'Model Loaded ✓' : 'Fetch Model'}
+            </button>
+            {isWebsocketPassiveEndpoint && (
+              <input
+                type="text"
+                value={manualCp}
+                onChange={(e) => {
+                  const newCp = e.target.value;
+                  setManualCp(newCp);
+                  // Typing a new cp invalidates whatever model was loaded for the old one
+                  if (modelFetched) {
+                    setModelFetched(false);
+                    setAvailableLDs([]);
+                    setSelectedLD('');
+                    setSelectedLN('');
+                    setSelectedDO('');
+                    setDoChildren([]);
+                    setAttributePath([]);
+                  }
+                }}
+                placeholder="cp (e.g. cp1)"
+                title="Connection point (cp) — required for WebSocket Passive endpoints"
+                style={{
+                  width: '110px',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  background: 'var(--bg-hover)',
+                  border: manualCp.trim() ? '1px solid var(--border-color)' : '1px solid var(--danger-color)'
+                }}
+              />
+            )}
+          </div>
       )}
 
       {/* Cascading Selection Row */}
