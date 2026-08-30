@@ -85,24 +85,25 @@ services:
       - "rti.host=bff-server"
       - "rti.port=5000"
 
-  # Frontend Web Server
-  frontend:
+  # HMI Web Server
+  rti-hmi:
     build:
-      context: .
-      dockerfile: Dockerfile.frontend  # or Dockerfile.acsi-ws-server.acsi-ws-client.rti-so.frontend.rti-fsp.bff.front-end
-    container_name: rti-demo-ui
-    working_dir: /app
+      context: hmi
+      dockerfile: Dockerfile
+    container_name: rti-hmi
     ports:
-      - "8080:8080"
-    volumes:
-      - ./front-end:/app
+      - "3001:80"
     depends_on:
       bff-server:
         condition: service_healthy
     networks:
       - rti-network
-    environment:
-      - REACT_APP_BFF_URL=http://bff-server:5000
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # RTI-FSP (Acsi-Server)
   rti-fsp:
@@ -262,7 +263,9 @@ services:
     environment:
       - PORT=8000
       - PYTHONUNBUFFERED=1
-    user: "1000:986"  # Run as pi user (uid 1000) with gpio group (gid 986)
+    user: "1000:986"  # pi user with gpio group
+    group_add:
+      - "988"
     devices:
       - "/dev/gpiochip0:/dev/gpiochip0"
       - "/dev/gpiochip4:/dev/gpiochip4"
@@ -270,6 +273,7 @@ services:
       - "/dev/gpiochip11:/dev/gpiochip11"
       - "/dev/gpiochip12:/dev/gpiochip12"
       - "/dev/gpiochip13:/dev/gpiochip13"
+      - "/dev/i2c-1:/dev/i2c-1"
     privileged: true
     ipc: host
     security_opt:

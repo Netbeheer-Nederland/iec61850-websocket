@@ -496,13 +496,13 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     # Fire-and-forget: don't wait for LED blink to complete
                     # Check health and blink LED in background
                     asyncio.create_task(
-                        blink_led_task(io_client, rptID, interval=0.2, count=1, mapping_manager=mapping_manager)
+                        blink_led_task(io_client, "rc_rcv", interval=0.2, count=1, mapping_manager=mapping_manager)
                     )
 
                     value = f"rptID={rptID} dataSet={dataSet}"
 
                     asyncio.create_task(
-                        write_to_lcd(io_client, rptID, value, mapping_manager=mapping_manager)
+                        write_to_lcd(io_client, "rc_rcv", value, mapping_manager=mapping_manager)
                     )
 
                 else:
@@ -532,13 +532,13 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     associate_id = associate_response.get("associateId", "connected")
                     # Blink LED to indicate connection
                     asyncio.create_task(
-                        blink_led_task(io_client, associate_id, interval=0.5, count=2, mapping_manager=mapping_manager)
+                        blink_led_task(io_client, "connected", interval=0.5, count=2, mapping_manager=mapping_manager)
                     )
                     
                     # Write connection info to LCD
                     value = f"Connected: {associate_id}"
                     asyncio.create_task(
-                        write_to_lcd(io_client, associate_id, value, mapping_manager=mapping_manager)
+                        write_to_lcd(io_client, "connected", value, mapping_manager=mapping_manager)
                     )
                 else:
                     logger.warning("IO client is None - cannot turn on LED. Call /api/io/connect first.")

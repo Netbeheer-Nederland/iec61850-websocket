@@ -71,8 +71,8 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     const name = sdo.name || 'SDO';
     const ref = `${parentRef}.${name}`;
     const inlineDas = sdo.dataAttributes || sdo.data_attributes || [];
-    const children = inlineDas.length > 0 ? inlineDas.map(da => buildDaNode(da, ref)) : null;
-    return {name, type: 'SDO', ref, cdc: sdo.cdc || '', fc: null, bType: null, children  };
+    const children = inlineDas.length > 0 ? inlineDas.map(da => buildDaNode(da, ref)) : [];
+    return {name, type: 'SDO', ref, cdc: sdo.cdc || '', fc: null, bType: null, children};
   };
 
   // Top-level children of a DO
@@ -93,6 +93,145 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     if (payload.result?.dataAttributeDefintion || payload.result?.sudDataDefinition) return payload.result;
     if (payload.data?.dataAttributeDefinition || payload.data?.subDataDefinition) return payload.data;
     return payload.result?.value || payload.value || payload.result || payload;
+  };
+
+  // Extract DO/SDO definition from already-loaded server model
+  const extractDoDefinitionFromModel = (modelData, ldName, lnName, doPath) => {
+    try {
+      let data = modelData;
+      
+      // Normalize to the actual model object
+      if (data?.result?.model?.server?.logicalDevices) {
+        data = data.result.model;
+      } else if (data?.result?.server?.logicalDevices) {
+        data = data.result;
+      } else if (data?.model?.server?.logicalDevices) {
+        data = data.model;
+      }
+      
+      // Try to extract from logicalDeviceMap/logicalNodeDetails structure (model-tree format)
+      const logicalDeviceMap = data.logicalDeviceMap || {};
+      const logicalNodeDetails = data.logicalNodeDetails || {};
+      const lnRef = `${ldName}/${lnName}`;
+      const details = logicalNodeDetails[lnRef] || {};
+      const dataObjects = details.dataObjects || [];
+      
+      if (dataObjects.length > 0) {
+        // Find the DO (or parent DO for SDO paths)
+        // doPath can be "DOName" for a DO, or "DOName.SDOName" for an SDO
+        const pathParts = doPath.split('.');
+        const doName = pathParts[0];
+        const sdoPath = pathParts.slice(1).join('.');
+        
+        const doObj = dataObjects.find(obj => {
+          const objName = typeof obj === 'object' ? obj.name : String(obj);
+          return objName === doName;
+        });
+        
+        if (doObj) {
+          // If it's an SDO path, navigate to the nested SDO
+          if (sdoPath && doObj.subDataObjects) {
+            let current = doObj;
+            const sdoParts = sdoPath.split('.');
+            
+            for (const part of sdoParts) {
+              const sdoObj = (current.subDataObjects || []).find(item => {
+                const itemName = typeof item === 'object' ? item.name : String(item);
+                return itemName === part;
+              });
+              if (!sdoObj) return null;
+              current = sdoObj;
+            }
+            
+            // Return SDO's definition
+            const dataAttributes = current.dataAttributes || current.data_attributes || [];
+            const subDataObjects = current.subDataObjects || current.sub_data_objects || [];
+            
+            return {
+              dataAttributeDefinition: dataAttributes,
+              subDataDefinition: subDataObjects
+            };
+          }
+          
+          // For regular DOs, return their definition
+          const dataAttributes = doObj.data_attributes || doObj.dataAttributes || doObj.da || [];
+          const subDataObjects = doObj.subDataObjects || doObj.sub_data_objects || [];
+          
+          return {
+            dataAttributeDefinition: dataAttributes,
+            subDataDefinition: subDataObjects
+          };
+        }
+      }
+      
+      // Try to extract from tree structure (Server model format)
+      if (data?.tree?.children) {
+        return extractDoDefinitionFromTree(data.tree, ldName, lnName, doPath);
+      }
+      
+      if (data?.children) {
+        return extractDoDefinitionFromTree(data, ldName, lnName, doPath);
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Failed to extract DO definition from model:', error);
+      return null;
+    }
+  };
+
+  // Helper to extract DO definition from tree-structured model
+  const extractDoDefinitionFromTree = (tree, ldName, lnName, doPath) => {
+    try {
+      const lnRef = `${ldName}/${lnName}`;
+      const doName = doPath.split('.')[0];
+      
+      // Find the LD in the tree
+      const ldNode = tree.children?.find(node => node.name === ldName || node.kind === ldName);
+      if (!ldNode) return null;
+      
+      // Find the LN under the LD
+      const lnNode = ldNode.children?.find(node => {
+        const nodeName = node.name || node.kind;
+        return nodeName === lnName || nodeName === lnRef;
+      });
+      if (!lnNode) return null;
+      
+      // Find the DO under the LN
+      const doNode = lnNode.children?.find(node => node.name === doName);
+      if (!doNode) return null;
+      
+      // For SDO paths, navigate deeper
+      const pathParts = doPath.split('.');
+      let current = doNode;
+      for (let i = 1; i < pathParts.length; i++) {
+        const part = pathParts[i];
+        current = current.children?.find(node => node.name === part);
+        if (!current) return null;
+      }
+      
+      // Extract DAs and SDOs from the current node
+      const dataAttributes = [];
+      const subDataObjects = [];
+      
+      if (current.children) {
+        current.children.forEach(child => {
+          if (child.kind === 'DA' || child.kind === 'DataAttribute' || child.type === 'DA' || child.type === 'DataAttribute') {
+            dataAttributes.push(child);
+          } else if (child.kind === 'SDO' || child.kind === 'SubDataObject' || child.type === 'SDO' || child.type === 'SubDataObject') {
+            subDataObjects.push(child);
+          }
+        });
+      }
+      
+      return {
+        dataAttributeDefinition: dataAttributes,
+        subDataDefinition: subDataObjects
+      };
+    } catch (error) {
+      console.error('Failed to extract DO definition from tree:', error);
+      return null;
+    }
   };
 
   // Walk a path of selected names down the tree to find the node at that depth
@@ -673,22 +812,42 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
       try {
         const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
         const effectiveCp = selectedConnection?.cp || cp || 'cp1';
+        const lnRef = `${selectedLD}/${selectedLN}`;
 
-        const result = await executeApiCall('data-definition', selectedTarget, {
-          cp: effectiveCp,
-          ld_inst: selectedLD,
-          ln_inst: selectedLN,
-          do_path: selectedDO,
-        });
+        // For ACSI Client endpoints (SO), use data-definition API
+        // For Server endpoints (FSP, true ACSI Server), extract from model
+        if (getAcsiRole(selectedConnection) === 'client') {
+          const result = await executeApiCall('data-definition', selectedTarget, {
+            cp: effectiveCp,
+            ld_inst: selectedLD,
+            ln_inst: selectedLN,
+            do_path: selectedDO,
+          });
 
-        if (result?.ok && result.payload) {
-          const value = extractDataDefinitionValue(result.payload);
-          const children = buildDoChildren(doRef, value);
-          dataDefinitionCacheRef.current[doRef] = children;
-          setDoChildren(children);
-        } else {
-          setDoChildren([]);
+          if (result?.ok && result.payload) {
+            const value = extractDataDefinitionValue(result.payload);
+            const children = buildDoChildren(doRef, value);
+            dataDefinitionCacheRef.current[doRef] = children;
+            setDoChildren(children);
+            return;
+          }
         }
+
+        // For Server endpoints (FSP, true ACSI Server), extract from the already-loaded model
+        if (getAcsiRole(selectedConnection) === 'server' && getModel) {
+          const modelData = getModel(selectedTarget);
+          if (modelData) {
+            const definitionValue = extractDoDefinitionFromModel(modelData, selectedLD, selectedLN, selectedDO);
+            if (definitionValue) {
+              const children = buildDoChildren(doRef, definitionValue);
+              dataDefinitionCacheRef.current[doRef] = children;
+              setDoChildren(children);
+              return;
+            }
+          }
+        }
+
+        setDoChildren([]);
       } catch (error) {
         setDoChildren([]);
       }
@@ -718,22 +877,43 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
       try {
         const selectedConnection = connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
         const effectiveCp = selectedConnection?.cp || cp || 'cp1';
+        const lnRef = `${selectedLD}/${selectedLN}`;
 
-        const result = await executeApiCall('data-definition', selectedTarget, {
-          cp: effectiveCp,
-          ld_inst: selectedLD,
-          ln_inst: selectedLN,
-          do_path: doPath,
-        });
+        // For ACSI Client endpoints, use data-definition API
+        // For Server endpoints (FSP, true ACSI Server), extract from model
+        if (getAcsiRole(selectedConnection) === 'client') {
+          const result = await executeApiCall('data-definition', selectedTarget, {
+            cp: effectiveCp,
+            ld_inst: selectedLD,
+            ln_inst: selectedLN,
+            do_path: doPath,
+          });
 
-        if (result?.ok && result.payload) {
-          const value = extractDataDefinitionValue(result.payload);
-          const children = buildDoChildren(selectedNode.ref, value);
-          dataDefinitionCacheRef.current[definitionPath] = children;
-          setDoChildren(prev => setChildrenAtPath(prev, attributePath, children));
-        } else {
-          setDoChildren(prev => setChildrenAtPath(prev, attributePath, []));
+          if (result?.ok && result.payload) {
+            const value = extractDataDefinitionValue(result.payload);
+            const children = buildDoChildren(selectedNode.ref, value);
+            dataDefinitionCacheRef.current[definitionPath] = children;
+            setDoChildren(prev => setChildrenAtPath(prev, attributePath, children));
+            return;
+          }
         }
+
+        // For Server endpoints (FSP, true ACSI Server), extract from the already-loaded model
+        if (getAcsiRole(selectedConnection) === 'server' && getModel) {
+          const modelData = getModel(selectedTarget);
+          if (modelData) {
+            // For SDOs, we need to find the nested path
+            const definitionValue = extractDoDefinitionFromModel(modelData, selectedLD, selectedLN, doPath);
+            if (definitionValue) {
+              const children = buildDoChildren(selectedNode.ref, definitionValue);
+              dataDefinitionCacheRef.current[definitionPath] = children;
+              setDoChildren(prev => setChildrenAtPath(prev, attributePath, children));
+              return;
+            }
+          }
+        }
+
+        setDoChildren(prev => setChildrenAtPath(prev, attributePath, []));
       } catch (error) {
         setDoChildren(prev => setChildrenAtPath(prev, attributePath, []));
       }

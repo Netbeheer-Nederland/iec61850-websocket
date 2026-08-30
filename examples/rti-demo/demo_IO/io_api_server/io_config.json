@@ -72,6 +72,27 @@
       "backlight_pin": null,
       "description": "16x2 LCD Display with HD44780 controller (4-bit mode)",
       "direction": "output"
+    },
+    {
+      "name": "lcd_i2c",
+      "type": "lcd_i2c",
+      "device_type": "lcd_i2c",
+      "identifier": 1,
+      "i2c_address": 39,
+      "i2c_bus": 1,
+      "columns": 16,
+      "rows": 2,
+      "backlight": true,
+      "rs_bit": 0,
+      "rw_bit": 1,
+      "e_bit": 2,
+      "backlight_bit": 3,
+      "d4_bit": 4,
+      "d5_bit": 5,
+      "d6_bit": 6,
+      "d7_bit": 7,
+      "description": "16x2 LCD Display with HD44780 controller and I2C backpack (PCF8574)",
+      "direction": "output"
     }
   ],
   "version": 1,

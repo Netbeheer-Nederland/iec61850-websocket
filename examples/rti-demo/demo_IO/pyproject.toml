@@ -13,6 +13,7 @@ dependencies = [
     "flask-cors==4.0.0",
     "gpiozero",
     "gpiod",
+    "smbus2",
     "httpx>=0.28.1",
     "PyJWT>=2.0.0,<3.0.0",
     "python-dotenv==1.0.0",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 function Settings({ settings, setSettings }) {
   const [localSettings, setLocalSettings] = useState({ ...settings });
@@ -11,11 +11,23 @@ function Settings({ settings, setSettings }) {
     text: 'Not checked',
     color: 'var(--text-muted)'
   });
+  // Tracks the last settings prop content we synced from, so a parent
+  // re-render that passes a new-but-equal object doesn't stomp on typing.
+  const syncedSettingsRef = useRef(JSON.stringify(settings));
+  const didMountRef = useRef(false);
 
   useEffect(() => {
-    setLocalSettings({ ...settings });
-    // Check BFF connection on page load
-    checkBffConnection();
+    const settingsStr = JSON.stringify(settings);
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      // Check BFF connection on initial page load only
+      checkBffConnection();
+      return;
+    }
+    if (settingsStr !== syncedSettingsRef.current) {
+      syncedSettingsRef.current = settingsStr;
+      setLocalSettings({ ...settings });
+    }
   }, [settings]);
 
   const checkBffConnection = useCallback(async () => {
@@ -49,21 +61,23 @@ function Settings({ settings, setSettings }) {
   const handleSaveSettings = async () => {
     // Save settings
     setSettings({ ...localSettings });
-    
+
     // Save refresh settings to localStorage
     localStorage.setItem('rti-hmi-refresh-settings', JSON.stringify(refreshSettings));
-    
+
     // Check BFF connection
     await checkBffConnection();
-    
+
     alert('Settings saved and BFF connection checked!');
   };
 
   const handleInputChange = (e) => {
     const { id, value, type } = e.target;
+    const keyMap = { 'bff-host': 'bffHost', 'bff-port': 'bffPort' };
+    const key = keyMap[id] || id;
     setLocalSettings(prev => ({
       ...prev,
-      [id]: type === 'number' ? parseInt(value) : value
+      [key]: type === 'number' ? parseInt(value) : value
     }));
   };
 
@@ -88,20 +102,20 @@ function Settings({ settings, setSettings }) {
               <span style={{ color: bffConnectionStatus.color, fontWeight: '600' }}>
                 {bffConnectionStatus.text}
               </span>
-              <span 
-                className="bff-status-dot" 
-                style={{ 
-                  background: bffConnectionStatus.connected ? 'var(--success-color)' : 'var(--danger-color)' 
+              <span
+                className="bff-status-dot"
+                style={{
+                  background: bffConnectionStatus.connected ? 'var(--success-color)' : 'var(--danger-color)'
                 }}
               ></span>
             </div>
           </div>
-          
+
           <div className="setting-item" style={{ display: 'block' }}>
             <label htmlFor="bff-host">BFF Server Host</label>
-            <input 
-              type="text" 
-              id="bff-host" 
+            <input
+              type="text"
+              id="bff-host"
               value={localSettings.bffHost}
               onChange={handleInputChange}
               style={{ width: '100%', maxWidth: '300px' }}
@@ -109,9 +123,9 @@ function Settings({ settings, setSettings }) {
           </div>
           <div className="setting-item" style={{ display: 'block' }}>
             <label htmlFor="bff-port">BFF Server Port</label>
-            <input 
-              type="number" 
-              id="bff-port" 
+            <input
+              type="number"
+              id="bff-port"
               value={localSettings.bffPort}
               onChange={handleInputChange}
               style={{ width: '100%', maxWidth: '300px' }}
@@ -122,9 +136,9 @@ function Settings({ settings, setSettings }) {
             <h4 style={{ marginBottom: '16px', color: 'var(--text-primary)' }}>Connection Refresh Time</h4>
             <div className="setting-item" style={{ display: 'block' }}>
               <label htmlFor="connection-status-period">Refresh Period in ms</label>
-              <input 
-                type="text" 
-                id="connection-status-period" 
+              <input
+                type="text"
+                id="connection-status-period"
                 value={refreshSettings.connectionStatusPeriod}
                 onChange={handleRefreshInputChange}
                 style={{ width: '100%', maxWidth: '300px' }}
@@ -132,9 +146,9 @@ function Settings({ settings, setSettings }) {
             </div>
             <div className="setting-item" style={{ display: 'block' }}>
               <label htmlFor="auto-refresh-toggle">Connection Cards Refresh Period in ms</label>
-              <input 
-                type="text" 
-                id="auto-refresh-toggle" 
+              <input
+                type="text"
+                id="auto-refresh-toggle"
                 value={refreshSettings.autoRefreshToggle}
                 onChange={handleRefreshInputChange}
                 style={{ width: '100%', maxWidth: '300px' }}

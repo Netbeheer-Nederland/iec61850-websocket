@@ -105,58 +105,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     }, []);
 
 
-  // Connect
-  const handleConnect = useCallback(async () => {
-    if (!wsHost || !wsPort) {
-      setError('Please enter both host and port');
-      return;
-    }
-    if (isNaN(wsPort) || wsPort < 1 || wsPort > 65535) {
-      setError('Invalid port number');
-      return;
-    }
-    if (!apiTarget) {
-      setError('No API endpoint configured');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await executeApiCall('connect', apiTarget, { host: wsHost, port: wsPort, cp: wsCp });
-      if (result?.ok) {
-        setConnected(true);
-        await loadStatus();
-      } else {
-        setError(result?.payload?.error || result?.rawText || 'Connection failed');
-      }
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [wsHost, wsPort, wsCp, apiTarget]);
-
-  // Disconnect
-  const handleDisconnect = useCallback(async () => {
-    if (!connected) return;
-    if (!apiTarget) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await executeApiCall('disconnect', apiTarget, { host: wsHost, port: wsPort, cp: wsCp });
-      if (result?.ok) {
-        setConnected(false);
-        setTreeData(null);
-      } else {
-        setError(result?.payload?.error || result?.rawText || 'Disconnection failed');
-      }
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [connected, wsHost, wsPort, wsCp, apiTarget]);
-
   // Load status
   const loadStatus = useCallback(async () => {
     if (!apiTarget) return;
@@ -216,10 +164,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
 
   // Load model tree
   const loadClientTree = useCallback(async () => {
-    if (!connected) {
-      setError('Please connect first');
-      return;
-    }
     if (!apiTarget) {
       setError('No API endpoint configured');
       return;
@@ -242,7 +186,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     } finally {
       setLoading(false);
     }
-  }, [connected, apiTarget, wsCp]);
+  }, [apiTarget, wsCp]);
 
   // Transform API response to tree structure
   const transformTree = (data) => {
@@ -427,10 +371,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   // Read data value
   const readDataValue = useCallback(
     async (objRef, fc, cpParam) => {
-      if (!connected) {
-        setError('Please connect first');
-        return;
-      }
       if (!apiTarget) {
         setError('No endpoint configured');
         return;
@@ -442,7 +382,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
           const updateTreeWithValue = (nodes, targetRef, valueData, isError) => {
             const formatted = formatValueForDisplay(valueData, isError);
             return nodes.map((node) =>
-              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } : 
+              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
               node.children ? { ...node, children: updateTreeWithValue(node.children, targetRef, valueData, isError) } : node
             );
           };
@@ -455,7 +395,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
           const updateTreeWithError = (nodes, targetRef) => {
             const formatted = formatValueForDisplay(errorValue, true);
             return nodes.map((node) =>
-              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } : 
+              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
               node.children ? { ...node, children: updateTreeWithError(node.children, targetRef) } : node
             );
           };
@@ -467,7 +407,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
         const updateTreeWithError = (nodes, targetRef) => {
           const formatted = formatValueForDisplay(error.message, true);
           return nodes.map((node) =>
-            node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } : 
+            node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
             node.children ? { ...node, children: updateTreeWithError(node.children, targetRef) } : node
           );
         };
@@ -476,16 +416,12 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
         }
       }
     },
-    [connected, apiTarget, wsCp, treeData, formatValueForDisplay]
+    [apiTarget, wsCp, treeData, formatValueForDisplay]
   );
 
   // Write data value
   const writeDataValue = useCallback(
     async (objRef, fc, value, value_type) => {
-      if (!connected) {
-        setError('Please connect first');
-        throw new Error('Please connect first');
-      }
       if (!apiTarget) {
         setError('No endpoint configured');
         throw new Error('No endpoint configured');
@@ -496,7 +432,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
           const updateTreeWithValue = (nodes, targetRef, valueData, isError) => {
             const formatted = formatValueForDisplay(valueData, isError);
             return nodes.map((node) =>
-              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } : 
+              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
               node.children ? { ...node, children: updateTreeWithValue(node.children, targetRef, valueData, isError) } : node
             );
           };
@@ -514,7 +450,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
         const updateTreeWithError = (nodes, targetRef) => {
           const formatted = formatValueForDisplay(error.message, true);
           return nodes.map((node) =>
-            node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } : 
+            node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
             node.children ? { ...node, children: updateTreeWithError(node.children, targetRef) } : node
           );
         };
@@ -525,7 +461,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
         throw error;
       }
     },
-    [connected, apiTarget, wsCp, treeData, formatValueForDisplay]
+    [apiTarget, wsCp, treeData, formatValueForDisplay]
   );
 
   // Handle context menu
@@ -556,7 +492,7 @@ const handleNodeClick = useCallback(
       ...prev,
       [nodeRef]: shouldToggle ? !prev[nodeRef] : true,
     }));
-    
+
     if (nodeInfo.nodeType === 'DO' || nodeInfo.nodeType === 'SDO') {
       // Skip fetching if children already loaded
       const nodeInTree = findNodeInTree(treeData, nodeInfo.ref);
@@ -752,7 +688,7 @@ const getContextMenuItems = () => {
           closeContextMenu();
         },
       });
-    } 
+    }
   }
   else if (nodeType === 'DA' || nodeType === 'SDA' || nodeType === 'FCDA') {
     const displayFc = fc || 'cf';
@@ -869,12 +805,6 @@ const getContextMenuItems = () => {
             disabled={loading}
           />
         </div>
-        <button id="acsi-connect-btn" className="btn-secondary" onClick={handleConnect} disabled={loading || connected}>
-          {loading ? 'Starting...' : 'Start'}
-        </button>
-        <button id="acsi-disconnect-btn" className="btn-secondary" onClick={handleDisconnect} disabled={loading || !connected}>
-          Stop
-        </button>
       </div>
 
       {/* Security Configuration Buttons */}
@@ -901,26 +831,26 @@ const getContextMenuItems = () => {
                 try {
                   // Build OAuth config from endpoint
                   const oauthConfig = endpoint?.OAuth || {};
-                  
+
                   // For active mode connections, use the client's port for WebSocket connection
                   let connectionPort = endpoint?.port || wsPort;
                   if (endpoint?.ws_mode === 'active' || endpoint?.ws_mode === 'Active') {
                       // Find corresponding client connection (SO) by replacing Server with Client in endpoint name
                       const clientName = endpoint.name.replace('Server', 'Client');
-                      const clientConnection = propConnections.find(c => 
-                          (c.type === 'RTI-SO' || c.acsi === 'client') && 
+                      const clientConnection = propConnections.find(c =>
+                          (c.type === 'RTI-SO' || c.acsi === 'client') &&
                           c.name === clientName
                       );
                       if (clientConnection) {
                           connectionPort = clientConnection.port;
                       }
                   }
-                  
+
                   // Use the connection's own host/port for the target endpoint
                   const targetHost = endpoint?.host || wsHost;
                   const targetPort = endpoint?.port || wsPort;
                   const connectionTarget = buildTargetValue(targetHost, targetPort);
-                  
+
                   const requestBody = {
                     connection_name: endpoint?.name,
                     enable_oauth: newValue,
@@ -933,10 +863,10 @@ const getContextMenuItems = () => {
                     token_issuer_url: newValue ? (oauthConfig.token_issuer || oauthConfig.token_endpoint || '') : null,
                     ca_certificate: newValue ? (oauthConfig.auth_server_ca || '').trim() : null
                   };
-                  
+
                   // Save to SO server
                   const soResult = await executeApiCall('reconfig-oauth', connectionTarget, requestBody);
-                  
+
                   // Also save to BFF's connections.json
                   const bffOauthConfig = {
                     connection_name: endpoint?.name || wsHost,
@@ -952,7 +882,7 @@ const getContextMenuItems = () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(bffOauthConfig)
                   });
-                  
+
                   if (soResult?.ok && bffResult.ok) {
                     setMessage({ type: 'success', text: `OAuth ${newValue ? 'enabled' : 'disabled'} successfully` });
                   } else {
@@ -976,7 +906,7 @@ const getContextMenuItems = () => {
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-        <button id="acsi-read-data-btn" className="btn-primary" onClick={loadClientTree} disabled={loading || !connected}>
+        <button id="acsi-read-data-btn" className="btn-primary" onClick={loadClientTree} disabled={loading || !apiTarget}>
           {loading ? 'Fetching...' : 'Fetch Model'}
         </button>
         <button className="btn-secondary" onClick={loadStatus} disabled={!apiTarget}>
@@ -1055,7 +985,7 @@ const getContextMenuItems = () => {
           />
         ) : (
           <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-            {connected ? 'Click "Fetch Model" to load the ACSI model tree' : 'Start the WebSocket connection to fetch the model'}
+            Click "Fetch Model" to load the ACSI model tree
           </p>
         )}
       </div>
@@ -1161,7 +1091,7 @@ const getContextMenuItems = () => {
         connection={(
           () => {
             // Try to find matching connection from live connections (has updated TLS)
-            const liveConn = connections.find(c => 
+            const liveConn = connections.find(c =>
               (c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) ||
               (c.host === wsHost && String(c.port) === String(wsPort))
             );
@@ -1227,4 +1157,3 @@ const getContextMenuItems = () => {
 };
 
 export default ACSIClient;
-
