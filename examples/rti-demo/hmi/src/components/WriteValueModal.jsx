@@ -15,7 +15,11 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
     const fetchCurrentValue = async () => {
       try {
         const endpointTarget = `${endpoint.host}:${endpoint.port}`;
-        const res = await executeApiCall('read', endpointTarget, { objRef, fc, cp });
+        const res = await executeApiCall('read', endpointTarget, {
+          objRef,
+          fc,
+          ...(cp ? {cp} : {}),
+        });
         if (res?.ok && res.payload?.result?.value) {
           const values = Array.isArray(res.payload.result.value)
             ? res.payload.result.value
@@ -75,7 +79,7 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
         fc,
         value: coercedValue,
         dataType: type,
-        cp,
+        ...(cp ? {cp} : {}),
       });
 
       if (!result?.ok) {

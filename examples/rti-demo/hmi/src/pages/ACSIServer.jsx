@@ -5,6 +5,8 @@ import Tree from '../components/Tree';
 import { transformModelToTree } from '../utils/modelUtils';
 
 import TLSConfigModal from '../components/TLSConfigModal';
+import ContextMenu  from "../components/ContextMenu.jsx";
+import WriteValueModal from '../components/WriteValueModal.jsx';
 
 function ACSIServer({ settings, updateModel, getModel, connections: propConnections, bffBaseUrl = 'http://localhost:5000'}) {
   const location = useLocation();
@@ -35,6 +37,11 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [showTLSModal, setShowTLSModal] = useState(false);
   const [useOAuth, setUseOAuth] = useState(false);
   const [message, setMessage] = useState(null);
+
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
+  const [contextMenuTarget, setContextMenuTarget] = useState(null);
+  const [showWriteModal, setShowWriteModal] = useState(false);
+  const [writeModalTarget, setWriteModalTarget] = useState({ ref: '', fc: '' });
 
   useEffect(() => {
     localStorage.setItem(storageKey, String(connected));
@@ -299,6 +306,135 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     finally { setLoading(false); }
   }, [endpointTarget, executeApiCall, endpoint]);
 
+  const formatValueForDisplay = useCallback((valuesData, isError = false) => {
+    if (isError) {
+      return { display: '✗ Error', color: '#c62828' };
+    }
+
+    function asn1TimeStampToISOString(ts) {
+      if (!ts || typeof ts.secondSinceEpoch !== 'number') return '';
+      const seconds = ts.secondSinceEpoch;
+      let ms = 0;
+      if (typeof ts.fractionOfSecond === 'number') {
+        ms = Math.floor(ts.fractionOfSecond / 1000);
+      }
+      const date = new Date((seconds * 1000) + ms);
+      return date.toISOString();
+    }
+
+    // valuesData is the flat { type, value } object from result.values
+    const type = valuesData?.type;
+    let value = valuesData?.value;
+
+    if (value && typeof value === 'object' && typeof value.secondSinceEpoch === 'number') {
+      value = asn1TimeStampToISOString(value) || JSON.stringify(value);
+    } else if (typeof value === 'number') {
+      value = type === 'enumerated' || Number.isInteger(value) ? String(value) : value.toFixed(2);
+    } else if (typeof value === 'boolean') {
+      value = value ? 'true' : 'false';
+    } else if (value && typeof value === 'object') {
+      value = JSON.stringify(value);
+    }
+
+    return { display: value !== undefined ? String(value) : '—', color: '#4caf50' };
+  }, []);
+
+  const readDataValue = useCallback(
+    async (objRef, fc) => {
+      if (!endpointTarget) {
+        setError('No endpoint configured');
+        return;
+      }
+      try {
+        // Server role: no cp needed, it already owns the model
+        const result = await executeApiCall('read', endpointTarget, { objRef, fc });
+
+        const updateTreeWithValue = (nodes, targetRef, valueData, isError) => {
+          const formatted = formatValueForDisplay(valueData, isError);
+          return nodes.map((node) =>
+            node.ref === targetRef
+              ? { ...node, value: formatted.display, valueColor: formatted.color }
+              : node.children
+              ? { ...node, children: updateTreeWithValue(node.children, targetRef, valueData, isError) }
+              : node
+          );
+        };
+
+        if (result?.ok) {
+          const valueData = result.payload?.result?.values;
+          if (valueData && treeData) {
+            setTreeData((prev) => ({ ...prev, children: updateTreeWithValue(prev.children, objRef, valueData, false) }));
+          }
+        } else {
+          const errorValue = result?.payload?.error || 'Unknown error';
+          if (treeData) {
+            setTreeData((prev) => ({ ...prev, children: updateTreeWithValue(prev.children, objRef, errorValue, true) }));
+          }
+        }
+      } catch (error) {
+        if (treeData) {
+          setTreeData((prev) => ({
+            ...prev,
+            children: (function updateErr(nodes) {
+              const formatted = formatValueForDisplay(error.message, true);
+              return nodes.map((node) =>
+                node.ref === objRef
+                  ? { ...node, value: formatted.display, valueColor: formatted.color }
+                  : node.children
+                  ? { ...node, children: updateErr(node.children) }
+                  : node
+              );
+            })(prev.children),
+          }));
+        }
+      }
+    },
+    [endpointTarget, executeApiCall, treeData, formatValueForDisplay]
+  );
+
+  const handleContextMenu = useCallback((e, nodeInfo) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenuTarget(nodeInfo);
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu({ visible: false, x: 0, y: 0 });
+    setContextMenuTarget(null);
+  }, []);
+
+  const getContextMenuItems = useCallback(() => {
+    if (!contextMenuTarget) return [];
+    const { nodeType, ref, fc } = contextMenuTarget;
+
+    // Only DA / SDA leaves are readable/writable. No Operate — not needed here.
+    if (nodeType !== 'DA' && nodeType !== 'SDA') return [];
+
+    const displayFc = fc || 'st';
+
+    return [
+      {
+        label: `Read Value [${displayFc.toUpperCase()}]`,
+        icon: 'fa-eye',
+        action: () => {
+          readDataValue(ref, displayFc);
+          closeContextMenu();
+        },
+      },
+      {
+        // Unrestricted on the server side — every FC is writable, not just CF/SP
+        label: `Write Value [${displayFc.toUpperCase()}]`,
+        icon: 'fa-pen',
+        action: () => {
+          setWriteModalTarget({ ref, fc: displayFc });
+          setShowWriteModal(true);
+          closeContextMenu();
+        },
+      },
+    ];
+  }, [contextMenuTarget, readDataValue, closeContextMenu]);
+
   // Auto-poll server status when endpoint is available
   useEffect(() => {
     if (!endpointTarget) return;
@@ -501,7 +637,14 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       )}
       
       <div id="acsi-modelPanel" className="model-tree" style={{ marginTop: '24px' }}>
-        {treeData ? <Tree data={treeData} expandedNodes={expandedNodes} onExpandToggle={handleExpandToggle} /> : 
+        {treeData ? (
+            <Tree
+                data={treeData}
+                expandedNodes={expandedNodes}
+                onExpandToggle={handleExpandToggle}
+                onContextMenu={handleContextMenu}
+            />
+          ) :
           <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
             {endpoint ? `Click "Load Model" to view the server model for ${endpoint.name || endpoint.host}:${endpoint.port}` : 'Configure and start the ACSI Server to load model'}
           </p>}
@@ -595,6 +738,35 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         }}
         onError={(msg) => setMessage({ type: 'error', text: msg })}
       />
+
+      <ContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        visible={contextMenu.visible}
+        onClose={closeContextMenu}
+        items={getContextMenuItems()}
+      />
+
+      {showWriteModal && (
+        <WriteValueModal
+          objRef={writeModalTarget.ref}
+          fc={writeModalTarget.fc}
+          endpoint={{ host: endpoint?.host || host, port: endpoint?.port || port }}
+          cp={null}
+          onClose={() => {
+            setShowWriteModal(false);
+            setWriteModalTarget({ ref: '', fc: '' });
+          }}
+          onSuccess={async () => {
+            setShowWriteModal(false);
+            if (writeModalTarget.ref && writeModalTarget.fc) {
+              await readDataValue(writeModalTarget.ref, writeModalTarget.fc);
+            }
+            setWriteModalTarget({ ref: '', fc: '' });
+          }}
+        />
+      )}
+
     </section>
   );
 }

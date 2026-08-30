@@ -54,8 +54,8 @@
       "token_endpoint": "https://localhost:8443/realms/iec61850-websocket/protocol/openid-connect/token",
       "client_id": "rti-fsp",
       "client_secret": "Af901GzeYXmZAqtJc03jGkHLEwgyPyHN",
-      "enable_token_refresh": true,
-      "enable_oauth": true,
+      "enable_token_refresh": false,
+      "enable_oauth": false,
       "idp_server": ""
     },
     "TLS": {
@@ -179,6 +179,7 @@
       "client_secret": "",
       "enable_token_refresh": false,
       "idp_server": ""
-    }
+    },
+    "status": "connected"
   }
 ]
