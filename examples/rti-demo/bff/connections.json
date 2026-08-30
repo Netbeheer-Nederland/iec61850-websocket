@@ -1,175 +1,36 @@
 [
   {
-    "id": 6,
-    "name": "Max_test_Client",
-    "host": "127.0.0.1",
+    "id": 1,
+    "name": "Demo_Pi1",
+    "host": "192.168.100.15",
     "port": 5002,
     "type": "RTI-SO",
-    "auto_discovered": false,
-    "created_at": "2026-07-09T09:46:19.806408",
-    "status": "connected",
-    "properties_info": {
-      "available": false,
-      "error": "HTTPConnectionPool(host='127.0.0.1', port=5002): Max retries exceeded with url: /api/properties (Caused by NewConnectionError(\"HTTPConnection(host='127.0.0.1', port=5002): Failed to establish a new connection: [Errno 111] Connection refused\"))"
-    },
     "acsi": "client",
     "ws_mode": "passive",
-    "endpoint": "",
+    "auto_discovered": false,
+    "created_at": "2026-08-28T11:28:21.138354",
     "OAuth": {
-      "certificate_endpoint": "https://localhost:8443/realms/iec61850-websocket/protocol/openid-connect/certs",
-      "token_issuer": "https://localhost:8443/realms/iec61850-websocket",
-      "auth_server_ca": "-----BEGIN CERTIFICATE-----\nMIIDjzCCAnegAwIBAgIUEdejLY81yBEs3hCM3K73pBb8SkMwDQYJKoZIhvcNAQEL\nBQAwbDELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEjAQ\nBgNVBAMMCWtleWNsb2FjazAeFw0yNTA4MTMxNDM3MjhaFw0zNTA4MTExNDM3Mjha\nMGwxCzAJBgNVBAYTAkRFMQswCQYDVQQIDAJCVzERMA8GA1UEBwwIRnJlaWJ1cmcx\nGzAZBgNVBAoMEk1aIEF1dG9tYXRpb24gR21iSDEMMAoGA1UECwwDUiZEMRIwEAYD\nVQQDDAlrZXljbG9hY2swggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDu\nnXFutSb7aybJy1I8o0PWOvQYPnPaQe8m/RlU5tn/CZK3wPvZUJScEL8rLOA9Z2D9\nTk226HfW54pimYkoEvhXMo1gzVyO6g4virnUWfL1PJX0BQPRj38cXZ4gBVcBPJ6N\nhfjMnA+HZ5OQPybtNAlTrObdMA5VoKLmTv/vM2COVPkV1l57bMt6GYkV5fn+NSnz\nnhoPxybqtkTvVARptcDeBiEDZ5G5KNtm94jhVHgEQRwisp+Jz+Ay+sntuWaQgkRJ\nT5X7yx1JtV1fSau6xf0qOqZKDD2Kt+qvgMk6Q+1WluCi8BUNv8RdRSS13sjlyyjD\nkwuwMw/r/R9f9XdG1CYPAgMBAAGjKTAnMCUGA1UdEQQeMByCCWtleWNsb2Fja4IJ\nbG9jYWxob3N0hwR/AAABMA0GCSqGSIb3DQEBCwUAA4IBAQCjHojfNCHbgqLqbSyi\nFnMQ4DxzWtw2Nk1PxKJvGoqfrs2dHdB8zvlEuBxIAKWcTkb8WngudRCtBFDM3pJE\nxkCxcPmcyLK5yolI5lZx0Ozc1hjKQxh28mtOC/EwZQzLlOddwEHytX6ZlMSC5Q1u\n26l8mf3bljQDolqWTLEF4Mpkn5X3UQWw9VI8Eo8t7/DBC9Ozu2DEcbNPMahsCJ5G\nkoMt0NrQN5hCr9LXnNida4vjLaSjUb/ksI4TYRismKVlea/ztjrn6mwiid6Au4P2\nWhTfH15GYOcKKD2/v9SGMGSHb3ewaaiRuhlaTsJzb9wS8zVKIMEL11iDOjyJ5wfd\nzpFA\n-----END CERTIFICATE-----",
+      "certificate_endpoint": "https://192.168.100.14:8443/realms/iec61850-websocket/protocol/openid-connect/certs",
+      "auth_server_ca": "-----BEGIN CERTIFICATE-----\nMIID9TCCAt2gAwIBAgIUIbu+OBoDiraaCrhp6qoUUEcJ7LYwDQYJKoZIhvcNAQEL\nBQAwbDELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEjAQ\nBgNVBAMMCWtleWNsb2FjazAeFw0yNjA4MzAxNTM4NTRaFw0zNjA4MjcxNTM4NTRa\nMGwxCzAJBgNVBAYTAkRFMQswCQYDVQQIDAJCVzERMA8GA1UEBwwIRnJlaWJ1cmcx\nGzAZBgNVBAoMEk1aIEF1dG9tYXRpb24gR21iSDEMMAoGA1UECwwDUiZEMRIwEAYD\nVQQDDAlrZXljbG9hY2swggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDu\nnXFutSb7aybJy1I8o0PWOvQYPnPaQe8m/RlU5tn/CZK3wPvZUJScEL8rLOA9Z2D9\nTk226HfW54pimYkoEvhXMo1gzVyO6g4virnUWfL1PJX0BQPRj38cXZ4gBVcBPJ6N\nhfjMnA+HZ5OQPybtNAlTrObdMA5VoKLmTv/vM2COVPkV1l57bMt6GYkV5fn+NSnz\nnhoPxybqtkTvVARptcDeBiEDZ5G5KNtm94jhVHgEQRwisp+Jz+Ay+sntuWaQgkRJ\nT5X7yx1JtV1fSau6xf0qOqZKDD2Kt+qvgMk6Q+1WluCi8BUNv8RdRSS13sjlyyjD\nkwuwMw/r/R9f9XdG1CYPAgMBAAGjgY4wgYswPQYDVR0RBDYwNIIJa2V5Y2xvYWNr\ngglsb2NhbGhvc3SHBH8AAAGHBMCoZA6HBMCoZAGHBMCoZA+HBMCoZBAwCQYDVR0T\nBAIwADALBgNVHQ8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwHQYDVR0OBBYE\nFDkF2upsOtaYAhjX0DSbRXSMFsWzMA0GCSqGSIb3DQEBCwUAA4IBAQDZBEPsqeyT\nWV/9q9YR4ZiExvbojN2G7uECt2I8d5+l8sPlQy3ZLYmmlWdJ2pTOxS/27EPHP6w/\n5yHzBj2+sI4ix806Mn5gC0T0uZimTkrcqP8C+r99N/Xe1dazmw/j8n7THBmjqtzl\nrQ7dDpglqfP+cW1NrAMpKVcalHaXAFaqhe0bnCWoZFPGRaOu0RB1wot2K9Bz3dGG\nvmXzqopJk4dliFZQ/P1PaPFinoZdlXz6uquZJcPCfhAgkTbtA3syI1G1U0m9atVJ\nIKZU24+dzqYUCNOg5o+nob3v/HKjtxfaA1KLLw/EQtxoEz0V3EGnqYfDAnNwtlsC\nyTkRZpGlJVcd\n-----END CERTIFICATE-----",
       "realm": "iec61850-websocket",
       "enable_token_refresh": false,
+      "idp_server": "keycloak",
       "enable_oauth": true,
-      "idp_server": "keycloak"
+      "token_issuer": "https://192.168.100.14:8443/realms/iec61850-websocket"
     },
-    "TLS": {
-      "server_key": "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAvBHjaMV1RRlVmYuM/0XJLMVHCE2dXQNaNWTPHh19U00/Dbr3\n1lyR3gT2m7DIJVe2hRi9ZMGZCJtIsVkKA8gM2uC3K/jWOAcOj+AgE/cjKswi9OCy\nu8+HSe53lxkRjastbopFu6+9zKM2v05wr240l5LfnmMaRHEHyGbsoRtSrzFsTSPo\nU02O0tOTsFaDTsSFXX8+JUmhvDedMSMtABx9xJTDlbnwsxejrLTRzqqxR5LUMKMI\nsVm2eEGB5X3ssAYrLfuXCvoGZIsINipKnRnEdA2qpIS5IbOCArg4PY7QB6quEQIs\neEizsCiakaHKoOJNSrRPt+KUdLdWT73XPZLHUQIDAQABAoIBADHTf29bmRUkgCQ8\n768V+xWMcqRFg+KHp9erjKAK6hAuz/zAQzccsVyj7f4TmQMjuOyMQGk4TWYVVe3+\njAOydY1rqbvRoleXrwj5NSZ0/HEzQjOkcFYHxm0U68QxVRA2gMPfiFgQWHWl7DRF\nAN/Jj890jyA0W1o0o/45HooUZhSZzC5W4xKd2LZtM3CnJZVR2D0MtslkwA/f6BPX\nLRqWha/DNv2J7xcl45BEhY8dUNMDCPhaFivQutGeeYD7hxem2iO3agxUqM258Xua\nO++jbWxxa6v7kY9S4bdTjsxwV8J6Pw6Er9Yn3ut8RAW0J9WSirSCppMe8N7WLgz7\nHZG/4G0CgYEA4JoZw8BDaniOh7ypzncaWP9y5HapeTHOrTGq1jGPm7fLaFkJ8/MO\nx+x9/ijVlqtuIxEmO/ydG1YwFTXk+KGl9zdkU+jDaL9by3G/V8EDcK3vjYW6qdeJ\ndpSj4Dezkjz7FH1Rom6cayJCE59mdD+YL9F1lya1U2OxJaB3cXD1UncCgYEA1lxn\nJFS/V0J1nYlF935ANvhJL7vfX7fdubMT45nJfdSv5awMyp6NIYvuQmUyVMUpx2F3\nTqGsmXJ2dp3cJ8aDrhveyfEXNYg+7AGf0A0PuJScDiYv7sfhOTUAXSdh1h1XN236\nbk6AlMLBRryPnvQ4/kZI1YcVk0/RcBTb0ed8nncCgYAt+JypamLiGgbiVYVUEyC7\ncp2rkXYirkUlQfM7oC1KrBXgJ8lXuzodRZSMPwNosXH7j3kJ8iyd+cghr0RMd5mm\nvhm06wGEIRbCz2dgqMrxd0h+6Q5J0Sn7sXTRYdVJa13g1b2tx4IQk5R+u7OWu6WE\ntBSjeXLHvLH3h56rA3nTBQKBgEEdqKc8pzMWmSvVu09HJrKMEY9SfrRQ4iW65FvL\nJ431wcj+zpPuPejm3OWGYBeoHNzYGqnkKs4iGyJFKc9bWjzVcoPdnLNCQ/rlM2q7\nzP7BBfa2WvEp/pymIQorIGkuWIQaAGzpo92Mm7GlLeuXPIjhSNa0RjWNlY16iJvm\nudBZAoGBAJYHO/ea6fVAFffsmab/kAo7+3cKymJ95lcnvNZPIJI5OvLNz6VaHQo2\nU5DmW4UvX9nGVf0QqIf+GHuMDEfgR+ObCa3U6fN31ADsM8s8zAS3aCmZoF/BAnmP\neX5hGWWplMkJqiNxGbC7Rn2SqSbedZurTPbAzYq/IAR/WPL7Ea7n\n-----END RSA PRIVATE KEY-----\n",
-      "server_cert": "-----BEGIN CERTIFICATE-----\nMIIDjTCCAnWgAwIBAgIUQHwhKUmBlZUPNydzGaFpUf6HiQIwDQYJKoZIhvcNAQEL\nBQAwajELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEDAO\nBgNVBAMMB3Jvb3RfQ0EwHhcNMjYwODE0MTMwMjM5WhcNMzYwODExMTMwMjM5WjBp\nMQswCQYDVQQGEwJERTELMAkGA1UECAwCQlcxETAPBgNVBAcMCEZyZWlidXJnMRsw\nGQYDVQQKDBJNWiBBdXRvbWF0aW9uIEdtYkgxDDAKBgNVBAsMA1ImRDEPMA0GA1UE\nAwwGcnRpLXNvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvBHjaMV1\nRRlVmYuM/0XJLMVHCE2dXQNaNWTPHh19U00/Dbr31lyR3gT2m7DIJVe2hRi9ZMGZ\nCJtIsVkKA8gM2uC3K/jWOAcOj+AgE/cjKswi9OCyu8+HSe53lxkRjastbopFu6+9\nzKM2v05wr240l5LfnmMaRHEHyGbsoRtSrzFsTSPoU02O0tOTsFaDTsSFXX8+JUmh\nvDedMSMtABx9xJTDlbnwsxejrLTRzqqxR5LUMKMIsVm2eEGB5X3ssAYrLfuXCvoG\nZIsINipKnRnEdA2qpIS5IbOCArg4PY7QB6quEQIseEizsCiakaHKoOJNSrRPt+KU\ndLdWT73XPZLHUQIDAQABoywwKjAoBgNVHREEITAfggZydGktc2+CCWxvY2FsaG9z\ndIcEfwAAAYcEwKhkKDANBgkqhkiG9w0BAQsFAAOCAQEAlR1JQsy0cAeq4ZKoVG0f\nNkmdQQ3t75ULJV8zvwSjM8KIq14sn5i5hzABsEjT2nPXgtLs0DMrMEqodJiAkzsQ\n2lDohRIVFC/g/FP3W0DiFY7Q3zOG2qkBXSbcazqk/3Rw6MSzyYKMm5OD08ycvxN6\nn+rcpd2T02Qg19xsF9IVr0x+qTofCvo9ZtcPaDBgH/B7+g2TL6sY6Q7u2w3lf0vU\nYn3c2Vv+GjPq5rEh2o45H9frjmLrLnxrIF2QDsiyk+l+E8Y01tVNrbsePc126vTW\nT0M3PBB0eONAyNjlzH2FCbSTUp9QyRTlXsGd13vPeQYHQ2FQPTMVevTuIkpVu1EG\n4A==\n-----END CERTIFICATE-----\n",
-      "server_ca": null,
-      "enable_tls": true,
-      "tls_version": "TLSv1_3"
-    }
-  },
-  {
-    "id": 7,
-    "name": "Max_test_Server",
-    "host": "127.0.0.1",
-    "port": 5001,
-    "type": "RTI-FSP",
-    "auto_discovered": false,
-    "created_at": "2026-07-09T12:56:34.933320",
     "status": "connected",
-    "properties_info": {
-      "available": false,
-      "error": "HTTPConnectionPool(host='127.0.0.1', port=5001): Max retries exceeded with url: /api/properties (Caused by NewConnectionError(\"HTTPConnection(host='127.0.0.1', port=5001): Failed to establish a new connection: [Errno 111] Connection refused\"))"
-    },
-    "acsi": "server",
-    "ws_mode": "active",
-    "endpoint": "",
-    "OAuth": {
-      "auth_server_ca": "-----BEGIN CERTIFICATE-----\nMIIDjzCCAnegAwIBAgIUEdejLY81yBEs3hCM3K73pBb8SkMwDQYJKoZIhvcNAQEL\nBQAwbDELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEjAQ\nBgNVBAMMCWtleWNsb2FjazAeFw0yNTA4MTMxNDM3MjhaFw0zNTA4MTExNDM3Mjha\nMGwxCzAJBgNVBAYTAkRFMQswCQYDVQQIDAJCVzERMA8GA1UEBwwIRnJlaWJ1cmcx\nGzAZBgNVBAoMEk1aIEF1dG9tYXRpb24gR21iSDEMMAoGA1UECwwDUiZEMRIwEAYD\nVQQDDAlrZXljbG9hY2swggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDu\nnXFutSb7aybJy1I8o0PWOvQYPnPaQe8m/RlU5tn/CZK3wPvZUJScEL8rLOA9Z2D9\nTk226HfW54pimYkoEvhXMo1gzVyO6g4virnUWfL1PJX0BQPRj38cXZ4gBVcBPJ6N\nhfjMnA+HZ5OQPybtNAlTrObdMA5VoKLmTv/vM2COVPkV1l57bMt6GYkV5fn+NSnz\nnhoPxybqtkTvVARptcDeBiEDZ5G5KNtm94jhVHgEQRwisp+Jz+Ay+sntuWaQgkRJ\nT5X7yx1JtV1fSau6xf0qOqZKDD2Kt+qvgMk6Q+1WluCi8BUNv8RdRSS13sjlyyjD\nkwuwMw/r/R9f9XdG1CYPAgMBAAGjKTAnMCUGA1UdEQQeMByCCWtleWNsb2Fja4IJ\nbG9jYWxob3N0hwR/AAABMA0GCSqGSIb3DQEBCwUAA4IBAQCjHojfNCHbgqLqbSyi\nFnMQ4DxzWtw2Nk1PxKJvGoqfrs2dHdB8zvlEuBxIAKWcTkb8WngudRCtBFDM3pJE\nxkCxcPmcyLK5yolI5lZx0Ozc1hjKQxh28mtOC/EwZQzLlOddwEHytX6ZlMSC5Q1u\n26l8mf3bljQDolqWTLEF4Mpkn5X3UQWw9VI8Eo8t7/DBC9Ozu2DEcbNPMahsCJ5G\nkoMt0NrQN5hCr9LXnNida4vjLaSjUb/ksI4TYRismKVlea/ztjrn6mwiid6Au4P2\nWhTfH15GYOcKKD2/v9SGMGSHb3ewaaiRuhlaTsJzb9wS8zVKIMEL11iDOjyJ5wfd\nzpFA\n-----END CERTIFICATE-----\n",
-      "realm": "iec61850-websocket",
-      "token_endpoint": "https://localhost:8443/realms/iec61850-websocket/protocol/openid-connect/token",
-      "client_id": "rti-fsp",
-      "client_secret": "Af901GzeYXmZAqtJc03jGkHLEwgyPyHN",
-      "enable_token_refresh": false,
-      "enable_oauth": false,
-      "idp_server": ""
-    },
-    "TLS": {
-      "server_key": null,
-      "server_cert": null,
-      "server_ca": "-----BEGIN CERTIFICATE-----\r\nMIIDtTCCAp2gAwIBAgIUJysTAOCqE3IaNO1QgtOPxMq6M8EwDQYJKoZIhvcNAQEL\r\nBQAwajELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\r\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEDAO\r\nBgNVBAMMB3Jvb3RfQ0EwHhcNMjIwMzE4MDkyNzEwWhcNMzIwMzE1MDkyNzEwWjBq\r\nMQswCQYDVQQGEwJERTELMAkGA1UECAwCQlcxETAPBgNVBAcMCEZyZWlidXJnMRsw\r\nGQYDVQQKDBJNWiBBdXRvbWF0aW9uIEdtYkgxDDAKBgNVBAsMA1ImRDEQMA4GA1UE\r\nAwwHcm9vdF9DQTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOMyaDaT\r\n+a4DT0s2NCrjUN8coLPfFrLRdN0Gx0hRViuLUFxd001jXruRgXKt2g8lR+YnzUeA\r\nPQHbcIfRQhL+jy/ZMXpmz4Nrl7vyOWFdu8nBKU6c7y9LmSGbnOJZjDXwlX6ERwui\r\nqFzAvRA6YXbPN8gY0B3Ou+T/mjkWN9L1x+V+7bGs9rVIoM78fVyM2FERBfsBtT76\r\nQVQv3KZ+a9EOLxqcZ/nGqsFFysFOSkiRC6Cy4mC5CSik9S5D7X9lz/bdga7O+hqd\r\nSKfir6YMlQGV37JPqmz69N6vvb9UOX/G989T4qdVB/zQOvMdcIWXkqb3vSAXYi/c\r\nClVS1Pymsy/MXQ0CAwEAAaNTMFEwHQYDVR0OBBYEFGYgIECdrhTsmgCKpVM0RHeC\r\nkFUmMB8GA1UdIwQYMBaAFGYgIECdrhTsmgCKpVM0RHeCkFUmMA8GA1UdEwEB/wQF\r\nMAMBAf8wDQYJKoZIhvcNAQELBQADggEBACsiuHFQjqOglenp/fcNbU034m/vvkyV\r\nSZXau9amXBWdeTEpc1HaPOYO7jFFnu/QoH6AbGZkpL0yWZJA2rf102AkOdAe6E0g\r\n2H77/hHoHVCfxOiOl3+icsLXJ4VXqV2vmUOEVnWfHRtej4My6avT9uCNMO2bw9hm\r\n56RAZrs82T9Mpg/1XQ9YUO1q4/JfP/+dCzPXAdwJ/h2cJ/q6Q9g1gRns8IzVlGOZ\r\n0ZBQCLqLl8vUei+t6YgjyBbeNCz4CEcmXKIJeqMB1jhpsgr6BBMTNTU2Q60b9fzU\r\nOCGLw94EnKYtHWGy2WHMFNbwkNCR0/jwhxKkU0HXy1aNMUBWp99M7P8=\r\n-----END CERTIFICATE-----\r\n",
-      "enable_tls": true,
-      "tls_version": "TLSv1_3"
-    }
+    "endpoint": ""
   },
   {
-    "id": 4,
-    "name": "docker-test-client",
-    "host": "rti-so",
-    "port": 5002,
-    "type": "RTI-SO",
-    "auto_discovered": false,
-    "created_at": "2026-07-16T10:59:59.221417",
-    "status": "disconnected",
-    "properties_info": {
-      "available": true,
-      "source": "/api/properties",
-      "properties": {
-        "ok": true,
-        "acsi_role": "ACSI-Client",
-        "ws_mode": "passive"
-      }
-    },
-    "TLS": {
-      "server_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCfJeWWWKpGpVBx\nGRFw2lXgI2FavnoUn/exdoxiKc6JYrvaecEsM+QZ05vmgozAVWyBAvU1Zm\nSmcl5gC1d4bi0O0Q8pVN3OKHvSN8yl+QVKoyoySjscIFH4Dkc/tSHWdKM2caq7qyEIA+R3\n/mBuowGVS7mfRzF8TpqMh/dVRcgbdrih1vcZiJ6PPDHhMzFZhNomx1PPvG09TwFx\nt6YpfUOEU+sh6d+CjFjJ7X3YENOnlAR4xbc8yiNM9Pq/K4B8mSf3B4wIwfUelz+w\nUv2jPkvdFkGYzi4QY2CHi5VKrYiniiLL1VofgNWi/3v8lbFrz9pdu2kYGNt+d08q\nrFs23BMHAgMBAAECggEAASs0x7xh9iZCDeD6jRyFYFTryTaFGTN6WbRk4CNHdlNv\nAFhzKaE97efTosc9qmHv0ii7GhSYIG+bL6BifyqfLEpiKDimO/ZCWbv5xeERmWE5\nlTUqjV1tZkfdXRa2J2fwe1AtY7bXhY8/W8qjjnYMmm1icRmDcwX1KGgNOHQy11GU\n0lwVMEApqK0XPgWpifIyLcJKJe7sD4hVVYf1K2T97DsAYn7/su15vLAtYxXaidIe\nBHE81lTqKqy0tWu5NluVc/ErlnXuc1TxS9b7C12QFZR3MMfSZY/duAZDQbSJbUAY\nyPPdZoDHAE9gXCp38IRH2dzMFaPkuR3SqOZaDmE3UQKBgQDKztHEb0VfsYhcIWnN\nwQhPaeVcqPiNGpSKqllAVHsmqf/Kx079RvbpmUcmj//GeVUxc+QwaLv6ZIAgkXj3\nt6rI6UzX4fczjaqqQUXTe3vTQRW3rBvlnfjX29zEmZfgeMh5kOgxPOA8urO0L94t\nKiZrz15WMpygbqtEFE9XJe7J9wKBgQDI45zr2jZQxSfiWSEDNlVvQ08NiCumqYNg\nq8SS9kWnZiZ7XLApfgfc/fPncb7O6NtkrD0F6fEQ7OLADGJBBuNNYYsVXXXcLifE\nunxx77G+Q7wL8qWi0vl2spt230GgovZn8M6ncIxUdaHAEJI6YmprcruQ72PjuDkY\nDa/2HR87cQKBgEv7ChnG+j2svIKPvhzoyd0+tkBtyZjLsYT15zQzsmO84uksnIpF\nUPIZi8+FuXS5NlKtsXr1ch+QEXSiK6ja9bAJv9FNhhiZZawdgjSGGdD+nE1QvK7c\n7UKpy18YkA74EVuCD4uK3BPEetjx6hIPrY9MhHJUydtNOvrphQQIYRrnAoGAe2PC\n+OL5RbczfkX8jvqKk2KmZctj9GReO7yFazc1JVMLA+60jWfJ8KVTcK9e4bwJNdbN\nTJqa5Sh7RjbVCtfuOZNWWHMld24qIx3gXiM564GzOSt7LX2kmJGwB92tc7tk2gcB\nB7uLlj0CcvQ6vP3CG+lG6AkCM9btyqZtlB/jFSECgYEAgBo+0txMtmq2ES5wr76m\ndjYU7Hr5FaCEfooQMOEUbsY1NzHRvDwJheKy05wdvStSDmFN9LpWT7c73iA4enTt\nHhQoiXappzehVhYXzQW806GuYt2u7Pz6VYbOnj5QOOUD9gvdHxC0V0MRwA1MsLyh\nWbBIyFfYgd3Ccld7/WbGTVw=\n-----END PRIVATE KEY-----\n",
-      "server_cert": "-----BEGIN CERTIFICATE-----\nMIIDzzCCAregAwIBAgIUQHwhKUmBlZUPNydzGaFpUf6HiQIwDQYJKoZIhvcNAQEL\nBQAwajELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEDAO\nBgNVBAMMB3Jvb3RfQ0EwHhcNMjUxMTAzMTM1NjI3WhcNMjYxMTAzMTM1NjI3WjBq\nMQswCQYDVQQGEwJERTELMAkGA1UECAwCQlcxETAPBgNVBAcMCEZyZWlidXJnMRsw\nGQYDVQQKDBJNWiBBdXRvbWF0aW9uIEdtYkgxDDAKBgNVBAsMA1ImRDEQMA4GA1UE\nAwwHc2VydmVyMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAJ8l5ZZY\nqkalUHEZEXDaVeAjYVq+ehSf97F2jGIpzoliu9p5wSwz5BnTm+aCjMBVbIEC9TVm\nZKZyXmALV3huLQ7RDylU3c4oe9I3zKX5BUqjKjJKOxwgUfgORz+1IdZ0ozZxqrur\nIQgD5Hf+YG6jAZVLuZ9HMXxOmoyH91VFyBt2uKHW9xmIno88MeEzMVmE2ibHU8+8\nbT1PAXG3pil9Q4RT6yHp34KMWMntfdgQ06eUBHjFtzzKI0z0+r8rgHyZJ/cHjAjB\n9R6XP7BS/aM+S90WQZjOLhBjYIeLlUqtiKeKIsvVWh+A1aL/e/yVsWvP2l27aRgY\n2353TyqsWzbcEwcCAwEAAaNtMGswKQYDVR0RBCIwIIIHc2VydmVyMYIJbG9jYWxo\nb3N0hwR/AAABhwTAqGQFMB0GA1UdDgQWBBS9ADbQVyl5nIaaSZQXhnrMPB/ncDAf\nBgNVHSMEGDAWgBRmICBAna4U7JoAiqVTNER3gpBVJjANBgkqhkiG9w0BAQsFAAOC\nAQEAKAGuN+h1i1FDUTx0RUnqlOzDGRLqAm67RduW89Hsx7DhMutbWAH8Aa0Q35+h\nwmH3C8T4gLJvghhWc8pXYZ7dA8305mme9ojEGtDJyVHUtGg8h2ntjGoplL/be8m5\n/iVNQfGmNRIz5Htj9fosE4Dv7WV+SWHazIimjmW2Oe5N+8IAbljAkokkTNzx4mNN\nO1uXFPQ9oB0YHmtMB68YZJZVZUxELwWGhpeB1dv6zxLyUGEougc92keAAnRmPgnA\neCR25RAiXegChiEYXxMOwWpf7eqzUVNT2DYSd5aZWcHDX2V8eKBGwaPR/JLCdjoY\nlVvcG9VgYrXOfWTMqUR9vJGB0w==\n-----END CERTIFICATE-----\n",
-      "enable_tls": false,
-      "tls_version": "1.2"
-    }
-  },
-  {
-    "id": 5,
-    "name": "docker-test-server",
-    "host": "rti-fsp",
-    "port": 5001,
-    "type": "RTI-FSP",
-    "auto_discovered": false,
-    "created_at": "2026-07-16T11:00:34.547468",
-    "status": "disconnected",
-    "properties_info": {
-      "available": true,
-      "source": "/api/properties",
-      "properties": {
-        "ok": true,
-        "acsi_role": "ACSI-Server",
-        "ws_mode": "Active"
-      }
-    },
-    "TLS": {
-      "server_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCfJeWWWKpGpVBx\nGRFw2lXgI2FavnoUn/exdoxiKc6JYrvaecEsM+QZ05vmgozAVWyBAvU1Zm\nSmcl5gC1d4bi0O0Q8pVN3OKHvSN8yl+QVKoyoySjscIFH4Dkc/tSHWdKM2caq7qyEIA+R3\n/mBuowGVS7mfRzF8TpqMh/dVRcgbdrih1vcZiJ6PPDHhMzFZhNomx1PPvG09TwFx\nt6YpfUOEU+sh6d+CjFjJ7X3YENOnlAR4xbc8yiNM9Pq/K4B8mSf3B4wIwfUelz+w\nUv2jPkvdFkGYzi4QY2CHi5VKrYiniiLL1VofgNWi/3v8lbFrz9pdu2kYGNt+d08q\nrFs23BMHAgMBAAECggEAASs0x7xh9iZCDeD6jRyFYFTryTaFGTN6WbRk4CNHdlNv\nAFhzKaE97efTosc9qmHv0ii7GhSYIG+bL6BifyqfLEpiKDimO/ZCWbv5xeERmWE5\nlTUqjV1tZkfdXRa2J2fwe1AtY7bXhY8/W8qjjnYMmm1icRmDcwX1KGgNOHQy11GU\n0lwVMEApqK0XPgWpifIyLcJKJe7sD4hVVYf1K2T97DsAYn7/su15vLAtYxXaidIe\nBHE81lTqKqy0tWu5NluVc/ErlnXuc1TxS9b7C12QFZR3MMfSZY/duAZDQbSJbUAY\nyPPdZoDHAE9gXCp38IRH2dzMFaPkuR3SqOZaDmE3UQKBgQDKztHEb0VfsYhcIWnN\nwQhPaeVcqPiNGpSKqllAVHsmqf/Kx079RvbpmUcmj//GeVUxc+QwaLv6ZIAgkXj3\nt6rI6UzX4fczjaqqQUXTe3vTQRW3rBvlnfjX29zEmZfgeMh5kOgxPOA8urO0L94t\nKiZrz15WMpygbqtEFE9XJe7J9wKBgQDI45zr2jZQxSfiWSEDNlVvQ08NiCumqYNg\nq8SS9kWnZiZ7XLApfgfc/fPncb7O6NtkrD0F6fEQ7OLADGJBBuNNYYsVXXXcLifE\nunxx77G+Q7wL8qWi0vl2spt230GgovZn8M6ncIxUdaHAEJI6YmprcruQ72PjuDkY\nDa/2HR87cQKBgEv7ChnG+j2svIKPvhzoyd0+tkBtyZjLsYT15zQzsmO84uksnIpF\nUPIZi8+FuXS5NlKtsXr1ch+QEXSiK6ja9bAJv9FNhhiZZawdgjSGGdD+nE1QvK7c\n7UKpy18YkA74EVuCD4uK3BPEetjx6hIPrY9MhHJUydtNOvrphQQIYRrnAoGAe2PC\n+OL5RbczfkX8jvqKk2KmZctj9GReO7yFazc1JVMLA+60jWfJ8KVTcK9e4bwJNdbN\nTJqa5Sh7RjbVCtfuOZNWWHMld24qIx3gXiM564GzOSt7LX2kmJGwB92tc7tk2gcB\nB7uLlj0CcvQ6vP3CG+lG6AkCM9btyqZtlB/jFSECgYEAgBo+0txMtmq2ES5wr76m\ndjYU7Hr5FaCEfooQMOEUbsY1NzHRvDwJheKy05wdvStSDmFN9LpWT7c73iA4enTt\nHhQoiXappzehVhYXzQW806GuYt2u7Pz6VYbOnj5QOOUD9gvdHxC0V0MRwA1MsLyh\nWbBIyFfYgd3Ccld7/WbGTVw=\n-----END PRIVATE KEY-----\n",
-      "server_cert": "-----BEGIN CERTIFICATE-----\nMIIDzzCCAregAwIBAgIUQHwhKUmBlZUPNydzGaFpUf6HiQIwDQYJKoZIhvcNAQEL\nBQAwajELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEDAO\nBgNVBAMMB3Jvb3RfQ0EwHhcNMjUxMTAzMTM1NjI3WhcNMjYxMTAzMTM1NjI3WjBq\nMQswCQYDVQQGEwJERTELMAkGA1UECAwCQlcxETAPBgNVBAcMCEZyZWlidXJnMRsw\nGQYDVQQKDBJNWiBBdXRvbWF0aW9uIEdtYkgxDDAKBgNVBAsMA1ImRDEQMA4GA1UE\nAwwHc2VydmVyMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAJ8l5ZZY\nqkalUHEZEXDaVeAjYVq+ehSf97F2jGIpzoliu9p5wSwz5BnTm+aCjMBVbIEC9TVm\nZKZyXmALV3huLQ7RDylU3c4oe9I3zKX5BUqjKjJKOxwgUfgORz+1IdZ0ozZxqrur\nIQgD5Hf+YG6jAZVLuZ9HMXxOmoyH91VFyBt2uKHW9xmIno88MeEzMVmE2ibHU8+8\nbT1PAXG3pil9Q4RT6yHp34KMWMntfdgQ06eUBHjFtzzKI0z0+r8rgHyZJ/cHjAjB\n9R6XP7BS/aM+S90WQZjOLhBjYIeLlUqtiKeKIsvVWh+A1aL/e/yVsWvP2l27aRgY\n2353TyqsWzbcEwcCAwEAAaNtMGswKQYDVR0RBCIwIIIHc2VydmVyMYIJbG9jYWxob3N0\nhwR/AAABhwTAqGQFMB0GA1UdDgQWBBS9ADbQVyl5nIaaSZQXhnrMPB/ncDAf\nBgNVHSMEGDAWgBRmICBAna4U7JoAiqVTNER3gpBVJjANBgkqhkiG9w0BAQsFAAOC\nAQEAKAGuN+h1i1FDUTx0RUnqlOzDGRLqAm67RduW89Hsx7DhMutbWAH8Aa0Q35+h\nwmH3C8T4gLJvghhWc8pXYZ7dA8305mme9ojEGtDJyVHUtGg8h2ntjGoplL/be8m5\n/iVNQfGmNRIz5Htj9fosE4Dv7WV+SWHazIimjmW2Oe5N+8IAbljAkokkTNzx4mNN\nO1uXFPQ9oB0YHmtMB68YZJZVZUxELwWGhpeB1dv6zxLyUGEougc92keAAnRmPgnA\neCR25RAiXegChiEYXxMOwWpf7eqzUVNT2DYSd5aZWcHDX2V8eKBGwaPR/JLCdjoY\nlVvcG9VgYrXOfWTMqUR9vJGB0w==\n-----END CERTIFICATE-----\n",
-      "enable_tls": false,
-      "tls_version": "1.2"
-    }
-  },
-  {
-    "id": 6,
-    "name": "fsp-2",
-    "host": "rti-fsp-2",
-    "port": 5005,
-    "type": "RTI-FSP",
-    "auto_discovered": false,
-    "created_at": "2026-07-27T14:32:25.448310",
-    "status": "disconnected",
-    "properties_info": {
-      "available": true,
-      "source": "/api/properties",
-      "properties": {
-        "ok": true,
-        "acsi_role": "ACSI-Server",
-        "ws_mode": "Active"
-      }
-    }
-  },
-  {
-    "id": 6,
-    "name": "keycloak",
-    "host": "",
-    "port": 5000,
-    "type": "IDP-Server",
-    "acsi": "",
-    "ws_mode": "",
-    "auto_discovered": false,
-    "created_at": "2026-08-20T17:33:37.544481",
-    "endpoint": "https://localhost:8443",
-    "status": "disconnected"
-  },
-  {
-    "id": 7,
-    "name": "Resp-FSP",
-    "host": "192.168.1.129",
+    "id": 2,
+    "name": "demo_pi2",
+    "host": "192.168.100.98",
     "port": 5001,
     "type": "RTI-FSP",
     "acsi": "server",
     "ws_mode": "active",
     "auto_discovered": false,
-    "created_at": "2026-08-25T20:31:57.475366",
-    "status": "disconnected"
-  },
-  {
-    "id": 8,
-    "name": "TEST",
-    "host": "127.0.0.2",
-    "port": 5000,
-    "type": "RTI-FSP",
-    "acsi": "server",
-    "ws_mode": "active",
-    "auto_discovered": false,
-    "created_at": "2026-08-28T18:07:45.851111",
+    "created_at": "2026-08-28T11:40:39.285837",
     "OAuth": {
       "certificate_endpoint": "",
       "auth_server_ca": "",
@@ -193,16 +54,17 @@
     "auto_discovered": false,
     "created_at": "2026-08-28T14:54:39.927806",
     "OAuth": {
-      "certificate_endpoint": "",
-      "auth_server_ca": "",
-      "realm": "",
-      "token_endpoint": "",
-      "client_id": "",
-      "client_secret": "",
-      "enable_token_refresh": false,
-      "idp_server": ""
+      "auth_server_ca": "-----BEGIN CERTIFICATE-----\nMIID9TCCAt2gAwIBAgIUIbu+OBoDiraaCrhp6qoUUEcJ7LYwDQYJKoZIhvcNAQEL\nBQAwbDELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEjAQ\nBgNVBAMMCWtleWNsb2FjazAeFw0yNjA4MzAxNTM4NTRaFw0zNjA4MjcxNTM4NTRa\nMGwxCzAJBgNVBAYTAkRFMQswCQYDVQQIDAJCVzERMA8GA1UEBwwIRnJlaWJ1cmcx\nGzAZBgNVBAoMEk1aIEF1dG9tYXRpb24gR21iSDEMMAoGA1UECwwDUiZEMRIwEAYD\nVQQDDAlrZXljbG9hY2swggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDu\nnXFutSb7aybJy1I8o0PWOvQYPnPaQe8m/RlU5tn/CZK3wPvZUJScEL8rLOA9Z2D9\nTk226HfW54pimYkoEvhXMo1gzVyO6g4virnUWfL1PJX0BQPRj38cXZ4gBVcBPJ6N\nhfjMnA+HZ5OQPybtNAlTrObdMA5VoKLmTv/vM2COVPkV1l57bMt6GYkV5fn+NSnz\nnhoPxybqtkTvVARptcDeBiEDZ5G5KNtm94jhVHgEQRwisp+Jz+Ay+sntuWaQgkRJ\nT5X7yx1JtV1fSau6xf0qOqZKDD2Kt+qvgMk6Q+1WluCi8BUNv8RdRSS13sjlyyjD\nkwuwMw/r/R9f9XdG1CYPAgMBAAGjgY4wgYswPQYDVR0RBDYwNIIJa2V5Y2xvYWNr\ngglsb2NhbGhvc3SHBH8AAAGHBMCoZA6HBMCoZAGHBMCoZA+HBMCoZBAwCQYDVR0T\nBAIwADALBgNVHQ8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwHQYDVR0OBBYE\nFDkF2upsOtaYAhjX0DSbRXSMFsWzMA0GCSqGSIb3DQEBCwUAA4IBAQDZBEPsqeyT\nWV/9q9YR4ZiExvbojN2G7uECt2I8d5+l8sPlQy3ZLYmmlWdJ2pTOxS/27EPHP6w/\n5yHzBj2+sI4ix806Mn5gC0T0uZimTkrcqP8C+r99N/Xe1dazmw/j8n7THBmjqtzl\nrQ7dDpglqfP+cW1NrAMpKVcalHaXAFaqhe0bnCWoZFPGRaOu0RB1wot2K9Bz3dGG\nvmXzqopJk4dliFZQ/P1PaPFinoZdlXz6uquZJcPCfhAgkTbtA3syI1G1U0m9atVJ\nIKZU24+dzqYUCNOg5o+nob3v/HKjtxfaA1KLLw/EQtxoEz0V3EGnqYfDAnNwtlsC\nyTkRZpGlJVcd\n-----END CERTIFICATE-----\n",
+      "realm": "iec61850-websocket",
+      "token_endpoint": "https://192.168.100.14:8443/realms/iec61850-websocket/protocol/openid-connect/token",
+      "client_id": "rti-fsp",
+      "client_secret": "Af901GzeYXmZAqtJc03jGkHLEwgyPyHN",
+      "enable_token_refresh": true,
+      "idp_server": "keycloak",
+      "enable_oauth": true
     },
-    "status": "connected"
+    "status": "connected",
+    "endpoint": ""
   },
   {
     "id": 4,
@@ -224,7 +86,7 @@
       "enable_token_refresh": false,
       "idp_server": ""
     },
-    "status": "connected"
+    "status": "disconnected"
   },
   {
     "id": 5,
@@ -246,6 +108,7 @@
       "client_secret": "",
       "enable_token_refresh": false,
       "idp_server": ""
-    }
+    },
+    "status": "connected"
   }
 ]

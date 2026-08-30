@@ -803,6 +803,8 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
     oauth_fields = {}
     if request.certificate_endpoint is not None:
         oauth_fields['certificate_endpoint'] = request.certificate_endpoint
+    if request.token_issuer_url is not None:
+        oauth_fields['token_issuer'] = request.token_issuer_url
     if request.auth_server_ca is not None:
         oauth_fields['auth_server_ca'] = request.auth_server_ca
     if request.realm is not None:

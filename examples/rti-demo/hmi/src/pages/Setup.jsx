@@ -238,6 +238,8 @@ function Setup({ settings }) {
       // Note: authServerCa is managed in ConnectionModal component state, not in formData
       // For now, we'll include it in the save
       const saveData = { ...formData };
+      console.log('SAVE PAYLOAD:', JSON.stringify(saveData, null, 2));
+      console.log('token_issuer_url specifically:', saveData.token_issuer_url);
 
       if (currentConnection) {
         // Update existing connection

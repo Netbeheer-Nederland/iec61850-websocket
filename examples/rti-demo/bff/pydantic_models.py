@@ -58,6 +58,8 @@ class ConnectionUpdateRequest(BaseModel):
     auth_server_ca: Optional[str] = Field(default=None, description="Auth server CA certificate")
     realm: Optional[str] = Field(default=None, description="OAuth realm for FSP")
     token_endpoint: Optional[str] = Field(default=None, description="OAuth token endpoint for FSP")
+    token_issuer_url: Optional[str] = Field(default=None, description="Token issuer URL for OAuth")
+
     client_id: Optional[str] = Field(default=None, description="OAuth client ID for FSP")
     client_secret: Optional[str] = Field(default=None, description="OAuth client secret for FSP")
     enable_token_refresh: Optional[bool] = Field(default=None, description="Enable token refresh for FSP")
