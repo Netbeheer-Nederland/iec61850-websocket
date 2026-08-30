@@ -1,0 +1,153 @@
+== SO: IEC 61850 ACSI Client
+
+This folder contains the **SO (System Operator)** implementation - an **IEC 61850 ACSI Client** 
+that uses WebSocket in passive mode to connect to ACSI servers for substation automation 
+monitoring and control.
+
+=== Overview
+
+The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication Service Interface) Client** that:
+
+* Connects to IEC 61850 servers via WebSocket (passive mode)
+* Provides REST API endpoints for client management (BFF - Backend for Frontend)
+* Retrieves and navigates server directory structures
+* Reads data values from connected servers
+* Writes data values to connected servers
+* Manages multiple connections and communication points
+* Integrates with IO devices via `demo_IO` service
+
+=== Architecture
+
+image::../images/SO - ACSI CLIENT.png[SO ACSI Client Architecture,link="../images/SO - ACSI CLIENT.png"]
+
+=== Directory Structure
+
+----
+so/
+├── acsi_client.py         # Core IEC 61850 WebSocket client implementation (passive mode)
+├── bff_endpoint.py        # REST API (FastAPI) for client management
+├── BFF_API.md             # API Documentation
+├── Dockerfile             # Container Configuration
+└── README.md
+----
+
+=== Key Components
+
+==== acsi_client.py - IEC 61850 WebSocket Client (Passive Mode)
+
+The core client implementation that handles:
+
+* WebSocket connection lifecycle (connect, disconnect, reconnect)
+* IEC 61850 client instantiation using ws61850 library
+* Server directory navigation (get server tree, logical devices, logical nodes)
+* Model building and caching from connected servers
+* Async event loop management for concurrent operations
+* Runtime state tracking (status, connections, errors)
+* Message logging (received and sent messages)
+* Action tracking for audit purposes
+* Report handling with callbacks for real-time updates
+
+[cols="1,1",options="header"]
+|===
+|Class |Purpose
+|`ModelInfo` |Manages model building state and data for each communication point
+|`ACSIClientRuntime` |Manages client runtime state, connections, model, actions, messages
+|`ACSIClient` |Main client controller with WebSocket endpoint integration
+|===
+
+==== bff_endpoint.py - REST API (Backend for Frontend)
+
+A FastAPI application that provides REST endpoints for managing the ACSI client.
+
+=== Quick Start
+
+==== Docker
+----
+docker build -t rti-demo-so -f examples/rti-demo/so/Dockerfile .
+docker run --rm -p 5002:5002 rti-demo-so
+docker network create rti-network
+docker run --rm -p 5002:5002 --network rti-network --name rti-so rti-demo-so
+----
+
+Health Check:
+----
+curl http://localhost:5002/api/iec61850client/status
+----
+
+==== Direct Python
+----
+python -m pip install -e . Flask==3.0.0 Flask-CORS==4.0.0
+python bff_endpoint.py
+PORT=5002 python bff_endpoint.py
+$env:PORT="5002"
+python .\bff_endpoint.py
+----
+
+=== IO Client Integration
+
+----
+curl -X POST http://localhost:5002/api/io/connect \
+  -H "Content-Type: application/json" \
+  -d '{"base_url": "http://demo-io:8000"}'
+
+curl http://localhost:5002/api/io/connection
+curl -X POST http://localhost:5002/api/io/disconnect
+----
+
+=== Configuration
+
+[cols="1,1,1",options="header"]
+|===
+|Variable |Default |Description
+|`PORT` |5002 |REST API port
+|`DEMO_IO_URL` |None |demo_IO service URL (for auto-connect)
+|===
+
+Connection Defaults: Host: localhost, WebSocket Port: 8765, CP: cp1
+
+=== Testing
+----
+pip install pytest pytest-asyncio
+python -m pytest -q rti-demo/tests/unit/
+----
+
+=== Model Status Values
+
+[cols="1,1",options="header"]
+|===
+|Status |Description
+|idle |No model building in progress
+|building |Model is being built from server
+|ready |Model is ready for use
+|error |Error occurred during model building
+|===
+
+=== Connection Status Values
+
+[cols="1,1",options="header"]
+|===
+|Status |Description
+|disconnected |Not connected to any server
+|connecting |Connection attempt in progress
+|connected |Successfully connected to server
+|disconnecting |Disconnection in progress
+|error |Connection error occurred
+|===
+
+=== Integration
+
+* With FSP: SO (Passive) <--WebSocket--> FSP (Server, Port 8765)
+* With demo_IO: POST `/api/io/connect` {base_url: "http://demo-io:8000"}
+* With BFF: HTTP/REST at port 5002
+* With FSP (Typical): Client -> SO (BFF/5002) -> SO (WS) -> FSP (WS/8765) -> FSP (BFF/5001)
+
+=== Files Reference
+
+[cols="1,1,1",options="header"]
+|===
+|File |Purpose |Key Classes/Functions
+|acsi_client.py |WebSocket client (passive mode) |ModelInfo, ACSIClientRuntime, ACSIClient
+|bff_endpoint.py |REST API |FastAPI app, endpoint routes
+|BFF_API.md |API docs |Endpoint specifications
+|Dockerfile |Container |Multi-stage build
+|===

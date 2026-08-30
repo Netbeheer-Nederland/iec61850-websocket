@@ -1,0 +1,85 @@
+== Main Demo README
+
+=== Overview
+
+Unified entry point for launching RTI (Real-Time Infrastructure) demo services.
+
+=== Services
+
+[cols="1,1,1",options="header"]
+|===
+|Service |Port |Description
+
+|`bff` |5000 |Backend for Frontend - REST API gateway
+
+|`fsp` |5001 |RTI-FSP - IEC 61850 server
+
+|`so` |5002 |RTI-SO - IEC 61850 client
+
+|`frontend` |8080 |Web-based HMI
+
+|===
+
+=== Verbose Mode & Logs
+
+By default, verbose logging is enabled and the console is kept alive (foreground mode). All service logs are prefixed with the service name:
+
+----
+[BFF Server] INFO: Starting RTI Demo BFF Server (FastAPI)...
+[BFF Server] INFO: 127.0.0.1:35682 - "GET /docs HTTP/1.1" 200 OK
+[FSP ACSI-Server_WebsocketActive] Starting server on port 5001
+[SO ACSI-Client_WebsocketPassive] Connected to endpoint
+[Frontend] Serving HTTP on 0.0.0.0 port 8080
+----
+
+To disable verbose logging: `python launch.py --no-verbose`  
+To run in background: `python launch.py --background`
+
+=== Troubleshooting
+
+[cols="1,1,1",options="header"]
+|===
+|Issue |Solution |Command
+
+|Port already in use |Find and kill process |`sudo kill -9 $(sudo lsof -t -i :8080) 2>/dev/null`
+
+|Module not found |Install dependencies |`pip install -e . && pip install uvicorn fastapi requests`
+
+|connections.json error |Remove directory and create file |`rmdir /S /Q connections.json 2>/dev/null; echo [] > connections.json`
+
+|===
+
+=== UV Package Manager
+
+UV is already implemented to manage the dependencies inside the dockers.
+
+[source,bash]
+----
+# Add a dependency
+uv add <package_name>
+
+# Update lock file
+uv lock
+
+# Sync dependencies to local environment
+uv sync
+
+# Run Python code
+uv run python <script_name.py>
+----
+
+=== Project Structure
+
+----
+rti-demo/
+├── launch.py              # Main entry point
+├── README.md              # This file
+├── bff/
+│   └── bff_server.py      # BFF Server
+├── fsp/
+│   └── bff_endpoint.py    # FSP ACSI-Server
+├── so/
+│   └── bff_endpoint.py    # SO ACSI-Client
+└── front-end/
+    └── index.html         # Web HMI
+----
