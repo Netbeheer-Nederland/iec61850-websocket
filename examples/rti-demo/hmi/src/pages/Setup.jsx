@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import InstanceVisualization from '../components/InstanceVisualization';
 import ConnectionModal from '../components/ConnectionModal';
 
-function Setup({ settings }) {
+function Setup({ settings, connections = [], loading = false, onReload }) {
   const navigate = useNavigate();
-  const [connections, setConnections] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [currentConnection, setCurrentConnection] = useState(null);
   const [formData, setFormData] = useState({
@@ -26,34 +25,7 @@ function Setup({ settings }) {
     enable_token_refresh: false,
     idp_server: ''
   });
-  const [loading, setLoading] = useState(true);
   const [bffError, setBffError] = useState(null);
-
-  // Fetch connections from BFF API
-  const fetchConnections = useCallback(async () => {
-    try {
-      setLoading(true);
-      setBffError(null);
-      const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/connections`);
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
-        return data.connections || [];
-      }
-      setBffError(`BFF returned error: ${response.status}`);
-      return [];
-    } catch (error) {
-      console.error('Failed to fetch connections:', error);
-      setBffError(`Cannot connect to BFF at ${settings.bffHost}:${settings.bffPort}`);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, [settings.bffHost, settings.bffPort]);
-
-  useEffect(() => {
-    fetchConnections();
-  }, [fetchConnections]);
 
   // Check all connections health using BFF endpoint
   const checkAllConnectionsHealth = async (connectionsList) => {
@@ -61,17 +33,7 @@ function Setup({ settings }) {
       const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/health`);
       const data = await response.json();
       
-      // Update connections with status from BFF
-      const updatedConnections = connectionsList.map(conn => {
-        // IDP-Server is always connected (local server)
-        if (conn.type === 'IDP-Server') {
-          return { ...conn, connected: true };
-        }
-        const target = data.targets.find(t => t.target === `${conn.host}:${conn.port}`);
-        return { ...conn, connected: target?.status === 'reachable' };
-      });
-      
-      setConnections(updatedConnections);
+      await onReload?.();
     } catch (error) {
       console.error('Failed to check connections:', error);
     }
@@ -79,16 +41,13 @@ function Setup({ settings }) {
 
   // Check all connections
   const handleCheckAllConnections = async () => {
-    setLoading(true);
     try {
-      const connList = await fetchConnections();
+      const connList = (await onReload?.()) || [];
       if (connList.length > 0) {
         await checkAllConnectionsHealth(connList);
       }
     } catch (error) {
       console.error('Failed to refresh connections:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -206,7 +165,7 @@ function Setup({ settings }) {
         method: 'DELETE'
       });
       if (response.ok) {
-        fetchConnections();
+        onReload?.();
       }
     } catch (error) {
       console.error('Failed to delete connection:', error);
@@ -247,7 +206,7 @@ function Setup({ settings }) {
           body: JSON.stringify(saveData)
         });
         if (response.ok) {
-          fetchConnections();
+          onReload?.();
           setShowModal(false);
         }
       } else {
@@ -258,7 +217,7 @@ function Setup({ settings }) {
           body: JSON.stringify(saveData)
         });
         if (response.ok) {
-          fetchConnections();
+          onReload?.();
           setShowModal(false);
         }
       }

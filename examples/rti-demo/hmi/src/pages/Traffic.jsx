@@ -3,34 +3,7 @@ import InstanceVisualization from '../components/InstanceVisualization';
 import MessageMonitor from '../components/MessageMonitor';
 import DataAccessPanel from '../components/DataAccessPanel';
 
-function Traffic({ settings, getModel, updateModel, connections: propConnections }) {
-  const [connections, setConnections] = useState(propConnections || []);
-  const [loading, setLoading] = useState(false);
-
-  // Fetch connections function (memoized)
-  const fetchConnections = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`http://${settings?.bffHost || 'localhost'}:${settings?.bffPort || '5000'}/api/connections`);
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch connections:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [settings?.bffHost, settings?.bffPort]);
-
-  // Use connections from props, fall back to fetching if not provided
-  useEffect(() => {
-    if (propConnections && propConnections.length > 0) {
-      setConnections(propConnections);
-    } else {
-      fetchConnections();
-    }
-  }, [settings?.bffHost, settings?.bffPort, propConnections, fetchConnections]);
+function Traffic({ settings, getModel, updateModel, connections = [], loading = false, onReload }) {
 
   const [monitorsExpanded, setMonitorsExpanded] = useState(true);
   const [panelsExpanded, setPanelsExpanded] = useState(true);
@@ -48,7 +21,7 @@ function Traffic({ settings, getModel, updateModel, connections: propConnections
           connections={connections}
           selectedConnection={null}
           loading={loading}
-          onReload={fetchConnections}
+          onReload={onReload}
           onConnectionClick={null}
           showLabels={true}
           showReload={true}

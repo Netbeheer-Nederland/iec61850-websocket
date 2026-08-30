@@ -6,10 +6,8 @@ import { executeApiCall, buildTargetValue } from '../services/apiService';
 import { generateModelPyCode } from '../utils/sclParser';
 import { transformModelToTree } from '../utils/modelUtils';
 
-function Model({ settings }) {
+function Model({ settings, connections = [], loading = false, onReload }) {
   const navigate = useNavigate();
-  const [connections, setConnections] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [treeData, setTreeData] = useState(null);
   const [selectedConnection, setSelectedConnection] = useState(null);
   const [uploadingModel, setUploadingModel] = useState(false);
@@ -23,26 +21,6 @@ function Model({ settings }) {
       [ref]: expanded
     }));
   }, []);
-  
-  // Fetch connections from BFF API
-  const fetchConnections = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`http://${settings?.bffHost || 'localhost'}:${settings?.bffPort || '5000'}/api/connections`);
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch connections:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [settings?.bffHost, settings?.bffPort]);
-
-  useEffect(() => {
-    fetchConnections();
-  }, [fetchConnections]);
 
   const handleConnectionClick = (conn) => {
     setSelectedConnection(conn);
@@ -51,7 +29,6 @@ function Model({ settings }) {
 
   const loadModel = useCallback(async (conn) => {
     if (!conn) return;
-    setLoading(true);
     try {
       const targetValue = buildTargetValue(conn.host, conn.port);
       const result = await executeApiCall('model', targetValue, {});
@@ -116,8 +93,6 @@ function Model({ settings }) {
       }
     } catch (error) {
       console.error('Failed to load model:', error);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -186,7 +161,7 @@ function Model({ settings }) {
         setUploadStatus(`Model updated successfully for ${conn.name}`);
         // Reload connections to get the updated model
         setTimeout(() => {
-          fetchConnections();
+          onReload?.();
           setUploadStatus('');
         }, 1000);
       } else {
@@ -202,7 +177,7 @@ function Model({ settings }) {
         fileInputRef.current.value = '';
       }
     }
-  }, [fetchConnections, setUploadingModel, setUploadStatus]);
+  }, [setUploadingModel, setUploadStatus]);
 
   // Trigger file input click
   const handleUpdateModelClick = useCallback((conn) => {
@@ -245,7 +220,7 @@ function Model({ settings }) {
             connections={connections}
             selectedConnection={selectedConnection}
             loading={loading}
-            onReload={fetchConnections}
+            onReload={onReload}
             onConnectionClick={handleConnectionClick}
             showLabels={true}
             showReload={true}
