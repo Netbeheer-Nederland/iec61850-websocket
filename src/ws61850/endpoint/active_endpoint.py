@@ -14,6 +14,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import jwt as pyjwt  # avoid name clash if 'jwt' variable exists nearby
+from datetime import datetime, timezone
 
 import asyncio
 import datetime
@@ -263,6 +265,25 @@ class ActiveEndpoint:
             first = False
             try:
                 token = await credentials_provider.get_access_token() if credentials_provider else access_token
+                # --- DEBUG: decode without verifying signature/exp/iat, just to inspect claims ---
+                if token:
+                    try:
+                        unverified = pyjwt.decode(token, options={"verify_signature": False, "verify_exp": False,
+                                                                  "verify_iat": False})
+                        iat = unverified.get("iat")
+                        exp = unverified.get("exp")
+                        now = datetime.now(timezone.utc).timestamp()
+                        print(
+                            f"### DIAG token iat={iat} ({datetime.fromtimestamp(iat, tz=timezone.utc) if iat else None})")
+                        print(
+                            f"### DIAG token exp={exp} ({datetime.fromtimestamp(exp, tz=timezone.utc) if exp else None})")
+                        print(f"### DIAG local now={now} ({datetime.now(timezone.utc)})")
+                        if iat:
+                            print(
+                                f"### DIAG iat - now = {iat - now:.2f} seconds (positive means iat is in the FUTURE relative to this clock)")
+                    except Exception as decode_err:
+                        print(f"### DIAG failed to decode token for inspection: {decode_err}")
+                # --- END DEBUG ---
 
                 print(
                     f"### DIAG task_id={id(asyncio.current_task())} has_provider={credentials_provider is not None} token_tail={token[-12:] if token else None}")
