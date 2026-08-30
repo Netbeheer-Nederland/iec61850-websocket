@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import jwt as pyjwt  # avoid name clash if 'jwt' variable exists nearby
-from datetime import datetime, timezone
 
 import asyncio
 import datetime
@@ -272,12 +271,12 @@ class ActiveEndpoint:
                                                                   "verify_iat": False})
                         iat = unverified.get("iat")
                         exp = unverified.get("exp")
-                        now = datetime.now(timezone.utc).timestamp()
+                        now = datetime.datetime.now(datetime.timezone.utc).timestamp()
                         print(
-                            f"### DIAG token iat={iat} ({datetime.fromtimestamp(iat, tz=timezone.utc) if iat else None})")
+                            f"### DIAG token iat={iat} ({datetime.datetime.fromtimestamp(iat, tz=datetime.timezone.utc) if iat else None})")
                         print(
-                            f"### DIAG token exp={exp} ({datetime.fromtimestamp(exp, tz=timezone.utc) if exp else None})")
-                        print(f"### DIAG local now={now} ({datetime.now(timezone.utc)})")
+                            f"### DIAG token exp={exp} ({datetime.datetime.fromtimestamp(exp, tz=datetime.timezone.utc) if exp else None})")
+                        print(f"### DIAG local now={now} ({datetime.datetime.now(datetime.timezone.utc)})")
                         if iat:
                             print(
                                 f"### DIAG iat - now = {iat - now:.2f} seconds (positive means iat is in the FUTURE relative to this clock)")
