@@ -732,7 +732,7 @@ body {
     color: white;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
     background: var(--primary-dark);
     box-shadow: var(--shadow-lg);
 }
@@ -743,7 +743,7 @@ body {
     border: 1px solid var(--border-color);
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover:not(:disabled) {
     background: var(--border-light);
     color: var(--text-primary);
 }
@@ -1458,13 +1458,14 @@ h3 {
     gap: 8px;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
     background: var(--primary-dark);
 }
 
 .btn-primary:disabled {
     background: var(--bg-tertiary);
     cursor: not-allowed;
+    opacity: 0.6;
 }
 
 .btn-secondary {
@@ -1482,7 +1483,7 @@ h3 {
     gap: 8px;
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover:not(:disabled) {
     background: var(--bg-secondary);
     color: var(--text-primary);
 }
@@ -1491,6 +1492,7 @@ h3 {
     background: var(--bg-tertiary);
     cursor: not-allowed;
     color: var(--text-muted);
+    opacity: 0.6;
 }
 
 #acsi-client-status {
@@ -2003,11 +2005,11 @@ h3 {
     transition: all 0.2s ease;
 }
 
-.control-window .modal-buttons .btn-primary:hover {
+.control-window .modal-buttons .btn-primary:hover:not(:disabled) {
     background: var(--primary-dark);
 }
 
-.control-window .modal-buttons .btn-secondary:hover {
+.control-window .modal-buttons .btn-secondary:hover:not(:disabled) {
     background: var(--bg-secondary);
     color: var(--text-primary);
 }
