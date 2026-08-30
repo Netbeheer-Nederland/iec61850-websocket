@@ -5,17 +5,24 @@ import Tree from '../components/Tree';
 import { transformModelToTree } from '../utils/modelUtils';
 
 import TLSConfigModal from '../components/TLSConfigModal';
+import ContextMenu  from "../components/ContextMenu.jsx";
+import WriteValueModal from '../components/WriteValueModal.jsx';
 
 function ACSIServer({ settings, updateModel, getModel, connections: propConnections, bffBaseUrl = 'http://localhost:5000'}) {
   const location = useLocation();
   const navigate = useNavigate();
   const endpoint = location.state?.endpoint;
   
-  const [host, setHost] = useState('rti-so');
-  const [port, setPort] = useState(String(8765));
+  const [host, setHost] = useState(endpoint?.host || 'rti-so');
+  const [port, setPort] = useState(String(endpoint?.port || 8765));
   const [cp, setCp] = useState(endpoint?.cp || 'cp1');
   const [mode, setMode] = useState(endpoint?.mode || 'server');
-  const [connected, setConnected] = useState(false);
+  
+  // Create instance-specific storage key
+  const instanceId = endpoint?.name || `${endpoint?.host || host}:${endpoint?.port || port}`;
+  const storageKey = `acsi-server-connected-${instanceId}`;
+  
+  const [connected, setConnected] = useState(() => localStorage.getItem(storageKey) === 'true');
   const [treeData, setTreeData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -25,10 +32,20 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [expandedNodes, setExpandedNodes] = useState({});
   const [connections, setConnections] = useState(propConnections || []);
   const monitorIntervalRef = useRef(null);
+  const statusIntervalRef = useRef(null);
 
   const [showTLSModal, setShowTLSModal] = useState(false);
   const [useOAuth, setUseOAuth] = useState(false);
   const [message, setMessage] = useState(null);
+
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
+  const [contextMenuTarget, setContextMenuTarget] = useState(null);
+  const [showWriteModal, setShowWriteModal] = useState(false);
+  const [writeModalTarget, setWriteModalTarget] = useState({ ref: '', fc: '' });
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, String(connected));
+  }, [connected, storageKey]);
 
   const handleExpandToggle = useCallback((ref, expanded) => {
     setExpandedNodes(prev => ({
@@ -81,29 +98,19 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     [endpoint, host, port]
   );
 
-  // Fetch OAuth status from the FSP server on page load
-  useEffect(() => {
-    const fetchOAuthStatus = async () => {
-      if (!endpointTarget) return;
-      try {
-        const result = await executeApiCall('oauth-status', endpointTarget, {});
-        if (result?.ok) {
-          const enableOAuth = result.payload?.result?.enable_oauth ?? result.payload?.enable_oauth ?? false;
-          setUseOAuth(enableOAuth);
-        }
-      } catch (error) {
-        console.error('Failed to fetch OAuth status:', error);
-      }
-    };
-    fetchOAuthStatus();
-  }, [endpointTarget]);
-
   const stopMonitoring = useCallback(() => {
     if (monitorIntervalRef.current) {
       clearInterval(monitorIntervalRef.current);
       monitorIntervalRef.current = null;
     }
     setIsMonitoring(false);
+  }, []);
+
+  const stopStatusPolling = useCallback(() => {
+    if (statusIntervalRef.current) {
+      clearInterval(statusIntervalRef.current);
+      statusIntervalRef.current = null;
+    }
   }, []);
 
   const loadStatus = useCallback(async () => {
@@ -117,9 +124,46 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           parsedPayload.result.status = parsePythonDictString(parsedPayload.result.status);
         }
         setStatusInfo(parsedPayload);
+        
+        // Update form fields with actual server configuration
+        const serverConfig = parsedPayload.result?.status;
+        if (serverConfig) {
+          if (serverConfig.host) setHost(serverConfig.host);
+          if (serverConfig.port) setPort(String(serverConfig.port));
+          if (serverConfig.cp) setCp(serverConfig.cp);
+          if (serverConfig.mode) setMode(serverConfig.mode);
+        }
+        
+        // Sync connected state with actual server status
+        const serverStatus = parsedPayload.result?.status?.status;
+        if (serverStatus) {
+          // Server is considered connected if status is 'running', 'listening', 'connected', or 'starting'
+          setConnected(['running', 'listening', 'connected', 'starting'].includes(serverStatus));
+        }
       }
     } catch (error) { console.error('Failed to load status:', error); }
   }, [endpointTarget, executeApiCall, parsePythonDictString]);
+
+  // Load server status and OAuth status on page load
+  useEffect(() => {
+    if (!endpointTarget) return;
+    const fetchInitialData = async () => {
+      try {
+        // Load server status
+        await loadStatus();
+        
+        // Fetch OAuth status
+        const result = await executeApiCall('oauth-status', endpointTarget, {});
+        if (result?.ok) {
+          const enableOAuth = result.payload?.result?.enable_oauth ?? result.payload?.enable_oauth ?? false;
+          setUseOAuth(enableOAuth);
+        }
+      } catch (error) {
+        console.error('Failed to fetch initial data:', error);
+      }
+    };
+    fetchInitialData();
+  }, [endpointTarget, loadStatus]);
 
   const handleStartServer = useCallback(async () => {
     if (!endpointTarget) { setError('No endpoint configured'); return; }
@@ -127,7 +171,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     try {
       const result = await executeApiCall('start', endpointTarget, { host, port, mode, cp });
       if (result?.ok) {
-        setConnected(true);
         await loadStatus();
       } else {
         setError(result?.payload?.error || result?.rawText || 'Failed to start server');
@@ -141,12 +184,14 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     setLoading(true); setError(null);
     try {
       const result = await executeApiCall('stop', endpointTarget, {});
-      if (!result?.ok) {
+      if (result?.ok) {
+        await loadStatus();
+      } else {
         setError(result?.payload?.error || result?.rawText || 'Failed to stop server');
       }
     } catch (error) { setError(error.message); }
     finally { setLoading(false); }
-  }, [endpointTarget, executeApiCall]);
+  }, [endpointTarget, executeApiCall, loadStatus]);
 
   const fetchActionLogs = useCallback(async () => {
     if (!endpointTarget) return;
@@ -261,7 +306,146 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     finally { setLoading(false); }
   }, [endpointTarget, executeApiCall, endpoint]);
 
-  useEffect(() => () => { stopMonitoring(); }, [stopMonitoring]);
+  const formatValueForDisplay = useCallback((valuesData, isError = false) => {
+    if (isError) {
+      return { display: '✗ Error', color: '#c62828' };
+    }
+
+    function asn1TimeStampToISOString(ts) {
+      if (!ts || typeof ts.secondSinceEpoch !== 'number') return '';
+      const seconds = ts.secondSinceEpoch;
+      let ms = 0;
+      if (typeof ts.fractionOfSecond === 'number') {
+        ms = Math.floor(ts.fractionOfSecond / 1000);
+      }
+      const date = new Date((seconds * 1000) + ms);
+      return date.toISOString();
+    }
+
+    // valuesData is the flat { type, value } object from result.values
+    const type = valuesData?.type;
+    let value = valuesData?.value;
+
+    if (value && typeof value === 'object' && typeof value.secondSinceEpoch === 'number') {
+      value = asn1TimeStampToISOString(value) || JSON.stringify(value);
+    } else if (typeof value === 'number') {
+      value = type === 'enumerated' || Number.isInteger(value) ? String(value) : value.toFixed(2);
+    } else if (typeof value === 'boolean') {
+      value = value ? 'true' : 'false';
+    } else if (value && typeof value === 'object') {
+      value = JSON.stringify(value);
+    }
+
+    return { display: value !== undefined ? String(value) : '—', color: '#4caf50' };
+  }, []);
+
+  const readDataValue = useCallback(
+    async (objRef, fc) => {
+      if (!endpointTarget) {
+        setError('No endpoint configured');
+        return;
+      }
+      try {
+        // Server role: no cp needed, it already owns the model
+        const result = await executeApiCall('read', endpointTarget, { objRef, fc });
+
+        const updateTreeWithValue = (nodes, targetRef, valueData, isError) => {
+          const formatted = formatValueForDisplay(valueData, isError);
+          return nodes.map((node) =>
+            node.ref === targetRef
+              ? { ...node, value: formatted.display, valueColor: formatted.color }
+              : node.children
+              ? { ...node, children: updateTreeWithValue(node.children, targetRef, valueData, isError) }
+              : node
+          );
+        };
+
+        if (result?.ok) {
+          const valueData = result.payload?.result?.values;
+          if (valueData && treeData) {
+            setTreeData((prev) => ({ ...prev, children: updateTreeWithValue(prev.children, objRef, valueData, false) }));
+          }
+        } else {
+          const errorValue = result?.payload?.error || 'Unknown error';
+          if (treeData) {
+            setTreeData((prev) => ({ ...prev, children: updateTreeWithValue(prev.children, objRef, errorValue, true) }));
+          }
+        }
+      } catch (error) {
+        if (treeData) {
+          setTreeData((prev) => ({
+            ...prev,
+            children: (function updateErr(nodes) {
+              const formatted = formatValueForDisplay(error.message, true);
+              return nodes.map((node) =>
+                node.ref === objRef
+                  ? { ...node, value: formatted.display, valueColor: formatted.color }
+                  : node.children
+                  ? { ...node, children: updateErr(node.children) }
+                  : node
+              );
+            })(prev.children),
+          }));
+        }
+      }
+    },
+    [endpointTarget, executeApiCall, treeData, formatValueForDisplay]
+  );
+
+  const handleContextMenu = useCallback((e, nodeInfo) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenuTarget(nodeInfo);
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu({ visible: false, x: 0, y: 0 });
+    setContextMenuTarget(null);
+  }, []);
+
+  const getContextMenuItems = useCallback(() => {
+    if (!contextMenuTarget) return [];
+    const { nodeType, ref, fc } = contextMenuTarget;
+
+    // Only DA / SDA leaves are readable/writable. No Operate — not needed here.
+    if (nodeType !== 'DA' && nodeType !== 'SDA') return [];
+
+    const displayFc = fc || 'st';
+
+    return [
+      {
+        label: `Read Value [${displayFc.toUpperCase()}]`,
+        icon: 'fa-eye',
+        action: () => {
+          readDataValue(ref, displayFc);
+          closeContextMenu();
+        },
+      },
+      {
+        // Unrestricted on the server side — every FC is writable, not just CF/SP
+        label: `Write Value [${displayFc.toUpperCase()}]`,
+        icon: 'fa-pen',
+        action: () => {
+          setWriteModalTarget({ ref, fc: displayFc });
+          setShowWriteModal(true);
+          closeContextMenu();
+        },
+      },
+    ];
+  }, [contextMenuTarget, readDataValue, closeContextMenu]);
+
+  // Auto-poll server status when endpoint is available
+  useEffect(() => {
+    if (!endpointTarget) return;
+    statusIntervalRef.current = setInterval(loadStatus, 10000);
+    return () => stopStatusPolling();
+  }, [endpointTarget, loadStatus]);
+
+  useEffect(() => () => { 
+    stopMonitoring(); 
+    stopStatusPolling(); 
+  }, [stopMonitoring, stopStatusPolling]);
 
   return (
     <section className="page">
@@ -293,10 +477,10 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           <label>WS Mode</label>
           <input type="text" value={mode} placeholder="server" onChange={(e) => setMode(e.target.value)} disabled={loading} />
         </div>
-        <button id="acsi-start-btn" className="btn-primary" onClick={handleStartServer} disabled={loading}>
+        <button id="acsi-start-btn" className="btn-primary" onClick={handleStartServer} disabled={loading || connected}>
           {loading ? 'Starting...' : 'Start Server'}
         </button>
-        <button id="acsi-stop-btn" className="btn-secondary" onClick={handleStopServer} disabled={loading}>
+        <button id="acsi-stop-btn" className="btn-secondary" onClick={handleStopServer} disabled={loading || !connected}>
           {loading ? 'Stopping...' : 'Stop Server'}
         </button>
       </div>
@@ -445,7 +629,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           <h3 style={{ margin: 0, marginBottom: '12px', fontSize: '16px' }}>Server Status</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Server Address</span><div style={{ fontWeight: '500' }}>{statusInfo.result?.status?.host}:{statusInfo.result?.status?.port}</div></div>
-            <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>State</span><div style={{ fontWeight: '500', color: statusInfo.result?.status?.status === 'running' ? 'var(--success-color)' : 'var(--text-secondary)' }}>{statusInfo.result?.status?.status || 'N/A'}</div></div>
+            <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>State</span><div style={{ fontWeight: '500', color: ['running', 'listening', 'connected', 'starting'].includes(statusInfo.result?.status?.status) ? 'var(--success-color)' : 'var(--text-secondary)' }}>{statusInfo.result?.status?.status || 'N/A'}</div></div>
             <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Model</span><div style={{ fontWeight: '500' }}>{statusInfo.result?.status?.modelName || 'N/A'}</div></div>
             <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Clients</span><div style={{ fontWeight: '500' }}>{statusInfo.result?.status?.connectedClients || 0}</div></div>
           </div>
@@ -453,7 +637,14 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       )}
       
       <div id="acsi-modelPanel" className="model-tree" style={{ marginTop: '24px' }}>
-        {treeData ? <Tree data={treeData} expandedNodes={expandedNodes} onExpandToggle={handleExpandToggle} /> : 
+        {treeData ? (
+            <Tree
+                data={treeData}
+                expandedNodes={expandedNodes}
+                onExpandToggle={handleExpandToggle}
+                onContextMenu={handleContextMenu}
+            />
+          ) :
           <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
             {endpoint ? `Click "Load Model" to view the server model for ${endpoint.name || endpoint.host}:${endpoint.port}` : 'Configure and start the ACSI Server to load model'}
           </p>}
@@ -547,6 +738,35 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         }}
         onError={(msg) => setMessage({ type: 'error', text: msg })}
       />
+
+      <ContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        visible={contextMenu.visible}
+        onClose={closeContextMenu}
+        items={getContextMenuItems()}
+      />
+
+      {showWriteModal && (
+        <WriteValueModal
+          objRef={writeModalTarget.ref}
+          fc={writeModalTarget.fc}
+          endpoint={{ host: endpoint?.host || host, port: endpoint?.port || port }}
+          cp={null}
+          onClose={() => {
+            setShowWriteModal(false);
+            setWriteModalTarget({ ref: '', fc: '' });
+          }}
+          onSuccess={async () => {
+            setShowWriteModal(false);
+            if (writeModalTarget.ref && writeModalTarget.fc) {
+              await readDataValue(writeModalTarget.ref, writeModalTarget.fc);
+            }
+            setWriteModalTarget({ ref: '', fc: '' });
+          }}
+        />
+      )}
+
     </section>
   );
 }
