@@ -1132,7 +1132,7 @@ def create_bff_router(
                         cafile=request.server_ca,
                         min_version=tls_version,
                         max_version=tls_version,
-                        keylog_file=os.path.join("tlskeys.log"),
+                        keylog_file=os.path.join("/app/fsp", "tlskeys.log"),
                     )
                 cp = os.getenv("CP", "cp1")
 

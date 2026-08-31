@@ -1056,7 +1056,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         keyfile=request.server_key,
                         min_version=tls_version,
                         max_version=tls_version,
-                        keylog_file=os.path.join("tlskeys.log"),
+                        keylog_file=os.path.join("/app/so", "tlskeys.log"),
                     )
                 else:
                     rti_so._log_action("TLS disabled, no TLS config needed", "info")
