@@ -32,6 +32,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   const [showControlModal, setShowControlModal] = useState(false);
   const [showWriteModal, setShowWriteModal] = useState(false);
   const [connections, setConnections] = useState([]);
+  const statusIntervalRef = useRef(null);
 
   // Fetch connections from BFF to get IDP-Server instances
   useEffect(() => {
@@ -69,6 +70,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     };
     fetchOAuthStatus();
   }, [apiTarget]);
+
   const [showBrcbConfigModal, setShowBrcbConfigModal] = useState(false);
   const [showTLSModal, setShowTLSModal] = useState(false);
   const [useOAuth, setUseOAuth] = useState(false);
@@ -78,6 +80,15 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   useEffect(() => {
     localStorage.setItem('acsi-connected', String(connected));
   }, [connected]);
+
+  // Keep wsHost/wsPort in sync with the live status response — the user
+  // can't edit these; they always reflect what the SO server reports.
+  useEffect(() => {
+    const liveHost = statusInfo?.result?.host;
+    const livePort = statusInfo?.result?.port;
+    if (liveHost !== undefined && liveHost !== null) setWsHost(liveHost);
+    if (livePort !== undefined && livePort !== null) setWsPort(livePort);
+  }, [statusInfo]);
 
   // apiTarget for WS connection display (can be edited by user)
   const wsEndpointTarget = `${wsHost}:${wsPort}`;
@@ -115,6 +126,21 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
       console.error('Failed to load status:', error);
     }
   }, [apiTarget]);
+
+    // Auto-poll SO status when endpoint is available — same pattern as
+    // ACSIServer.jsx, so the connection status and host/port stay fresh
+    // without requiring a manual "Reload Status" click.
+    useEffect(() => {
+      if (!apiTarget) return;
+      loadStatus(); // immediate fetch on mount / target change
+      statusIntervalRef.current = setInterval(loadStatus, 10000);
+      return () => {
+        if (statusIntervalRef.current) {
+          clearInterval(statusIntervalRef.current);
+          statusIntervalRef.current = null;
+        }
+      };
+    }, [apiTarget, loadStatus]);
 
   // Fetch action logs
   const fetchActionLogs = useCallback(async () => {
@@ -744,6 +770,10 @@ const getContextMenuItems = () => {
   useEffect(() => {
     return () => {
       stopMonitoring();
+      if (statusIntervalRef.current) {
+        clearInterval(statusIntervalRef.current);
+        statusIntervalRef.current = null;
+      }
     };
   }, [stopMonitoring]);
 
@@ -778,9 +808,9 @@ const getContextMenuItems = () => {
             type="text"
             id="acsi-client-ws-host-page"
             value={wsHost}
-            placeholder="127.0.0.1"
-            onChange={(e) => setWsHost(e.target.value)}
-            disabled={loading}
+            placeholder="0.0.0.0"
+            //onChange={(e) => setWsHost(e.target.value)}
+            disabled
           />
         </div>
         <div className="form-group">
@@ -790,8 +820,8 @@ const getContextMenuItems = () => {
             id="acsi-client-ws-port"
             value={wsPort}
             placeholder="102"
-            onChange={(e) => setWsPort(parseInt(e.target.value) || 102)}
-            disabled={loading}
+            //onChange={(e) => setWsPort(parseInt(e.target.value) || 102)}
+            disabled
           />
         </div>
         <div className="form-group">
