@@ -130,7 +130,9 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         if (serverConfig) {
           if (serverConfig.host) setHost(serverConfig.host);
           if (serverConfig.port) setPort(String(serverConfig.port));
-          if (serverConfig.cp) setCp(serverConfig.cp);
+          if (Array.isArray(serverConfig.accessPoints) && serverConfig.accessPoints.length > 0) {
+            setCp(serverConfig.accessPoints[0]);
+          }
           if (serverConfig.mode) setMode(serverConfig.mode);
         }
         
