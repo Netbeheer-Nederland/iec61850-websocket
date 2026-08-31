@@ -22,6 +22,7 @@ function App() {
   const [endpoints, setEndpoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [connections, setConnections] = useState([]);
+  const [connectionsLoading, setConnectionsLoading] = useState(true);
   const [models, setModels] = useState({});
   const [settings, setSettings] = useState({
     bffHost: 'localhost',
@@ -44,6 +45,29 @@ function App() {
   const getModel = useCallback((endpointId) => {
     return models[endpointId]?.data;
   }, [models]);
+
+  const fetchConnections = useCallback(async () => {
+    try {
+      setConnectionsLoading(true);
+      const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/connections`);
+      if (response.ok) {
+        const data = await response.json();
+        setConnections(data.connections || []);
+        return data.connections || [];
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to fetch connections:', error);
+      return [];
+    } finally {
+      setConnectionsLoading(false);
+    }
+  }, [settings.bffHost, settings.bffPort]);
+
+  // Fetch once on mount / whenever BFF settings change
+  useEffect(() => {
+    fetchConnections();
+  }, [fetchConnections]);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -121,10 +145,10 @@ function App() {
           <Header bffStatus={bffStatus} />
           <Routes>
             <Route path="/" element={<Setup settings={settings} />} />
-            <Route path="/setup" element={<Setup settings={settings} />} />
+            <Route path="/setup" element={<Setup settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections}/>} />
             <Route path="/connections" element={<Connections connections={connections} setConnections={setConnections} />} />
-            <Route path="/model" element={<Model settings={settings} connections={connections} updateModel={updateModel} getModel={getModel} />} />
-            <Route path="/traffic" element={<Traffic settings={settings} updateModel={updateModel} connections={connections} getModel={getModel} />} />
+            <Route path="/model" element={<Model settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections} updateModel={updateModel} getModel={getModel} />} />
+            <Route path="/traffic" element={<Traffic settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections} updateModel={updateModel} getModel={getModel} />} />
             <Route path="/data" element={<Data />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/diagnostics" element={<Diagnostics />} />
