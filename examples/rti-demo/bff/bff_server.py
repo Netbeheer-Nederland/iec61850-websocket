@@ -154,6 +154,16 @@ app.add_middleware(
 
 # -------------------- Health & Status --------------------
 
+async def _check_target(key: str, client: BffClient) -> Dict[str, str]:
+    try:
+        await asyncio.wait_for(
+            asyncio.to_thread(client.request, "GET", "/api/health"),
+            timeout=3.0
+        )
+        return {"target": key, "status": "reachable"}
+    except Exception:
+        return {"target": key, "status": "unreachable"}
+
 @app.get(
     "/api/health",
     summary="Health Check",
@@ -166,33 +176,12 @@ app.add_middleware(
     tags=["Health"]
 )
 async def health_check():
-    """Get the health status of the BFF server and its registered targets.
-    
-    Returns:
-        JSON with BFF status, list of targets, and their reachability status.
-    """
     try:
-        # BFF self status
-        bff_status = {
-            "status": "ok",
-            "service": "BFF",
-        }
+        bff_status = {"status": "ok", "service": "BFF"}
 
-        # Known clients (registered)
-        targets = []
-        for key in _bff_clients.keys():
-            status = "unknown"
-            try:
-                client = _bff_clients[key]
-                client.request("GET", "/api/health")
-                status = "reachable"
-            except Exception:
-                status = "unreachable"
-            
-            targets.append({
-                "target": key,
-                "status": status
-            })
+        targets = await asyncio.gather(
+            *(_check_target(key, client) for key, client in _bff_clients.items())
+        )
 
         return {
             "ok": True,
@@ -203,10 +192,8 @@ async def health_check():
 
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
 
 def _fetch_endpoint_properties(endpoint: Dict) -> Dict:
     """Fetch endpoint properties from server/client properties APIs when available.

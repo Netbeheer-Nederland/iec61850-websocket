@@ -197,8 +197,6 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
       // Note: authServerCa is managed in ConnectionModal component state, not in formData
       // For now, we'll include it in the save
       const saveData = { ...formData };
-      console.log('SAVE PAYLOAD:', JSON.stringify(saveData, null, 2));
-      console.log('token_issuer_url specifically:', saveData.token_issuer_url);
 
       if (currentConnection) {
         // Update existing connection
@@ -210,6 +208,9 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
         if (response.ok) {
           onReload?.();
           setShowModal(false);
+        } else {
+          const errText = await response.text().catch(() => '');
+          alert(`Failed to save connection: ${errText || response.statusText}`);
         }
       } else {
         // Add new connection
@@ -221,6 +222,9 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
         if (response.ok) {
           onReload?.();
           setShowModal(false);
+        } else {
+          const errText = await response.text().catch(() => '');
+          alert(`Failed to save connection: ${errText || response.statusText}`);
         }
       }
     } catch (error) {
@@ -352,4 +356,3 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
 }
 
 export default Setup;
-

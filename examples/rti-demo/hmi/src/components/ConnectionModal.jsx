@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 function ConnectionModal({ 
   settings, 
@@ -11,6 +11,7 @@ function ConnectionModal({
   onSave 
 }) {
   const [selectedIdpServer, setSelectedIdpServer] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   // Get IDP-Server connections
   const idpServers = connections.filter(conn => conn.type === 'IDP-Server');
@@ -327,6 +328,15 @@ function ConnectionModal({
     }));
   };
 
+  const handleSave = async () => {
+    setSubmitting(true);
+    try {
+      await onSave();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const isGeneric = formData.type === 'Generic';
   const isIDP = formData.type === 'IDP-Server';
 
@@ -552,12 +562,12 @@ function ConnectionModal({
               )}
             </div>
             <div className="modal-footer">
-              <button className="btn-secondary" onClick={onClose}>
+              <button className="btn-secondary" onClick={onClose} disabled={submitting}>
                 Close
               </button>
-              <button className="btn-primary" onClick={onSave}>
-                <i className="fas fa-save"></i>
-                Save Instance
+              <button className="btn-primary" onClick={handleSave} disabled={submitting}>
+                <i className={`fas ${submitting ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>
+                {submitting ? 'Saving...' : 'Save Instance'}
               </button>
             </div>
           </div>
