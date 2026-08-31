@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { generateModelPyCode } from '../utils/sclParser';
 
 function Tools() {
-  const [activeTab, setActiveTab] = useState('scl-model-factory');
   const [sclFile, setSclFile] = useState(null);
   const [sclContent, setSclContent] = useState('');
   const [iedNames, setIedNames] = useState([]);
@@ -14,11 +13,6 @@ function Tools() {
   const [isLoading, setIsLoading] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState({});
   const fileInputRef = useRef(null);
-
-  // Tab switching
-  const handleTabChange = (tabId) => {
-    setActiveTab(tabId);
-  };
 
   // Handle file selection
   const handleFileChange = useCallback((event) => {
@@ -283,34 +277,21 @@ function Tools() {
       </div>
 
       <div className="acsi-log-tabs" role="tablist" aria-label="Tool tabs">
-        <button 
+        <h3
           id="scl-model-factory-btn" 
-          className={`acsi-log-tab ${activeTab === 'scl-model-factory' ? 'active' : ''}`} 
-          type="button" 
+          className={"acsi-log-tab active" }
           role="tab" 
-          aria-selected={activeTab === 'scl-model-factory'}
-          onClick={() => handleTabChange('scl-model-factory')}
+          aria-selected={true}
         >
           SCL Model Factory
-        </button>
-        <button 
-          id="api-btn" 
-          className={`acsi-log-tab ${activeTab === 'api' ? 'active' : ''}`} 
-          type="button" 
-          role="tab" 
-          aria-selected={activeTab === 'api'}
-          onClick={() => handleTabChange('api')}
-        >
-          API
-        </button>
+        </h3>
       </div>
 
       {/* SCL Model Factory Tab */}
       <div 
         id="scl-model-factory-tab" 
-        className={`acsi-log-tab-panel ${activeTab === 'scl-model-factory' ? 'active' : ''}`} 
+        className={"acsi-log-tab-panel active"}
         role="tabpanel"
-        style={{ display: activeTab === 'scl-model-factory' ? 'block' : 'none' }}
       >
         <div style={{ padding: '20px 0' }}>
           <div className="tools-workspace">
@@ -430,86 +411,6 @@ function Tools() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* API Tab */}
-      <div 
-        id="api-tab" 
-        className={`acsi-log-tab-panel ${activeTab === 'api' ? 'active' : ''}`} 
-        role="tabpanel"
-        style={{ display: activeTab === 'api' ? 'block' : 'none' }}
-      >
-        <section className="acsi-panel acsi-panel-main" id="acsi-api-tester">
-          <div>
-            <h2>API Tester</h2>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Test API endpoints directly from the browser.
-            </p>
-          </div>
-          <div className="acsi-api-controls">
-            <div style={{ marginBottom: '16px' }}>
-              <label className="acsi-label" htmlFor="acsi-api-select">Endpoint</label>
-              <select id="endpoint-api-select" className="acsi-select" style={{ marginBottom: '12px', width: '100%' }}>
-                <option value="">Select an endpoint</option>
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label className="acsi-label" htmlFor="acsi-api-select">API</label>
-              <select id="api-select" className="acsi-select" style={{ marginBottom: '12px', width: '100%' }}>
-                <option value="">Select an API</option>
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label className="acsi-label" htmlFor="acsi-api-body">Request Body (JSON, optional)</label>
-              <textarea 
-                id="acsi-api-body" 
-                className="acsi-textarea" 
-                rows="6" 
-                placeholder={"{\n  \"objRef\": \"LD0.LLN0.Mod.stVal\",\n  \"fc\": \"ST\"\n}"}
-                style={{ width: '100%', padding: '12px', borderRadius: '4px', border: '1px solid var(--border-color)' }}
-              ></textarea>
-            </div>
-
-            <button id="acsi-api-run" className="btn-primary" type="button">
-              <i className="fas fa-play"></i>
-              Run API
-            </button>
-          </div>
-        </section>
-        
-        <section className="acsi-panel acsi-panel-main" id="acsi-api-logs-panel">
-          <h2>Log Messages</h2>
-          <div className="acsi-log-tabs" role="tablist" aria-label="Log tabs">
-            <button 
-              id="acsi-log-tab-api-btn" 
-              className="acsi-log-tab active" 
-              type="button" 
-              role="tab" 
-              aria-selected="true"
-            >
-              API Logs
-            </button>
-          </div>
-          <div id="acsi-log-tab-api" className="acsi-log-tab-panel active" role="tabpanel">
-            <div 
-              id="acsi-api-logs" 
-              className="acsi-log-list"
-              style={{ 
-                border: '1px solid var(--border-color)', 
-                borderRadius: '8px', 
-                padding: '12px', 
-                minHeight: '200px',
-                background: 'var(--bg-card)'
-              }}
-            >
-              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-                API logs will appear here when you run API calls.
-              </p>
-            </div>
-          </div>
-        </section>
       </div>
     </section>
   );
