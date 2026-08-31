@@ -108,6 +108,9 @@ class PassiveEndpoint:
         self._cert_endpoint = cert_endpoint
         self._token_issuer = token_issuer
 
+        self._reconfig_lock = asyncio.Lock()
+
+
         # Define close_on_expiry as a bound method that can be passed safely
         # We'll set it up after the object is fully initialized
         self._close_on_expiry_bound = lambda ws, exp: self._close_on_expiry_impl(ws, exp)
@@ -181,97 +184,104 @@ class PassiveEndpoint:
         )
 
     async def reconfigure_oauth(self, oauth_enable, certificate_endpoint=None, token_issuer=None, kc_cert=None):
-        self._oauth_enable = oauth_enable
+        async with self._reconfig_lock:
 
-        self._cert_endpoint = certificate_endpoint
-        self._token_issuer = token_issuer
+            self._oauth_enable = oauth_enable
 
-        cert_file = None
+            self._cert_endpoint = certificate_endpoint
+            self._token_issuer = token_issuer
 
-        try:
-            # kc_cert contains the certificate CONTENT, not a filename
-            if kc_cert:
-                cert_file = tempfile.NamedTemporaryFile(
-                    mode="w",
-                    suffix=".pem",
-                    delete=False,
-                )
-                cert_file.write(kc_cert)
-                cert_file.flush()
-                cert_file.close()
+            cert_file = None
 
-                cafile = cert_file.name
-            else:
-                cafile = None
+            try:
+                # kc_cert contains the certificate CONTENT, not a filename
+                if kc_cert:
+                    cert_file = tempfile.NamedTemporaryFile(
+                        mode="w",
+                        suffix=".pem",
+                        delete=False,
+                    )
+                    cert_file.write(kc_cert)
+                    cert_file.flush()
+                    cert_file.close()
 
-            self._kc_cert = cafile
+                    cafile = cert_file.name
+                else:
+                    cafile = None
 
-            if oauth_enable and certificate_endpoint and token_issuer:
-                _cache = JwksCache(jwks_uri=certificate_endpoint, cafile=cafile)
-                self._jwt_validator = JwtValidator(_cache, issuer=token_issuer, audience="account")
-            else:
-                self._jwt_validator = None
+                self._kc_cert = cafile
 
-            if oauth_enable:
-                if self._is_endpoint_running:
+                if oauth_enable and certificate_endpoint and token_issuer:
+                    _cache = JwksCache(jwks_uri=certificate_endpoint, cafile=cafile)
+                    self._jwt_validator = JwtValidator(_cache, issuer=token_issuer, audience="account")
+                else:
+                    self._jwt_validator = None
+
+                if oauth_enable:
+                    if self._is_endpoint_running:
+                        try:
+                            await asyncio.wait_for(self.stop_passive(), timeout=10.0)  # ← Add timeout
+                        except asyncio.TimeoutError:
+                            logger.warning("Server stop timed out, continuing reconfigure")
+                    # Start server in background without blocking
+                    logger.info("Starting WebSocket server with TLS on")
+                    self._server_task = asyncio.create_task(
+                        self._run_server("0.0.0.0", 8765)
+                    )
+                    self._server_task.add_done_callback(self._on_server_task_done)
+            except Exception  as e:
+                logger.error(f"Error during reconfigure_oauth: {e}", exc_info=True)
+                raise
+
+
+            #finally:
+                # Remove the temporary certificate file
+            #    if cert_file is not None:
+            #        try:
+            #            os.unlink(cert_file.name)
+            #        except FileNotFoundError:
+            #            pass
+
+    async def reconfigure_endpoint(self, tls_enable, tls_config=None, oauth_enable=False):
+
+        async with self._reconfig_lock:
+
+            self._tls_config = tls_config
+            self._oauth_enable = oauth_enable
+
+            # Always stop existing server if running, regardless of TLS state change
+            # This ensures we reconnect with the new TLS configuration
+            if self._is_endpoint_running:
+                try:
+                    await asyncio.wait_for(self.stop_passive(), timeout=10.0)
+                except Exception as e:
+                    logger.error(f"stop_passive failed during reconfigure: {e}", exc_info=True)
+                    raise RuntimeError(f"Cannot reconfigure: failed to stop existing server: {e}")
+
+                if hasattr(self, '_server_task') and self._server_task and not self._server_task.done():
                     try:
-                        await asyncio.wait_for(self.stop_passive(), timeout=10.0)  # ← Add timeout
+                        await asyncio.wait_for(self._server_task, timeout=10.0)
+                    except asyncio.CancelledError:
+                        # Expected: closing the server cancels its serve_forever() future,
+                        # which surfaces here as CancelledError. This means the old
+                        # server shut down successfully, not that something failed.
+                        logger.info("Old server task ended via close()-triggered cancellation (expected)")
                     except asyncio.TimeoutError:
-                        logger.warning("Server stop timed out, continuing reconfigure")
-                # Start server in background without blocking
-                logger.info("Starting WebSocket server with TLS on")
+                        logger.error("Old server task did not exit within timeout")
+                        raise RuntimeError("Cannot reconfigure: port 8765 still in use (old task didn't exit)")
+
+                # Wait for port to be released from TIME_WAIT state (critical on Windows)
+                await asyncio.sleep(3.0)
+
+            # Start server with new configuration
+            if not self._is_endpoint_running:
+                logger.info("Starting WebSocket server with new configuration")
                 self._server_task = asyncio.create_task(
                     self._run_server("0.0.0.0", 8765)
                 )
-        except Exception  as e:
-            logger.error(f"Error during reconfigure_oauth: {e}", exc_info=True)
-            raise
-
-
-        #finally:
-            # Remove the temporary certificate file
-        #    if cert_file is not None:
-        #        try:
-        #            os.unlink(cert_file.name)
-        #        except FileNotFoundError:
-        #            pass
-
-    async def reconfigure_endpoint(self, tls_enable, tls_config=None, oauth_enable=False):
-        self._tls_config = tls_config
-        self._oauth_enable = oauth_enable
-
-        # Always stop existing server if running, regardless of TLS state change
-        # This ensures we reconnect with the new TLS configuration
-        if self._is_endpoint_running:
-            try:
-                await asyncio.wait_for(self.stop_passive(), timeout=10.0)
-            except Exception as e:
-                logger.error(f"stop_passive failed during reconfigure: {e}", exc_info=True)
-                raise RuntimeError(f"Cannot reconfigure: failed to stop existing server: {e}")
-
-            if hasattr(self, '_server_task') and self._server_task and not self._server_task.done():
-                try:
-                    await asyncio.wait_for(self._server_task, timeout=10.0)
-                except asyncio.CancelledError:
-                    # Expected: closing the server cancels its serve_forever() future,
-                    # which surfaces here as CancelledError. This means the old
-                    # server shut down successfully, not that something failed.
-                    logger.info("Old server task ended via close()-triggered cancellation (expected)")
-                except asyncio.TimeoutError:
-                    logger.error("Old server task did not exit within timeout")
-                    raise RuntimeError("Cannot reconfigure: port 8765 still in use (old task didn't exit)")
-
-            # Wait for port to be released from TIME_WAIT state (critical on Windows)
-            await asyncio.sleep(3.0)
-
-        # Start server with new configuration
-        if not self._is_endpoint_running:
-            logger.info("Starting WebSocket server with new configuration")
-            self._server_task = asyncio.create_task(
-                self._run_server("0.0.0.0", 8765)
-            )
-        else:
-            raise RuntimeError("Cannot start server: old server still running")
+                self._server_task.add_done_callback(self._on_server_task_done)
+            else:
+                raise RuntimeError("Cannot start server: old server still running")
 
     async def _run_server(self, hostname: str, port: int):
         """Internal method that actually runs the server."""
@@ -294,6 +304,15 @@ class PassiveEndpoint:
         # If all retries fail
         raise RuntimeError(f"Failed to start server on {hostname}:{port} after {max_retries} attempts")
 
+    def _on_server_task_done(self, task: asyncio.Task):
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            logger.error("Server task failed permanently: %s", exc, exc_info=exc)
+            self._is_endpoint_running = False
+            self._endpoint_running_event.clear()
+            self._last_start_error = exc  # <-- surface this to the reconfig endpoints
 
     async def start(self, hostname: str, port: int, protocol=None) -> None:
         ssl_ctx = build_tls_context_from_strings(self._tls_config) if self._tls_config else None
