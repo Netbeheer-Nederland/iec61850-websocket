@@ -1034,7 +1034,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_reconfig_connection(request: TLSConnectionCreateConfigRequest):
         """Reconfigure the connection with a new communication point."""
         try:
-            rti_so._log_action(f"Reconfig connection request: host={request.host}, port={request.port}, enable_tls={request.enable_tls}", "info")
+            rti_so._log_action(f"Reconfig connection request: connection={request.connection_name}, enable_tls={request.enable_tls}", "info")
             # Normalize tls_version to handle "1.2", "1.3", "TLSv1_2", "TLSv1_3" formats
             tls_version_str = (request.tls_version or "1.3").lower()
             if "1.2" in tls_version_str or "1_2" in tls_version_str:
