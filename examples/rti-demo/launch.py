@@ -346,7 +346,22 @@ class RTILauncher:
     
     def _launch_python_service(self, svc_type: ServiceType, config: ServiceConfig,
                            background: bool = False) -> subprocess.Popen:
-        """Launch a Python-based service."""
+        """Launch a Python-based service as a subprocess.
+        
+        Creates a subprocess running the service's entry point Python file.
+        Captures stdout/stderr and prefixes output with service name for logging.
+        
+        Args:
+            svc_type: The service type to launch
+            config: Service configuration with entry point, env vars, etc.
+            background: If True, runs in background (non-blocking)
+            
+        Returns:
+            subprocess.Popen: The running process object
+            
+        Raises:
+            FileNotFoundError: If entry point file doesn't exist
+        """
         entry_path = self.base_dir / config.entry_point
 
         if not entry_path.exists():
@@ -399,16 +414,19 @@ class RTILauncher:
 
     def launch_service(self, svc_type: ServiceType, port: Optional[int] = None,
                        docker: bool = False, background: bool = False) -> subprocess.Popen:
-        """Launch a single service.
+        """Launch a single RTI demo service.
+        
+        Delegates to either _launch_python_service or _launch_docker_service
+        based on the docker parameter.
         
         Args:
-            svc_type: The service type to launch
-            port: Override the default port
-            docker: Run in Docker container
-            background: Run in background
+            svc_type: The service type to launch (BFF, FSP, SO, or IO)
+            port: Override the default port for this service
+            docker: If True, launch in Docker container; if False, launch as Python process
+            background: If True, run in background (non-blocking)
             
         Returns:
-            The subprocess.Popen object for the launched service
+            subprocess.Popen: The running process object for the launched service
         """
         config = self._get_service_config(svc_type, port)
         
@@ -418,7 +436,18 @@ class RTILauncher:
             return self._launch_python_service(svc_type, config, background)
     
     def _launch_docker_service(self, config: ServiceConfig, background: bool) -> subprocess.Popen:
-        """Launch a service in Docker."""
+        """Launch a service in a Docker container.
+        
+        Builds and runs a Docker container using the service's Docker image.
+        Configures networking, port mapping, environment variables, and labels.
+        
+        Args:
+            config: Service configuration with Docker image, ports, env vars, etc.
+            background: If True, runs in background (non-blocking)
+            
+        Returns:
+            subprocess.Popen: The running Docker process object
+        """
         port = config.default_port
         
         # Build docker command
@@ -665,7 +694,21 @@ class RTILauncher:
 
 
 def main():
-    """Main entry point for the RTI demo launcher."""
+    """Main entry point for the RTI demo launcher.
+    
+    Parses command line arguments, initializes the launcher, and performs
+    the requested action (launch, stop, status check).
+    
+    Handles:
+    - Service launching (all services or specific ones)
+    - Service stopping
+    - Status reporting
+    - Background/foreground mode
+    - Verbose logging
+    - Docker mode
+    
+    Exits with status code 0 on success, non-zero on errors.
+    """
     launcher = RTILauncher()
     
     # Parse command line arguments
