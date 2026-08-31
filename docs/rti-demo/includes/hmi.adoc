@@ -1,0 +1,321 @@
+== HMI: React Frontend
+
+This is the React-based HMI (Human Machine Interface) for the IEC 61850 RTI Demo application, 
+providing a modern web interface for monitoring and controlling RTI services (FSP and SO).
+
+=== Technology Stack
+
+* React 18 with functional components and hooks
+* React Router v6 for client-side SPA navigation
+* Vite for fast development and building
+* State management using React context and useState/useEffect/useCallback hooks
+* localStorage for persistence
+
+=== Available Pages
+
+[cols="1,1,1",options="header"]
+|===
+|Route |File |Purpose
+|/setup (default) |Setup.jsx |Connection overview, health status
+|/acsi-client |ACSIClient.jsx |SO interface, tree view, controls
+|/acsi-server |ACSIServer.jsx |FSP interface, tree view, data write
+|/connections |Connections.jsx |Connection management (CRUD)
+|/model |Model.jsx |IEC 61850 model viewer, SCL upload
+|/traffic |Traffic.jsx |Traffic monitoring, data access
+|/data |Data.jsx |Simple data visualization
+|/tools |Tools.jsx |SCL Model Factory, XML parsing
+|/reports |Reports.jsx |Reports and logging
+|/diagnostics |Diagnostics.jsx |System diagnostics
+|/settings |Settings.jsx |BFF configuration
+|===
+
+=== Page Details
+
+==== Setup (`/setup`)
+**File**: Setup.jsx (16KB)
+
+**Purpose**: Initial landing page providing an overview of all configured connections and their status.
+
+**Features**:
+* Visual instance visualization showing SO, FSP, and connections
+* Connection health status monitoring
+* Connection management (add, edit, delete)
+* OAuth and TLS configuration access
+* Auto-checks all connection health on page load
+* Default route (redirects from `/`)
+
+==== ACSI Client (`/acsi-client`)
+**File**: ACSIClient.jsx (46KB)
+
+**Purpose**: Interface for ACSI-Client (RTI-SO) operations - acts as a client connecting to external servers.
+
+**Features**:
+* WebSocket connection management (host, port, CP)
+* IEC 61850 data model tree visualization
+* Context menu for right-click operations on data objects
+* Control operations (for controllable CDC types: SPC, DPC, APC, INC, ENC, BSC, ING, ASG, CTE, ENG)
+* Data write operations via modal dialog
+* BRCB (Buffered Report Control Block) configuration
+* TLS configuration support
+* OAuth authentication integration
+* Protocol message monitoring
+* Real-time data updates
+
+==== ACSI Server (`/acsi-server`)
+**File**: ACSIServer.jsx (33KB)
+
+**Purpose**: Interface for ACSI-Server (RTI-FSP) operations - acts as a server providing the IEC 61850 data model.
+
+**Features**:
+* Server configuration (host, port, CP, mode)
+* IEC 61850 data model tree visualization with expandable nodes
+* Data write operations with value modification
+* Tree expansion state persistence
+* TLS configuration support
+* OAuth authentication integration
+* Protocol message monitoring
+* Status information display
+
+==== Connections (`/connections`)
+**File**: Connections.jsx (7KB)
+
+**Purpose**: Central connection management interface for configuring all RTI service endpoints.
+
+**Features**:
+* List all configured connections in table format
+* Add new connections via modal dialog
+* Edit existing connections
+* Delete connections
+* Connection type selection (RTI-SO, RTI-FSP, IDP-Server)
+* ACSI role configuration (server/client)
+* WebSocket mode selection (active/passive)
+* Refresh connections list
+* Connection persistence using localStorage
+
+==== Model (`/model`)
+**File**: Model.jsx (15KB)
+
+**Purpose**: IEC 61850 model visualization and management page.
+
+**Features**:
+* Connection selection for model loading
+* IEC 61850 data model tree display
+* SCL file upload for model generation
+* Model persistence and retrieval
+* Tree expansion state management
+* Visual instance connection graph
+* Model upload status tracking
+
+==== Traffic (`/traffic`)
+**File**: Traffic.jsx (18KB)
+
+**Purpose**: Traffic monitoring and data access dashboard.
+
+**Features**:
+* Visual instance visualization showing all SO, FSP, and their connections
+* Multiple collapsible Data Access Panels
+* Dynamic panel management (add/remove)
+* Real-time message monitoring
+* Connection health monitoring
+* Connection reload functionality
+
+==== Data (`/data`)
+**File**: Data.jsx (3KB)
+
+**Purpose**: Data visualization and display page.
+
+**Features**:
+* Simple data display interface
+* Placeholder for data visualization components
+
+==== Tools (`/tools`)
+**File**: Tools.jsx (18KB)
+
+**Purpose**: Utility tools for SCL file processing and model generation.
+
+**Features**:
+* **SCL Model Factory**: Parse SCL (Substation Configuration Language) XML files
+  - File upload and validation
+  - IED (Intelligent Electronic Device) extraction
+  - AccessPoint extraction
+  - Model tree generation
+  - Python code generation for RTI-FSP models
+* File size display
+* Parse error handling
+* Model preview
+
+==== Reports (`/reports`)
+**File**: Reports.jsx (1.5KB)
+
+**Purpose**: Reports and logging page.
+
+**Features**:
+* Simple reports interface
+* Placeholder for reporting functionality
+
+==== Diagnostics (`/diagnostics`)
+**File**: Diagnostics.jsx (1.6KB)
+
+**Purpose**: System diagnostics and health monitoring page.
+
+**Features**:
+* Simple diagnostics interface
+* Placeholder for diagnostic tools
+
+==== Settings (`/settings`)
+**File**: Settings.jsx (6KB)
+
+**Purpose**: Application configuration and settings management.
+
+**Features**:
+* BFF server configuration (host, port)
+* Settings persistence using localStorage
+* Form validation
+* Default settings management
+* Connection to BFF health check
+
+=== Directory Structure
+
+----
+hmi/
++-- src/
+    +-- assets/
+    |   +-- styles.css
+    +-- components/             # 12 reusable components
+    |   +-- BrcbConfigModal.jsx
+    |   +-- ConnectionModal.jsx
+    |   +-- ContextMenu.jsx
+    |   +-- ControlModal.jsx
+    |   +-- DataAccessPanel.jsx
+    |   +-- Header.jsx
+    |   +-- InstanceVisualization.jsx
+    |   +-- MessageMonitor.jsx
+    |   +-- OAuthConfigModal.jsx
+    |   +-- Sidebar.jsx
+    |   +-- TLSConfigModal.jsx
+    |   +-- Tree.jsx
+    |   +-- WriteValueModal.jsx
+    +-- pages/                 # 11 pages
+    |   +-- ACSIClient.jsx
+    |   +-- ACSIServer.jsx
+    |   +-- Connections.jsx
+    |   +-- Data.jsx
+    |   +-- Diagnostics.jsx
+    |   +-- Model.jsx
+    |   +-- Monitoring.jsx
+    |   +-- Reports.jsx
+    |   +-- Settings.jsx
+    |   +-- Setup.jsx
+    |   +-- Tools.jsx
+    |   +-- Traffic.jsx
+    +-- utils/
+    |   +-- modelUtils.js
+    |   +-- sclParser.js
+    +-- services/
+    |   +-- apiService.js
+    +-- App.jsx
+    +-- index.css
+    +-- main.jsx
++-- package.json
++-- vite.config.js
++-- index.html
+----
+
+=== API Service (apiService.js)
+
+* 25+ API endpoint definitions
+* BFF base URL from localStorage
+* `executeApiCall()` - Main API execution
+* Direct and dynamic execution modes
+* Health check functionality
+
+**Exported Functions**:
+* `getApiById(id)` - Get API definition by ID
+* `getBffBaseUrl()` - Get configured BFF base URL
+* `buildBffApiUrl(path, targetValue)` - Build complete API URL
+* `executeApiCall(apiId, targetValue, bodyOverride, options)` - Main API execution function
+* `ensureBffHealthy()` - Verify BFF is accessible
+* `buildTargetValue(host, port)` - Create target identifier string
+* `getDefaultTargetFromEndpoint(endpoint)` - Get target from endpoint object
+
+**API Definitions** (25+ endpoints):
+* Connection management: connect, disconnect
+* Model operations: model-tree, data-definition
+* Data operations: read, write, operate
+* Dataset operations: dataset-directory
+* Logs: actions-logs, clear-logs
+* Status: status, health
+* Control: operate
+* Report Control Blocks: urcb-read, brcb-read, brcb-write, urcb-write
+* ACSI Server: start, stop, model, update-iedmodel
+* OAuth: reconfigure-oauth, oauth-status, messages, clear_messages
+
+=== Available Scripts
+
+----
+npm install
+npm run dev    # http://localhost:3000
+npm run build  # production to dist/
+npm run preview
+----
+
+=== Installation
+----
+cd path/to/rti-demo/hmi
+npm install
+npm run dev
+npm run build
+----
+
+=== Routing Structure
+----
+/ (default) -> /setup
+/connections
+/model
+/traffic
+/data
+/reports
+/diagnostics
+/tools
+/settings
+/acsi-client
+/acsi-server
+* (404) -> /setup
+----
+
+=== Integration Notes
+
+* Frontend communicates exclusively with BFF server
+* BFF host and port configurable via Settings page
+* All configuration persisted in browser localStorage
+* Connection management centralized and shared across all pages
+* API endpoints defined in apiService.js, executed through /api/execute BFF endpoint
+
+=== API Dependencies
+
+BFF (port 5000) expects these endpoints:
+
+*Health & Status*: GET /api/health, GET /api/endpoints, GET /api/connections
+
+*Connection Management*: POST /api/add-connection, PUT /api/edit-connection/{name}, DELETE /api/delete-connection/{name}
+
+*Data Operations*: POST /api/data/read, POST /api/data/write, POST /api/operate
+
+*Model Operations*: POST /api/model/tree, POST /api/getDataDefinition, POST /api/model, POST /api/update-iedmodel
+
+*ACSI Operations*: POST /api/start, POST /api/stop, POST /api/connect, POST /api/disconnect
+
+*Report Control Blocks*: POST /api/urcb-read, POST /api/brcb-read, POST /api/urcb-write, POST /api/brcb-write
+
+*OAuth Configuration*: POST /api/reconfig-oauth, GET /api/oauth-status, GET /api/messages, POST /api/clear_messages
+
+*Dynamic Execution*: POST /api/execute
+
+=== Browser Support
+
+* Chrome (recommended)
+* Firefox
+* Edge
+* Safari (latest versions)
+
+Requires modern JavaScript features (ES6+ modules, async/await, React 18).

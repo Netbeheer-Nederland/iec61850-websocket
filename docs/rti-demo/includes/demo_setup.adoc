@@ -1,0 +1,349 @@
+== Demo Setup: Docker Compose Files
+
+This folder contains Docker Compose configuration files for deploying the RTI demo 
+system across multiple physical devices.
+
+> **Windows users**: Start Docker Desktop before running any docker-compose commands. 
+> The error `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine` 
+> means Docker Desktop is not running.
+
+=== Device Setup
+
+[cols="1,1,1,1",options="header"]
+|===
+|Device |Docker Compose File |Services |Exposed Ports
+|**PC** |`docker-compose.HMI.yml` |BFF + Frontend (HMI) |5000, 8080
+|**Raspberry Pi 1** |`docker-compose.FSP.yml` |FSP + IO Server |5001, 8000
+|**Raspberry Pi 2** |`docker-compose.SO.yml` |SO + IO Server |5002, 8000, 8765
+|===
+
+=== Quick Start Commands
+
+==== On PC (HMI + BFF)
+----
+cd examples/rti-demo/demo_setup
+
+docker-compose -f docker-compose.HMI.yml build --no-cache
+docker-compose -f docker-compose.HMI.yml up -d
+docker-compose -f docker-compose.HMI.yml down
+docker-compose -f docker-compose.HMI.yml build --no-cache && docker-compose -f docker-compose.HMI.yml up -d
+----
+
+==== On Raspberry Pi 1 (FSP + IO Server)
+----
+cd examples/rti-demo/demo_setup
+
+docker-compose -f docker-compose.FSP.yml build --no-cache
+docker-compose -f docker-compose.FSP.yml up -d
+docker-compose -f docker-compose.FSP.yml down
+docker-compose -f docker-compose.FSP.yml build --no-cache && docker-compose -f docker-compose.FSP.yml up -d
+----
+
+==== On Raspberry Pi 2 (SO + IO Server)
+----
+cd examples/rti-demo/demo_setup
+
+docker-compose -f docker-compose.SO.yml build --no-cache
+docker-compose -f docker-compose.SO.yml up -d
+docker-compose -f docker-compose.SO.yml down
+docker-compose -f docker-compose.SO.yml build --no-cache && docker-compose -f docker-compose.SO.yml up -d
+----
+
+=== Command Reference
+
+==== Build Commands (No Cache)
+----
+docker-compose -f docker-compose.HMI.yml build --no-cache
+docker-compose -f docker-compose.FSP.yml build --no-cache
+docker-compose -f docker-compose.SO.yml build --no-cache
+
+docker-compose -f docker-compose.HMI.yml build --no-cache --pull
+----
+
+==== Start Commands
+----
+docker-compose -f docker-compose.HMI.yml up -d
+docker-compose -f docker-compose.HMI.yml up -d --build
+docker-compose -f docker-compose.HMI.yml build --no-cache && docker-compose -f docker-compose.HMI.yml up -d
+----
+
+==== Stop Commands
+----
+docker-compose -f docker-compose.HMI.yml down
+docker-compose -f docker-compose.HMI.yml down -v
+docker-compose -f docker-compose.HMI.yml down --rmi all -v
+----
+
+==== Status and Logs
+----
+docker-compose -f docker-compose.HMI.yml ps
+docker-compose -f docker-compose.HMI.yml logs -f
+docker-compose -f docker-compose.HMI.yml logs -f bff-server
+docker-compose -f docker-compose.HMI.yml exec bff-server curl http://localhost:5000/api/health
+----
+
+=== Configuration Before Deployment
+
+==== Update IP Addresses in HMI
+Edit `docker-compose.HMI.yml`:
+----
+frontend:
+  environment:
+    - REACT_APP_BFF_URL=http://<BFF_IP>:5000
+----
+Replace `<BFF_IP>` with your PC's actual LAN IP address (e.g., `192.168.1.100`).
+
+==== Configure BFF to Find FSP and SO
+Add to `docker-compose.HMI.yml` under `bff-server` environment:
+----
+bff-server:
+  environment:
+    - FSP_URL=http://<RPI1_IP>:5001
+    - SO_URL=http://<RPI2_IP>:5002
+----
+
+=== Service URLs After Deployment
+
+[cols="1,1,1",options="header"]
+|===
+|Service |URL |Device
+|HMI (React) |`http://<PC_IP>:8080` |PC
+|BFF REST API |`http://<PC_IP>:5000` |PC
+|FSP REST API |`http://<RPI1_IP>:5001` |Raspberry Pi 1
+|FSP WebSocket |`ws://<RPI1_IP>:8765` |Raspberry Pi 1
+|SO REST API |`http://<RPI2_IP>:5002` |Raspberry Pi 2
+|SO WebSocket |`ws://<RPI2_IP>:8765` |Raspberry Pi 2
+|IO Server (RPi1) |`http://<RPI1_IP>:8000` |Raspberry Pi 1
+|IO Server (RPi2) |`http://<RPI2_IP>:8000` |Raspberry Pi 2
+|===
+
+=== Demo IO Setup
+
+Services to Demonstrate:
+* Reports
+* Operation Control
+* Setpoints
+
+==== SO → ACSI Client
+* **WebSocket (WS)**: Passive
+* **Indicators**:
+  - LED 1 → Connection status
+  - LED 2 → Report received
+  - LED 3 → stVal (Boolean)
+* **Inputs**:
+  - **Potentiometer 1**: Input for Oper Float, Monitor displays value
+  - **Potentiometer 2**: Input for Oper Int, Monitor displays value
+
+==== FSP → ACSI Server
+* **WebSocket (WS)**: Active
+* **Indicators**:
+  - LED 1 → Connection status
+  - LED 2 → Operation control received
+* **Monitoring**: Monitor displays Operation Float value
+* **Input**: Button → Input to stVal (Boolean), Triggers the RCB
+
+=== Demo Flow
+. Establish communication between FSP (ACSI Server) and SO (ACSI Client).
+. Verify LED 1 on both sides indicates connection status.
+. Change Potentiometer 1 and observe the Oper Float value on the monitor.
+. Change Potentiometer 2 and observe the Oper Int value on the monitor.
+. Verify report reception:
+   - LED 2 on SO indicates report received.
+   - LED 2 on FSP indicates operation control received.
+. Press the button to change stVal.
+. Verify LED 3 reflects the report value change.
+. Confirm the RCB is triggered and the report is transmitted successfully.
+
+=== Signal Mapping
+----
+BUTTON (FSP)
+    │
+    ▼
+stVal (Boolean)
+    │
+    ▼
+RCB Triggered
+    │
+    ▼
+Report Sent
+    │
+    ▼
+SO receives report
+    │
+    ▼
+LED3 indicates change of stVal
+----
+
+=== Operation Control Demo
+----
+SO Potentiometer 1 (Oper Float)
+           │
+           ▼
+      Operation Control
+           │
+           ▼
+         FSP
+           │
+           ▼
+      Monitor Value
+----
+
+=== Physical Devices
+
+**P1 (SO)**
+----
+├─ LED1 Connection
+├─ LED2 Report Received
+├─ LED3 stVal Mapping
+├─ Pot 1 Oper Float
+└─ Pot 2 Oper Int
+----
+
+**P2 (FSP)**
+----
+├─ LED1 Connection
+├─ LED2 Operation Received
+├─ Button → stVal
+└─ Monitor → Oper Float
+----
+
+**P3**
+----
+└─ Status/Display Module (optional)
+----
+
+=== Docker Network Notes
+* Each device has its own `rti-network` bridge network
+* Containers on same device can communicate using service names:
+  - `bff-server:5000`
+  - `frontend:8080`
+  - `rti-fsp:5001`
+  - `rti-so:5002`
+  - `demo_io:8000`
+* Cross-device communication requires using actual IP addresses
+
+=== Prerequisites
+. **Docker Desktop** (Windows) or **Docker Engine** (Linux/RPi) on all devices
+. **Dockerfiles** exist:
+   - `Dockerfile.bff` (in rti-demo/)
+   - `hmi/Dockerfile` (in rti-demo/hmi/)
+   - `Dockerfile.IO` (in rti-demo/)
+   - `examples/rti-demo/Dockerfile.rti-fsp`
+   - `examples/rti-demo/Dockerfile.rti-so`
+. All devices on same LAN network
+. **Firewall** allows traffic on ports: 5000, 5001, 5002, 8000, 8080, 8765
+
+=== Troubleshooting
+
+[cols="1,1",options="header"]
+|===
+|Issue |Solution
+|Port already in use |`lsof -i :5000` then `kill -9 <PID>`
+|Build fails - missing Dockerfile |`ls -la Dockerfile.bff`
+|GPIO access denied on Raspberry Pi |`sudo usermod -aG docker $USER` and `sudo usermod -aG gpio $USER`
+|Images not found |`docker images` then `docker pull rti-demo-bff`
+|Docker socket permission |Windows: `//var/run/docker.sock:/var/run/docker.sock`, Linux: `/var/run/docker.sock:/var/run/docker.sock`
+|===
+
+=== Useful Docker Commands
+----
+docker ps
+docker images
+docker system prune
+docker stats
+docker exec -it bff-server bash
+----
+
+=== Raspberry Pi IO Setup
+
+==== Enable I2C Interface
+----
+sudo raspi-config
+# Navigate to: Interface Options -> I2C -> Enable
+sudo reboot
+----
+
+==== Install I2C Dependencies
+----
+sudo apt update
+sudo apt install -y i2c-tools python3-smbus
+pip install smbus2
+----
+
+==== Verify I2C is Working
+----
+lsmod | grep i2c
+ls /dev/i2c*
+sudo i2cdetect -y 1
+----
+
+Most I2C LCD backpacks (PCF8574) use address **0x27** or **0x3F**.
+Update `io_config.json`:
+----
+{
+  "name": "lcd_i2c",
+  "device_type": "lcd_i2c",
+  "i2c_address": 40,  // 0x27 in decimal
+  "i2c_bus": 1
+}
+----
+
+==== Troubleshooting I2C LCD
+[cols="1,1",options="header"]
+|===
+|Issue |Solution
+|`i2cdetect` shows no devices |Check wiring, verify I2C is enabled
+|Address shows `UU` |Device conflict, try power cycling
+|Wrong address (0x27 vs 0x3F) |Try both addresses in config
+|Permission denied on `/dev/i2c-1` |Add user to i2c group: `sudo usermod -aG i2c $USER` then reboot
+|===
+
+==== Wiring Reference (PCF8574 I2C LCD Backpack)
+[cols="1,1",options="header"]
+|===
+|LCD Backpack |Raspberry Pi
+|GND |Pin 6 (GND)
+|VCC |Pin 2 (5V) or Pin 1 (3.3V) *
+|SDA |Pin 3 (GPIO 2, SDA)
+|SCL |Pin 5 (GPIO 3, SCL)
+|===
+
+*Check your LCD backpack documentation for voltage requirements (3.3V vs 5V)*
+
+=== IO API Server
+Provides REST API endpoints for controlling physical IO devices.
+
+Start:
+----
+cd demo_IO/io_api_server
+python main.py
+PORT=8080 python main.py
+cd demo_IO
+docker-compose up rti-io
+----
+
+API Endpoints:
+* Health: GET /api/io/health
+* List devices: GET /api/io/devices
+* Device state: GET /api/io/{device_name}
+* Write to device: POST /api/io/{device_name}
+* LCD write: POST /api/io/lcd/{device_name}/write
+* LCD write line: POST /api/io/lcd/{device_name}/write-line
+* LCD clear: POST /api/io/lcd/{device_name}/clear
+
+Device Configuration Example:
+----
+{
+  "devices": [
+    {
+      "name": "led1",
+      "device_type": "led",
+      "type": "led",
+      "gpio_pin": 17,
+      "direction": "output"
+    }
+  ]
+}
+----
+
+See `demo_IO/io_api_server/devices.py` for all supported device types.

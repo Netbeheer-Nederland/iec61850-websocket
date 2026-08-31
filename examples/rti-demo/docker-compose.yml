@@ -263,9 +263,11 @@ services:
     environment:
       - PORT=8000
       - PYTHONUNBUFFERED=1
-    user: "1000:986"  # pi user with gpio group
+    user: "pi"  # pi user with gpio group
     group_add:
-      - "988"
+      - "gpio"    # <-- Change from 988
+      - "i2c"     # <-- Add this
+ 
     devices:
       - "/dev/gpiochip0:/dev/gpiochip0"
       - "/dev/gpiochip4:/dev/gpiochip4"
@@ -274,7 +276,9 @@ services:
       - "/dev/gpiochip12:/dev/gpiochip12"
       - "/dev/gpiochip13:/dev/gpiochip13"
       - "/dev/i2c-1:/dev/i2c-1"
-    privileged: true
+      - "/dev/i2c-13:/dev/i2c-13"
+      - "/dev/i2c-14:/dev/i2c-14"
+
     ipc: host
     security_opt:
       - seccomp:unconfined

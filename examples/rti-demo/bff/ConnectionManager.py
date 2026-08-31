@@ -1,4 +1,21 @@
-# ==================== Connection Management ====================
+"""Connection Management Module for RTI Demo BFF.
+
+This module provides centralized management of connections to RTI services (FSP, SO, demo_IO, IDP-Server).
+It handles:
+- Connection CRUD operations (Create, Read, Update, Delete)
+- Persistent storage to connections.json file
+- Health monitoring of all registered connections
+- Auto-discovery of services (Docker containers, network scanning)
+- OAuth and TLS configuration per connection
+- BFF client instantiation for each connection
+
+The ConnectionManager is a core component of the BFF server, enabling it to:
+1. Maintain a registry of all backend service endpoints
+2. Monitor service health and availability
+3. Proxy requests to the appropriate backend service
+4. Manage authentication (OAuth) and encryption (TLS) settings
+"""
+
 from typing import Any, Dict, List, Optional, Tuple
 from bffClient import BffClient
 from concurrent.futures import ThreadPoolExecutor
@@ -8,8 +25,24 @@ import os
 import json
 from datetime import datetime
 
+
 class ConnectionManager:
-    """Manages connections to remote RTI endpoints."""
+    """Manages connections to remote RTI endpoints.
+    
+    This class is responsible for:
+    - Maintaining a list of all configured connections
+    - Loading/saving connections from/to connections.json
+    - Creating BffClient instances for each connection
+    - Monitoring connection health status
+    - Auto-registering discovered services
+    - Providing connection lookup by name or host:port
+    
+    Attributes:
+        connections_file: Path to the JSON file for persistent storage
+        _bff_clients: Dictionary of BffClient instances keyed by "host:port"
+        connections: List of connection dictionaries
+        logger: Logger instance for connection-related messages
+    """
 
     def __init__(self, bff_clients, connections_file, logger ) -> None:
         self.connections_file = connections_file
@@ -37,7 +70,14 @@ class ConnectionManager:
                     self._bff_clients[key] = BffClient(f"http://{host}:{port}")
 
     def get_client(self) -> httpx.AsyncClient:
-        """Return a shared AsyncClient, creating it lazily."""
+        """Return a shared AsyncClient, creating it lazily.
+        
+        Creates a single httpx.AsyncClient instance with 2-second timeout
+        that is reused for all health check requests to avoid connection overhead.
+        
+        Returns:
+            Shared httpx.AsyncClient instance
+        """
         if self._client is None:
             self._client = httpx.AsyncClient(timeout=2.0)
         return self._client
@@ -247,13 +287,16 @@ class ConnectionManager:
         return connection
 
     def delete_connection(self, conn_name) -> bool:
-        """Delete a connection by ID.
+        """Delete a connection by name.
+
+        Removes the connection from the connections list and deletes the associated
+        BffClient instance. Also saves the updated connections to disk.
 
         Args:
-            conn_id: ID of the connection to delete
+            conn_name: Name of the connection to delete
 
         Returns:
-            True if connection was deleted, False otherwise.
+            bool: True if connection was found and deleted, False otherwise
         """
         # Find the connection to get its host:port before deleting
         connection = self.get_connection(conn_name)
@@ -274,16 +317,39 @@ class ConnectionManager:
         return False
 
     def get_connection(self, conn_name: str) -> Optional[Dict]:
-        """Get a specific connection by ID."""
+        """Get a specific connection by name.
+        
+        Args:
+            conn_name: Name of the connection to retrieve
+            
+        Returns:
+            Connection dictionary if found, None otherwise
+        """
         return next((c for c in self.connections if c['name'] == conn_name), None)
 
     def get_connection_by_host_port(self, host: str, port: int) -> Optional[Dict]:
-        """Get connection by host and port."""
+        """Get connection by host and port.
+        
+        Useful for looking up connections when you have network coordinates
+        but not the connection name.
+        
+        Args:
+            host: Hostname or IP address
+            port: Port number
+            
+        Returns:
+            Connection dictionary if found, None otherwise
+        """
         return next((c for c in self.connections
                      if c['host'] == host and c['port'] == port), None)
 
     def update_connection_status(self, conn_name: str, status: str) -> None:
-        """Update connection status."""
+        """Update connection status and save to disk.
+        
+        Args:
+            conn_name: Name of the connection to update
+            status: New status value (e.g., 'connected', 'disconnected', 'error')
+        """
         conn = self.get_connection(conn_name)
         if conn:
             conn['status'] = status
