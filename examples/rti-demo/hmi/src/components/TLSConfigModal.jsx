@@ -51,6 +51,7 @@ const TLSConfigModal = ({
   const [serverKey, setServerKey] = useState('');
   const [serverCert, setServerCert] = useState('');
   const [caCert, setCaCert] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   // Initialize wsMode from connection if available
   const [wsMode, setWsMode] = useState(() => {
     if (connection?.ws_mode) {
@@ -206,6 +207,8 @@ const TLSConfigModal = ({
     if (!connection) { onError?.('Please select a connection'); return; }
     const config = buildConfig();
     if (!config) return;
+
+    setSubmitting(true);
     try {
       // Call BFF's /api/connections/tls-config endpoint directly
       // This saves TLS config to BFF's connections.json
@@ -250,6 +253,8 @@ const TLSConfigModal = ({
       }
     } catch (error) { 
       onError?.(`Failed to save TLS config: ${error.message}`); 
+    } finally {
+      setSubmitting(false);
     }
   }, [connection, enableTLS, buildConfig, bffBaseUrl, onSuccess, onError, onClose, wsHost]);
 
@@ -378,8 +383,10 @@ const TLSConfigModal = ({
             </div>
 
             <div style={styles.modalFooter}>
-              <button type="button" className="btn-secondary" onClick={onClose} style={styles.button}>Cancel</button>
-              <button type="submit" className="btn-primary" style={styles.button}>Save</button>
+              <button type="button" className="btn-secondary" onClick={onClose} style={styles.button} disabled={submitting}>Cancel</button>
+              <button type="submit" className="btn-primary" style={styles.button} disabled={submitting}>
+                {submitting ? 'Saving...' : 'Save'}
+              </button>
             </div>
           </form>
         </div>
