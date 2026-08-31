@@ -18,27 +18,44 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
         const res = await executeApiCall('read', endpointTarget, {
           objRef,
           fc,
-          ...(cp ? {cp} : {}),
+          ...(cp ? { cp } : {}),
         });
-        if (res?.ok && res.payload?.result?.value) {
-          const values = Array.isArray(res.payload.result.value)
-            ? res.payload.result.value
-            : [res.payload.result.value];
-          if (values.length > 0 && values[0]?.data) {
-            const firstValue = values[0];
-            if (Array.isArray(firstValue.data) && firstValue.data.length >= 2) {
-              setType(firstValue.data[0]);
-              setCurrentValue(JSON.stringify(firstValue.data[1]));
-            } else if (typeof firstValue.data === 'object') {
-              const typeKeys = Object.keys(firstValue.data).filter(
-                (k) => !['name', 'elementName'].includes(k)
-              );
-              if (typeKeys.length > 0) {
-                setType(typeKeys[0]);
-                setCurrentValue(JSON.stringify(firstValue.data[typeKeys[0]]));
+
+        if (res?.ok) {
+          // FSP / ACSI Server shape: result.values = { type, value } (flat)
+          if (res.payload?.result?.values) {
+            const { type: valType, value: val } = res.payload.result.values;
+            setType(valType || 'Unknown');
+            setCurrentValue(val !== undefined ? JSON.stringify(val) : 'N/A');
+            return;
+          }
+
+          // SO / ACSI Client shape: result.value = [ { data: [...] } ]
+          if (res.payload?.result?.value) {
+            const values = Array.isArray(res.payload.result.value)
+              ? res.payload.result.value
+              : [res.payload.result.value];
+            if (values.length > 0 && values[0]?.data) {
+              const firstValue = values[0];
+              if (Array.isArray(firstValue.data) && firstValue.data.length >= 2) {
+                setType(firstValue.data[0]);
+                setCurrentValue(JSON.stringify(firstValue.data[1]));
+                return;
+              } else if (typeof firstValue.data === 'object') {
+                const typeKeys = Object.keys(firstValue.data).filter(
+                  (k) => !['name', 'elementName'].includes(k)
+                );
+                if (typeKeys.length > 0) {
+                  setType(typeKeys[0]);
+                  setCurrentValue(JSON.stringify(firstValue.data[typeKeys[0]]));
+                  return;
+                }
               }
             }
           }
+
+          setType('Unknown');
+          setCurrentValue('N/A');
         } else {
           setType('Unknown');
           setCurrentValue(res?.payload?.error || 'N/A');
@@ -49,7 +66,6 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
       }
     };
     fetchCurrentValue();
-    // Focus input after mount
     setTimeout(() => inputRef.current?.focus(), 50);
   }, [objRef, fc, endpoint, cp]);
 
@@ -64,28 +80,17 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
     try {
       const endpointTarget = `${endpoint.host}:${endpoint.port}`;
 
-      // Coerce value to the correct JS type before sending
-      let coercedValue = newValue;
-      if (type === 'boolean') {
-        coercedValue = (newValue === 'true' || newValue === '1' || newValue === true);
-      } else if (['enumerated', 'integer', 'int8', 'int16', 'int32', 'int64', 'int8u', 'int16u', 'int32u'].includes(type)) {
-        coercedValue = parseInt(newValue, 10);
-      } else if (type === 'float32') {
-        coercedValue = parseFloat(newValue);
-      }
-
       let result = await executeApiCall('write', endpointTarget, {
         objRef,
         fc,
-        value: coercedValue,
+        value: newValue,      // send the raw string, like DataAccessPanel does
         dataType: type,
-        ...(cp ? {cp} : {}),
+        ...(cp ? { cp } : {}),
       });
 
       if (!result?.ok) {
         setResult({ visible: true, success: false, message: 'x Write unsuccessful!' });
-      }
-      else {
+      } else {
         setResult({ visible: true, success: true, message: '✓ Write successful!' });
       }
       setTimeout(() => {
