@@ -57,12 +57,14 @@ function Header({ bffStatus }) {
         </button>
         
         {/* BFF Status Indicator - hidden on ACSI Client page */}
+        {/*
         {location.pathname !== '/acsi-client' && (
           <div className="bff-connection-indicator" aria-live="polite">
             <span className={`bff-status-dot ${bffStatus.connected ? 'connected' : ''}`}></span>
             <span className="bff-status-text">{bffStatus.text}</span>
           </div>
         )}
+        */}
       </div>
     </header>
   );

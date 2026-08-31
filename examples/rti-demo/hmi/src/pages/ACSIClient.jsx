@@ -939,9 +939,9 @@ const getContextMenuItems = () => {
         <button id="acsi-read-data-btn" className="btn-primary" onClick={loadClientTree} disabled={loading || !apiTarget}>
           {loading ? 'Fetching...' : 'Fetch Model'}
         </button>
-        <button className="btn-secondary" onClick={loadStatus} disabled={!apiTarget}>
+        {/*<button className="btn-secondary" onClick={loadStatus} disabled={!apiTarget}>
           Reload Status
-        </button>
+        </button>*/}
         <button id="messages-start-btn" className="btn-primary" onClick={startMonitoring} disabled={!apiTarget || isMonitoring}>
           {isMonitoring ? 'Monitoring...' : 'Start Monitor'}
         </button>
@@ -977,6 +977,7 @@ const getContextMenuItems = () => {
       )}
 
       {/* Status Info */}
+      {/*}
       {statusInfo && (
         <div style={{ marginBottom: '24px', padding: '16px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
           <h3 style={{ margin: 0, marginBottom: '12px', fontSize: '16px' }}>Connection Status</h3>
@@ -1000,7 +1001,7 @@ const getContextMenuItems = () => {
           </div>
         </div>
       )}
-
+      */}
       {/* Tree Container */}
       <div id="acsi-client-tree-container" className="model-tree" style={{ marginTop: '24px' }}>
         {treeData ? (
