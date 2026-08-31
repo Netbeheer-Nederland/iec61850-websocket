@@ -54,25 +54,31 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     }));
   }, []);
 
-  // Fetch connections from BFF to get live TLS config
-  useEffect(() => {
-    const fetchConnections = async () => {
-      try {
-        const url = `${bffBaseUrl}/api/connections`;
-        const response = await fetch(url);
-        if (response.ok) {
-          const data = await response.json();
-          setConnections(data.connections || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch connections:', error);
+  // Fetch connections from BFF to get live TLS/status config.
+  // Returns the fetched list (or null on failure) so callers can act on
+  // freshly-fetched data instead of relying on component state that may
+  // lag behind a background status update.
+  const fetchConnections = useCallback(async () => {
+    try {
+      const url = `${bffBaseUrl}/api/connections`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        const list = data.connections || [];
+        setConnections(list);
+        return list;
       }
-    };
-    
+    } catch (error) {
+      console.error('Failed to fetch connections:', error);
+    }
+    return null;
+  }, [bffBaseUrl]);
+
+  useEffect(() => {
     if (bffBaseUrl) {
       fetchConnections();
     }
-  }, [bffBaseUrl]);
+  }, [bffBaseUrl, fetchConnections]);
 
   // Helper to parse Python dict string to JS object
   const parsePythonDictString = useCallback((pythonStr) => {
@@ -91,6 +97,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       console.warn('Could not parse Python dict string:', e);
       return pythonStr;
     }
+  }, []);
+
+  // Resolve the IDP server name associated with this connection's OAuth config
+  const resolveIdpServerName = useCallback((ep) => {
+    const oauthConfig = ep?.OAuth || ep?.oauth || {};
+    return oauthConfig.idp_server || ep?.idp_server || '';
   }, []);
 
   const endpointTarget = useMemo(() =>
@@ -504,11 +516,29 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             checked={useOAuth}
             onChange={async (e) => {
               const newValue = e.target.checked;
+
+              if (!endpointTarget || !endpoint?.name) return;
+
+              setLoading(true);
+
+              // Only gate the ENABLE path on IDP availability. Disabling proceeds unchecked.
+              if (newValue) {
+                const idpServerName = resolveIdpServerName(endpoint);
+                const latestConnections = await fetchConnections();
+                const idpServerConn = (latestConnections || connections).find(
+                  c => c.type === 'IDP-Server' && c.name === idpServerName
+                );
+
+                if (!idpServerConn || idpServerConn.status !== 'connected') {
+                  setMessage({ type: 'error', text: 'IDP server unavailable' });
+                  setLoading(false);
+                  return;
+                }
+              }
+
               setUseOAuth(newValue);
               // Call reconfig-oauth immediately when checkbox is toggled
-              if (endpointTarget && endpoint?.name) {
-                setLoading(true);
-                try {
+              try {
                   // Build OAuth config from endpoint
                   const oauthConfig = endpoint?.OAuth || {};
                   
@@ -579,7 +609,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
                 } finally {
                   setLoading(false);
                 }
-              }
             }}
             disabled={loading}
             id="acsi-oauth-checkbox"
@@ -724,18 +753,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         onSuccess={(msg) => {
           setMessage({ type: 'success', text: msg });
           // Refetch connections to get updated TLS config
-          const fetchConnections = async () => {
-            try {
-              const url = `${bffBaseUrl}/api/connections`;
-              const response = await fetch(url);
-              if (response.ok) {
-                const data = await response.json();
-                setConnections(data.connections || []);
-              }
-            } catch (error) {
-              console.error('Failed to refetch connections:', error);
-            }
-          };
           fetchConnections();
         }}
         onError={(msg) => setMessage({ type: 'error', text: msg })}
