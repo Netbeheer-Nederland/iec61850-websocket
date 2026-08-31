@@ -104,6 +104,21 @@ class ActiveEndpoint:
         # find and cleanly cancel "whatever's running" before starting anew.
         self._connect_task: asyncio.Task | None = None
 
+        # Persisted credential state so ANY reconfigure path (TLS-only or
+        # OAuth-only) can restart the connection without accidentally
+        # dropping the other setting. Without this, reconfigure_connection()
+        # would restart with no Authorization header even if OAuth is still
+        # enabled, and disabling OAuth had no way to hand a "no credentials"
+        # restart back to reconfigure_connection's code path.
+        self._access_token: str | None = None
+        self._credentials_provider: "ClientCredentialsProvider | None" = None
+
+        # Serializes reconfigure_connection() and reconfigure_oauth() so a
+        # TLS toggle and an OAuth toggle firing close together can't both
+        # capture the same previous _connect_task and race to overwrite
+        # self._connect_task with each other's new task.
+        self._reconfig_lock = asyncio.Lock()
+
     # ------------------------------------------------------------------
     # Public interface (EndpointProtocol)
     # ------------------------------------------------------------------
@@ -155,7 +170,16 @@ class ActiveEndpoint:
             except asyncio.CancelledError:
                 pass
 
-    def run_in_background(self, host: str, port: int, cp: str, *, access_token=None, protocol=None) -> asyncio.Task:
+    def run_in_background(
+        self,
+        host: str,
+        port: int,
+        cp: str,
+        *,
+        access_token=None,
+        credentials_provider: "ClientCredentialsProvider | None" = None,
+        protocol=None,
+    ) -> asyncio.Task:
         """Start the connect/reconnect loop as a tracked background task.
 
         Captures whatever was previously running BEFORE scheduling the new
@@ -166,7 +190,14 @@ class ActiveEndpoint:
 
         async def _runner():
             await self._cancel_task(previous_task)
-            await self.start(host, int(port), cp, access_token=access_token, protocol=protocol)
+            await self.start(
+                host,
+                int(port),
+                cp,
+                access_token=access_token,
+                credentials_provider=credentials_provider,
+                protocol=protocol,
+            )
 
         task = asyncio.create_task(_runner(), name=f"{cp}-active-connect")
         self._connect_task = task
@@ -178,73 +209,100 @@ class ActiveEndpoint:
 
     async def reconfigure_connection(self, host, port, cp, tls_enable, tls_config=None):
         """Reconfigure TLS settings and (re)start the connection."""
-        self._tls_config = tls_config
-        print("entering reconfigure_connection with tls_enable:", tls_enable)
-        # Always restart the connection regardless of TLS enable state
-        # run_in_background cancels any existing loop and schedules the
-        # new one — never await start() directly, it runs forever.
-        self.run_in_background(host, port, cp)
-        if tls_enable:
-            print("entered reconfigure_connection with tls_enable True, tls_config:", tls_config)
-
+        async with self._reconfig_lock:
+            self._tls_config = tls_config
+            print("entering reconfigure_connection with tls_enable:", tls_enable)
+            # Always restart the connection regardless of TLS enable state.
+            # Reuse whatever credential state OAuth reconfiguration last set,
+            # so toggling TLS alone never silently drops an active OAuth
+            # session's Authorization header.
+            # run_in_background cancels any existing loop and schedules the
+            # new one — never await start() directly, it runs forever.
+            self.run_in_background(
+                host,
+                port,
+                cp,
+                access_token=self._access_token,
+                credentials_provider=self._credentials_provider,
+            )
+            if tls_enable:
+                print("entered reconfigure_connection with tls_enable True, tls_config:", tls_config)
 
     async def reconfigure_oauth(self, host, port, cp, oauth_enable, token_endpoint=None,
                                 client_id=None, client_secret=None, kc_cert=None,
                                 enable_token_refresh=False):
+        async with self._reconfig_lock:
+            self._oauth_enable = oauth_enable
+            self._assoc_handler._kc_cert = kc_cert
+            self._assoc_handler._token_endpoint = token_endpoint
 
-        self._oauth_enable = oauth_enable
-        self._assoc_handler._kc_cert = kc_cert
-        self._assoc_handler._token_endpoint = token_endpoint
+            cafile = None
+            client_con_provider = None
+            access_token = None
 
-        cafile = None
-        client_con_provider = None
-        access_token = None
+            if oauth_enable:
+                if kc_cert:
+                    print(f"### DIAG kc_cert repr (first 80 chars): {kc_cert[:80]!r}")
+                    cert_file = tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False)
+                    cert_file.write(kc_cert)
+                    cert_file.flush()
+                    cert_file.close()
+                    cafile = cert_file.name
 
-        if oauth_enable:
-            if kc_cert:
-                print(f"### DIAG kc_cert repr (first 80 chars): {kc_cert[:80]!r}")
-                cert_file = tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False)
-                cert_file.write(kc_cert)
-                cert_file.flush()
-                cert_file.close()
-                cafile = cert_file.name
+                client_con_provider = ClientCredentialsProvider(
+                    token_url=token_endpoint, client_id=client_id,
+                    client_secret=client_secret, cafile=cafile,
+                )
+                access_token = await client_con_provider.get_access_token()
 
-            client_con_provider = ClientCredentialsProvider(
-                token_url=token_endpoint, client_id=client_id,
-                client_secret=client_secret, cafile=cafile,
-            )
-            access_token = await client_con_provider.get_access_token()
+            if oauth_enable:
+                # Persist so a later TLS-only reconfigure_connection() call
+                # can restart the loop without losing these credentials.
+                self._access_token = access_token
+                self._credentials_provider = client_con_provider if enable_token_refresh else None
 
-        if oauth_enable:
-            previous_task = self._connect_task  # capture BEFORE creating the new task
+                previous_task = self._connect_task  # capture BEFORE creating the new task
 
-            async def _run_and_cleanup():
-                try:
-                    await self._cancel_task(previous_task)
-                    if enable_token_refresh:
-                        # Provider is handed to start() — every reconnect fetches
-                        # a fresh token via the provider's own expiry-aware cache.
-                        await self.start(host, int(port), cp, credentials_provider=client_con_provider)
-                    else:
-                        # Static token — once it expires, every reconnect keeps
-                        # presenting the same dead token and will keep failing,
-                        # by design (demo mode).
-                        await self.start(host, int(port), cp, access_token=access_token)
-                finally:
-                    if cafile is not None:
-                        try:
-                            os.unlink(cafile)
-                        except FileNotFoundError:
-                            pass
+                async def _run_and_cleanup():
+                    try:
+                        await self._cancel_task(previous_task)
+                        if enable_token_refresh:
+                            # Provider is handed to start() — every reconnect fetches
+                            # a fresh token via the provider's own expiry-aware cache.
+                            await self.start(host, int(port), cp, credentials_provider=client_con_provider)
+                        else:
+                            # Static token — once it expires, every reconnect keeps
+                            # presenting the same dead token and will keep failing,
+                            # by design (demo mode).
+                            await self.start(host, int(port), cp, access_token=access_token)
+                    finally:
+                        if cafile is not None:
+                            try:
+                                os.unlink(cafile)
+                            except FileNotFoundError:
+                                pass
 
-            task = asyncio.create_task(_run_and_cleanup(), name=f"{cp}-active-connect-oauth")
-            self._connect_task = task
-        else:
-            if cafile is not None:
-                try:
-                    os.unlink(cafile)
-                except FileNotFoundError:
-                    pass
+                task = asyncio.create_task(_run_and_cleanup(), name=f"{cp}-active-connect-oauth")
+                self._connect_task = task
+            else:
+                if cafile is not None:
+                    try:
+                        os.unlink(cafile)
+                    except FileNotFoundError:
+                        pass
+
+                # Clear persisted credentials so future reconfigure_connection()
+                # calls correctly restart with no Authorization header.
+                self._access_token = None
+                self._credentials_provider = None
+
+                # The caller (router) may have already cancelled the previous
+                # _connect_task before invoking this method. Either way, the
+                # connection loop MUST be restarted here without credentials —
+                # otherwise disabling OAuth leaves the client permanently
+                # disconnected until some unrelated reconfigure call happens
+                # to restart it.
+                self.run_in_background(host, int(port), cp)
 
     async def start(self, hostname: str, port: int, cp: str, *,
                     access_token: str | None = None,
