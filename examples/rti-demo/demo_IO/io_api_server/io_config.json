@@ -35,14 +35,16 @@
     },
     {
       "name": "pot1",
-      "type": "potentiometer",
       "device_type": "potentiometer",
-      "identifier": 0,
+      "adc_type": "ads1115",
+      "i2c_bus": 1,
+      "i2c_address": 72,
       "adc_channel": 0,
-      "description": "Potentiometer on ADC channel 0",
-      "direction": "input",
+      "adc_reference_voltage": 3.3,
       "min_value": 0.0,
-      "max_value": 100.0
+      "max_value": 100.0,
+      "is_inverted": false,
+      "description": "Potentiometer on ADS1115 #1"
     },
     {
       "name": "button1",
