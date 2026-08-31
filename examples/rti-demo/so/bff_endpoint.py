@@ -1083,18 +1083,29 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 # read_value/write_value/operate elsewhere in this router.
                 rti_so._log_action("Invoking reconfigure_endpoint on runtime loop", "info")
                 rti_so.invoke_on_runtime_loop(
-                    rti_so.runtime.endpoint.reconfigure_endpoint(request.enable_tls, tls_config=tls_config),
+                    rti_so.runtime.endpoint.reconfigure_endpoint(request.enable_tls,
+                                                                 tls_config=tls_config,
+                                                                 oauth_enable=rti_so.runtime.endpoint._oauth_enable),
                     timeout=30,  # stop_passive + restart can take a few seconds
                 )
 
-                if request.enable_tls:
-                    rti_so._log_action("Waiting for endpoint to be running", "info")
-                    rti_so.invoke_on_runtime_loop(
-                        rti_so.runtime.endpoint._endpoint_running_event.wait(),
-                        timeout=20,
+                #if request.enable_tls:
+                rti_so._log_action("Waiting for endpoint to be running", "info")
+                rti_so.invoke_on_runtime_loop(
+                    rti_so.runtime.endpoint._endpoint_running_event.wait(),
+                    timeout=20,
+                )
+
+                if not rti_so.runtime.endpoint._is_endpoint_running:
+                    last_err = getattr(rti_so.runtime.endpoint, "_last_start_error", None)
+                    rti_so._log_action(f"Endpoint failed to start: {last_err}", "error")
+                    return JSONResponse(
+                        content={"ok": False, "error": f"endpoint failed to start: {last_err}"},
+                        status_code=500,
                     )
-                    rti_so._log_action(f"Endpoint status: {rti_so.runtime.endpoint._is_endpoint_running}", "info")
-                    print("endpoint status is: ", rti_so.runtime.endpoint._is_endpoint_running)
+
+                rti_so._log_action(f"Endpoint status: {rti_so.runtime.endpoint._is_endpoint_running}", "info")
+                print("endpoint status is: ", rti_so.runtime.endpoint._is_endpoint_running)
 
                 rti_so._log_action(f"Connection reconfigured: enable_tls={request.enable_tls}", "info")
                 return JSONResponse(
