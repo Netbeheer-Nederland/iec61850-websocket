@@ -2,7 +2,7 @@
   {
     "id": 1,
     "name": "Demo_Pi1",
-    "host": "192.168.100.15",
+    "host": "192.168.100.41",
     "port": 5002,
     "type": "RTI-SO",
     "acsi": "client",
@@ -15,11 +15,18 @@
       "realm": "iec61850-websocket",
       "enable_token_refresh": false,
       "idp_server": "keycloak",
-      "enable_oauth": true,
+      "enable_oauth": false,
       "token_issuer": "https://192.168.100.14:8443/realms/iec61850-websocket"
     },
     "status": "connected",
-    "endpoint": ""
+    "endpoint": "",
+    "TLS": {
+      "enable_tls": true,
+      "tls_version": "TLSv1_2",
+      "server_key": "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAvBHjaMV1RRlVmYuM/0XJLMVHCE2dXQNaNWTPHh19U00/Dbr3\n1lyR3gT2m7DIJVe2hRi9ZMGZCJtIsVkKA8gM2uC3K/jWOAcOj+AgE/cjKswi9OCy\nu8+HSe53lxkRjastbopFu6+9zKM2v05wr240l5LfnmMaRHEHyGbsoRtSrzFsTSPo\nU02O0tOTsFaDTsSFXX8+JUmhvDedMSMtABx9xJTDlbnwsxejrLTRzqqxR5LUMKMI\nsVm2eEGB5X3ssAYrLfuXCvoGZIsINipKnRnEdA2qpIS5IbOCArg4PY7QB6quEQIs\neEizsCiakaHKoOJNSrRPt+KUdLdWT73XPZLHUQIDAQABAoIBADHTf29bmRUkgCQ8\n768V+xWMcqRFg+KHp9erjKAK6hAuz/zAQzccsVyj7f4TmQMjuOyMQGk4TWYVVe3+\njAOydY1rqbvRoleXrwj5NSZ0/HEzQjOkcFYHxm0U68QxVRA2gMPfiFgQWHWl7DRF\nAN/Jj890jyA0W1o0o/45HooUZhSZzC5W4xKd2LZtM3CnJZVR2D0MtslkwA/f6BPX\nLRqWha/DNv2J7xcl45BEhY8dUNMDCPhaFivQutGeeYD7hxem2iO3agxUqM258Xua\nO++jbWxxa6v7kY9S4bdTjsxwV8J6Pw6Er9Yn3ut8RAW0J9WSirSCppMe8N7WLgz7\nHZG/4G0CgYEA4JoZw8BDaniOh7ypzncaWP9y5HapeTHOrTGq1jGPm7fLaFkJ8/MO\nx+x9/ijVlqtuIxEmO/ydG1YwFTXk+KGl9zdkU+jDaL9by3G/V8EDcK3vjYW6qdeJ\ndpSj4Dezkjz7FH1Rom6cayJCE59mdD+YL9F1lya1U2OxJaB3cXD1UncCgYEA1lxn\nJFS/V0J1nYlF935ANvhJL7vfX7fdubMT45nJfdSv5awMyp6NIYvuQmUyVMUpx2F3\nTqGsmXJ2dp3cJ8aDrhveyfEXNYg+7AGf0A0PuJScDiYv7sfhOTUAXSdh1h1XN236\nbk6AlMLBRryPnvQ4/kZI1YcVk0/RcBTb0ed8nncCgYAt+JypamLiGgbiVYVUEyC7\ncp2rkXYirkUlQfM7oC1KrBXgJ8lXuzodRZSMPwNosXH7j3kJ8iyd+cghr0RMd5mm\nvhm06wGEIRbCz2dgqMrxd0h+6Q5J0Sn7sXTRYdVJa13g1b2tx4IQk5R+u7OWu6WE\ntBSjeXLHvLH3h56rA3nTBQKBgEEdqKc8pzMWmSvVu09HJrKMEY9SfrRQ4iW65FvL\nJ431wcj+zpPuPejm3OWGYBeoHNzYGqnkKs4iGyJFKc9bWjzVcoPdnLNCQ/rlM2q7\nzP7BBfa2WvEp/pymIQorIGkuWIQaAGzpo92Mm7GlLeuXPIjhSNa0RjWNlY16iJvm\nudBZAoGBAJYHO/ea6fVAFffsmab/kAo7+3cKymJ95lcnvNZPIJI5OvLNz6VaHQo2\nU5DmW4UvX9nGVf0QqIf+GHuMDEfgR+ObCa3U6fN31ADsM8s8zAS3aCmZoF/BAnmP\neX5hGWWplMkJqiNxGbC7Rn2SqSbedZurTPbAzYq/IAR/WPL7Ea7n\n-----END RSA PRIVATE KEY-----\n",
+      "server_cert": "-----BEGIN CERTIFICATE-----\nMIIEEzCCAvugAwIBAgIUCIu8UU3Lf1zuxF6/rKzRPo2zes4wDQYJKoZIhvcNAQEL\nBQAwajELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEDAO\nBgNVBAMMB3Jvb3RfQ0EwHhcNMjYwODMxMDc0MjIyWhcNMzYwODI4MDc0MjIyWjBp\nMQswCQYDVQQGEwJERTELMAkGA1UECAwCQlcxETAPBgNVBAcMCEZyZWlidXJnMRsw\nGQYDVQQKDBJNWiBBdXRvbWF0aW9uIEdtYkgxDDAKBgNVBAsMA1ImRDEPMA0GA1UE\nAwwGcnRpLXNvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvBHjaMV1\nRRlVmYuM/0XJLMVHCE2dXQNaNWTPHh19U00/Dbr31lyR3gT2m7DIJVe2hRi9ZMGZ\nCJtIsVkKA8gM2uC3K/jWOAcOj+AgE/cjKswi9OCyu8+HSe53lxkRjastbopFu6+9\nzKM2v05wr240l5LfnmMaRHEHyGbsoRtSrzFsTSPoU02O0tOTsFaDTsSFXX8+JUmh\nvDedMSMtABx9xJTDlbnwsxejrLTRzqqxR5LUMKMIsVm2eEGB5X3ssAYrLfuXCvoG\nZIsINipKnRnEdA2qpIS5IbOCArg4PY7QB6quEQIseEizsCiakaHKoOJNSrRPt+KU\ndLdWT73XPZLHUQIDAQABo4GxMIGuMEAGA1UdEQQ5MDeCBnJ0aS1zb4IJbG9jYWxo\nb3N0hwR/AAABhwTAqGQOhwTAqGQPhwTAqGQBhwTAqGQQhwTAqGQpMB0GA1UdJQQW\nMBQGCCsGAQUFBwMBBggrBgEFBQcDAjALBgNVHQ8EBAMCBaAwHQYDVR0OBBYEFEJO\nmUYYClyb7u+GaOzLl9M/2EH6MB8GA1UdIwQYMBaAFGYgIECdrhTsmgCKpVM0RHeC\nkFUmMA0GCSqGSIb3DQEBCwUAA4IBAQA8cRKO6OWwXuzCzNC8pN3tFu4PKhMYs7Hm\n3nJvXiuCp5501IWrzvSvJHJjHwYPFp7c0Tr423m1P/ppwRwRB/P20kSR+VA/BZwA\nS8OQ6JW2CwHo75UjneUO1QW/fd9c941JM0g86IOcoSTEa5yQ0KmB7UA3mIvvXE8H\nS3cNKJ/mC5njLHkVH7sgaxPNCV/toNzPaAhUiH/WhOjZ3wOQd1mrWQtZiXsesVUs\nh1i05i4mEUT0pscZ28+9jGX/yn1r3/kq0xhnPXseiotp+y+GSJXy01ZbUyWLcbke\nmpXEoR3uCVmLJ+8amX6MlLCy5DfePejfPJcoV9/KVfQ7RpEaoobL\n-----END CERTIFICATE-----\n",
+      "server_ca": null
+    }
   },
   {
     "id": 2,
@@ -59,12 +66,19 @@
       "token_endpoint": "https://192.168.100.14:8443/realms/iec61850-websocket/protocol/openid-connect/token",
       "client_id": "rti-fsp",
       "client_secret": "Af901GzeYXmZAqtJc03jGkHLEwgyPyHN",
-      "enable_token_refresh": true,
+      "enable_token_refresh": false,
       "idp_server": "keycloak",
-      "enable_oauth": true
+      "enable_oauth": false
     },
     "status": "connected",
-    "endpoint": ""
+    "endpoint": "",
+    "TLS": {
+      "enable_tls": true,
+      "tls_version": "TLSv1_2",
+      "server_key": null,
+      "server_cert": null,
+      "server_ca": "-----BEGIN CERTIFICATE-----\r\nMIIDtTCCAp2gAwIBAgIUJysTAOCqE3IaNO1QgtOPxMq6M8EwDQYJKoZIhvcNAQEL\r\nBQAwajELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\r\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEDAO\r\nBgNVBAMMB3Jvb3RfQ0EwHhcNMjIwMzE4MDkyNzEwWhcNMzIwMzE1MDkyNzEwWjBq\r\nMQswCQYDVQQGEwJERTELMAkGA1UECAwCQlcxETAPBgNVBAcMCEZyZWlidXJnMRsw\r\nGQYDVQQKDBJNWiBBdXRvbWF0aW9uIEdtYkgxDDAKBgNVBAsMA1ImRDEQMA4GA1UE\r\nAwwHcm9vdF9DQTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOMyaDaT\r\n+a4DT0s2NCrjUN8coLPfFrLRdN0Gx0hRViuLUFxd001jXruRgXKt2g8lR+YnzUeA\r\nPQHbcIfRQhL+jy/ZMXpmz4Nrl7vyOWFdu8nBKU6c7y9LmSGbnOJZjDXwlX6ERwui\r\nqFzAvRA6YXbPN8gY0B3Ou+T/mjkWN9L1x+V+7bGs9rVIoM78fVyM2FERBfsBtT76\r\nQVQv3KZ+a9EOLxqcZ/nGqsFFysFOSkiRC6Cy4mC5CSik9S5D7X9lz/bdga7O+hqd\r\nSKfir6YMlQGV37JPqmz69N6vvb9UOX/G989T4qdVB/zQOvMdcIWXkqb3vSAXYi/c\r\nClVS1Pymsy/MXQ0CAwEAAaNTMFEwHQYDVR0OBBYEFGYgIECdrhTsmgCKpVM0RHeC\r\nkFUmMB8GA1UdIwQYMBaAFGYgIECdrhTsmgCKpVM0RHeCkFUmMA8GA1UdEwEB/wQF\r\nMAMBAf8wDQYJKoZIhvcNAQELBQADggEBACsiuHFQjqOglenp/fcNbU034m/vvkyV\r\nSZXau9amXBWdeTEpc1HaPOYO7jFFnu/QoH6AbGZkpL0yWZJA2rf102AkOdAe6E0g\r\n2H77/hHoHVCfxOiOl3+icsLXJ4VXqV2vmUOEVnWfHRtej4My6avT9uCNMO2bw9hm\r\n56RAZrs82T9Mpg/1XQ9YUO1q4/JfP/+dCzPXAdwJ/h2cJ/q6Q9g1gRns8IzVlGOZ\r\n0ZBQCLqLl8vUei+t6YgjyBbeNCz4CEcmXKIJeqMB1jhpsgr6BBMTNTU2Q60b9fzU\r\nOCGLw94EnKYtHWGy2WHMFNbwkNCR0/jwhxKkU0HXy1aNMUBWp99M7P8=\r\n-----END CERTIFICATE-----\r\n"
+    }
   },
   {
     "id": 4,

@@ -77,8 +77,8 @@ const TLSConfigModal = ({
       
       // Determine the runtime server port based on connection type
       // RTI-SO uses port 5002, RTI-FSP uses port 5001
-      const host = wsHost || connection.host || 'localhost';
-      const port = connection?.type === 'RTI-SO' ? '5002' : '5001';
+      const host = connection.host || 'localhost';
+      const port = connection.port;
       
       if (!host || !port) {
         console.warn('Cannot fetch TLS config: missing host or port');
@@ -226,8 +226,8 @@ const TLSConfigModal = ({
       
       // Also reconfigure the server's runtime TLS config
       // This ensures the /api/tls-config GET endpoint returns the updated values
-      const host = wsHost || connection.host || 'localhost';
-      const port = connection?.type === 'RTI-SO' ? '5002' : '5001';
+      const host = connection.host || 'localhost';
+      const port = connection.port;
       const reconfigureUrl = `http://${host}:${port}/api/reconfig-connection`;
       
       const reconfigureResponse = await fetch(reconfigureUrl, {
