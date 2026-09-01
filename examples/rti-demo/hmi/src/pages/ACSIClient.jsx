@@ -33,6 +33,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   const [showWriteModal, setShowWriteModal] = useState(false);
   const [connections, setConnections] = useState([]);
   const statusIntervalRef = useRef(null);
+  const doDefinitionCacheRef = useRef({});
 
   // Fetch connections from BFF to get IDP-Server instances
   useEffect(() => {
@@ -490,21 +491,79 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     [apiTarget, wsCp, treeData, formatValueForDisplay]
   );
 
+  // Cache of DO definitions used ONLY to decide context-menu availability.
+  // Deliberately separate from treeData so checking it never expands a row.
+  const fetchDoDefinition = useCallback(
+    async (ref) => {
+      if (doDefinitionCacheRef.current[ref]) {
+        return doDefinitionCacheRef.current[ref];
+      }
+      try {
+        const ldName = ref.split('/')[0];
+        const lnName = ref.split('/')[1].split('.')[0];
+        const doPath = ref.split('/')[1].split('.').slice(1).join('.');
+        const result = await executeApiCall('data-definition', apiTarget, {
+          ld_inst: ldName,
+          ln_inst: lnName,
+          do_path: doPath,
+          cp: wsCp,
+        });
+        if (result?.ok) {
+          const def = {
+            dataAttributes: result.payload.result.value?.dataAttributeDefinition || [],
+            subDataObjects: result.payload.result.value?.subDataDefinition || [],
+          };
+          doDefinitionCacheRef.current[ref] = def;
+          return def;
+        }
+      } catch (error) {
+        console.error('Failed to fetch DO definition:', error);
+      }
+      return null;
+    },
+    [apiTarget, wsCp]
+  );
+
+  const hasOperInDef = (def) =>
+    !!def?.dataAttributes?.some((da) => (da.name || da.daRef?.split('.').pop() || '').toLowerCase() === 'oper');
+
   // Handle context menu
-const handleContextMenu = useCallback((e, nodeInfo) => {
-  e.preventDefault();
-  e.stopPropagation();
-  setContextMenuTarget(nodeInfo);
-  setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
-}, []);
+  const handleContextMenu = useCallback(
+    (e, nodeInfo) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const { clientX, clientY } = e;
+
+      const cachedDef = doDefinitionCacheRef.current[nodeInfo.ref];
+      const isDO = nodeInfo.nodeType === 'DO';
+
+      // Open right away with whatever we already know.
+      setContextMenuTarget({
+        ...nodeInfo,
+        hasOperDA: cachedDef ? hasOperInDef(cachedDef) : null, // null = not yet known
+        operPending: isDO && !cachedDef,
+      });
+      setContextMenu({ visible: true, x: clientX, y: clientY });
+
+      // If unknown, resolve in the background — no setTreeData, no expand side-effect.
+      if (isDO && !cachedDef) {
+        fetchDoDefinition(nodeInfo.ref).then((def) => {
+          setContextMenuTarget((prev) =>
+            prev && prev.ref === nodeInfo.ref
+              ? { ...prev, hasOperDA: hasOperInDef(def), operPending: false }
+              : prev // menu target changed/closed since — ignore stale result
+          );
+        });
+      }
+    },
+    [fetchDoDefinition]
+  );
 
   // Close context menu
   const closeContextMenu = useCallback(() => {
     setContextMenu({ visible: false, x: 0, y: 0 });
     setContextMenuTarget(null);
   }, []);
-
-
 
   // Handle node click (for expanding DOs/SDOs)
   // Handle node click (for expanding DOs/SDOs)
@@ -520,31 +579,13 @@ const handleNodeClick = useCallback(
     }));
 
     if (nodeInfo.nodeType === 'DO' || nodeInfo.nodeType === 'SDO') {
-      // Skip fetching if children already loaded
       const nodeInTree = findNodeInTree(treeData, nodeInfo.ref);
-      if (nodeInTree?.children?.length > 0) {
-        return;
-      }
+      if (nodeInTree?.children?.length > 0) return; // already expanded once
 
-      // Fetch DO definition and update tree
-      try {
-        const ldName = nodeInfo.ref.split('/')[0];
-        const lnName = nodeInfo.ref.split('/')[1].split('.')[0];
-        const doPath = nodeInfo.ref.split('/')[1].split('.').slice(1).join('.');
-        const result = await executeApiCall('data-definition', apiTarget, {
-          ld_inst: ldName,
-          ln_inst: lnName,
-          do_path: doPath,
-          cp: wsCp,
-        });
-        if (result?.ok) {
-          const dataAttributes = result.payload.result.value?.dataAttributeDefinition || [];
-          const subDataObjects = result.payload.result.value?.subDataDefinition || [];
-          const updatedTree = updateTreeWithChildren(nodeInfo.ref, dataAttributes, subDataObjects);
-          setTreeData(updatedTree);
-        }
-      } catch (error) {
-        console.error('Failed to fetch DO definition:', error);
+      const def = await fetchDoDefinition(nodeInfo.ref);
+      if (def) {
+        const updatedTree = updateTreeWithChildren(nodeInfo.ref, def.dataAttributes, def.subDataObjects);
+        setTreeData(updatedTree);
       }
     } else if (nodeInfo.nodeType === 'DataSet') {
       // Fetch DataSet directory
@@ -703,17 +744,21 @@ const getContextMenuItems = () => {
 
   if (nodeType === 'DO') {
     if (cdc && CONTROLLABLE_CDCS.includes(cdc.toUpperCase())) {
-      items.push({
-        label: 'Operate',
-        icon: 'fa-play',
-        action: () => {
-          // Capture the target info before closing the context menu
-          const { ref, name, cdc, endpoint: nodeEndpoint, cp: nodeCp } = contextMenuTarget;
-          setControlModalTarget({ ref, name, cdc, endpoint: nodeEndpoint, cp: nodeCp });
-          setShowControlModal(true);
-          closeContextMenu();
-        },
-      });
+      if (contextMenuTarget.operPending) {
+        items.push({ label: 'Checking availability...', icon: 'fa-spinner', disabled: true, action: () => {} });
+      } else if (contextMenuTarget.hasOperDA) {
+          items.push({
+            label: 'Operate',
+            icon: 'fa-play',
+            action: () => {
+              // Capture the target info before closing the context menu
+              const {ref, name, cdc, endpoint: nodeEndpoint, cp: nodeCp} = contextMenuTarget;
+              setControlModalTarget({ref, name, cdc, endpoint: nodeEndpoint, cp: nodeCp});
+              setShowControlModal(true);
+              closeContextMenu();
+            },
+          });
+        }
     }
   }
   else if (nodeType === 'DA' || nodeType === 'SDA' || nodeType === 'FCDA') {
