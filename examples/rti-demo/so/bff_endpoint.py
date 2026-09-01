@@ -834,8 +834,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             # Step 2: Fetch all LD directories in PARALLEL
             async def fetch_ld_directory(ld):
                 try:
+                    ln_list = None
                     _set_current_ld(ld)
-                    ln_list = await acsi_client.get_logical_device_directory(ld, ws_info, None, None)
+                    lock = rti_so.runtime.invoke_lock
+                    if lock is None:
+                        ln_list = await acsi_client.get_logical_device_directory(ld, ws_info, None, None)
+                    else:
+                        async with lock:
+                            ln_list = await acsi_client.get_logical_device_directory(ld, ws_info, None, None)
                     if not isinstance(ln_list, list):
                         raise RuntimeError('unexpected-ln-list')
                     return {'ld': ld, 'ln_list': ln_list, 'status': 'ok'}

@@ -91,7 +91,7 @@
   {
     "id": 4,
     "name": "rti-fsp-2",
-    "host": "192.168.100.41",
+    "host": "192.168.100.14",
     "port": 5005,
     "type": "RTI-FSP",
     "acsi": "server",
@@ -106,9 +106,11 @@
       "client_id": "",
       "client_secret": "",
       "enable_token_refresh": false,
-      "idp_server": ""
+      "idp_server": "",
+      "token_issuer": ""
     },
-    "status": "disconnected"
+    "status": "disconnected",
+    "endpoint": ""
   },
   {
     "id": 5,

@@ -652,7 +652,10 @@ class ACSIServer:
             self._log_action("Server listening", detail={"host": host, "port": port, "cps": [cp]})
 
         try:
-            await asyncio.gather(*tasks.values())
+            results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+            for (name, task), result in zip(tasks.items(), results):
+                if isinstance(result, Exception) and not isinstance(result, asyncio.CancelledError):
+                    self._log_action(f"Task '{name}' failed: {result}", "error")
         except asyncio.CancelledError:
             pass
         except Exception as exc:
