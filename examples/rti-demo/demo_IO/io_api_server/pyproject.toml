@@ -10,6 +10,7 @@ dependencies = [
     "uvicorn[standard]>=0.21.0",
     "pydantic>=1.10.0",
     "gpiod>=2.0.0",
+    "spidev>=0.2.0",  # MCP3008 SPI ADC
     # Optional ADC dependencies (for potentiometer support)
     # Install with: pip install demo_io[adc]
     # spidev>=0.2.0,  # For MCP3008 SPI ADC

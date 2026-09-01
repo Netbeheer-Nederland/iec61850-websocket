@@ -1948,6 +1948,41 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     rti_so.read_value(obj_ref, fc, cp), timeout=10
                 )
 
+                if _use_io_client:
+                    try:
+                        # Get the existing IO router's client and mapping manager
+                        from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                        from demo_IO.io_client.io_utils import sync_to_io_device,write_to_lcd, blink_led_task
+
+                        io_client = get_io_client()
+                        mapping_manager = get_mapping_manager()
+                        logger.info(f"[SO] IO client for sync: {io_client}")
+                        if io_client:
+                            # Fire-and-forget: don't wait for IO sync to complete
+                            # Check health and sync in background
+                            lcdValue = f"Read - {obj_ref}"
+
+                            if result is None:
+                                    lcdValue = f"Readvalue failed - {obj_ref} fail"
+                            else:
+                                lcdValue = f"{obj_ref} : {result.get("value")}"
+
+                            asyncio.create_task(
+                                blink_led_task(io_client, "read", interval=0.2, count=1, mapping_manager=mapping_manager)
+                            )
+                            
+                            asyncio.create_task(
+                                write_to_lcd(io_client, "read", lcdValue, mapping_manager=mapping_manager)
+                            )
+
+                        else:
+                            logger.warning("[SO] IO client is None - cannot sync to device. Call /api/io/connect first.")
+                    except ImportError as e:
+                        logger.error(f"[SO] ImportError - Cannot import IO client: {e}")
+                    except Exception as e:
+                        logger.error(f"[SO] Exception in IO sync setup: {e}")
+
+
                 if result is None:
                     rti_so._log_action(
                         "Client readvalue failed: instanceNotAvailable",
@@ -2621,17 +2656,35 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 if _use_io_client:
                     try:
                         # Get the existing IO router's client and mapping manager
-                        from demo_IO.io_client.io_router import get_io_client
-                        from demo_IO.io_client.io_utils import sync_to_io_device
+                        from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                        from demo_IO.io_client.io_utils import sync_to_io_device,write_to_lcd, blink_led_task
 
                         io_client = get_io_client()
+                        mapping_manager = get_mapping_manager()
                         logger.info(f"[SO] IO client for sync: {io_client}")
                         if io_client:
                             # Fire-and-forget: don't wait for IO sync to complete
                             # Check health and sync in background
+                            ledValue = True
+                            lcdValue = f"Write - {obj_ref} Value: {value}"
+
+                            if result is None:
+                                    ledValue = False
+                                    lcdValue = f"Write - {obj_ref} fail"
+                            else:
+                                if result.get("error") is not None:
+                                    ledValue = False
+                                    lcdValue = f"Write - {obj_ref} fail"
+
+
                             asyncio.create_task(
-                                sync_to_io_device(io_client, obj_ref, value)
+                                blink_led_task(io_client, "setpoint", interval=0.2, count=1, mapping_manager=mapping_manager)
                             )
+                            
+                            asyncio.create_task(
+                                write_to_lcd(io_client, "setpoint", lcdValue, mapping_manager=mapping_manager)
+                            )
+
                         else:
                             logger.warning("[SO] IO client is None - cannot sync to device. Call /api/io/connect first.")
                     except ImportError as e:
@@ -2660,6 +2713,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                             content={"ok": False, "error": result.get("error")},
                             status_code=500
                         )
+
             except FuturesTimeoutError:
                 return JSONResponse(
                     content={"ok": False, "error": "write timeout"},
@@ -2756,12 +2810,43 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 result = rti_so.invoke_on_runtime_loop(
                     rti_so.operate(obj_ref, value, value_type, cp), timeout=10
                 )
+
                 if result is None:
                     return JSONResponse(
                         content={"ok": False, "error": "instanceNotAvailable"},
                         status_code=404
                     )
                 else:
+
+                    if _use_io_client:
+                        try:
+                            # Get the existing IO router's client and mapping manager
+                            from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
+                            from demo_IO.io_client.io_utils import blink_led_task, write_to_lcd
+                            
+                            io_client = get_io_client()
+                            mapping_manager = get_mapping_manager()
+                            logger.info(f"IO client for sync: {io_client}")
+                            if io_client:
+                                # Fire-and-forget: don't wait for LED blink to complete
+                                # Check health and blink LED in background
+                                asyncio.create_task(
+                                    blink_led_task(io_client, "operate", interval=0.2, count=1, mapping_manager=mapping_manager)
+                                )
+            
+                                lcd_value = f"Oper {obj_ref}={value}"
+            
+                                asyncio.create_task(
+                                    write_to_lcd(io_client, "operate", lcd_value, mapping_manager=mapping_manager)
+                                )
+            
+                            else:
+                                logger.warning("IO client is None - cannot sync to device. Call /api/io/connect first.")
+                        except ImportError as e:
+                            logger.error(f"ImportError - Cannot import IO client: {e}")
+                        except Exception as e:
+                            logger.error(f"Exception in IO sync setup: {e}")
+
                     print("operate result in so: ", result)
                     #operate_result = result.get('result', {})
                     success = result.get('result', False)

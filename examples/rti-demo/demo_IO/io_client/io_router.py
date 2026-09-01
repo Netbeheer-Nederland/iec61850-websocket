@@ -121,6 +121,16 @@ class IOMappingRequest(BaseModel):
         description="Initial state (optional)",
         json_schema_extra={"example": False}
     )
+    service: Optional[str] = Field(
+        default=None,
+        description="ACSI service type: writeValue or operate (default: writeValue)",
+        json_schema_extra={"example": "writeValue"}
+    )
+    dataType: Optional[str] = Field(
+        default=None,
+        description="Data type for ACSI values: BOOLEAN, INT8, INT16, INT32, FLOAT32, etc.",
+        json_schema_extra={"example": "FLOAT32"}
+    )
 
 
 class IOMappingResponse(BaseModel):
@@ -134,6 +144,8 @@ class IOMappingResponse(BaseModel):
     direction: str = "output"
     device_type: Optional[str] = None
     initial_state: bool = False
+    service: Optional[str] = None
+    dataType: Optional[str] = None
 
 
 class MappingListResponse(BaseModel):
@@ -246,7 +258,47 @@ def create_io_router() -> APIRouter:
     
     # ==================== Input Device Callback Registration ====================
     
-    def _register_input_callback(device_name: str, obj_ref: str, fc: str = "ST") -> bool:
+    def _create_io_to_iec_callback(device_name: str, obj_ref: str, fc: str, io_client: AsyncDemoIOClient, service: str = "writeValue", data_type: str = ""):
+        """Create a callback function that writes IO device changes to IEC61850.
+        
+        This wrapper binds device-specific context to the callback handler.
+        
+        Args:
+            device_name: Name of the input device
+            obj_ref: IEC61850 object reference to write to
+            fc: Functional constraint
+            io_client: The async IO client instance
+            service: ACSI service type - "writeValue" or "operate" (default: "writeValue")
+            data_type: Data type for ACSI values (e.g., "BOOLEAN", "INT32", "FLOAT32")
+            
+        Returns:
+            A callback function that accepts (old_value, new_value) parameters from device
+        """
+        async def callback(old_value: Any, new_value: Any):
+            logger.info(f"Device {device_name}: {old_value} -> {new_value}, writing to {obj_ref}")
+            try:
+                if service == "writeValue":
+                    success = await io_client.write_to_iec61850(obj_ref, new_value, fc, data_type)
+                    if success:
+                        logger.info(f"Successfully wrote {device_name}={new_value} to {obj_ref}")
+                    else:
+                        logger.warning(f"Failed to write {device_name}={new_value} to {obj_ref}")
+                else:  # operate
+                    # For operate, use value_type parameter. If data_type is empty, use default "BOOLEAN"
+                    if data_type:
+                        success = await io_client.operate_to_iec61850(obj_ref, new_value, value_type=data_type)
+                    else:
+                        success = await io_client.operate_to_iec61850(obj_ref, new_value)
+                    if success:
+                        logger.info(f"Successfully operated {device_name}={new_value} to {obj_ref}")
+                    else:
+                        logger.warning(f"Failed to operate {device_name}={new_value} to {obj_ref}")
+            except Exception as e:
+                logger.error(f"Error writing {device_name} to {obj_ref}: {e}")
+        
+        return callback
+    
+    def _register_input_callback(device_name: str, obj_ref: str, fc: str = "ST", service: str = "writeValue", data_type: str = "") -> bool:
         """Register callback for a specific input device to write to IEC61850.
         
         When the input device value changes, it will write to the ACSI server's
@@ -259,6 +311,8 @@ def create_io_router() -> APIRouter:
             device_name: Name of the input device
             obj_ref: IEC61850 object reference to write to
             fc: Functional constraint (default: "ST")
+            service: ACSI service type - "writeValue" or "operate" (default: "writeValue")
+            data_type: Data type for ACSI values (e.g., "BOOLEAN", "INT32", "FLOAT32")
             
         Returns:
             bool: True if callback was registered successfully
@@ -287,20 +341,10 @@ def create_io_router() -> APIRouter:
         if hasattr(device, 'clear_change_callbacks'):
             device.clear_change_callbacks()
         
-        # Create callback that writes to IEC61850 via ACSI endpoint
-        async def io_to_iec_callback(old_value, new_value):
-            logger.info(f"Device {device_name}: {old_value} -> {new_value}, writing to {obj_ref}")
-            try:
-                success = await io_client.write_to_iec61850(obj_ref, new_value, fc)
-                if success:
-                    logger.info(f"Successfully wrote {device_name}={new_value} to {obj_ref}")
-                else:
-                    logger.warning(f"Failed to write {device_name}={new_value} to {obj_ref}")
-            except Exception as e:
-                logger.error(f"Error writing {device_name} to {obj_ref}: {e}")
-        
+        # Create callback using the wrapper approach
+        io_to_iec_callback = _create_io_to_iec_callback(device_name, obj_ref, fc, io_client, service, data_type)
         device.register_change_callback(io_to_iec_callback)
-        logger.info(f"Registered IEC61850 callback: {device_name} -> {obj_ref}")
+        logger.info(f"Registered IEC61850 callback: {device_name} -> {obj_ref} (service={service}, dataType={data_type})")
         return True
     
     def _register_all_input_callbacks():
@@ -326,7 +370,9 @@ def create_io_router() -> APIRouter:
                 success = _register_input_callback(
                     device_name,
                     mapping["objRef"],
-                    mapping.get("fc", "ST")
+                    mapping.get("fc", "ST"),
+                    mapping.get("service", "writeValue"),
+                    mapping.get("dataType", "")
                 )
                 if success:
                     registered_count += 1
@@ -979,7 +1025,9 @@ def create_io_router() -> APIRouter:
                 description=request.description,
                 initial_state=request.initial_state,
                 direction=request.direction,
-                device_type=request.device_type
+                device_type=request.device_type,
+                service=request.service,
+                dataType=request.dataType
             )
             manager.save()
             
@@ -1022,7 +1070,9 @@ def create_io_router() -> APIRouter:
                     description=config.get("description", ""),
                     direction=config.get("direction", "output"),
                     device_type=config.get("device_type"),
-                    initial_state=config.get("initial_state", False)
+                    initial_state=config.get("initial_state", False),
+                    service=config.get("service"),
+                    dataType=config.get("dataType")
                 )
             
             return MappingListResponse(
@@ -1067,7 +1117,9 @@ def create_io_router() -> APIRouter:
                 device_name=device_name,
                 objRef=mapping.get("objRef"),
                 description=mapping.get("description", ""),
-                initial_state=mapping.get("initial_state", False)
+                initial_state=mapping.get("initial_state", False),
+                service=mapping.get("service"),
+                dataType=mapping.get("dataType")
             )
         except HTTPException:
             raise
@@ -1112,7 +1164,9 @@ def create_io_router() -> APIRouter:
                     device_name=mapping["device_name"],
                     objRef=mapping.get("objRef"),
                     description=mapping.get("description", ""),
-                    initial_state=mapping.get("initial_state", False)
+                    initial_state=mapping.get("initial_state", False),
+                    service=mapping.get("service"),
+                    dataType=mapping.get("dataType")
                 )
             }
         except HTTPException:
@@ -1318,14 +1372,16 @@ def create_io_router() -> APIRouter:
             all_mappings = manager.get_all_mappings()
             
             # Build the mappings dict for the IO server
-            # IO server expects: {"mappings": {"device_name": {"objRef": "...", "fc": "..."}, ...}}
+            # IO server expects: {"mappings": {"device_name": {"objRef": "...", "fc": "...", "service": "...", "dataType": "..."}, ...}}
             server_mappings = {}
             for device_name, mapping in all_mappings.items():
                 # Only include mappings that have an objRef
                 if mapping.get("objRef"):
                     server_mappings[device_name] = {
                         "objRef": mapping["objRef"],
-                        "fc": mapping.get("fc", "ST")
+                        "fc": mapping.get("fc", "ST"),
+                        "service": mapping.get("service", "writeValue"),
+                        "dataType": mapping.get("dataType", "")
                     }
             
             if not server_mappings:
@@ -1419,7 +1475,9 @@ def create_io_router() -> APIRouter:
                         if mapping.get("objRef"):
                             server_mappings[device_name] = {
                                 "objRef": mapping["objRef"],
-                                "fc": mapping.get("fc", "ST")
+                                "fc": mapping.get("fc", "ST"),
+                                "service": mapping.get("service", "writeValue"),
+                                "dataType": mapping.get("dataType", "")
                             }
                     
                     if server_mappings:

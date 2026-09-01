@@ -257,16 +257,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.IO
+      args:
+        PI_USER: ${PI_USER:-pi}
+        PI_UID: ${PI_UID:-1000}
+        PI_GID: ${PI_GID:-1000}
+        GPIO_GID: ${GPIO_GID:-986}
+        I2C_GID: ${I2C_GID:-988}
+        SPI_GID: ${SPI_GID:-989}
     container_name: demo_io
     ports:
       - "8000:8000"
     environment:
       - PORT=8000
       - PYTHONUNBUFFERED=1
-    user: "pi"  # pi user with gpio group
+    user: ${PI_USER:-pi}  # User with gpio group access
     group_add:
-      - "gpio"    # <-- Change from 988
-      - "i2c"     # <-- Add this
+      - "gpio"
+      - "i2c"
+      - "spi"
  
     devices:
       - "/dev/gpiochip0:/dev/gpiochip0"
@@ -278,6 +286,8 @@ services:
       - "/dev/i2c-1:/dev/i2c-1"
       - "/dev/i2c-13:/dev/i2c-13"
       - "/dev/i2c-14:/dev/i2c-14"
+      - "/dev/spidev0.0:/dev/spidev0.0"
+      - "/dev/spidev0.1:/dev/spidev0.1"
 
     ipc: host
     security_opt:

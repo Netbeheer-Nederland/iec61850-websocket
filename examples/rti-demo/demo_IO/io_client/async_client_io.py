@@ -672,7 +672,8 @@ class AsyncDemoIOClient:
         self,
         obj_ref: str,
         value: Any,
-        fc: str = "ST"
+        fc: str = "ST",
+        data_type: str = ""
     ) -> bool:
         """Write to IEC61850 server via standard /writevalue endpoint.
         
@@ -683,6 +684,7 @@ class AsyncDemoIOClient:
             obj_ref: IEC61850 object reference to write to
             value: Value to write (will be converted to string)
             fc: Functional constraint (default: "ST")
+            data_type: Data type for the value (e.g., "BOOLEAN", "INT32", "FLOAT32")
             
         Returns:
             bool: True if write succeeded, False otherwise
@@ -696,7 +698,7 @@ class AsyncDemoIOClient:
                         "objRef": obj_ref,
                         "fc": fc,
                         "value": str(value),
-                        "dataType": ""
+                        "dataType": data_type
                     }
                 )
                 if response.status_code == 200:
@@ -706,6 +708,51 @@ class AsyncDemoIOClient:
                 return False
         except Exception as e:
             logger.error(f"IEC61850 write error: {e}")
+            return False
+    
+    async def operate_to_iec61850(
+        self,
+        obj_ref: str,
+        value: Any,
+        value_type: str = "BOOLEAN",
+        cp: str = "cp1"
+    ) -> bool:
+        """Send an Operate command to IEC61850 server via /api/operate endpoint.
+        
+        This method allows IO input devices to send IEC61850 Operate commands to the ACSI server.
+        It makes an HTTP POST to the ACSI's /api/operate endpoint.
+        
+        Use this for controllable data objects that require IEC61850 Operate service
+        (e.g., control objects like CSWI, XCBR).
+        
+        Args:
+            obj_ref: IEC61850 controllable DO object reference (e.g., "LD0/MMXU.WMaxSpt")
+            value: Value to set via operate (will be converted to string)
+            value_type: Value type hint for coercion (BOOLEAN, INT32, FLOAT32, etc.)
+            cp: Communication point identifier (default: "cp1")
+            
+        Returns:
+            bool: True if operate succeeded, False otherwise
+        """
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as http_client:
+                response = await http_client.post(
+                    f"{self._acsi_base_url}/api/operate",
+                    json={
+                        "objRef": obj_ref,
+                        "value": value,
+                        "value_type": value_type,
+                        "cp": cp
+                    }
+                )
+                if response.status_code == 200:
+                    logger.info(f"IEC61850 operate successful: {obj_ref}={value}")
+                    return True
+                logger.error(f"IEC61850 operate failed: {response.status_code} - {response.text}")
+                return False
+        except Exception as e:
+            logger.error(f"IEC61850 operate error: {e}")
             return False
     
     def set_acsi_base_url(self, url: str) -> None:
@@ -1004,6 +1051,10 @@ class DemoIOClient:
     # IEC61850 write method
     def write_iec61850(self, obj_ref: str, value: Any, fc: str = "ST") -> bool:
         return self._sync(self._async_client.write_iec61850(obj_ref, value, fc))
+    
+    # IEC61850 operate method
+    def operate_to_iec61850(self, obj_ref: str, value: Any, value_type: str = "BOOLEAN", cp: str = "cp1") -> bool:
+        return self._sync(self._async_client.operate_to_iec61850(obj_ref, value, value_type, cp))
     
     # Session management
     def close(self):

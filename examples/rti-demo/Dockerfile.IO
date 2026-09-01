@@ -4,6 +4,7 @@
 # ============================================================
 # Stage 1: Builder
 # ============================================================
+
 FROM python:3.13-slim AS builder
 
 WORKDIR /app
@@ -61,16 +62,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create pi user with gpio group access (matching host user)
-# UID 1000 = pi, GID 1000 = pi's primary group, GID 986 = gpio on Raspberry Pi
-RUN groupadd -g 1000 pi && \
-    groupadd -g 986 gpio && \
-    groupadd -g 988 i2c && \
-    useradd -m -u 1000 -g 1000 -G gpio,i2c  pi && \
-    echo 'pi ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers.d/pi
+# Use build arguments for username and user/group IDs (default to Raspberry Pi values)
+ARG PI_USER=pi
+ARG PI_UID=1000
+ARG PI_GID=1000
+ARG GPIO_GID=986
+ARG I2C_GID=988
+ARG SPI_GID=989
+
+# Create user with gpio group access (matching host user)
+# Default values: PI_USER=pi, UID 1000, GID 1000
+# GPIO_GID 986, I2C_GID 988, SPI_GID 989 = Raspberry Pi default group IDs
+RUN groupadd -g ${PI_GID} ${PI_USER} && \
+    groupadd -g ${GPIO_GID} gpio && \
+    groupadd -g ${I2C_GID} i2c && \
+    groupadd -g ${SPI_GID} spi && \
+    useradd -m -u ${PI_UID} -g ${PI_GID} -G gpio,i2c,spi ${PI_USER} && \
+    echo '${PI_USER} ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers.d/${PI_USER}
 
 # Copy application and virtual environment
-COPY --from=builder --chown=pi:gpio /app /app
+COPY --from=builder --chown=${PI_USER}:gpio /app /app
 
 # Fix permissions so pi user (1000:986) can access everything
 RUN chmod -R g+rwX /app
