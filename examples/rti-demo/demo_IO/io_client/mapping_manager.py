@@ -94,7 +94,7 @@ class IOMappingManager:
                 self._mappings = {}
                 
                 # Process each device type section
-                for device_type_section in ["leds", "buttons", "potentiometers", "sensors"]:
+                for device_type_section in ["leds", "buttons", "potentiometers", "sensors", "lcds"]:
                     if device_type_section in data:
                         for key, config in data[device_type_section].items():
                             device_name = key

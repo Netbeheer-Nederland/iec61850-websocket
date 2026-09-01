@@ -1757,7 +1757,7 @@ def create_bff_router(
                     try:
                         # Get the existing IO router's client and mapping manager
                         from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
-                        from demo_IO.io_client.io_utils import sync_to_io_device
+                        from demo_IO.io_client.io_utils import sync_to_io_device, write_to_lcd
                         
                         io_client = get_io_client()
                         logger.info(f"IO client for sync: {io_client}")
@@ -1766,6 +1766,12 @@ def create_bff_router(
                             # Check health and sync in background
                             asyncio.create_task(
                                 sync_to_io_device(io_client, obj_ref, value)
+                            )
+
+                            value_write = f"{obj_ref} : {value}"
+
+                            asyncio.create_task(
+                                write_to_lcd(io_client, "writeValue", value_write, mapping_manager=mapping_manager)
                             )
                         else:
                             logger.warning("IO client is None - cannot sync to device. Call /api/io/connect first.")

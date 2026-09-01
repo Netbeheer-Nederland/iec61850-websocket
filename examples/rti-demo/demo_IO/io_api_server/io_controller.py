@@ -645,13 +645,14 @@ def get_device_mapping(device_name: str) -> Optional[Dict[str, Any]]:
     return _device_mappings.get(device_name)
 
 
-async def write_to_acsi_async(obj_ref: str, value: Any, fc: str = "ST") -> bool:
+async def write_to_acsi_async(obj_ref: str, value: Any, fc: str = "ST", data_type: str = "") -> bool:
     """Write a value to the ACSI server via HTTP POST (async version).
     
     Args:
         obj_ref: IEC61850 object reference
         value: Value to write
         fc: Functional constraint
+        data_type: Data type for the value (e.g., "BOOLEAN", "INT32", "FLOAT32")
         
     Returns:
         True if write succeeded, False otherwise
@@ -669,7 +670,7 @@ async def write_to_acsi_async(obj_ref: str, value: Any, fc: str = "ST") -> bool:
                     "objRef": obj_ref,
                     "fc": fc,
                     "value": str(value),
-                    "dataType": ""
+                    "dataType": data_type
                 }
             )
             if response.status_code == 200:
@@ -682,13 +683,53 @@ async def write_to_acsi_async(obj_ref: str, value: Any, fc: str = "ST") -> bool:
         return False
 
 
-def write_to_acsi(obj_ref: str, value: Any, fc: str = "ST") -> bool:
+async def operate_to_acsi_async(obj_ref: str, value: Any, data_type: str = "") -> bool:
+    """Send an Operate command to the ACSI server via HTTP POST (async version).
+    
+    Args:
+        obj_ref: IEC61850 object reference
+        value: Value to operate with
+        data_type: Data type for the value (e.g., "BOOLEAN", "INT32", "FLOAT32")
+        
+    Returns:
+        True if operate succeeded, False otherwise
+    """
+    if not _acsi_config or not _acsi_config.enabled:
+        logger.debug("ACSI server not configured or disabled, skipping operate")
+        return False
+    
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5.0) as http_client:
+            # Note: /api/operate expects value_type (not dataType), and it's required
+            # If data_type is empty, use "BOOLEAN" as default
+            value_type = data_type if data_type else "BOOLEAN"
+            response = await http_client.post(
+                f"{_acsi_config.url}/api/operate",
+                json={
+                    "objRef": obj_ref,
+                    "value": str(value),
+                    "value_type": value_type
+                }
+            )
+            if response.status_code == 200:
+                logger.info(f"ACSI operate successful: {obj_ref}={value}")
+                return True
+            logger.error(f"ACSI operate failed: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        logger.error(f"ACSI operate error: {e}")
+        return False
+
+
+def write_to_acsi(obj_ref: str, value: Any, fc: str = "ST", data_type: str = "") -> bool:
     """Write a value to the ACSI server via HTTP POST (synchronous version).
     
     Args:
         obj_ref: IEC61850 object reference
         value: Value to write
         fc: Functional constraint
+        data_type: Data type for the value (e.g., "BOOLEAN", "INT32", "FLOAT32")
         
     Returns:
         True if write succeeded, False otherwise
@@ -706,7 +747,7 @@ def write_to_acsi(obj_ref: str, value: Any, fc: str = "ST") -> bool:
                     "objRef": obj_ref,
                     "fc": fc,
                     "value": str(value),
-                    "dataType": ""
+                    "dataType": data_type
                 }
             )
             if response.status_code == 200:
@@ -716,6 +757,45 @@ def write_to_acsi(obj_ref: str, value: Any, fc: str = "ST") -> bool:
             return False
     except Exception as e:
         logger.error(f"ACSI write error: {e}")
+        return False
+
+
+def operate_to_acsi(obj_ref: str, value: Any, data_type: str = "") -> bool:
+    """Send an Operate command to the ACSI server via HTTP POST (synchronous version).
+    
+    Args:
+        obj_ref: IEC61850 object reference
+        value: Value to operate with
+        data_type: Data type for the value (e.g., "BOOLEAN", "INT32", "FLOAT32")
+        
+    Returns:
+        True if operate succeeded, False otherwise
+    """
+    if not _acsi_config or not _acsi_config.enabled:
+        logger.debug("ACSI server not configured or disabled, skipping operate")
+        return False
+    
+    try:
+        import httpx
+        with httpx.Client(timeout=5.0) as http_client:
+            # Note: /api/operate expects value_type (not dataType), and it's required
+            # If data_type is empty, use "BOOLEAN" as default
+            value_type = data_type if data_type else "BOOLEAN"
+            response = http_client.post(
+                f"{_acsi_config.url}/api/operate",
+                json={
+                    "objRef": obj_ref,
+                    "value": str(value),
+                    "value_type": value_type
+                }
+            )
+            if response.status_code == 200:
+                logger.info(f"ACSI operate successful: {obj_ref}={value}")
+                return True
+            logger.error(f"ACSI operate failed: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        logger.error(f"ACSI operate error: {e}")
         return False
 
 
@@ -735,11 +815,23 @@ def sync_device_to_acsi(device_name: str, value: Any) -> bool:
     
     obj_ref = mapping.get("objRef")
     fc = mapping.get("fc", "ST")
+    service = mapping.get("service", "writeValue")
+    data_type = mapping.get("dataType", "")
     
     if not obj_ref:
         return False
     
-    return write_to_acsi(obj_ref, value, fc)
+    # Handle both single string and array of strings for objRef
+    obj_refs = [obj_ref] if isinstance(obj_ref, str) else obj_ref
+    success = True
+    for ref in obj_refs:
+        if service == "operate":
+            if not operate_to_acsi(ref, value, data_type):
+                success = False
+        else:
+            if not write_to_acsi(ref, value, fc, data_type):
+                success = False
+    return success
 
 
 async def sync_device_to_acsi_async(device_name: str, value: Any) -> bool:
@@ -758,11 +850,23 @@ async def sync_device_to_acsi_async(device_name: str, value: Any) -> bool:
     
     obj_ref = mapping.get("objRef")
     fc = mapping.get("fc", "ST")
+    service = mapping.get("service", "writeValue")
+    data_type = mapping.get("dataType", "")
     
     if not obj_ref:
         return False
     
-    return await write_to_acsi_async(obj_ref, value, fc)
+    # Handle both single string and array of strings for objRef
+    obj_refs = [obj_ref] if isinstance(obj_ref, str) else obj_ref
+    success = True
+    for ref in obj_refs:
+        if service == "operate":
+            if not await operate_to_acsi_async(ref, value, data_type):
+                success = False
+        else:
+            if not await write_to_acsi_async(ref, value, fc, data_type):
+                success = False
+    return success
 
 
 # Global IOController instance

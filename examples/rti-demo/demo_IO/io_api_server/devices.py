@@ -147,6 +147,7 @@ class PotentiometerConfig(DeviceConfig):
     i2c_address: int = 0x48
     i2c_bus: int = 1
     adc_type: str = "ads1115"
+    change_threshold: float = 0.01  # Fraction of range to trigger change detection (default 1%)
     
     def __post_init__(self):
         if self.identifier == 0 and self.adc_channel != 0:
@@ -164,6 +165,7 @@ class PotentiometerConfig(DeviceConfig):
             "i2c_address": self.i2c_address,
             "i2c_bus": self.i2c_bus,
             "adc_type": self.adc_type,
+            "change_threshold": self.change_threshold,
         })
         return result
 
@@ -618,7 +620,7 @@ class PotentiometerDevice(InputDevice):
         self._spi = None
         self._adc_type = None
         self._channel = 0
-        self._value_change_threshold = 0.01  # 1% change to trigger callback (as a fraction of the range)
+        self._value_change_threshold = config.change_threshold  # Use config's threshold (as a fraction of the range)
         self._mock_value = 0.5  # Default midpoint value for mock mode (normalized 0-1)
         self._init_hardware()
         if not self._hardware_available:
@@ -626,7 +628,7 @@ class PotentiometerDevice(InputDevice):
             self._hardware_available = True  # Allow operation in mock mode
         # Start polling-based change detection for analog inputs
         # Uses threshold to avoid noise-triggered false changes
-        # Calculate threshold in scaled units: 1% of the value range
+        # Calculate threshold in scaled units: config.change_threshold of the value range
         value_range = config.max_value - config.min_value
         scaled_threshold = self._value_change_threshold * value_range
         self._start_polling_monitor(poll_interval=0.2, threshold=scaled_threshold)
@@ -645,7 +647,6 @@ class PotentiometerDevice(InputDevice):
                 if adc_type_config == 'mcp3008':
                     try:
                         import spidev
-                        import RPi.GPIO as GPIO
                         self._spi = spidev.SpiDev()
                         self._spi.open(0, 0)
                         self._spi.max_speed_hz = 1000000

@@ -1331,7 +1331,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
     async def api_sync_acsi_mappings(request: Request):
         """Replace all ACSI mappings with mappings from the request body.
         
-        Request body should be: {"mappings": {"device_name": {"objRef": "...", "fc": "..."}, ...}}
+        Request body should be: {"mappings": {"device_name": {"objRef": "...", "fc": "...", "service": "writeValue"|"operate", "dataType": "BOOLEAN"|"INT32"|"FLOAT32"}, ...}}
         """
         from io_controller import _device_mappings as global_mappings
         

@@ -305,6 +305,8 @@ The default devices defined in `io_config.json` use the following GPIO configura
 | **ADS1115 not detected** | Check I2C wiring, enable I2C in raspi-config |
 | **LEDs not responding** | Verify wiring (resistor +, GND -), check GPIO numbering |
 | **ACSI connection failed** | Verify DEMO_IO_URL, check demo_IO is running |
+| **Docker: `/dev/spidev0.0` not found** | Enable SPI in raspi-config, or remove SPI devices from docker-compose.yml |
+| **Docker: device passthrough errors** | Verify device files exist on host, check device permissions |
 
 ### Debug Commands
 
@@ -343,6 +345,81 @@ sudo raspi-config
 # Navigate to: Interface Options -> SPI -> Enable
 sudo reboot
 ```
+
+### Configure Docker User for Hardware Access
+
+The `rti-io` (demo_io) container runs as a configurable user with access to GPIO, I2C, and SPI groups. By default, the Dockerfile uses standard Raspberry Pi OS values for the `pi` user:
+
+- `pi` user: UID=1000, GID=1000
+- `gpio` group: GID=986
+- `i2c` group: GID=988
+- `spi` group: GID=989
+
+If your system has different values, you can configure them in three ways:
+
+**Method 1: Auto-detect with username (Recommended)**
+Just pass the username - the script detects all IDs automatically:
+```bash
+./set_docker_user.sh pi && docker-compose up --build
+```
+For a different user:
+```bash
+./set_docker_user.sh myuser && docker-compose up --build
+```
+
+**Method 2: Use .env file**
+Copy `.env` to your working directory and uncomment/modify the values:
+```bash
+# Edit .env with your username and UID/GID values
+PI_USER=pi
+PI_UID=1000
+PI_GID=1000
+GPIO_GID=986
+I2C_GID=988
+SPI_GID=989
+docker-compose up --build
+```
+
+**Method 3: Direct environment variables**
+```bash
+PI_USER=pi PI_UID=$(id -u pi) PI_GID=$(id -g pi) \
+GPIO_GID=$(getent group gpio | cut -d: -f3) \
+I2C_GID=$(getent group i2c | cut -d: -f3) \
+SPI_GID=$(getent group spi | cut -d: -f3) \
+docker-compose up --build
+```
+
+### Docker: Device Passthrough Issues
+
+When running demo_IO in Docker, the `docker-compose.yml` file includes device passthrough for GPIO, I2C, and SPI devices. If you encounter the error:
+
+```
+Error response from daemon: error gathering device information while adding custom device "/dev/spidev0.0": no such file or directory
+```
+
+This means the host system (Raspberry Pi) does not have the required device files. The demo_IO service in docker-compose.yml mounts the following devices by default:
+
+- **GPIO**: `/dev/gpiochip0`, `/dev/gpiochip4`, `/dev/gpiochip10-13`
+- **I2C**: `/dev/i2c-1`, `/dev/i2c-13`, `/dev/i2c-14`
+- **SPI**: `/dev/spidev0.0`, `/dev/spidev0.1`
+
+**Solutions:**
+
+1. **Enable required interfaces** on Raspberry Pi:
+   - For SPI: Enable SPI in `raspi-config` (Interface Options -> SPI -> Enable)
+   - For I2C: Enable I2C in `raspi-config` (Interface Options -> I2C -> Enable)
+   - Reboot after enabling: `sudo reboot`
+
+2. **Remove unused device mappings** from `docker-compose.yml` if you don't need certain device types. Comment out or remove the corresponding lines under the `devices:` section for the `rti-io` service.
+
+3. **Verify device files exist** on the host:
+   ```bash
+   ls /dev/gpio* /dev/i2c* /dev/spidev* 2>/dev/null
+   ```
+
+4. **Check user permissions**: The container runs as user `pi` with group membership in `gpio`, `i2c`, and `spi`. Ensure your host user has access to these device files.
+
+5. **Use mock mode for development**: If running on non-Raspberry Pi systems (Windows, macOS, or Raspberry Pi without hardware), remove all `devices:` entries from docker-compose.yml. The IO server will operate in mock mode.
 
 ---
 
