@@ -1760,6 +1760,7 @@ def create_bff_router(
                         from demo_IO.io_client.io_utils import sync_to_io_device, write_to_lcd
                         
                         io_client = get_io_client()
+                        mapping_manager = get_mapping_manager()
                         logger.info(f"IO client for sync: {io_client}")
                         if io_client:
                             # Fire-and-forget: don't wait for IO sync to complete
