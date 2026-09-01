@@ -52,7 +52,7 @@ const API_DEFINITIONS = [
   
   // Messages operations
   { id: 'messages', label: 'GET /api/messages', method: 'GET', path: '/api/messages' },
-  { id: 'clear-messages', label: 'POST /api/clear_messages', method: 'POST', path: '/api/clear_messages' },
+  { id: 'clear-messages', label: 'POST /api/clear-messages', method: 'POST', path: '/api/clear-messages' },
 ];
 
 /**

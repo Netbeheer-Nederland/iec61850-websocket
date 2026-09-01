@@ -17,6 +17,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [port, setPort] = useState(String(endpoint?.port || 8765));
   const [cp, setCp] = useState(endpoint?.cp || 'cp1');
   const [mode, setMode] = useState(endpoint?.mode || 'server');
+  const hostPortInitializedRef = useRef(false);
   
   // Create instance-specific storage key
   const instanceId = endpoint?.name || `${endpoint?.host || host}:${endpoint?.port || port}`;
@@ -140,14 +141,17 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         // Update form fields with actual server configuration
         const serverConfig = parsedPayload.result?.status;
         if (serverConfig) {
-          if (serverConfig.host) setHost(serverConfig.host);
-          if (serverConfig.port) setPort(String(serverConfig.port));
-          if (Array.isArray(serverConfig.accessPoints) && serverConfig.accessPoints.length > 0) {
-            setCp(serverConfig.accessPoints[0]);
+          if (!hostPortInitializedRef.current) {
+            if (serverConfig.host) setHost(serverConfig.host);
+            if (serverConfig.port) setPort(String(serverConfig.port));
+            if (Array.isArray(serverConfig.accessPoints) && serverConfig.accessPoints.length > 0) {
+              setCp(serverConfig.accessPoints[0]);
+            }
+            if (serverConfig.mode) setMode(serverConfig.mode);
+            hostPortInitializedRef.current = true;
           }
-          if (serverConfig.mode) setMode(serverConfig.mode);
         }
-        
+
         // Sync connected state with actual server status
         const serverStatus = parsedPayload.result?.status?.status;
         if (serverStatus) {

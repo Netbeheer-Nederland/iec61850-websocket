@@ -17,6 +17,8 @@ function Header({ bffStatus }) {
         return 'Connections';
       case '/model':
         return 'IEC 61850 Model Tree';
+      case '/traffic':
+        return 'Traffic';
       case '/data':
         return 'Read / Write Data';
       case '/reports':

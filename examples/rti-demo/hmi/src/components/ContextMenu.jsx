@@ -39,14 +39,14 @@ const ContextMenu = ({ x, y, visible, onClose, items }) => {
       {items.map((item, index) => (
         <div
           key={item.id || index}
-          className={`context-menu-item${item.danger ? ' danger' : ''}`}
+          className={`context-menu-item${item.danger ? ' danger' : ''}${item.disabled ? ' disabled' : ''}`}
           onClick={() => {
             if (item.action) item.action();
             onClose();
           }}
-          style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+          style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: item.disabled ? 0.6 : 1 }}
         >
-          {item.icon && <i className={`fas ${item.icon}`} style={{ marginRight: '8px' }} />}
+          {item.icon && <i className={`fas ${item.icon}${item.icon === 'fa-spinner' ? ' fa-spin' : ''}`} style={{ marginRight: '8px' }} />}
           <span>{item.label}</span>
         </div>
       ))}
