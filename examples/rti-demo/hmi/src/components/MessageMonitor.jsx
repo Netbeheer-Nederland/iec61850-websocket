@@ -29,7 +29,7 @@ function MessageMonitor({
 
   // Fetch messages through BFF execute endpoint
   const getMessagesApi = useCallback((targetValue) => {
-    return executeApiCall('messages', targetValue, null);
+    return executeApiCall('messages', targetValue, {});
   }, []);
 
   const fetchMessages = useCallback(async () => {
@@ -120,7 +120,7 @@ function MessageMonitor({
     
     try {
       const targetValue = buildTargetValue(selectedEndpoint.host, selectedEndpoint.port);
-      const result = await executeApiCall('clear-messages', targetValue, null);
+      const result = await executeApiCall('clear-messages', targetValue, {});
       
       if (result?.ok) {
         setMessages([]);
