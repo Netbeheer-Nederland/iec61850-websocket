@@ -134,6 +134,12 @@ class ModelRequest(BaseModel):
         json_schema_extra={"example": "cp1"}
     )
 
+    refresh: bool = Field(
+        default=False,
+        description="Force a fresh model rebuild instead of returning cached data",
+        json_schema_extra={"example": False}
+    )
+
 class ServerDirectoryRequest(BaseModel):
     """Request body for getting server directory.
 
@@ -767,7 +773,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         if acsi_client is None:
             raise HTTPException(status_code=404, detail=f"Client with cp={cp} not found")
         else:
-            logger.info("client found with cp: ", acsi_client.cp)
+            logger.info("client found with cp: ", cp)
 
         if not rti_so or not endpoint or not loop or not acsi_client.is_connected:
             raise RuntimeError('not-connected')
@@ -1520,11 +1526,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         },
         tags=["Model Access"]
     )
-    async def api_model(request: ModelRequest, refresh: bool = False):
+    async def api_model(request: ModelRequest):
         """Get the IED model tree from the connected server."""
 
         cp = request.cp
         model_info = rti_so.get_model_info(cp)
+        refresh = request.refresh
+
+        print("the refresh value: ", refresh)
 
         if refresh:
                 with rti_so.runtime.lock:
@@ -1536,6 +1545,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         try:
             loop = rti_so.runtime.loop
             if loop is None or not getattr(loop, "is_running", lambda: False)():
+                print("Client not connected, raising HTTPException")
                 raise HTTPException(status_code=503, detail="client-not-connected")
 
             _check_websocket_connection()
@@ -1552,6 +1562,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 start_result = _start_model_build_if_needed(cp)
                 if start_result == 'error':
                     rti_so._log_action('Model build scheduling failed', 'error')
+                    print("the error is: ", rti_so.runtime.model_error)
+
                     raise HTTPException(status_code=503, detail=rti_so.runtime.model_error)
                 else:
                     await model_info.model_ready_event.wait()
@@ -1560,9 +1572,11 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
             return {'status': 'error', 'model': None}
         except HTTPException:
+            print("HTTPException raised in api_model, re-raising")
             raise
         except Exception as exc:
             rti_so._log_action(f"Get model failed (outer): {exc}", "error")
+            print("Unhandled outer exception in api_model:", exc)
             logger.exception("Unhandled outer exception in api_model")
             raise HTTPException(
                 status_code=500,
@@ -2148,17 +2162,26 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             do_path = request.do_path
 
             cp = request.cp
+            print("the cp value in getDataDefinition: ", cp)
+            print("the ld_inst value in getDataDefinition: ", ld_inst)
+            print("the ln_inst value in getDataDefinition: ", ln_inst)
+            print("the do_path value in getDataDefinition: ", do_path)
+
             acsi_client = rti_so.get_iec61850_client(cp)
             if acsi_client is None:
                 return JSONResponse(
                     content={"ok": False, "error": "ACSI client not found!"},
                     status_code=500
                 )
-
+            if acsi_client:
+                print("the acsi_client value in getDataDefinition: ", acsi_client)
+            else:
+                print("the acsi_client is None in getDataDefinition")
             obj_ref = f"{ld_inst}/{ln_inst}.{do_path}" if do_path else f"{ld_inst}/{ln_inst}"
 
             if not obj_ref:
                 #client._log_action("Client readvalue rejected: missing objRef", "warn")
+                print("missing objRef in getDataDefinition")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
@@ -2168,6 +2191,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 result = rti_so.invoke_on_runtime_loop(
                     rti_so.get_data_definition(obj_ref, cp), timeout=10
                 )
+
+                print("result in getDataDefinition: ", result)
 
                 if result is None:
                     return JSONResponse(
@@ -2193,11 +2218,13 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=404
                 )
             except Exception as exc:
+                print("Exception in getDataDefinition: ", exc)
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
         except Exception as exc:
+            print("Unhandled exception in getDataDefinition: ", exc)
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
                 status_code=500

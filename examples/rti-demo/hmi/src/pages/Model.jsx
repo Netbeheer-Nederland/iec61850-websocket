@@ -159,6 +159,28 @@ function Model({ settings, connections = [], loading = false, onReload }) {
 
       if (result?.ok) {
         setUploadStatus(`Model updated successfully for ${conn.name}`);
+        //rebuild models 
+        try {
+          const targetValue = buildTargetValue(conn.host, conn.port);
+          const statusResult = await executeApiCall('model', targetValue, {});
+          const fspCp = statusResult?.payload?.result?.accessPoints?.[0] || 'cp1';
+
+          const connectedSoInstances = connections.filter(
+            c => c.type === 'RTI-SO' && c.status === 'connected'
+          );
+          Promise.allSettled(
+            connectedSoInstances.map(soConn =>
+              executeApiCall('model-tree', buildTargetValue(soConn.host, soConn.port), {
+                cp: fspCp,
+                refresh: true
+              })
+            )
+          );
+        } catch (notifyErr) {
+          console.error('Failed to notify SO instances of model change:', notifyErr);
+        }
+
+
         // Reload connections to get the updated model
         setTimeout(() => {
           onReload?.();
