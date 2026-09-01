@@ -241,7 +241,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     const name = sdo.name || 'SDO';
     const ref = `${parentRef}.${name}`;
     const inlineDas = sdo.dataAttributes || sdo.data_attributes || [];
-    const children = inlineDas.length > 0 ? inlineDas.map(da => buildDaNode(da, ref)) : [];
+    const children = inlineDas.length > 0 ? inlineDas.map(da => buildDaNode(da, ref)) : null;
     return {name, type: 'SDO', ref, cdc: sdo.cdc || '', fc: null, bType: null, children};
   };
 
