@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { executeApiCall, buildTargetValue } from '../services/apiService';
+import ControlModal from './ControlModal';
+
+const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
 /**
  * DataAccessPanel - A reusable component for reading and writing data from ACSI endpoints
@@ -9,6 +12,7 @@ import { executeApiCall, buildTargetValue } from '../services/apiService';
  * - Cascading dropdowns for LD (Logical Devices), LN (Logical Nodes), DO (Data Objects), DA (Data Attributes)
  * - Read button to fetch data value
  * - Write button to write data value
+ * - Operate button to open ControlModal for controllable DO/SDO
  * - Displays results of operations
  * - Manual cp entry box (shown only for WebSocket Passive endpoints), used wherever cp is needed
  * 
@@ -61,6 +65,146 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
   // cp, so this local tracker is what lets us tell "model loaded for cp1" apart
   // from "model loaded for cp2" and re-enable Fetch Model when cp changes.
   const [fetchedCp, setFetchedCp] = useState(null);
+
+  // ControlModal state
+  const [showControlModal, setShowControlModal] = useState(false);
+  const [controlModalTarget, setControlModalTarget] = useState({ ref: '', name: '', cdc: '', endpoint: null, cp: null });
+  const [operateResult, setOperateResult] = useState(null); // { success: boolean, message: string } | null
+
+  // Get connected endpoints (excluding IDP-Server type)
+  const connectedEndpoints = useMemo(() => {
+    return connections.filter(conn => conn.status === 'connected' && conn.type !== 'IDP-Server');
+  }, [connections]);
+
+  // Currently selected connection object
+  const selectedConnection = useMemo (() => {
+    return connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
+  }, [connectedEndpoints, selectedTarget]);
+
+  // Derive ACSI role from the connection type
+  const getAcsiRole = (conn) => {
+    if (!conn) return null;
+    if (conn.acsi === 'client' || conn.acsi === 'server') return conn.acsi;
+    const t = (conn.type || '').toUpperCase();
+    if (t.includes('SO')) return 'client';
+    if (t.includes('FSP')) return 'server';
+    return null;
+  };
+
+  // FSP endpoints have no write restriction; SO endpoints only allows CF/SP
+  const isServerEndpoint = useMemo(() => {
+    return getAcsiRole(selectedConnection) === 'server';
+  }, [selectedConnection]);
+
+  // Check if this is a TRUE ACSI Server (has acsi='server'), not just FSP
+  const isTrueAcsiServer = useMemo(() => {
+    return selectedConnection?.acsi === 'server';
+  }, [selectedConnection]);
+
+  // True for "passive" websocket endpoints (e.g. RTI-SO). These need cp entered
+  // manually here rather than inferred from a client-side connection object.
+  // NOTE: adjust this check if your connection `type` strings differ from "RTI-SO",
+  // or if another connection type also happens to contain "SO" as a substring.
+  const isWebsocketPassiveEndpoint = useMemo(() => {
+    const t = (selectedConnection?.type || '').toUpperCase();
+    return t.includes('SO');
+  }, [selectedConnection]);
+
+  // Compute effective cp - used for all endpoint types
+  const effectiveCp = useMemo(() => {
+    return (isWebsocketPassiveEndpoint && manualCp) || selectedConnection?.cp || cp || 'cp1';
+  }, [isWebsocketPassiveEndpoint, manualCp, selectedConnection, cp]);
+
+  // Effective writable check
+  const canWriteFc = useCallback((fc) => {
+    if (isServerEndpoint) return true;
+    return isWritableFc(fc);
+  }, [isServerEndpoint]);
+
+  // Look up the selected DO/SDO's own `cdc` field directly from the model.
+  // Unlike doChildren (which holds the DO's *children*, not the DO itself),
+  // this walks the same two model shapes extractDoDefinitionFromModel handles,
+  // but returns the DO node's cdc instead of its attribute definitions.
+  const getDoCdc = (modelData, ldName, lnName, doPath) => {
+    try {
+      let data = modelData;
+      if (data?.result?.model?.server?.logicalDevices) data = data.result.model;
+      else if (data?.result?.server?.logicalDevices) data = data.result;
+      else if (data?.model?.server?.logicalDevices) data = data.model;
+
+      const pathParts = doPath.split('.');
+      const doName = pathParts[0];
+      const sdoParts = pathParts.slice(1);
+
+      // Shape 1: logicalDeviceMap / logicalNodeDetails (ACSI Client model-tree)
+      const logicalNodeDetails = data?.logicalNodeDetails || {};
+      const lnRef = `${ldName}/${lnName}`;
+      const details = logicalNodeDetails[lnRef] || {};
+      const dataObjects = details.dataObjects || [];
+      const doObj = dataObjects.find(obj => (typeof obj === 'object' ? obj.name : String(obj)) === doName);
+
+      if (doObj && typeof doObj === 'object') {
+        if (sdoParts.length === 0) return doObj.cdc || '';
+        // Navigate nested SDOs for an SDO path
+        let current = doObj;
+        for (const part of sdoParts) {
+          const sdo = (current.subDataObjects || current.sub_data_objects || []).find(item =>
+            (typeof item === 'object' ? item.name : String(item)) === part
+          );
+          if (!sdo) return '';
+          current = sdo;
+        }
+        return current.cdc || '';
+      }
+
+      // Shape 2: tree-structured model (kind/name/children)
+      const tree = data?.tree?.children ? data.tree : (data?.children ? data : null);
+      if (tree) {
+        const ldNode = tree.children?.find(n => n.name === ldName || n.kind === ldName);
+        const lnNode = ldNode?.children?.find(n => (n.name || n.kind) === lnName);
+        let current = lnNode?.children?.find(n => n.name === doName);
+        for (const part of sdoParts) {
+          current = current?.children?.find(n => n.name === part);
+        }
+        return current?.cdc || '';
+      }
+
+      return '';
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Resolve the currently selected DO's own cdc for the Operate-button check.
+  const selectedDoCdc = useMemo(() => {
+    if (!selectedTarget || !selectedLD || !selectedLN || !selectedDO || !getModel) return '';
+    const modelData = getModel(selectedTarget);
+    return getDoCdc(modelData, selectedLD, selectedLN, selectedDO);
+  }, [selectedTarget, selectedLD, selectedLN, selectedDO, getModel]);
+
+  // Check if Operate button should be shown
+  const showOperateButton = useMemo(() => {
+    if (!selectedTarget || !selectedConnection || !selectedDO || !selectedLD || !selectedLN) return false;
+    const isAcsiClient = getAcsiRole(selectedConnection) === 'client';
+    if (!isAcsiClient) return false;
+
+    return CONTROLLABLE_CDCS.includes((selectedDoCdc || '').toUpperCase());
+  }, [selectedTarget, selectedConnection, selectedDO, selectedLD, selectedLN, selectedDoCdc]);
+
+  // Handle Operate button click
+  const handleOperateClick = useCallback(() => {
+    if (!selectedLD || !selectedLN || !selectedDO || !selectedConnection || !effectiveCp) return;
+    setOperateResult(null); // clear any stale result from a previous operate
+    const doRef = `${selectedLD}/${selectedLN}.${selectedDO}`;
+    setControlModalTarget({
+      ref: doRef,
+      name: selectedDO,
+      cdc: selectedDoCdc || '',
+      endpoint: selectedConnection,
+      cp: effectiveCp
+    });
+    setShowControlModal(true);
+  }, [selectedLD, selectedLN, selectedDO, selectedConnection, effectiveCp, selectedDoCdc]);
 
   // Recursively parse a nested structure DA
   const buildSdaNode = (sda, parentRef, fc) => {
@@ -276,56 +420,20 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
   const WRITABLE_FCS = ['CF', 'SP'];
   const isWritableFc =(fc) => WRITABLE_FCS.includes((fc || '').toUpperCase());
 
-  // Get connected endpoints (excluding IDP-Server type)
-  const connectedEndpoints = useMemo(() => {
-    return connections.filter(conn => conn.status === 'connected' && conn.type !== 'IDP-Server');
-  }, [connections]);
-
-  // Currently selected connection object
-  const selectedConnection = useMemo (() => {
-    return connectedEndpoints.find(conn => buildTargetValue(conn.host, conn.port) === selectedTarget);
-  }, [connectedEndpoints, selectedTarget]);
-
-  // Derive ACSI role from the connection type
-  const getAcsiRole = (conn) => {
-    if (!conn) return null;
-    if (conn.acsi === 'client' || conn.acsi === 'server') return conn.acsi;
-    const t = (conn.type || '').toUpperCase();
-    if (t.includes('SO')) return 'client';
-    if (t.includes('FSP')) return 'server';
-    return null;
-  };
-
-  // FSP endpoints have no write restriction; SO endpoints only allows CF/SP
-  const isServerEndpoint = useMemo(() => {
-    return getAcsiRole(selectedConnection) === 'server';
-  }, [selectedConnection]);
-
-  // Check if this is a TRUE ACSI Server (has acsi='server'), not just FSP
-  const isTrueAcsiServer = useMemo(() => {
-    return selectedConnection?.acsi === 'server';
-  }, [selectedConnection]);
-
-  // True for "passive" websocket endpoints (e.g. RTI-SO). These need cp entered
-  // manually here rather than inferred from a client-side connection object.
-  // NOTE: adjust this check if your connection `type` strings differ from "RTI-SO",
-  // or if another connection type also happens to contain "SO" as a substring.
-  const isWebsocketPassiveEndpoint = useMemo(() => {
-    const t = (selectedConnection?.type || '').toUpperCase();
-    return t.includes('SO');
-  }, [selectedConnection]);
-
-  // Compute effective cp - used for all endpoint types
-  const effectiveCp = useMemo(() => {
-    return (isWebsocketPassiveEndpoint && manualCp) || selectedConnection?.cp || cp || 'cp1';
-  }, [isWebsocketPassiveEndpoint, manualCp, selectedConnection, cp]);
-
-  // Effective writable check
-  const canWriteFc = useCallback((fc) => {
-    if (isServerEndpoint) return true;
-    return isWritableFc(fc);
-  }, [isServerEndpoint]);
-
+  const parsePythonDictString = useCallback((pythonStr) => {
+    if (!pythonStr || typeof pythonStr !== 'string') return pythonStr;
+    try {
+      const jsonStr = pythonStr
+          .replace(/'/g, '"')
+          .replace(/True/g, 'true')
+          .replace(/False/g, 'false')
+          .replace(/None/g, 'null')
+          .replace(/""+/g, '"');
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      return pythonStr;
+    }
+  }, []);
 
   // Extract hierarchy from model data
   const extractHierarchyFromModel = useCallback((modelData) => {
@@ -675,21 +783,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
         extractChildrenFromTree(child, parentRef, parentType, hierarchy);
       }
     });
-  }, []);
-
-  const parsePythonDictString = useCallback((pythonStr) => {
-    if (!pythonStr || typeof pythonStr !== 'string') return pythonStr;
-    try {
-      const jsonStr = pythonStr
-          .replace(/'/g, '"')
-          .replace(/True/g, 'true')
-          .replace(/False/g, 'false')
-          .replace(/None/g, 'null')
-          .replace(/""+/g, '"');
-      return JSON.parse(jsonStr);
-    } catch (e) {
-      return pythonStr;
-    }
   }, []);
 
   const handleFetchModel = useCallback(async () => {
@@ -1146,6 +1239,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     setError(null);
     setManualCp('');
     setFetchedCp(null);
+    setOperateResult(null);
   }, []);
 
   return (
@@ -1375,6 +1469,20 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
           </div>
       )}
 
+      {/* Operate Button - shown for ACSI Client endpoints with controllable DO/SDO */}
+      {showOperateButton && (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          <button
+            onClick={handleOperateClick}
+            className="btn-primary"
+            style={{ flex: 1 }}
+            title="Operate on controllable DO/SDO"
+          >
+            Operate
+          </button>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         <button
@@ -1473,7 +1581,54 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
           </div>
         </div>
       )}
-    </div>
+
+      {operateResult && (
+        <div style={{
+          padding: '12px',
+          background: operateResult.success ? 'var(--success-bg)' : 'var(--danger-bg)',
+          color: operateResult.success ? 'var(--success-color)' : 'var(--danger-color)',
+          borderRadius: '4px',
+          marginBottom: '12px'
+        }}>
+          <i className={`fas fa-${operateResult.success ? 'check-circle' : 'exclamation-circle'}`} style={{ marginRight: '8px' }}></i>
+          {operateResult.message}
+        </div>
+      )}
+
+      {/* ControlModal for DO/SDO operations */}
+      {showControlModal && (
+        <ControlModal
+          objRef={controlModalTarget.ref}
+          objName={controlModalTarget.name}
+          cdc={controlModalTarget.cdc}
+          endpoint={controlModalTarget.endpoint}
+          cp={controlModalTarget.cp}
+          onClose={() => {
+            setShowControlModal(false);
+            setControlModalTarget({ ref: '', name: '', cdc: '', endpoint: null, cp: null });
+          }}
+          onSuccess={(payload) => {
+            const deviceMsg = payload?.result?.message || payload?.message;
+            setOperateResult({
+              success: true,
+              message: deviceMsg
+                ? `Operate succeeded on ${controlModalTarget.name}: ${deviceMsg}`
+                : `Operate succeeded on ${controlModalTarget.name}`
+            });
+            setShowControlModal(false);
+            setControlModalTarget({ ref: '', name: '', cdc: '', endpoint: null, cp: null });
+          }}
+          onError={(errMsg) => {
+            setOperateResult({
+              success: false,
+              message: `Operate failed on ${controlModalTarget.name}: ${errMsg}`
+            });
+            // Leave the modal open on failure, same as ControlModal's own
+            // inline error behavior, so the user can adjust and retry.
+          }}
+        />
+      )}
+      </div>
   );
 }
 

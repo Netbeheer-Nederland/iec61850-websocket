@@ -4,7 +4,7 @@ import { executeApiCall, getApiById } from '../services/apiService';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
-const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess }) => {
+const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess, onError = () => {} }) => {
   const [ctlVal, setCtlVal] = useState('');
   const [ctlNum, setCtlNum] = useState(0);
   const [originCat, setOriginCat] = useState('1');
@@ -89,14 +89,28 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess }
       const params = getControlParameters();
       const endpointTarget = `${endpoint.host}:${endpoint.port}`;
       const response = await executeApiCall('operate', endpointTarget, params);
-      if (response?.ok) {
+
+      // response?.ok only reflects the HTTP call succeeding, not whether the
+      // control operation itself was accepted by the device. Check the actual
+      // result payload (same shape DataAccessPanel already unwraps for
+      // writeResult) so a device-level rejection isn't reported as success.
+      const opSuccess = response?.ok &&
+        (response?.payload?.result?.success ?? response?.payload?.success ?? true);
+
+      if (opSuccess) {
         setResult({ visible: true, success: true, message: 'Operate successful' });
-        onSuccess();
+        onSuccess(response?.payload);
       } else {
-        setResult({ visible: true, success: false, message: `Operate failed: ${response.error || 'Unknown error'}` });
+        const errMsg = response?.payload?.result?.error
+          || response?.payload?.error
+          || response?.rawText
+          || 'Unknown error';
+        setResult({ visible: true, success: false, message: `Operate failed: ${errMsg}` });
+        onError(errMsg);
       }
     } catch (error) {
       setResult({ visible: true, success: false, message: `Operate error: ${error.message}` });
+      onError(error.message);
     } finally {
       setIsOperating(false);
     }
@@ -165,6 +179,7 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess }
       ctlNum: parseInt(ctlNum),
       origin: { orCat: parseInt(originCat), orIdent: originIdent },
       test: testMode,
+      cp,
     };
   };
 
