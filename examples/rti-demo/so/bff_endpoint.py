@@ -1965,7 +1965,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                             if result is None:
                                     lcdValue = f"Readvalue failed - {obj_ref} fail"
                             else:
-                                lcdValue = f"{obj_ref} : {result.get("value")}"
+                                lcdValue = f"{obj_ref} : {result.get('value')}"
 
                             asyncio.create_task(
                                 blink_led_task(io_client, "read", interval=0.2, count=1, mapping_manager=mapping_manager)
