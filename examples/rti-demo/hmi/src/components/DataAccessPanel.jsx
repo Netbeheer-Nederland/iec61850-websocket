@@ -37,8 +37,10 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
 
   // State for complex structures
   const [doChildren, setDoChildren] = useState([]);
+  const [doChildrenLoading, setDoChildrenLoading] = useState(false);
   const [attributePath, setAttributePath] = useState([]);
   const dataDefinitionCacheRef = useRef({});
+
 
   // Tracks the previously-selected target so the dropdown-populate effect can
   // tell "target actually changed" apart from "getModel/extractHierarchyFromModel
@@ -182,14 +184,21 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     return getDoCdc(modelData, selectedLD, selectedLN, selectedDO);
   }, [selectedTarget, selectedLD, selectedLN, selectedDO, getModel]);
 
+  // Does the selected DO's own (top-level) definition contain an Oper DA
+  const hasOperDA = useMemo(() => {
+    return doChildren.some(
+        (child) => child.type === 'DA' && (child.name || '').toLowerCase() === 'oper'
+    );
+  }, [doChildren]);
+
   // Check if Operate button should be shown
   const showOperateButton = useMemo(() => {
     if (!selectedTarget || !selectedConnection || !selectedDO || !selectedLD || !selectedLN) return false;
     const isAcsiClient = getAcsiRole(selectedConnection) === 'client';
     if (!isAcsiClient) return false;
-
-    return CONTROLLABLE_CDCS.includes((selectedDoCdc || '').toUpperCase());
-  }, [selectedTarget, selectedConnection, selectedDO, selectedLD, selectedLN, selectedDoCdc]);
+    if (!CONTROLLABLE_CDCS.includes((selectedDoCdc || '').toUpperCase())) return false;
+    return hasOperDA;
+  }, [selectedTarget, selectedConnection, selectedDO, selectedLD, selectedLN, selectedDoCdc, hasOperDA]);
 
   // Handle Operate button click
   const handleOperateClick = useCallback(() => {
@@ -232,7 +241,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     const name = sdo.name || 'SDO';
     const ref = `${parentRef}.${name}`;
     const inlineDas = sdo.dataAttributes || sdo.data_attributes || [];
-    const children = inlineDas.length > 0 ? inlineDas.map(da => buildDaNode(da, ref)) : [];
+    const children = inlineDas.length > 0 ? inlineDas.map(da => buildDaNode(da, ref)) : null;
     return {name, type: 'SDO', ref, cdc: sdo.cdc || '', fc: null, bType: null, children};
   };
 
@@ -954,6 +963,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
   useEffect(() => {
     if (!selectedDO || !selectedLN || !selectedLD || !selectedTarget) {
       setDoChildren([]);
+      setDoChildrenLoading(false);
       setAttributePath([]);
       return;
     }
@@ -963,8 +973,11 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
 
     if (dataDefinitionCacheRef.current[doRef]) {
       setDoChildren(dataDefinitionCacheRef.current[doRef]);
+      setDoChildrenLoading(false);
       return;
     }
+
+    setDoChildrenLoading(true);
 
     const fetchDoDefinition = async () => {
       try {
@@ -1006,6 +1019,8 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
         setDoChildren([]);
       } catch (error) {
         setDoChildren([]);
+      } finally {
+        setDoChildrenLoading(false);
       }
     };
 
@@ -1470,18 +1485,26 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
       )}
 
       {/* Operate Button - shown for ACSI Client endpoints with controllable DO/SDO */}
-      {showOperateButton && (
+      {selectedTarget && selectedDO && selectedLD && selectedLN &&
+      CONTROLLABLE_CDCS.includes((selectedDoCdc || '').toUpperCase()) && (
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-          <button
-            onClick={handleOperateClick}
-            className="btn-primary"
-            style={{ flex: 1 }}
-            title="Operate on controllable DO/SDO"
-          >
-            Operate
-          </button>
+          {doChildrenLoading ? (
+            <button className="btn-primary" style={{ flex: 1 }} disabled>
+              <i className="fas fa-spinner fa-spin" style={{ marginRight: '6px' }}></i>
+              Checking availability...
+            </button>
+          ) : hasOperDA ? (
+            <button
+              onClick={handleOperateClick}
+              className="btn-primary"
+              style={{ flex: 1 }}
+              title="Operate on controllable DO/SDO"
+            >
+              Operate
+            </button>
+          ) : null}
         </div>
-      )}
+    )}
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
