@@ -2,7 +2,7 @@
   {
     "id": 1,
     "name": "Demo_Pi1",
-    "host": "127.0.0.1",
+    "host": "192.168.100.14",
     "port": 5002,
     "type": "RTI-SO",
     "acsi": "client",
@@ -16,10 +16,7 @@
       "enable_token_refresh": false,
       "idp_server": "keycloak",
       "enable_oauth": false,
-      "token_issuer": "https://192.168.100.14:8443/realms/iec61850-websocket",
-      "token_endpoint": "",
-      "client_id": "",
-      "client_secret": ""
+      "token_issuer": "https://192.168.100.14:8443/realms/iec61850-websocket"
     },
     "status": "connected",
     "endpoint": "",
@@ -34,7 +31,7 @@
   {
     "id": 2,
     "name": "demo_pi2",
-    "host": "127.0.0.1",
+    "host": "192.168.100.14",
     "port": 5001,
     "type": "RTI-FSP",
     "acsi": "server",
@@ -49,9 +46,7 @@
       "client_secret": "Af901GzeYXmZAqtJc03jGkHLEwgyPyHN",
       "enable_token_refresh": false,
       "idp_server": "keycloak",
-      "enable_oauth": false,
-      "certificate_endpoint": "https://192.168.100.14:8443/realms/iec61850-websocket/protocol/openid-connect/certs",
-      "token_issuer": "https://192.168.100.14:8443/realms/iec61850-websocket"
+      "enable_oauth": false
     },
     "status": "connected",
     "endpoint": "",

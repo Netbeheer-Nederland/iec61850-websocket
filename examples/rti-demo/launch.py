@@ -63,6 +63,7 @@ class ServiceType(Enum):
     """Available RTI demo service types."""
     BFF = "bff"
     FSP = "fsp"
+    FSP2 = "fsp2"
     SO = "so"
     IO = "io"
 
@@ -109,7 +110,7 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
         entry_point="fsp/bff_endpoint.py",
         default_port=5001,
         description="RTI-FSP",
-        env_vars={"PORT": "5001"},
+        env_vars={"PORT": "5001", "CP": "cp1"},
         docker_image="rti-demo-fsp",
         health_check_path="/api/status",
         labels={
@@ -117,6 +118,23 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
             "rti.type": "RTI-FSP",
             "rti.host": "rti-server",
             "rti.port": "5001"
+        }
+    ),
+    ServiceType.FSP2: ServiceConfig(
+        name="FSP2 ACSI-Server_WebsocketActive",
+        service_type=ServiceType.FSP2,
+        module="fsp.bff_endpoint",
+        entry_point="fsp/bff_endpoint.py",
+        default_port=5005,
+        description="RTI-FSP (second instance)",
+        env_vars={"PORT": "5005", "MODELPATH": "models", "CP": "cp2"},  
+        docker_image="rti-demo-fsp",
+        health_check_path="/api/status",
+        labels={
+            "rti.service": "rti-server-2",
+            "rti.type": "RTI-FSP",
+            "rti.host": "rti-server-2",
+            "rti.port": "5005"
         }
     ),
     ServiceType.SO: ServiceConfig(

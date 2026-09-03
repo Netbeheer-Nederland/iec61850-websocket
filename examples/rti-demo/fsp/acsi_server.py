@@ -614,12 +614,17 @@ class ACSIServer:
 
         cp = self.runtime.cp or "cp1"
 
-        # ready_event is bound to whichever loop is running when it's created.
-        # Since self.runtime.server is a long-lived singleton reused across
-        # stop/start cycles, but each start_server() spins up a brand-new event
-        # loop, we must recreate ready_event here — on the loop that will
-        # actually use it — rather than relying on the one created once in
-        # IEC61850Server.__init__ (which becomes stale after the first restart).
+        if (
+                self.runtime.server is not None
+                and self.runtime.ied_model is not None
+                and getattr(self.runtime.server, "ied_model", None) is not self.runtime.ied_model
+        ):
+            self.runtime.server.update_ied_model(self.runtime.ied_model)
+            self._log_action(
+                "Applied pending model before start (was updated while stopped)",
+                detail={"ied": self.runtime.ied_model.name},
+            )
+
         self.runtime.server.ready_event = asyncio.Event()
 
         report_task = asyncio.create_task(
@@ -652,7 +657,10 @@ class ACSIServer:
             self._log_action("Server listening", detail={"host": host, "port": port, "cps": [cp]})
 
         try:
-            await asyncio.gather(*tasks.values())
+            results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+            for (name, task), result in zip(tasks.items(), results):
+                if isinstance(result, Exception) and not isinstance(result, asyncio.CancelledError):
+                    self._log_action(f"Task '{name}' failed: {result}", "error")
         except asyncio.CancelledError:
             pass
         except Exception as exc:
