@@ -60,69 +60,14 @@
   },
   {
     "id": 3,
-    "name": "rti-fsp",
-    "host": "192.168.100.40",
-    "port": 5001,
-    "type": "RTI-FSP",
-    "acsi": "server",
-    "ws_mode": "active",
-    "auto_discovered": false,
-    "created_at": "2026-08-28T14:54:39.927806",
-    "OAuth": {
-      "auth_server_ca": "-----BEGIN CERTIFICATE-----\nMIID9TCCAt2gAwIBAgIUIbu+OBoDiraaCrhp6qoUUEcJ7LYwDQYJKoZIhvcNAQEL\nBQAwbDELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEjAQ\nBgNVBAMMCWtleWNsb2FjazAeFw0yNjA4MzAxNTM4NTRaFw0zNjA4MjcxNTM4NTRa\nMGwxCzAJBgNVBAYTAkRFMQswCQYDVQQIDAJCVzERMA8GA1UEBwwIRnJlaWJ1cmcx\nGzAZBgNVBAoMEk1aIEF1dG9tYXRpb24gR21iSDEMMAoGA1UECwwDUiZEMRIwEAYD\nVQQDDAlrZXljbG9hY2swggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDu\nnXFutSb7aybJy1I8o0PWOvQYPnPaQe8m/RlU5tn/CZK3wPvZUJScEL8rLOA9Z2D9\nTk226HfW54pimYkoEvhXMo1gzVyO6g4virnUWfL1PJX0BQPRj38cXZ4gBVcBPJ6N\nhfjMnA+HZ5OQPybtNAlTrObdMA5VoKLmTv/vM2COVPkV1l57bMt6GYkV5fn+NSnz\nnhoPxybqtkTvVARptcDeBiEDZ5G5KNtm94jhVHgEQRwisp+Jz+Ay+sntuWaQgkRJ\nT5X7yx1JtV1fSau6xf0qOqZKDD2Kt+qvgMk6Q+1WluCi8BUNv8RdRSS13sjlyyjD\nkwuwMw/r/R9f9XdG1CYPAgMBAAGjgY4wgYswPQYDVR0RBDYwNIIJa2V5Y2xvYWNr\ngglsb2NhbGhvc3SHBH8AAAGHBMCoZA6HBMCoZAGHBMCoZA+HBMCoZBAwCQYDVR0T\nBAIwADALBgNVHQ8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwHQYDVR0OBBYE\nFDkF2upsOtaYAhjX0DSbRXSMFsWzMA0GCSqGSIb3DQEBCwUAA4IBAQDZBEPsqeyT\nWV/9q9YR4ZiExvbojN2G7uECt2I8d5+l8sPlQy3ZLYmmlWdJ2pTOxS/27EPHP6w/\n5yHzBj2+sI4ix806Mn5gC0T0uZimTkrcqP8C+r99N/Xe1dazmw/j8n7THBmjqtzl\nrQ7dDpglqfP+cW1NrAMpKVcalHaXAFaqhe0bnCWoZFPGRaOu0RB1wot2K9Bz3dGG\nvmXzqopJk4dliFZQ/P1PaPFinoZdlXz6uquZJcPCfhAgkTbtA3syI1G1U0m9atVJ\nIKZU24+dzqYUCNOg5o+nob3v/HKjtxfaA1KLLw/EQtxoEz0V3EGnqYfDAnNwtlsC\nyTkRZpGlJVcd\n-----END CERTIFICATE-----\n",
-      "realm": "iec61850-websocket",
-      "token_endpoint": "https://192.168.100.14:8443/realms/iec61850-websocket/protocol/openid-connect/token",
-      "client_id": "rti-fsp",
-      "client_secret": "Af901GzeYXmZAqtJc03jGkHLEwgyPyHN",
-      "enable_token_refresh": false,
-      "idp_server": "keycloak",
-      "enable_oauth": false
-    },
-    "status": "disconnected",
-    "endpoint": "",
-    "TLS": {
-      "enable_tls": true,
-      "tls_version": "TLSv1_2",
-      "server_key": null,
-      "server_cert": null,
-      "server_ca": "-----BEGIN CERTIFICATE-----\r\nMIIDtTCCAp2gAwIBAgIUJysTAOCqE3IaNO1QgtOPxMq6M8EwDQYJKoZIhvcNAQEL\r\nBQAwajELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\r\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEDAO\r\nBgNVBAMMB3Jvb3RfQ0EwHhcNMjIwMzE4MDkyNzEwWhcNMzIwMzE1MDkyNzEwWjBq\r\nMQswCQYDVQQGEwJERTELMAkGA1UECAwCQlcxETAPBgNVBAcMCEZyZWlidXJnMRsw\r\nGQYDVQQKDBJNWiBBdXRvbWF0aW9uIEdtYkgxDDAKBgNVBAsMA1ImRDEQMA4GA1UE\r\nAwwHcm9vdF9DQTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOMyaDaT\r\n+a4DT0s2NCrjUN8coLPfFrLRdN0Gx0hRViuLUFxd001jXruRgXKt2g8lR+YnzUeA\r\nPQHbcIfRQhL+jy/ZMXpmz4Nrl7vyOWFdu8nBKU6c7y9LmSGbnOJZjDXwlX6ERwui\r\nqFzAvRA6YXbPN8gY0B3Ou+T/mjkWN9L1x+V+7bGs9rVIoM78fVyM2FERBfsBtT76\r\nQVQv3KZ+a9EOLxqcZ/nGqsFFysFOSkiRC6Cy4mC5CSik9S5D7X9lz/bdga7O+hqd\r\nSKfir6YMlQGV37JPqmz69N6vvb9UOX/G989T4qdVB/zQOvMdcIWXkqb3vSAXYi/c\r\nClVS1Pymsy/MXQ0CAwEAAaNTMFEwHQYDVR0OBBYEFGYgIECdrhTsmgCKpVM0RHeC\r\nkFUmMB8GA1UdIwQYMBaAFGYgIECdrhTsmgCKpVM0RHeCkFUmMA8GA1UdEwEB/wQF\r\nMAMBAf8wDQYJKoZIhvcNAQELBQADggEBACsiuHFQjqOglenp/fcNbU034m/vvkyV\r\nSZXau9amXBWdeTEpc1HaPOYO7jFFnu/QoH6AbGZkpL0yWZJA2rf102AkOdAe6E0g\r\n2H77/hHoHVCfxOiOl3+icsLXJ4VXqV2vmUOEVnWfHRtej4My6avT9uCNMO2bw9hm\r\n56RAZrs82T9Mpg/1XQ9YUO1q4/JfP/+dCzPXAdwJ/h2cJ/q6Q9g1gRns8IzVlGOZ\r\n0ZBQCLqLl8vUei+t6YgjyBbeNCz4CEcmXKIJeqMB1jhpsgr6BBMTNTU2Q60b9fzU\r\nOCGLw94EnKYtHWGy2WHMFNbwkNCR0/jwhxKkU0HXy1aNMUBWp99M7P8=\r\n-----END CERTIFICATE-----\r\n"
-    }
-  },
-  {
-    "id": 4,
-    "name": "rti-fsp-2",
-    "host": "192.168.100.14",
-    "port": 5005,
-    "type": "RTI-FSP",
-    "acsi": "server",
-    "ws_mode": "active",
-    "auto_discovered": false,
-    "created_at": "2026-08-28T14:55:07.646501",
-    "OAuth": {
-      "certificate_endpoint": "",
-      "auth_server_ca": "",
-      "realm": "",
-      "token_endpoint": "",
-      "client_id": "",
-      "client_secret": "",
-      "enable_token_refresh": false,
-      "idp_server": "",
-      "token_issuer": ""
-    },
-    "status": "disconnected",
-    "endpoint": ""
-  },
-  {
-    "id": 5,
-    "name": "keycloak",
-    "host": "",
+    "name": "testFSP2",
+    "host": "127.0.0.1",
     "port": 5000,
-    "type": "IDP-Server",
-    "acsi": "",
-    "ws_mode": "",
+    "type": "RTI-FSP",
+    "acsi": "server",
+    "ws_mode": "active",
     "auto_discovered": false,
-    "created_at": "2026-08-28T14:55:23.814988",
-    "endpoint": "https://192.168.100.14:8443",
+    "created_at": "2026-09-03T11:49:02.508434",
     "OAuth": {
       "certificate_endpoint": "",
       "auth_server_ca": "",
@@ -132,7 +77,6 @@
       "client_secret": "",
       "enable_token_refresh": false,
       "idp_server": ""
-    },
-    "status": "connected"
+    }
   }
 ]

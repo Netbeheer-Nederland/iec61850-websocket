@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 /**
  * Reusable component for visualizing SO-FSP connections
- * 
+ *
  * @param {Object[]} connections - Array of connection objects
  * @param {Object|null} selectedConnection - Currently selected connection (for highlighting)
  * @param {Function|null} onConnectionClick - Click handler for connection items
@@ -22,21 +22,26 @@ function InstanceVisualization({
   loading = false
 }) {
   const navigate = useNavigate();
-  
+
   // Internal click handlers for SO and FSP circles
   const handleSoClick = () => {
     const soConnection = connections.find(conn => conn.type === 'RTI-SO' && conn.status === 'connected');
     navigate('/acsi-client', { state: { endpoint: soConnection || { host: '127.0.0.1', port: 102, name: 'Default' } } });
   };
-  
+
   const handleFspClick = (conn) => {
     navigate('/acsi-server', { state: { endpoint: conn } });
   };
+
+  const soConnections = connections.filter(conn => conn.type === 'RTI-SO' && conn.status === 'connected');
+  const fspConnections = connections.filter(conn => conn.type === 'RTI-FSP' && conn.status === 'connected');
+  const hasConnected = connections.filter(conn => conn.status === 'connected').length > 0;
+
   return (
     <div style={{ marginBottom: '40px', position: 'relative' }}>
       {showReload && onReload && (
         <div style={{ position: 'absolute', top: '0', right: '0' }}>
-          <button 
+          <button
             className="btn-icon"
             onClick={onReload}
             title="Refresh Instances"
@@ -51,105 +56,73 @@ function InstanceVisualization({
           <span className="spinner"></span>
           Loading...
         </div>
-      ) : connections.filter(conn => conn.status === 'connected').length > 0 ? (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: '40px', minHeight: '300px' }}>
-          {/* SO (Client) Side - Left */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '180px' }}>
-            <div
-              style={{
-                width: '140px',
-                height: '140px',
-                border: '2px solid var(--border-color)',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '12px',
-                background: 'var(--bg-card)',
-                cursor: 'pointer'
-              }}
-              onClick={handleSoClick}
-              title="Type: RTI-SO (Client)"
-            >
-              <span style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600' }}>SO</span>
-            </div>
-            {showLabels && (
-              <div style={{
-                padding: '6px 12px',
-                background: 'var(--bg-hover)',
-                borderRadius: '16px',
-                textAlign: 'center',
-                fontSize: '11px',
-                border: '1px solid var(--border-color)'
-              }}>
-                RTI-SO
-              </div>
-            )}
-            {connections
-              .filter(conn => conn.type === 'RTI-SO' && conn.status === 'connected')
-              .map((conn) => (
+      ) : hasConnected ? (
+        // alignItems defaults to 'stretch' here (removed 'flex-start') so the SO
+        // column and the FSP column share the same height, letting the SO side
+        // center itself against however tall the FSP stack ends up being.
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', minHeight: '300px' }}>
+          {/* SO (Client) Side - Left - centers vertically against FSP column height */}
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minWidth: '180px' }}>
+            {soConnections.map((conn) => (
+              <React.Fragment key={`so-${conn.name}`}>
                 <div
-                  key={`so-${conn.name}`}
                   style={{
-                    padding: '6px 12px',
-                    background: selectedConnection?.name === conn.name ? 'var(--primary-light)' : 'var(--bg-hover)',
-                    borderRadius: '16px',
-                    margin: '6px 0',
-                    textAlign: 'center',
-                    fontSize: '10px',
-                    border: '1px solid var(--border-color)',
-                    minWidth: '140px',
-                    cursor: onConnectionClick ? 'pointer' : 'default'
+                    width: '140px',
+                    height: '140px',
+                    border: '2px solid var(--border-color)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '12px',
+                    background: 'var(--bg-card)',
+                    cursor: 'pointer'
                   }}
-                  onClick={() => onConnectionClick?.(conn)}
-                  title={`Type: ${conn.type}`}
+                  onClick={handleSoClick}
+                  title="Type: RTI-SO (Client)"
                 >
-                  <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{conn.name}</span>
-                  <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <span style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600' }}>{conn.name}</span>
+                </div>
+                {showLabels && (
+                  <div style={{
+                      padding: '6px 12px',
+                      background: selectedConnection?.name === conn.name ? 'var(--primary-light)' : 'var(--bg-hover)',
+                      borderRadius: '16px',
+                      textAlign: 'center',
+                      fontSize: '11px',
+                      border: '1px solid var(--border-color)',
+                      cursor: onConnectionClick ? 'pointer' : 'default'
+                    }}
+                    onClick={() => onConnectionClick?.(conn)}
+                    title="Edit instance"
+                  >
                     RTI-SO
                   </div>
-                  {conn.properties_info?.properties && (
-                    <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>
-                      {conn.properties_info.properties.acsi_role} · {conn.properties_info.properties.ws_mode}
-                    </div>
-                  )}
-                </div>
-              ))}
+                )}
+              </React.Fragment>
+            ))}
           </div>
 
-          {/* Connection lines */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '60px' }}>
-            {connections
-              .filter(conn => conn.type === 'RTI-FSP' && conn.status === 'connected')
-              .map((_, index) => (
+          {/* FSP (Server) Side - Right - each FSP is its own row: line + circle/label,
+              stacked vertically. This is what makes each line sit next to its own FSP
+              instead of clustering separately at the top. */}
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '24px' }}>
+            {fspConnections.map((conn) => (
+              <div key={`fsp-row-${conn.name}`} style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+                {/* Connection line - lives next to this specific FSP */}
                 <div
-                  key={`line-${index}`}
                   style={{
-                    height: '1px',
+                    height: '4px',
                     width: '40px',
-                    background: 'var(--border-color)',
-                    margin: '6px 0',
-                    borderStyle: 'dashed'
+                    background: (conn.connectedClients ?? 0) > 0
+                      ? 'repeating-linear-gradient(to right, var(--success-color) 0, var(--success-color) 6px, transparent 6px, transparent 12px)'
+                      : 'repeating-linear-gradient(to right, var(--border-color) 0, var(--border-color) 6px, transparent 6px, transparent 12px)',
+                    flexShrink: 0
                   }}
                 ></div>
-              ))}
-            {connections.filter(conn => conn.type === 'RTI-FSP' && conn.status === 'connected').length === 0 && (
-              <div style={{
-                height: '1px',
-                width: '40px',
-                background: 'var(--border-color)',
-                margin: '6px 0',
-                borderStyle: 'dashed'
-              }}></div>
-            )}
-          </div>
 
-          {/* FSP (Server) Side - Right */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '180px' }}>
-            {connections
-              .filter(conn => conn.type === 'RTI-FSP' && conn.status === 'connected')
-              .map((conn) => (
-                <React.Fragment key={`fsp-${conn.name}`}>
+                {/* FSP circle + label */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '180px', marginLeft: '16px' }}>
                   <div
                     style={{
                       width: '120px',
@@ -178,21 +151,26 @@ function InstanceVisualization({
                       textAlign: 'center',
                       fontSize: '11px',
                       border: '1px solid var(--border-color)',
-                      minWidth: '120px'
-                    }}>
-                      <div style={{ fontWeight: '500' }}>{conn.name}</div>
-                      <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>
-                        RTI-FSP
-                      </div>
-                      {conn.properties_info?.properties && (
-                        <div style={{ color: 'var(--text-muted)', marginTop: '2px', fontSize: '9px' }}>
-                          {conn.properties_info.properties.acsi_role} · {conn.properties_info.properties.ws_mode}
-                        </div>
-                      )}
+                      cursor: onConnectionClick ? 'pointer' : 'default'
+                    }}
+                    onClick={() => onConnectionClick?.(conn)}
+                    title="Edit instance"
+                   >
+                      RTI-FSP
                     </div>
                   )}
-                </React.Fragment>
-              ))}
+                </div>
+              </div>
+            ))}
+            {fspConnections.length === 0 && (
+              <div
+                style={{
+                  height: '4px',
+                  width: '40px',
+                  background: 'repeating-linear-gradient(to right, var(--border-color) 0, var(--border-color) 6px, transparent 6px, transparent 12px)'
+                }}
+              ></div>
+            )}
           </div>
         </div>
       ) : (

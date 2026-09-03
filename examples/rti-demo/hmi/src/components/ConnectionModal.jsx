@@ -361,6 +361,19 @@ function ConnectionModal({
                   onChange={handleInputChange}
                 />
               </div>
+              <div className="form-group">
+                <label htmlFor="type">Type</label>
+                <select
+                  id="type"
+                  value={formData.type}
+                  onChange={handleTypeChange}
+                >
+                  <option value="Generic">Generic</option>
+                  <option value="RTI-SO">RTI-SO (WS Passive/ACSI Client)</option>
+                  <option value="RTI-FSP">RTI-FSP (WS Active/ACSI Server)</option>
+                  <option value="IDP-Server">IDP-Server</option>
+                </select>
+              </div>
               {!isIDP && (
                 <>
                   <div className="form-group">
@@ -383,19 +396,6 @@ function ConnectionModal({
                   </div>
                 </>
               )}
-              <div className="form-group">
-                <label htmlFor="type">Type</label>
-                <select 
-                  id="type" 
-                  value={formData.type} 
-                  onChange={handleTypeChange}
-                >
-                  <option value="Generic">Generic</option>
-                  <option value="RTI-SO">RTI-SO (WS Passive/ACSI Client)</option>
-                  <option value="RTI-FSP">RTI-FSP (WS Active/ACSI Server)</option>
-                  <option value="IDP-Server">IDP-Server</option>
-                </select>
-              </div>
               {!isIDP && (
                 <>
                   <div className="form-group">
