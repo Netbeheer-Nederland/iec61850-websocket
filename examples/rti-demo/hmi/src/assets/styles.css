@@ -1090,7 +1090,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    margin-bottom: 0;  /* Parent handles bottom margin */
+    margin-bottom: 10px;  /* Parent handles bottom margin */
     min-width: 180px;  /* Prevents squishing in flex container */
 }
 
