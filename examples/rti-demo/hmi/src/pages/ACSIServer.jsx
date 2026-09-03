@@ -16,7 +16,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [host, setHost] = useState(endpoint?.host || 'rti-so');
   const [port, setPort] = useState(String(endpoint?.port || 8765));
   const [cp, setCp] = useState(endpoint?.cp || 'cp1');
-  const [mode, setMode] = useState(endpoint?.mode || 'server');
+  const [mode, setMode] = useState(endpoint?.mode === 'client' ? 'client' : 'server');
   const hostPortInitializedRef = useRef(false);
   
   // Create instance-specific storage key
@@ -31,9 +31,19 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [protocolMessages, setProtocolMessages] = useState([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState({});
-  const [connections, setConnections] = useState(propConnections || []);
+  const [connections, setConnections] = useState([]);
   const monitorIntervalRef = useRef(null);
   const statusIntervalRef = useRef(null);
+
+  const fspInstances = useMemo(
+    () => connections.filter(c => c.type === 'RTI-SO'),
+    [connections]
+  );
+
+
+  const [selectedInstanceName, setSelectedInstanceName] = useState(() => endpoint?.name);
+  const instanceMatchedRef = useRef(false);
+  const isCustomInstance = selectedInstanceName === 'custom';
 
   const [showTLSModal, setShowTLSModal] = useState(false);
   const [useOAuth, setUseOAuth] = useState(false);
@@ -48,6 +58,17 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     localStorage.setItem(storageKey, String(connected));
   }, [connected, storageKey]);
 
+  const handleInstanceSelect = useCallback((e) => {
+    const value = e.target.value;
+    setSelectedInstanceName(value);
+    if (value === 'custom') return;
+    const inst = fspInstances.find(c => c.name === value);
+    if (inst) {
+      setHost(inst.host || '');
+      setPort(String(inst.port || ''));
+    }
+  }, [fspInstances]);
+
   const handleExpandToggle = useCallback((ref, expanded) => {
     setExpandedNodes(prev => ({
       ...prev,
@@ -55,6 +76,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     }));
   }, []);
 
+  const [connectionsLoaded, setConnectionsLoaded] = useState(false);
   // Fetch connections from BFF to get live TLS/status config.
   // Returns the fetched list (or null on failure) so callers can act on
   // freshly-fetched data instead of relying on component state that may
@@ -67,6 +89,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         const data = await response.json();
         const list = data.connections || [];
         setConnections(list);
+        setConnectionsLoaded(true);
         return list;
       }
     } catch (error) {
@@ -137,20 +160,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           parsedPayload.result.status = parsePythonDictString(parsedPayload.result.status);
         }
         setStatusInfo(parsedPayload);
-        
-        // Update form fields with actual server configuration
-        const serverConfig = parsedPayload.result?.status;
-        if (serverConfig) {
-          if (!hostPortInitializedRef.current) {
-            if (serverConfig.host) setHost(serverConfig.host);
-            if (serverConfig.port) setPort(String(serverConfig.port));
-            if (Array.isArray(serverConfig.accessPoints) && serverConfig.accessPoints.length > 0) {
-              setCp(serverConfig.accessPoints[0]);
-            }
-            if (serverConfig.mode) setMode(serverConfig.mode);
-            hostPortInitializedRef.current = true;
-          }
-        }
 
         // Sync connected state with actual server status
         const serverStatus = parsedPayload.result?.status?.status;
@@ -182,6 +191,69 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     };
     fetchInitialData();
   }, [endpointTarget, loadStatus]);
+
+  const initialSyncDoneRef = useRef(false);
+
+  useEffect(() => {
+  if (initialSyncDoneRef.current) return;
+    if (!endpointTarget) return;
+
+    const syncInitialConfig = async () => {
+      if (connected) {
+        // Already connected — trust the live server's own reported config
+        try {
+          const result = await executeApiCall('status', endpointTarget, null);
+          if (result?.ok) {
+            let serverConfig = result.payload?.result?.status;
+            if (typeof serverConfig === 'string') {
+              serverConfig = parsePythonDictString(serverConfig);
+            }
+            if (serverConfig) {
+              if (serverConfig.host) setHost(serverConfig.host);
+              if (serverConfig.port) setPort(String(serverConfig.port));
+              if (Array.isArray(serverConfig.accessPoints) && serverConfig.accessPoints.length > 0) {
+                setCp(serverConfig.accessPoints[0]);
+              }
+              if (serverConfig.mode) setMode(serverConfig.mode);
+            }
+          }
+          initialSyncDoneRef.current = true;
+        } catch (e) {
+          console.error('Failed to sync from live server status:', e);
+        }
+      } else {
+        if (!connectionsLoaded) return; // wait for the real fetch before deciding
+
+        if (selectedInstanceName === 'custom') {
+          initialSyncDoneRef.current = true;
+          return;
+        }
+
+        let inst = selectedInstanceName
+          ? fspInstances.find(c => c.name === selectedInstanceName)
+          : null;
+
+        if (!selectedInstanceName) {
+          // Nothing selected yet — default to the first instance found
+          inst = fspInstances[0] || null;
+          if (inst) setSelectedInstanceName(inst.name);
+        } else if (!inst) {
+          // A name came in (e.g. via navigation state) but it's not in the list
+          setSelectedInstanceName('custom');
+        }
+
+        if (inst) {
+          setHost(inst.host || '');
+          setPort(String(inst.port || ''));
+          if (inst.cp) setCp(inst.cp);
+        }
+
+        initialSyncDoneRef.current = true;
+      }
+    };
+
+    syncInitialConfig();
+  }, [connected, fspInstances, selectedInstanceName, connectionsLoaded, endpointTarget, executeApiCall, parsePythonDictString]);
 
   const handleStartServer = useCallback(async () => {
     if (!endpointTarget) { setError('No endpoint configured'); return; }
@@ -467,44 +539,20 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
 
   return (
     <section className="page">
-      <div className="page-header">
+      <div className="page-header" style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <h1><i className="fas fa-server" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>ACSI Server</h1>
-          {endpoint && (
-            <span id="acsi-endpoint-badge" className="acsi-endpoint-badge" style={{ display: 'inline-flex' }}>
-              {endpoint.name || `${endpoint.host}:${endpoint.port}`}
-            </span>
-          )}
+          <h1><i className="fas fa-server" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>Websocket Connection</h1>
         </div>
-      </div>
-      
-      <div className="acsi-connection-section" style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginBottom: '24px' }}>
-        <div className="form-group">
-          <label>WS Host</label>
-          <input type="text" value={host} placeholder="0.0.0.0" onChange={(e) => setHost(e.target.value)} disabled={loading} />
-        </div>
-        <div className="form-group">
-          <label>WS Port</label>
-          <input type="number" value={port} placeholder="102" onChange={(e) => setPort(e.target.value)} disabled={loading} />
-        </div>
-        <div className="form-group">
-          <label>WS CP</label>
-          <input type="text" value={cp} placeholder="cp1" onChange={(e) => setCp(e.target.value)} disabled={loading} />
-        </div>
-        <div className="form-group">
-          <label>WS Mode</label>
-          <input type="text" value={mode} placeholder="server" onChange={(e) => setMode(e.target.value)} disabled={loading} />
-        </div>
-        <button id="acsi-start-btn" className="btn-primary" onClick={handleStartServer} disabled={loading || connected}>
-          {loading ? 'Starting...' : 'Start Server'}
-        </button>
-        <button id="acsi-stop-btn" className="btn-secondary" onClick={handleStopServer} disabled={loading || !connected}>
-          {loading ? 'Stopping...' : 'Stop Server'}
-        </button>
       </div>
 
       {/* Security Configuration Buttons */}
       <div style={{ display: 'flex', gap: '16px', marginLeft: 'auto', marginBottom: '24px' }}>
+        <button id="acsi-start-btn" className={connected ? 'btn-secondary' : 'btn-primary'} onClick={handleStartServer} disabled={loading || connected}>
+            {loading ? 'Starting...' : 'Connect'}
+          </button>
+          <button id="acsi-stop-btn" className={connected ? 'btn-primary' : 'btn-secondary'} onClick={handleStopServer} disabled={loading || !connected}>
+            {loading ? 'Stopping...' : 'Disconnect'}
+          </button>
         <button
           className="btn-secondary"
           onClick={() => setShowTLSModal(true)}
@@ -621,23 +669,64 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </label>
       </div>
 
-      
+      <div className="acsi-connection-section" style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        <div className="form-group">
+          <label>Instance</label>
+          <select value={selectedInstanceName} onChange={handleInstanceSelect} disabled={loading}>
+            <option value="" disabled>Select instance...</option>
+            {fspInstances.map(inst => (
+              <option key={inst.name} value={inst.name}>
+                {inst.name} ({inst.host}:{inst.port})
+              </option>
+            ))}
+            <option value="custom">Custom...</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>WS Host</label>
+          <input
+            type="text"
+            value={host}
+            placeholder="0.0.0.0"
+            onChange={(e) => setHost(e.target.value)}
+            disabled={loading || !isCustomInstance}
+          />
+        </div>
+        <div className="form-group">
+          <label>WS Port</label>
+          <input type="number" value={port} placeholder="102" onChange={(e) => setPort(e.target.value)} disabled={loading || !isCustomInstance} />
+        </div>
+        <div className="form-group">
+          <label>WS CP</label>
+          <input type="text" value={cp} placeholder="cp1" onChange={(e) => setCp(e.target.value)} disabled={loading} />
+        </div>
+        <div className="form-group">
+          <label>WS Mode</label>
+          <select value={mode} onChange={(e) => setMode(e.target.value)} disabled={loading}>
+            <option value="server">server</option>
+            <option value="client">client</option>
+          </select>
+        </div>
+      </div>
+        <div className="page-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <h1><i className="fas fa-server" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>ACSI Server</h1>
+            {endpoint && (
+              <span id="acsi-endpoint-badge" className="acsi-endpoint-badge" style={{ display: 'inline-flex' }}>
+                {endpoint.name || `${endpoint.host}:${endpoint.port}`}
+              </span>
+            )}
+          </div>
+        </div>
+
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
         <button id="acsi-load-model-btn" className="btn-primary" onClick={loadServerModel} disabled={loading}>
           {loading ? 'Loading...' : 'Load Model'}
         </button>
-        <button id="acsi-reload-status-btn" className="btn-secondary" onClick={loadStatus} disabled={!endpointTarget}>
+        {/*<button id="acsi-reload-status-btn" className="btn-secondary" onClick={loadStatus} disabled={!endpointTarget}>
           Reload Status
-        </button>
-        <button id="messages-start-btn" className="btn-primary" onClick={startMonitoring} disabled={!endpointTarget || isMonitoring}>
-          {isMonitoring ? 'Monitoring...' : 'Start Monitor'}
-        </button>
-        <button id="messages-stop-btn" className="btn-secondary" onClick={stopMonitoringHandler} disabled={!isMonitoring}>
-          Stop Monitor
-        </button>
-        <button id="messages-clear-btn" className="btn-secondary" onClick={clearMessages} disabled={!endpointTarget}>
-          Clear Logs
-        </button>
+        </button>*/}
       </div>
 
       {message && (
@@ -661,7 +750,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       
       {statusInfo && (
         <div style={{ marginBottom: '24px', padding: '16px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-          <h3 style={{ margin: 0, marginBottom: '12px', fontSize: '16px' }}>Server Status</h3>
+          <h3 style={{ margin: 0, marginBottom: '12px', fontSize: '16px' }}>Connection Status</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Server Address</span><div style={{ fontWeight: '500' }}>{statusInfo.result?.status?.host}:{statusInfo.result?.status?.port}</div></div>
             <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>State</span><div style={{ fontWeight: '500', color: ['running', 'listening', 'connected', 'starting'].includes(statusInfo.result?.status?.status) ? 'var(--success-color)' : 'var(--text-secondary)' }}>{statusInfo.result?.status?.status || 'N/A'}</div></div>
@@ -671,7 +760,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </div>
       )}
       
-      <div id="acsi-modelPanel" className="model-tree" style={{ marginTop: '24px' }}>
+      <div id="acsi-modelPanel" className="model-tree" style={{ marginTop: '24px', padding: '20px' }}>
         {treeData ? (
             <Tree
                 data={treeData}
@@ -684,7 +773,25 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             {endpoint ? `Click "Load Model" to view the server model for ${endpoint.name || endpoint.host}:${endpoint.port}` : 'Configure and start the ACSI Server to load model'}
           </p>}
       </div>
-      
+
+      <div className="page-header">
+        <div style={{  display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <h1><i className="fas fa-server" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>Monitoring</h1>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+        <button id="messages-start-btn" className={isMonitoring ? 'btn-secondary' : 'btn-primary'} onClick={startMonitoring} disabled={!endpointTarget || isMonitoring}>
+          {isMonitoring ? 'Monitoring...' : 'Start Monitor'}
+        </button>
+        <button id="messages-stop-btn" className={isMonitoring ? 'btn-primary' : 'btn-secondary'} onClick={stopMonitoringHandler} disabled={!isMonitoring}>
+          Stop Monitor
+        </button>
+        <button id="messages-clear-btn" className="btn-secondary" onClick={clearMessages} disabled={!endpointTarget}>
+          Clear Logs
+        </button>
+      </div>
+
       {isMonitoring && (
         <div style={{ marginTop: '24px' }}>
           <h3 style={{ fontSize: '16px', marginBottom: '12px' }}>Protocol Messages</h3>

@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 
 function Header({ bffStatus }) {
   const location = useLocation();
+  const endpoint = location.state?.endpoint;
 
   // Get breadcrumb text based on current path
   const getBreadcrumbText = () => {
@@ -31,10 +32,14 @@ function Header({ bffStatus }) {
         return 'Monitoring';
       case '/settings':
         return 'Settings';
-      case '/acsi-client':
-        return 'ACSI Client';
-      case '/acsi-server':
-        return 'ACSI Server';
+      case '/acsi-client': {
+        const name = endpoint?.name || (endpoint ? `${endpoint.host}:${endpoint.port}` : null);
+        return name ? `Configuration — ${name}` : 'ACSI Client';
+      }
+      case '/acsi-server' : {
+        const name = endpoint?.name || (endpoint ? `${endpoint.host}:${endpoint.port}` : null);
+        return name ? `Configuration — ${name}` : 'ACSI Server';
+      }
       default:
         return 'Setup';
     }
