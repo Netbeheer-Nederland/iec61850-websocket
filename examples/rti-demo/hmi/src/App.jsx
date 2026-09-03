@@ -29,6 +29,9 @@ function App() {
     bffPort: '5000'
   });
 
+  // Single source of truth for the BFF base URL, derived from settings.
+  const bffBaseUrl = `http://${settings.bffHost}:${settings.bffPort}`;
+
   // Models state: stores endpoint -> model mapping
   // updateModel: add/update a model for an endpoint
   const updateModel = useCallback((endpointId, modelData) => {
@@ -154,8 +157,8 @@ function App() {
             <Route path="/diagnostics" element={<Diagnostics />} />
             <Route path="/tools" element={<Tools />} />
             <Route path="/settings" element={<Settings settings={settings} setSettings={setSettings} />} />
-            <Route path="/acsi-client" element={<ACSIClient settings={settings} connections={connections} updateModel={updateModel} getModel={getModel} />} />
-            <Route path="/acsi-server" element={<ACSIServer settings={settings} connections={connections} updateModel={updateModel} getModel={getModel} />} />
+            <Route path="/acsi-client" element={<ACSIClient settings={settings} bffBaseUrl={bffBaseUrl} connections={connections} updateModel={updateModel} getModel={getModel} />} />
+            <Route path="/acsi-server" element={<ACSIServer settings={settings} bffBaseUrl={bffBaseUrl} connections={connections} updateModel={updateModel} getModel={getModel} />} />
             <Route path="*" element={<Navigate to="/setup" replace />} />
           </Routes>
         </main>

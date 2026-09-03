@@ -13,6 +13,7 @@ import traceback
 import asyncio
 import os
 from concurrent.futures import TimeoutError as FuturesTimeoutError
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, Optional
 from fastapi import FastAPI, APIRouter, Request, HTTPException
@@ -26,8 +27,31 @@ from ws61850.security.tls import TLSConfig
 import ssl
 import json
 
+def resolve_log_level(value: Optional[str], default: int = logging.INFO) -> int:
+    """Map a level name (case-insensitive) to a logging constant.
+
+    Falls back to ``default`` for unknown/empty values instead of letting
+    ``basicConfig`` raise ``ValueError`` and abort startup. Also accepts a
+    numeric string (e.g. "10") and uvicorn's "trace" alias.
+    """
+    if value is None:
+        return default
+    name = str(value).strip().upper()
+    if not name:
+        return default
+    if name.isdigit():
+        return int(name)
+    if name == "TRACE":  # uvicorn alias, no stdlib equivalent
+        return logging.DEBUG
+    level = logging.getLevelName(name)  # returns int for known names, str otherwise
+    return level if isinstance(level, int) else default
+
+
+# Module-level default from the environment; the __main__ CLI can override it.
+LOG_LEVEL = resolve_log_level(os.getenv("LOG_LEVEL"))
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=LOG_LEVEL,
     format='%(asctime)s - %(name)s - %(threadName)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout)  # Force stdout for Docker
@@ -35,7 +59,47 @@ logging.basicConfig(
     force=True  # Override any existing config
 )
 
+# Apply the severity to the root logger here at import time, not only in the
+# __main__ block, so every entry point honours LOG_LEVEL: `python
+# so/bff_endpoint.py`, `uvicorn so.bff_endpoint:app`, a service wrapper, or
+# pytest importing create_fastapi_app. Child loggers (acsi_client, ws61850.*)
+# and the ACSI client's background event-loop thread inherit this level.
+logging.getLogger().setLevel(LOG_LEVEL)
+
 logger = logging.getLogger(__name__)
+
+
+class HealthCheckAccessFilter(logging.Filter):
+    """Demote uvicorn access-log lines for health/status polls to DEBUG.
+
+    The Docker healthcheck hits ``/api/status`` (and service discovery hits
+    ``/api/health``) every few seconds; logged at INFO they bury the real
+    request log. Matching records are relabelled DEBUG and only pass through
+    when the ``uvicorn.access`` logger is actually at DEBUG.
+    """
+
+    QUIET_PATHS = ("/api/status", "/api/health")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn access records: (client_addr, method, path, http_version, status)
+        if not isinstance(args, tuple) or len(args) < 3:
+            return True
+        path = str(args[2]).split("?", 1)[0]
+        if path not in self.QUIET_PATHS:
+            return True
+        record.levelno = logging.DEBUG
+        record.levelname = "DEBUG"
+        return logging.getLogger("uvicorn.access").isEnabledFor(logging.DEBUG)
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # Installed here (not before uvicorn.run) so it survives uvicorn's own
+    # logging dictConfig, which runs before app startup.
+    logging.getLogger("uvicorn.access").addFilter(HealthCheckAccessFilter())
+    yield
+
 
 # Global flag to control io_client usage for writevalue sync
 _use_io_client = True
@@ -385,6 +449,7 @@ class WriteValueRequest(BaseModel):
 def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     """Create and configure the FastAPI application for Acsi-Client BFF."""
     app = FastAPI(
+        lifespan=_lifespan,
         title="ACSI Client WS Passive",
         description="Backend for Frontend (BFF) endpoint providing REST API for ACSI client control. "
                     "This service manages IEC61850 WebSocket client connections, data access, "
@@ -2984,9 +3049,47 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     return router, rti_so
 
 if __name__ == "__main__":
+    import argparse
     import uvicorn
+
+    _LOG_CHOICES = ["critical", "error", "warning", "info", "debug", "trace"]
+
+    parser = argparse.ArgumentParser(description="RTI Demo SO (ACSI client) BFF endpoint")
+    parser.add_argument(
+        "--host",
+        default=os.getenv("HOST", "0.0.0.0"),
+        help="Host interface to bind (default: %(default)s, env: HOST)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("PORT", "5003")),
+        help="Port to listen on (default: %(default)s, env: PORT)",
+    )
+    parser.add_argument(
+        "--log-level",
+        default=os.getenv("LOG_LEVEL", "info"),
+        help="Log level: %s (default: %%(default)s, env: LOG_LEVEL)" % ", ".join(_LOG_CHOICES),
+    )
+    args = parser.parse_args()
+
+    # Module scope already applied LOG_LEVEL from the environment at import
+    # (covers the app + ws61850 + acsi_client loggers). Re-resolve here so an
+    # explicit --log-level on the command line wins, and hand the same value to
+    # uvicorn so its own 'uvicorn'/'uvicorn.error'/'uvicorn.access' loggers
+    # follow suit.
+    resolved = resolve_log_level(args.log_level)
+    logging.getLogger().setLevel(resolved)
+    uvicorn_log_level = args.log_level.lower()
+    if uvicorn_log_level not in _LOG_CHOICES:
+        uvicorn_log_level = logging.getLevelName(resolved).lower()
+
+    logger.info(
+        "Starting RTI Demo SO BFF on %s:%d (log level %s)",
+        args.host, args.port, logging.getLevelName(resolved),
+    )
+
     factory_dir = Path(__file__).parent
     app = create_fastapi_app(factory_dir)
-    port = int(os.getenv("PORT", "5003"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host=args.host, port=args.port, log_level=uvicorn_log_level)
 

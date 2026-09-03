@@ -67,13 +67,15 @@ export const getApiById = (id) => API_DEFINITIONS.find(api => api.id === id);
  * @returns {string} The BFF base URL
  */
 export const getBffBaseUrl = () => {
-  const storedHost = localStorage.getItem('bffHost') || localStorage.getItem('rti-hmi-settings') 
-    ? JSON.parse(localStorage.getItem('rti-hmi-settings'))?.bffHost 
-    : 'localhost';
-  const storedPort = localStorage.getItem('bffPort') || localStorage.getItem('rti-hmi-settings')
-    ? JSON.parse(localStorage.getItem('rti-hmi-settings'))?.bffPort
-    : '5000';
-  return `http://${storedHost}:${storedPort}`;
+  let savedSettings = {};
+  try {
+    savedSettings = JSON.parse(localStorage.getItem('rti-hmi-settings') || '{}') || {};
+  } catch (e) {
+    console.warn(`Failed to parse rti-hmi-settings: ${e.message}`);
+  }
+  const host = localStorage.getItem('bffHost') || savedSettings.bffHost || 'localhost';
+  const port = localStorage.getItem('bffPort') || savedSettings.bffPort || '5000';
+  return `http://${host}:${port}`;
 };
 
 /**

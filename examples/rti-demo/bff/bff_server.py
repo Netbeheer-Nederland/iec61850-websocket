@@ -18,6 +18,7 @@ from datetime import datetime
 import json
 import os
 import logging
+import sys
 from typing import Any, Dict, List, Optional, Tuple
 import requests
 import threading
@@ -43,11 +44,70 @@ import httpx
 _bff_clients: Dict[str, BffClient] = {}
 
 # Configure logging
+def resolve_log_level(value: Optional[str], default: int = logging.INFO) -> int:
+    """Map a level name (case-insensitive) to a logging constant.
+
+    Falls back to ``default`` for unknown/empty values instead of letting
+    ``basicConfig`` raise ``ValueError`` and abort startup. Also accepts a
+    numeric string (e.g. "10") and uvicorn's "trace" alias.
+    """
+    if value is None:
+        return default
+    name = str(value).strip().upper()
+    if not name:
+        return default
+    if name.isdigit():
+        return int(name)
+    if name == "TRACE":  # uvicorn alias, no stdlib equivalent
+        return logging.DEBUG
+    level = logging.getLevelName(name)  # returns int for known names, str otherwise
+    return level if isinstance(level, int) else default
+
+
+# Module-level default from the environment; the __main__ CLI can override it.
+LOG_LEVEL = resolve_log_level(os.getenv("LOG_LEVEL"))
+
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=LOG_LEVEL,
+    format='%(asctime)s - %(name)s - %(threadName)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # Force stdout for Docker
+    ],
+    force=True  # Override any existing config
 )
+
+# Apply the severity to the root logger here at import time, not only in the
+# __main__ block, so every entry point honours LOG_LEVEL: `python
+# bff/bff_server.py`, `uvicorn bff.bff_server:app`, a service wrapper, or
+# pytest importing the module. Child loggers and the status-monitor / thread
+# pool workers inherit this level.
+logging.getLogger().setLevel(LOG_LEVEL)
+
 logger = logging.getLogger(__name__)
+
+
+class HealthCheckAccessFilter(logging.Filter):
+    """Demote uvicorn access-log lines for health/status polls to DEBUG.
+
+    The Docker healthcheck hits ``/api/health`` (and the HMI polls it plus
+    ``/api/status``) every few seconds; logged at INFO they bury the real
+    request log. Matching records are relabelled DEBUG and only pass through
+    when the ``uvicorn.access`` logger is actually at DEBUG.
+    """
+
+    QUIET_PATHS = ("/api/status", "/api/health")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn access records: (client_addr, method, path, http_version, status)
+        if not isinstance(args, tuple) or len(args) < 3:
+            return True
+        path = str(args[2]).split("?", 1)[0]
+        if path not in self.QUIET_PATHS:
+            return True
+        record.levelno = logging.DEBUG
+        record.levelname = "DEBUG"
+        return logging.getLogger("uvicorn.access").isEnabledFor(logging.DEBUG)
 
 # Try to import docker for auto-discovery
 DOCKER_AVAILABLE = False
@@ -89,6 +149,10 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Installed here (not before uvicorn.run) so it survives uvicorn's own
+    # logging dictConfig, which runs before app startup.
+    logging.getLogger("uvicorn.access").addFilter(HealthCheckAccessFilter())
+
     asyncio.create_task(
         conn_manager.status_monitor(interval=10)
     )
@@ -1243,6 +1307,42 @@ async def general_exception_handler(request: Request, exc: Exception):
 # ==================== Application Entry Point ====================
 
 if __name__ == '__main__':
+    import argparse
     import uvicorn
-    logger.info("Starting RTI Demo BFF Server (FastAPI)...")
-    uvicorn.run(app, host='0.0.0.0', port=5000)
+
+    _LOG_CHOICES = ["critical", "error", "warning", "info", "debug", "trace"]
+
+    parser = argparse.ArgumentParser(description="RTI Demo BFF Server (FastAPI)")
+    parser.add_argument(
+        "--host",
+        default=os.getenv("HOST", "0.0.0.0"),
+        help="Host interface to bind (default: %(default)s, env: HOST)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("PORT", "5000")),
+        help="Port to listen on (default: %(default)s, env: PORT)",
+    )
+    parser.add_argument(
+        "--log-level",
+        default=os.getenv("LOG_LEVEL", "info"),
+        help="Log level: %s (default: %%(default)s, env: LOG_LEVEL)" % ", ".join(_LOG_CHOICES),
+    )
+    args = parser.parse_args()
+
+    # Module scope already applied LOG_LEVEL from the environment at import.
+    # Re-resolve here so an explicit --log-level on the command line wins, and
+    # hand the same value to uvicorn so its own 'uvicorn'/'uvicorn.error'/
+    # 'uvicorn.access' loggers follow suit.
+    resolved = resolve_log_level(args.log_level)
+    logging.getLogger().setLevel(resolved)
+    uvicorn_log_level = args.log_level.lower()
+    if uvicorn_log_level not in _LOG_CHOICES:
+        uvicorn_log_level = logging.getLevelName(resolved).lower()
+
+    logger.info(
+        "Starting RTI Demo BFF Server (FastAPI) on %s:%d (log level %s)...",
+        args.host, args.port, logging.getLevelName(resolved),
+    )
+    uvicorn.run(app, host=args.host, port=args.port, log_level=uvicorn_log_level)

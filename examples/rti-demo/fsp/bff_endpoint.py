@@ -8,15 +8,47 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from typing import Optional
+
+
+def resolve_log_level(value: Optional[str], default: int = logging.INFO) -> int:
+    """Map a level name (case-insensitive) to a logging constant.
+
+    Falls back to ``default`` for unknown/empty values instead of letting
+    ``basicConfig`` raise ``ValueError`` and abort startup. Also accepts a
+    numeric string (e.g. "10") and uvicorn's "trace" alias.
+    """
+    if value is None:
+        return default
+    name = str(value).strip().upper()
+    if not name:
+        return default
+    if name.isdigit():
+        return int(name)
+    if name == "TRACE":  # uvicorn alias, no stdlib equivalent
+        return logging.DEBUG
+    level = logging.getLevelName(name)  # returns int for known names, str otherwise
+    return level if isinstance(level, int) else default
+
+
+# Module-level default from the environment; the __main__ CLI can override it.
+LOG_LEVEL = resolve_log_level(os.getenv("LOG_LEVEL"))
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=LOG_LEVEL,
     format='%(asctime)s - %(name)s - %(threadName)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout)  # Force stdout for Docker
     ],
     force=True  # Override any existing config
 )
+
+# Apply the severity to the root logger here at import time, not only in the
+# __main__ block, so every entry point honours LOG_LEVEL: `python
+# fsp/bff_endpoint.py`, `uvicorn fsp.bff_endpoint:app`, a service wrapper, or
+# pytest importing create_fastapi_app. Child loggers (acsi_server, ws61850.*)
+# and any background event-loop thread inherit this level.
+logging.getLogger().setLevel(LOG_LEVEL)
 
 logger = logging.getLogger(__name__)
 
@@ -1903,8 +1935,46 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     return app
 
 if __name__ == "__main__":
+    import argparse
     import uvicorn
+
+    _LOG_CHOICES = ["critical", "error", "warning", "info", "debug", "trace"]
+
+    parser = argparse.ArgumentParser(description="RTI Demo FSP (ACSI server) BFF endpoint")
+    parser.add_argument(
+        "--host",
+        default=os.getenv("HOST", "0.0.0.0"),
+        help="Host interface to bind (default: %(default)s, env: HOST)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("PORT", "5001")),
+        help="Port to listen on (default: %(default)s, env: PORT)",
+    )
+    parser.add_argument(
+        "--log-level",
+        default=os.getenv("LOG_LEVEL", "info"),
+        help="Log level: %s (default: %%(default)s, env: LOG_LEVEL)" % ", ".join(_LOG_CHOICES),
+    )
+    args = parser.parse_args()
+
+    # Module scope already applied LOG_LEVEL from the environment at import
+    # (covers the app + ws61850 + acsi_server loggers). Re-resolve here so an
+    # explicit --log-level on the command line wins, and hand the same value to
+    # uvicorn so its own 'uvicorn'/'uvicorn.error'/'uvicorn.access' loggers
+    # follow suit.
+    resolved = resolve_log_level(args.log_level)
+    logging.getLogger().setLevel(resolved)
+    uvicorn_log_level = args.log_level.lower()
+    if uvicorn_log_level not in _LOG_CHOICES:
+        uvicorn_log_level = logging.getLevelName(resolved).lower()
+
+    logger.info(
+        "Starting RTI Demo FSP BFF on %s:%d (log level %s)",
+        args.host, args.port, logging.getLevelName(resolved),
+    )
+
     factory_dir = Path(__file__).parent
     app = create_fastapi_app(factory_dir)
-    port = int(os.getenv("PORT", "5001"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host=args.host, port=args.port, log_level=uvicorn_log_level)
