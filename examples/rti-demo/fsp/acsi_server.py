@@ -614,6 +614,22 @@ class ACSIServer:
 
         cp = self.runtime.cp or "cp1"
 
+        # If the model was updated while the server was stopped, update_model_file
+        # only refreshed self.runtime.ied_model (no hot-swap path runs when not
+        # listening) — self.runtime.server itself never got the new model. Bring
+        # it in sync here before starting tasks against it, otherwise we'd serve
+        # whatever model existed at ACSIServer.__init__ time.
+        if (
+                self.runtime.server is not None
+                and self.runtime.ied_model is not None
+                and getattr(self.runtime.server, "ied_model", None) is not self.runtime.ied_model
+        ):
+            self.runtime.server.update_ied_model(self.runtime.ied_model)
+            self._log_action(
+                "Applied pending model before start (was updated while stopped)",
+                detail={"ied": self.runtime.ied_model.name},
+            )
+
         # ready_event is bound to whichever loop is running when it's created.
         # Since self.runtime.server is a long-lived singleton reused across
         # stop/start cycles, but each start_server() spins up a brand-new event
