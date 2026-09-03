@@ -420,8 +420,14 @@ function MessageMonitor({
                 }}
                 title="Toggle pretty print"
                 style={{
-                  padding: '4px',
+                  width: '20px',
+                  height: '20px',
+                  padding: 0,
                   fontSize: '10px',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   background: 'var(--bg-hover)',
                   border: 'none',
                   borderRadius: '4px 0 0 4px'
@@ -437,8 +443,14 @@ function MessageMonitor({
                 }}
                 title="Copy to clipboard"
                 style={{
-                  padding: '4px',
+                  width: '20px',
+                  height: '20px',
+                  padding: 0,
                   fontSize: '10px',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   background: 'var(--bg-hover)',
                   border: 'none',
                   borderRadius: '0 4px 4px 0'
