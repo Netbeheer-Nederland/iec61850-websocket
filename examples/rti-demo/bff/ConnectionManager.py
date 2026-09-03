@@ -23,6 +23,7 @@ import asyncio
 import httpx
 import os
 import json
+import tempfile
 from datetime import datetime
 
 
@@ -106,12 +107,41 @@ class ConnectionManager:
         return []
 
     def save_connections(self) -> None:
-        """Save connections to file."""
+        """Persist connections to disk atomically.
+
+        Writes a temp file in the same directory and then atomically replaces
+        the target, so a failed or partial write never truncates or corrupts
+        an existing ``connections.json``.
+
+        Raises:
+            OSError: if the file (or its directory) cannot be written, e.g.
+                ``PermissionError`` when the volume is mounted read-only or the
+                process user lacks write rights. The error is logged and then
+                re-raised so callers can surface it instead of silently losing
+                the change.
+        """
+        target = self.connections_file
+        directory = os.path.dirname(os.path.abspath(target)) or "."
+        tmp_path = None
         try:
-            with open(self.connections_file, 'w') as f:
+            fd, tmp_path = tempfile.mkstemp(
+                prefix=".connections-", suffix=".json.tmp", dir=directory
+            )
+            with os.fdopen(fd, "w") as f:
                 json.dump(self.connections, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, target)
+            tmp_path = None
         except Exception as e:
-            self.logger.error(f"Error saving connections: {e}")
+            self.logger.error(f"Error saving connections to {target}: {e}")
+            raise
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
 
     def add_connection(self, name: str, host: Optional[str] = None, port: Optional[int] = None, conn_type: str = "",
                        acsi: Optional[str] = None, ws_mode: Optional[str] = None, endpoint: Optional[str] = None,
@@ -353,7 +383,14 @@ class ConnectionManager:
         conn = self.get_connection(conn_name)
         if conn:
             conn['status'] = status
-            self.save_connections()
+            try:
+                self.save_connections()
+            except OSError as e:
+                # Status refreshes are frequent and transient; a persistence
+                # failure here must not propagate and kill the caller/monitor.
+                self.logger.warning(
+                    f"Could not persist status for {conn_name}: {e}"
+                )
 
     def auto_register_discovered(self, discovered: Dict[str, Dict]) -> int:
         """Auto-register discovered services as connections.

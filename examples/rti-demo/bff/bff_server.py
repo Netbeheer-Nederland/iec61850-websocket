@@ -1294,6 +1294,21 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
+@app.exception_handler(OSError)
+async def storage_exception_handler(request: Request, exc: OSError):
+    """Surface filesystem failures (e.g. a read-only connections.json) instead
+    of collapsing them into a generic 500 with no detail. Covers
+    PermissionError, read-only filesystem, and no-space-left errors raised
+    while persisting connection changes."""
+    logger.error(
+        "Storage error on %s %s: %s", request.method, request.url.path, exc
+    )
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"ok": False, "error": f"Failed to persist data to disk: {exc}"},
+    )
+
+
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle unexpected exceptions."""
