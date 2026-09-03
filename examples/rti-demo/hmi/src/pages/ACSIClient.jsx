@@ -822,63 +822,32 @@ const getContextMenuItems = () => {
     };
   }, [stopMonitoring]);
 
-  return (
+   return (
     <section className="page">
       {/* Header */}
-      <div className="page-header">
+      <div className="page-header" style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <h1>
             <i className="fas fa-microchip" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>
-            ACSI Interface
+            Websocket Connection
           </h1>
-          <span id="acsi-endpoint-badge" className="acsi-endpoint-badge" style={{ display: connected ? 'inline-flex' : 'none' }}>
-            {connected && statusInfo && `${statusInfo.result?.host}:${statusInfo.result?.port}`}
-            {statusInfo?.result?.accessPoints && <span style={{ marginLeft: '8px' }}>AP: {statusInfo.result.accessPoints}</span>}
-            {endpoint && !connected && <span>{endpoint.name || `${endpoint.host}:${endpoint.port}`}</span>}
-          </span>
         </div>
       </div>
 
       {/* Connection Section */}
-      <div style={{ display: 'flex', alignItems: 'left', gap: '16px', marginBottom: '24px' }}>
-        <h2>
-          <i style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>ACSI Client
-        </h2>
-      </div>
-
       <div className="acsi-connection-section" style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginBottom: '24px' }}>
+
         <div className="form-group">
           <label htmlFor="acsi-client-ws-host-page">WS Host</label>
-          <input
-            type="text"
-            id="acsi-client-ws-host-page"
-            value={wsHost}
-            placeholder="0.0.0.0"
-            //onChange={(e) => setWsHost(e.target.value)}
-            disabled
-          />
+          <input type="text" id="acsi-client-ws-host-page" value={wsHost} placeholder="0.0.0.0" disabled />
         </div>
         <div className="form-group">
           <label>WS Port</label>
-          <input
-            type="number"
-            id="acsi-client-ws-port"
-            value={wsPort}
-            placeholder="102"
-            //onChange={(e) => setWsPort(parseInt(e.target.value) || 102)}
-            disabled
-          />
+          <input type="number" id="acsi-client-ws-port" value={wsPort} placeholder="102" disabled />
         </div>
         <div className="form-group">
           <label>WS CP</label>
-          <input
-            type="text"
-            id="acsi-client-ws-cp"
-            value={wsCp}
-            placeholder="cp1"
-            onChange={(e) => setWsCp(e.target.value)}
-            disabled={loading}
-          />
+          <input type="text" id="acsi-client-ws-cp" value={wsCp} placeholder="cp1" onChange={(e) => setWsCp(e.target.value)} disabled={loading}/>
         </div>
       </div>
 
@@ -979,22 +948,24 @@ const getContextMenuItems = () => {
         </label>
       </div>
 
+      <div className="page-header" style={{ position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <h1>
+            <i className="fas fa-microchip" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>
+            ACSI Client
+          </h1>
+          <span id="acsi-endpoint-badge" className="acsi-endpoint-badge" style={{ display: connected ? 'inline-flex' : 'none' }}>
+            {connected && statusInfo && `${statusInfo.result?.host}:${statusInfo.result?.port}`}
+            {statusInfo?.result?.accessPoints && <span style={{ marginLeft: '8px' }}>AP: {statusInfo.result.accessPoints}</span>}
+            {endpoint && !connected && <span>{endpoint.name || `${endpoint.host}:${endpoint.port}`}</span>}
+          </span>
+        </div>
+      </div>
+
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
         <button id="acsi-read-data-btn" className="btn-primary" onClick={loadClientTree} disabled={loading || !apiTarget}>
           {loading ? 'Fetching...' : 'Fetch Model'}
-        </button>
-        {/*<button className="btn-secondary" onClick={loadStatus} disabled={!apiTarget}>
-          Reload Status
-        </button>*/}
-        <button id="messages-start-btn" className="btn-primary" onClick={startMonitoring} disabled={!apiTarget || isMonitoring}>
-          {isMonitoring ? 'Monitoring...' : 'Start Monitor'}
-        </button>
-        <button id="messages-stop-btn" className="btn-secondary" onClick={stopMonitoring} disabled={!isMonitoring}>
-          Stop Monitor
-        </button>
-        <button id="messages-clear-btn" className="btn-secondary" onClick={clearMessages} disabled={!apiTarget}>
-          Clear Logs
         </button>
       </div>
 
@@ -1064,6 +1035,27 @@ const getContextMenuItems = () => {
             Click "Fetch Model" to load the ACSI model tree
           </p>
         )}
+      </div>
+
+      <div className="page-header" style={{ position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <h1>
+            <i className="fas fa-microchip" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>
+            Monitoring
+          </h1>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+        <button id="messages-start-btn" className={isMonitoring ? 'btn-secondary' : 'btn-primary'} onClick={startMonitoring} disabled={!apiTarget || isMonitoring}>
+          {isMonitoring ? 'Monitoring...' : 'Start Monitor'}
+        </button>
+        <button id="messages-stop-btn" className={isMonitoring ? 'btn-primary' : 'btn-secondary'} onClick={stopMonitoring} disabled={!isMonitoring}>
+          Stop Monitor
+        </button>
+        <button id="messages-clear-btn" className="btn-secondary" onClick={clearMessages} disabled={!apiTarget}>
+          Clear Logs
+        </button>
       </div>
 
       {/* Protocol Messages */}
@@ -1212,18 +1204,6 @@ const getContextMenuItems = () => {
         onSuccess={(msg) => {
           setMessage({ type: 'success', text: msg });
           // Refetch connections to get updated TLS config
-          const fetchConnections = async () => {
-            try {
-              const url = `${bffBaseUrl}/api/connections`;
-              const response = await fetch(url);
-              if (response.ok) {
-                const data = await response.json();
-                setConnections(data.connections || []);
-              }
-            } catch (error) {
-              console.error('Failed to refetch connections:', error);
-            }
-          };
           fetchConnections();
         }}
         onError={(msg) => setMessage({ type: 'error', text: msg })}

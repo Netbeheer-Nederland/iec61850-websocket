@@ -65,7 +65,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     const inst = fspInstances.find(c => c.name === value);
     if (inst) {
       setHost(inst.host || '');
-      setPort(String(inst.port || ''));
     }
   }, [fspInstances]);
 
@@ -244,7 +243,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
 
         if (inst) {
           setHost(inst.host || '');
-          setPort(String(inst.port || ''));
           if (inst.cp) setCp(inst.cp);
         }
 
@@ -695,7 +693,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </div>
         <div className="form-group">
           <label>WS Port</label>
-          <input type="number" value={port} placeholder="102" onChange={(e) => setPort(e.target.value)} disabled={loading || !isCustomInstance} />
+          <input type="number" value={port} placeholder="8765" onChange={(e) => setPort(e.target.value)} disabled={loading} />
         </div>
         <div className="form-group">
           <label>WS CP</label>
