@@ -134,6 +134,12 @@ class ModelRequest(BaseModel):
         json_schema_extra={"example": "cp1"}
     )
 
+    refresh: bool = Field(
+        default=False,
+        description="Force a fresh model rebuild instead of returning cached data",
+        json_schema_extra={"example": False}
+    )
+
 class ServerDirectoryRequest(BaseModel):
     """Request body for getting server directory.
 
@@ -475,14 +481,14 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     router, _client = create_bff_router(resolved_factory_dir)
     app.include_router(router)
     app.state.client = _client
-    
+
     # Include IO router for device control via demo_IO
     try:
         # Add parent directory to path so we can import from demo_IO
         demo_io_parent = Path(__file__).parent.parent
         if str(demo_io_parent) not in sys.path:
             sys.path.insert(0, str(demo_io_parent))
-        
+
         from demo_IO.io_client.io_router import create_io_router
         io_router = create_io_router()
         app.include_router(io_router)
@@ -499,7 +505,7 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     return app
 
 def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
@@ -523,7 +529,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 # Get the existing IO router's client and mapping manager
                 from demo_IO.io_client.io_router import get_io_client
                 from demo_IO.io_client.io_utils import sync_to_io_device
-                
+
                 io_client = get_io_client()
                 logger.info(f"IO client for sync: {io_client}")
                 if io_client:
@@ -538,7 +544,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 logger.error(f"ImportError - Cannot import IO client: {e}")
             except Exception as e:
                 logger.error(f"Exception in IO sync setup: {e}")
-        
+
 
     rti_so.install_write_callback(on_write_callback)
 
@@ -553,7 +559,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 # Get the existing IO router's client and mapping manager
                 from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
                 from demo_IO.io_client.io_utils import blink_led_task, write_to_lcd
-                
+
                 io_client = get_io_client()
                 mapping_manager = get_mapping_manager()
                 logger.info(f"IO client for sync: {io_client}")
@@ -576,19 +582,32 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 logger.error(f"ImportError - Cannot import IO client: {e}")
             except Exception as e:
                 logger.error(f"Exception in IO sync setup: {e}")
-                
+
 
     rti_so.install_report_callback(on_report_callback)
 
     def on_connected_callback(associate_response):
         """Callback for received associateResponse messages."""
         logger.info(f"[CONNECTED] associateResponse: {associate_response}")
-        
+        # A build that failed or hung while disconnected can leave model_status
+        # stuck at 'error' (or 'building'). Clear it here so the next fetch
+        # after reconnect rebuilds against the live connection instead of
+        # immediately returning a stale pre-reconnect error.
+        cp = associate_response.get("associateId")
+        if cp:
+            model_info = rti_so.get_model_info(cp)
+            with rti_so.runtime.lock:
+                if model_info.model_status in ('error', 'building'):
+                    model_info.model_status = 'idle'
+                    model_info.model_data = None
+                    model_info.model_error = None
+                    model_info.model_ready_event.clear()
+
         if _use_io_client:
             try:
                 from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
                 from demo_IO.io_client.io_utils import blink_led_task, write_to_lcd
-                
+
                 io_client = get_io_client()
                 mapping_manager = get_mapping_manager()
                 logger.info(f"IO client for connected: {io_client}")
@@ -599,7 +618,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     asyncio.create_task(
                         blink_led_task(io_client, "connected", interval=0.5, count=2, mapping_manager=mapping_manager)
                     )
-                    
+
                     # Write connection info to LCD
                     value = f"Connected: {associate_id}"
                     asyncio.create_task(
@@ -767,7 +786,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         if acsi_client is None:
             raise HTTPException(status_code=404, detail=f"Client with cp={cp} not found")
         else:
-            logger.info("client found with cp: ", acsi_client.cp)
+            logger.info("client found with cp: ", cp)
 
         if not rti_so or not endpoint or not loop or not acsi_client.is_connected:
             raise RuntimeError('not-connected')
@@ -822,14 +841,20 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             ld_list = await acsi_client.get_server_directory(ws_info, None, None)
             if not isinstance(ld_list, list):
                 raise RuntimeError('unexpected-server-directory')
-            
+
             _init_progress(ld_list)
-            
+
             # Step 2: Fetch all LD directories in PARALLEL
             async def fetch_ld_directory(ld):
                 try:
+                    ln_list = None
                     _set_current_ld(ld)
-                    ln_list = await acsi_client.get_logical_device_directory(ld, ws_info, None, None)
+                    lock = rti_so.runtime.invoke_lock
+                    if lock is None:
+                        ln_list = await acsi_client.get_logical_device_directory(ld, ws_info, None, None)
+                    else:
+                        async with lock:
+                            ln_list = await acsi_client.get_logical_device_directory(ld, ws_info, None, None)
                     if not isinstance(ln_list, list):
                         raise RuntimeError('unexpected-ln-list')
                     return {'ld': ld, 'ln_list': ln_list, 'status': 'ok'}
@@ -838,22 +863,22 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     return {'ld': ld, 'ln_list': [], 'status': 'error'}
                 finally:
                     _finish_ld()
-            
+
             ld_coros = [fetch_ld_directory(ld) for ld in ld_list]
             ld_results = await asyncio.gather(*ld_coros)
-            
+
             # Build maps from results
             logical_device_map = {}
             logical_device_status = {}
             all_ln_tasks = []  # List of (ld, ln_inst) tuples
-            
+
             for result in ld_results:
                 ld = result['ld']
                 ln_list = result['ln_list']
                 logical_device_map[ld] = ln_list
                 logical_device_status[ld] = result['status']
                 _add_lns_total(len(ln_list))
-                
+
                 # Collect all LNs for parallel fetching
                 for ln_full in ln_list:
                     if '/' in ln_full:
@@ -863,7 +888,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     else:
                         ln_inst = ln_full
                     all_ln_tasks.append((ld, ln_inst))
-            
+
             # Step 3: Fetch all LN details in PARALLEL
             async def fetch_ln_details(task):
                 ld, ln_inst = task
@@ -876,16 +901,16 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     print(f"Failed to get details for {ld}/{ln_inst}: {e}")
                     _inc_ln_done()
                     return {'ld': ld, 'ln_inst': ln_inst, 'details': None}
-            
+
             ln_coros = [fetch_ln_details(task) for task in all_ln_tasks]
             ln_results = await asyncio.gather(*ln_coros)
-            
+
             # Build logical_node_details
             logical_node_details = {}
             for result in ln_results:
                 if result['details']:
                     logical_node_details[f"{result['ld']}/{result['ln_inst']}"] = result['details']
-            
+
             model = {
                 'server': {'logicalDevices': ld_list},
                 'logicalDeviceMap': logical_device_map,
@@ -903,6 +928,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             with rti_so.runtime.lock:
                 model_info.model_status = 'error'
                 model_info.model_error = str(e)
+                model_info.model_ready_event.set()
             raise
 
     def _start_model_build_if_needed(cp):
@@ -1243,7 +1269,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     server_cert = tls_config.certfile
                 if hasattr(tls_config, 'keyfile'):
                     server_key = tls_config.keyfile
-            
+
             # Get ws_mode
             ws_mode = "passive"
             if hasattr(endpoint, 'ws_mode'):
@@ -1292,14 +1318,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 token_issuer_url = token_endpoint_from_req.replace('/protocol/openid-connect/token', '')
                 rti_so._log_action("Extracted token_issuer from token_endpoint URL", "info")
             ca_certificate = getattr(request, 'ca_certificate', None)
-            
+
             # Validate that required OAuth settings are provided
             connection_name = request.connection_name or "unknown"
             if request.enable_oauth and (not certificate_endpoint or not token_issuer_url):
                 error_msg = f"certificate_endpoint and token_issuer_url are required for OAuth but were not provided in request for connection: {connection_name}"
                 rti_so._log_action(error_msg, "error")
                 raise ValueError(error_msg)
-            
+
             # When disabling OAuth, pass None to signal that OAuth should be disabled
             # The underlying library should handle None properly
             if not request.enable_oauth:
@@ -1307,7 +1333,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 certificate_endpoint = None
                 token_issuer_url = None
                 ca_certificate = None
-            
+
             if request.ws_mode.lower() == "passive":
                 rti_so._log_action("Reconfiguring OAuth for passive mode", "info")
                 loop = rti_so.runtime.loop
@@ -1450,7 +1476,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         try:
             host = request.host
             port = request.port
-            
+
             rti_so._log_action(f"Connect request: host={host}, port={port}", "info")
 
             try:
@@ -1520,11 +1546,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         },
         tags=["Model Access"]
     )
-    async def api_model(request: ModelRequest, refresh: bool = False):
+    async def api_model(request: ModelRequest):
         """Get the IED model tree from the connected server."""
 
         cp = request.cp
         model_info = rti_so.get_model_info(cp)
+        refresh = request.refresh
+
+        print("the refresh value: ", refresh)
 
         if refresh:
                 with rti_so.runtime.lock:
@@ -1536,6 +1565,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         try:
             loop = rti_so.runtime.loop
             if loop is None or not getattr(loop, "is_running", lambda: False)():
+                print("Client not connected, raising HTTPException")
                 raise HTTPException(status_code=503, detail="client-not-connected")
 
             _check_websocket_connection()
@@ -1552,17 +1582,24 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 start_result = _start_model_build_if_needed(cp)
                 if start_result == 'error':
                     rti_so._log_action('Model build scheduling failed', 'error')
+                    print("the error is: ", rti_so.runtime.model_error)
+
                     raise HTTPException(status_code=503, detail=rti_so.runtime.model_error)
                 else:
-                    await model_info.model_ready_event.wait()
+                    try:
+                        await asyncio.wait_for(model_info.model_ready_event.wait(), timeout=12)
+                    except asyncio.TimeoutError:
+                        raise HTTPException(status_code=504, detail="model-build-timeout")
                     data = model_info.model_data
                     return {"status": "ready", "model": data}
 
             return {'status': 'error', 'model': None}
-        except HTTPException:
+        except HTTPException as e:
+            print("HTTPException raised in api_model, re-raising: ", e)
             raise
         except Exception as exc:
             rti_so._log_action(f"Get model failed (outer): {exc}", "error")
+            print("Unhandled outer exception in api_model:", exc)
             logger.exception("Unhandled outer exception in api_model")
             raise HTTPException(
                 status_code=500,
@@ -2035,7 +2072,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                             asyncio.create_task(
                                 blink_led_task(io_client, "read", interval=0.2, count=1, mapping_manager=mapping_manager)
                             )
-                            
+
                             asyncio.create_task(
                                 write_to_lcd(io_client, "read", lcdValue, mapping_manager=mapping_manager)
                             )
@@ -2148,17 +2185,26 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             do_path = request.do_path
 
             cp = request.cp
+            print("the cp value in getDataDefinition: ", cp)
+            print("the ld_inst value in getDataDefinition: ", ld_inst)
+            print("the ln_inst value in getDataDefinition: ", ln_inst)
+            print("the do_path value in getDataDefinition: ", do_path)
+
             acsi_client = rti_so.get_iec61850_client(cp)
             if acsi_client is None:
                 return JSONResponse(
                     content={"ok": False, "error": "ACSI client not found!"},
                     status_code=500
                 )
-
+            if acsi_client:
+                print("the acsi_client value in getDataDefinition: ", acsi_client)
+            else:
+                print("the acsi_client is None in getDataDefinition")
             obj_ref = f"{ld_inst}/{ln_inst}.{do_path}" if do_path else f"{ld_inst}/{ln_inst}"
 
             if not obj_ref:
                 #client._log_action("Client readvalue rejected: missing objRef", "warn")
+                print("missing objRef in getDataDefinition")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400
@@ -2168,6 +2214,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 result = rti_so.invoke_on_runtime_loop(
                     rti_so.get_data_definition(obj_ref, cp), timeout=10
                 )
+
+                print("result in getDataDefinition: ", result)
 
                 if result is None:
                     return JSONResponse(
@@ -2193,11 +2241,13 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=404
                 )
             except Exception as exc:
+                print("Exception in getDataDefinition: ", exc)
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
         except Exception as exc:
+            print("Unhandled exception in getDataDefinition: ", exc)
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
                 status_code=500
@@ -2716,7 +2766,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 result = rti_so.invoke_on_runtime_loop(
                     rti_so.write_value(obj_ref, value, fc, value_type, cp), timeout=10
                 )
-                
+
                 # Sync with mapped device if io_client is enabled (fire-and-forget)
                 if _use_io_client:
                     try:
@@ -2745,7 +2795,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                             asyncio.create_task(
                                 blink_led_task(io_client, "setpoint", interval=0.2, count=1, mapping_manager=mapping_manager)
                             )
-                            
+
                             asyncio.create_task(
                                 write_to_lcd(io_client, "setpoint", lcdValue, mapping_manager=mapping_manager)
                             )
@@ -2888,7 +2938,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                             # Get the existing IO router's client and mapping manager
                             from demo_IO.io_client.io_router import get_io_client, get_mapping_manager
                             from demo_IO.io_client.io_utils import blink_led_task, write_to_lcd
-                            
+
                             io_client = get_io_client()
                             mapping_manager = get_mapping_manager()
                             logger.info(f"IO client for sync: {io_client}")
@@ -2898,13 +2948,13 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                                 asyncio.create_task(
                                     blink_led_task(io_client, "operate", interval=0.2, count=1, mapping_manager=mapping_manager)
                                 )
-            
+
                                 lcd_value = f"Oper {obj_ref}={value}"
-            
+
                                 asyncio.create_task(
                                     write_to_lcd(io_client, "operate", lcd_value, mapping_manager=mapping_manager)
                                 )
-            
+
                             else:
                                 logger.warning("IO client is None - cannot sync to device. Call /api/io/connect first.")
                         except ImportError as e:
@@ -3007,7 +3057,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     )
     def api_get_io_client_status():
         """Get current io_client usage status for writevalue sync.
-        
+
         Returns:
             dict: {"enabled": bool}
         """
@@ -3026,14 +3076,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     )
     def api_set_io_client(request: IoClientConfigRequest):
         """Enable or disable io_client usage for writevalue sync.
-        
-        When enabled, writes to the ACSI server via /writevalue will be synced 
-        to physical IO devices. When disabled, writes will only affect the ACSI 
+
+        When enabled, writes to the ACSI server via /writevalue will be synced
+        to physical IO devices. When disabled, writes will only affect the ACSI
         server model.
-        
+
         Request Body:
             IoClientConfigRequest: {"enabled": bool}
-        
+
         Returns:
             dict: {"ok": True, "enabled": bool, "message": str}
         """

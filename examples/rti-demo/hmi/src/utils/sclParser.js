@@ -716,6 +716,61 @@ function toPythonLiteral(value, indent = 0) {
   return `{\n${items.join(',\n')}\n${pad}}`;
 }
 
+/**
+ * Returns a Python literal for a type-appropriate default value, used when
+ * the SCL provides no explicit <Val> for a Data Attribute. Falling back to
+ * None here is unsafe for scalar types — the ASN.1 encoder cannot serialize
+ * None into a typed field, which crashes reads/writes for any DA (commonly
+ * settable/writable ones like setpoints) that has no baked-in initial value.
+ * Structured types (quality, timeStamp, check, structure) are composed of
+ * nested DataAttributes handled elsewhere, so they keep None here rather
+ * than guessing a shape for them.
+ */
+function defaultValueLiteralForType(daType, indent = 4) {
+  switch (daType) {
+    case 'boolean':
+      return 'False';
+    case 'int8':
+    case 'int16':
+    case 'int24':
+    case 'int32':
+    case 'int64':
+    case 'int8u':
+    case 'int16u':
+    case 'int24u':
+    case 'int32u':
+    case 'enumerated':
+      return '0';
+    case 'float32':
+    case 'float64':
+      return '0.0';
+    case 'visString64':
+    case 'visString129':
+    case 'visString255':
+      return "''";
+    case 'quality':
+      return toPythonLiteral({ validity: 'good' }, indent);
+    case 'timeStamp':
+      return toPythonLiteral(
+        {
+          secondSinceEpoch: 0,
+          fractionOfSecond: 0,
+          timeQuality: {
+            leapSecondsKnown: false,
+            clockFailure: false,
+            clockNotSynchronized: false,
+            timeAccuracy: 0
+          }
+        },
+        indent
+      );
+    case 'octetString':
+      return "b''";
+    default:
+      return 'None';
+  }
+}
+
 function emitDaTypeFunctions(lines, templates, iedOverrides, parentPath = []) {
   Object.entries(templates.daTypes).forEach(([daTypeId, daTypeDef]) => {
     const fnSuffix = safeIdentifier(normalizeTypeRef(daTypeId));
@@ -736,7 +791,7 @@ function emitDaTypeFunctions(lines, templates, iedOverrides, parentPath = []) {
       } else {
         const bdaType = bda.dataAttributeType || 'structure';
         const bdaTypeExpr = `DataAttributeType.${bdaType}`;
-        let valueLiteral = resolvedVal !== null ? toPythonLiteral(resolvedVal) : 'None';
+        let valueLiteral = resolvedVal !== null ? toPythonLiteral(resolvedVal) : defaultValueLiteralForType(bdaType);
         lines.push(`    ${bdaVar} = DataAttribute(${toPythonLiteral(bda.name || 'BDA')}, ${bdaTypeExpr}, fc, ${valueLiteral}, da)`);
       }
 
@@ -773,7 +828,7 @@ function emitDoTypeFunctions(lines, templates, iedOverrides) {
       } else {
         const daType = da.dataAttributeType || 'structure';
         const daTypeExpr = `DataAttributeType.${daType}`;
-        let valueLiteral = resolvedVal !== null ? toPythonLiteral(resolvedVal) : 'None';
+        let valueLiteral = resolvedVal !== null ? toPythonLiteral(resolvedVal) : defaultValueLiteralForType(daType);
         lines.push(`    ${daVar} = DataAttribute(${toPythonLiteral(da.name || 'DA')}, ${daTypeExpr}, ${fcExpr}, ${valueLiteral}, do)`);
       }
 
