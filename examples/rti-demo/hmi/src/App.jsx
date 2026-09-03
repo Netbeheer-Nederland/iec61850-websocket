@@ -13,6 +13,7 @@ import Settings from './pages/Settings';
 import Setup from './pages/Setup';
 import ACSIClient from './pages/ACSIClient';
 import ACSIServer from './pages/ACSIServer';
+import { executeApiCall, buildTargetValue } from './services/apiService';
 
 function App() {
   const [bffStatus, setBffStatus] = useState({
@@ -49,14 +50,60 @@ function App() {
     return models[endpointId]?.data;
   }, [models]);
 
+  // Parses the Python-dict-formatted status string the FSP's /api/status
+  // endpoint returns, e.g. "{'status': 'listening', 'connectedClients': 1, ...}".
+  const parsePythonDictString = useCallback((pythonStr) => {
+    if (!pythonStr || typeof pythonStr !== 'string') return null;
+    try {
+      const jsonStr = pythonStr
+        .replace(/'/g, '"')
+        .replace(/True/g, 'true')
+        .replace(/False/g, 'false')
+        .replace(/None/g, 'null');
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      return null;
+    }
+  }, []);
+
+  const enrichFspClientCounts = useCallback(async (connectionsList) => {
+    const bffTarget = buildTargetValue(settings.bffHost, settings.bffPort);
+    const fspConns = connectionsList.filter(c => c.type === 'RTI-FSP' && c.status === 'connected');
+
+    const results = await Promise.allSettled(
+      fspConns.map(async (conn) => {
+        const target = buildTargetValue(conn.host, conn.port);
+        if (!target || target === bffTarget) return { name: conn.name, count: 0 };
+        const result = await executeApiCall('status', target, null);
+        const rawStatus = result?.payload?.result?.status;
+        const parsed = typeof rawStatus === 'string' ? parsePythonDictString(rawStatus) : rawStatus;
+        const isListening = parsed?.status === 'listening';
+        const count = isListening ? (parsed?.connectedClients ?? 0) : 0;
+
+        return { name: conn.name, count };
+      })
+    );
+
+    const countMap = {};
+    results.forEach(r => {
+      if (r.status === 'fulfilled') countMap[r.value.name] = r.value.count;
+    });
+
+    return connectionsList.map(c =>
+      c.type === 'RTI-FSP' ? { ...c, connectedClients: countMap[c.name] ?? 0 } : c
+    );
+  }, [settings.bffHost, settings.bffPort, parsePythonDictString]);
+
   const fetchConnections = useCallback(async () => {
     try {
       setConnectionsLoading(true);
       const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/connections`);
       if (response.ok) {
         const data = await response.json();
-        setConnections(data.connections || []);
-        return data.connections || [];
+        const rawConnections = data.connections || [];
+        const enriched = await enrichFspClientCounts(rawConnections);
+        setConnections(enriched);
+        return enriched;
       }
       return [];
     } catch (error) {
@@ -65,7 +112,7 @@ function App() {
     } finally {
       setConnectionsLoading(false);
     }
-  }, [settings.bffHost, settings.bffPort]);
+  }, [settings.bffHost, settings.bffPort, enrichFspClientCounts]);
 
   // Fetch once on mount / whenever BFF settings change
   useEffect(() => {
