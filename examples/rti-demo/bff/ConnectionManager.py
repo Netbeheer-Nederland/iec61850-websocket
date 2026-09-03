@@ -473,7 +473,7 @@ class ConnectionManager:
 
         try:
             response = await client.get(
-                f"http://{con['host']}:{con['port']}",
+                f"http://{con['host']}:{con['port']}/api/health",
             )
             con["status"] = (
                 "connected"
