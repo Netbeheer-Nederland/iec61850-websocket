@@ -114,7 +114,9 @@ function InstanceVisualization({
                   style={{
                     height: '4px',
                     width: '40px',
-                    background: 'repeating-linear-gradient(to right, var(--border-color) 0, var(--border-color) 6px, transparent 6px, transparent 12px)',
+                    background: (conn.connectedClients ?? 0) > 0
+                      ? 'repeating-linear-gradient(to right, var(--success-color) 0, var(--success-color) 6px, transparent 6px, transparent 12px)'
+                      : 'repeating-linear-gradient(to right, var(--border-color) 0, var(--border-color) 6px, transparent 6px, transparent 12px)',
                     flexShrink: 0
                   }}
                 ></div>
