@@ -614,11 +614,6 @@ class ACSIServer:
 
         cp = self.runtime.cp or "cp1"
 
-        # If the model was updated while the server was stopped, update_model_file
-        # only refreshed self.runtime.ied_model (no hot-swap path runs when not
-        # listening) — self.runtime.server itself never got the new model. Bring
-        # it in sync here before starting tasks against it, otherwise we'd serve
-        # whatever model existed at ACSIServer.__init__ time.
         if (
                 self.runtime.server is not None
                 and self.runtime.ied_model is not None
@@ -630,12 +625,6 @@ class ACSIServer:
                 detail={"ied": self.runtime.ied_model.name},
             )
 
-        # ready_event is bound to whichever loop is running when it's created.
-        # Since self.runtime.server is a long-lived singleton reused across
-        # stop/start cycles, but each start_server() spins up a brand-new event
-        # loop, we must recreate ready_event here — on the loop that will
-        # actually use it — rather than relying on the one created once in
-        # IEC61850Server.__init__ (which becomes stale after the first restart).
         self.runtime.server.ready_event = asyncio.Event()
 
         report_task = asyncio.create_task(
