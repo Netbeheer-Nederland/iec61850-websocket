@@ -401,7 +401,24 @@ function MessageMonitor({
       if (jsonContent) {
         return (
           <div style={{ position: 'relative' }}>
-            {syntaxHighlightJson(displayText)}
+            {shouldPrettyPrint ? (
+              <pre 
+                style={{
+                  margin: 0, 
+                  fontSize: '11px', 
+                  fontFamily: 'Consolas, "Courier New", monospace',
+                  whiteSpace: 'pre-wrap',
+                  wordWrap: 'break-word',
+                  maxWidth: '100%',
+                  overflowX: 'auto',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                {displayText}
+              </pre>
+            ) : (
+              syntaxHighlightJson(displayText)
+            )}
             <div style={{
               position: 'absolute',
               top: '4px',
