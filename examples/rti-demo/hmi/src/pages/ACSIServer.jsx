@@ -12,17 +12,27 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const location = useLocation();
   const navigate = useNavigate();
   const endpoint = location.state?.endpoint;
-  
+
+  // Create instance-specific storage keys. Computed up front (before the
+  // host/port state below) so the port initializer can use portStorageKey
+  // without depending on state that doesn't exist yet.
+  const instanceId = endpoint?.name || `${endpoint?.host || 'rti-so'}:${endpoint?.port || 8765}`;
+  const storageKey = `acsi-server-connected-${instanceId}`;
+  const portStorageKey = `acsi-server-port-${instanceId}`;
+
   const [host, setHost] = useState(endpoint?.host || 'rti-so');
-  const [port, setPort] = useState(String(endpoint?.port || 8765));
+  // Port resolution order: cached value for this instance > value passed
+  // via navigation state > default 8765. Once a value exists in
+  // localStorage it always wins over anything fetched from a live server,
+  // so leaving and returning to this page never clobbers what's there.
+  const [port, setPort] = useState(() => {
+    const cachedPort = localStorage.getItem(portStorageKey);
+    return cachedPort || String(endpoint?.port || 8765);
+  });
   const [cp, setCp] = useState(endpoint?.cp || 'cp1');
   const [mode, setMode] = useState(endpoint?.mode === 'client' ? 'client' : 'server');
   const hostPortInitializedRef = useRef(false);
-  
-  // Create instance-specific storage key
-  const instanceId = endpoint?.name || `${endpoint?.host || host}:${endpoint?.port || port}`;
-  const storageKey = `acsi-server-connected-${instanceId}`;
-  
+
   const [connected, setConnected] = useState(() => localStorage.getItem(storageKey) === 'true');
   const [treeData, setTreeData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -58,10 +68,21 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     localStorage.setItem(storageKey, String(connected));
   }, [connected, storageKey]);
 
+  // Persist the port for this instance whenever it changes, so it survives
+  // navigating away and back.
+  useEffect(() => {
+    localStorage.setItem(portStorageKey, port);
+  }, [port, portStorageKey]);
+
   const handleInstanceSelect = useCallback((e) => {
     const value = e.target.value;
     setSelectedInstanceName(value);
-    if (value === 'custom') return;
+    if (value === 'custom') {
+      // Fresh custom entry starts from the default port, not whatever was
+      // cached for a previously-selected instance.
+      setPort(String(8765));
+      return;
+    }
     const inst = fspInstances.find(c => c.name === value);
     if (inst) {
       setHost(inst.host || '');
@@ -177,7 +198,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       try {
         // Load server status
         await loadStatus();
-        
+
         // Fetch OAuth status
         const result = await executeApiCall('oauth-status', endpointTarget, {});
         if (result?.ok) {
@@ -209,7 +230,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             }
             if (serverConfig) {
               if (serverConfig.host) setHost(serverConfig.host);
-              if (serverConfig.port) setPort(String(serverConfig.port));
               if (Array.isArray(serverConfig.accessPoints) && serverConfig.accessPoints.length > 0) {
                 setCp(serverConfig.accessPoints[0]);
               }
@@ -302,7 +322,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const startMonitoring = useCallback(async () => {
     if (isMonitoring) return;
     if (!endpointTarget) { setError('No endpoint configured'); return; }
-    
+
     stopMonitoring();
     setIsMonitoring(true);
     await fetchActionLogs();
@@ -328,7 +348,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       const result = await executeApiCall('model', endpointTarget, {});
       if (result?.ok) {
         let modelData = result.payload;
-        
+
         // Path 1: result.result.model (BFF wraps response in result)
         if (modelData?.result?.model) {
           modelData = modelData.result.model;
@@ -338,12 +358,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           modelData = modelData.model;
         }
         // Path 3: The payload itself might be the model
-        
+
         // Check if there's a tree field
         if (modelData?.tree) {
           modelData = modelData.tree;
         }
-        
+
         // Handle case where model is a Python dict string
         if (typeof modelData === 'string') {
           // Try to parse as JSON first
@@ -363,12 +383,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             }
           }
         }
-        
+
         // If we still have the full BFF response, try result field
         if (modelData === result.payload && modelData?.result) {
           modelData = modelData.result;
         }
-        
+
         // If modelData has accessPoints but no children structure, create a simple tree
         if (modelData?.accessPoints && !modelData.children && !modelData.ieds && !modelData.kind) {
           modelData = {
@@ -379,7 +399,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             }))
           };
         }
-        
+
         if (modelData && Object.keys(modelData).length > 0) {
           setTreeData(transformModelToTree(modelData));
           // Save the model in the global models list
@@ -530,9 +550,9 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     return () => stopStatusPolling();
   }, [endpointTarget, loadStatus]);
 
-  useEffect(() => () => { 
-    stopMonitoring(); 
-    stopStatusPolling(); 
+  useEffect(() => () => {
+    stopMonitoring();
+    stopStatusPolling();
   }, [stopMonitoring, stopStatusPolling]);
 
   return (
@@ -591,26 +611,26 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
               try {
                   // Build OAuth config from endpoint
                   const oauthConfig = endpoint?.OAuth || {};
-                  
+
                   // For active mode (FSP), use the client's port for WebSocket connection
                   let connectionPort = endpoint?.port || port;
                   if (endpoint?.ws_mode === 'active' || endpoint?.ws_mode === 'Active') {
                       // Find corresponding client connection (SO) by replacing Server with Client in endpoint name
                       const clientName = endpoint.name.replace('Server', 'Client');
-                      const clientConnection = connections.find(c => 
-                          (c.type === 'RTI-SO' || c.acsi === 'client') && 
+                      const clientConnection = connections.find(c =>
+                          (c.type === 'RTI-SO' || c.acsi === 'client') &&
                           c.name === clientName
                       );
                       if (clientConnection) {
                           connectionPort = clientConnection.port;
                       }
                   }
-                  
+
                   // Use the connection's own host/port for the target endpoint
                   const targetHost = endpoint?.host || host;
                   const targetPort = endpoint?.port || port;
                   const connectionTarget = buildTargetValue(targetHost, targetPort);
-                  
+
                   const requestBody = {
                     connection_name: endpoint?.name,
                     enable_oauth: newValue,
@@ -625,10 +645,10 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
                     ca_certificate: newValue ? (oauthConfig.auth_server_ca || '') : null,
                     enable_token_refresh: newValue ? (oauthConfig.enable_token_refresh || false) : false
                   };
-                  
+
                   // Save to SO/FSP server
                   const soResult = await executeApiCall('reconfig-oauth', connectionTarget, requestBody);
-                  
+
                   // Also save to BFF's connections.json
                   const bffOauthConfig = {
                     connection_name: endpoint?.name || host,
@@ -646,7 +666,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(bffOauthConfig)
                   });
-                  
+
                   if (soResult?.ok && bffResult.ok) {
                     setMessage({ type: 'success', text: `OAuth ${newValue ? 'enabled' : 'disabled'} successfully` });
                   } else {
@@ -741,11 +761,11 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         {message.text}
       </div>
     )}
-      
+
       {error && <div className="alert alert-error" style={{ marginBottom: '16px', padding: '12px', background: 'var(--danger-bg)', color: 'var(--danger-color)', borderRadius: '4px' }}>
         <i className="fas fa-exclamation-triangle" style={{ marginRight: '8px' }}></i>{error}
       </div>}
-      
+
       {statusInfo && (
         <div style={{ marginBottom: '24px', padding: '16px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
           <h3 style={{ margin: 0, marginBottom: '12px', fontSize: '16px' }}>Connection Status</h3>
@@ -757,7 +777,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           </div>
         </div>
       )}
-      
+
       <div id="acsi-modelPanel" className="model-tree" style={{ marginTop: '24px', padding: '20px' }}>
         {treeData ? (
             <Tree
@@ -817,7 +837,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         connection={(
           () => {
             // Try to find matching connection from live connections (has updated TLS)
-            const liveConn = connections.find(c => 
+            const liveConn = connections.find(c =>
               (c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) ||
               (c.host === host && String(c.port) === String(port))
             );
