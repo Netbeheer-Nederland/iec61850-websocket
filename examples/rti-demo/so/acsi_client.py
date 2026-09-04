@@ -196,6 +196,8 @@ class ACSIClient:
 
     def get_iec61850_client(self, cp):
         return next((client for client in self.runtime.client_list if client.cp == cp), None)
+    def get_cp_list(self):
+        return [client.cp for client in self.runtime.client_list]
 
     def _log_action(
         self, message: str, level: str = "info", detail: Optional[Dict[str, Any]] = None

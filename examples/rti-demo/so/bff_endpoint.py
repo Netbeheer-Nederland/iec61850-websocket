@@ -1436,6 +1436,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             "ok": True,
             "acsi_role": "ACSI-Client",
             "ws_mode": "passive",
+            "acsi_client_list": rti_so.get_cp_list(),
         }
 
     @router.post(
