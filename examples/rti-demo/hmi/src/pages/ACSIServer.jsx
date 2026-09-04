@@ -51,7 +51,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   );
 
 
-  const [selectedInstanceName, setSelectedInstanceName] = useState(() => endpoint?.name);
+  const [selectedInstanceName, setSelectedInstanceName] = useState(() => endpoint?.name || '');
   const instanceMatchedRef = useRef(false);
   const isCustomInstance = selectedInstanceName === 'custom';
 

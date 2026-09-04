@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {useState, useEffect, useCallback, useReducer, useRef} from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -94,29 +94,47 @@ function App() {
     );
   }, [settings.bffHost, settings.bffPort, parsePythonDictString]);
 
-  const fetchConnections = useCallback(async () => {
+  const connectionsRef = useRef([]);
+  const isFetchingRef = useRef(false);
+
+  const fetchConnections = useCallback(async ({ background = false} = {}) => {
+    if (isFetchingRef.current) return connectionsRef.current;
+    isFetchingRef.current = true;
     try {
-      setConnectionsLoading(true);
+      if (!background) setConnectionsLoading(true);
       const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/connections`);
       if (response.ok) {
         const data = await response.json();
         const rawConnections = data.connections || [];
         const enriched = await enrichFspClientCounts(rawConnections);
-        setConnections(enriched);
+
+        const changed = JSON.stringify(enriched) !== JSON.stringify(connectionsRef.current);
+        if (changed) {
+          connectionsRef.current = enriched;
+          setConnections(enriched);
+        }
         return enriched;
       }
-      return [];
+      return connectionsRef.current;
     } catch (error) {
       console.error('Failed to fetch connections:', error);
-      return [];
+      return connectionsRef.current;
     } finally {
-      setConnectionsLoading(false);
+      if (!background) setConnectionsLoading(false);
+      isFetchingRef.current = false;
     }
   }, [settings.bffHost, settings.bffPort, enrichFspClientCounts]);
 
   // Fetch once on mount / whenever BFF settings change
   useEffect(() => {
     fetchConnections();
+  }, [fetchConnections]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchConnections({ background: true});
+    }, 1000);
+    return () => clearInterval(interval);
   }, [fetchConnections]);
 
   // Load settings from localStorage
