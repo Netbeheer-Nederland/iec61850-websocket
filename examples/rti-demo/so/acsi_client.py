@@ -83,7 +83,13 @@ class ACSIClient:
         self._update_model_info_dict()
 
         #start Websocket Passive instance
-        self.connect("0.0.0.0", 8765)
+        try:
+            self.connect("0.0.0.0", 8765)
+            self.runtime.status = "connecting"
+        except Exception as e:
+            self.status = "error"
+            self.runtime.error = str(e)
+            logger.exception("Failed to start passive WebSocket endpoint")
 
     def install_write_callback(self, callback):
        self.runtime.write_callback = callback;
@@ -333,21 +339,24 @@ class ACSIClient:
                 _start_task=start_task,
             )
 
+            try:
+                await asyncio.wait_for(
+                    self.runtime.endpoint._endpoint_running_event.wait(),
+                    timeout=30  # Match timeout in reconfig-connection
+                )
+            except asyncio.TimeoutError as e:
+                start_task.cancel()
+                self.runtime.status = "disconnected"
+                self.runtime.error = str(e)
+                raise RuntimeError("Endpoint failed to start within timeout")
 
-            #try:
-            #    await asyncio.wait_for(client.ready_event.wait(), None)
-            #except asyncio.TimeoutError as exc:
-            #    start_task.cancel()
-            #    raise RuntimeError(
-            #        f"Association with {host}:{port}/{cp} timed out"
-            #    ) from exc
-            status = "disconnected"
+
             if self.runtime.endpoint.get_endpoint_status():
-                status = "connected"
+                self.runtime.status = "connected"
 
 
             self._set_runtime_state(
-                status=status,
+                status=self.runtime.status,
                 error=None,
             )
 
