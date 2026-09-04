@@ -21,6 +21,7 @@ function MessageMonitor({
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [messages, setMessages] = useState([]);
   const [expandedMessageId, setExpandedMessageId] = useState(null);
+  const [prettyPrintMessages, setPrettyPrintMessages] = useState({});
   const [status, setStatus] = useState('Monitoring stopped');
   
   const pollingRef = useRef(null);
@@ -230,6 +231,7 @@ function MessageMonitor({
   const syntaxHighlightJson = (jsonString) => {
     try {
       const jsonObj = JSON.parse(jsonString);
+      const lines = jsonString.split('\n');
       return (
         <pre 
           style={{
@@ -242,70 +244,87 @@ function MessageMonitor({
             overflowX: 'auto'
           }}
         >
-          {jsonString.split('\n').map((line, i) => {
+          {lines.map((line, i) => {
             const indent = line.match(/^\s*/)?.[0] || '';
             const trimmedLine = line.trim();
             const content = line.substring(indent.length);
-            
-            // Don't apply color to empty lines
+            const isLast = i === lines.length - 1;
+
+            let lineNode;
+
             if (!trimmedLine) {
-              return <span key={i}><span style={{ color: 'var(--text-muted)' }}>{indent}</span></span>;
-            }
-            
-            let color = 'var(--text-primary)';
-            
-            // JSON structure tokens
-            if (trimmedLine === '{' || trimmedLine === '}' || trimmedLine === '[' || trimmedLine === ']') {
-              color = 'var(--text-secondary)';
-            }
-            // Booleans
-            else if (trimmedLine === 'true' || trimmedLine === 'false') {
-              color = 'var(--primary-color)';
-            }
-            // Null
-            else if (trimmedLine === 'null') {
-              color = 'var(--text-muted)';
-            }
-            // Numbers
-            else if (!isNaN(trimmedLine) && !trimmedLine.includes('"')) {
-              color = 'var(--warning-color)';
-            }
-            // Strings - check if it's a JSON string value
-            else if (trimmedLine.startsWith('"') && trimmedLine.endsWith('"')) {
-              // If it contains a colon, it's a key (before the colon)
+              lineNode = <span style={{ color: 'var(--text-muted)' }}>{indent}</span>;
+            } else if (trimmedLine === '{' || trimmedLine === '}' || trimmedLine === '[' || trimmedLine === ']') {
+              lineNode = (
+                <span>
+                  <span style={{ color: 'var(--text-muted)' }}>{indent}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{content}</span>
+                </span>
+              );
+            } else if (trimmedLine === 'true' || trimmedLine === 'false') {
+              lineNode = (
+                <span>
+                  <span style={{ color: 'var(--text-muted)' }}>{indent}</span>
+                  <span style={{ color: 'var(--primary-color)' }}>{content}</span>
+                </span>
+              );
+            } else if (trimmedLine === 'null') {
+              lineNode = (
+                <span>
+                  <span style={{ color: 'var(--text-muted)' }}>{indent}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{content}</span>
+                </span>
+              );
+            } else if (!isNaN(trimmedLine) && !trimmedLine.includes('"')) {
+              lineNode = (
+                <span>
+                  <span style={{ color: 'var(--text-muted)' }}>{indent}</span>
+                  <span style={{ color: 'var(--warning-color)' }}>{content}</span>
+                </span>
+              );
+            } else if (trimmedLine.startsWith('"') && trimmedLine.endsWith('"')) {
               if (content.includes(':')) {
-                // This is a key-value pair, extract the key part
                 const keyPart = content.split(':')[0];
                 const valuePart = content.split(':').slice(1).join(':');
-                return (
-                  <span key={i}>
+                lineNode = (
+                  <span>
                     <span style={{ color: 'var(--text-muted)' }}>{indent}</span>
                     <span style={{ color: 'var(--info-color)', fontWeight: '500' }}>{keyPart}:</span>
                     <span style={{ color: 'var(--success-color)' }}>{valuePart}</span>
                   </span>
                 );
+              } else {
+                lineNode = (
+                  <span>
+                    <span style={{ color: 'var(--text-muted)' }}>{indent}</span>
+                    <span style={{ color: 'var(--success-color)' }}>{content}</span>
+                  </span>
+                );
               }
-              // Plain string value
-              color = 'var(--success-color)';
-            }
-            // Keys without quotes (sometimes happens in malformed JSON display)
-            else if (content.includes(':') && !content.includes('"')) {
+            } else if (content.includes(':') && !content.includes('"')) {
               const keyPart = content.split(':')[0];
               const valuePart = content.split(':').slice(1).join(':');
-              return (
-                <span key={i}>
+              lineNode = (
+                <span>
                   <span style={{ color: 'var(--text-muted)' }}>{indent}</span>
                   <span style={{ color: 'var(--info-color)', fontWeight: '500' }}>{keyPart}:</span>
                   <span style={{ color: 'var(--text-primary)' }}>{valuePart}</span>
                 </span>
               );
+            } else {
+              lineNode = (
+                <span>
+                  <span style={{ color: 'var(--text-muted)' }}>{indent}</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{content}</span>
+                </span>
+              );
             }
-            
+
             return (
-              <span key={i}>
-                <span style={{ color: 'var(--text-muted)' }}>{indent}</span>
-                <span style={{ color }}>{content}</span>
-              </span>
+              <React.Fragment key={i}>
+                {lineNode}
+                {!isLast && '\n'}
+              </React.Fragment>
             );
           })}
         </pre>
@@ -339,57 +358,124 @@ function MessageMonitor({
     try {
       let jsonContent = null;
       let displayText = '';
+      const msgId = msg.id || msg.message || JSON.stringify(msg);
+      const shouldPrettyPrint = prettyPrintMessages[msgId] || false;
       
       // Handle message.message field
       if (msg.message) {
-        displayText = typeof msg.message === 'string' ? msg.message : JSON.stringify(msg.message, null, 2);
-        jsonContent = displayText;
+        if (typeof msg.message === 'string') {
+          try {
+            const parsed = JSON.parse(msg.message);
+            displayText = shouldPrettyPrint ? JSON.stringify(parsed, null, 2) : msg.message;
+            jsonContent = displayText;
+          } catch (e) {
+            displayText = msg.message;
+            jsonContent = msg.message;
+          }
+        } else {
+          displayText = shouldPrettyPrint ? JSON.stringify(msg.message, null, 2) : JSON.stringify(msg.message);
+          jsonContent = displayText;
+        }
       }
       // Handle payload
       else if (msg.payload) {
-        displayText = JSON.stringify(msg.payload, null, 2);
+        displayText = shouldPrettyPrint ? JSON.stringify(msg.payload, null, 2) : JSON.stringify(msg.payload);
         jsonContent = displayText;
       }
       // Handle string
       else if (typeof msg === 'string') {
         try {
-          // Try to parse as JSON
-          JSON.parse(msg);
-          displayText = msg;
-          jsonContent = msg;
+          const parsed = JSON.parse(msg);
+          displayText = shouldPrettyPrint ? JSON.stringify(parsed, null, 2) : msg;
+          jsonContent = displayText;
         } catch (e) {
           return <span>{msg}</span>;
         }
       }
       // Default: stringify the whole object
       else {
-        displayText = JSON.stringify(msg, null, 2);
+        displayText = shouldPrettyPrint ? JSON.stringify(msg, null, 2) : JSON.stringify(msg);
         jsonContent = displayText;
       }
       
       if (jsonContent) {
         return (
           <div style={{ position: 'relative' }}>
-            {syntaxHighlightJson(jsonContent)}
-            <button
-              className="btn-icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                copyToClipboard(jsonContent);
-              }}
-              title="Copy to clipboard"
-              style={{
-                position: 'absolute',
-                top: '4px',
-                right: '4px',
-                padding: '4px',
-                fontSize: '10px',
-                background: 'var(--bg-hover)',
-                border: 'none'
-              }}
-            >
-              <i className="fas fa-copy" style={{ fontSize: '10px' }}></i>
-            </button>
+            {shouldPrettyPrint ? (
+              <pre 
+                style={{
+                  margin: 0, 
+                  fontSize: '11px', 
+                  fontFamily: 'Consolas, "Courier New", monospace',
+                  whiteSpace: 'pre-wrap',
+                  wordWrap: 'break-word',
+                  maxWidth: '100%',
+                  overflowX: 'auto',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                {displayText}
+              </pre>
+            ) : (
+              syntaxHighlightJson(displayText)
+            )}
+            <div style={{
+              position: 'absolute',
+              top: '4px',
+              right: '4px',
+              display: 'flex',
+              gap: '4px'
+            }}>
+              <button
+                className="btn-icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPrettyPrintMessages(prev => ({
+                    ...prev,
+                    [msgId]: !prev[msgId]
+                  }));
+                }}
+                title="Toggle pretty print"
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  padding: 0,
+                  fontSize: '10px',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'var(--bg-hover)',
+                  border: 'none',
+                  borderRadius: '4px 0 0 4px'
+                }}
+              >
+                <i className="fas fa-align-left" style={{ fontSize: '10px' }}></i>
+              </button>
+              <button
+                className="btn-icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  copyToClipboard(jsonContent);
+                }}
+                title="Copy to clipboard"
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  padding: 0,
+                  fontSize: '10px',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'var(--bg-hover)',
+                  border: 'none',
+                  borderRadius: '0 4px 4px 0'
+                }}
+              >
+                <i className="fas fa-copy" style={{ fontSize: '10px' }}></i>
+              </button>
+            </div>
           </div>
         );
       }
