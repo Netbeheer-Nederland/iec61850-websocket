@@ -21,7 +21,8 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   const [wsPort, setWsPort] = useState(8765);
   const [wsCp, setWsCp] = useState(endpoint?.cp || 'cp1');
   const [connected, setConnected] = useState(() => localStorage.getItem('acsi-connected') === 'true');
-  const [treeData, setTreeData] = useState(null);
+  const [clientTrees, setClientTrees] = useState({}); // cp -> tree object, keyed so each client keeps its own model
+  const [clientLoading, setClientLoading] = useState({}); // cp -> boolean, tracks in-flight "Fetch Model" per client
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [statusInfo, setStatusInfo] = useState(null);
@@ -32,6 +33,8 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   const [showControlModal, setShowControlModal] = useState(false);
   const [showWriteModal, setShowWriteModal] = useState(false);
   const [connections, setConnections] = useState([]);
+  const [acsiClientList, setAcsiClientList] = useState([]);
+  const [expandedClients, setExpandedClients] = useState({});
   const statusIntervalRef = useRef(null);
   const doDefinitionCacheRef = useRef({});
 
@@ -72,6 +75,23 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     fetchOAuthStatus();
   }, [apiTarget]);
 
+  // Fetch properties (includes acsi_client_list) on page load
+  useEffect(() => {
+    const fetchProperties = async () => {
+      if (!apiTarget) return;
+      try {
+        const result = await executeApiCall('properties', apiTarget, {});
+        if (result?.ok) {
+          const clientList = result.payload?.result?.acsi_client_list || result.payload?.acsi_client_list || [];
+          setAcsiClientList(Array.isArray(clientList) ? clientList : []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch properties:', error);
+      }
+    };
+    fetchProperties();
+  }, [apiTarget]);
+
   const [showBrcbConfigModal, setShowBrcbConfigModal] = useState(false);
   const [showTLSModal, setShowTLSModal] = useState(false);
   const [useOAuth, setUseOAuth] = useState(false);
@@ -107,13 +127,17 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     setIsMonitoring(false);
   }, []);
 
-    const [expandedNodes, setExpandedNodes] = useState({});
+    const [expandedNodesByClient, setExpandedNodesByClient] = useState({}); // cp -> { [nodeRef]: bool }
 
-    const handleExpandToggle = useCallback((nodeRef, isExpanded) => {
-      setExpandedNodes((prev) => ({
+    const handleExpandToggle = useCallback((cp, nodeRef, isExpanded) => {
+      setExpandedNodesByClient((prev) => ({
         ...prev,
-        [nodeRef]: isExpanded,
+        [cp]: { ...(prev[cp] || {}), [nodeRef]: isExpanded },
       }));
+    }, []);
+
+    const toggleClientExpanded = useCallback((cp) => {
+      setExpandedClients((prev) => ({ ...prev, [cp]: !prev[cp] }));
     }, []);
 
 
@@ -190,18 +214,24 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   }, [apiTarget]);
 
   // Load model tree
-  const loadClientTree = useCallback(async () => {
+  // cpParam lets callers (accordion "Fetch Model" buttons) target a specific
+  // cp; each cp's fetched tree is kept independently in clientTrees.
+  const loadClientTree = useCallback(async (cpParam) => {
     if (!apiTarget) {
       setError('No API endpoint configured');
       return;
     }
-    setLoading(true);
+    const cpToUse = cpParam || wsCp;
+    setClientLoading((prev) => ({ ...prev, [cpToUse]: true }));
     setError(null);
     try {
-      const result = await executeApiCall('model-tree', apiTarget, { cp: wsCp });
+      const result = await executeApiCall('model-tree', apiTarget, { cp: cpToUse });
       if (result?.ok) {
         const tree = transformTree(result.payload);
-        setTreeData(tree.length > 0 ? { name: 'Server', type: 'server', children: tree } : null);
+        setClientTrees((prev) => ({
+          ...prev,
+          [cpToUse]: tree.length > 0 ? { name: 'Server', type: 'server', children: tree } : null,
+        }));
         if (updateModel) {
           updateModel(apiTarget, result.payload);
         }
@@ -211,7 +241,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     } catch (error) {
       setError(error.message);
     } finally {
-      setLoading(false);
+      setClientLoading((prev) => ({ ...prev, [cpToUse]: false }));
     }
   }, [apiTarget, wsCp]);
 
@@ -402,71 +432,61 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
         setError('No endpoint configured');
         return;
       }
+      const cpToUse = cpParam || wsCp;
+      const applyToTree = (valueData, isError) => {
+        setClientTrees((prevTrees) => {
+          const tree = prevTrees[cpToUse];
+          if (!tree) return prevTrees;
+          const formatted = formatValueForDisplay(valueData, isError);
+          const updateTreeWithValue = (nodes) =>
+            nodes.map((node) =>
+              node.ref === objRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
+              node.children ? { ...node, children: updateTreeWithValue(node.children) } : node
+            );
+          return { ...prevTrees, [cpToUse]: { ...tree, children: updateTreeWithValue(tree.children) } };
+        });
+      };
       try {
-        const cpToUse = cpParam || wsCp;
         const result = await executeApiCall('read', apiTarget, { objRef, fc, cp: cpToUse });
         if (result?.ok) {
-          const updateTreeWithValue = (nodes, targetRef, valueData, isError) => {
-            const formatted = formatValueForDisplay(valueData, isError);
-            return nodes.map((node) =>
-              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
-              node.children ? { ...node, children: updateTreeWithValue(node.children, targetRef, valueData, isError) } : node
-            );
-          };
           const valueData = result.payload?.result?.value;
-          if (valueData && treeData) {
-            setTreeData((prev) => ({ ...prev, children: updateTreeWithValue(prev.children, objRef, valueData, false) }));
-          }
+          if (valueData) applyToTree(valueData, false);
         } else {
-          const errorValue = result?.payload?.error || 'Unknown error';
-          const updateTreeWithError = (nodes, targetRef) => {
-            const formatted = formatValueForDisplay(errorValue, true);
-            return nodes.map((node) =>
-              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
-              node.children ? { ...node, children: updateTreeWithError(node.children, targetRef) } : node
-            );
-          };
-          if (treeData) {
-            setTreeData((prev) => ({ ...prev, children: updateTreeWithError(prev.children, objRef) }));
-          }
+          applyToTree(result?.payload?.error || 'Unknown error', true);
         }
       } catch (error) {
-        const updateTreeWithError = (nodes, targetRef) => {
-          const formatted = formatValueForDisplay(error.message, true);
-          return nodes.map((node) =>
-            node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
-            node.children ? { ...node, children: updateTreeWithError(node.children, targetRef) } : node
-          );
-        };
-        if (treeData) {
-          setTreeData((prev) => ({ ...prev, children: updateTreeWithError(prev.children, objRef) }));
-        }
+        applyToTree(error.message, true);
       }
     },
-    [apiTarget, wsCp, treeData, formatValueForDisplay]
+    [apiTarget, wsCp, formatValueForDisplay]
   );
 
   // Write data value
   const writeDataValue = useCallback(
-    async (objRef, fc, value, value_type) => {
+    async (objRef, fc, value, value_type, cpParam) => {
       if (!apiTarget) {
         setError('No endpoint configured');
         throw new Error('No endpoint configured');
       }
-      try {
-        const result = await executeApiCall('write', apiTarget, { objRef, fc, value, value_type, cp: wsCp });
-        if (result?.ok) {
-          const updateTreeWithValue = (nodes, targetRef, valueData, isError) => {
-            const formatted = formatValueForDisplay(valueData, isError);
-            return nodes.map((node) =>
-              node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
-              node.children ? { ...node, children: updateTreeWithValue(node.children, targetRef, valueData, isError) } : node
+      const cpToUse = cpParam || wsCp;
+      const applyToTree = (valueData, isError) => {
+        setClientTrees((prevTrees) => {
+          const tree = prevTrees[cpToUse];
+          if (!tree) return prevTrees;
+          const formatted = formatValueForDisplay(valueData, isError);
+          const updateTreeWithValue = (nodes) =>
+            nodes.map((node) =>
+              node.ref === objRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
+              node.children ? { ...node, children: updateTreeWithValue(node.children) } : node
             );
-          };
+          return { ...prevTrees, [cpToUse]: { ...tree, children: updateTreeWithValue(tree.children) } };
+        });
+      };
+      try {
+        const result = await executeApiCall('write', apiTarget, { objRef, fc, value, value_type, cp: cpToUse });
+        if (result?.ok) {
           const valueData = result.payload?.result?.value || value;
-          if (valueData && treeData) {
-            setTreeData((prev) => ({ ...prev, children: updateTreeWithValue(prev.children, objRef, valueData, false) }));
-          }
+          if (valueData) applyToTree(valueData, false);
           return result;
         } else {
           const errorMsg = result?.payload?.error || result?.rawText || 'Write failed';
@@ -474,29 +494,23 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
           throw new Error(errorMsg);
         }
       } catch (error) {
-        const updateTreeWithError = (nodes, targetRef) => {
-          const formatted = formatValueForDisplay(error.message, true);
-          return nodes.map((node) =>
-            node.ref === targetRef ? { ...node, value: formatted.display, valueColor: formatted.color } :
-            node.children ? { ...node, children: updateTreeWithError(node.children, targetRef) } : node
-          );
-        };
-        if (treeData) {
-          setTreeData((prev) => ({ ...prev, children: updateTreeWithError(prev.children, objRef) }));
-        }
+        applyToTree(error.message, true);
         setError(error.message);
         throw error;
       }
     },
-    [apiTarget, wsCp, treeData, formatValueForDisplay]
+    [apiTarget, wsCp, formatValueForDisplay]
   );
 
   // Cache of DO definitions used ONLY to decide context-menu availability.
-  // Deliberately separate from treeData so checking it never expands a row.
+  // Deliberately separate from clientTrees so checking it never expands a row.
+  // Cache key includes cp since the same ref string can exist under different clients.
   const fetchDoDefinition = useCallback(
-    async (ref) => {
-      if (doDefinitionCacheRef.current[ref]) {
-        return doDefinitionCacheRef.current[ref];
+    async (ref, cpParam) => {
+      const cpToUse = cpParam || wsCp;
+      const cacheKey = `${cpToUse}::${ref}`;
+      if (doDefinitionCacheRef.current[cacheKey]) {
+        return doDefinitionCacheRef.current[cacheKey];
       }
       try {
         const ldName = ref.split('/')[0];
@@ -506,14 +520,14 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
           ld_inst: ldName,
           ln_inst: lnName,
           do_path: doPath,
-          cp: wsCp,
+          cp: cpToUse,
         });
         if (result?.ok) {
           const def = {
             dataAttributes: result.payload.result.value?.dataAttributeDefinition || [],
             subDataObjects: result.payload.result.value?.subDataDefinition || [],
           };
-          doDefinitionCacheRef.current[ref] = def;
+          doDefinitionCacheRef.current[cacheKey] = def;
           return def;
         }
       } catch (error) {
@@ -534,20 +548,23 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
       e.stopPropagation();
       const { clientX, clientY } = e;
 
-      const cachedDef = doDefinitionCacheRef.current[nodeInfo.ref];
+      const cpToUse = nodeInfo.cp || wsCp;
+      const cacheKey = `${cpToUse}::${nodeInfo.ref}`;
+      const cachedDef = doDefinitionCacheRef.current[cacheKey];
       const isDO = nodeInfo.nodeType === 'DO';
 
       // Open right away with whatever we already know.
       setContextMenuTarget({
         ...nodeInfo,
+        cp: cpToUse,
         hasOperDA: cachedDef ? hasOperInDef(cachedDef) : null, // null = not yet known
         operPending: isDO && !cachedDef,
       });
       setContextMenu({ visible: true, x: clientX, y: clientY });
 
-      // If unknown, resolve in the background — no setTreeData, no expand side-effect.
+      // If unknown, resolve in the background — no setClientTrees, no expand side-effect.
       if (isDO && !cachedDef) {
-        fetchDoDefinition(nodeInfo.ref).then((def) => {
+        fetchDoDefinition(nodeInfo.ref, cpToUse).then((def) => {
           setContextMenuTarget((prev) =>
             prev && prev.ref === nodeInfo.ref
               ? { ...prev, hasOperDA: hasOperInDef(def), operPending: false }
@@ -556,7 +573,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
         });
       }
     },
-    [fetchDoDefinition]
+    [fetchDoDefinition, wsCp]
   );
 
   // Close context menu
@@ -566,31 +583,35 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   }, []);
 
   // Handle node click (for expanding DOs/SDOs)
-  // Handle node click (for expanding DOs/SDOs)
+  // nodeInfo.cp identifies which client's tree/accordion this click came
+  // from — each accordion's <Tree> forces this explicitly on every callback.
 const handleNodeClick = useCallback(
   async (nodeInfo) => {
     const nodeRef = nodeInfo.ref;
+    const cpToUse = nodeInfo.cp || wsCp;
 
      const shouldToggle = !['DO', 'SDO', 'DataSet'].includes(nodeInfo.nodeType);
 
-    setExpandedNodes((prev) => ({
+    setExpandedNodesByClient((prev) => ({
       ...prev,
-      [nodeRef]: shouldToggle ? !prev[nodeRef] : true,
+      [cpToUse]: {
+        ...(prev[cpToUse] || {}),
+        [nodeRef]: shouldToggle ? !(prev[cpToUse] || {})[nodeRef] : true,
+      },
     }));
 
     if (nodeInfo.nodeType === 'DO' || nodeInfo.nodeType === 'SDO') {
-      const nodeInTree = findNodeInTree(treeData, nodeInfo.ref);
+      const nodeInTree = findNodeInTree(clientTrees[cpToUse], nodeInfo.ref);
       if (nodeInTree?.children?.length > 0) return; // already expanded once
 
-      const def = await fetchDoDefinition(nodeInfo.ref);
+      const def = await fetchDoDefinition(nodeInfo.ref, cpToUse);
       if (def) {
-        const updatedTree = updateTreeWithChildren(nodeInfo.ref, def.dataAttributes, def.subDataObjects);
-        setTreeData(updatedTree);
+        updateTreeWithChildren(cpToUse, nodeInfo.ref, def.dataAttributes, def.subDataObjects);
       }
     } else if (nodeInfo.nodeType === 'DataSet') {
       // Fetch DataSet directory
        // Check if already loaded
-      const nodeInTree = findNodeInTree(treeData, nodeInfo.ref);
+      const nodeInTree = findNodeInTree(clientTrees[cpToUse], nodeInfo.ref);
       if (nodeInTree?.children?.length > 0) {
         return; // Skip re-fetching
       }
@@ -603,11 +624,11 @@ const handleNodeClick = useCallback(
           ld_inst: ldName,
           ln_inst: lnInst,
           ds_inst: dsName,
+          cp: cpToUse,
         });
         if (result?.ok) {
           const dataAttributes = result.payload.result.value || [];
-          const updatedTree = updateTreeWithDataSetChildren(nodeInfo.ref, dataAttributes);
-          setTreeData(updatedTree);
+          updateTreeWithDataSetChildren(cpToUse, nodeInfo.ref, dataAttributes);
         }
       } catch (error) {
         console.error('Failed to fetch DataSet directory:', error);
@@ -617,7 +638,7 @@ const handleNodeClick = useCallback(
       console.log('ReportControl clicked:', nodeInfo.ref);
     }
   },
-  [apiTarget, wsCp, treeData]
+  [apiTarget, wsCp, clientTrees, fetchDoDefinition]
 );
   const findNodeInTree = (tree, ref) => {
     if (!tree) return null;
@@ -631,7 +652,9 @@ const handleNodeClick = useCallback(
     return null;
   };
   // Helper to update tree with children for DOs/SDOs
-  const updateTreeWithChildren = (ref, dataAttributes, subDataObjects) => {
+  // Writes directly into clientTrees[cp] via functional setState, so it never
+  // relies on a possibly-stale closure over the current tree.
+  const updateTreeWithChildren = useCallback((cp, ref, dataAttributes, subDataObjects) => {
 
     const buildSdaChildren = (sdaList, parentRef, parentFc) => {
       return sdaList.map((sda) => {
@@ -646,95 +669,100 @@ const handleNodeClick = useCallback(
       });
     };
 
-    const updateNode = (nodes) => {
-      let changed = false;
-      const result = nodes.map((node) => {
-        if (node.ref === ref) {
-          const existingChildren = node.children || [];
-          const existingRefs = new Set(existingChildren.map((child) => child.ref));
+    setClientTrees((prevTrees) => {
+      const tree = prevTrees[cp];
+      if (!tree) return prevTrees;
 
-          const daChildren = dataAttributes
-            .filter((da) => {
-              const daName = da.name || da.daRef?.split('.').pop() || 'DA';
-              return !existingRefs.has(`${ref}.${daName}`);
-            })
-            .map((da) => {
-              const daName = da.name || da.daRef?.split('.').pop() || 'DA';
-              const daRef = `${ref}.${daName}`;
-              const fc = da.fc || '';
-              const bType = Array.isArray(da.daType) ? da.daType[0] : (da.bType || '');
-              const rawSubDas =
-                Array.isArray(da.daType) && da.daType[0] === 'structure' && Array.isArray(da.daType[1])
-                  ? da.daType[1]
-                  : (da.subDataAttributes || da.sub_attributes || da.sda || []);
-              return { name: daName, type: 'DA', ref: daRef, fc, bType, children: buildSdaChildren(rawSubDas, daRef, fc) };
-            });
+      const updateNode = (nodes) => {
+        let changed = false;
+        const result = nodes.map((node) => {
+          if (node.ref === ref) {
+            const existingChildren = node.children || [];
+            const existingRefs = new Set(existingChildren.map((child) => child.ref));
 
-          const sdoChildren = subDataObjects
-            .filter((sdo) => !existingRefs.has(`${ref}.${sdo.name || 'SDO'}`))
-            .map((sdo) => {
-              const sdoName = sdo.name || 'SDO';
-              const sdoRef = `${ref}.${sdoName}`;
-              const sdoDas = (sdo.dataAttributes || sdo.data_attributes || []).map((sdoDa) => {
-                const sdoDaName = sdoDa.name || sdoDa.daRef?.split('.').pop() || 'SDA';
-                return { name: sdoDaName, type: 'SDA', ref: `${sdoRef}.${sdoDaName}`, fc: sdoDa.fc || '', bType: sdoDa.bType || '', children: [] };
+            const daChildren = dataAttributes
+              .filter((da) => {
+                const daName = da.name || da.daRef?.split('.').pop() || 'DA';
+                return !existingRefs.has(`${ref}.${daName}`);
+              })
+              .map((da) => {
+                const daName = da.name || da.daRef?.split('.').pop() || 'DA';
+                const daRef = `${ref}.${daName}`;
+                const fc = da.fc || '';
+                const bType = Array.isArray(da.daType) ? da.daType[0] : (da.bType || '');
+                const rawSubDas =
+                  Array.isArray(da.daType) && da.daType[0] === 'structure' && Array.isArray(da.daType[1])
+                    ? da.daType[1]
+                    : (da.subDataAttributes || da.sub_attributes || da.sda || []);
+                return { name: daName, type: 'DA', ref: daRef, fc, bType, children: buildSdaChildren(rawSubDas, daRef, fc) };
               });
-              return { name: sdoName, type: 'SDO', ref: sdoRef, cdc: sdo.cdc || '', children: sdoDas };
-            });
 
-          changed = true;
-          // Return same object reference if nothing new to add
-          if (daChildren.length === 0 && sdoChildren.length === 0) return node;
-          return { ...node, children: [...existingChildren, ...daChildren, ...sdoChildren] };
-        }
+            const sdoChildren = subDataObjects
+              .filter((sdo) => !existingRefs.has(`${ref}.${sdo.name || 'SDO'}`))
+              .map((sdo) => {
+                const sdoName = sdo.name || 'SDO';
+                const sdoRef = `${ref}.${sdoName}`;
+                const sdoDas = (sdo.dataAttributes || sdo.data_attributes || []).map((sdoDa) => {
+                  const sdoDaName = sdoDa.name || sdoDa.daRef?.split('.').pop() || 'SDA';
+                  return { name: sdoDaName, type: 'SDA', ref: `${sdoRef}.${sdoDaName}`, fc: sdoDa.fc || '', bType: sdoDa.bType || '', children: [] };
+                });
+                return { name: sdoName, type: 'SDO', ref: sdoRef, cdc: sdo.cdc || '', children: sdoDas };
+              });
 
-        if (node.children && node.children.length > 0) {
-          const updatedChildren = updateNode(node.children);
-          // Only create new object if children actually changed
-          if (updatedChildren !== node.children) {
-            return { ...node, children: updatedChildren };
+            changed = true;
+            // Return same object reference if nothing new to add
+            if (daChildren.length === 0 && sdoChildren.length === 0) return node;
+            return { ...node, children: [...existingChildren, ...daChildren, ...sdoChildren] };
           }
-        }
-        // Return same reference for unchanged nodes — React skips re-rendering these
-        return node;
-      });
 
-      // Return same array reference if nothing changed
-      return changed || result.some((n, i) => n !== nodes[i]) ? result : nodes;
-    };
+          if (node.children && node.children.length > 0) {
+            const updatedChildren = updateNode(node.children);
+            // Only create new object if children actually changed
+            if (updatedChildren !== node.children) {
+              return { ...node, children: updatedChildren };
+            }
+          }
+          // Return same reference for unchanged nodes — React skips re-rendering these
+          return node;
+        });
 
-    const updatedChildren = updateNode(treeData.children);
-    // Only trigger re-render if something actually changed
-    if (updatedChildren === treeData.children) return treeData;
-    return { ...treeData, children: updatedChildren };
-  };
+        // Return same array reference if nothing changed
+        return changed || result.some((n, i) => n !== nodes[i]) ? result : nodes;
+      };
+
+      const updatedChildren = updateNode(tree.children);
+      // Only trigger re-render if something actually changed
+      if (updatedChildren === tree.children) return prevTrees;
+      return { ...prevTrees, [cp]: { ...tree, children: updatedChildren } };
+    });
+  }, []);
 
   // Helper to update tree with DataSet children
-  const updateTreeWithDataSetChildren = (ref, dataAttributes) => {
-  const updateNode = (nodes) => {
-    return nodes.map((node) => {
-      if (node.ref === ref) {
-        const fcdas = dataAttributes.map((da) => {
-          //const daName = da.name || da.daRef?.split('.').pop() || 'FCDA';
-          //const daRef = `${ref}.${daName}.${da.fc}`; // Include fc in ref to ensure uniqueness
-          return {
-            name: da.ref,
-            type: 'FCDA',
-            ref: da.ref,
-            fc: da.fc,
-            children: [],
-          };
+  const updateTreeWithDataSetChildren = useCallback((cp, ref, dataAttributes) => {
+    setClientTrees((prevTrees) => {
+      const tree = prevTrees[cp];
+      if (!tree) return prevTrees;
+      const updateNode = (nodes) => {
+        return nodes.map((node) => {
+          if (node.ref === ref) {
+            const fcdas = dataAttributes.map((da) => ({
+              name: da.ref,
+              type: 'FCDA',
+              ref: da.ref,
+              fc: da.fc,
+              children: [],
+            }));
+            return {
+              ...node,
+              children: [...(node.children || []), ...fcdas],
+            };
+          }
+          return node.children ? { ...node, children: updateNode(node.children) } : node;
         });
-        return {
-          ...node,
-          children: [...(node.children || []), ...fcdas],
-        };
-      }
-      return node.children ? { ...node, children: updateNode(node.children) } : node;
+      };
+      return { ...prevTrees, [cp]: { ...tree, children: updateNode(tree.children) } };
     });
-  };
-  return { ...treeData, children: updateNode(treeData.children) };
-};
+  }, []);
 
 const getContextMenuItems = () => {
   if (!contextMenuTarget) return [];
@@ -789,7 +817,7 @@ const getContextMenuItems = () => {
       label: 'Expand',
       icon: 'fa-folder-open',
       action: () => {
-        handleNodeClick({ ref, nodeType: 'SDO' });
+        handleNodeClick({ ref, nodeType: 'SDO', cp: contextMenuTarget.cp || wsCp });
         closeContextMenu();
       },
     });
@@ -844,10 +872,6 @@ const getContextMenuItems = () => {
         <div className="form-group">
           <label>WS Port</label>
           <input type="number" id="acsi-client-ws-port" value={wsPort} placeholder="102" disabled />
-        </div>
-        <div className="form-group">
-          <label>WS CP</label>
-          <input type="text" id="acsi-client-ws-cp" value={wsCp} placeholder="cp1" onChange={(e) => setWsCp(e.target.value)} disabled={loading}/>
         </div>
       </div>
 
@@ -962,12 +986,79 @@ const getContextMenuItems = () => {
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-        <button id="acsi-read-data-btn" className="btn-primary" onClick={loadClientTree} disabled={loading || !apiTarget}>
-          {loading ? 'Fetching...' : 'Fetch Model'}
-        </button>
-      </div>
+      {/* ACSI Clients (from properties API's acsi_client_list) */}
+      {acsiClientList.length > 0 && (
+        <div className="acsi-clients-list" style={{ marginBottom: '24px' }}>
+          {acsiClientList.map((cp) => {
+            const isExpanded = !!expandedClients[cp];
+            const isFetchingThis = !!clientLoading[cp];
+            const cpTree = clientTrees[cp];
+            return (
+              <div
+                key={cp}
+                className="acsi-client-entry"
+                style={{
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  onClick={() => toggleClientExpanded(cp)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    cursor: 'pointer',
+                    background: 'var(--bg-card)',
+                  }}
+                >
+                  <span style={{ fontWeight: 500 }}>{cp}</span>
+                  <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
+                </div>
+                {isExpanded && (
+                  <div
+                    style={{
+                      padding: '16px',
+                      background: 'var(--bg-card)',
+                      borderTop: '1px solid var(--border-color)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                      <button
+                        className="btn-primary"
+                        onClick={() => loadClientTree(cp)}
+                        disabled={isFetchingThis || !apiTarget}
+                      >
+                        {isFetchingThis ? 'Fetching...' : 'Fetch Model'}
+                      </button>
+                    </div>
+                    <div id={`acsi-client-tree-container-${cp}`} className="model-tree">
+                      {cpTree ? (
+                        <Tree
+                          data={cpTree}
+                          onNodeClick={(nodeInfo) => handleNodeClick({ ...nodeInfo, cp })}
+                          onContextMenu={(e, nodeInfo) => handleContextMenu(e, { ...nodeInfo, cp })}
+                          onExpandToggle={(nodeRef, isExpandedFlag) => handleExpandToggle(cp, nodeRef, isExpandedFlag)}
+                          expandedNodes={expandedNodesByClient[cp] || {}}
+                          endpoint={endpoint}
+                          cp={cp}
+                        />
+                      ) : (
+                        <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
+                          Click "Fetch Model" to load the ACSI model tree for {cp}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {message && (
         <div className="alert" style={{
@@ -1018,24 +1109,6 @@ const getContextMenuItems = () => {
         </div>
       )}
       */}
-      {/* Tree Container */}
-      <div id="acsi-client-tree-container" className="model-tree" style={{ marginTop: '24px' }}>
-        {treeData ? (
-          <Tree
-            data={treeData}
-            onNodeClick={handleNodeClick}
-            onContextMenu={handleContextMenu}
-            onExpandToggle={handleExpandToggle}
-            expandedNodes={expandedNodes}
-            endpoint={endpoint}
-            cp={wsCp}
-          />
-        ) : (
-          <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-            Click "Fetch Model" to load the ACSI model tree
-          </p>
-        )}
-      </div>
 
       <div className="page-header" style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -1126,7 +1199,7 @@ const getContextMenuItems = () => {
             setWriteModalTarget({ ref: '', fc: '', endpoint: null, cp: null });
             // Refresh the value after write
             if (writeModalTarget.ref && writeModalTarget.fc) {
-              await readDataValue(writeModalTarget.ref, writeModalTarget.fc);
+              await readDataValue(writeModalTarget.ref, writeModalTarget.fc, writeModalTarget.cp || wsCp);
             }
           }}
         />
