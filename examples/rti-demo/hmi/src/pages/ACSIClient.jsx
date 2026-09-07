@@ -114,6 +114,30 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   // apiTarget for WS connection display (can be edited by user)
   const wsEndpointTarget = `${wsHost}:${wsPort}`;
 
+  // Color for the small connection-status dot next to "Websocket Connection",
+  // driven by the /api/status response's result.status field.
+  const connectionStatusColor = (() => {
+    const status = (statusInfo?.result?.status || '').toLowerCase();
+    if (status === 'connected') return '#4caf50';
+    if (status === 'connecting') return '#ff9800';
+    if (status === 'error') return '#f44336';
+    if (status === 'disconnected') return '#9e9e9e';
+    return '#9e9e9e'; // unknown/not yet loaded
+  })();
+
+  // Display label for the dot's tooltip — translates the raw backend status
+  // into the wording we want shown to the user.
+  const connectionStatusLabel = (() => {
+    const status = (statusInfo?.result?.status || '').toLowerCase();
+    const STATUS_LABELS = {
+      connected: 'started',
+      connecting: 'starting',
+      disconnecting: 'stopping',
+      disconnected: 'stopped',
+    };
+    return STATUS_LABELS[status] || status || 'unknown';
+  })();
+
   const [writeModalTarget, setWriteModalTarget] = useState({ ref: '', fc: '', endpoint: null, cp: null });
   const [controlModalTarget, setControlModalTarget] = useState({ ref: '', name: '', cdc: '', endpoint: null, cp: null });
   const [brcbConfigTarget, setBrcbConfigTarget] = useState({ ref: '', rcbType: '', endpoint: null, cp: null });
@@ -859,6 +883,17 @@ const getContextMenuItems = () => {
             <i className="fas fa-microchip" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>
             Websocket Connection
           </h1>
+          <span
+            title={statusInfo?.result?.status ? `WS Passive status: ${connectionStatusLabel}` : 'Status: unknown'}
+            style={{
+              display: 'inline-block',
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              backgroundColor: connectionStatusColor,
+              flexShrink: 0,
+            }}
+          ></span>
         </div>
       </div>
 

@@ -215,7 +215,7 @@ function Settings({ settings, setSettings }) {
               style={{ width: '100%', maxWidth: '300px' }}
             />
           </div>
-          
+
           <button className="btn-primary" id="btn-save-settings" onClick={handleSaveSettings}>
             <i className="fas fa-save"></i>
             Save Settings and Test BFF Connection
