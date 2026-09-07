@@ -831,7 +831,7 @@ class ACSIClient:
             return False, None
 
         if expected_type is bool:
-            if raw_str is str:
+            if isinstance(raw_str, str):
                 if raw_str.lower() in ("true", "1"):
                     return True, True
                 elif raw_str.lower() in ("false", "0"):
@@ -879,8 +879,7 @@ class ACSIClient:
             raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
-        if data_type == "boolean":
-            value = bool(value)
+
         async with self.runtime.invoke_lock:
             TYPE_MAP = {
                 "boolean": bool,
