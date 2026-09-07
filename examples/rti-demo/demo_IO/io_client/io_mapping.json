@@ -2,7 +2,7 @@
   "leds": {
     "led1": {
       "device_name": "led1",
-      "objRef": "connected",
+      "objRef": ["connected","stopped"],
       "direction": "output",
       "device_type": "led"
     },
@@ -27,9 +27,12 @@
         "rc_rcv",
         "connected",
         "oper_send",
+        "oper_rcv",
         "setpoint",
         "read",
-        "operate"
+        "operate",
+        "writeValue",
+        "stopped"
       ],
       "direction": "output",
       "device_type": "lcd"
@@ -40,7 +43,12 @@
         "rc_rcv",
         "connected",
         "oper_send",
-        "writeValue"
+        "oper_rcv",
+        "setpoint",
+        "read",
+        "operate",
+        "writeValue",
+        "stopped"
       ],
       "direction": "output",
       "device_type": "lcd_i2c",
