@@ -2,7 +2,7 @@
   {
     "id": 1,
     "name": "Demo_Pi1",
-    "host": "192.168.100.14",
+    "host": "127.0.0.1",
     "port": 5002,
     "type": "RTI-SO",
     "acsi": "client",
@@ -16,7 +16,10 @@
       "enable_token_refresh": false,
       "idp_server": "keycloak",
       "enable_oauth": false,
-      "token_issuer": "https://192.168.100.14:8443/realms/iec61850-websocket"
+      "token_issuer": "https://192.168.100.14:8443/realms/iec61850-websocket",
+      "token_endpoint": "",
+      "client_id": "",
+      "client_secret": ""
     },
     "status": "connected",
     "endpoint": "",
@@ -31,7 +34,7 @@
   {
     "id": 2,
     "name": "demo_pi2",
-    "host": "192.168.100.14",
+    "host": "127.0.0.1",
     "port": 5001,
     "type": "RTI-FSP",
     "acsi": "server",
@@ -46,7 +49,9 @@
       "client_secret": "Af901GzeYXmZAqtJc03jGkHLEwgyPyHN",
       "enable_token_refresh": false,
       "idp_server": "keycloak",
-      "enable_oauth": false
+      "enable_oauth": false,
+      "certificate_endpoint": "",
+      "token_issuer": ""
     },
     "status": "connected",
     "endpoint": "",
@@ -57,5 +62,29 @@
       "server_cert": null,
       "server_ca": "-----BEGIN CERTIFICATE-----\r\nMIIDtTCCAp2gAwIBAgIUJysTAOCqE3IaNO1QgtOPxMq6M8EwDQYJKoZIhvcNAQEL\r\nBQAwajELMAkGA1UEBhMCREUxCzAJBgNVBAgMAkJXMREwDwYDVQQHDAhGcmVpYnVy\r\nZzEbMBkGA1UECgwSTVogQXV0b21hdGlvbiBHbWJIMQwwCgYDVQQLDANSJkQxEDAO\r\nBgNVBAMMB3Jvb3RfQ0EwHhcNMjIwMzE4MDkyNzEwWhcNMzIwMzE1MDkyNzEwWjBq\r\nMQswCQYDVQQGEwJERTELMAkGA1UECAwCQlcxETAPBgNVBAcMCEZyZWlidXJnMRsw\r\nGQYDVQQKDBJNWiBBdXRvbWF0aW9uIEdtYkgxDDAKBgNVBAsMA1ImRDEQMA4GA1UE\r\nAwwHcm9vdF9DQTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOMyaDaT\r\n+a4DT0s2NCrjUN8coLPfFrLRdN0Gx0hRViuLUFxd001jXruRgXKt2g8lR+YnzUeA\r\nPQHbcIfRQhL+jy/ZMXpmz4Nrl7vyOWFdu8nBKU6c7y9LmSGbnOJZjDXwlX6ERwui\r\nqFzAvRA6YXbPN8gY0B3Ou+T/mjkWN9L1x+V+7bGs9rVIoM78fVyM2FERBfsBtT76\r\nQVQv3KZ+a9EOLxqcZ/nGqsFFysFOSkiRC6Cy4mC5CSik9S5D7X9lz/bdga7O+hqd\r\nSKfir6YMlQGV37JPqmz69N6vvb9UOX/G989T4qdVB/zQOvMdcIWXkqb3vSAXYi/c\r\nClVS1Pymsy/MXQ0CAwEAAaNTMFEwHQYDVR0OBBYEFGYgIECdrhTsmgCKpVM0RHeC\r\nkFUmMB8GA1UdIwQYMBaAFGYgIECdrhTsmgCKpVM0RHeCkFUmMA8GA1UdEwEB/wQF\r\nMAMBAf8wDQYJKoZIhvcNAQELBQADggEBACsiuHFQjqOglenp/fcNbU034m/vvkyV\r\nSZXau9amXBWdeTEpc1HaPOYO7jFFnu/QoH6AbGZkpL0yWZJA2rf102AkOdAe6E0g\r\n2H77/hHoHVCfxOiOl3+icsLXJ4VXqV2vmUOEVnWfHRtej4My6avT9uCNMO2bw9hm\r\n56RAZrs82T9Mpg/1XQ9YUO1q4/JfP/+dCzPXAdwJ/h2cJ/q6Q9g1gRns8IzVlGOZ\r\n0ZBQCLqLl8vUei+t6YgjyBbeNCz4CEcmXKIJeqMB1jhpsgr6BBMTNTU2Q60b9fzU\r\nOCGLw94EnKYtHWGy2WHMFNbwkNCR0/jwhxKkU0HXy1aNMUBWp99M7P8=\r\n-----END CERTIFICATE-----\r\n"
     }
+  },
+  {
+    "id": 3,
+    "name": "testFSP2",
+    "host": "127.0.0.1",
+    "port": 5005,
+    "type": "RTI-FSP",
+    "acsi": "server",
+    "ws_mode": "active",
+    "auto_discovered": false,
+    "created_at": "2026-09-03T11:49:02.508434",
+    "OAuth": {
+      "certificate_endpoint": "",
+      "auth_server_ca": "",
+      "realm": "",
+      "token_endpoint": "",
+      "client_id": "rti-fsp",
+      "client_secret": "Af901GzeYXmZAqtJc03jGkHLEwgyPyHN",
+      "enable_token_refresh": false,
+      "idp_server": "",
+      "token_issuer": ""
+    },
+    "status": "disconnected",
+    "endpoint": ""
   }
 ]

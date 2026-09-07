@@ -216,30 +216,6 @@ function Settings({ settings, setSettings }) {
             />
           </div>
 
-          <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border-color)' }}>
-            <h4 style={{ marginBottom: '16px', color: 'var(--text-primary)' }}>Connection Refresh Time</h4>
-            <div className="setting-item" style={{ display: 'block' }}>
-              <label htmlFor="connection-status-period">Refresh Period in ms</label>
-              <input
-                type="text"
-                id="connection-status-period"
-                value={refreshSettings.connectionStatusPeriod}
-                onChange={handleRefreshInputChange}
-                style={{ width: '100%', maxWidth: '300px' }}
-              />
-            </div>
-            <div className="setting-item" style={{ display: 'block' }}>
-              <label htmlFor="auto-refresh-toggle">Connection Cards Refresh Period in ms</label>
-              <input
-                type="text"
-                id="auto-refresh-toggle"
-                value={refreshSettings.autoRefreshToggle}
-                onChange={handleRefreshInputChange}
-                style={{ width: '100%', maxWidth: '300px' }}
-              />
-            </div>
-          </div>
-
           <button className="btn-primary" id="btn-save-settings" onClick={handleSaveSettings}>
             <i className="fas fa-save"></i>
             Save Settings and Test BFF Connection
