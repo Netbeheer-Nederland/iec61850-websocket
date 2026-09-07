@@ -221,8 +221,9 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     const ref = `${parentRef}.${name}`;
     const bType = Array.isArray(sda.cmpType) ? sda.cmpType[0] : (sda.bType || '');
     const nestedSda = Array.isArray(sda.cmpType) && sda.cmpType[0] === 'structure' && Array.isArray(sda.cmpType[1])
-      ? sda.cmpType[1] : [];
-    return { name, type: 'SDA', ref, fc, bType, children: nestedSda.map(c => buildSdaNode(c, ref, fc))};
+      ? sda.cmpType[1]
+      : (sda.children || []); // PATCH: tree-shape fallback
+    return { name, type: 'SDA', ref, fc, bType, children: nestedSda.map(c => buildSdaNode(c, ref, fc)) };
   };
 
   // Parse a DA
@@ -232,7 +233,8 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     const fc = da.fc || da.Fc || da.FC || '';
     const bType = Array.isArray(da.daType) ? da.daType[0] : (da.bType || '');
     const nestedSda = Array.isArray(da.daType) && da.daType[0] === 'structure' && Array.isArray(da.daType[1])
-      ? da.daType[1] : (da.subDataAttributes || da.sub_attributes || da.sda || []);
+      ? da.daType[1]
+      : (da.subDataAttributes || da.sub_attributes || da.sda || da.children || []); // PATCH
     return { name, type: 'DA', ref, fc, bType, children: nestedSda.map(c => buildSdaNode(c, ref, fc)) };
   };
 
@@ -355,23 +357,19 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     try {
       const lnRef = `${ldName}/${lnName}`;
       const doName = doPath.split('.')[0];
-      
-      // Find the LD in the tree
+
       const ldNode = tree.children?.find(node => node.name === ldName || node.kind === ldName);
       if (!ldNode) return null;
-      
-      // Find the LN under the LD
+
       const lnNode = ldNode.children?.find(node => {
         const nodeName = node.name || node.kind;
         return nodeName === lnName || nodeName === lnRef;
       });
       if (!lnNode) return null;
-      
-      // Find the DO under the LN
+
       const doNode = lnNode.children?.find(node => node.name === doName);
       if (!doNode) return null;
-      
-      // For SDO paths, navigate deeper
+
       const pathParts = doPath.split('.');
       let current = doNode;
       for (let i = 1; i < pathParts.length; i++) {
@@ -379,21 +377,30 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
         current = current.children?.find(node => node.name === part);
         if (!current) return null;
       }
-      
-      // Extract DAs and SDOs from the current node
+
       const dataAttributes = [];
       const subDataObjects = [];
-      
+
       if (current.children) {
         current.children.forEach(child => {
-          if (child.kind === 'DA' || child.kind === 'DataAttribute' || child.type === 'DA' || child.type === 'DataAttribute') {
-            dataAttributes.push(child);
-          } else if (child.kind === 'SDO' || child.kind === 'SubDataObject' || child.type === 'SDO' || child.type === 'SubDataObject') {
+          const kind = child.kind || child.type;
+          const isDA = kind === 'DA' || kind === 'DataAttribute' || kind === 'SDA';
+
+          if (isDA) {
+            // PATCH: normalize fc casing for buildDaNode's lookup
+            dataAttributes.push({ ...child, fc: child.fc || child.Fc || child.FC || '' });
+          } else {
+            // PATCH: classify by exclusion instead of an exact-string whitelist.
+            // Anything nested under a DO that isn't a DA is structurally a
+            // nested data object (SDO) — whatever tag the backend gives it
+            // ('SDO', 'DO', 'DataObject', 'SubDataObject', etc). Dropping
+            // unrecognized tags here is what was silently emptying out CMV/
+            // structured DOs like MMXU's "A" on FSP/server endpoints.
             subDataObjects.push(child);
           }
         });
       }
-      
+
       return {
         dataAttributeDefinition: dataAttributes,
         subDataDefinition: subDataObjects
@@ -885,6 +892,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
       if (targetChanged) {
         setManualCp('');
         setFetchedCp(null);
+        dataDefinitionCacheRef.current = {}; // PATCH
       }
       return;
     }
@@ -907,6 +915,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
       setAttributePath([]);
       setManualCp('');
       setFetchedCp(null);
+      dataDefinitionCacheRef.current = {}; // PATCH
     }
   }, [selectedTarget, getModel, extractHierarchyFromModel]);
 
@@ -916,6 +925,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     if (effectiveCp === fetchedCp) return;  // Still matches what's loaded
 
     // cp changed - invalidate model state
+    dataDefinitionCacheRef.current = {}; // PATCH: stale DA/SDO defs from the old cp must not leak in
     setModelFetched(false);
     setAvailableLDs([]);
     setSelectedLD('');
@@ -1255,6 +1265,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     setManualCp('');
     setFetchedCp(null);
     setOperateResult(null);
+    dataDefinitionCacheRef.current = {}; // PATCH
   }, []);
 
   return (
@@ -1326,6 +1337,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
                     setSelectedDO('');
                     setDoChildren([]);
                     setAttributePath([]);
+                    dataDefinitionCacheRef.current = {}; // PATCH
                   }
                 }}
                 placeholder="cp (e.g. cp1)"
