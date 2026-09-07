@@ -8,10 +8,10 @@ Perfect for use in async FastAPI applications or any async context.
 
 Usage:
     import asyncio
-    from async_client_io import AsyncDemoIOClient
+    from async_client_io import AsyncIOClient
     
     async def main():
-        async with AsyncDemoIOClient(base_url="http://localhost:8080") as client:
+        async with AsyncIOClient(base_url="http://localhost:8080") as client:
             # Configure a device
             await client.config_led(name="led1", gpio_pin=17)
             
@@ -69,7 +69,7 @@ DEFAULT_RETRY_STATUS_CODES = [429, 500, 502, 503, 504]
 # ==================== EXCEPTION CLASSES ====================
 # Define exception classes locally (previously imported from client_io)
 
-class DemoIOClientError(Exception):
+class IOClientError(Exception):
     """Base exception for demo_IO client errors."""
     pass
 
@@ -94,9 +94,9 @@ class AuthenticationError(Exception):
     pass
 
 __all__ = [
-    "AsyncDemoIOClient",
+    "AsyncIOClient",
     "DemoIOClient",
-    "DemoIOClientError",
+    "IOClientError",
     "ConnectionError",
     "RequestTimeoutError",
     "APIError",
@@ -105,7 +105,7 @@ __all__ = [
 ]
 
 
-class AsyncDemoIOClient:
+class AsyncIOClient:
     """Async HTTP client for the demo_IO IO Device Control API.
     
     Uses httpx.AsyncClient for async HTTP requests, providing:
@@ -116,9 +116,9 @@ class AsyncDemoIOClient:
     - Same interface as sync DemoIOClient
     
     Usage:
-        from async_client_io import AsyncDemoIOClient
+        from async_client_io import AsyncIOClient
         
-        async with AsyncDemoIOClient(base_url="http://localhost:8080") as client:
+        async with AsyncIOClient(base_url="http://localhost:8080") as client:
             await client.set_device("led1", True)
             state = await client.get_led_state("led1")
     """
@@ -174,7 +174,7 @@ class AsyncDemoIOClient:
         self._client: Optional[httpx.AsyncClient] = None
         self._is_closed = True
         
-        logger.info(f"Initialized AsyncDemoIOClient with base URL: {self.io_base}")
+        logger.info(f"Initialized AsyncIOClient with base URL: {self.io_base}")
     
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the httpx AsyncClient."""
@@ -786,7 +786,7 @@ class AsyncDemoIOClient:
         if self._client and not self._is_closed:
             await self._client.aclose()
             self._is_closed = True
-            logger.info("AsyncDemoIOClient session closed")
+            logger.info("AsyncIOClient session closed")
     
     async def __aenter__(self):
         """Async context manager entry."""
@@ -816,14 +816,14 @@ class AsyncDemoIOClient:
 
 
 class DemoIOClient:
-    """Synchronous wrapper for AsyncDemoIOClient.
+    """Synchronous wrapper for AsyncIOClient.
     
     This class provides a synchronous interface to the demo_IO API by wrapping
-    the async methods of AsyncDemoIOClient. It uses asyncio.run() to execute
+    the async methods of AsyncIOClient. It uses asyncio.run() to execute
     async code synchronously.
     
     Note: This should only be used in synchronous contexts. For async applications,
-    use AsyncDemoIOClient directly.
+    use AsyncIOClient directly.
     
     Usage:
         from demo_IO.io_client.async_client_io import DemoIOClient
@@ -849,7 +849,7 @@ class DemoIOClient:
     ):
         """Initialize the synchronous demo_IO client.
         
-        This creates an AsyncDemoIOClient internally and wraps its methods.
+        This creates an AsyncIOClient internally and wraps its methods.
         
         Args:
             base_url: Base URL of the demo_IO service
@@ -863,7 +863,7 @@ class DemoIOClient:
             limits: httpx connection limits
             acsi_base_url: Base URL of ACSI server for IEC61850 writes
         """
-        self._async_client = AsyncDemoIOClient(
+        self._async_client = AsyncIOClient(
             base_url=base_url,
             mapping_file=mapping_file,
             timeout=timeout,
