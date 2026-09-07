@@ -19,17 +19,17 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const instanceId = endpoint?.name || `${endpoint?.host || 'rti-so'}:${endpoint?.port || 8765}`;
   const storageKey = `acsi-server-connected-${instanceId}`;
   const portStorageKey = `acsi-server-port-${instanceId}`;
+  const cpStorageKey = `acsi-server-cp-${instanceId}`;
 
   const [host, setHost] = useState(endpoint?.host || 'rti-so');
-  // Port resolution order: cached value for this instance > value passed
-  // via navigation state > default 8765. Once a value exists in
-  // localStorage it always wins over anything fetched from a live server,
-  // so leaving and returning to this page never clobbers what's there.
   const [port, setPort] = useState(() => {
     const cachedPort = localStorage.getItem(portStorageKey);
     return cachedPort || String(endpoint?.port || 8765);
   });
-  const [cp, setCp] = useState(endpoint?.cp || 'cp1');
+  const [cp, setCp] = useState(() => {
+    const cachedCp = localStorage.getItem(cpStorageKey);
+    return cachedCp || endpoint?.cp || 'cp1';
+  });
   const [mode, setMode] = useState(endpoint?.mode === 'client' ? 'client' : 'server');
   const hostPortInitializedRef = useRef(false);
 
@@ -44,12 +44,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [connections, setConnections] = useState([]);
   const monitorIntervalRef = useRef(null);
   const statusIntervalRef = useRef(null);
+  const cpUserEditedRef = useRef(false);
 
   const fspInstances = useMemo(
     () => connections.filter(c => c.type === 'RTI-SO'),
     [connections]
   );
-
 
   const [selectedInstanceName, setSelectedInstanceName] = useState(() => endpoint?.name || '');
   const instanceMatchedRef = useRef(false);
@@ -73,6 +73,11 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   useEffect(() => {
     localStorage.setItem(portStorageKey, port);
   }, [port, portStorageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(cpStorageKey, cp);
+  }, [cp, cpStorageKey]);
+
 
   const handleInstanceSelect = useCallback((e) => {
     const value = e.target.value;
@@ -154,6 +159,10 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     [endpoint, host, port]
   );
 
+  useEffect(() => {
+    cpUserEditedRef.current = false;
+  }, [endpointTarget]);
+
   const stopMonitoring = useCallback(() => {
     if (monitorIntervalRef.current) {
       clearInterval(monitorIntervalRef.current);
@@ -182,10 +191,13 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         setStatusInfo(parsedPayload);
 
         // Sync connected state with actual server status
-        const serverStatus = parsedPayload.result?.status?.status;
-        if (serverStatus) {
+        const serverStatus = parsedPayload.result?.status;
+        if (serverStatus.status) {
           // Server is considered connected if status is 'running', 'listening', 'connected', or 'starting'
-          setConnected(['running', 'listening', 'connected', 'starting'].includes(serverStatus));
+          setConnected(['running', 'listening', 'connected', 'starting'].includes(serverStatus.status));
+        }
+        if (!cpUserEditedRef.current && Array.isArray(serverStatus?.accessPoints) && serverStatus.accessPoints.length > 0) {
+          setCp(serverStatus.accessPoints[0]);
         }
       }
     } catch (error) { console.error('Failed to load status:', error); }
@@ -230,9 +242,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             }
             if (serverConfig) {
               if (serverConfig.host) setHost(serverConfig.host);
-              if (Array.isArray(serverConfig.accessPoints) && serverConfig.accessPoints.length > 0) {
-                setCp(serverConfig.accessPoints[0]);
-              }
               if (serverConfig.mode) setMode(serverConfig.mode);
             }
           }
@@ -717,7 +726,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </div>
         <div className="form-group">
           <label>WS CP</label>
-          <input type="text" value={cp} placeholder="cp1" onChange={(e) => setCp(e.target.value)} disabled={loading} />
+          <input type="text" value={cp} placeholder="cp1" onChange={(e) => { cpUserEditedRef.current = true; setCp(e.target.value);}} disabled={loading} />
         </div>
         <div className="form-group">
           <label>WS Mode</label>
