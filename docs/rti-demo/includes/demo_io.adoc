@@ -18,7 +18,7 @@ The demo_IO system enables remote control and monitoring of physical IO devices
 
 === Architecture
 
-image::../images/Demo_IO.png[Demo IO Architecture,link="../images/Demo_IO.png"]
+image::Demo_IO.png[Demo IO Architecture,link="Demo_IO.png"]
 
 === Directory Structure
 

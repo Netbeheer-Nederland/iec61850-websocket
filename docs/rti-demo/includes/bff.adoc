@@ -1,4 +1,4 @@
-== BFF: Backend For Frontend
+== BFF: Backend For Frontendimage
 
 The **BFF (Backend For Frontend)** layer in the RTI Demo serves as an intermediary between 
 the **HMI (Human Machine Interface)** and the **ACSI services** (RTI-SO and RTI-FSP). 
@@ -15,7 +15,7 @@ connection management, authentication, and data transformation.
 
 === Architecture Diagram
 
-image::../images/BFF.png[BFF Architecture,link="../images/BFF.png"]
+image::BFF.png[BFF Architecture,link="BFF.png"]
 
 === Data Flow
 
@@ -129,7 +129,7 @@ with OAuth fields from connections.json.
 ==== Dynamic Execution
 * **POST** `/api/execute` - Execute any API on registered target
 
-image::../images/Sequence_Diagram-Dynamic_Execution_via_POST__api_execute.png[Dynamic Execution Sequence Diagram,link="../images/Sequence_Diagram-Dynamic_Execution_via_POST__api_execute.png"]
+image::Sequence_Diagram-Dynamic_Execution_via_POST__api_execute.png[Dynamic Execution Sequence Diagram,link="Sequence_Diagram-Dynamic_Execution_via_POST__api_execute.png"]
 
 ==== Reports
 * **GET** `/api/reports` - List available reports
@@ -140,7 +140,7 @@ image::../images/Sequence_Diagram-Dynamic_Execution_via_POST__api_execute.png[Dy
 
 === Security Features
 
-image::../images/Security_and_OAuth 2.0_Communication_Flow.png[Security and OAuth 2.0 Communication Flow,link="../images/Security_and_OAuth 2.0_Communication_Flow.png"]
+image::Security_and_OAuth_2.0_Communication_Flow.png[Security and OAuth 2.0 Communication Flow,link="Security_and_OAuth_2.0_Communication_Flow.png"]
 
 ==== TLS Encryption (per-connection)
 * Supports TLSv1.2 and TLSv1.3

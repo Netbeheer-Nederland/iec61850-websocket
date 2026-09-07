@@ -16,7 +16,7 @@ The RTI-FSP directory implements a complete **IEC 61850 ACSI (Abstract Communica
 
 === Architecture
 
-image::../images/RTI_FSP_ACSI_SERVER.png[RTI-FSP ACSI Server Architecture,link="../images/RTI_FSP_ACSI_SERVER.png"]
+image::RTI_FSP_ACSI_SERVER.png[RTI-FSP ACSI Server Architecture,link="RTI_FSP_ACSI_SERVER.png"]
 
 === Directory Structure
 

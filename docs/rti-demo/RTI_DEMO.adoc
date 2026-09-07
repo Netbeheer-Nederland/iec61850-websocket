@@ -6,6 +6,7 @@
 :toclevels: 4
 :icons: font
 :source-highlighter: pygments
+:imagesdir: images
 
 *Document Version:* 1.0  
 *Last Updated:* 2026-08-28  
@@ -39,7 +40,7 @@ Unified entry point for launching RTI (Real-Time Infrastructure) demo services.
 
 === Main Architecture Diagram
 
-image::images/RTI_Demo_System_Architecture_Overview.png[RTI Demo System Architecture Overview,link="images/RTI_Demo_System_Architecture_Overview.png"]
+image::RTI_Demo_System_Architecture_Overview.png[RTI Demo System Architecture Overview,link="RTI_Demo_System_Architecture_Overview.png"]
 
 === Communication Matrix
 
