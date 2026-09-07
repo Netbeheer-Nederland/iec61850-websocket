@@ -18,7 +18,7 @@ The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication 
 
 === Architecture
 
-image::../images/SO - ACSI CLIENT.png[SO ACSI Client Architecture,link="../images/SO - ACSI CLIENT.png"]
+image::../images/SO_ACSI_CLIENT.png[SO ACSI Client Architecture,link="../images/SO_ACSI_CLIENT.png"]
 
 === Directory Structure
 

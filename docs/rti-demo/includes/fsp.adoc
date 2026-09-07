@@ -1,11 +1,11 @@
-== FSP: IEC 61850 ACSI Server
+== RTI-FSP: IEC 61850 ACSI Server - WS Active
 
-This folder contains the **FSP (Functional Server Platform)** implementation - an **IEC 61850 ACSI Server** 
+This folder contains the **RTI-FSP (Flexibility Service Provider)** implementation - an **IEC 61850 ACSI Server** 
 that provides WebSocket-based communication in active mode for substation automation and power system control.
 
 === Overview
 
-The FSP directory implements a complete **IEC 61850 ACSI (Abstract Communication Service Interface) Server** that:
+The RTI-FSP directory implements a complete **IEC 61850 ACSI (Abstract Communication Service Interface) Server** that:
 
 * Exposes IEC 61850 data model via WebSocket (active mode)
 * Provides REST API endpoints for server management (BFF - Backend for Frontend)
@@ -16,27 +16,21 @@ The FSP directory implements a complete **IEC 61850 ACSI (Abstract Communication
 
 === Architecture
 
-image::../images/FSP-ACSI_SERVER.png[FSP ACSI Server Architecture,link="../images/FSP-ACSI_SERVER.png"]
+image::../images/RTI_FSP_ACSI_SERVER.png[RTI-FSP ACSI Server Architecture,link="../images/RTI_FSP_ACSI_SERVER.png"]
 
 === Directory Structure
 
 ----
-fsp/
+RTI-FSP/
 ├── acsi_server.py        # Core WebSocket Server (Active Mode)
 ├── bff_endpoint.py       # REST API (FastAPI)
 ├── model.py              # IED Model (Python)
-├── BFF_API.md            # API Documentation
-├── Dockerfile            # Container Configuration
-├── check_syntax.py        # Validation
-├── run_bff.py            # Execution Script
-├── start_bff.bat          # Windows Startup
-├── test_start.py         # Tests
 └── README.md
 ----
 
 === Key Components
 
-==== acsi_server.py - IEC 61850 WebSocket Server (Active Mode)
+==== acsi_server.py - ACSI Server & WebSocket -Active Mode
 
 The core server implementation that handles:
 
@@ -74,11 +68,11 @@ A FastAPI application that provides REST endpoints for managing the ACSI Server.
 
 ==== Docker
 ----
-docker build -t rti-demo-fsp -f examples/rti-demo/fsp/Dockerfile .
-docker run --rm -p 5001:5001 rti-demo-fsp
+docker build -t rti-demo-RTI-FSP -f examples/rti-demo/RTI-FSP/Dockerfile .
+docker run --rm -p 5001:5001 rti-demo-RTI-FSP
 # With network
 docker network create rti-network
-docker run --rm -p 5001:5001 --network rti-network --name rti-fsp rti-demo-fsp
+docker run --rm -p 5001:5001 --network rti-network --name rti-RTI-FSP rti-demo-RTI-FSP
 ----
 
 Health Check:
@@ -109,7 +103,7 @@ Server Defaults: Host: 0.0.0.0, WebSocket Port: 8765, Mode: server, CP: cp1
 === Integration
 
 * With demo_IO: POST `/api/io/connect` {base_url: "http://demo-io:8000"}
-* With SO: FSP (Server, Port 8765) <--WebSocket--> SO (Client)
+* With SO: RTI-FSP (Server, Port 8765) <--WebSocket--> SO (Client)
 * With BFF: HTTP/REST at port 5001
 
 === Troubleshooting

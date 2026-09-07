@@ -53,11 +53,7 @@ image::images/RTI_Demo_System_Architecture_Overview.png[RTI Demo System Architec
 
 |BFF |SO |HTTP/REST |5002
 
-|BFF |demo_IO |HTTP/REST |8000
-
-|FSP (Internal) |FSP (External) |WebSocket/ACSI |8765
-
-|SO (Internal) |FSP |WebSocket/ACSI |8765
+|RTI-FSP/RTI-SO |demo_IO |HTTP/REST |8000
 
 |demo_IO |Physical Devices |Direct Hardware |GPIO/ADC/I2C
 
@@ -67,76 +63,9 @@ image::images/RTI_Demo_System_Architecture_Overview.png[RTI Demo System Architec
 
 |===
 
-== Quick Start Guide
-
-=== Launch All Services
-
-[source,bash]
-----
-# Launch all services (default: all services with foreground & verbose mode)
-python launch.py
-
-# Launch individual services
-python launch.py bff
-python launch.py fsp
-python launch.py so
-python launch.py frontend
-----
-
-=== Common Commands
-
-[source,bash]
-----
-# Show help
-python launch.py --help
-
-# List available services
-python launch.py list
-
-# Launch with custom port
-python launch.py bff --port 5005
-
-# Disable foreground mode (run in background)
-python launch.py --background
-
-# Disable verbose logging
-python launch.py --no-verbose
-
-# Check running services
-python launch.py --status
-
-# Stop all services
-python launch.py --stop
-
-# Docker mode
-python launch.py --docker
-----
-
-=== Access URLs
-
-[cols="1,1,1",options="header"]
-|===
-|Service |Port |Access URL
-
-|BFF |5000 |http://localhost:5000
-
-|FSP |5001 |http://localhost:5001
-
-|SO |5002 |http://localhost:5002
-
-|Frontend (HMI) |8080 |http://localhost:8080
-
-|===
-
-== Main Demo README
-
 include::includes/main.adoc[]
 
-== FSP - Functional Server Platform (ACSI-Server)
-
 include::includes/fsp.adoc[]
-
-== SO - System Operator (ACSI-Client)
 
 include::includes/so.adoc[]
 
@@ -256,6 +185,69 @@ HMI -> BFF -> SO (REST:5002) -> SO (WebSocket:8765) -> FSP (WebSocket:8765) -> M
 
 HMI -> BFF (**POST** `/api/add-connection`) -> connections.json -> BffClient registration  
 BFF background: status_monitor checks health every 10 seconds
+
+== Quick Start Guide
+
+=== Launch All Services
+
+[source,bash]
+----
+# Launch all services (default: all services with foreground & verbose mode)
+python launch.py
+
+# Launch individual services
+python launch.py bff
+python launch.py fsp
+python launch.py so
+python launch.py frontend
+----
+
+=== Common Commands
+
+[source,bash]
+----
+# Show help
+python launch.py --help
+
+# List available services
+python launch.py list
+
+# Launch with custom port
+python launch.py bff --port 5005
+
+# Disable foreground mode (run in background)
+python launch.py --background
+
+# Disable verbose logging
+python launch.py --no-verbose
+
+# Check running services
+python launch.py --status
+
+# Stop all services
+python launch.py --stop
+
+# Docker mode
+python launch.py --docker
+----
+
+=== Access URLs
+
+[cols="1,1,1",options="header"]
+|===
+|Service |Port |Access URL
+
+|BFF |5000 |http://localhost:5000
+
+|FSP |5001 |http://localhost:5001
+
+|SO |5002 |http://localhost:5002
+
+|Frontend (HMI) |8080 |http://localhost:8080
+
+|===
+
+
 
 == Troubleshooting Guide
 
