@@ -512,14 +512,6 @@ class ACSIServer:
                 )
                 self.runtime.tasks["report"] = report_task
                 
-                # Restart custom demo tasks if the new model has the required objects
-                if old_server.find_object_in_tree("LD0/DGEN1.DEROpSt.stVal") is not None:
-                    toggle_task = asyncio.create_task(
-                        self._toggle_custom_value(old_server, "LD0/DGEN1.DEROpSt.stVal"),
-                        name="toggle-value"
-                    )
-                    self.runtime.tasks["toggle"] = toggle_task
-                
                 self._log_action(
                     "Server services updated with new model",
                     detail={
@@ -631,12 +623,6 @@ class ACSIServer:
             self.runtime.server.periodic_report_start(), name=f"{cp}-periodic-report"
         )
         tasks: Dict[str, asyncio.Task] = {"report": report_task}
-
-        if self.runtime.server.find_object_in_tree("LD0/DGEN1.DEROpSt.stVal") is not None:
-            tasks["toggle"] = asyncio.create_task(
-                self._toggle_custom_value(self.runtime.server, "LD0/DGEN1.DEROpSt.stVal"),
-                name="toggle-value",
-            )
 
         ws_task = self.runtime.endpoint.run_in_background(host, port, cp)
         tasks["ws"] = ws_task
