@@ -2816,6 +2816,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         status_code=404
                     )
                 else:
+                    print(f"the write result for {obj_ref}: {result} ")
                     if result.get("error") is None:
                         return {
                             "ok": True,
@@ -2831,25 +2832,26 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         )
 
             except FuturesTimeoutError:
+                rti_so._log_action("WriteValue timeout", "error")
                 return JSONResponse(
                     content={"ok": False, "error": "write timeout"},
                     status_code=504
                 )
             except ValueError as exc:
+                rti_so._log_action(f"WriteValue value error: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=404
                 )
             except Exception as exc:
-                return JSONResponse(
-                    content={"ok": False, "error": str(exc)},
-                    status_code=500
-                )
+                rti_so._log_action(f"WriteValue error: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)},
                     status_code=500
                 )
         except Exception as exc:
+            rti_so._log_action(f"WriteValue error: {exc}", "error")
+
             return JSONResponse(
                 content={"ok": False, "error": str(exc)},
                 status_code=500

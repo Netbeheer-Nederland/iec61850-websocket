@@ -824,6 +824,54 @@ class ACSIClient:
             result = await client.get_URCB_values(obj_ref, websocket_info, None, None)
         return {"urcbDefinition": result}
 
+    def convert_value(self, type_name, raw_str, TYPE_MAP):
+        expected_type = TYPE_MAP.get(type_name)
+        if expected_type is None:
+            print(f"Unknown type: {type_name}")
+            return False, None
+
+        if expected_type is bool:
+            if raw_str is str:
+                if raw_str.lower() in ("true", "1"):
+                    return True, True
+                elif raw_str.lower() in ("false", "0"):
+                    return True, False
+                else:
+                    print(f"Cannot convert '{raw_str}' to bool")
+                    return False, None
+            else:
+                return True, bool(raw_str)
+
+        if expected_type is int:
+            try:
+                return True, int(raw_str)
+            except (ValueError, TypeError):
+                print(f"Cannot convert '{raw_str}' to int")
+                return False, None
+
+        if expected_type is float:
+            try:
+                return True, float(raw_str)
+            except (ValueError, TypeError):
+                print(f"Cannot convert '{raw_str}' to float")
+                return False, None
+
+        if expected_type is bytes:
+            try:
+                return True, bytes.fromhex(raw_str)  # adjust if not hex-encoded
+            except (ValueError, TypeError):
+                print(f"Cannot convert '{raw_str}' to bytes")
+                return False, None
+
+        if expected_type is str:
+            return True, raw_str  # already a string
+
+        if expected_type is list:
+            print(f"No defined conversion for {type_name} (list) from string '{raw_str}'")
+            return False, None
+
+        return False, None
+
     async def write_value(self, obj_ref: str, value: Any, fc: str, data_type: str, cp:str) -> Dict[str, Any]:
         """Write a value to the server."""
         client = self.get_iec61850_client(cp)
@@ -834,7 +882,42 @@ class ACSIClient:
         if data_type == "boolean":
             value = bool(value)
         async with self.runtime.invoke_lock:
-            result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, self.runtime.write_callback, None)
+            TYPE_MAP = {
+                "boolean": bool,
+                "int8": int,
+                "int16": int,
+                "int24": int,
+                "int32": int,
+                "int64": int,
+                "int8u": int,
+                "int16u": int,
+                "int24u": int,
+                "int32u": int,
+                "float32": float,
+                "octetString": bytes,
+                "visString64": str,
+                "visString129": str,
+                "visString255": str,
+                "array": list,
+                "bitstring": list,  # or int/str depending on how you represent bits
+                "generalizedtime": str,  # or datetime, depending on how you parse it
+                "binarytime": str,  # or datetime/time
+                "quality": int,  # or a custom Quality class/bitmask
+                "timeStamp": str,  # or datetime
+                "enumerated": int,
+            }
+
+            converted, converted_val = self.convert_value(data_type, value, TYPE_MAP)
+
+            if converted is False:
+                raise RuntimeError(f"Type mismatch: '{value}' is not valid for {data_type}")
+            else:
+                print("the value: ", value)
+                print("the type: ", data_type)
+                result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, converted_val)}], websocket_info,
+                                                      self.runtime.write_callback, None)
+
+            #result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, self.runtime.write_callback, None)
         print(result)
         print("Write operation completed successfully.")
         print("new value:", value)
