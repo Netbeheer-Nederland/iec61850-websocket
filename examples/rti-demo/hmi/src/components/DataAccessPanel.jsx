@@ -1498,6 +1498,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
 
       {/* Operate Button - shown for ACSI Client endpoints with controllable DO/SDO */}
       {selectedTarget && selectedDO && selectedLD && selectedLN &&
+      getAcsiRole(selectedConnection) === 'client' &&
       CONTROLLABLE_CDCS.includes((selectedDoCdc || '').toUpperCase()) && (
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
           {doChildrenLoading ? (
