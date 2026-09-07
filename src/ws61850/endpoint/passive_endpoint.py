@@ -531,7 +531,7 @@ class PassiveEndpoint:
         headers = request.headers
         auth_header = headers.get("Authorization")
 
-        self.client_list[:] = [c for c in self.client_list if c.cp != cp]
+        #self.client_list[:] = [c for c in self.client_list if c.cp != cp]
         self.client_list.append(IEC61850Client(cp))
         if self._oauth_enable:
             if not auth_header or not auth_header.startswith("Bearer "):
@@ -582,6 +582,7 @@ class PassiveEndpoint:
                 selected_client.ready_event.clear()
                 selected_client.is_connected = False
                 selected_client.disconnect_event.set()
+                self.client_list[:] = [c for c in self.client_list if c.cp != cp]
             if selected_server is not None:
                 selected_server.set_quality_to_questionable()
         except Exception as e:
