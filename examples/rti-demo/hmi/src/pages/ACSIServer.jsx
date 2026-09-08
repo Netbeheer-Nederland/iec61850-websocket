@@ -30,7 +30,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     const cachedCp = localStorage.getItem(cpStorageKey);
     return cachedCp || endpoint?.cp || 'cp1';
   });
-  const [mode, setMode] = useState(endpoint?.mode === 'client' ? 'client' : 'server');
+  const [mode, setMode] = useState(endpoint?.mode === 'passive' ? 'passive' : 'active');
   const hostPortInitializedRef = useRef(false);
 
   const [connected, setConnected] = useState(() => localStorage.getItem(storageKey) === 'true');
@@ -731,8 +731,8 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         <div className="form-group">
           <label>WS Mode</label>
           <select value={mode} onChange={(e) => setMode(e.target.value)} disabled={loading}>
-            <option value="server">server</option>
-            <option value="client">client</option>
+            <option value="active">Active</option>
+            <option value="passive">Passive</option>
           </select>
         </div>
       </div>
