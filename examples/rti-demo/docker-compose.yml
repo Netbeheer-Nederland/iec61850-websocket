@@ -112,6 +112,7 @@ services:
 
   # RTI-FSP (Acsi-Server)
   rti-fsp:
+    user: root
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.rti-fsp
