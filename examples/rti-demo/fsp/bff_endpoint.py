@@ -1032,9 +1032,9 @@ def create_bff_router(
             mode = request.mode
             cp = request.cp
 
-            if mode != "server":
+            if mode != "active":
                 return JSONResponse(
-                    content={"ok": False, "error": "Only 'server' mode is supported in this app."},
+                    content={"ok": False, "error": "Only 'active' mode is supported in this app."},
                     status_code=400
                 )
             try:
