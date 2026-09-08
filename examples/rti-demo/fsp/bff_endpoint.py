@@ -1033,6 +1033,7 @@ def create_bff_router(
             cp = request.cp
 
             if mode != "active":
+                rti_fsp._log_action("Only 'active' mode is supported in this app", "error")
                 return JSONResponse(
                     content={"ok": False, "error": "Only 'active' mode is supported in this app."},
                     status_code=400
