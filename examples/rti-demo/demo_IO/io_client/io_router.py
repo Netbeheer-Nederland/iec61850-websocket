@@ -22,8 +22,8 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .async_client_io import AsyncDemoIOClient
-from .mapping_manager import IOMappingManager
+from async_client_io import AsyncDemoIOClient
+from mapping_manager import IOMappingManager
 
 logger = logging.getLogger(__name__)
 
