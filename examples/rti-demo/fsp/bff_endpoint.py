@@ -175,7 +175,8 @@ io_plugin_REQUIRED_FILES = [
     "io_router.py",
     "io_utils.py", 
     "mapping_manager.py",
-    "__init__.py"
+    "__init__.py",
+    "async_client_io.py"
 ]
 
 import httpx
@@ -200,7 +201,8 @@ def check_required_io_plugin_files() -> bool:
         "io_router.py",
         "io_utils.py", 
         "mapping_manager.py",
-        "__init__.py"
+        "__init__.py",
+        "async_client_io.py"
     ]
     
     for file in required_files:
@@ -224,7 +226,19 @@ def load_io_plugin_modules() -> bool:
         # Add the dynamic directory to sys.path so imports work
         if str(io_plugin_dynamic_DIR) not in sys.path:
             sys.path.insert(0, str(io_plugin_dynamic_DIR))
-        
+
+        # Load async_client_io module (dependency of io_router) — must load first
+        async_client_io_path = get_io_plugin_file_path("async_client_io.py")
+        spec = importlib.util.spec_from_file_location("async_client_io", async_client_io_path)
+        if spec and spec.loader:
+            async_client_io_module = importlib.util.module_from_spec(spec)
+            sys.modules["async_client_io"] = async_client_io_module
+            spec.loader.exec_module(async_client_io_module)
+            logger.info(f"Successfully loaded async_client_io from {async_client_io_path}")
+        else:
+            logger.error(f"Failed to load async_client_io from {async_client_io_path}")
+            return False
+
         # Load io_router module
         io_router_path = get_io_plugin_file_path("io_router.py")
         spec = importlib.util.spec_from_file_location("io_router", io_router_path)
