@@ -47,7 +47,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import httpx
 
-from .mapping_manager import IOMappingManager
+from mapping_manager import IOMappingManager
 
 logger = logging.getLogger(__name__)
 
