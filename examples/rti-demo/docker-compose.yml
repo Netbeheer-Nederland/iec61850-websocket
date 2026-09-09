@@ -171,6 +171,8 @@ services:
 
   # RTI SO (Acsi-Client)
   rti-so:
+    user:
+      root
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.rti-so
