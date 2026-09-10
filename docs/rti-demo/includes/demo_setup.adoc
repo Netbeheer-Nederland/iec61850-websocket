@@ -256,6 +256,24 @@ docker exec -it bff-server bash
 
 === Raspberry Pi IO Setup
 
+==== Enable SPI:
+----
+sudo raspi-config
+# Navigate to: Interface Options -> SPI -> Enable
+sudo reboot
+----
+
+==== Verify SPI is Working
+----
+lsmod | grep spi
+ls /dev/spi*
+----
+==== Install SPI Dependencies
+----
+sudo apt update
+sudo apt install spi-tools
+----
+
 ==== Enable I2C Interface
 ----
 sudo raspi-config
