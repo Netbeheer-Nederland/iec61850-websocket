@@ -81,11 +81,48 @@ _io_plugin_module = None
 _mapping_manager_module = None
 _io_utils_module = None
 
+# ==================== Dynamic IO Router Registration ====================
+# Reference to the running FastAPI app instance, captured in
+# create_fastapi_app(). Lets us register the IO router AFTER startup -
+# e.g. right after a successful /api/io-plugin/connect call - without
+# needing a process restart. FastAPI/Starlette supports adding routers
+# at any time (it's just appending routes); it does not support removing
+# them, so _io_router_included is a one-way latch.
+_fastapi_app_ref: Optional[FastAPI] = None
+_io_router_included = False
+
+
+def _try_include_io_router() -> bool:
+    """Register the dynamically-loaded IO router on the running app, if not already done.
+
+    Safe to call repeatedly - only registers once. This is what lets the
+    IO control endpoints (LEDs, mappings, etc.) appear right after
+    /api/io-plugin/connect or /api/io-plugin/reload succeed, with no
+    process restart needed.
+    """
+    global _io_router_included
+    if _io_router_included:
+        return True
+    if _fastapi_app_ref is None:
+        logger.warning("Cannot include IO router - app reference not set yet")
+        return False
+    if _io_plugin_module is None or not hasattr(_io_plugin_module, 'create_io_router'):
+        return False
+    try:
+        io_router = _io_plugin_module.create_io_router()
+        _fastapi_app_ref.include_router(io_router)
+        _io_router_included = True
+        logger.info("IO router included dynamically")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to dynamically include IO router: {e}")
+        return False
+
 # ==================== IO Plugin Connection Management ====================
 
 class IOPluginConnectionStatus:
     """Track the connection status to IO server and file download status."""
-    
+
     def __init__(self):
         self.connected = False
         self.last_connection_time = None
@@ -96,7 +133,7 @@ class IOPluginConnectionStatus:
         self.successful_fetches = 0
         self.io_server_url = None
         self.connection_history = []
-    
+
     def connect(self, server_url: str):
         """Mark connection as established."""
         self.connected = True
@@ -107,7 +144,7 @@ class IOPluginConnectionStatus:
             "timestamp": self.last_connection_time,
             "server_url": server_url
         })
-    
+
     def disconnect(self):
         """Mark connection as closed."""
         self.connected = False
@@ -116,7 +153,7 @@ class IOPluginConnectionStatus:
             "action": "disconnect",
             "timestamp": self.last_disconnect_time
         })
-    
+
     def record_fetch(self, success: bool, error: str = None, files_fetched: int = 0):
         """Record a file fetch attempt."""
         self.fetch_attempts += 1
@@ -133,12 +170,12 @@ class IOPluginConnectionStatus:
             "error": error,
             "files_fetched": files_fetched
         })
-    
+
     def get_status(self) -> Dict[str, Any]:
         """Get current connection status as dictionary."""
         import time
         current_time = time.time()
-        
+
         # Calculate time since last activity
         last_activity = None
         if self.last_connection_time:
@@ -147,7 +184,7 @@ class IOPluginConnectionStatus:
             last_activity = current_time - self.last_disconnect_time
         elif self.last_fetch_time:
             last_activity = current_time - self.last_fetch_time
-        
+
         return {
             "connected": self.connected,
             "io_server_url": self.io_server_url,
@@ -173,10 +210,11 @@ io_plugin_RETRY_DELAY = float(os.getenv("io_plugin_RETRY_DELAY", "1.0"))
 # Default files to fetch from IO server
 io_plugin_REQUIRED_FILES = [
     "io_router.py",
-    "io_utils.py", 
+    "io_utils.py",
     "mapping_manager.py",
     "__init__.py",
-    "async_client_io.py"
+    "async_client_io.py",
+    "io_mapping.json"
 ]
 
 import httpx
@@ -199,29 +237,54 @@ def check_required_io_plugin_files() -> bool:
     """Check if all required io_plugin files exist."""
     required_files = [
         "io_router.py",
-        "io_utils.py", 
+        "io_utils.py",
         "mapping_manager.py",
         "__init__.py",
         "async_client_io.py"
     ]
-    
+
     for file in required_files:
         file_path = get_io_plugin_file_path(file)
         if not file_path.exists():
             logger.debug(f"Required io_plugin file not found: {file_path}")
             return False
-    
+
     return True
+
+
+def _rebuild_pydantic_models(module) -> None:
+    """Force-build any deferred Pydantic model schemas defined in a dynamically loaded module.
+
+    Pydantic v2 sometimes defers a model's schema build until first use
+    (e.g. when it can't immediately resolve every referenced type). That
+    deferred build later resolves forward references via
+    sys.modules[<model's __module__>].__dict__ - which only works if the
+    module was registered in sys.modules (see load_io_plugin_modules).
+    Calling model_rebuild() here forces the build to happen immediately,
+    so a broken model fails loudly at connect/reload time instead of
+    silently corrupting the next /openapi.json request.
+    """
+    try:
+        from pydantic import BaseModel
+    except ImportError:
+        return
+
+    for name, obj in vars(module).items():
+        try:
+            if isinstance(obj, type) and issubclass(obj, BaseModel) and obj is not BaseModel:
+                obj.model_rebuild(force=True, _types_namespace=vars(module))
+        except Exception as e:
+            logger.warning(f"Could not rebuild Pydantic model '{name}' from {module.__name__}: {e}")
 
 
 def load_io_plugin_modules() -> bool:
     """Dynamically load io_plugin modules from the dynamic directory."""
     global _io_plugin_module, _mapping_manager_module, _io_utils_module
-    
+
     if not check_required_io_plugin_files():
         logger.warning("Required io_plugin files are missing")
         return False
-    
+
     try:
         # Add the dynamic directory to sys.path so imports work
         if str(io_plugin_dynamic_DIR) not in sys.path:
@@ -240,40 +303,56 @@ def load_io_plugin_modules() -> bool:
             return False
 
         # Load io_router module
+        # IMPORTANT: register in sys.modules under its own name BEFORE
+        # exec_module. Pydantic v2 may defer building a model's schema
+        # (e.g. IOConnectionConfig) until first use, and when it does,
+        # it resolves forward references via sys.modules[<module>].__dict__.
+        # Without this registration, that lookup fails and FastAPI's
+        # /openapi.json generation crashes with "is not fully defined".
         io_router_path = get_io_plugin_file_path("io_router.py")
         spec = importlib.util.spec_from_file_location("io_router", io_router_path)
         if spec and spec.loader:
             _io_plugin_module = importlib.util.module_from_spec(spec)
+            sys.modules["io_router"] = _io_plugin_module
             spec.loader.exec_module(_io_plugin_module)
+            # Force any deferred Pydantic model schemas in this module to
+            # build now, while we can still report a clean load failure
+            # here, rather than deferring the crash to whenever
+            # /openapi.json happens to be requested next.
+            _rebuild_pydantic_models(_io_plugin_module)
             logger.info(f"Successfully loaded io_router from {io_router_path}")
         else:
             logger.error(f"Failed to load io_router from {io_router_path}")
             return False
-        
+
         # Load io_utils module
         io_utils_path = get_io_plugin_file_path("io_utils.py")
         spec = importlib.util.spec_from_file_location("io_utils", io_utils_path)
         if spec and spec.loader:
             _io_utils_module = importlib.util.module_from_spec(spec)
+            sys.modules["io_utils"] = _io_utils_module
             spec.loader.exec_module(_io_utils_module)
+            _rebuild_pydantic_models(_io_utils_module)
             logger.info(f"Successfully loaded io_utils from {io_utils_path}")
         else:
             logger.error(f"Failed to load io_utils from {io_utils_path}")
             return False
-        
+
         # Load mapping_manager module
         mapping_manager_path = get_io_plugin_file_path("mapping_manager.py")
         spec = importlib.util.spec_from_file_location("mapping_manager", mapping_manager_path)
         if spec and spec.loader:
             _mapping_manager_module = importlib.util.module_from_spec(spec)
+            sys.modules["mapping_manager"] = _mapping_manager_module
             spec.loader.exec_module(_mapping_manager_module)
+            _rebuild_pydantic_models(_mapping_manager_module)
             logger.info(f"Successfully loaded mapping_manager from {mapping_manager_path}")
         else:
             logger.error(f"Failed to load mapping_manager from {mapping_manager_path}")
             return False
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"Failed to load io_plugin modules: {e}")
         return False
@@ -284,24 +363,24 @@ def get_io_plugin_dynamic():
     if _io_plugin_module is None:
         if not load_io_plugin_modules():
             return None
-    
+
     try:
-        return _io_plugin_module.get_io_plugin()
+        return _io_plugin_module.get_io_client()
     except AttributeError:
-        logger.error("io_router module doesn't have get_io_plugin function")
+        logger.error("io_router module doesn't have get_io_client function")
         return None
 
 
 def get_mapping_manager_dynamic():
     """Get the mapping_manager instance from dynamically loaded modules."""
-    if _mapping_manager_module is None:
+    if _io_plugin_module is None:
         if not load_io_plugin_modules():
             return None
-    
+
     try:
-        return _mapping_manager_module.get_mapping_manager()
+        return _io_plugin_module.get_mapping_manager()
     except AttributeError:
-        logger.error("mapping_manager module doesn't have get_mapping_manager function")
+        logger.error("io_router module doesn't have get_mapping_manager function")
         return None
 
 
@@ -310,7 +389,7 @@ def get_sync_to_io_device_dynamic():
     if _io_utils_module is None:
         if not load_io_plugin_modules():
             return None
-    
+
     try:
         return _io_utils_module.sync_to_io_device
     except AttributeError:
@@ -323,7 +402,7 @@ def get_write_to_lcd_dynamic():
     if _io_utils_module is None:
         if not load_io_plugin_modules():
             return None
-    
+
     try:
         return _io_utils_module.write_to_lcd
     except AttributeError:
@@ -336,7 +415,7 @@ def get_blink_led_task_dynamic():
     if _io_utils_module is None:
         if not load_io_plugin_modules():
             return None
-    
+
     try:
         return _io_utils_module.blink_led_task
     except AttributeError:
@@ -360,28 +439,34 @@ def clear_io_plugin_modules():
     # Remove dynamic directory from sys.path
     if str(io_plugin_dynamic_DIR) in sys.path:
         sys.path.remove(str(io_plugin_dynamic_DIR))
+    # Remove all dynamically-registered modules from sys.modules so a
+    # subsequent reload picks up freshly-downloaded copies instead of
+    # stale cached modules (and stale Pydantic model classes/schemas).
+    for _mod_name in ("async_client_io", "io_router", "io_utils", "mapping_manager"):
+        if _mod_name in sys.modules:
+            del sys.modules[_mod_name]
 
 
 # ==================== IO Plugin HTTP Client Functions ====================
 
 async def download_file_from_io_server(server_url: str, filename: str, timeout: float = 10.0) -> Optional[str]:
     """Download a single file from the IO server.
-    
+
     Args:
         server_url: URL of the IO server (e.g., 'http://localhost:8000')
         filename: Name of the file to download
         timeout: Timeout in seconds
-        
+
     Returns:
         File content as string if successful, None otherwise
     """
     try:
         url = f"{server_url.rstrip('/')}/api/io-plugin/files/{filename}"
         logger.info(f"Downloading file from: {url}")
-        
+
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(url)
-            
+
             if response.status_code == 200:
                 data = response.json()
                 if data.get("ok", False):
@@ -397,7 +482,7 @@ async def download_file_from_io_server(server_url: str, filename: str, timeout: 
             else:
                 logger.error(f"Failed to download file '{filename}': HTTP {response.status_code}")
                 return None
-                
+
     except httpx.TimeoutException:
         logger.error(f"Timeout downloading file '{filename}' from IO server")
         return None
@@ -410,18 +495,18 @@ async def download_file_from_io_server(server_url: str, filename: str, timeout: 
 
 async def download_io_plugin_files(server_url: str, files: List[str] = None, timeout: float = 10.0) -> Dict[str, Any]:
     """Download multiple io_plugin files from the IO server with retry logic.
-    
+
     Args:
         server_url: URL of the IO server
         files: List of filenames to download (defaults to io_plugin_REQUIRED_FILES)
         timeout: Timeout per file download in seconds
-        
+
     Returns:
         Dictionary with results: {"success": bool, "downloaded": list, "failed": list, "errors": dict}
     """
     if files is None:
         files = io_plugin_REQUIRED_FILES
-    
+
     results = {
         "success": False,
         "downloaded": [],
@@ -430,22 +515,22 @@ async def download_io_plugin_files(server_url: str, files: List[str] = None, tim
         "total_files": len(files),
         "downloaded_count": 0
     }
-    
+
     try:
         # Ensure target directory exists
         ensure_io_plugin_dir()
-        
+
         for filename in files:
             for attempt in range(io_plugin_MAX_RETRIES):
                 try:
                     content = await download_file_from_io_server(server_url, filename, timeout)
-                    
+
                     if content is not None:
                         # Save the file
                         file_path = get_io_plugin_file_path(filename)
                         with open(file_path, 'w', encoding='utf-8') as f:
                             f.write(content)
-                        
+
                         results["downloaded"].append(filename)
                         results["downloaded_count"] += 1
                         logger.info(f"Saved file '{filename}' to {file_path}")
@@ -455,21 +540,21 @@ async def download_io_plugin_files(server_url: str, files: List[str] = None, tim
                         results["errors"][filename] = error_msg
                         if attempt < io_plugin_MAX_RETRIES - 1:
                             await asyncio.sleep(io_plugin_RETRY_DELAY)
-                        
+
                 except Exception as e:
                     error_msg = f"Error downloading '{filename}': {e} (attempt {attempt + 1}/{io_plugin_MAX_RETRIES})"
                     results["errors"][filename] = error_msg
                     if attempt < io_plugin_MAX_RETRIES - 1:
                         await asyncio.sleep(io_plugin_RETRY_DELAY)
-            
+
             if filename not in results["downloaded"]:
                 results["failed"].append(filename)
-        
+
         # Mark success if we got all required files
         results["success"] = len(results["failed"]) == 0
-        
+
         return results
-        
+
     except Exception as e:
         logger.error(f"Error in download_io_plugin_files: {e}")
         results["success"] = False
@@ -478,21 +563,21 @@ async def download_io_plugin_files(server_url: str, files: List[str] = None, tim
 
 async def check_io_server_health(server_url: str, timeout: float = 5.0) -> Dict[str, Any]:
     """Check if the IO server is healthy and available.
-    
+
     Args:
         server_url: URL of the IO server
         timeout: Timeout in seconds
-        
+
     Returns:
         Dictionary with health check results
     """
     try:
         url = f"{server_url.rstrip('/')}/api/io/health"
         logger.info(f"Checking IO server health at: {url}")
-        
+
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(url)
-            
+
             if response.status_code == 200:
                 data = response.json()
                 return {
@@ -511,7 +596,7 @@ async def check_io_server_health(server_url: str, timeout: float = 5.0) -> Dict[
                     "error": f"HTTP {response.status_code}",
                     "status": "unreachable"
                 }
-                
+
     except httpx.TimeoutException:
         return {
             "healthy": False,
@@ -536,12 +621,12 @@ async def check_io_server_health(server_url: str, timeout: float = 5.0) -> Dict[
 
 async def fetch_and_load_io_plugin_files(server_url: str) -> Dict[str, Any]:
     """Connect to IO server, download files, and load modules.
-    
+
     This is the main function for on-demand IO Plugin connection.
-    
+
     Args:
         server_url: URL of the IO server
-        
+
     Returns:
         Dictionary with connection and loading results
     """
@@ -555,45 +640,45 @@ async def fetch_and_load_io_plugin_files(server_url: str) -> Dict[str, Any]:
         "modules_loaded": [],
         "errors": {}
     }
-    
+
     try:
         # Step 1: Check server health
         health_check = await check_io_server_health(server_url)
         if not health_check.get("healthy", False):
             results["errors"]["server_check"] = health_check.get("error", "Server unhealthy")
             return results
-        
+
         results["server_healthy"] = True
         results["health_check"] = health_check
-        
+
         # Step 2: Download files
         download_result = await download_io_plugin_files(server_url)
         results["download_success"] = download_result.get("success", False)
         results["files_downloaded"] = download_result.get("downloaded", [])
         results["files_failed"] = download_result.get("failed", [])
         results["download_errors"] = download_result.get("errors", {})
-        
+
         if not download_result.get("success", False):
             results["errors"]["download"] = "Failed to download all required files"
             return results
-        
+
         # Step 3: Clear existing modules and reload
         clear_io_plugin_modules()
-        
+
         # Step 4: Load the newly downloaded modules
         modules_loaded = load_io_plugin_modules()
         if modules_loaded:
             update_io_plugin_usage()
             results["load_success"] = True
-            results["modules_loaded"] = ["io_router", "io_utils", "mapping_manager"]
+            results["modules_loaded"] = ["async_client_io", "io_router", "io_utils", "mapping_manager"]
             results["use_io_plugin_enabled"] = _use_io_plugin
         else:
             results["errors"]["load"] = "Failed to load modules"
-        
+
         results["connection_success"] = True
-        
+
         return results
-        
+
     except Exception as e:
         logger.error(f"Error in fetch_and_load_io_plugin_files: {e}")
         results["errors"]["general"] = str(e)
@@ -763,7 +848,7 @@ class IoClientConnectRequest(BaseModel):
     files: Optional[List[str]] = Field(
         default=None,
         description="Specific files to fetch. If None, fetches all required files",
-        json_schema_extra={"example": ["io_router.py", "io_utils.py", "mapping_manager.py", "__init__.py"]}
+        json_schema_extra={"example": ["io_router.py", "io_utils.py", "mapping_manager.py", "__init__.py", "async_client_io.py"]}
     )
     timeout: float = Field(
         default=10.0,
@@ -860,8 +945,9 @@ def create_bff_router(
 
     def on_connected_callback(associate_response):
         """Callback for sent associateResponse messages."""
+        global _use_io_plugin
         logger.info(f"[FSP CONNECTED] associateResponse: {associate_response}")
-        
+
         if _use_io_plugin:
             try:
                 # Use dynamic loading functions
@@ -869,7 +955,7 @@ def create_bff_router(
                 mapping_manager = get_mapping_manager_dynamic()
                 sync_to_io_device = get_sync_to_io_device_dynamic()
                 write_to_lcd = get_write_to_lcd_dynamic()
-                
+
                 if io_plugin is None or mapping_manager is None or sync_to_io_device is None or write_to_lcd is None:
                     logger.warning("Dynamic io_plugin loading failed, falling back to disabled state")
                     _use_io_plugin = False
@@ -882,7 +968,7 @@ def create_bff_router(
                     asyncio.create_task(
                         sync_to_io_device(io_plugin, "connected", True)
                     )
-                    
+
                     # Write connection info to LCD
                     value = f"FSP Connected: {associate_id}"
                     asyncio.create_task(
@@ -894,24 +980,25 @@ def create_bff_router(
                 logger.error(f"[FSP] ImportError - Cannot import IO Plugin: {e}")
             except Exception as e:
                 logger.error(f"[FSP] Exception in IO connected callback: {e}")
-        
+
     def on_operate_received_callback(operate_data):
         """Callback for received operate request messages - blinks LED."""
+        global _use_io_plugin
         logger.info(f"[FSP OPERATE RECEIVED] operate request: {operate_data}")
-        
+
         if _use_io_plugin:
             try:
                 # Use dynamic loading functions
                 io_plugin = get_io_plugin_dynamic()
                 mapping_manager = get_mapping_manager_dynamic()
                 blink_led_task = get_blink_led_task_dynamic()
-                
+
                 if io_plugin is None or mapping_manager is None or blink_led_task is None:
                     logger.warning("Dynamic io_plugin loading failed, falling back to disabled state")
                     _use_io_plugin = False
                     return
                 if io_plugin:
-                
+
                     asyncio.create_task(
                         blink_led_task(io_plugin, "oper_rcv", interval=0.2, count=1, mapping_manager=mapping_manager)
                     )
@@ -922,34 +1009,35 @@ def create_bff_router(
             except Exception as e:
                 logger.error(f"[FSP] Exception in operate received callback: {e}")
 
-        
+
 
     def on_operate_response_callback(operate_response):
         """Callback for sent operate response messages - prints to LCD."""
+        global _use_io_plugin
         logger.info(f"[FSP OPERATE RESPONSE] operate response: {operate_response}")
-        
+
         if _use_io_plugin:
             try:
                 # Use dynamic loading functions
                 io_plugin = get_io_plugin_dynamic()
                 mapping_manager = get_mapping_manager_dynamic()
                 write_to_lcd = get_write_to_lcd_dynamic()
-                
+
                 if io_plugin is None or mapping_manager is None or write_to_lcd is None:
                     logger.warning("Dynamic io_plugin loading failed, falling back to disabled state")
                     _use_io_plugin = False
                     return
-                
+
                 if io_plugin:
 
                     success = operate_response.get("success", False)
                     add_cause = operate_response.get("addCause", "")
-                    
+
                     if success:
                         value = "Operation: SUCCESS"
                     else:
                         value = f"Operation: FAILED - {add_cause}" if add_cause else "Operation: FAILED"
-                    
+
                     asyncio.create_task(
                         write_to_lcd(io_plugin, "oper_send", value, mapping_manager=mapping_manager)
                     )
@@ -960,7 +1048,7 @@ def create_bff_router(
             except Exception as e:
                 logger.error(f"[FSP] Exception in operate response callback: {e}")
 
-        
+
     rti_fsp.install_connected_callback(on_connected_callback)
     rti_fsp.install_operate_received_callback(on_operate_received_callback)
     rti_fsp.install_operate_response_callback(on_operate_response_callback)
@@ -1098,14 +1186,14 @@ def create_bff_router(
                 for data_object in (ln.data_objects or []):
                     cdc = (data_object.cdc or "").lower()
                     obj_info = {"name": data_object.name, "cdc": data_object.cdc}
-                    
+
                     # Collect DataSets (from DataObjects with cdc="dataset")
                     if cdc == "dataset":
                         datasets.append(obj_info)
                     # Collect Report Control Blocks (RCB, BRCB, URCB) from DataObjects
                     elif cdc in ("rcb", "brcb", "urcb"):
                         report_control_blocks.append(obj_info)
-                    
+
                     data_objects.append(obj_info)
                     for da_path, fc_name in collect_da_paths_from_do(data_object, data_object.name):
                         data_attributes.append(da_path)
@@ -1745,6 +1833,7 @@ def create_bff_router(
         Raises:
             HTTPException 500: If error occurs during stop
         """
+        global _use_io_plugin
         try:
             status = rti_fsp.runtime.status
             if status in (None, "stopped"):
@@ -1760,7 +1849,7 @@ def create_bff_router(
                         mapping_manager = get_mapping_manager_dynamic()
                         sync_to_io_device = get_sync_to_io_device_dynamic()
                         write_to_lcd = get_write_to_lcd_dynamic()
-                        
+
                         if io_plugin is None or mapping_manager is None or sync_to_io_device is None or write_to_lcd is None:
                             logger.warning("Dynamic io_plugin loading failed, falling back to disabled state")
                             _use_io_plugin = False
@@ -1772,7 +1861,7 @@ def create_bff_router(
                             asyncio.create_task(
                                 sync_to_io_device(io_plugin, "stopped", False)
                             )
-                            
+
                             # Write connection info to LCD
                             asyncio.create_task(
                                 write_to_lcd(io_plugin, "stopped", "Stopped", mapping_manager=mapping_manager)
@@ -1783,7 +1872,7 @@ def create_bff_router(
                         logger.error(f"[FSP] ImportError - Cannot import IO Plugin: {e}")
                     except Exception as e:
                         logger.error(f"[FSP] Exception in IO connected callback: {e}")
-                
+
 
                 current = rti_fsp.runtime.status
                 if current in ("stopping", "starting"):
@@ -1887,7 +1976,7 @@ def create_bff_router(
                     print(f"Error during reconfigure_connection: {e}")
                     # Don't fail the endpoint - the connection may still have been restarted
                     # Just log and continue
-                
+
                 rti_fsp.runtime.tasks["ws"] = endpoint._connect_task
 
                 print("Reconfigured connection with TLS enabled:", request.enable_tls)
@@ -1957,7 +2046,7 @@ def create_bff_router(
                     server_cert = tls_config.certfile
                 if hasattr(tls_config, 'keyfile'):
                     server_key = tls_config.keyfile
-            
+
             # Get ws_mode
             ws_mode = "active"
             if hasattr(endpoint, 'ws_mode'):
@@ -1998,23 +2087,23 @@ def create_bff_router(
             cp = request.cp or os.getenv("CP", "cp1")
             host = request.host
             oauth_port = request.port
-            
+
             # Get OAuth settings from request (BFF should provide these from connections.json)
             token_endpoint = getattr(request, 'token_endpoint_url', None) or getattr(request, 'token_endpoint', None)
             client_id = getattr(request, 'client_id', None)
             client_secret = getattr(request, 'client_secret', None)
             ca_certificate = getattr(request, 'ca_certificate', None)
             enable_token_refresh = getattr(request, 'enable_token_refresh', False)
-            
+
             connection_name = request.connection_name or "unknown"
             rti_fsp._log_action(f"OAuth configuration - enable: {request.enable_oauth}, connection: {connection_name}", "info")
-            
+
             # Validate that required OAuth settings are provided
             if request.enable_oauth and not token_endpoint:
                 error_msg = f"token_endpoint is required for OAuth but was not provided in request for connection: {connection_name}"
                 rti_fsp._log_action(error_msg, "error")
                 raise ValueError(error_msg)
-            
+
             # When disabling OAuth, pass None to signal that OAuth should be disabled
             # The underlying library should handle None properly
             if not request.enable_oauth:
@@ -2023,7 +2112,7 @@ def create_bff_router(
                 client_id = None
                 client_secret = None
                 ca_certificate = None
-            
+
             print("Reconfiguring OAuth with connection: ", connection_name)
             print(f"OAuth enable: {request.enable_oauth}, token_endpoint: {token_endpoint}")
 
@@ -2382,6 +2471,7 @@ def create_bff_router(
             HTTPException 403: If server is not running
             HTTPException 404: If write timeout occurs
         """
+        global _use_io_plugin
         try:
             obj_ref = request.objRef
             fc = request.fc
@@ -2427,7 +2517,7 @@ def create_bff_router(
                         mapping_manager = get_mapping_manager_dynamic()
                         sync_to_io_device = get_sync_to_io_device_dynamic()
                         write_to_lcd = get_write_to_lcd_dynamic()
-                        
+
                         if io_plugin is None or mapping_manager is None or sync_to_io_device is None or write_to_lcd is None:
                             logger.warning("Dynamic io_plugin loading failed, falling back to disabled state")
                             _use_io_plugin = False
@@ -2451,8 +2541,8 @@ def create_bff_router(
                         logger.error(f"ImportError - Cannot import IO Plugin: {e}")
                     except Exception as e:
                         logger.error(f"Exception in IO sync setup: {e}")
-                
-                
+
+
                 return {
                     "ok": True,
                     "success": True,
@@ -2504,7 +2594,7 @@ def create_bff_router(
     )
     def api_get_io_plugin_status():
         """Get current io_plugin usage status.
-        
+
         Returns:
             dict: {"enabled": bool}
         """
@@ -2523,15 +2613,15 @@ def create_bff_router(
     )
     def api_set_io_plugin(request: IoPluginConfigRequest):
         """Enable or disable io_plugin usage.
-        
+
         When enabled, writes to the ACSI server will be synced to physical IO devices.
         When disabled, writes will only affect the ACSI server model.
-        
+
         If enabling, will attempt to load modules if files are present.
-        
+
         Request Body:
             IoPluginConfigRequest: {"enabled": bool}
-        
+
         Returns:
             dict: {"ok": True, "enabled": bool, "message": str}
         """
@@ -2544,6 +2634,7 @@ def create_bff_router(
                 if check_required_io_plugin_files():
                     load_io_plugin_modules()
                     update_io_plugin_usage()
+                    _try_include_io_router()
                 else:
                     # Required files are missing, disable io_plugin
                     _use_io_plugin = False
@@ -2551,7 +2642,7 @@ def create_bff_router(
             except Exception as e:
                 logger.error(f"Error enabling IO Plugin: {e}")
                 _use_io_plugin = False
-                
+
         logger.info(f"IO Plugin usage set to: {_use_io_plugin}")
         return {
             "ok": True,
@@ -2573,27 +2664,27 @@ def create_bff_router(
     )
     async def api_upload_io_plugin_file(file: UploadFile = File(...), request: IoPluginFileUploadRequest = None):
         """Upload a file to the dynamic io_plugin directory.
-        
+
         Files can be uploaded one at a time. After uploading all required files,
         call /api/io-plugin/reload to load the modules.
-        
+
         Args:
             file: UploadFile - The file to upload
             request: IoPluginFileUploadRequest - Optional request body with file_path and overwrite
-            
+
         Returns:
             dict: {"ok": True, "file_path": str, "size": int, "message": str}
         """
         try:
             # Read file content
             file_content = await file.read()
-            
+
             # Determine file path
             if request and request.file_path:
                 file_path = get_io_plugin_file_path(request.file_path)
             else:
                 file_path = get_io_plugin_file_path(file.filename)
-            
+
             # Check if file already exists
             if file_path.exists() and not (request and request.overwrite):
                 return {
@@ -2601,20 +2692,20 @@ def create_bff_router(
                     "error": f"File already exists: {file_path.name}",
                     "message": "Use overwrite=true to replace existing files"
                 }
-            
+
             # Ensure directory exists
             ensure_io_plugin_dir()
-            
+
             # Write file
             with open(file_path, 'wb') as f:
                 f.write(file_content)
-            
+
             logger.info(f"Uploaded io_plugin file: {file_path} ({len(file_content)} bytes)")
-            
+
             # Check if we now have all required files
             if check_required_io_plugin_files():
                 logger.info("All required io_plugin files are now present")
-            
+
             return {
                 "ok": True,
                 "file_path": str(file_path.relative_to(io_plugin_dynamic_DIR)),
@@ -2623,7 +2714,7 @@ def create_bff_router(
                 "message": f"File uploaded successfully: {file.filename}",
                 "files_present": check_required_io_plugin_files()
             }
-            
+
         except Exception as e:
             logger.error(f"Error uploading io_plugin file: {e}")
             raise HTTPException(status_code=500, detail=str(e))
@@ -2641,13 +2732,13 @@ def create_bff_router(
     )
     def api_list_io_plugin_files():
         """List all files in the dynamic io_plugin directory.
-        
+
         Returns:
             dict: {"files": list, "required_files_present": bool, "missing_files": list}
         """
         try:
             ensure_io_plugin_dir()
-            
+
             # Get all files in the directory
             all_files = []
             for item in io_plugin_dynamic_DIR.iterdir():
@@ -2658,19 +2749,19 @@ def create_bff_router(
                         "size": item.stat().st_size,
                         "modified": item.stat().st_mtime
                     })
-            
+
             # Check which required files are missing
-            required_files = ["io_router.py", "io_utils.py", "mapping_manager.py", "__init__.py"]
+            required_files = ["io_router.py", "io_utils.py", "mapping_manager.py", "__init__.py", "async_client_io.py"]
             present_files = [f.name for f in io_plugin_dynamic_DIR.iterdir() if f.is_file()]
             missing_files = [f for f in required_files if f not in present_files]
-            
+
             return {
                 "files": all_files,
                 "required_files_present": len(missing_files) == 0,
                 "missing_files": missing_files,
                 "directory": str(io_plugin_dynamic_DIR)
             }
-            
+
         except Exception as e:
             logger.error(f"Error listing io_plugin files: {e}")
             raise HTTPException(status_code=500, detail=str(e))
@@ -2689,42 +2780,47 @@ def create_bff_router(
     )
     def api_reload_io_plugin_modules(request: IoClientReloadRequest = None):
         """Reload io_plugin modules from the dynamic directory.
-        
+
         Args:
             request: IoClientReloadRequest - Optional request body with force flag
-            
+
         Returns:
             dict: {"ok": True, "loaded": bool, "message": str, "modules": list}
         """
         try:
             force = request.force if request else False
-            
+
             # Clear existing modules first
             clear_io_plugin_modules()
-            
+
             # Check if required files exist
             if not check_required_io_plugin_files():
                 return {
                     "ok": False,
                     "loaded": False,
                     "message": "Required files are missing",
-                    "missing_files": [f for f in ["io_router.py", "io_utils.py", "mapping_manager.py", "__init__.py"] 
+                    "missing_files": [f for f in ["io_router.py", "io_utils.py", "mapping_manager.py", "__init__.py", "async_client_io.py"]
                                     if not get_io_plugin_file_path(f).exists()]
                 }
-            
+
             # Load modules
             success = load_io_plugin_modules()
-            
+
             if success:
                 # Update the usage flag
                 update_io_plugin_usage()
-                
+
+                # Register the IO router on the running app if this is the
+                # first successful load - no restart needed.
+                _try_include_io_router()
+
                 return {
                     "ok": True,
                     "loaded": True,
                     "message": "IO Plugin modules reloaded successfully",
-                    "modules": ["io_router", "io_utils", "mapping_manager"],
-                    "io_plugin_enabled": _use_io_plugin
+                    "modules": ["async_client_io", "io_router", "io_utils", "mapping_manager"],
+                    "io_plugin_enabled": _use_io_plugin,
+                    "io_router_included": _io_router_included
                 }
             else:
                 return {
@@ -2732,7 +2828,7 @@ def create_bff_router(
                     "loaded": False,
                     "message": "Failed to load io_plugin modules"
                 }
-                
+
         except Exception as e:
             logger.error(f"Error reloading io_plugin modules: {e}")
             raise HTTPException(status_code=500, detail=str(e))
@@ -2751,33 +2847,33 @@ def create_bff_router(
     )
     def api_delete_io_plugin_file(file_path: str):
         """Delete a file from the dynamic io_plugin directory.
-        
+
         Args:
             file_path: str - Path to the file (relative to io_plugin directory)
-            
+
         Returns:
             dict: {"ok": True, "deleted": str, "message": str}
         """
         try:
             file_to_delete = get_io_plugin_file_path(file_path)
-            
+
             if not file_to_delete.exists():
                 return {
                     "ok": False,
                     "deleted": False,
                     "message": f"File not found: {file_path}"
                 }
-            
+
             file_to_delete.unlink()
             logger.info(f"Deleted io_plugin file: {file_path}")
-            
+
             return {
                 "ok": True,
                 "deleted": True,
                 "file_path": file_path,
                 "message": f"File deleted successfully: {file_path}"
             }
-            
+
         except Exception as e:
             logger.error(f"Error deleting io_plugin file: {e}")
             raise HTTPException(status_code=500, detail=str(e))
@@ -2794,18 +2890,19 @@ def create_bff_router(
     )
     def api_get_io_plugin_detailed_status():
         """Get detailed status of io_plugin dynamic loading.
-        
+
         Returns:
             dict: {"enabled": bool, "files_present": bool, "modules_loaded": bool, "details": dict}
         """
         try:
             files_present = check_required_io_plugin_files()
             modules_loaded = _io_plugin_module is not None and _mapping_manager_module is not None and _io_utils_module is not None
-            
+
             return {
                 "enabled": _use_io_plugin,
                 "files_present": files_present,
                 "modules_loaded": modules_loaded,
+                "io_router_included": _io_router_included,
                 "dynamic_directory": str(io_plugin_dynamic_DIR),
                 "details": {
                     "io_router_loaded": _io_plugin_module is not None,
@@ -2813,15 +2910,15 @@ def create_bff_router(
                     "mapping_manager_loaded": _mapping_manager_module is not None
                 }
             }
-            
+
         except Exception as e:
             logger.error(f"Error getting io_plugin detailed status: {e}")
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @router.post(
         "/io-plugin/connect",
         summary="Connect to IO Server",
-        description="Connect to IO server and download io_plugin files for dynamic loading. This is an on-demand connection endpoint (no auto-fetch at startup).",
+        description="Connect to IO server and download io_plugin files for dynamic loading. This is an on-demand connection endpoint (no auto-fetch at startup). The IO control router (LEDs, mappings, etc.) is registered automatically on the running app if this is the first successful connect - no restart required.",
         response_description="Connection result with download and loading status",
         responses={
             200: {"description": "Connection and file download completed successfully"},
@@ -2832,13 +2929,15 @@ def create_bff_router(
     )
     async def api_io_plugin_connect(request: IoClientConnectRequest):
         """Connect to IO server and fetch io_plugin files.
-        
+
         This endpoint implements on-demand connection to the IO server. It will:
         1. Check IO server health
         2. Download required files (or specified files)
         3. Load the modules if download is successful
         4. Enable io_plugin usage if requested
-        
+        5. Register the IO control router on the running app (once) so its
+           endpoints become reachable without restarting the process
+
         Request Body:
             IoClientConnectRequest: {
                 "server_url": str,           # IO server URL
@@ -2846,7 +2945,7 @@ def create_bff_router(
                 "timeout": float,             # Timeout in seconds
                 "enable_io_plugin": bool    # Enable io_plugin after success
             }
-        
+
         Returns:
             dict: {
                 "ok": True/False,
@@ -2857,45 +2956,49 @@ def create_bff_router(
                 "files_downloaded": list[str],
                 "files_failed": list[str],
                 "errors": dict,
-                "status": str
+                "status": str,
+                "io_router_included": bool
             }
         """
         global _use_io_plugin
-        
+
         try:
             # Record connection attempt
             io_plugin_connection_status.connect(request.server_url)
-            
+
             # Set the server URL for future reference
             io_plugin_connection_status.io_server_url = request.server_url
-            
+
             # Perform the connection and file download
             result = await fetch_and_load_io_plugin_files(request.server_url)
-            
+
             # Update connection status
             io_plugin_connection_status.record_fetch(
                 success=result.get("connection_success", False),
                 error=result.get("errors", {}).get("general") or ", ".join(result.get("errors", {}).values()),
                 files_fetched=len(result.get("files_downloaded", []))
             )
-            
+
             # Enable io_plugin usage if requested and if connection was successful
             if request.enable_io_plugin and result.get("connection_success", False):
                 _use_io_plugin = True
                 update_io_plugin_usage()
-            
+                # Register the IO router on the running app (no restart needed)
+                _try_include_io_router()
+
             result["io_plugin_enabled"] = _use_io_plugin
+            result["io_router_included"] = _io_router_included
             result["ok"] = result.get("connection_success", False)
-            
+
             if result.get("connection_success", False):
                 logger.info(f"IO Plugin connection successful: {request.server_url}")
                 result["status"] = "connected"
             else:
                 logger.warning(f"IO Plugin connection failed: {result.get('errors', {})}")
                 result["status"] = "failed"
-            
+
             return result
-            
+
         except Exception as e:
             error_msg = str(e)
             io_plugin_connection_status.record_fetch(success=False, error=error_msg)
@@ -2920,18 +3023,23 @@ def create_bff_router(
     )
     async def api_io_plugin_disconnect(request: IoClientDisconnectRequest):
         """Disconnect from IO server.
-        
+
         This endpoint will:
         1. Mark connection as disconnected
         2. Optionally clear downloaded files
         3. Optionally disable io_plugin usage
-        
+
+        Note: this does NOT unregister the IO router from the running app -
+        FastAPI/Starlette has no supported way to remove routes once added.
+        The router's own endpoints already fail gracefully (return errors)
+        once the underlying client/modules become unavailable.
+
         Request Body:
             IoClientDisconnectRequest: {
                 "clear_files": bool,         # Clear downloaded files
                 "disable_io_plugin": bool   # Disable io_plugin usage
             }
-        
+
         Returns:
             dict: {
                 "ok": True/False,
@@ -2942,11 +3050,11 @@ def create_bff_router(
             }
         """
         global _use_io_plugin
-        
+
         try:
             # Record disconnection
             io_plugin_connection_status.disconnect()
-            
+
             # Clear files if requested
             files_cleared = False
             if request.clear_files:
@@ -2960,14 +3068,14 @@ def create_bff_router(
                     logger.info("IO Plugin files cleared")
                 except Exception as e:
                     logger.error(f"Error clearing IO Plugin files: {e}")
-            
+
             # Disable io_plugin usage if requested
             io_plugin_disabled = False
             if request.disable_io_plugin:
                 _use_io_plugin = False
                 io_plugin_disabled = True
                 logger.info("IO Plugin usage disabled")
-            
+
             return {
                 "ok": True,
                 "disconnected": True,
@@ -2975,7 +3083,7 @@ def create_bff_router(
                 "io_plugin_disabled": io_plugin_disabled,
                 "message": "Disconnected from IO server successfully"
             }
-            
+
         except Exception as e:
             logger.error(f"Error during IO Plugin disconnection: {e}")
             return {
@@ -2997,7 +3105,7 @@ def create_bff_router(
     )
     async def api_get_io_plugin_connection_status():
         """Get current IO Plugin connection status.
-        
+
         Returns:
             IOPluginConnectionStatusResponse: {
                 "connected": bool,
@@ -3035,12 +3143,12 @@ def create_bff_router(
     )
     async def api_check_io_server_health(request: IoClientConnectRequest):
         """Check IO server health.
-        
+
         Request Body:
             IoClientConnectRequest: {
                 "server_url": str   # IO server URL to check
             }
-        
+
         Returns:
             dict: {
                 "healthy": bool,
@@ -3069,6 +3177,8 @@ def create_bff_router(
 def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
 
     """Create and configure the FastAPI application for ACSI server BFF."""
+    global _fastapi_app_ref
+
     app = FastAPI(
         title="ACSI Server WS Active",
         description="Backend for Frontend (BFF) endpoint providing REST API for ACSI Server control. "
@@ -3114,10 +3224,15 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
         ]
     )
 
+    # Capture the app reference so the IO router can be registered later
+    # (e.g. right after /api/io-plugin/connect succeeds), without needing
+    # a process restart.
+    _fastapi_app_ref = app
+
     resolved_factory_dir = os.getenv('MODELPATH') or factory_dir or Path(__file__).parent
     router, _server = create_bff_router(resolved_factory_dir)
     app.include_router(router)
-    
+
     # Include IO router for device control via demo_IO
     # Add CORS middleware to allow requests from frontend
     app.add_middleware(
@@ -3127,16 +3242,16 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
-    # Include IO router for control via dynamic loading only
+
+    # Include IO router for control via dynamic loading only.
+    # If the files aren't present yet at startup, this is a no-op - the
+    # router gets registered later, on-demand, by _try_include_io_router()
+    # once /api/io-plugin/connect or /api/io-plugin/reload succeed.
     try:
         if check_required_io_plugin_files():
-            # Load the modules and try to get the create_io_router function
             if load_io_plugin_modules():
-                if _io_plugin_module and hasattr(_io_plugin_module, 'create_io_router'):
-                    io_router = _io_plugin_module.create_io_router()
-                    app.include_router(io_router)
-                    logger.info("IO router included from dynamic loading")
+                update_io_plugin_usage()
+                _try_include_io_router()
             else:
                 logger.debug("IO router not available - required files missing for dynamic loading")
                 
