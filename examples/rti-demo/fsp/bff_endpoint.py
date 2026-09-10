@@ -119,7 +119,7 @@ def _try_include_io_router() -> bool:
         return False
 
 
-async def _bootstrap_io_client_after_connect(demo_io_server_url: str) -> Dict[str, Any]:
+async def _bootstrap_io_client_after_connect(demo_io_server_url: str, acsi_url: str) -> Dict[str, Any]:
     """Chain the demo_IO device-proxy bootstrap sequence right after a
     successful /api/io-plugin/connect (files downloaded, modules loaded,
     IO router registered via _try_include_io_router()).
@@ -168,7 +168,8 @@ async def _bootstrap_io_client_after_connect(demo_io_server_url: str) -> Dict[st
             logger.error(f"IO bootstrap step '{step_name}' failed: {e}")
             steps[step_name] = {"ok": False, "error": str(e)}
 
-    await _call("io_connect", "POST", "/api/io/connect", json={"base_url": demo_io_server_url})
+    await _call("io_connect", "POST", "/api/io/connect", json={"base_url": demo_io_server_url,
+                                                               "acsi_url": acsi_url})
     await _call("sync_to_server", "POST", "/api/io/acsi/sync-to-server")
     await _call("enable_server_sync", "POST", "/api/io/acsi/enable-server-sync")
 
@@ -901,10 +902,10 @@ class IoClientConnectRequest(BaseModel):
         description="URL of the IO server to connect to",
         json_schema_extra={"example": "http://localhost:8000"}
     )
-    files: Optional[List[str]] = Field(
-        default=None,
-        description="Specific files to fetch. If None, fetches all required files",
-        json_schema_extra={"example": ["io_router.py", "io_utils.py", "mapping_manager.py", "__init__.py", "async_client_io.py"]}
+    acsi_url: str = Field(
+        default= "http://localhost:5001",
+        description="URL of the FSP",
+        json_schema_extra={"example": "http://localhost:5001"}
     )
     timeout: float = Field(
         default=10.0,
@@ -3070,7 +3071,7 @@ def create_bff_router(
                 # server-side ACSI sync. Best-effort - failures here are
                 # reported but don't fail this endpoint's response.
                 if _io_router_included:
-                    result["io_bootstrap"] = await _bootstrap_io_client_after_connect(request.server_url)
+                    result["io_bootstrap"] = await _bootstrap_io_client_after_connect(request.server_url, request.acsi_url)
                     print("bootstrap result: ", result["io_bootstrap"])
 
             result["io_plugin_enabled"] = _use_io_plugin
