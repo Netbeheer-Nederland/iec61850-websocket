@@ -118,6 +118,62 @@ def _try_include_io_router() -> bool:
         logger.error(f"Failed to dynamically include IO router: {e}")
         return False
 
+
+async def _bootstrap_io_client_after_connect(demo_io_server_url: str) -> Dict[str, Any]:
+    """Chain the demo_IO device-proxy bootstrap sequence right after a
+    successful /api/io-plugin/connect (files downloaded, modules loaded,
+    IO router registered via _try_include_io_router()).
+
+    Calls, in order:
+        1. POST /api/io/connect               - point the IO router's proxy
+           client at the demo_IO device service (the same host that just
+           served the io-plugin files)
+        2. POST /api/io/acsi/sync-to-server    - push current IEC61850
+           mappings to that device service
+        3. POST /api/io/acsi/enable-server-sync - enable it to write input
+           device changes back to ACSI
+
+    These three handlers are defined as private closures inside
+    io_router.py's create_io_router() - they are wired to FastAPI via
+    decorators but never exposed as importable module-level functions, so
+    _io_plugin_module.api_connect_io(...) etc. do not exist to call
+    directly. Going over loopback HTTP to our own just-registered routes
+    reuses their existing logic/validation exactly as an external client
+    would trigger it, without needing to modify io_router.py.
+
+    Best-effort: any failure here is logged and reported in the returned
+    dict, but never raised - a bootstrap hiccup should not turn an
+    otherwise-successful /io-plugin/connect into a failure response.
+    """
+    self_port = os.getenv("PORT", "5001")
+    base = f"http://127.0.0.1:{self_port}"
+    steps: Dict[str, Any] = {}
+
+    async def _call(step_name: str, method: str, path: str, **kwargs):
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.request(method, f"{base}{path}", **kwargs)
+            try:
+                body = resp.json()
+            except Exception:
+                body = resp.text
+            steps[step_name] = {
+                "ok": resp.status_code < 400,
+                "status_code": resp.status_code,
+                "body": body,
+            }
+            if resp.status_code >= 400:
+                logger.warning(f"IO bootstrap step '{step_name}' returned HTTP {resp.status_code}: {body}")
+        except Exception as e:
+            logger.error(f"IO bootstrap step '{step_name}' failed: {e}")
+            steps[step_name] = {"ok": False, "error": str(e)}
+
+    await _call("io_connect", "POST", "/api/io/connect", json={"base_url": demo_io_server_url})
+    await _call("sync_to_server", "POST", "/api/io/acsi/sync-to-server")
+    await _call("enable_server_sync", "POST", "/api/io/acsi/enable-server-sync")
+
+    return steps
+
 # ==================== IO Plugin Connection Management ====================
 
 class IOPluginConnectionStatus:
@@ -962,17 +1018,27 @@ def create_bff_router(
                     return
                 logger.info(f"[FSP] IO Plugin for connected: {io_plugin}")
                 if io_plugin:
+                    # This callback runs on an AnyIO worker thread (it's a
+                    # plain sync def, not async), not on the asyncio event
+                    # loop itself - asyncio.create_task() would raise
+                    # "no running event loop" here. Schedule onto the
+                    # actual FSP event loop instead.
+                    loop = rti_fsp.runtime.loop
+                    if loop is None or not loop.is_running():
+                        logger.warning("[FSP] Cannot schedule IO sync - runtime loop not available")
+                        return
+
                     # Use associateId as identifier, or a default
                     associate_id = associate_response.get("associateId", "fsp_connected")
                     # Turn LED ON (write True/1 to the LED reference)
-                    asyncio.create_task(
-                        sync_to_io_device(io_plugin, "connected", True)
+                    asyncio.run_coroutine_threadsafe(
+                        sync_to_io_device(io_plugin, "connected", True), loop
                     )
 
                     # Write connection info to LCD
                     value = f"FSP Connected: {associate_id}"
-                    asyncio.create_task(
-                        write_to_lcd(io_plugin, "connected", value, mapping_manager=mapping_manager)
+                    asyncio.run_coroutine_threadsafe(
+                        write_to_lcd(io_plugin, "connected", value, mapping_manager=mapping_manager), loop
                     )
                 else:
                     logger.warning("[FSP] IO Plugin is None - cannot turn on LED. Call /api/io/connect first.")
@@ -998,9 +1064,15 @@ def create_bff_router(
                     _use_io_plugin = False
                     return
                 if io_plugin:
+                    # Runs on an AnyIO worker thread - see on_connected_callback
+                    # for why asyncio.create_task() would fail here.
+                    loop = rti_fsp.runtime.loop
+                    if loop is None or not loop.is_running():
+                        logger.warning("[FSP] Cannot schedule IO sync - runtime loop not available")
+                        return
 
-                    asyncio.create_task(
-                        blink_led_task(io_plugin, "oper_rcv", interval=0.2, count=1, mapping_manager=mapping_manager)
+                    asyncio.run_coroutine_threadsafe(
+                        blink_led_task(io_plugin, "oper_rcv", interval=0.2, count=1, mapping_manager=mapping_manager), loop
                     )
                 else:
                     logger.warning("[FSP] IO Plugin is None - cannot blink LED. Call /api/io/connect first.")
@@ -1029,6 +1101,12 @@ def create_bff_router(
                     return
 
                 if io_plugin:
+                    # Runs on an AnyIO worker thread - see on_connected_callback
+                    # for why asyncio.create_task() would fail here.
+                    loop = rti_fsp.runtime.loop
+                    if loop is None or not loop.is_running():
+                        logger.warning("[FSP] Cannot schedule IO sync - runtime loop not available")
+                        return
 
                     success = operate_response.get("success", False)
                     add_cause = operate_response.get("addCause", "")
@@ -1038,8 +1116,8 @@ def create_bff_router(
                     else:
                         value = f"Operation: FAILED - {add_cause}" if add_cause else "Operation: FAILED"
 
-                    asyncio.create_task(
-                        write_to_lcd(io_plugin, "oper_send", value, mapping_manager=mapping_manager)
+                    asyncio.run_coroutine_threadsafe(
+                        write_to_lcd(io_plugin, "oper_send", value, mapping_manager=mapping_manager), loop
                     )
                 else:
                     logger.warning("[FSP] IO Plugin is None - cannot write to LCD. Call /api/io/connect first.")
@@ -2985,6 +3063,15 @@ def create_bff_router(
                 update_io_plugin_usage()
                 # Register the IO router on the running app (no restart needed)
                 _try_include_io_router()
+
+                # Chain the demo_IO bootstrap sequence now that /api/io/*
+                # is live: point the proxy client at the same host we just
+                # downloaded files from, then sync mappings and enable
+                # server-side ACSI sync. Best-effort - failures here are
+                # reported but don't fail this endpoint's response.
+                if _io_router_included:
+                    result["io_bootstrap"] = await _bootstrap_io_client_after_connect(request.server_url)
+                    print("bootstrap result: ", result["io_bootstrap"])
 
             result["io_plugin_enabled"] = _use_io_plugin
             result["io_router_included"] = _io_router_included
