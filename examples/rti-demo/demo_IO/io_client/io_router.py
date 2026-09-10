@@ -403,6 +403,96 @@ def create_io_router() -> APIRouter:
             return wrapper
         return decorator
 
+    @router.post(
+        "/connect",
+        summary="Connect to demo_IO",
+        description="Configure the connection to a demo_IO service. "
+                    "This must be called before using IO endpoints if DEMO_IO_URL is not set.",
+        response_description="Connection confirmation",
+        responses={
+            200: {"description": "Connected successfully"},
+            500: {"description": "Connection failed"}
+        },
+        tags=["IO Connection"]
+    )
+    async def api_connect_io(config: IOConnectionConfig, request: Request):
+        """Connect to a demo_IO service.
+
+        Request Body:
+            IOConnectionConfig: {
+                "base_url": str  # Base URL of demo_IO service
+            }
+
+        Returns:
+            dict: Connection confirmation with health check
+        """
+        try:
+            # Get ACSI base URL: first from request, then environment, then auto-detect
+            # This URL will be passed to IO server so it knows where to write ACSI data
+            acsi_base_url = config.acsi_url  # From request body
+            if not acsi_base_url:
+                acsi_base_url = os.getenv("ACSI_BASE_URL")  # From environment variable
+
+            if not acsi_base_url:
+                # Auto-detect FSP's LAN IP
+                import socket
+
+                ip_address = None
+                hostname = socket.gethostname()
+
+                try:
+                    addr_info = socket.getaddrinfo(hostname, None)
+                    for info in addr_info:
+                        ip = info[4][0]
+                        if not ip.startswith("127.") and not ip.startswith("169.254.") and not ip.startswith("::"):
+                            if ip.startswith("192.168."):
+                                ip_address = ip
+                                break
+
+                    if ip_address:
+                        acsi_base_url = f"http://{ip_address}:5001"
+                    else:
+                        for info in addr_info:
+                            ip = info[4][0]
+                            if not ip.startswith("127.") and not ip.startswith("::"):
+                                ip_address = ip
+                                acsi_base_url = f"http://{ip_address}:5001"
+                                break
+                except:
+                    pass
+
+            if not acsi_base_url:
+                acsi_base_url = "http://localhost:5001"
+
+            logger.info(f"Using ACSI base URL for IO server: {acsi_base_url}")
+            client = AsyncDemoIOClient(base_url=config.base_url, acsi_base_url=acsi_base_url)
+
+            # Test connection (async)
+            if not await client.is_healthy():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"demo_IO service at {config.base_url} is not responding"
+                )
+
+            set_io_client(client)
+
+            # Register input callbacks after connecting
+            _register_all_input_callbacks()
+
+            logger.info(f"Connected to demo_IO at {config.base_url} with ACSI URL: {acsi_base_url}")
+            return {
+                "ok": True,
+                "message": f"Connected to demo_IO at {config.base_url}",
+                "base_url": config.base_url,
+                "acsi_base_url": acsi_base_url,
+                "healthy": True
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Failed to connect to demo_IO: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
+
     # ==================== Health and Status ====================
     
     @router.get(
