@@ -119,6 +119,116 @@ _io_plugin_module = None
 _mapping_manager_module = None
 _io_utils_module = None
 
+# Reference to the running FastAPI app instance, captured in
+# create_fastapi_app(). Lets us register the IO router AFTER startup -
+# e.g. right after a successful /api/io-plugin/connect call - without
+# needing a process restart. FastAPI/Starlette supports adding routers
+# at any time (it's just appending routes); it does not support removing
+# them, so _io_router_included is a one-way latch.
+_fastapi_app_ref: Optional["FastAPI"] = None
+_io_router_included = False
+
+
+def _try_include_io_router() -> bool:
+    """Register the dynamically-loaded IO router on the running app, if not already done.
+
+    Safe to call repeatedly - only registers once. This is what lets the
+    IO control endpoints (LEDs, mappings, etc.) appear right after
+    /api/io-plugin/connect or /api/io-plugin/reload succeed, with no
+    process restart needed.
+    """
+    global _io_router_included
+    if _io_router_included:
+        return True
+    if _fastapi_app_ref is None:
+        logger.warning("Cannot include IO router - app reference not set yet")
+        return False
+    if _io_plugin_module is None or not hasattr(_io_plugin_module, 'create_io_router'):
+        return False
+    try:
+        io_router = _io_plugin_module.create_io_router()
+        _fastapi_app_ref.include_router(io_router)
+        _io_router_included = True
+        logger.info("IO router included dynamically")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to dynamically include IO router: {e}")
+        return False
+
+
+async def _bootstrap_io_client_after_connect(demo_io_server_url: str) -> Dict[str, Any]:
+    """Chain the demo_IO device-proxy bootstrap sequence right after a
+    successful /api/io-plugin/connect (files downloaded, modules loaded,
+    IO router registered via _try_include_io_router()).
+
+    Calls, in order:
+        1. POST /api/io/connect               - point the IO router's proxy
+           client at the demo_IO device service (the same host that just
+           served the io-plugin files)
+        2. POST /api/io/acsi/sync-to-server    - push current IEC61850
+           mappings to that device service
+        3. POST /api/io/acsi/enable-server-sync - enable it to write input
+           device changes back to ACSI
+
+    These three handlers are defined as private closures inside
+    io_router.py's create_io_router() - they are wired to FastAPI via
+    decorators but never exposed as importable module-level functions, so
+    _io_plugin_module.api_connect_io(...) etc. do not exist to call
+    directly. Going over loopback HTTP to our own just-registered routes
+    reuses their existing logic/validation exactly as an external client
+    would trigger it, without needing to modify io_router.py.
+
+    Best-effort: any failure here is logged and reported in the returned
+    dict, but never raised - a bootstrap hiccup should not turn an
+    otherwise-successful /io-plugin/connect into a failure response.
+    """
+    self_port = os.getenv("PORT", "5003")
+    base = f"http://127.0.0.1:{self_port}"
+    steps: Dict[str, Any] = {}
+
+    async def _call(step_name: str, method: str, path: str, **kwargs):
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.request(method, f"{base}{path}", **kwargs)
+            try:
+                body = resp.json()
+            except Exception:
+                body = resp.text
+            steps[step_name] = {
+                "ok": resp.status_code < 400,
+                "status_code": resp.status_code,
+                "body": body,
+            }
+            if resp.status_code >= 400:
+                logger.warning(f"IO bootstrap step '{step_name}' returned HTTP {resp.status_code}: {body}")
+        except Exception as e:
+            logger.error(f"IO bootstrap step '{step_name}' failed: {e}")
+            steps[step_name] = {"ok": False, "error": str(e)}
+
+    # Explicitly pass the ACSI base URL rather than relying on io_router.py's
+    # own fallback chain (request body -> ACSI_BASE_URL env var -> LAN-IP
+    # auto-detect). That auto-detect runs socket.gethostname() INSIDE this
+    # container, so it resolves to the Docker-bridge IP - unreachable from
+    # a physical device like the demo_io Pi on the real LAN. Setting
+    # ACSI_BASE_URL in this container's environment (e.g.
+    # http://<host-LAN-IP>:5003) and passing it here explicitly avoids that
+    # trap entirely.
+    acsi_base_url = os.getenv("ACSI_BASE_URL")
+    connect_body: Dict[str, Any] = {"base_url": demo_io_server_url}
+    if acsi_base_url:
+        connect_body["acsi_url"] = acsi_base_url
+    else:
+        logger.warning(
+            "ACSI_BASE_URL is not set - /api/io/connect will fall back to "
+            "io_router.py's auto-detected address, which is unreliable inside Docker."
+        )
+
+    await _call("io_connect", "POST", "/api/io/connect", json=connect_body)
+    await _call("sync_to_server", "POST", "/api/io/acsi/sync-to-server")
+    await _call("enable_server_sync", "POST", "/api/io/acsi/enable-server-sync")
+
+    return steps
+
 
 class IOPluginConnectionStatus:
     """Track the connection status to IO server and file download status."""
@@ -251,6 +361,31 @@ def check_required_io_plugin_files() -> bool:
     return True
 
 
+def _rebuild_pydantic_models(module) -> None:
+    """Force-build any deferred Pydantic model schemas defined in a dynamically loaded module.
+
+    Pydantic v2 sometimes defers a model's schema build until first use
+    (e.g. when it can't immediately resolve every referenced type). That
+    deferred build later resolves forward references via
+    sys.modules[<model's __module__>].__dict__ - which only works if the
+    module was registered in sys.modules (see load_io_plugin_modules).
+    Calling model_rebuild() here forces the build to happen immediately,
+    so a broken model fails loudly at connect/reload time instead of
+    silently corrupting the next /openapi.json request.
+    """
+    try:
+        from pydantic import BaseModel
+    except ImportError:
+        return
+
+    for name, obj in vars(module).items():
+        try:
+            if isinstance(obj, type) and issubclass(obj, BaseModel) and obj is not BaseModel:
+                obj.model_rebuild(force=True, _types_namespace=vars(module))
+        except Exception as e:
+            logger.warning(f"Could not rebuild Pydantic model '{name}' from {module.__name__}: {e}")
+
+
 def load_io_plugin_modules() -> bool:
     """Dynamically load io_plugin modules from the dynamic directory."""
     global _io_plugin_module, _mapping_manager_module, _io_utils_module
@@ -279,11 +414,23 @@ def load_io_plugin_modules() -> bool:
             return False
 
         # Load io_router module
+        # IMPORTANT: register in sys.modules under its own name BEFORE
+        # exec_module. Pydantic v2 may defer building a model's schema
+        # (e.g. IOConnectionConfig) until first use, and when it does,
+        # it resolves forward references via sys.modules[<module>].__dict__.
+        # Without this registration, that lookup fails and FastAPI's
+        # /openapi.json generation crashes with "is not fully defined".
         io_router_path = get_io_plugin_file_path("io_router.py")
         spec = importlib.util.spec_from_file_location("io_router", io_router_path)
         if spec and spec.loader:
             _io_plugin_module = importlib.util.module_from_spec(spec)
+            sys.modules["io_router"] = _io_plugin_module
             spec.loader.exec_module(_io_plugin_module)
+            # Force any deferred Pydantic model schemas in this module to
+            # build now, while we can still report a clean load failure
+            # here, rather than deferring the crash to whenever
+            # /openapi.json happens to be requested next.
+            _rebuild_pydantic_models(_io_plugin_module)
             logger.info(f"Successfully loaded io_router from {io_router_path}")
         else:
             logger.error(f"Failed to load io_router from {io_router_path}")
@@ -294,7 +441,9 @@ def load_io_plugin_modules() -> bool:
         spec = importlib.util.spec_from_file_location("io_utils", io_utils_path)
         if spec and spec.loader:
             _io_utils_module = importlib.util.module_from_spec(spec)
+            sys.modules["io_utils"] = _io_utils_module
             spec.loader.exec_module(_io_utils_module)
+            _rebuild_pydantic_models(_io_utils_module)
             logger.info(f"Successfully loaded io_utils from {io_utils_path}")
         else:
             logger.error(f"Failed to load io_utils from {io_utils_path}")
@@ -305,7 +454,9 @@ def load_io_plugin_modules() -> bool:
         spec = importlib.util.spec_from_file_location("mapping_manager", mapping_manager_path)
         if spec and spec.loader:
             _mapping_manager_module = importlib.util.module_from_spec(spec)
+            sys.modules["mapping_manager"] = _mapping_manager_module
             spec.loader.exec_module(_mapping_manager_module)
+            _rebuild_pydantic_models(_mapping_manager_module)
             logger.info(f"Successfully loaded mapping_manager from {mapping_manager_path}")
         else:
             logger.error(f"Failed to load mapping_manager from {mapping_manager_path}")
@@ -408,10 +559,12 @@ def clear_io_plugin_modules():
     # Remove dynamic directory from sys.path
     if str(io_plugin_dynamic_DIR) in sys.path:
         sys.path.remove(str(io_plugin_dynamic_DIR))
-    # Remove async_client_io from sys.modules so a subsequent reload picks
-    # up a freshly-downloaded copy instead of a stale cached module.
-    if "async_client_io" in sys.modules:
-        del sys.modules["async_client_io"]
+    # Remove all dynamically-registered modules from sys.modules so a
+    # subsequent reload picks up freshly-downloaded copies instead of
+    # stale cached modules (and stale Pydantic model classes/schemas).
+    for _mod_name in ("async_client_io", "io_router", "io_utils", "mapping_manager"):
+        if _mod_name in sys.modules:
+            del sys.modules[_mod_name]
 
 
 # ==================== IO Plugin HTTP Client Functions ====================
@@ -1088,6 +1241,7 @@ class IOPluginConnectionStatusResponse(BaseModel):
 
 def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     """Create and configure the FastAPI application for Acsi-Client BFF."""
+    global _fastapi_app_ref
     app = FastAPI(
         lifespan=_lifespan,
         title="ACSI Client WS Passive",
@@ -1117,6 +1271,11 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(router)
     app.state.client = _client
 
+    # Capture the app reference so the IO router can be registered later
+    # (e.g. right after /api/io-plugin/connect succeeds), without needing
+    # a process restart.
+    _fastapi_app_ref = app
+
     # Initialize dynamic io_plugin loading system (mirrors FSP behaviour:
     # if files already exist under IO_PLUGIN_STORAGE from a previous run,
     # try to load them at startup; otherwise stays disabled until
@@ -1124,14 +1283,15 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     ensure_io_plugin_dir()
     update_io_plugin_usage()
 
-    # Include IO router for device control via dynamic loading only
+    # Include IO router for device control via dynamic loading only.
+    # If the files aren't present yet at startup, this is a no-op - the
+    # router gets registered later, on-demand, by _try_include_io_router()
+    # once /api/io-plugin/connect or /api/io-plugin/reload succeed.
     try:
         if check_required_io_plugin_files():
             if load_io_plugin_modules():
-                if _io_plugin_module and hasattr(_io_plugin_module, 'create_io_router'):
-                    io_router = _io_plugin_module.create_io_router()
-                    app.include_router(io_router)
-                    logger.info("IO router included from dynamic loading")
+                update_io_plugin_usage()
+                _try_include_io_router()
             else:
                 logger.debug("IO router not available - failed to load dynamic modules")
         else:
@@ -1176,10 +1336,17 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     return
                 logger.info(f"IO client for sync: {io_client}")
                 if io_client:
-                    # Fire-and-forget: don't wait for IO sync to complete
-                    # Check health and sync in background
-                    asyncio.create_task(
-                        sync_to_io_device(io_client, obj_ref, value)
+                    # This callback runs on an AnyIO worker thread (it's a
+                    # plain sync def, not async), not on the asyncio event
+                    # loop itself - asyncio.create_task() would raise
+                    # "no running event loop" here. Schedule onto the
+                    # actual runtime event loop instead.
+                    loop = rti_so.runtime.loop
+                    if loop is None or not loop.is_running():
+                        logger.warning("Cannot schedule IO sync - runtime loop not available")
+                        return
+                    asyncio.run_coroutine_threadsafe(
+                        sync_to_io_device(io_client, obj_ref, value), loop
                     )
                 else:
                     logger.warning("IO client is None - cannot sync to device. Call /api/io-plugin/connect first.")
@@ -1209,16 +1376,21 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     return
                 logger.info(f"IO client for sync: {io_client}")
                 if io_client:
-                    # Fire-and-forget: don't wait for LED blink to complete
-                    # Check health and blink LED in background
-                    asyncio.create_task(
-                        blink_led_task(io_client, "rc_rcv", interval=0.2, count=1, mapping_manager=mapping_manager)
+                    # Runs on an AnyIO worker thread - see on_write_callback
+                    # for why asyncio.create_task() would fail here.
+                    loop = rti_so.runtime.loop
+                    if loop is None or not loop.is_running():
+                        logger.warning("Cannot schedule IO sync - runtime loop not available")
+                        return
+
+                    asyncio.run_coroutine_threadsafe(
+                        blink_led_task(io_client, "rc_rcv", interval=0.2, count=1, mapping_manager=mapping_manager), loop
                     )
 
                     value = f"rptID={rptID} dataSet={dataSet}"
 
-                    asyncio.create_task(
-                        write_to_lcd(io_client, "rc_rcv", value, mapping_manager=mapping_manager)
+                    asyncio.run_coroutine_threadsafe(
+                        write_to_lcd(io_client, "rc_rcv", value, mapping_manager=mapping_manager), loop
                     )
 
                 else:
@@ -1260,17 +1432,24 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     return
                 logger.info(f"IO client for connected: {io_client}")
                 if io_client:
+                    # Runs on an AnyIO worker thread - see on_write_callback
+                    # for why asyncio.create_task() would fail here.
+                    loop = rti_so.runtime.loop
+                    if loop is None or not loop.is_running():
+                        logger.warning("Cannot schedule IO sync - runtime loop not available")
+                        return
+
                     # Use associateId as identifier, or a default
                     associate_id = associate_response.get("associateId", "connected")
                     # Blink LED to indicate connection
-                    asyncio.create_task(
-                        blink_led_task(io_client, "connected", interval=0.5, count=2, mapping_manager=mapping_manager)
+                    asyncio.run_coroutine_threadsafe(
+                        blink_led_task(io_client, "connected", interval=0.5, count=2, mapping_manager=mapping_manager), loop
                     )
 
                     # Write connection info to LCD
                     value = f"Connected: {associate_id}"
-                    asyncio.create_task(
-                        write_to_lcd(io_client, "connected", value, mapping_manager=mapping_manager)
+                    asyncio.run_coroutine_threadsafe(
+                        write_to_lcd(io_client, "connected", value, mapping_manager=mapping_manager), loop
                     )
                 else:
                     logger.warning("IO client is None - cannot turn on LED. Call /api/io-plugin/connect first.")
@@ -3706,6 +3885,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 if check_required_io_plugin_files():
                     load_io_plugin_modules()
                     update_io_plugin_usage()
+                    _try_include_io_router()
                 else:
                     _use_io_client = False
                     logger.warning("Required IO plugin files are missing, disabling IO client")
@@ -3781,8 +3961,19 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             if request.enable_io_plugin and result.get("connection_success", False):
                 _use_io_client = True
                 update_io_plugin_usage()
+                # Register the IO router on the running app (no restart needed)
+                _try_include_io_router()
+
+                # Chain the demo_IO bootstrap sequence now that /api/io/*
+                # is live: point the proxy client at the same host we just
+                # downloaded files from, then sync mappings and enable
+                # server-side ACSI sync. Best-effort - failures here are
+                # reported but don't fail this endpoint's response.
+                if _io_router_included:
+                    result["io_bootstrap"] = await _bootstrap_io_client_after_connect(request.server_url)
 
             result["io_plugin_enabled"] = _use_io_client
+            result["io_router_included"] = _io_router_included
             result["ok"] = result.get("connection_success", False)
 
             if result.get("connection_success", False):
@@ -4038,12 +4229,16 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
             if success:
                 update_io_plugin_usage()
+                # Register the IO router on the running app if this is the
+                # first successful load - no restart needed.
+                _try_include_io_router()
                 return {
                     "ok": True,
                     "loaded": True,
                     "message": "IO Plugin modules reloaded successfully",
                     "modules": ["async_client_io", "io_router", "io_utils", "mapping_manager"],
-                    "io_plugin_enabled": _use_io_client
+                    "io_plugin_enabled": _use_io_client,
+                    "io_router_included": _io_router_included
                 }
             else:
                 return {
