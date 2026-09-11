@@ -46,6 +46,12 @@ RUN useradd --create-home --shell /usr/sbin/nologin app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --from=builder --chown=app:app /app/bff /app/bff
 
+# Writable location for runtime state (connections.json). Kept outside the
+# root-owned WORKDIR and the code bind mount; backed by a named volume in
+# docker-compose.yml. Created before the USER switch so 'app' owns it and the
+# fresh volume inherits that ownership - no host UID matching required.
+RUN mkdir -p /config && chown app:app /config
+
 USER app
 
 EXPOSE 5000

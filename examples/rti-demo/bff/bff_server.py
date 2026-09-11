@@ -89,9 +89,9 @@ logger = logging.getLogger(__name__)
 class HealthCheckAccessFilter(logging.Filter):
     """Demote uvicorn access-log lines for health/status polls to DEBUG.
 
-    The Docker healthcheck hits ``/api/health`` (and the HMI polls it plus
+    The Docker health check hits ``/api/health`` (and the HMI polls it plus
     ``/api/status``) every few seconds; logged at INFO they bury the real
-    request log. Matching records are relabelled DEBUG and only pass through
+    request log. Matching records are relabeled DEBUG and only pass through
     when the ``uvicorn.access`` logger is actually at DEBUG.
     """
 
@@ -135,8 +135,30 @@ else:
 # Ensure base directory exists
 os.makedirs(BASE_DIR, exist_ok=True)
 
-CONNECTIONS_FILE = os.path.join(BASE_DIR, 'connections.json')
+# BFF_CONNECTIONS_FILE lets the deployment override where connection state is
+# persisted. In Docker BASE_DIR is '/app', which is root-owned while the process
+# runs as the unprivileged 'app' user, so the atomic save (temp file + rename in
+# the same directory) fails with EACCES. docker-compose.yml points this at a
+# dedicated, writable /config directory backed by a named volume.
+CONNECTIONS_FILE = os.environ.get('BFF_CONNECTIONS_FILE') or os.path.join(BASE_DIR, 'connections.json')
 STATS_FILE = os.path.join(BASE_DIR, 'stats.json')
+
+# Seed a freshly mounted config location (e.g. an empty Docker volume) once from
+# the connections.json shipped next to this module, so existing connections
+# survive the first start. After that the configured file is authoritative.
+_seed_connections = os.path.join(script_dir, 'connections.json')
+if (
+    not os.path.exists(CONNECTIONS_FILE)
+    and os.path.exists(_seed_connections)
+    and os.path.abspath(_seed_connections) != os.path.abspath(CONNECTIONS_FILE)
+):
+    try:
+        import shutil
+        os.makedirs(os.path.dirname(CONNECTIONS_FILE) or ".", exist_ok=True)
+        shutil.copyfile(_seed_connections, CONNECTIONS_FILE)
+        logger.info("Seeded %s from %s", CONNECTIONS_FILE, _seed_connections)
+    except OSError as e:
+        logger.warning("Could not seed %s from %s: %s", CONNECTIONS_FILE, _seed_connections, e)
 
 
 # Initialize managers
