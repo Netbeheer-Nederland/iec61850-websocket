@@ -1,0 +1,126 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+
+name: Images
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # Turn the diff into a JSON list of images to build. On a tag or a manual
+  # dispatch the list is forced to all seven.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            lib: &lib
+              - 'src/ws61850/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.github/workflows/images.yml'
+            rti: &rti
+              - *lib
+              - 'examples/rti-demo/pyproject.toml'
+              - 'examples/rti-demo/uv.lock'
+            so:          [ *rti, 'examples/rti-demo/so/**',             'examples/rti-demo/Dockerfile.rti-so' ]
+            fsp:         [ *rti, 'examples/rti-demo/fsp/**',            'examples/rti-demo/Dockerfile.rti-fsp' ]
+            acsi_client: [ *rti, 'examples/rti-demo/acsi_ws_client/**', 'examples/rti-demo/Dockerfile.acsi-ws-client' ]
+            acsi_server: [ *rti, 'examples/rti-demo/acsi_ws_server/**', 'examples/rti-demo/Dockerfile.acsi-ws-server' ]
+            bff:         [ 'examples/rti-demo/bff/**', 'examples/rti-demo/pyproject.toml', 'examples/rti-demo/uv.lock', 'examples/rti-demo/Dockerfile.bff' ]
+            io:          [ 'examples/rti-demo/demo_IO/**', 'examples/rti-demo/Dockerfile.IO' ]
+            hmi:         [ 'examples/rti-demo/hmi/**' ]
+
+      - id: set
+        env:
+          FIRED: ${{ toJSON(steps.f.outputs) }}
+        run: |
+          force=${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
+          out='[]'
+          for k in so fsp acsi_client acsi_server bff io hmi; do
+            hit=$(jq -r --arg k "$k" '.[$k] // "false"' <<<"$FIRED")
+            if [ "$force" = true ] || [ "$hit" = true ]; then
+              out=$(jq -c --arg k "$k" '. + [$k]' <<<"$out")
+            fi
+          done
+          echo "matrix={\"image\":$out}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.matrix != '{"image":[]}'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: img
+        run: |
+          case "${{ matrix.image }}" in
+            so)          c=. ; f=examples/rti-demo/Dockerfile.rti-so         ; n=ws61850-so ;;
+            fsp)         c=. ; f=examples/rti-demo/Dockerfile.rti-fsp        ; n=ws61850-fsp ;;
+            acsi_client) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-client ; n=ws61850-acsi-ws-client ;;
+            acsi_server) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-server ; n=ws61850-acsi-ws-server ;;
+            bff)         c=examples/rti-demo ; f=examples/rti-demo/Dockerfile.bff ; n=rti-demo-bff ;;
+            io)          c=examples/rti-demo ; f=examples/rti-demo/Dockerfile.IO  ; n=rti-demo-io ; p=linux/amd64,linux/arm64 ;;
+            hmi)         c=examples/rti-demo/hmi ; f=examples/rti-demo/hmi/Dockerfile ; n=rti-demo-hmi ;;
+          esac
+          {
+            echo "ctx=$c"
+            echo "file=$f"
+            echo "name=$n"
+            echo "platforms=${p:-linux/amd64}"
+          } >> "$GITHUB_OUTPUT"
+
+      - if: contains(steps.img.outputs.platforms, 'arm64')
+        uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ steps.img.outputs.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+#      - uses: docker/build-push-action@v6
+#        with:
+#          context: ${{ steps.img.outputs.ctx }}
+#          file: ${{ steps.img.outputs.file }}
+#          platforms: ${{ steps.img.outputs.platforms }}
+#          push: ${{ github.event_name != 'pull_request' }}
+#          tags: ${{ steps.meta.outputs.tags }}
+#          labels: ${{ steps.meta.outputs.labels }}
+#          cache-from: type=gha,scope=${{ matrix.image }}
+#          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+#          provenance: false
