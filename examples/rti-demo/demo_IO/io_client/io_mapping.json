@@ -1,0 +1,78 @@
+{
+  "leds": {
+    "led1": {
+      "device_name": "led1",
+      "objRef": "connected",
+      "direction": "output",
+      "device_type": "led"
+    },
+    "led2": {
+      "device_name": "led2",
+      "objRef": [
+        "rc_rcv",
+        "oper_rcv"
+      ],
+      "direction": "output",
+      "device_type": "led"
+    },
+    "led3": {
+      "device_name": "led3",
+      "objRef": ["setpoints","read", "operate"],
+      "direction": "output",
+      "device_type": "led"
+    },
+    "lcd1": {
+      "device_name": "lcd1",
+      "objRef": [
+        "rc_rcv",
+        "connected",
+        "oper_send",
+        "setpoint",
+        "read",
+        "operate"
+      ],
+      "direction": "output",
+      "device_type": "lcd"
+    },
+    "lcd_i2c": {
+      "device_name": "lcd_i2c",
+      "objRef": [
+        "rc_rcv",
+        "connected",
+        "oper_send",
+        "writeValue"
+      ],
+      "direction": "output",
+      "device_type": "lcd_i2c",
+      "i2c_address": 39,
+      "i2c_bus": 1,
+      "columns": 16,
+      "rows": 2,
+      "backlight": true
+    }
+  },
+  "buttons": {
+    "button1": {
+      "device_name": "button1",
+      "objRef": "LD0/DWMX1.DERAvail.stVal",
+      "direction": "input",
+      "device_type": "button"
+    }
+  },
+  "potentiometers": {
+    "pot1": {
+      "device_name": "pot1",
+      "objRef": "LD0/MMXU1.TotW.mag.f",
+      "direction": "input",
+      "device_type": "potentiometer"
+    },
+    "pot2": {
+      "device_name": "pot2",
+      "objRef": "LD0/DWMX1.WMaxSpt",
+      "direction": "input",
+      "device_type": "potentiometer",
+      "service": "operate",
+      "dataType": "float32"
+    }
+  }
+}

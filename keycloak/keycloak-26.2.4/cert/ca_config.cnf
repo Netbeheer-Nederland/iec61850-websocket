@@ -1,0 +1,18 @@
+[ req ]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_ca
+prompt = no
+
+[ req_distinguished_name ]
+C = DE
+ST = BW
+L = Freiburg
+O = MZ Automation GmbH
+OU = R&D
+CN = websocketClient
+
+[ v3_ca ]
+basicConstraints = CA:TRUE
+keyUsage = critical, digitalSignature, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer

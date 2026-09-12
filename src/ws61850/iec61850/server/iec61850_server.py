@@ -90,6 +90,8 @@ class IEC61850Server:
             ied_model, self.server_control_objects, lambda: self.control_handler
         )
 
+        self.periodic_report_tasks = {}  # {server_report_control: asyncio.Task}
+
     def update_ied_model(self, new_ied_model) -> None:
         """
         Update the IED model and refresh all dependent services.
@@ -140,6 +142,15 @@ class IEC61850Server:
         if tree_item is None:
             return None
         return tree_item.mmsValue
+
+    async def get_data_value_and_type(self, obj_ref):
+        tree_item = self.find_object_in_tree(obj_ref)
+        if tree_item is None:
+            return None
+        if isinstance(tree_item, DataAttribute):
+            return {"type": tree_item.attr_type.name, "value": tree_item.mmsValue}
+
+        return None
 
     async def set_quality_to_good(self, control_do):
         quality_item = next((da for da in control_do.get_da_from_do_or_da_list() if da.name == "q"), None)
@@ -414,6 +425,7 @@ class IEC61850Server:
                     self.periodic_report_task(server_report_control), name=server_report_control.rcb.get_objRef()
                 )
             )
+            self.periodic_report_tasks[server_report_control] = tasks[-1]
 
         await asyncio.gather(*tasks)
 
@@ -425,7 +437,7 @@ class IEC61850Server:
         ied = self.ied_model
         maxMessageSize_client = 65000
         decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
-        associate_id = "id_" + cp
+        associate_id = cp
         websocket_info.associate_id = associate_id
 
         if decoded_message[0] == "associate":
@@ -527,11 +539,11 @@ class IEC61850Server:
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
 
             elif service_name == "getURCBValues":
-                tpaa_response, _ = self._report_service.get_urcb_values(invoke_id, associate_id, decoded_message)
+                tpaa_response, _ =  self._report_service.get_urcb_values(invoke_id, associate_id, decoded_message)
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
 
             elif service_name == "setBRCBValues":
-                tpaa_response, gi_brcb = self._report_service.set_brcb_values(
+                tpaa_response, gi_brcb = await self._report_service.set_brcb_values(
                     invoke_id, associate_id, decoded_message, websocket_info, self
                 )
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
@@ -551,7 +563,7 @@ class IEC61850Server:
                         gi_brcb.rcb.gi = False
 
             elif service_name == "setURCBValues":
-                tpaa_response, gi_urcb = self._report_service.set_urcb_values(
+                tpaa_response, gi_urcb = await self._report_service.set_urcb_values(
                     invoke_id, associate_id, decoded_message, websocket_info, self
                 )
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
@@ -571,9 +583,12 @@ class IEC61850Server:
                         gi_urcb.rcb.gi = False
 
             elif service_name == "operate":
-                tpaa_response, quality_do = self._control_service.operate(invoke_id, associate_id, decoded_message)
-                if quality_do is not None:
-                    await self.set_quality_to_good(quality_do)
+                #tpaa_response, quality_do = self._control_service.operate(invoke_id, associate_id, decoded_message)
+                #if quality_do is not None:
+                #    await self.set_quality_to_good(quality_do)
+                print("entered Operate service")
+                tpaa_response, control_do = self._control_service.operate(invoke_id, associate_id, decoded_message)
+                print("operate response:", tpaa_response)
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
 
             elif service_name == "select":

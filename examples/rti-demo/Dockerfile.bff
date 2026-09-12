@@ -1,0 +1,62 @@
+# RTI Demo BFF Server - Multi-stage Docker Image
+
+# ============================================================
+# Stage 1: Builder
+# ============================================================
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_PREFERENCE=only-system
+
+WORKDIR /app
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Create the virtual environment and install dependencies
+RUN uv sync --locked --no-install-project --no-dev
+
+# Copy BFF application
+COPY bff/ ./bff/
+
+# Install project dependencies
+RUN uv sync --locked --no-dev
+
+
+# ============================================================
+# Stage 2: Runtime
+# ============================================================
+FROM python:3.11-slim-bookworm
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=5000 \
+    PATH="/app/.venv/bin:$PATH"
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home --shell /usr/sbin/nologin app
+
+# Copy ONLY the virtual environment and BFF
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
+COPY --from=builder --chown=app:app /app/bff /app/bff
+
+# Writable location for runtime state (connections.json). Kept outside the
+# root-owned WORKDIR and the code bind mount; backed by a named volume in
+# docker-compose.yml. Created before the USER switch so 'app' owns it and the
+# fresh volume inherits that ownership - no host UID matching required.
+RUN mkdir -p /config && chown app:app /config
+
+USER app
+
+EXPOSE 5000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:5000/api/health || exit 1
+
+CMD ["python", "-u", "bff/bff_server.py"]

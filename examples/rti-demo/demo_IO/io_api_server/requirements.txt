@@ -1,0 +1,28 @@
+# Raspberry Pi GPIO LED Control API - Dependencies
+# ====================================================
+
+# Web framework
+fastapi>=0.95.0
+uvicorn[standard]>=0.21.0
+
+# Pydantic models (included with FastAPI, but explicit for clarity)
+pydantic>=1.10.0
+
+# GPIO control for Raspberry Pi (optional - mock mode works without it)
+# Install only on Raspberry Pi or for hardware testing:
+# gpiozero>=1.6.0
+
+# For better async support (optional)
+anyio>=3.0.0
+httpx>=0.23.0
+
+# Development dependencies (optional)
+# python-multipart
+# pytest
+# requests
+
+# To install all dependencies:
+# pip install fastapi uvicorn pydantic anyio httpx
+
+# On Raspberry Pi, also install:
+# pip install gpiozero

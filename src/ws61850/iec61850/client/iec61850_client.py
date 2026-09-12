@@ -280,6 +280,7 @@ class IEC61850Client:
         )
 
         request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
+
         await websocket_info.websocket.send(request)
         if self.send_msg_callback is not None:
             self.send_msg_callback(request, datetime.datetime.now())
@@ -514,7 +515,17 @@ class IEC61850Client:
                 if set_val == "ok":
                     result = True
                 if callback is not None:
-                    callback(result, parameter)
+                    extracted_data_type = None
+                    extracted_value = value
+                    if isinstance(value, list) and len(value) > 0:
+                        first_item = value[0]
+                    if isinstance(first_item, dict) and "data" in first_item:
+                        data_tuple = first_item["data"]
+                    if isinstance(data_tuple, tuple) and len(data_tuple) >= 2:
+                        extracted_data_type = data_tuple[0]
+                        extracted_value = data_tuple[1]
+                    callback(obj_ref, extracted_value, fc, extracted_data_type, result)
+                 
                 websocket_info.invoke_id += 1
                 return result
             else:

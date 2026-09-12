@@ -1,0 +1,16 @@
+== Main Demo README
+
+=== Project Structure
+
+----
+rti-demo/
+├── README.md              # This file
+├── bff/
+│   └── bff_server.py      # BFF Server
+├── fsp/
+│   └── bff_endpoint.py    # RTI-FSP ACSI-Server - WS active
+├── so/
+│   └── bff_endpoint.py    # RTI-SO ACSI-Client - WS passive
+└── hmi/
+    └── index.html         # Web HMI
+----

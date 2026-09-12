@@ -1,0 +1,47 @@
+# Build context for the repo-root Docker builds (examples/rti-demo/Dockerfile.rti-so,
+# .rti-fsp, .acsi-ws-client, .acsi-ws-server). These COPY only:
+#   src/ws61850
+#   examples/rti-demo/{pyproject.toml,uv.lock}
+#   examples/rti-demo/{so,fsp,acsi_ws_client,acsi_ws_server,demo_IO}
+# Everything else is noise in the context. Builds with context: examples/rti-demo
+# (bff, IO) use examples/rti-demo/.dockerignore instead.
+
+# VCS, IDE, tooling
+.git
+.github
+.claude
+.idea
+.ruff_cache
+.pytest_cache
+
+# Virtualenvs and Python caches
+.venv
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/*$py.class
+
+# Node
+**/node_modules
+**/dist
+
+# Not consumed by any image
+docs
+tests
+testing
+scripts
+keycloak
+examples/ws61850_interactive
+examples/ws61850_mode
+examples/rti-demo/demo_setup
+examples/rti-demo/hmi
+examples/rti-demo/models
+examples/rti-demo/.venv
+
+# Generated / local state
+**/*.log
+**/*.pid
+launch_config.json
+*.local.json
+examples/rti-demo/bff/connections.json
+stats.json

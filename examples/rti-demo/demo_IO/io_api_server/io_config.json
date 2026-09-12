@@ -1,0 +1,180 @@
+{
+  "devices": [
+    {
+      "name": "led1",
+      "type": "led",
+      "device_type": "led",
+      "identifier": 17,
+      "gpio_pin": 17,
+      "description": "LED 1 on GPIO 17 (Pin 11)",
+      "direction": "output",
+      "initial_state": false,
+      "is_active_high": true
+    },
+    {
+      "name": "led2",
+      "type": "led",
+      "device_type": "led",
+      "identifier": 18,
+      "gpio_pin": 18,
+      "description": "LED 2 on GPIO 18 (Pin 12)",
+      "direction": "output",
+      "initial_state": false,
+      "is_active_high": true
+    },
+    {
+      "name": "led3",
+      "type": "led",
+      "device_type": "led",
+      "identifier": 22,
+      "gpio_pin": 22,
+      "description": "LED 3 on GPIO 22 (Pin 15)",
+      "direction": "output",
+      "initial_state": false,
+      "is_active_high": true
+    },
+    {
+      "name": "pot1",
+      "device_type": "potentiometer",
+      "adc_type": "mcp3008",
+      "spi_bus": 0,
+      "spi_device": 0,
+      "adc_channel": 0,
+      "adc_reference_voltage": 3.3,
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "is_inverted": false,
+      "change_threshold": 0.05,
+      "description": "Potentiometer on MCP3008 channel 0"
+    },
+    {
+      "name": "pot2",
+      "device_type": "potentiometer",
+      "adc_type": "mcp3008",
+      "spi_bus": 0,
+      "spi_device": 0,
+      "adc_channel": 1,
+      "adc_reference_voltage": 3.3,
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "is_inverted": false,
+      "change_threshold": 0.05,
+      "description": "Potentiometer on MCP3008 channel 1"
+    },
+    {
+      "name": "pot3",
+      "device_type": "potentiometer",
+      "adc_type": "mcp3008",
+      "spi_bus": 0,
+      "spi_device": 0,
+      "adc_channel": 2,
+      "adc_reference_voltage": 3.3,
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "is_inverted": false,
+      "change_threshold": 0.05,
+      "description": "Potentiometer on MCP3008 channel 2"
+    },
+    {
+      "name": "pot4",
+      "device_type": "potentiometer",
+      "adc_type": "mcp3008",
+      "spi_bus": 0,
+      "spi_device": 0,
+      "adc_channel": 3,
+      "adc_reference_voltage": 3.3,
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "is_inverted": false,
+      "change_threshold": 0.05,
+      "description": "Potentiometer on MCP3008 channel 3"
+    },
+    {
+      "name": "button1",
+      "type": "button",
+      "device_type": "button",
+      "identifier": 4,
+      "gpio_pin": 4,
+      "description": "Button on GPIO 4 (Pin 7)",
+      "direction": "input",
+      "debounce_time": 0.05,
+      "pull_up": true,
+      "latching": true,
+      "is_active_high": false
+    },
+    {
+      "name": "button2",
+      "type": "button",
+      "device_type": "button",
+      "identifier": 23,
+      "gpio_pin": 23,
+      "description": "Button on GPIO 23 (Pin 16)",
+      "direction": "input",
+      "debounce_time": 0.05,
+      "pull_up": true,
+      "latching": true,
+      "is_active_high": false
+    },
+    {
+      "name": "button3",
+      "type": "button",
+      "device_type": "button",
+      "identifier": 24,
+      "gpio_pin": 24,
+      "description": "Button on GPIO 24 (Pin 18)",
+      "direction": "input",
+      "debounce_time": 0.05,
+      "pull_up": true,
+      "latching": true,
+      "is_active_high": false
+    },
+    {
+      "name": "lcd1",
+      "type": "lcd",
+      "device_type": "lcd",
+      "identifier": 0,
+      "gpio_rs": 26,
+      "gpio_e": 19,
+      "gpio_data": [13, 12, 16, 20],
+      "gpio_rw": null,
+      "columns": 16,
+      "rows": 2,
+      "backlight": true,
+      "backlight_pin": null,
+      "description": "16x2 LCD Display with HD44780 controller (4-bit mode)",
+      "direction": "output"
+    },
+    {
+      "name": "lcd_i2c",
+      "type": "lcd_i2c",
+      "device_type": "lcd_i2c",
+      "identifier": 1,
+      "i2c_address": 39,
+      "i2c_bus": 1,
+      "columns": 16,
+      "rows": 2,
+      "backlight": true,
+      "rs_bit": 0,
+      "rw_bit": 1,
+      "e_bit": 2,
+      "backlight_bit": 3,
+      "d4_bit": 4,
+      "d5_bit": 5,
+      "d6_bit": 6,
+      "d7_bit": 7,
+      "description": "16x2 LCD Display with HD44780 controller and I2C backpack (PCF8574)",
+      "direction": "output"
+    }
+  ],
+  "version": 1,
+  "acsi_server": {
+    "url": "http://localhost:5001",
+    "enabled": false
+  },
+  "mappings": {
+    "button1": {
+      "objRef": "LD0/LLN0$ST$Mod",
+      "fc": "ST"
+    }
+  }
+}

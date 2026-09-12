@@ -1,0 +1,22 @@
+[ req ]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[ req_distinguished_name ]
+C = DE
+ST = BW
+L = Freiburg
+O = MZ Automation GmbH
+OU = R&D
+CN = client1
+
+[ v3_req ]
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth, serverAuth
+subjectAltName = @alt_names
+
+[ alt_names ]
+DNS.1 = client1
+DNS.2 = localhost
+IP.1 = 127.0.0.1
