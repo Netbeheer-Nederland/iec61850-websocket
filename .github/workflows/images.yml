@@ -41,10 +41,12 @@ jobs:
               - *lib
               - 'examples/rti-demo/pyproject.toml'
               - 'examples/rti-demo/uv.lock'
-            so:          [ *rti, 'examples/rti-demo/so/**',             'examples/rti-demo/Dockerfile.rti-so' ]
-            fsp:         [ *rti, 'examples/rti-demo/fsp/**',            'examples/rti-demo/Dockerfile.rti-fsp' ]
-            acsi_client: [ *rti, 'examples/rti-demo/acsi_ws_client/**', 'examples/rti-demo/Dockerfile.acsi-ws-client' ]
-            acsi_server: [ *rti, 'examples/rti-demo/acsi_ws_server/**', 'examples/rti-demo/Dockerfile.acsi-ws-server' ]
+              - 'examples/rti-demo/demo_IO/**'
+              - 'examples/rti-demo/Dockerfile.service'
+            so:          [ *rti, 'examples/rti-demo/so/**' ]
+            fsp:         [ *rti, 'examples/rti-demo/fsp/**' ]
+            acsi_client: [ *rti, 'examples/rti-demo/acsi_ws_client/**' ]
+            acsi_server: [ *rti, 'examples/rti-demo/acsi_ws_server/**' ]
             bff:         [ 'examples/rti-demo/bff/**', 'examples/rti-demo/pyproject.toml', 'examples/rti-demo/uv.lock', 'examples/rti-demo/Dockerfile.bff' ]
             io:          [ 'examples/rti-demo/demo_IO/**', 'examples/rti-demo/Dockerfile.IO' ]
             hmi:         [ 'examples/rti-demo/hmi/**' ]
@@ -76,10 +78,14 @@ jobs:
       - id: img
         run: |
           case "${{ matrix.image }}" in
-            so)          c=. ; f=examples/rti-demo/Dockerfile.rti-so         ; n=ws61850-so ;;
-            fsp)         c=. ; f=examples/rti-demo/Dockerfile.rti-fsp        ; n=ws61850-fsp ;;
-            acsi_client) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-client ; n=ws61850-acsi-ws-client ;;
-            acsi_server) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-server ; n=ws61850-acsi-ws-server ;;
+            so)          c=. ; f=examples/rti-demo/Dockerfile.service ; n=ws61850-so ;
+                         a="SERVICE_DIR=so|SERVICE_MODULE=so/bff_endpoint.py|APP_PORT=5002" ;;
+            fsp)         c=. ; f=examples/rti-demo/Dockerfile.service ; n=ws61850-fsp ;
+                         a="SERVICE_DIR=fsp|SERVICE_MODULE=fsp/bff_endpoint.py|APP_PORT=5001" ;;
+            acsi_client) c=. ; f=examples/rti-demo/Dockerfile.service ; n=ws61850-acsi-ws-client ;
+                         a="SERVICE_DIR=acsi_ws_client|SERVICE_MODULE=acsi_ws_client/bff_endpoint.py|APP_PORT=5003" ;;
+            acsi_server) c=. ; f=examples/rti-demo/Dockerfile.service ; n=ws61850-acsi-ws-server ;
+                         a="SERVICE_DIR=acsi_ws_server|SERVICE_MODULE=acsi_ws_server/bff_endpoint.py|APP_PORT=5004" ;;
             bff)         c=examples/rti-demo ; f=examples/rti-demo/Dockerfile.bff ; n=rti-demo-bff ;;
             io)          c=examples/rti-demo ; f=examples/rti-demo/Dockerfile.IO  ; n=rti-demo-io ; p=linux/amd64,linux/arm64 ;;
             hmi)         c=examples/rti-demo/hmi ; f=examples/rti-demo/hmi/Dockerfile ; n=rti-demo-hmi ;;
@@ -89,6 +95,9 @@ jobs:
             echo "file=$f"
             echo "name=$n"
             echo "platforms=${p:-linux/amd64}"
+            echo "args<<EOF"
+            [ -n "$a" ] && tr '|' '\n' <<<"$a"
+            echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
       - if: contains(steps.img.outputs.platforms, 'arm64')
@@ -117,6 +126,7 @@ jobs:
 #        with:
 #          context: ${{ steps.img.outputs.ctx }}
 #          file: ${{ steps.img.outputs.file }}
+#          build-args: ${{ steps.img.outputs.args }}
 #          platforms: ${{ steps.img.outputs.platforms }}
 #          push: ${{ github.event_name != 'pull_request' }}
 #          tags: ${{ steps.meta.outputs.tags }}

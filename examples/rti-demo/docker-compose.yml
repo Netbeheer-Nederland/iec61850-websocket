@@ -114,7 +114,11 @@ services:
   rti-fsp:
     build:
       context: ../..
-      dockerfile: examples/rti-demo/Dockerfile.rti-fsp
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: fsp
+        SERVICE_MODULE: fsp/bff_endpoint.py
+        APP_PORT: "5001"
     container_name: rti-fsp
     ports:
       - "5001:5001"
@@ -146,7 +150,11 @@ services:
   rti-fsp-2:
     build:
       context: ../..
-      dockerfile: examples/rti-demo/Dockerfile.rti-fsp
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: fsp
+        SERVICE_MODULE: fsp/bff_endpoint.py
+        APP_PORT: "5001"
     container_name: rti-fsp-2
     ports:
       - "5005:5005"  # Map to different host port, same container port
@@ -177,7 +185,11 @@ services:
   rti-so:
     build:
       context: ../..
-      dockerfile: examples/rti-demo/Dockerfile.rti-so
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: so
+        SERVICE_MODULE: so/bff_endpoint.py
+        APP_PORT: "5002"
     container_name: rti-so
     ports:
       - "5002:5002"
@@ -206,7 +218,11 @@ services:
   active-ws-acsi-client:
     build:
       context: ../..
-      dockerfile: examples/rti-demo/Dockerfile.acsi-ws-client
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: acsi_ws_client
+        SERVICE_MODULE: acsi_ws_client/bff_endpoint.py
+        APP_PORT: "5003"
     container_name: active-ws-acsi-client
     ports:
       - "5003:5003"
@@ -234,7 +250,11 @@ services:
   passive-ws-acsi-server:
     build:
       context: ../..
-      dockerfile: examples/rti-demo/Dockerfile.acsi-ws-server
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: acsi_ws_server
+        SERVICE_MODULE: acsi_ws_server/bff_endpoint.py
+        APP_PORT: "5004"
     container_name: passive-ws-acsi-server
     ports:
       - "5004:5004"

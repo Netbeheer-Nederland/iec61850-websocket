@@ -2,7 +2,11 @@ services:
   rti-so:
     build:
       context: ../../../
-      dockerfile: examples/rti-demo/Dockerfile.rti-so
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: so
+        SERVICE_MODULE: so/bff_endpoint.py
+        APP_PORT: "5002"
     container_name: rti-so
     ports:
       - "5002:5002"

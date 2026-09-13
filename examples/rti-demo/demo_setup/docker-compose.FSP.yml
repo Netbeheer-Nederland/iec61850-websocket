@@ -2,7 +2,11 @@ services:
   rti-fsp:
     build:
       context: ../../../
-      dockerfile: examples/rti-demo/Dockerfile.rti-fsp
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: fsp
+        SERVICE_MODULE: fsp/bff_endpoint.py
+        APP_PORT: "5001"
     container_name: rti-fsp
     ports:
       - "5001:5001"
