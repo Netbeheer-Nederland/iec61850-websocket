@@ -131,6 +131,11 @@ class IOMappingRequest(BaseModel):
         description="Data type for ACSI values: BOOLEAN, INT8, INT16, INT32, FLOAT32, etc.",
         json_schema_extra={"example": "FLOAT32"}
     )
+    fc: Optional[str] = Field(
+        default="st",
+        description="Data Attribute FC",
+        json_schema_extra={"example": "st"}
+    )
 
 
 class IOMappingResponse(BaseModel):
