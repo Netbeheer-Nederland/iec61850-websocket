@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { executeApiCall, buildTargetValue } from '../services/apiService';
+import { executeApiCall, buildTargetValue, getAutoRefreshIntervalMs } from '../services/apiService';
 import ControlModal from './ControlModal';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
@@ -53,6 +53,8 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
   const [writeValue, setWriteValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const autoRefreshTimerRef = useRef(null);
 
   const [modelFetched, setModelFetched] = useState(false);
   const [fetchingModel, setFetchingModel] = useState(false);
@@ -1190,6 +1192,39 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     }
   }, [selectedTarget, buildObjectRef, selectedFC, connections, cp, manualCp, isWebsocketPassiveEndpoint, effectiveCp]);
 
+  // Auto-refresh: when enabled, periodically re-run the same read for the
+  // currently selected attribute instead of requiring a manual Read click
+  // every time. Interval length comes from the Settings page.
+  useEffect(() => {
+    if (autoRefreshTimerRef.current) {
+      clearInterval(autoRefreshTimerRef.current);
+      autoRefreshTimerRef.current = null;
+    }
+
+    if (!autoRefresh || !buildObjectRef()) {
+      return undefined;
+    }
+
+    autoRefreshTimerRef.current = setInterval(() => {
+      handleRead();
+    }, getAutoRefreshIntervalMs());
+
+    return () => {
+      if (autoRefreshTimerRef.current) {
+        clearInterval(autoRefreshTimerRef.current);
+        autoRefreshTimerRef.current = null;
+      }
+    };
+  }, [autoRefresh, handleRead, buildObjectRef]);
+
+  // Turning auto-refresh off (or switching to a target/attribute it no
+  // longer applies to) shouldn't leave a stale toggle on.
+  useEffect(() => {
+    if (autoRefresh && !buildObjectRef()) {
+      setAutoRefresh(false);
+    }
+  }, [selectedTarget, selectedNode, autoRefresh, buildObjectRef]);
+
   // Handle write operation
   const handleWrite = useCallback(async () => {
     if (!selectedTarget) {
@@ -1520,6 +1555,17 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     )}
 
       {/* Action Buttons */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: buildObjectRef() ? 'pointer' : 'default' }}>
+          <input
+            type="checkbox"
+            checked={autoRefresh}
+            disabled={!buildObjectRef()}
+            onChange={(e) => setAutoRefresh(e.target.checked)}
+          />
+          Auto-refresh
+        </label>
+      </div>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         <button
           onClick={handleRead}

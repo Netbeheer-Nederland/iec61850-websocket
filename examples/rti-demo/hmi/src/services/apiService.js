@@ -82,6 +82,23 @@ export const getBffBaseUrl = () => {
 };
 
 /**
+ * Get the user-configured auto-refresh interval (ms) from the Settings page,
+ * set via the "Auto Refresh Interval" field and persisted to localStorage
+ * under 'rti-hmi-refresh-settings'.
+ * @returns {number} The interval in milliseconds (default 5000)
+ */
+export const getAutoRefreshIntervalMs = () => {
+  const DEFAULT_MS = 5000;
+  try {
+    const saved = JSON.parse(localStorage.getItem('rti-hmi-refresh-settings') || '{}') || {};
+    const ms = Number(saved.autoRefreshToggle);
+    return Number.isFinite(ms) && ms > 0 ? ms : DEFAULT_MS;
+  } catch (e) {
+    return DEFAULT_MS;
+  }
+};
+
+/**
  * Build BFF API URL
  * @param {string} path - The API path
  * @param {string|null} targetValue - Optional target value (host:port)
@@ -230,6 +247,7 @@ export const getDefaultTargetFromEndpoint = (endpoint) => {
 export default {
   getApiById,
   getBffBaseUrl,
+  getAutoRefreshIntervalMs,
   buildBffApiUrl,
   executeApiCall,
   ensureBffHealthy,

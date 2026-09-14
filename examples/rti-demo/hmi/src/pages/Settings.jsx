@@ -222,6 +222,30 @@ function Settings({ settings, setSettings }) {
           </button>
         </div>
 
+        <div className="settings-group">
+          <h3>Data Auto-Refresh</h3>
+          <div className="setting-item" style={{ display: 'block' }}>
+            <label htmlFor="autoRefreshToggle">Auto-Refresh Interval (ms)</label>
+            <input
+              type="number"
+              id="autoRefreshToggle"
+              min="1000"
+              step="500"
+              value={refreshSettings.autoRefreshToggle}
+              onChange={handleRefreshInputChange}
+              style={{ width: '100%', maxWidth: '300px' }}
+            />
+            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '6px' }}>
+              How often the Data Access Panel re-reads the selected value when its
+              "Auto-refresh" checkbox is enabled. Click Save to apply.
+            </p>
+          </div>
+          <button className="btn-primary" id="btn-save-refresh-settings" onClick={handleSaveSettings}>
+            <i className="fas fa-save"></i>
+            Save Settings
+          </button>
+        </div>
+
         <div className="settings-group" style={{ display: 'none' }}>
           <h3>Display Settings</h3>
           <div className="setting-item" style={{ display: 'flex', alignItems: 'center' }}>

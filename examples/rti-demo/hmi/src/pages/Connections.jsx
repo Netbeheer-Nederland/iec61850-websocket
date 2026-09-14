@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function Connections({ connections, setConnections }) {
+function Connections({ connections, setConnections, loading = false, onReload }) {
   const [showModal, setShowModal] = useState(false);
   const [currentConnection, setCurrentConnection] = useState(null);
   const [formData, setFormData] = useState({
@@ -51,8 +51,7 @@ function Connections({ connections, setConnections }) {
   };
 
   const handleRefresh = () => {
-    // Refresh connections - placeholder
-    console.log('Refreshing connections...');
+    onReload?.();
   };
 
   return (
@@ -65,8 +64,8 @@ function Connections({ connections, setConnections }) {
         </button>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
-        <button className="btn-icon" id="refresh-cons-btn" title="Refresh" onClick={handleRefresh}>
-          <i className="fas fa-sync-alt"></i>
+        <button className="btn-icon" id="refresh-cons-btn" title="Refresh" onClick={handleRefresh} disabled={loading}>
+          <i className={`fas fa-sync-alt${loading ? ' fa-spin' : ''}`}></i>
         </button>
       </div>
       <div className="connections-table" id="connections-container">
@@ -97,7 +96,7 @@ function Connections({ connections, setConnections }) {
                   <td>{conn.type === 'IDP-Server' ? conn.endpoint : '-'}</td>
                   <td>
                     <span className="endpoint-card-status">
-                      {conn.connected ? 'Connected' : 'Disconnected'}
+                      {conn.status === 'connected' ? 'Connected' : 'Disconnected'}
                     </span>
                   </td>
                   <td>

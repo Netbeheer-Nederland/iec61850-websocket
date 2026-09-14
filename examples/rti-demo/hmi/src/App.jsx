@@ -185,25 +185,31 @@ function App() {
   //   return () => clearInterval(interval);
   // }, [fetchEndpoints]);
 
-  // Poll BFF status - COMMENTED OUT to stop automatic polling
-  // useEffect(() => {
-  //   const checkBffStatus = async () => {
-  //     try {
-  //       const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/health`);
-  //       if (response.ok) {
-  //         setBffStatus({ connected: true, text: 'BFF connected' });
-  //       } else {
-  //         setBffStatus({ connected: false, text: 'BFF disconnected' });
-  //       }
-  //     } catch (error) {
-  //       setBffStatus({ connected: false, text: 'BFF disconnected' });
-  //     }
-  //   };
+  // Poll BFF status so the header's connection indicator reflects reality
+  // instead of being stuck on its initial "disconnected" state.
+  useEffect(() => {
+    let cancelled = false;
+    const checkBffStatus = async () => {
+      try {
+        const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/health`);
+        if (cancelled) return;
+        if (response.ok) {
+          setBffStatus({ connected: true, text: 'BFF connected' });
+        } else {
+          setBffStatus({ connected: false, text: 'BFF disconnected' });
+        }
+      } catch (error) {
+        if (!cancelled) setBffStatus({ connected: false, text: 'BFF disconnected' });
+      }
+    };
 
-  //   checkBffStatus();
-  //   const interval = setInterval(checkBffStatus, 10000);
-  //   return () => clearInterval(interval);
-  // }, [settings.bffHost, settings.bffPort]);
+    checkBffStatus();
+    const interval = setInterval(checkBffStatus, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [settings.bffHost, settings.bffPort]);
 
   return (
     <Router>
@@ -214,7 +220,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Setup settings={settings} />} />
             <Route path="/setup" element={<Setup settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections}/>} />
-            <Route path="/connections" element={<Connections connections={connections} setConnections={setConnections} />} />
+            <Route path="/connections" element={<Connections connections={connections} setConnections={setConnections} loading={connectionsLoading} onReload={fetchConnections} />} />
             <Route path="/model" element={<Model settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections} updateModel={updateModel} getModel={getModel} />} />
             <Route path="/traffic" element={<Traffic settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections} updateModel={updateModel} getModel={getModel} />} />
             <Route path="/data" element={<Data />} />
