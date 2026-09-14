@@ -887,7 +887,8 @@ def create_io_router() -> APIRouter:
                 direction=request.direction,
                 device_type=request.device_type,
                 service=request.service,
-                dataType=request.dataType
+                dataType=request.dataType,
+                fc=request.fc,
             )
             manager.save()
             

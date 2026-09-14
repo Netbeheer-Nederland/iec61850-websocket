@@ -156,7 +156,7 @@ def _try_include_io_router() -> bool:
         return False
 
 
-async def _bootstrap_io_client_after_connect(demo_io_server_url: str) -> Dict[str, Any]:
+async def _bootstrap_io_client_after_connect(demo_io_server_url: str, acsi_url: str) -> Dict[str, Any]:
     """Chain the demo_IO device-proxy bootstrap sequence right after a
     successful /api/io-plugin/connect (files downloaded, modules loaded,
     IO router registered via _try_include_io_router()).
@@ -205,23 +205,7 @@ async def _bootstrap_io_client_after_connect(demo_io_server_url: str) -> Dict[st
             logger.error(f"IO bootstrap step '{step_name}' failed: {e}")
             steps[step_name] = {"ok": False, "error": str(e)}
 
-    # Explicitly pass the ACSI base URL rather than relying on io_router.py's
-    # own fallback chain (request body -> ACSI_BASE_URL env var -> LAN-IP
-    # auto-detect). That auto-detect runs socket.gethostname() INSIDE this
-    # container, so it resolves to the Docker-bridge IP - unreachable from
-    # a physical device like the demo_io Pi on the real LAN. Setting
-    # ACSI_BASE_URL in this container's environment (e.g.
-    # http://<host-LAN-IP>:5003) and passing it here explicitly avoids that
-    # trap entirely.
-    acsi_base_url = os.getenv("ACSI_BASE_URL")
-    connect_body: Dict[str, Any] = {"base_url": demo_io_server_url}
-    if acsi_base_url:
-        connect_body["acsi_url"] = acsi_base_url
-    else:
-        logger.warning(
-            "ACSI_BASE_URL is not set - /api/io/connect will fall back to "
-            "io_router.py's auto-detected address, which is unreliable inside Docker."
-        )
+    connect_body: Dict[str, Any] = {"base_url": demo_io_server_url, "acsi_url": acsi_url}
 
     await _call("io_connect", "POST", "/api/io/connect", json=connect_body)
     await _call("sync_to_server", "POST", "/api/io/acsi/sync-to-server")
@@ -327,6 +311,7 @@ io_plugin_REQUIRED_FILES = [
     "mapping_manager.py",
     "__init__.py",
     "async_client_io.py",
+    "io_mapping.json"
 ]
 
 
@@ -1166,10 +1151,10 @@ class IoClientConnectRequest(BaseModel):
         description="URL of the IO server to connect to",
         json_schema_extra={"example": "http://localhost:8000"}
     )
-    files: Optional[List[str]] = Field(
-        default=None,
-        description="Specific files to fetch. If None, fetches all required files",
-        json_schema_extra={"example": ["io_router.py", "io_utils.py", "mapping_manager.py", "__init__.py", "async_client_io.py"]}
+    acsi_url: str = Field(
+        default="http://localhost:5002",
+        description="URL of the IO server to connect to",
+        json_schema_extra={"example": "http://localhost:5002"}
     )
     timeout: float = Field(
         default=10.0,
@@ -3970,7 +3955,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 # server-side ACSI sync. Best-effort - failures here are
                 # reported but don't fail this endpoint's response.
                 if _io_router_included:
-                    result["io_bootstrap"] = await _bootstrap_io_client_after_connect(request.server_url)
+                    result["io_bootstrap"] = await _bootstrap_io_client_after_connect(request.server_url, request.acsi_url)
 
             result["io_plugin_enabled"] = _use_io_client
             result["io_router_included"] = _io_router_included
