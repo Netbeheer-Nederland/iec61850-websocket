@@ -847,11 +847,23 @@ class AsyncIOClient:
             # This is not ideal but prevents resource leaks
             try:
                 loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    # The loop that owned this client's connections is
+                    # already gone (e.g. this instance was replaced by a
+                    # module reload and GC ran after that loop shut
+                    # down). There's nothing safe left to schedule -
+                    # attempting aclose() here raises "Event loop is
+                    # closed" from deep inside httpx/httpcore, and since
+                    # nothing awaits the resulting task, asyncio logs it
+                    # as "Task exception was never retrieved" on every
+                    # such cycle. The OS reclaims the underlying sockets
+                    # when the process exits regardless.
+                    return
                 if loop.is_running():
                     loop.create_task(self.aclose())
                 else:
                     loop.run_until_complete(self.aclose())
-            except:
+            except Exception:
                 pass
 
 
@@ -1599,11 +1611,20 @@ class AsyncDemoIOClient:
             # This is not ideal but prevents resource leaks
             try:
                 loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    # See the matching comment in AsyncIOClient.__del__:
+                    # the loop that owned this client's connections may
+                    # already be closed by the time GC runs this (e.g.
+                    # after a module reload replaces this instance).
+                    # Scheduling aclose() on a closed loop just raises
+                    # "Event loop is closed" from inside httpx/httpcore
+                    # with nowhere for the exception to be retrieved.
+                    return
                 if loop.is_running():
                     loop.create_task(self.aclose())
                 else:
                     loop.run_until_complete(self.aclose())
-            except:
+            except Exception:
                 pass
 
 class DemoIOClient:
