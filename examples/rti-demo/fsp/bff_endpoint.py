@@ -1000,6 +1000,18 @@ def create_bff_router(
 
     rti_fsp = ACSIServer(factory_dir)
 
+    def _log_io_sync_result(fut, label):
+        """Done-callback for a run_coroutine_threadsafe future: logs success/
+        failure once the coroutine actually finishes, without blocking the
+        thread that scheduled it. Safe to call from any thread - fut.result()
+        here only re-raises an already-completed future's exception, it does
+        not block."""
+        try:
+            fut.result()
+            logger.info(f"[FSP] {label} completed successfully")
+        except Exception as e:
+            logger.error(f"[FSP] {label} failed: {e}")
+
     def on_connected_callback(associate_response):
         """Callback for sent associateResponse messages."""
         global _use_io_plugin
@@ -1007,7 +1019,6 @@ def create_bff_router(
 
         if _use_io_plugin:
             try:
-                # Use dynamic loading functions
                 io_plugin = get_io_plugin_dynamic()
                 mapping_manager = get_mapping_manager_dynamic()
                 sync_to_io_device = get_sync_to_io_device_dynamic()
@@ -1019,28 +1030,32 @@ def create_bff_router(
                     return
                 logger.info(f"[FSP] IO Plugin for connected: {io_plugin}")
                 if io_plugin:
-                    # This callback runs on an AnyIO worker thread (it's a
-                    # plain sync def, not async), not on the asyncio event
-                    # loop itself - asyncio.create_task() would raise
-                    # "no running event loop" here. Schedule onto the
-                    # actual FSP event loop instead.
+                    # IMPORTANT: this callback runs directly ON the FSP's own
+                    # event-loop thread (Thread-N _event_loop_thread), not on a
+                    # separate worker thread. Blocking here with future.result()
+                    # would freeze that very loop - including the coroutines we
+                    # just scheduled onto it - guaranteeing a spurious timeout.
+                    # Use a non-blocking done-callback instead; it fires
+                    # whenever the coroutine actually finishes, without
+                    # stalling the association handshake or anything else on
+                    # this loop.
                     loop = rti_fsp.runtime.loop
                     if loop is None or not loop.is_running():
                         logger.warning("[FSP] Cannot schedule IO sync - runtime loop not available")
                         return
 
-                    # Use associateId as identifier, or a default
                     associate_id = associate_response.get("associateId", "fsp_connected")
-                    # Turn LED ON (write True/1 to the LED reference)
-                    asyncio.run_coroutine_threadsafe(
+                    value = f"FSP Connected: {associate_id}"
+
+                    fut1 = asyncio.run_coroutine_threadsafe(
                         sync_to_io_device(io_plugin, "connected", True), loop
                     )
+                    fut1.add_done_callback(lambda f: _log_io_sync_result(f, "LED sync on connect"))
 
-                    # Write connection info to LCD
-                    value = f"FSP Connected: {associate_id}"
-                    asyncio.run_coroutine_threadsafe(
+                    fut2 = asyncio.run_coroutine_threadsafe(
                         write_to_lcd(io_plugin, "connected", value, mapping_manager=mapping_manager), loop
                     )
+                    fut2.add_done_callback(lambda f: _log_io_sync_result(f, "LCD write on connect"))
                 else:
                     logger.warning("[FSP] IO Plugin is None - cannot turn on LED. Call /api/io/connect first.")
             except ImportError as e:
@@ -1055,7 +1070,6 @@ def create_bff_router(
 
         if _use_io_plugin:
             try:
-                # Use dynamic loading functions
                 io_plugin = get_io_plugin_dynamic()
                 mapping_manager = get_mapping_manager_dynamic()
                 blink_led_task = get_blink_led_task_dynamic()
@@ -1065,24 +1079,24 @@ def create_bff_router(
                     _use_io_plugin = False
                     return
                 if io_plugin:
-                    # Runs on an AnyIO worker thread - see on_connected_callback
-                    # for why asyncio.create_task() would fail here.
+                    # Same non-blocking rationale as on_connected_callback -
+                    # this also runs directly on the FSP event-loop thread.
                     loop = rti_fsp.runtime.loop
                     if loop is None or not loop.is_running():
                         logger.warning("[FSP] Cannot schedule IO sync - runtime loop not available")
                         return
 
-                    asyncio.run_coroutine_threadsafe(
-                        blink_led_task(io_plugin, "oper_rcv", interval=0.2, count=1, mapping_manager=mapping_manager), loop
+                    fut = asyncio.run_coroutine_threadsafe(
+                        blink_led_task(io_plugin, "oper_rcv", interval=0.2, count=1, mapping_manager=mapping_manager),
+                        loop
                     )
+                    fut.add_done_callback(lambda f: _log_io_sync_result(f, "LED blink on operate received"))
                 else:
                     logger.warning("[FSP] IO Plugin is None - cannot blink LED. Call /api/io/connect first.")
             except ImportError as e:
                 logger.error(f"[FSP] ImportError - Cannot import IO Plugin: {e}")
             except Exception as e:
                 logger.error(f"[FSP] Exception in operate received callback: {e}")
-
-
 
     def on_operate_response_callback(operate_response):
         """Callback for sent operate response messages - prints to LCD."""
@@ -1091,7 +1105,6 @@ def create_bff_router(
 
         if _use_io_plugin:
             try:
-                # Use dynamic loading functions
                 io_plugin = get_io_plugin_dynamic()
                 mapping_manager = get_mapping_manager_dynamic()
                 write_to_lcd = get_write_to_lcd_dynamic()
@@ -1102,8 +1115,7 @@ def create_bff_router(
                     return
 
                 if io_plugin:
-                    # Runs on an AnyIO worker thread - see on_connected_callback
-                    # for why asyncio.create_task() would fail here.
+                    # Same non-blocking rationale as on_connected_callback.
                     loop = rti_fsp.runtime.loop
                     if loop is None or not loop.is_running():
                         logger.warning("[FSP] Cannot schedule IO sync - runtime loop not available")
@@ -1117,16 +1129,16 @@ def create_bff_router(
                     else:
                         value = f"Operation: FAILED - {add_cause}" if add_cause else "Operation: FAILED"
 
-                    asyncio.run_coroutine_threadsafe(
+                    fut = asyncio.run_coroutine_threadsafe(
                         write_to_lcd(io_plugin, "oper_send", value, mapping_manager=mapping_manager), loop
                     )
+                    fut.add_done_callback(lambda f: _log_io_sync_result(f, "LCD write on operate response"))
                 else:
                     logger.warning("[FSP] IO Plugin is None - cannot write to LCD. Call /api/io/connect first.")
             except ImportError as e:
                 logger.error(f"[FSP] ImportError - Cannot import IO Plugin: {e}")
             except Exception as e:
                 logger.error(f"[FSP] Exception in operate response callback: {e}")
-
 
     rti_fsp.install_connected_callback(on_connected_callback)
     rti_fsp.install_operate_received_callback(on_operate_received_callback)
@@ -1915,12 +1927,12 @@ def create_bff_router(
         global _use_io_plugin
         try:
             status = rti_fsp.runtime.status
+            logger.info(f"[FSP STOP] current status={status!r}")
             if status in (None, "stopped"):
+                logger.info("[FSP STOP] early-return: already stopped, skipping IO sync")
                 return {"ok": True, "status": "stopped"}
 
             try:
-                rti_fsp.stop_server()
-
                 if _use_io_plugin:
                     try:
                         # Use dynamic loading functions
@@ -1935,16 +1947,24 @@ def create_bff_router(
                             return
                         logger.info(f"[FSP] IO Plugin for connected: {io_plugin}")
                         if io_plugin:
-                            # Use associateId as identifier, or a default
-                            # Turn LED ON (write True/1 to the LED reference)
-                            asyncio.create_task(
-                                sync_to_io_device(io_plugin, "stopped", False)
-                            )
-
-                            # Write connection info to LCD
-                            asyncio.create_task(
-                                write_to_lcd(io_plugin, "stopped", "Stopped", mapping_manager=mapping_manager)
-                            )
+                            loop = rti_fsp.runtime.loop
+                            if loop is not None and loop.is_running():
+                                try:
+                                    fut1 = asyncio.run_coroutine_threadsafe(
+                                        sync_to_io_device(io_plugin, "stopped", False), loop
+                                    )
+                                    fut2 = asyncio.run_coroutine_threadsafe(
+                                        write_to_lcd(io_plugin, "stopped", "Stopped", mapping_manager=mapping_manager),
+                                        loop
+                                    )
+                                    # Block here (we're on a worker thread, not the loop) until
+                                    # the device write actually completes, or time out.
+                                    fut1.result(timeout=5)
+                                    fut2.result(timeout=5)
+                                except Exception as e:
+                                    logger.error(f"[FSP] IO sync on stop failed or timed out: {e}")
+                            else:
+                                logger.warning("[FSP] Cannot schedule IO sync on stop - runtime loop not available")
                         else:
                             logger.warning("[FSP] IO Plugin is None - cannot turn on LED. Call /api/io/connect first.")
                     except ImportError as e:
@@ -1952,7 +1972,7 @@ def create_bff_router(
                     except Exception as e:
                         logger.error(f"[FSP] Exception in IO connected callback: {e}")
 
-
+                rti_fsp.stop_server()
                 current = rti_fsp.runtime.status
                 if current in ("stopping", "starting"):
                     return {"ok": True, "status": "stopping"}
