@@ -490,6 +490,25 @@ def update_io_plugin_usage():
 def clear_io_plugin_modules():
     """Clear all loaded io_plugin modules."""
     global _io_plugin_module, _mapping_manager_module, _io_utils_module
+
+    # Explicitly close the outgoing IO client's httpx session while its
+    # event loop is still alive, instead of leaving cleanup to
+    # __del__/GC timing. If we just drop the module reference here, GC
+    # may not run until well after this loop has been closed (each
+    # /api/start spins up a brand-new event-loop thread), at which point
+    # aclose() raises "Event loop is closed" from deep inside
+    # httpx/httpcore with nothing awaiting the resulting task - logged
+    # as "Task exception was never retrieved" on every reload cycle.
+    if _io_plugin_module is not None and hasattr(_io_plugin_module, 'get_io_client'):
+        try:
+            old_client = _io_plugin_module.get_io_client()
+            if old_client is not None:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(old_client.aclose())
+        except Exception as e:
+            logger.debug(f"Error closing old IO client during module clear: {e}")
+
     _io_plugin_module = None
     _mapping_manager_module = None
     _io_utils_module = None
@@ -1000,18 +1019,6 @@ def create_bff_router(
 
     rti_fsp = ACSIServer(factory_dir)
 
-    def _log_io_sync_result(fut, label):
-        """Done-callback for a run_coroutine_threadsafe future: logs success/
-        failure once the coroutine actually finishes, without blocking the
-        thread that scheduled it. Safe to call from any thread - fut.result()
-        here only re-raises an already-completed future's exception, it does
-        not block."""
-        try:
-            fut.result()
-            logger.info(f"[FSP] {label} completed successfully")
-        except Exception as e:
-            logger.error(f"[FSP] {label} failed: {e}")
-
     def on_connected_callback(associate_response):
         """Callback for sent associateResponse messages."""
         global _use_io_plugin
@@ -1063,6 +1070,18 @@ def create_bff_router(
             except Exception as e:
                 logger.error(f"[FSP] Exception in IO connected callback: {e}")
 
+    def _log_io_sync_result(fut, label):
+        """Done-callback for a run_coroutine_threadsafe future: logs
+        success/failure once the coroutine actually finishes, without
+        blocking the thread that scheduled it. Safe to call from any
+        thread - fut.result() here only re-raises an already-completed
+        future's exception, it does not block."""
+        try:
+            fut.result()
+            logger.info(f"[FSP] {label} completed successfully")
+        except Exception as e:
+            logger.error(f"[FSP] {label} failed: {e}")
+
     def on_operate_received_callback(operate_data):
         """Callback for received operate request messages - blinks LED."""
         global _use_io_plugin
@@ -1070,6 +1089,7 @@ def create_bff_router(
 
         if _use_io_plugin:
             try:
+                # Use dynamic loading functions
                 io_plugin = get_io_plugin_dynamic()
                 mapping_manager = get_mapping_manager_dynamic()
                 blink_led_task = get_blink_led_task_dynamic()
@@ -1087,8 +1107,7 @@ def create_bff_router(
                         return
 
                     fut = asyncio.run_coroutine_threadsafe(
-                        blink_led_task(io_plugin, "oper_rcv", interval=0.2, count=1, mapping_manager=mapping_manager),
-                        loop
+                        blink_led_task(io_plugin, "oper_rcv", interval=0.2, count=1, mapping_manager=mapping_manager), loop
                     )
                     fut.add_done_callback(lambda f: _log_io_sync_result(f, "LED blink on operate received"))
                 else:
@@ -1098,6 +1117,8 @@ def create_bff_router(
             except Exception as e:
                 logger.error(f"[FSP] Exception in operate received callback: {e}")
 
+
+
     def on_operate_response_callback(operate_response):
         """Callback for sent operate response messages - prints to LCD."""
         global _use_io_plugin
@@ -1105,6 +1126,7 @@ def create_bff_router(
 
         if _use_io_plugin:
             try:
+                # Use dynamic loading functions
                 io_plugin = get_io_plugin_dynamic()
                 mapping_manager = get_mapping_manager_dynamic()
                 write_to_lcd = get_write_to_lcd_dynamic()
@@ -1139,6 +1161,7 @@ def create_bff_router(
                 logger.error(f"[FSP] ImportError - Cannot import IO Plugin: {e}")
             except Exception as e:
                 logger.error(f"[FSP] Exception in operate response callback: {e}")
+
 
     rti_fsp.install_connected_callback(on_connected_callback)
     rti_fsp.install_operate_received_callback(on_operate_received_callback)
@@ -1947,6 +1970,15 @@ def create_bff_router(
                             return
                         logger.info(f"[FSP] IO Plugin for connected: {io_plugin}")
                         if io_plugin:
+                            # This handler runs on a separate FastAPI/AnyIO
+                            # worker thread (not the FSP's own event-loop
+                            # thread), so blocking here with .result() is
+                            # safe - it does not freeze the loop the
+                            # coroutine needs to run on. Blocking (rather
+                            # than the non-blocking done-callback used in
+                            # the FSP-side callbacks above) also lets us
+                            # guarantee the LED-off write actually
+                            # completes before stop_server() proceeds.
                             loop = rti_fsp.runtime.loop
                             if loop is not None and loop.is_running():
                                 try:
