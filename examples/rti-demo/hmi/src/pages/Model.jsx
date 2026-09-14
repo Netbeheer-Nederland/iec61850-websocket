@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Tree from '../components/Tree';
 import InstanceVisualization from '../components/InstanceVisualization';
-import { executeApiCall, buildTargetValue } from '../services/apiService';
+import { executeApiCall, buildTargetValue, getAutoRefreshIntervalMs } from '../services/apiService';
 import { generateModelPyCode } from '../utils/sclParser';
 import { transformModelToTree } from '../utils/modelUtils';
 
@@ -14,7 +14,9 @@ function Model({ settings, connections = [], loading = false, onReload }) {
   const [expandedNodes, setExpandedNodes] = useState({});
   const fileInputRef = useRef(null);
   const [uploadStatus, setUploadStatus] = useState('');
-  
+  const [autoRefreshTree, setAutoRefreshTree] = useState(false);
+  const treeRefreshIntervalRef = useRef(null);
+
   const handleExpandToggle = useCallback((ref, expanded) => {
     setExpandedNodes(prev => ({
       ...prev,
@@ -95,6 +97,34 @@ function Model({ settings, connections = [], loading = false, onReload }) {
       console.error('Failed to load model:', error);
     }
   }, []);
+
+  // Auto-refresh: while enabled, periodically reload the tree for the
+  // selected connection so model changes (e.g. after an "Update Model"
+  // upload from another instance) show up without a manual "View" click.
+  useEffect(() => {
+    if (treeRefreshIntervalRef.current) {
+      clearInterval(treeRefreshIntervalRef.current);
+      treeRefreshIntervalRef.current = null;
+    }
+    if (!autoRefreshTree || !selectedConnection) return undefined;
+
+    treeRefreshIntervalRef.current = setInterval(() => {
+      loadModel(selectedConnection);
+    }, getAutoRefreshIntervalMs());
+    return () => {
+      if (treeRefreshIntervalRef.current) {
+        clearInterval(treeRefreshIntervalRef.current);
+        treeRefreshIntervalRef.current = null;
+      }
+    };
+  }, [autoRefreshTree, selectedConnection, loadModel]);
+
+  // Turning the selected connection off shouldn't leave a stale toggle on.
+  useEffect(() => {
+    if (autoRefreshTree && !selectedConnection) {
+      setAutoRefreshTree(false);
+    }
+  }, [selectedConnection, autoRefreshTree]);
 
   const handleNavigateToInstance = (conn) => {
     if (conn.type === 'RTI-SO') {
@@ -370,9 +400,17 @@ function Model({ settings, connections = [], loading = false, onReload }) {
         {selectedConnection && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ margin: 0 }}>Model for: {selectedConnection.name}</h3>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
-                className="btn-icon" 
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={autoRefreshTree}
+                  onChange={(e) => setAutoRefreshTree(e.target.checked)}
+                />
+                Auto-refresh
+              </label>
+              <button
+                className="btn-icon"
                 onClick={() => handleNavigateToInstance(selectedConnection)}
                 title="Open instance"
               >

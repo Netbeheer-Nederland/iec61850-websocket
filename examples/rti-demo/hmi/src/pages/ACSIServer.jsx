@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
+import { executeApiCall, buildTargetValue, getApiById, getAutoRefreshIntervalMs } from '../services/apiService';
 import Tree from '../components/Tree';
 import { transformModelToTree } from '../utils/modelUtils';
 
@@ -42,6 +42,8 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState({});
   const [connections, setConnections] = useState([]);
+  const [autoRefreshValues, setAutoRefreshValues] = useState(false);
+  const valuesRefreshIntervalRef = useRef(null);
   const monitorIntervalRef = useRef(null);
   const statusIntervalRef = useRef(null);
   const cpUserEditedRef = useRef(false);
@@ -509,6 +511,41 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     [endpointTarget, executeApiCall, treeData, formatValueForDisplay]
   );
 
+  // Re-reads every DA/SDA leaf that already has a displayed value (i.e. was
+  // read at least once via the context menu), so previously-read values stay
+  // live instead of freezing at whatever they were when last read.
+  const refreshReadValues = useCallback(() => {
+    if (!treeData) return;
+    const collectReadNodes = (nodes, acc = []) => {
+      for (const node of nodes || []) {
+        if ((node.type === 'DA' || node.type === 'SDA') && node.value !== undefined) {
+          acc.push({ ref: node.ref, fc: node.fc || 'st' });
+        }
+        if (node.children) collectReadNodes(node.children, acc);
+      }
+      return acc;
+    };
+    collectReadNodes(treeData.children).forEach(({ ref, fc }) => readDataValue(ref, fc));
+  }, [treeData, readDataValue]);
+
+  // Auto-refresh: while enabled, periodically replay reads for every value
+  // currently shown in the tree, using the interval configured in Settings.
+  useEffect(() => {
+    if (valuesRefreshIntervalRef.current) {
+      clearInterval(valuesRefreshIntervalRef.current);
+      valuesRefreshIntervalRef.current = null;
+    }
+    if (!autoRefreshValues || !treeData) return undefined;
+
+    valuesRefreshIntervalRef.current = setInterval(refreshReadValues, getAutoRefreshIntervalMs());
+    return () => {
+      if (valuesRefreshIntervalRef.current) {
+        clearInterval(valuesRefreshIntervalRef.current);
+        valuesRefreshIntervalRef.current = null;
+      }
+    };
+  }, [autoRefreshValues, treeData, refreshReadValues]);
+
   const handleContextMenu = useCallback((e, nodeInfo) => {
     e.preventDefault();
     e.stopPropagation();
@@ -747,13 +784,22 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           </div>
         </div>
 
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'center' }}>
         <button id="acsi-load-model-btn" className="btn-primary" onClick={loadServerModel} disabled={loading}>
           {loading ? 'Loading...' : 'Load Model'}
         </button>
         {/*<button id="acsi-reload-status-btn" className="btn-secondary" onClick={loadStatus} disabled={!endpointTarget}>
           Reload Status
         </button>*/}
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: treeData ? 'pointer' : 'default' }}>
+          <input
+            type="checkbox"
+            checked={autoRefreshValues}
+            disabled={!treeData}
+            onChange={(e) => setAutoRefreshValues(e.target.checked)}
+          />
+          Auto-refresh read values
+        </label>
       </div>
 
       {message && (
