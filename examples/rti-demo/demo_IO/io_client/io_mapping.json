@@ -64,7 +64,8 @@
       "device_name": "button1",
       "objRef": "LD0/DWMX1.DERAvail.stVal",
       "direction": "input",
-      "device_type": "button"
+      "device_type": "button",
+      "fc": "st"
     }
   },
   "potentiometers": {
@@ -72,7 +73,8 @@
       "device_name": "pot1",
       "objRef": "LD0/MMXU1.TotW.mag.f",
       "direction": "input",
-      "device_type": "potentiometer"
+      "device_type": "potentiometer",
+      "fc": "mx"
     },
     "pot2": {
       "device_name": "pot2",
