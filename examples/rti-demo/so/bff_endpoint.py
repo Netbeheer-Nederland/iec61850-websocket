@@ -3569,6 +3569,13 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400
                 )
 
+            if fc != "cf" or fc != "sp":
+                rti_so._log_action("Access Violation: Write only allowed to CF and SP FCs", "warn")
+                return JSONResponse(
+                    content={"ok": False, "error": "Access Violation: Write only allowed to CF and SP FCs"},
+                    status_code=400
+                )
+
             if value is None:
                 rti_so._log_action(f"Writevalue request rejected: missing value for objRef={obj_ref}", "warn")
                 return JSONResponse(
