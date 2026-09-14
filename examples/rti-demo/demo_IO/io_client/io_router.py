@@ -151,6 +151,7 @@ class IOMappingResponse(BaseModel):
     initial_state: bool = False
     service: Optional[str] = None
     dataType: Optional[str] = None
+    fc: Optional[str] = "st"
 
 
 class MappingListResponse(BaseModel):
@@ -938,7 +939,8 @@ def create_io_router() -> APIRouter:
                     device_type=config.get("device_type"),
                     initial_state=config.get("initial_state", False),
                     service=config.get("service"),
-                    dataType=config.get("dataType")
+                    dataType=config.get("dataType"),
+                    fc=config.get("fc")
                 )
             
             return MappingListResponse(
