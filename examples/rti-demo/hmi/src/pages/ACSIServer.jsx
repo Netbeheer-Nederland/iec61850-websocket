@@ -756,45 +756,68 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </label>
       </div>
 
-      <div className="acsi-connection-section" style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <div className="form-group">
-          <label>Instance</label>
-          <select value={selectedInstanceName} onChange={handleInstanceSelect} disabled={loading}>
-            <option value="" disabled>Select instance...</option>
-            {fspInstances.map(inst => (
-              <option key={inst.name} value={inst.name}>
-                {inst.name} ({inst.host}:{inst.port})
-              </option>
-            ))}
-            <option value="custom">Custom...</option>
-          </select>
+      <div className="acsi-connection-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
+          <div className="form-group">
+            <label>Instance</label>
+            <select value={selectedInstanceName} onChange={handleInstanceSelect} disabled={loading}>
+              <option value="" disabled>Select instance...</option>
+              {fspInstances.map(inst => (
+                <option key={inst.name} value={inst.name}>
+                  {inst.name} ({inst.host}:{inst.port})
+                </option>
+              ))}
+              <option value="custom">Custom...</option>
+            </select>
+          </div>
         </div>
 
-        <div className="form-group">
-          <label>WS Host</label>
-          <input
-            type="text"
-            value={host}
-            placeholder="0.0.0.0"
-            onChange={(e) => setHost(e.target.value)}
-            disabled={loading || !isCustomInstance}
-          />
-        </div>
-        <div className="form-group">
-          <label>WS Port</label>
-          <input type="number" value={port} placeholder="8765" onChange={(e) => setPort(e.target.value)} disabled={loading} />
-        </div>
-        <div className="form-group">
-          <label>WS CP</label>
-          <input type="text" value={cp} placeholder="cp1" onChange={(e) => { cpUserEditedRef.current = true; setCp(e.target.value);}} disabled={loading} />
-        </div>
-        <div className="form-group">
-          <label>WS Mode</label>
-          <select value={mode} onChange={(e) => setMode(e.target.value)} disabled={loading}>
-            {!mode && <option value="" disabled>Select instance...</option>}
-            <option value="active">Active</option>
-            <option value="passive">Passive</option>
-          </select>
+        {/* Only editable for a "custom" instance - picking a real one from
+            the dropdown above pre-fills these read-only, from that
+            instance's own configuration. */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
+          <div className="form-group">
+            <label>WS Host</label>
+            <input
+              type="text"
+              value={host}
+              placeholder="0.0.0.0"
+              onChange={(e) => setHost(e.target.value)}
+              disabled={loading || !isCustomInstance}
+            />
+          </div>
+          <div className="form-group">
+            <label>WS Port</label>
+            <input
+              type="number"
+              value={port}
+              placeholder="8765"
+              onChange={(e) => setPort(e.target.value)}
+              disabled={loading || !isCustomInstance}
+            />
+          </div>
+          <div className="form-group">
+            <label>WS CP</label>
+            <input
+              type="text"
+              value={cp}
+              placeholder="cp1"
+              onChange={(e) => { cpUserEditedRef.current = true; setCp(e.target.value); }}
+              disabled={loading || !isCustomInstance}
+            />
+          </div>
+          <div className="form-group">
+            <label>WS Mode</label>
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+              disabled={loading || !isCustomInstance}
+            >
+              {!mode && <option value="" disabled>Select instance...</option>}
+              <option value="active">Active</option>
+              <option value="passive">Passive</option>
+            </select>
+          </div>
         </div>
       </div>
         <div className="page-header">
