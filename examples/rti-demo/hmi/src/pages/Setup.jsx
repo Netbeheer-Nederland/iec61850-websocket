@@ -142,6 +142,10 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
       name: conn.name || '',
       host: conn.host || '',
       port: conn.port || 5000,
+      // Leave blank (not a fabricated 8765) when the connection genuinely
+      // has no ws_port set - defaulting to a fake-looking real port would
+      // make an unconfigured instance look configured, exactly what the WS
+      // port split was meant to stop happening.
       ws_port: conn.ws_port || '',
       type: conn.type || 'RTI-SO',
       acsi: conn.acsi || 'server',
