@@ -93,6 +93,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     const inst = fspInstances.find(c => c.name === value);
     if (inst) {
       setHost(inst.host || '');
+      // Was missing: without this, port kept whatever was previously set
+      // (e.g. left over from a prior instance, or the BFF's own port if
+      // nothing else had set it), so switching instances silently kept
+      // talking to the wrong port.
+      setPort(String(inst.port || 8765));
+      if (inst.cp) setCp(inst.cp);
     }
   }, [fspInstances]);
 
@@ -274,6 +280,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
 
         if (inst) {
           setHost(inst.host || '');
+          setPort(String(inst.port || 8765));
           if (inst.cp) setCp(inst.cp);
         }
 
