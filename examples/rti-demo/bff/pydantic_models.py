@@ -5,8 +5,9 @@ from typing import Any, Dict, List, Optional, Tuple
 class ConnectionCreateRequest(BaseModel):
     """Request body for creating a new connection."""
     name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
-    host: Optional[str] = Field(default=None, description="Hostname or IP address of the endpoint", json_schema_extra={"example": "localhost"})
-    port: Optional[int] = Field(default=None, description="Port number of the endpoint", json_schema_extra={"example": 5000})
+    host: Optional[str] = Field(default=None, description="Hostname or IP address of the endpoint's BFF server", json_schema_extra={"example": "localhost"})
+    port: Optional[int] = Field(default=None, description="Port number of the endpoint's BFF server (used for all /api/execute proxying)", json_schema_extra={"example": 5000})
+    ws_port: Optional[int] = Field(default=None, description="Port the RTI-SO instance's own WebSocket (Passive) endpoint listens on - distinct from the BFF server port above, and only meaningful for RTI-SO connections", json_schema_extra={"example": 8765})
     type: str = Field(..., description="Type of the endpoint (e.g., RTI-FSP, RTI-SO, IDP-Server)", json_schema_extra={"example": "RTI-FSP"})
     acsi: Optional[str] = Field(default=None, description="ACSI role (server/client)", json_schema_extra={"example": "server"})
     ws_mode: Optional[str] = Field(default=None, description="WebSocket mode", json_schema_extra={"example": ""})
@@ -48,8 +49,9 @@ class OAUTHConnectionCreateConfigRequest(BaseModel):
 class ConnectionUpdateRequest(BaseModel):
     """Request body for updating an existing connection."""
     name: Optional[str] = Field(default=None, description="Human-readable name for the connection")
-    host: Optional[str] = Field(default=None, description="Hostname or IP address of the endpoint")
-    port: Optional[int] = Field(default=None, description="Port number of the endpoint")
+    host: Optional[str] = Field(default=None, description="Hostname or IP address of the endpoint's BFF server")
+    port: Optional[int] = Field(default=None, description="Port number of the endpoint's BFF server")
+    ws_port: Optional[int] = Field(default=None, description="Port the RTI-SO instance's own WebSocket (Passive) endpoint listens on - distinct from the BFF server port above")
     type: Optional[str] = Field(default=None, description="Type of the endpoint")
     acsi: Optional[str] = Field(default=None, description="ACSI role (server/client)")
     ws_mode: Optional[str] = Field(default=None, description="WebSocket mode")

@@ -952,6 +952,7 @@ async def create_connection(request: ConnectionCreateRequest):
         name=request.name,
         host=request.host,
         port=request.port,
+        ws_port=request.ws_port,
         conn_type=request.type,
         acsi=request.acsi,
         ws_mode=request.ws_mode,
@@ -1048,6 +1049,8 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         connection['host'] = request.host
     if request.port is not None:
         connection['port'] = request.port
+    if request.ws_port is not None:
+        connection['ws_port'] = request.ws_port
     if request.type is not None:
         connection['type'] = request.type
     if request.acsi is not None:

@@ -149,17 +149,22 @@ class ConnectionManager:
                        realm: Optional[str] = None, token_endpoint: Optional[str] = None,
                        client_id: Optional[str] = None, client_secret: Optional[str] = None,
                        enable_token_refresh: Optional[bool] = None, idp_server: Optional[str] = None,
-                       auto_discovered: bool = False) -> Dict:
+                       auto_discovered: bool = False, ws_port: Optional[int] = None) -> Dict:
         """Add a new connection.
 
         Args:
             name: Human-readable name for the connection
-            host: Hostname or IP address
-            port: Port number
+            host: Hostname or IP address of the endpoint's BFF server
+            port: Port number of the endpoint's BFF server (used for /api/execute proxying)
             conn_type: Type of endpoint
             acsi: ACSI role (server/client)
             ws_mode: WebSocket mode
             auto_discovered: Whether this connection was auto-discovered
+            ws_port: Port the RTI-SO instance's own WebSocket (Passive) endpoint
+                listens on - distinct from `port` above (the BFF server port),
+                and only meaningful for RTI-SO connections. An RTI-FSP's
+                "Start Server" dials out to this SO-side ws_port/host, not to
+                the SO's BFF port.
 
         Returns:
             The created connection dictionary.
@@ -222,6 +227,8 @@ class ConnectionManager:
                 connection_in_file['type'] = conn_type
                 connection_in_file['acsi'] = acsi
                 connection_in_file['ws_mode'] = ws_mode
+                if ws_port is not None:
+                    connection_in_file['ws_port'] = ws_port
 
                 # Update OAuth fields for non-IDP-Server types
                 oauth_fields = {}
@@ -271,6 +278,7 @@ class ConnectionManager:
             'name': name,
             'host': host,
             'port': port,
+            'ws_port': ws_port,
             'type': conn_type,
             'acsi': acsi,
             'ws_mode': ws_mode,
