@@ -14,6 +14,7 @@ Features:
 
 from __future__ import annotations
 
+import ast
 from datetime import datetime
 import json
 import os
@@ -25,7 +26,7 @@ import threading
 import time
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request, HTTPException, status, Body
+from fastapi import FastAPI, Request, HTTPException, status, Body, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -166,6 +167,167 @@ conn_manager = ConnectionManager(bff_clients=_bff_clients, connections_file=CONN
 data_manager = DataManager(conn_manager, logger)
 
 
+# ==================== Browser Push Relay (WebSocket) ====================
+#
+# The HMI used to learn about connection/message changes purely by polling
+# (every 1s for connections, every 5-10s per open MessageMonitor/action log).
+# This hub fans out server-pushed updates to every connected browser tab over
+# a single /ws endpoint, and push_relay_loop() is the one place that polls the
+# RTI-SO/RTI-FSP instances on their behalf, so N open tabs cost one poll
+# cycle instead of N.
+
+class WSHub:
+    """Tracks connected browser WebSocket clients and broadcasts JSON messages."""
+
+    def __init__(self) -> None:
+        self._clients: set[WebSocket] = set()
+        self._lock = asyncio.Lock()
+
+    async def register(self, ws: WebSocket) -> None:
+        async with self._lock:
+            self._clients.add(ws)
+
+    async def unregister(self, ws: WebSocket) -> None:
+        async with self._lock:
+            self._clients.discard(ws)
+
+    async def broadcast(self, message: Dict[str, Any]) -> None:
+        async with self._lock:
+            clients = list(self._clients)
+        if not clients:
+            return
+        dead = []
+        for ws in clients:
+            try:
+                await ws.send_json(message)
+            except Exception:
+                dead.append(ws)
+        if dead:
+            async with self._lock:
+                for ws in dead:
+                    self._clients.discard(ws)
+
+
+ws_hub = WSHub()
+
+# Tracks the highest message "id" already relayed per "host:port" target, so
+# push_relay_loop() only broadcasts messages a browser hasn't seen yet.
+_last_relayed_message_id: Dict[str, int] = {}
+
+
+def _parse_status_repr(raw: Any) -> Optional[Dict[str, Any]]:
+    """Parse the FSP's /api/status 'status' field.
+
+    fsp/acsi_server.py's api_status() returns str(dict) - a Python repr
+    (single-quoted, True/False/None) rather than JSON - so json.loads can't
+    read it. ast.literal_eval parses that safely without eval().
+    """
+    if isinstance(raw, dict):
+        return raw
+    if not isinstance(raw, str):
+        return None
+    try:
+        parsed = ast.literal_eval(raw)
+        return parsed if isinstance(parsed, dict) else None
+    except (ValueError, SyntaxError):
+        return None
+
+
+async def _fetch_fsp_client_count(con: Dict[str, Any]) -> Tuple[str, int]:
+    """Look up an RTI-FSP connection's live connected-client count."""
+    key = f"{con.get('host')}:{con.get('port')}"
+    client = _bff_clients.get(key)
+    if not client:
+        return con.get("name"), 0
+    try:
+        result = await asyncio.to_thread(client.request, "GET", "/api/status")
+        parsed = _parse_status_repr(result.get("status")) if isinstance(result, dict) else None
+        if parsed and parsed.get("status") == "listening":
+            return con.get("name"), parsed.get("connectedClients", 0) or 0
+    except Exception:
+        pass
+    return con.get("name"), 0
+
+
+async def _build_enriched_connections() -> List[Dict[str, Any]]:
+    """Mirror the HMI's former client-side enrichFspClientCounts, server-side."""
+    conns = conn_manager.connections
+    fsp_conns = [
+        c for c in conns
+        if c.get("type") == "RTI-FSP" and c.get("status") == "connected"
+        and c.get("host") and c.get("port")
+    ]
+    counts: Dict[str, int] = {}
+    if fsp_conns:
+        results = await asyncio.gather(
+            *(_fetch_fsp_client_count(c) for c in fsp_conns),
+            return_exceptions=True
+        )
+        for r in results:
+            if isinstance(r, tuple):
+                counts[r[0]] = r[1]
+
+    enriched = []
+    for con in conns:
+        entry = dict(con)
+        if con.get("type") == "RTI-FSP":
+            entry["connectedClients"] = counts.get(con.get("name"), 0)
+        enriched.append(entry)
+    return enriched
+
+
+async def _relay_new_messages(target_key: str, client: BffClient) -> None:
+    """Broadcast any protocol messages logged by `target_key` since the last cycle."""
+    try:
+        result = await asyncio.to_thread(client.request, "GET", "/api/messages")
+    except Exception:
+        return
+    messages = result.get("messages") if isinstance(result, dict) else None
+    if not messages:
+        return
+
+    last_id = _last_relayed_message_id.get(target_key, 0)
+    current_max = max((m.get("id", 0) for m in messages if isinstance(m, dict)), default=0)
+    if current_max < last_id:
+        # message ids reset - the instance restarted (or logs were cleared).
+        last_id = 0
+
+    new_items = [m for m in messages if isinstance(m, dict) and m.get("id", 0) > last_id]
+    if not new_items:
+        return
+
+    _last_relayed_message_id[target_key] = current_max
+    await ws_hub.broadcast({"type": "messages", "target": target_key, "data": new_items})
+
+
+async def push_relay_loop(interval: float = 2.0) -> None:
+    """Background task: poll once centrally, push deltas to every browser tab."""
+    last_connections_snapshot: Optional[str] = None
+    while True:
+        try:
+            enriched = await _build_enriched_connections()
+            snapshot = json.dumps(enriched, sort_keys=True, default=str)
+            if snapshot != last_connections_snapshot:
+                last_connections_snapshot = snapshot
+                await ws_hub.broadcast({"type": "connections", "data": enriched})
+
+            live_targets = [
+                (f"{c['host']}:{c['port']}", _bff_clients.get(f"{c['host']}:{c['port']}"))
+                for c in conn_manager.connections
+                if c.get("type") in ("RTI-SO", "RTI-FSP")
+                and c.get("status") == "connected"
+                and c.get("host") and c.get("port")
+            ]
+            await asyncio.gather(*(
+                _relay_new_messages(key, client)
+                for key, client in live_targets if client is not None
+            ))
+        except Exception:
+            logger.exception("push_relay_loop iteration failed")
+
+        await asyncio.sleep(interval)
+
+
 # ==================== FastAPI Application Setup ====================
 from contextlib import asynccontextmanager
 
@@ -178,6 +340,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(
         conn_manager.status_monitor(interval=10)
     )
+    asyncio.create_task(push_relay_loop(interval=2))
 
     yield
 
@@ -237,6 +400,30 @@ app.add_middleware(
 
 
 # ==================== API Endpoints ====================
+
+# -------------------- Live Updates (WebSocket) --------------------
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Browser-facing push channel.
+
+    The HMI connects once and receives {"type": "connections", "data": [...]}
+    and {"type": "messages", "target": "host:port", "data": [...]} events from
+    push_relay_loop() instead of polling. Clients don't need to send
+    anything; the receive loop below exists only to detect disconnects.
+    """
+    await websocket.accept()
+    await ws_hub.register(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        await ws_hub.unregister(websocket)
+
 
 # -------------------- Health & Status --------------------
 

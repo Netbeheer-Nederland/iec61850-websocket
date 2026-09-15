@@ -14,6 +14,7 @@ import Setup from './pages/Setup';
 import ACSIClient from './pages/ACSIClient';
 import ACSIServer from './pages/ACSIServer';
 import { executeApiCall, buildTargetValue } from './services/apiService';
+import { connect as connectLiveSocket, reconnect as reconnectLiveSocket, subscribe as subscribeLive } from './services/liveSocket';
 
 function App() {
   const [bffStatus, setBffStatus] = useState({
@@ -130,12 +131,36 @@ function App() {
     fetchConnections();
   }, [fetchConnections]);
 
+  // Live updates: the BFF pushes connection changes over /ws (see
+  // push_relay_loop in bff/bff_server.py) instead of every tab polling
+  // /api/connections on its own 1s timer. Falls back to nothing if the
+  // socket is down - fetchConnections() above still covers first paint, and
+  // onReload (passed to pages below) still works as a manual refresh.
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchConnections({ background: true});
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [fetchConnections]);
+    connectLiveSocket();
+    const unsubscribe = subscribeLive('connections', (msg) => {
+      const enriched = Array.isArray(msg.data) ? msg.data : [];
+      const changed = JSON.stringify(enriched) !== JSON.stringify(connectionsRef.current);
+      if (changed) {
+        connectionsRef.current = enriched;
+        setConnections(enriched);
+      }
+      setConnectionsLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Reconnect the live socket when the BFF host/port changes (not on the
+  // initial mount, which already connects above), so it points at the right
+  // server instead of silently going stale.
+  const liveSocketMountedRef = useRef(false);
+  useEffect(() => {
+    if (!liveSocketMountedRef.current) {
+      liveSocketMountedRef.current = true;
+      return;
+    }
+    reconnectLiveSocket();
+  }, [settings.bffHost, settings.bffPort]);
 
   // Load settings from localStorage
   useEffect(() => {
