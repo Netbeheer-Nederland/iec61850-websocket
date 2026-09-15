@@ -804,6 +804,26 @@ body {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+/* Read-only/disabled fields (e.g. ACSI/WebSocket Mode for RTI-SO/RTI-FSP,
+   Certificate Endpoint) - visually recede instead of looking like a normal
+   editable field with the browser's default (often barely-different) look. */
+.form-group input:read-only,
+.form-group input:disabled,
+.form-group select:disabled,
+.form-group textarea:read-only,
+.form-group textarea:disabled {
+    background: var(--bg-card);
+    color: var(--text-muted);
+    border-style: dashed;
+    cursor: not-allowed;
+}
+
+.form-group input:read-only:focus,
+.form-group input:disabled:focus {
+    border-color: var(--border-color);
+    box-shadow: none;
+}
+
 .setting-item input[type="checkbox"] {
     width: auto;
     margin-right: 8px;
