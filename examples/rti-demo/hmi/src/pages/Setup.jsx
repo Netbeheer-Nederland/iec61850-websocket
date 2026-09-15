@@ -11,6 +11,10 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
     name: '',
     host: '',
     port: 5000,
+    // Only meaningful for RTI-SO: the port its own WebSocket (Passive)
+    // endpoint listens on, distinct from `port` above (that instance's
+    // BFF server port, used for every /api/execute call to it).
+    ws_port: '',
     type: 'RTI-SO',
     acsi: 'server',
     ws_mode: '',
@@ -54,7 +58,7 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
   // Add connection
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false, idp_server: '' });
+    setFormData({ name: '', host: '', port: 5000, ws_port: '', type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false, idp_server: '' });
     setShowModal(true);
   };
 
@@ -138,6 +142,7 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
       name: conn.name || '',
       host: conn.host || '',
       port: conn.port || 5000,
+      ws_port: conn.ws_port || '',
       type: conn.type || 'RTI-SO',
       acsi: conn.acsi || 'server',
       ws_mode: conn.ws_mode || '',

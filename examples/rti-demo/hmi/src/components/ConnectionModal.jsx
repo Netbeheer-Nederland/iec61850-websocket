@@ -339,6 +339,7 @@ function ConnectionModal({
 
   const isGeneric = formData.type === 'Generic';
   const isIDP = formData.type === 'IDP-Server';
+  const isSO = formData.type === 'RTI-SO';
 
   return (
     <>
@@ -378,22 +379,43 @@ function ConnectionModal({
                 <>
                   <div className="form-group">
                     <label htmlFor="host">Host</label>
-                    <input 
-                      type="text" 
-                      id="host" 
-                      value={formData.host} 
+                    <input
+                      type="text"
+                      id="host"
+                      value={formData.host}
                       onChange={handleInputChange}
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="port">Port</label>
-                    <input 
-                      type="number" 
-                      id="port" 
-                      value={formData.port} 
+                    <label htmlFor="port">{isSO ? 'BFF Port' : 'Port'}</label>
+                    <input
+                      type="number"
+                      id="port"
+                      value={formData.port}
                       onChange={handleInputChange}
                     />
+                    {isSO && (
+                      <small style={{ color: 'var(--text-muted)' }}>
+                        Port this instance's own BFF server listens on (used for all API calls to it).
+                      </small>
+                    )}
                   </div>
+                  {isSO && (
+                    <div className="form-group">
+                      <label htmlFor="ws_port">WS Port</label>
+                      <input
+                        type="number"
+                        id="ws_port"
+                        value={formData.ws_port}
+                        placeholder="8765"
+                        onChange={handleInputChange}
+                      />
+                      <small style={{ color: 'var(--text-muted)' }}>
+                        Port this instance's own WebSocket (Passive) endpoint
+                        listens on - distinct from the BFF port above.
+                      </small>
+                    </div>
+                  )}
                 </>
               )}
               {!isIDP && (

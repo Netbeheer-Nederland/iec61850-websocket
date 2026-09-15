@@ -14,11 +14,17 @@ const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG
 const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connections: propConnections = [] }) => {
   const location = useLocation();
   const endpoint = location.state?.endpoint;
-  // Store the original API endpoint (BFF) - this is used for all API calls
-  // WS host/port are only used in the body of connect/disconnect calls
+  // Two distinct ports for an RTI-SO instance:
+  // - apiTarget (endpoint.host:endpoint.port) is its BFF server - every
+  //   /api/execute call in this file goes there.
+  // - wsHost/wsPort is its own WebSocket (Passive) endpoint - the address
+  //   an RTI-FSP dials into. Seeded from the connection's stored ws_port
+  //   (falling back to the historical 8765 default only if that isn't set
+  //   yet), then kept in sync with the live status response below once
+  //   connected.
   const apiTarget = endpoint ? `${endpoint.host}:${endpoint.port}` : null;
-  const [wsHost, setWsHost] = useState('127.0.0.1');
-  const [wsPort, setWsPort] = useState(8765);
+  const [wsHost, setWsHost] = useState(endpoint?.host || '127.0.0.1');
+  const [wsPort, setWsPort] = useState(endpoint?.ws_port || 8765);
   const [wsCp, setWsCp] = useState(endpoint?.cp || 'cp1');
   const [connected, setConnected] = useState(() => localStorage.getItem('acsi-connected') === 'true');
   const [clientTrees, setClientTrees] = useState({}); // cp -> tree object, keyed so each client keeps its own model
@@ -897,9 +903,20 @@ const getContextMenuItems = () => {
         </div>
       </div>
 
-      {/* Connection Section */}
-      <div className="acsi-connection-section" style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginBottom: '24px' }}>
+      {/* Connection Section - two distinct ports, shown explicitly so
+          they're never confused: the BFF server this page talks to via
+          /api/execute, and this instance's own WebSocket (Passive)
+          endpoint that an RTI-FSP dials into. */}
+      <div className="acsi-connection-section" style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
 
+        <div className="form-group">
+          <label htmlFor="acsi-client-bff-host">BFF Host</label>
+          <input type="text" id="acsi-client-bff-host" value={endpoint?.host || ''} placeholder="—" disabled />
+        </div>
+        <div className="form-group">
+          <label htmlFor="acsi-client-bff-port">BFF Port</label>
+          <input type="number" id="acsi-client-bff-port" value={endpoint?.port || ''} placeholder="—" disabled />
+        </div>
         <div className="form-group">
           <label htmlFor="acsi-client-ws-host-page">WS Host</label>
           <input type="text" id="acsi-client-ws-host-page" value={wsHost} placeholder="0.0.0.0" disabled />

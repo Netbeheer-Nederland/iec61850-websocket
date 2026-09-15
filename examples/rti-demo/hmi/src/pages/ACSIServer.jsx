@@ -107,7 +107,14 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       // (e.g. left over from a prior instance, or the BFF's own port if
       // nothing else had set it), so switching instances silently kept
       // talking to the wrong port.
-      setPort(String(inst.port || 8765));
+      //
+      // This is the SO's *WebSocket* port (ws_port) - the address this FSP
+      // dials out to - not its BFF server port (inst.port, used for
+      // /api/execute calls to that SO instance). Left blank rather than
+      // falling back to inst.port when ws_port isn't set on the connection,
+      // so a misconfigured instance is visibly incomplete instead of
+      // silently pointing at the wrong port again.
+      setPort(inst.ws_port ? String(inst.ws_port) : '');
       setCp(inst.cp || 'cp1');
       // FSP only ever supports "active" mode (see fsp/bff_endpoint.py's
       // /start), and connection entries don't carry a per-instance mode -
@@ -251,11 +258,15 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
 
   useEffect(() => {
   if (initialSyncDoneRef.current) return;
-    if (!endpointTarget) return;
 
     const syncInitialConfig = async () => {
       if (connected) {
-        // Already connected — trust the live server's own reported config
+        // Already connected — trust the live server's own reported config.
+        // (Only this branch needs endpointTarget - the "resolve which
+        // instance to auto-select" branch below doesn't have one yet until
+        // it runs, since host/port start blank and endpointTarget is
+        // derived from them.)
+        if (!endpointTarget) return;
         try {
           const result = await executeApiCall('status', endpointTarget, null);
           if (result?.ok) {
@@ -295,7 +306,9 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
 
         if (inst) {
           setHost(inst.host || '');
-          setPort(String(inst.port || 8765));
+          // See the identical comment in handleInstanceSelect: this is the
+          // SO's ws_port (WS listen port), not its BFF port (inst.port).
+          setPort(inst.ws_port ? String(inst.ws_port) : '');
           setCp(inst.cp || 'cp1');
           setMode('active');
         }
@@ -759,12 +772,14 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       <div className="acsi-connection-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
           <div className="form-group">
-            <label>Instance</label>
-            <select value={selectedInstanceName} onChange={handleInstanceSelect} disabled={loading}>
+            <label htmlFor="acsi-server-instance-select">Instance</label>
+            <select id="acsi-server-instance-select" value={selectedInstanceName} onChange={handleInstanceSelect} disabled={loading}>
               <option value="" disabled>Select instance...</option>
               {fspInstances.map(inst => (
                 <option key={inst.name} value={inst.name}>
-                  {inst.name} ({inst.host}:{inst.port})
+                  {/* WS address this instance's Passive endpoint listens on
+                      (what this page will dial into) - not its BFF port. */}
+                  {inst.name} ({inst.host}:{inst.ws_port || 'ws port not set'})
                 </option>
               ))}
               <option value="custom">Custom...</option>
@@ -777,8 +792,9 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             instance's own configuration. */}
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
           <div className="form-group">
-            <label>WS Host</label>
+            <label htmlFor="acsi-server-ws-host">WS Host</label>
             <input
+              id="acsi-server-ws-host"
               type="text"
               value={host}
               placeholder="0.0.0.0"
@@ -787,8 +803,9 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             />
           </div>
           <div className="form-group">
-            <label>WS Port</label>
+            <label htmlFor="acsi-server-ws-port">WS Port</label>
             <input
+              id="acsi-server-ws-port"
               type="number"
               value={port}
               placeholder="8765"
@@ -797,8 +814,9 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             />
           </div>
           <div className="form-group">
-            <label>WS CP</label>
+            <label htmlFor="acsi-server-ws-cp">WS CP</label>
             <input
+              id="acsi-server-ws-cp"
               type="text"
               value={cp}
               placeholder="cp1"
@@ -807,8 +825,9 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             />
           </div>
           <div className="form-group">
-            <label>WS Mode</label>
+            <label htmlFor="acsi-server-ws-mode">WS Mode</label>
             <select
+              id="acsi-server-ws-mode"
               value={mode}
               onChange={(e) => setMode(e.target.value)}
               disabled={loading || !isCustomInstance}
