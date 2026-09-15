@@ -20,3 +20,17 @@ dependencies = [
     "websockets>=16.1",
     "werkzeug==3.0.1",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest >= 9.0.0",
+    "pytest-asyncio >= 1.3.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "unit: fast, isolated unit tests (no Docker/network required)",
+    "integration: integration tests requiring live Docker containers",
+]
