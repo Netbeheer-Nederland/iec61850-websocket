@@ -207,6 +207,20 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
       // For now, we'll include it in the save
       const saveData = { ...formData };
 
+      // ws_port only applies to RTI-SO (see ConnectionModal.jsx) - for every
+      // other type formData.ws_port is just leftover '' from the shared
+      // initial state, and the backend's ws_port field is a plain
+      // Optional[int]: sending "" for it 400s ("unable to parse string as
+      // an integer"). For RTI-SO itself, blank still shouldn't be sent as
+      // "" either - default it instead, so a freshly registered instance
+      // always has a usable ws_port rather than needing a second edit.
+      if (saveData.type === 'RTI-SO') {
+        const parsedWsPort = Number(saveData.ws_port);
+        saveData.ws_port = Number.isFinite(parsedWsPort) && parsedWsPort > 0 ? parsedWsPort : 8765;
+      } else {
+        delete saveData.ws_port;
+      }
+
       if (currentConnection) {
         // Update existing connection
         const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/edit-connection/${currentConnection.name}`, {

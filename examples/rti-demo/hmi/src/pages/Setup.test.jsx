@@ -68,3 +68,55 @@ describe('Setup page - Register/Edit Instance modal', () => {
     expect(screen.queryByLabelText('WS Port')).not.toBeInTheDocument();
   });
 });
+
+describe('Setup page - saving connections', () => {
+  const lastSaveBody = () => {
+    const call = global.fetch.mock.calls.find(([url]) => String(url).includes('/api/add-connection'));
+    return JSON.parse(call[1].body);
+  };
+
+  it('omits ws_port entirely when saving an RTI-FSP (it has no such property)', async () => {
+    renderSetup();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.selectOptions(screen.getByLabelText('Type'), 'RTI-FSP');
+    await u.type(screen.getByLabelText('Name'), 'fsp1');
+    await u.type(screen.getByLabelText('Host'), '10.0.0.2');
+
+    await u.click(screen.getByRole('button', { name: /save instance/i }));
+
+    // Previously sent as "" (leftover from the shared initial formData),
+    // which the backend's Optional[int] field rejected outright:
+    // {"detail":[{"type":"int_parsing", ..., "input":""}]}.
+    expect(lastSaveBody()).not.toHaveProperty('ws_port');
+  });
+
+  it('defaults ws_port for an RTI-SO connection left blank, instead of sending ""', async () => {
+    renderSetup();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.type(screen.getByLabelText('Name'), 'so1');
+    await u.type(screen.getByLabelText('Host'), '10.0.0.1');
+    // WS Port left untouched (blank).
+
+    await u.click(screen.getByRole('button', { name: /save instance/i }));
+
+    expect(lastSaveBody().ws_port).toBe(8765);
+  });
+
+  it('keeps a real ws_port value the user entered for RTI-SO', async () => {
+    renderSetup();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.type(screen.getByLabelText('Name'), 'so1');
+    await u.type(screen.getByLabelText('Host'), '10.0.0.1');
+    await u.type(screen.getByLabelText('WS Port'), '9001');
+
+    await u.click(screen.getByRole('button', { name: /save instance/i }));
+
+    expect(lastSaveBody().ws_port).toBe(9001);
+  });
+});
