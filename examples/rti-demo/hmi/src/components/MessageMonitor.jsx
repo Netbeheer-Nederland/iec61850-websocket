@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { executeApiCall, buildTargetValue } from '../services/apiService';
+import { subscribe as subscribeLive, isConnected as isLiveConnected, onConnectionStateChange } from '../services/liveSocket';
 
 /**
  * MessageMonitor component for monitoring WebSocket messages from endpoints
@@ -33,17 +34,40 @@ function MessageMonitor({
     return executeApiCall('messages', targetValue, {});
   }, []);
 
+  // Append new messages, deduping by id (shared by both the HTTP catch-up
+  // fetch below and the live WS push path).
+  const ingestMessages = useCallback((msgs) => {
+    if (!Array.isArray(msgs) || msgs.length === 0) return;
+
+    const uniqueMsgs = msgs.filter(msg => {
+      const msgId = msg.id || msg.message || JSON.stringify(msg);
+      if (messageIdsRef.current.has(msgId)) {
+        return false; // Duplicate
+      }
+      messageIdsRef.current.add(msgId);
+      return true;
+    });
+
+    if (uniqueMsgs.length > 0) {
+      setMessages(prev => [...prev, ...uniqueMsgs]);
+    }
+
+    if (selectedEndpoint) {
+      setStatus(`Monitoring ${selectedEndpoint.name || selectedEndpoint.host}:${selectedEndpoint.port} (${messageIdsRef.current.size} messages)`);
+    }
+  }, [selectedEndpoint]);
+
   const fetchMessages = useCallback(async () => {
     if (!selectedEndpoint) return;
-    
+
     try {
       const targetValue = buildTargetValue(selectedEndpoint.host, selectedEndpoint.port);
       const result = await getMessagesApi(targetValue);
-      
+
       if (result?.ok && result.payload) {
         // Handle the messages response
         let msgs = result.payload;
-        
+
         // Normalize the response - handle different possible structures
         if (msgs.messages) {
           msgs = msgs.messages;
@@ -52,36 +76,34 @@ function MessageMonitor({
         } else if (msgs.result?.payload?.messages) {
           msgs = msgs.result.payload.messages;
         }
-        
+
         if (Array.isArray(msgs)) {
-          // Filter out duplicates based on message id
-          const uniqueMsgs = msgs.filter(msg => {
-            const msgId = msg.id || msg.message || JSON.stringify(msg);
-            if (messageIdsRef.current.has(msgId)) {
-              return false; // Duplicate
-            }
-            messageIdsRef.current.add(msgId);
-            return true;
-          });
-          
-          if (uniqueMsgs.length > 0) {
-            setMessages(prev => [...prev, ...uniqueMsgs]);
-          }
-        } else if (typeof msgs === 'object') {
-          const msgId = msgs.id || msgs.message || JSON.stringify(msgs);
-          if (!messageIdsRef.current.has(msgId)) {
-            messageIdsRef.current.add(msgId);
-            setMessages(prev => [...prev, msgs]);
-          }
+          ingestMessages(msgs);
+        } else if (msgs && typeof msgs === 'object') {
+          ingestMessages([msgs]);
         }
-        
-        setStatus(`Monitoring ${selectedEndpoint.name || selectedEndpoint.host}:${selectedEndpoint.port} (${messageIdsRef.current.size} messages)`);
       }
     } catch (error) {
       console.error('Failed to fetch messages:', error);
       setStatus(`Error: ${error.message || 'Failed to fetch messages'}`);
     }
-  }, [selectedEndpoint, getMessagesApi]);
+  }, [selectedEndpoint, getMessagesApi, ingestMessages]);
+
+  // Fallback HTTP polling - only runs while the live push socket (see
+  // services/liveSocket.js) is down. When it's up, the BFF pushes new
+  // messages as they're logged (see push_relay_loop in bff_server.py) and
+  // this interval stays cleared.
+  const startPolling = useCallback(() => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingRef.current = setInterval(fetchMessages, currentIntervalRef.current);
+  }, [fetchMessages]);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
 
   // Start monitoring
   const startMonitoring = useCallback(() => {
@@ -89,31 +111,53 @@ function MessageMonitor({
       setStatus('Please select an endpoint first');
       return;
     }
-    
+
     setIsMonitoring(true);
     setStatus(`Starting monitoring for ${selectedEndpoint.name || selectedEndpoint.host}...`);
-    
-    // Clear existing poll
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-    }
-    
-    // Fetch immediately
+
+    // Catch up on anything already logged, then rely on the live push
+    // subscription below for new messages - falling back to polling only if
+    // the socket isn't connected.
     fetchMessages();
-    
-    // Set up polling using the current interval from ref
-    pollingRef.current = setInterval(fetchMessages, currentIntervalRef.current);
-  }, [selectedEndpoint, fetchMessages]);
+    if (!isLiveConnected()) {
+      startPolling();
+    }
+  }, [selectedEndpoint, fetchMessages, startPolling]);
 
   // Stop monitoring
   const stopMonitoring = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
+    stopPolling();
     setIsMonitoring(false);
     setStatus('Monitoring stopped');
-  }, []);
+  }, [stopPolling]);
+
+  // Live push: while monitoring, ingest messages the BFF relays for this
+  // endpoint's target instead of waiting for the next poll.
+  useEffect(() => {
+    if (!isMonitoring || !selectedEndpoint) return undefined;
+    const targetValue = buildTargetValue(selectedEndpoint.host, selectedEndpoint.port);
+    return subscribeLive('messages', (msg) => {
+      if (msg.target === targetValue) {
+        ingestMessages(msg.data);
+      }
+    });
+  }, [isMonitoring, selectedEndpoint, ingestMessages]);
+
+  // If the socket drops while monitoring, fall back to polling so messages
+  // keep arriving; once it's back, stop polling and catch up on anything
+  // missed while it was down (the push channel only carries new messages
+  // going forward, not a backlog).
+  useEffect(() => {
+    if (!isMonitoring) return undefined;
+    return onConnectionStateChange((connected) => {
+      if (connected) {
+        stopPolling();
+        fetchMessages();
+      } else {
+        startPolling();
+      }
+    });
+  }, [isMonitoring, startPolling, stopPolling, fetchMessages]);
 
   // Clear messages - both locally and on the server
   const clearMessages = useCallback(async () => {
@@ -142,13 +186,13 @@ function MessageMonitor({
     const newInterval = parseInt(e.target.value, 10);
     setInterval(newInterval);
     currentIntervalRef.current = newInterval;
-    
-    // If currently monitoring, restart with new interval from ref
+
+    // Only relevant if fallback polling is actually running (i.e. the live
+    // socket is down); restart it with the new interval.
     if (isMonitoring && pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = setInterval(fetchMessages, currentIntervalRef.current);
+      startPolling();
     }
-  }, [isMonitoring, fetchMessages]);
+  }, [isMonitoring, startPolling]);
 
   // Clean up on unmount
   useEffect(() => {
