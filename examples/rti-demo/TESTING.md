@@ -40,7 +40,7 @@ directory - the one this file lives in).
 
 ```bash
 cd examples/rti-demo
-uv sync
+uv sync --active
 ```
 
 This creates/updates `.venv` inside `examples/rti-demo` and installs
