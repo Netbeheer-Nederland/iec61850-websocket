@@ -67,6 +67,52 @@ describe('Setup page - Register/Edit Instance modal', () => {
     expect(screen.getByLabelText('BFF Port')).toBeInTheDocument();
     expect(screen.queryByLabelText('WS Port')).not.toBeInTheDocument();
   });
+
+  it('shows ACSI/WebSocket Mode as read-only text (not a dropdown) for RTI-SO', async () => {
+    renderSetup();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+
+    const acsi = screen.getByLabelText('ACSI');
+    const wsMode = screen.getByLabelText('WebSocket Mode');
+    expect(acsi.tagName).toBe('INPUT');
+    expect(acsi).toHaveAttribute('readonly');
+    expect(acsi).toHaveValue('Client');
+    expect(wsMode.tagName).toBe('INPUT');
+    expect(wsMode).toHaveAttribute('readonly');
+    expect(wsMode).toHaveValue('Passive');
+  });
+
+  it('shows ACSI/WebSocket Mode as read-only text for RTI-FSP too', async () => {
+    renderSetup();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.selectOptions(screen.getByLabelText('Type'), 'RTI-FSP');
+
+    const acsi = screen.getByLabelText('ACSI');
+    const wsMode = screen.getByLabelText('WebSocket Mode');
+    expect(acsi.tagName).toBe('INPUT');
+    expect(acsi).toHaveValue('Server');
+    expect(wsMode.tagName).toBe('INPUT');
+    expect(wsMode).toHaveValue('Active');
+  });
+
+  it('keeps ACSI/WebSocket Mode as real, editable dropdowns for Generic', async () => {
+    renderSetup();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.selectOptions(screen.getByLabelText('Type'), 'Generic');
+
+    const acsi = screen.getByLabelText('ACSI');
+    const wsMode = screen.getByLabelText('WebSocket Mode');
+    expect(acsi.tagName).toBe('SELECT');
+    expect(acsi).toBeEnabled();
+    expect(wsMode.tagName).toBe('SELECT');
+    expect(wsMode).toBeEnabled();
+  });
 });
 
 describe('Setup page - saving connections', () => {

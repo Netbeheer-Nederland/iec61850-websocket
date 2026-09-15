@@ -429,28 +429,47 @@ function ConnectionModal({
                 <>
                   <div className="form-group">
                     <label htmlFor="acsi">ACSI</label>
-                    <select 
-                      id="acsi" 
-                      value={formData.acsi || 'server'}
-                      onChange={handleInputChange}
-                      disabled={!isGeneric}
-                    >
-                      <option value="server">Server</option>
-                      <option value="client">Client</option>
-                    </select>
+                    {isGeneric ? (
+                      <select
+                        id="acsi"
+                        value={formData.acsi || 'server'}
+                        onChange={handleInputChange}
+                      >
+                        <option value="server">Server</option>
+                        <option value="client">Client</option>
+                      </select>
+                    ) : (
+                      // RTI-SO/RTI-FSP: fixed by type, not a real choice -
+                      // shown as a read-only field, not a dropdown that
+                      // looks editable but isn't.
+                      <input
+                        type="text"
+                        id="acsi"
+                        readOnly
+                        value={formData.acsi === 'client' ? 'Client' : 'Server'}
+                      />
+                    )}
                   </div>
                   <div className="form-group">
                     <label htmlFor="ws_mode">WebSocket Mode</label>
-                    <select 
-                      id="ws_mode" 
-                      value={formData.ws_mode || ''}
-                      onChange={handleInputChange}
-                      disabled={!isGeneric}
-                    >
-                      <option value="">Select mode...</option>
-                      <option value="active">Active</option>
-                      <option value="passive">Passive</option>
-                    </select>
+                    {isGeneric ? (
+                      <select
+                        id="ws_mode"
+                        value={formData.ws_mode || ''}
+                        onChange={handleInputChange}
+                      >
+                        <option value="">Select mode...</option>
+                        <option value="active">Active</option>
+                        <option value="passive">Passive</option>
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        id="ws_mode"
+                        readOnly
+                        value={formData.ws_mode === 'active' ? 'Active' : formData.ws_mode === 'passive' ? 'Passive' : ''}
+                      />
+                    )}
                   </div>
                 </>
               )}

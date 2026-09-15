@@ -20,8 +20,11 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
     // being empty.
     ws_port: 8765,
     type: 'RTI-SO',
-    acsi: 'server',
-    ws_mode: '',
+    // Matches type: 'RTI-SO' (client/passive) - ConnectionModal has a
+    // self-correcting effect for when these get out of sync with type, but
+    // starting them already-correct avoids a visible flip on first render.
+    acsi: 'client',
+    ws_mode: 'passive',
     endpoint: '',
     certificate_endpoint: '',
     auth_server_ca: '',
@@ -62,7 +65,7 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
   // Add connection
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, ws_port: 8765, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false, idp_server: '' });
+    setFormData({ name: '', host: '', port: 5000, ws_port: 8765, type: 'RTI-SO', acsi: 'client', ws_mode: 'passive', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false, idp_server: '' });
     setShowModal(true);
   };
 
