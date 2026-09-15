@@ -113,7 +113,9 @@ describe('Setup page - saving connections', () => {
     await u.click(screen.getByRole('button', { name: /register instance/i }));
     await u.type(screen.getByLabelText('Name'), 'so1');
     await u.type(screen.getByLabelText('Host'), '10.0.0.1');
-    await u.type(screen.getByLabelText('WS Port'), '9001');
+    const wsPortInput = screen.getByLabelText('WS Port');
+    await u.clear(wsPortInput);
+    await u.type(wsPortInput, '9001');
 
     await u.click(screen.getByRole('button', { name: /save instance/i }));
 

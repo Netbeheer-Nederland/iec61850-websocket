@@ -13,8 +13,12 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
     port: 5000,
     // Only meaningful for RTI-SO: the port its own WebSocket (Passive)
     // endpoint listens on, distinct from `port` above (that instance's
-    // BFF server port, used for every /api/execute call to it).
-    ws_port: '',
+    // BFF server port, used for every /api/execute call to it). A real
+    // default value, same as `port`'s 5000 - not just a placeholder hint -
+    // so a freshly opened "Register Instance" form shows it the same way
+    // BFF Port is shown, rather than looking prefilled while actually
+    // being empty.
+    ws_port: 8765,
     type: 'RTI-SO',
     acsi: 'server',
     ws_mode: '',
@@ -58,7 +62,7 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
   // Add connection
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, ws_port: '', type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false, idp_server: '' });
+    setFormData({ name: '', host: '', port: 5000, ws_port: 8765, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false, idp_server: '' });
     setShowModal(true);
   };
 

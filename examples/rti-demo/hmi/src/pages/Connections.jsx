@@ -9,8 +9,10 @@ function Connections({ connections, setConnections, loading = false, onReload })
     port: 5000,
     // Only meaningful for RTI-SO/Generic: the port its own WebSocket
     // (Passive) endpoint listens on - distinct from `port` above (that
-    // instance's BFF server port, used for every API call to it).
-    ws_port: '',
+    // instance's BFF server port, used for every API call to it). A real
+    // default value, same as `port`'s 5000 - not just a placeholder hint -
+    // so it's shown the same way BFF Port is on a freshly opened form.
+    ws_port: 8765,
     type: 'RTI-SO',
     acsi: 'server',
     ws_mode: '',
@@ -19,7 +21,7 @@ function Connections({ connections, setConnections, loading = false, onReload })
 
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, ws_port: '', type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '' });
+    setFormData({ name: '', host: '', port: 5000, ws_port: 8765, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '' });
     setShowModal(true);
   };
 
