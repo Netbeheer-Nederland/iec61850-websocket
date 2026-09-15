@@ -18,7 +18,12 @@ function MessageMonitor({
   showEndpointSelect = true
 }) {
   const [selectedEndpoint, setSelectedEndpoint] = useState(null);
-  const [interval, setInterval] = useState(defaultInterval);
+  // Named pollIntervalMs (not "interval") so it doesn't shadow the global
+  // window.setInterval used below to actually schedule the fallback poll -
+  // a prior version of this file did shadow it, which silently turned every
+  // setInterval(fetchMessages, ms) call into a call to the React state
+  // setter instead of scheduling a timer.
+  const [pollIntervalMs, setPollIntervalMs] = useState(defaultInterval);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [messages, setMessages] = useState([]);
   const [expandedMessageId, setExpandedMessageId] = useState(null);
@@ -184,7 +189,7 @@ function MessageMonitor({
   // Handle interval change
   const handleIntervalChange = useCallback((e) => {
     const newInterval = parseInt(e.target.value, 10);
-    setInterval(newInterval);
+    setPollIntervalMs(newInterval);
     currentIntervalRef.current = newInterval;
 
     // Only relevant if fallback polling is actually running (i.e. the live
@@ -212,8 +217,8 @@ function MessageMonitor({
 
   // Keep currentIntervalRef in sync with interval state
   useEffect(() => {
-    currentIntervalRef.current = interval;
-  }, [interval]);
+    currentIntervalRef.current = pollIntervalMs;
+  }, [pollIntervalMs]);
 
   // Format message timestamp
   const formatTimestamp = (timestamp) => {
@@ -572,9 +577,9 @@ function MessageMonitor({
             </select>
           )}
           
-          <select 
+          <select
             className="monitor-interval-select"
-            value={interval}
+            value={pollIntervalMs}
             onChange={handleIntervalChange}
             disabled={!selectedEndpoint}
           >
