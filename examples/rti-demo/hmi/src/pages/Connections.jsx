@@ -7,6 +7,10 @@ function Connections({ connections, setConnections, loading = false, onReload })
     name: '',
     host: '',
     port: 5000,
+    // Only meaningful for RTI-SO/Generic: the port its own WebSocket
+    // (Passive) endpoint listens on - distinct from `port` above (that
+    // instance's BFF server port, used for every API call to it).
+    ws_port: '',
     type: 'RTI-SO',
     acsi: 'server',
     ws_mode: '',
@@ -15,13 +19,15 @@ function Connections({ connections, setConnections, loading = false, onReload })
 
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '' });
+    setFormData({ name: '', host: '', port: 5000, ws_port: '', type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '' });
     setShowModal(true);
   };
 
   const handleEditConnection = (conn) => {
     setCurrentConnection(conn);
-    setFormData({ ...conn });
+    // ws_port defaults to '' (not undefined) for connections that predate
+    // it, so the input stays a controlled component.
+    setFormData({ ws_port: '', ...conn });
     setShowModal(true);
   };
 
@@ -42,17 +48,37 @@ function Connections({ connections, setConnections, loading = false, onReload })
     setShowModal(false);
   };
 
+  // Maps each field's DOM id to its formData key. Without this, every field
+  // below silently never updated state at all: e.target.id (e.g.
+  // "conn-host") was used directly as the formData key, which never matched
+  // the actual field name ("host") the inputs read their value from - so
+  // typing in any of them had no visible effect.
+  const CONN_FIELD_ID_MAP = {
+    'conn-name': 'name',
+    'conn-host': 'host',
+    'conn-port': 'port',
+    'conn-ws-port': 'ws_port',
+    'conn-type': 'type',
+    'conn-endpoint': 'endpoint',
+  };
+
   const handleInputChange = (e) => {
     const { id, value, type } = e.target;
+    const key = CONN_FIELD_ID_MAP[id] || id;
     setFormData(prev => ({
       ...prev,
-      [id]: type === 'number' ? parseInt(value) : value
+      [key]: type === 'number' ? parseInt(value) : value
     }));
   };
 
   const handleRefresh = () => {
     onReload?.();
   };
+
+  // RTI-SO (and a "Custom" Generic connection standing in for one) is the
+  // only type with a WebSocket endpoint of its own to configure a port
+  // for, distinct from its BFF server port.
+  const needsWsPort = formData.type === 'RTI-SO' || formData.type === 'Generic';
 
   return (
     <section className="page">
@@ -79,7 +105,8 @@ function Connections({ connections, setConnections, loading = false, onReload })
               <tr>
                 <th>Name</th>
                 <th>Host</th>
-                <th>Port</th>
+                <th>BFF Port</th>
+                <th>WS Port</th>
                 <th>Type</th>
                 <th>Endpoint</th>
                 <th>Status</th>
@@ -92,6 +119,7 @@ function Connections({ connections, setConnections, loading = false, onReload })
                   <td>{conn.name}</td>
                   <td>{conn.type === 'IDP-Server' ? '-' : conn.host}</td>
                   <td>{conn.type === 'IDP-Server' ? '-' : conn.port}</td>
+                  <td>{conn.type === 'RTI-SO' ? (conn.ws_port || '—') : '-'}</td>
                   <td>{conn.type}</td>
                   <td>{conn.type === 'IDP-Server' ? conn.endpoint : '-'}</td>
                   <td>
@@ -153,14 +181,35 @@ function Connections({ connections, setConnections, loading = false, onReload })
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="conn-port">Port</label>
-                    <input 
-                      type="number" 
-                      id="conn-port" 
-                      value={formData.port} 
+                    <label htmlFor="conn-port">{needsWsPort ? 'BFF Port' : 'Port'}</label>
+                    <input
+                      type="number"
+                      id="conn-port"
+                      value={formData.port}
                       onChange={handleInputChange}
                     />
+                    {needsWsPort && (
+                      <small style={{ color: 'var(--text-muted)' }}>
+                        Port this instance's own BFF server listens on (used for all API calls to it).
+                      </small>
+                    )}
                   </div>
+                  {needsWsPort && (
+                    <div className="form-group">
+                      <label htmlFor="conn-ws-port">WS Port</label>
+                      <input
+                        type="number"
+                        id="conn-ws-port"
+                        value={formData.ws_port}
+                        placeholder="8765"
+                        onChange={handleInputChange}
+                      />
+                      <small style={{ color: 'var(--text-muted)' }}>
+                        Port this instance's own WebSocket (Passive) endpoint
+                        listens on - distinct from the BFF port above.
+                      </small>
+                    </div>
+                  )}
                 </>
               )}
               <div className="form-group">
