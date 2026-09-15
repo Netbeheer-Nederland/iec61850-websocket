@@ -21,16 +21,22 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const portStorageKey = `acsi-server-port-${instanceId}`;
   const cpStorageKey = `acsi-server-cp-${instanceId}`;
 
-  const [host, setHost] = useState(endpoint?.host || 'rti-so');
+  // Start blank rather than guessing ("rti-so", 8765, "cp1", "active") - a
+  // real value only appears once an instance is actually resolved, either
+  // from navigation state (below) or from picking one on the page.
+  const [host, setHost] = useState(endpoint?.host || '');
   const [port, setPort] = useState(() => {
     const cachedPort = localStorage.getItem(portStorageKey);
-    return cachedPort || String(endpoint?.port || 8765);
+    return cachedPort || (endpoint?.port ? String(endpoint.port) : '');
   });
   const [cp, setCp] = useState(() => {
     const cachedCp = localStorage.getItem(cpStorageKey);
-    return cachedCp || endpoint?.cp || 'cp1';
+    return cachedCp || endpoint?.cp || '';
   });
-  const [mode, setMode] = useState(endpoint?.mode === 'passive' ? 'passive' : 'active');
+  const [mode, setMode] = useState(() => {
+    if (endpoint?.mode === 'passive') return 'passive';
+    return endpoint ? 'active' : '';
+  });
   const hostPortInitializedRef = useRef(false);
 
   const [connected, setConnected] = useState(() => localStorage.getItem(storageKey) === 'true');
@@ -85,9 +91,13 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     const value = e.target.value;
     setSelectedInstanceName(value);
     if (value === 'custom') {
-      // Fresh custom entry starts from the default port, not whatever was
-      // cached for a previously-selected instance.
-      setPort(String(8765));
+      // Fresh custom entry starts fully blank for the user to fill in, not
+      // whatever host/port/cp were left over from a previously-selected
+      // instance.
+      setHost('');
+      setPort('');
+      setCp('');
+      setMode('active');
       return;
     }
     const inst = fspInstances.find(c => c.name === value);
@@ -98,7 +108,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       // nothing else had set it), so switching instances silently kept
       // talking to the wrong port.
       setPort(String(inst.port || 8765));
-      if (inst.cp) setCp(inst.cp);
+      setCp(inst.cp || 'cp1');
+      // FSP only ever supports "active" mode (see fsp/bff_endpoint.py's
+      // /start), and connection entries don't carry a per-instance mode -
+      // but the field must have a valid value once a real instance is
+      // selected, not stay blank.
+      setMode('active');
     }
   }, [fspInstances]);
 
@@ -281,7 +296,8 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         if (inst) {
           setHost(inst.host || '');
           setPort(String(inst.port || 8765));
-          if (inst.cp) setCp(inst.cp);
+          setCp(inst.cp || 'cp1');
+          setMode('active');
         }
 
         initialSyncDoneRef.current = true;
@@ -775,6 +791,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         <div className="form-group">
           <label>WS Mode</label>
           <select value={mode} onChange={(e) => setMode(e.target.value)} disabled={loading}>
+            {!mode && <option value="" disabled>Select instance...</option>}
             <option value="active">Active</option>
             <option value="passive">Passive</option>
           </select>
