@@ -1,4 +1,13 @@
-"""Unit tests for SO ACSI-Client_WebsocketPassive BFF endpoint routes."""
+"""Unit tests for SO ACSI-Client_WebsocketPassive BFF endpoint routes.
+
+so/bff_endpoint.py is a FastAPI router (create_bff_router), mounted under
+the "/api" prefix - not the Flask blueprint this file originally tested
+against. Routes are flat (e.g. "/api/status", not
+"/api/iec61850client/status"), and a couple of routes changed method or
+name entirely: GET /connections -> POST /connections, and
+/actions + /actions/clear -> /actions-logs + /clear-logs,
+/messages/clear -> /clear-messages.
+"""
 
 from __future__ import annotations
 
@@ -6,10 +15,13 @@ import sys
 from pathlib import Path
 
 import pytest
-from flask import Flask
-import requests
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
-# Allow importing rti-demo/so modules as top-level modules.
+from tests.conftest import import_module_from_path
+
+# Allow importing rti-demo/so modules (acsi_client, pydantic_models, ...) as
+# top-level modules - so/bff_endpoint.py imports them that way itself.
 SO_DIR = Path(__file__).resolve().parents[3] / "so"
 if str(SO_DIR) not in sys.path:
     sys.path.insert(0, str(SO_DIR))
@@ -18,20 +30,27 @@ if str(SO_DIR) not in sys.path:
 pytestmark = pytest.mark.unit
 
 
+def content_type(response) -> str:
+    return response.headers.get("content-type", "")
+
+
 @pytest.fixture
 def app_client():
-    """Create a Flask app with BFF blueprint."""
-    try:
-        import bff_endpoint
-        blueprint, acsi_client = bff_endpoint.create_bff_blueprint()
-        
-        app = Flask(__name__)
-        app.config['TESTING'] = True
-        app.register_blueprint(blueprint)
-        
-        yield app.test_client(), acsi_client
-    except Exception as e:
-        pytest.skip(f"Could not initialize BFF endpoint: {e}")
+    """Create a FastAPI app wrapping the SO's BFF router."""
+    # Loaded under a unique module name, not the generic "bff_endpoint" a
+    # plain `import bff_endpoint` would use - fsp/bff_endpoint.py is also
+    # literally named "bff_endpoint.py" and would collide with it. See
+    # tests/conftest.py:import_module_from_path.
+    bff_endpoint = import_module_from_path("so_bff_endpoint", SO_DIR / "bff_endpoint.py")
+
+    app = FastAPI()
+    # create_bff_router's first parameter is typed `app: FastAPI` but isn't
+    # actually used to build the router or the ACSIClient() it wraps - it's
+    # only read by the (unrelated, unused-here) /apis discovery route.
+    router, acsi_client = bff_endpoint.create_bff_router(app)
+    app.include_router(router)
+
+    return TestClient(app), acsi_client
 
 
 class TestEndpointsExist:
@@ -40,240 +59,249 @@ class TestEndpointsExist:
     def test_status_endpoint_exists(self, app_client):
         """Test status endpoint is accessible."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/status")
+        response = client.get("/api/status")
         # Should return 200 or 500 (depending on client state), but not 404
         assert response.status_code != 404
 
     def test_connections_endpoint_exists(self, app_client):
         """Test connections endpoint is accessible."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/connections")
+        response = client.post("/api/connections", json={})
         assert response.status_code != 404
 
     def test_connect_endpoint_exists(self, app_client):
         """Test connect endpoint is accessible."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/connect", json={})
+        response = client.post("/api/connect", json={})
         # Should return 200 or error, but not 404
         assert response.status_code != 404
 
     def test_disconnect_endpoint_exists(self, app_client):
         """Test disconnect endpoint is accessible."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/disconnect")
+        response = client.post("/api/disconnect")
         assert response.status_code != 404
 
     def test_actions_endpoint_exists(self, app_client):
-        """Test actions endpoint is accessible."""
+        """Test the action log endpoint is accessible."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/actions")
+        response = client.get("/api/actions-logs")
         assert response.status_code != 404
 
     def test_clear_actions_endpoint_exists(self, app_client):
-        """Test clear actions endpoint is accessible."""
+        """Test the clear-action-log endpoint is accessible."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/actions/clear")
+        response = client.post("/api/clear-logs")
         assert response.status_code != 404
 
     def test_messages_endpoint_exists(self, app_client):
         """Test messages endpoint is accessible."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/messages")
+        response = client.get("/api/messages")
         assert response.status_code != 404
 
     def test_clear_messages_endpoint_exists(self, app_client):
         """Test clear messages endpoint is accessible."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/messages/clear")
+        response = client.post("/api/clear-messages")
         assert response.status_code != 404
 
     def test_readvalue_endpoint_exists(self, app_client):
         """Test readvalue endpoint is accessible."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/readvalue", json={})
-        # Should error (missing objRef) but not 404
+        response = client.post("/api/readvalue", json={})
+        # Should error (missing objRef, a required field) but not 404
         assert response.status_code != 404
 
     def test_writevalue_endpoint_exists(self, app_client):
         """Test writevalue endpoint is accessible."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/writevalue", json={})
-        # Should error (missing params) but not 404
+        response = client.post("/api/writevalue", json={})
+        # Should error (missing params, all required fields) but not 404
         assert response.status_code != 404
 
 
 class TestStatusEndpoint:
-    """Tests for GET /api/iec61850client/status endpoint."""
+    """Tests for GET /api/status endpoint."""
 
     def test_status_returns_json(self, app_client):
         """Test status endpoint returns JSON."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/status")
-        assert "application/json" in response.content_type
+        response = client.get("/api/status")
+        assert "application/json" in content_type(response)
 
     def test_status_returns_dict(self, app_client):
         """Test status endpoint returns a dictionary."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/status")
-        body = response.get_json()
-        assert isinstance(body, dict)
+        response = client.get("/api/status")
+        assert isinstance(response.json(), dict)
 
 
 class TestConnectionsEndpoint:
-    """Tests for GET /api/iec61850client/connections endpoint."""
+    """Tests for POST /api/connections endpoint."""
 
     def test_connections_returns_json(self, app_client):
         """Test connections endpoint returns JSON."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/connections")
-        assert "application/json" in response.content_type
+        response = client.post("/api/connections", json={})
+        assert "application/json" in content_type(response)
 
     def test_connections_returns_ok_flag(self, app_client):
         """Test connections response has ok flag."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/connections")
-        body = response.get_json()
+        response = client.post("/api/connections", json={})
+        body = response.json()
         assert "ok" in body or "status" in body
 
 
 class TestConnectEndpoint:
-    """Tests for POST /api/iec61850client/connect endpoint."""
+    """Tests for POST /api/connect endpoint."""
 
     def test_connect_invalid_port_string(self, app_client):
-        """Test connect with invalid port string returns 400."""
+        """Test connect with a non-numeric port string is rejected."""
         client, _ = app_client
         response = client.post(
-            "/api/iec61850client/connect",
+            "/api/connect",
             json={"host": "localhost", "port": "invalid"}
         )
-        assert response.status_code == 400
+        # port is a pydantic `int` field, so a non-numeric string is now
+        # rejected by request validation (422) rather than the handler's own
+        # logic (which used to return 400).
+        assert response.status_code == 422
 
     def test_connect_returns_json(self, app_client):
         """Test connect endpoint returns JSON."""
         client, _ = app_client
+        # connect() starts a background thread and returns immediately
+        # without waiting for the connection to actually succeed - safe to
+        # call for real here, nothing to mock.
         response = client.post(
-            "/api/iec61850client/connect",
+            "/api/connect",
             json={"host": "localhost", "port": 8765}
         )
-        print(response)
-        assert "application/json" in response.content_type
+        assert "application/json" in content_type(response)
 
 
 class TestDisconnectEndpoint:
-    """Tests for POST /api/iec61850client/disconnect endpoint."""
+    """Tests for POST /api/disconnect endpoint."""
 
     def test_disconnect_returns_json(self, app_client):
         """Test disconnect endpoint returns JSON."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/disconnect")
-        assert "application/json" in response.content_type
+        response = client.post("/api/disconnect")
+        assert "application/json" in content_type(response)
 
 
 class TestActionsEndpoint:
-    """Tests for GET /api/iec61850client/actions endpoint."""
+    """Tests for GET /api/actions-logs endpoint."""
 
     def test_actions_returns_json(self, app_client):
-        """Test actions endpoint returns JSON."""
+        """Test the action log endpoint returns JSON."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/actions")
-        assert "application/json" in response.content_type
+        response = client.get("/api/actions-logs")
+        assert "application/json" in content_type(response)
 
     def test_actions_returns_list(self, app_client):
-        """Test actions response contains a list."""
+        """Test action log response contains a list."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/actions")
-        body = response.get_json()
+        response = client.get("/api/actions-logs")
+        body = response.json()
         assert "actions" in body or isinstance(body, list)
 
 
 class TestClearActionsEndpoint:
-    """Tests for POST /api/iec61850client/actions/clear endpoint."""
+    """Tests for POST /api/clear-logs endpoint."""
 
     def test_clear_actions_returns_json(self, app_client):
-        """Test clear actions endpoint returns JSON."""
+        """Test clear-action-log endpoint returns JSON."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/actions/clear")
-        assert "application/json" in response.content_type
+        response = client.post("/api/clear-logs")
+        assert "application/json" in content_type(response)
 
 
 class TestMessagesEndpoint:
-    """Tests for GET /api/iec61850client/messages endpoint."""
+    """Tests for GET /api/messages endpoint."""
 
     def test_messages_returns_json(self, app_client):
         """Test messages endpoint returns JSON."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/messages")
-        assert "application/json" in response.content_type
+        response = client.get("/api/messages")
+        assert "application/json" in content_type(response)
 
     def test_messages_returns_list(self, app_client):
         """Test messages response contains a list."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/messages")
-        body = response.get_json()
+        response = client.get("/api/messages")
+        body = response.json()
         assert "messages" in body or isinstance(body, list)
 
 
 class TestClearMessagesEndpoint:
-    """Tests for POST /api/iec61850client/messages/clear endpoint."""
+    """Tests for POST /api/clear-messages endpoint."""
 
     def test_clear_messages_returns_json(self, app_client):
         """Test clear messages endpoint returns JSON."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/messages/clear")
-        assert "application/json" in response.content_type
+        response = client.post("/api/clear-messages")
+        assert "application/json" in content_type(response)
 
 
 class TestReadValueEndpoint:
-    """Tests for POST /api/iec61850client/readvalue endpoint."""
+    """Tests for POST /api/readvalue endpoint."""
 
     def test_readvalue_missing_objref(self, app_client):
-        """Test readvalue with missing objRef returns 400."""
+        """Test readvalue with a missing (required) objRef is rejected."""
         client, _ = app_client
         response = client.post(
-            "/api/iec61850client/readvalue",
+            "/api/readvalue",
             json={}
         )
-        assert response.status_code == 400
+        # objRef is a required field on ReadvalueRequest - rejected by
+        # request validation (422) before the handler runs.
+        assert response.status_code == 422
 
     def test_readvalue_error_response_is_json(self, app_client):
         """Test readvalue error response is JSON."""
         client, _ = app_client
         response = client.post(
-            "/api/iec61850client/readvalue",
+            "/api/readvalue",
             json={}
         )
-        assert "application/json" in response.content_type
+        assert "application/json" in content_type(response)
 
 
 class TestWriteValueEndpoint:
-    """Tests for POST /api/iec61850client/writevalue endpoint."""
+    """Tests for POST /api/writevalue endpoint."""
 
     def test_writevalue_missing_objref(self, app_client):
-        """Test writevalue with missing objRef returns 400."""
+        """Test writevalue with a missing (required) objRef is rejected."""
         client, _ = app_client
         response = client.post(
-            "/api/iec61850client/writevalue",
+            "/api/writevalue",
             json={"value": 1}
         )
-        assert response.status_code == 400
+        # fc and objRef are both required fields on WriteValueRequest and
+        # neither is present here - 422 from request validation.
+        assert response.status_code == 422
 
     def test_writevalue_missing_value(self, app_client):
-        """Test writevalue with missing value returns 400."""
+        """Test writevalue with a missing (required) value is rejected."""
         client, _ = app_client
         response = client.post(
-            "/api/iec61850client/writevalue",
+            "/api/writevalue",
             json={"objRef": "LD0/LLN0.Mod.stVal"}
         )
-        assert response.status_code == 400
+        # fc and value are both required and neither is present here.
+        assert response.status_code == 422
 
     def test_writevalue_error_response_is_json(self, app_client):
         """Test writevalue error response is JSON."""
         client, _ = app_client
         response = client.post(
-            "/api/iec61850client/writevalue",
+            "/api/writevalue",
             json={}
         )
-        assert "application/json" in response.content_type
+        assert "application/json" in content_type(response)
 
 
 class TestHTTPMethods:
@@ -282,31 +310,31 @@ class TestHTTPMethods:
     def test_status_requires_get(self, app_client):
         """Test status endpoint requires GET."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/status")
+        response = client.post("/api/status")
         assert response.status_code == 405
 
     def test_connect_requires_post(self, app_client):
         """Test connect endpoint requires POST."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/connect")
+        response = client.get("/api/connect")
         assert response.status_code == 405
 
     def test_disconnect_requires_post(self, app_client):
         """Test disconnect endpoint requires POST."""
         client, _ = app_client
-        response = client.get("/api/iec61850client/disconnect")
+        response = client.get("/api/disconnect")
         assert response.status_code == 405
 
     def test_actions_requires_get(self, app_client):
-        """Test actions endpoint requires GET."""
+        """Test the action log endpoint requires GET."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/actions")
+        response = client.post("/api/actions-logs")
         assert response.status_code == 405
 
     def test_messages_requires_get(self, app_client):
         """Test messages endpoint requires GET."""
         client, _ = app_client
-        response = client.post("/api/iec61850client/messages")
+        response = client.post("/api/messages")
         assert response.status_code == 405
 
 
@@ -317,30 +345,34 @@ class TestErrorHandling:
         """Test handling of malformed JSON."""
         client, _ = app_client
         response = client.post(
-            "/api/iec61850client/connect",
-            data="not json",
-            content_type="application/json"
+            "/api/connect",
+            content="not json",
+            headers={"content-type": "application/json"}
         )
-        # Should handle gracefully, not 500
-        assert response.status_code != 500 or response.status_code == 400
+        # Should handle gracefully, not crash with a 500.
+        assert response.status_code != 500
 
     def test_readvalue_error_message_present(self, app_client):
-        """Test readvalue error includes error message."""
+        """Test readvalue error includes some error/detail message."""
         client, _ = app_client
         response = client.post(
-            "/api/iec61850client/readvalue",
+            "/api/readvalue",
             json={}
         )
-        body = response.get_json()
-        assert "error" in body or "ok" in body
+        body = response.json()
+        # FastAPI's own request-validation errors use "detail" rather than
+        # this app's usual custom {"ok": False, "error": ...} shape.
+        assert "error" in body or "ok" in body or "detail" in body
 
 
-def test_so_properties():
-    """GET /api/iec61850server/properties via BFF should return FSP role/ws_mode."""
-    response = requests.get("http://127.0.0.1:5002/api/iec61850client/properties", timeout=10)
-    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
-    data = response.json()
-    print(f"BFF->FSP Properties Response: {data}")
-    assert data.get('ok') is True
-    assert data.get('server_role') == 'ACSI_Client'
-    assert data.get('ws_mode') == 'passive'
+def test_so_properties(app_client):
+    """GET /api/properties should return the SO's fixed role/ws_mode."""
+    client, _ = app_client
+
+    response = client.get("/api/properties")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["acsi_role"] == "ACSI-Client"
+    assert body["ws_mode"] == "passive"

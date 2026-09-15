@@ -1,4 +1,10 @@
-"""Unit tests for FSP BFF endpoint routes."""
+"""Unit tests for FSP BFF endpoint routes.
+
+fsp/bff_endpoint.py is a FastAPI router (create_bff_router), mounted under
+the "/api" prefix - not the Flask blueprint this file originally tested
+against. Routes are flat (e.g. "/api/status", not
+"/api/iec61850server/status").
+"""
 
 from __future__ import annotations
 
@@ -6,15 +12,22 @@ import sys
 from pathlib import Path
 
 import pytest
-from flask import Flask
-import requests
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
-# Allow importing rti-demo/fsp modules as top-level modules.
+from tests.conftest import import_module_from_path
+
+# Allow importing rti-demo/fsp modules (acsi_server, pydantic_models, ...)
+# as top-level modules - fsp/bff_endpoint.py imports them that way itself.
 FSP_DIR = Path(__file__).resolve().parents[3] / "fsp"
 if str(FSP_DIR) not in sys.path:
     sys.path.insert(0, str(FSP_DIR))
 
-import bff_endpoint
+# Loaded under a unique module name, not the generic "bff_endpoint" a plain
+# `import bff_endpoint` would use - so/bff_endpoint.py is also literally
+# named "bff_endpoint.py" and would collide with it. See
+# tests/conftest.py:import_module_from_path.
+bff_endpoint = import_module_from_path("fsp_bff_endpoint", FSP_DIR / "bff_endpoint.py")
 
 
 pytestmark = pytest.mark.unit
@@ -27,10 +40,10 @@ def client_and_server(tmp_path: Path):
         "ied = IedModel(name='TestIED')\n",
         encoding="utf-8",
     )
-    app = Flask(__name__)
-    blueprint, server = bff_endpoint.create_bff_blueprint(tmp_path)
-    app.register_blueprint(blueprint)
-    return app.test_client(), server
+    app = FastAPI()
+    router, server = bff_endpoint.create_bff_router(tmp_path)
+    app.include_router(router)
+    return TestClient(app), server
 
 
 def test_status_returns_server_status(client_and_server):
@@ -45,36 +58,39 @@ def test_status_returns_server_status(client_and_server):
         "accessPoints": ["cp1"],
     }
 
-    response = client.get("/api/iec61850server/status")
+    response = client.get("/api/status")
 
     assert response.status_code == 200
-    body = response.get_json()
-    assert body["status"] == "stopped"
-    assert body["port"] == 8765
+    # The route wraps get_status()'s dict as a str() repr in the "status"
+    # field - see fsp/acsi_server.py get_status()/api_status().
+    body = response.json()
+    assert body["ok"] is True
+    assert "'status': 'stopped'" in body["status"]
+    assert "'port': 8765" in body["status"]
 
 
 def test_start_rejects_unsupported_mode(client_and_server):
     client, _ = client_and_server
 
     response = client.post(
-        "/api/iec61850server/start",
-        json={"mode": "client", "host": "localhost", "port": 8765},
+        "/api/start",
+        json={"mode": "passive", "host": "localhost", "port": "8765"},
     )
 
     assert response.status_code == 400
-    assert "Only 'server' mode is supported" in response.get_json()["error"]
+    assert "Only 'active' mode is supported" in response.json()["error"]
 
 
 def test_start_rejects_invalid_port(client_and_server):
     client, _ = client_and_server
 
     response = client.post(
-        "/api/iec61850server/start",
-        json={"mode": "server", "host": "localhost", "port": "bad"},
+        "/api/start",
+        json={"mode": "active", "host": "localhost", "port": "bad"},
     )
 
     assert response.status_code == 400
-    assert "Invalid port value" in response.get_json()["error"]
+    assert "Invalid port value" in response.json()["error"]
 
 
 def test_start_calls_server_and_updates_cp(client_and_server):
@@ -89,12 +105,12 @@ def test_start_calls_server_and_updates_cp(client_and_server):
     server.start_server = fake_start
 
     response = client.post(
-        "/api/iec61850server/start",
-        json={"mode": "server", "host": "127.0.0.1", "port": 9000, "cp": "cp2"},
+        "/api/start",
+        json={"mode": "active", "host": "127.0.0.1", "port": "9000", "cp": "cp2"},
     )
 
     assert response.status_code == 200
-    assert response.get_json()["ok"] is True
+    assert response.json()["ok"] is True
     assert called == {"host": "127.0.0.1", "port": 9000}
     assert server.runtime.cp == "cp2"
 
@@ -103,65 +119,76 @@ def test_stop_returns_stopped_when_already_stopped(client_and_server):
     client, server = client_and_server
     server.runtime.status = "stopped"
 
-    response = client.post("/api/iec61850server/stop")
+    response = client.post("/api/stop")
 
     assert response.status_code == 200
-    assert response.get_json() == {"ok": True, "status": "stopped"}
+    assert response.json() == {"ok": True, "status": "stopped"}
 
 
 def test_readvalue_requires_objref(client_and_server):
     client, server = client_and_server
-    server.runtime.server_cp = object()
+    server.runtime.server = object()
 
-    response = client.post("/api/iec61850server/readvalue", json={"fc": "mx"})
+    # objRef is a required field on ReadvalueRequest, so omitting it entirely
+    # is rejected by FastAPI's own request validation (422) before the
+    # handler runs - send an empty string instead, which is schema-valid and
+    # actually exercises the handler's own `if not obj_ref` check below.
+    response = client.post("/api/readvalue", json={"objRef": "", "fc": "mx"})
 
     assert response.status_code == 400
-    assert response.get_json()["error"] == "objRef is required"
+    assert response.json()["error"] == "objRef is required"
 
 
 def test_readvalue_rejects_when_server_not_running(client_and_server):
     client, server = client_and_server
-    server.runtime.server_cp = None
+    server.runtime.server = None
 
-    response = client.post("/api/iec61850server/readvalue", json={"objRef": "LD0/LLN0.Mod.stVal"})
+    response = client.post("/api/readvalue", json={"objRef": "LD0/LLN0.Mod.stVal"})
 
     assert response.status_code == 503
-    assert response.get_json()["error"] == "Server is not running"
+    assert response.json()["error"] == "Server is not running"
 
 
 def test_readvalue_success_wraps_single_value(client_and_server):
     client, server = client_and_server
-    server.runtime.server_cp = object()
+    server.runtime.server = object()
     server.read_value = lambda _obj_ref: {"type": "boolean", "value": True}
 
     response = client.post(
-        "/api/iec61850server/readvalue",
+        "/api/readvalue",
         json={"objRef": "LD0/LLN0.Mod.stVal", "fc": "st"},
     )
 
     assert response.status_code == 200
-    body = response.get_json()
+    body = response.json()
     assert body["ok"] is True
     assert body["success"] is True
-    assert body["values"] == [{"type": "boolean", "value": True}]
+    # Unlike the client-side (SO) readvalue route, the server side returns
+    # the single value dict directly under "values", not wrapped in a list.
+    assert body["values"] == {"type": "boolean", "value": True}
 
 
 def test_writevalue_requires_value(client_and_server):
     client, server = client_and_server
-    server.runtime.server_cp = object()
+    server.runtime.server = object()
 
+    # WritevalueRequest.value is a required, non-nullable `str` field, so a
+    # request missing it is rejected by FastAPI's own request validation
+    # (422) before the handler's own `if value is None` check can run - that
+    # check is unreachable through the API as currently typed. This asserts
+    # the actual current behavior: still rejected, just at the request-
+    # validation layer rather than with the handler's custom error message.
     response = client.post(
-        "/api/iec61850server/writevalue",
+        "/api/writevalue",
         json={"objRef": "LD0/LLN0.Mod.stVal", "fc": "st"},
     )
 
-    assert response.status_code == 400
-    assert response.get_json()["error"] == "value is required"
+    assert response.status_code == 422
 
 
 def test_writevalue_success_response(client_and_server):
     client, server = client_and_server
-    server.runtime.server_cp = object()
+    server.runtime.server = object()
 
     def fake_write(obj_ref: str, value, data_type: str = "unknown"):
         return {
@@ -173,31 +200,33 @@ def test_writevalue_success_response(client_and_server):
     server.write_value = fake_write
 
     response = client.post(
-        "/api/iec61850server/writevalue",
+        "/api/writevalue",
+        # value is typed as `str` on WritevalueRequest ("value to write as
+        # string representation") - pydantic v2 doesn't coerce an int here.
         json={
             "objRef": "LD0/LLN0.Mod.stVal",
             "fc": "st",
-            "value": 1,
+            "value": "1",
             "dataType": "int32",
         },
     )
 
     assert response.status_code == 200
-    body = response.get_json()
+    body = response.json()
     assert body["ok"] is True
     assert body["success"] is True
     assert body["objRef"] == "LD0/LLN0.Mod.stVal"
-    assert body["value"] == 1
+    assert body["value"] == "1"
     assert body["dataType"] == "int32"
 
 
 def test_update_iedmodel_requires_model_py(client_and_server):
     client, _ = client_and_server
 
-    response = client.post("/api/iec61850server/update-iedmodel", json={})
+    response = client.post("/api/update-iedmodel", json={"modelPy": ""})
 
     assert response.status_code == 400
-    assert "modelPy is required" in response.get_json()["error"]
+    assert "modelPy is required" in response.json()["error"]
 
 
 def test_update_iedmodel_success(client_and_server):
@@ -206,15 +235,15 @@ def test_update_iedmodel_success(client_and_server):
     class _FakeIed:
         name = "UpdatedIED"
 
-    server.update_model_file = lambda _content: _FakeIed()
+    server.update_model_file = lambda _content, apply_dynamically=True: _FakeIed()
 
     response = client.post(
-        "/api/iec61850server/update-iedmodel",
+        "/api/update-iedmodel",
         json={"modelPy": "from ws61850.iec61850.data_model.ied_model import IedModel\nied = IedModel(name='UpdatedIED')\n"},
     )
 
     assert response.status_code == 200
-    body = response.get_json()
+    body = response.json()
     assert body["ok"] is True
     assert body["ied"] == "UpdatedIED"
 
@@ -223,14 +252,14 @@ def test_connections_returns_server_info_when_no_clients(client_and_server):
     client, server = client_and_server
     server.runtime.endpoint = None
 
-    response = client.get("/api/iec61850server/connections")
+    response = client.get("/api/connections")
 
     assert response.status_code == 200
-    body = response.get_json()
+    body = response.json()
     assert body["ok"] is True
-    assert body["server_role"] == "ACSI_Server"
-    assert body["ws_mode"] == "passive"
-    assert body["connected_clients"] == 0
+    assert body["role"] == "ACSI-Server"
+    assert body["ws_mode"] == "active"
+    assert body["connected_servers"] == 0
     assert body["connections"] == []
 
 
@@ -248,19 +277,19 @@ def test_connections_extracts_client_tpa_info(client_and_server):
     fake_endpoint.websocket_info_list = [_FakeWebSocketInfo()]
     server.runtime.endpoint = fake_endpoint
 
-    response = client.get("/api/iec61850server/connections")
+    response = client.get("/api/connections")
 
     assert response.status_code == 200
-    body = response.get_json()
+    body = response.json()
     assert body["ok"] is True
-    assert body["connected_clients"] == 1
+    assert body["connected_servers"] == 1
     assert len(body["connections"]) == 1
 
     conn = body["connections"][0]
     assert conn["peer_address"] == "192.168.1.100"
     assert conn["peer_port"] == 54321
-    assert conn["server_role"] == "ACSI_Server"
-    assert conn["ws_mode"] == "passive"
+    assert conn["role"] == "ACSI-Server"
+    assert conn["ws_mode"] == "active"
     assert conn["status"] == "active"
 
 
@@ -282,21 +311,24 @@ def test_connections_marks_disconnected_clients(client_and_server):
     ]
 
     server.runtime.endpoint = fake_endpoint
-    response = client.get("/api/iec61850server/connections")
+    response = client.get("/api/connections")
 
     assert response.status_code == 200
-    body = response.get_json()
-    assert body["connected_clients"] == 2
+    body = response.json()
+    assert body["connected_servers"] == 2
 
     assert body["connections"][0]["status"] == "active"
     assert body["connections"][1]["status"] == "disconnected"
 
-def test_fsp_properties():
-    """GET /api/iec61850server/properties via BFF should return FSP role/ws_mode."""
-    response = requests.get("http://127.0.0.1:5001/api/iec61850server/properties", timeout=10)
-    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
-    data = response.json()
-    print(f"BFF->FSP Properties Response: {data}")
-    assert data.get('ok') is True
-    assert data.get('server_role') == 'ACSI_Server'
-    assert data.get('ws_mode') == 'active'
+
+def test_fsp_properties(client_and_server):
+    """GET /api/properties should return the FSP's fixed role/ws_mode."""
+    client, _ = client_and_server
+
+    response = client.get("/api/properties")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["acsi_role"] == "ACSI-Server"
+    assert body["ws_mode"] == "Active"
