@@ -44,9 +44,10 @@ def app_client():
     bff_endpoint = import_module_from_path("so_bff_endpoint", SO_DIR / "bff_endpoint.py")
 
     app = FastAPI()
-    # create_bff_router's first parameter is typed `app: FastAPI` but isn't
-    # actually used to build the router or the ACSIClient() it wraps - it's
-    # only read by the (unrelated, unused-here) /apis discovery route.
+    # create_bff_router's first parameter is typed `app: FastAPI` but is
+    # unused - it isn't needed to build the router or the ACSIClient() it
+    # wraps, and the /apis discovery route (which used to read it via the
+    # since-removed Flask-only `app.url_map`) now inspects `router` instead.
     router, acsi_client = bff_endpoint.create_bff_router(app)
     app.include_router(router)
 
@@ -119,6 +120,26 @@ class TestEndpointsExist:
         response = client.post("/api/writevalue", json={})
         # Should error (missing params, all required fields) but not 404
         assert response.status_code != 404
+
+
+class TestApisEndpoint:
+    """Tests for GET /api/apis (route discovery/introspection)."""
+
+    def test_apis_lists_registered_routes(self, app_client):
+        """Regression test: this used to call the Flask-only app.url_map,
+        which doesn't exist on a FastAPI app and would raise AttributeError
+        (a 500) for every request. It now inspects the router directly."""
+        client, _ = app_client
+
+        response = client.get("/api/apis")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["ok"] is True
+        assert body["count"] > 0
+        paths = {e["path"] for e in body["endpoints"]}
+        assert "/api/status" in paths
+        assert "/api/readvalue" in paths
 
 
 class TestStatusEndpoint:

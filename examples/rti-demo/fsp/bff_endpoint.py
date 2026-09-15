@@ -555,7 +555,10 @@ def create_bff_router(
 
         routes = []
         for route in router.routes:
-            path = f"/api{route.path}"
+            # route.path on a route added through a prefixed APIRouter (here,
+            # prefix="/api") is already the full path, e.g. "/api/status" -
+            # prepending "/api" again doubled it to "/api/api/status".
+            path = route.path
             methods = list(route.methods)
 
             body_schema = None

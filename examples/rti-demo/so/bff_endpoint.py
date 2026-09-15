@@ -2654,13 +2654,49 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
         tags=["Discovery"]
     )
     async def api_list_all_endpoints(request: Request):
-        """List all API endpoints."""
+        """List all API endpoints with their schemas and metadata.
+
+        Returns:
+            dict: {
+                "ok": True,
+                "count": int,
+                "endpoints": [
+                    {
+                        "path": str,
+                        "methods": list[str],
+                        "endpoint": str,
+                        "body_schema": dict | None
+                    }
+                ]
+            }
+        """
+        from pydantic import TypeAdapter
+
         routes = []
-        for rule in app.url_map.iter_rules():
-            path = str(rule)
-            if path.startswith("/api/iec61850client/"):
-                methods = [m for m in rule.methods if m not in ("HEAD", "OPTIONS")]
-                routes.append({"path": path, "methods": methods, "endpoint": rule.endpoint})
+        for route in router.routes:
+            # route.path on a route added through a prefixed APIRouter (here,
+            # prefix="/api") is already the full path, e.g. "/api/status" -
+            # prepending "/api" again doubled it to "/api/api/status".
+            path = route.path
+            methods = [m for m in route.methods if m not in ("HEAD", "OPTIONS")]
+
+            body_schema = None
+            if hasattr(route, 'body_field') and route.body_field:
+                try:
+                    model = route.body_field.annotation
+                    if model is not Any:
+                        adapter = TypeAdapter(model)
+                        body_schema = adapter.json_schema()
+                except Exception:
+                    body_schema = None
+
+            routes.append({
+                "path": path,
+                "methods": methods,
+                "endpoint": route.name,
+                "body_schema": body_schema
+            })
+
         return {"ok": True, "count": len(routes), "endpoints": sorted(routes, key=lambda x: x["path"])}
 
     @router.get(

@@ -321,6 +321,24 @@ def test_connections_marks_disconnected_clients(client_and_server):
     assert body["connections"][1]["status"] == "disconnected"
 
 
+def test_apis_lists_registered_routes(client_and_server):
+    """Regression test: route.path on a route added through a prefixed
+    APIRouter (here, prefix="/api") is already the full path, so this
+    handler's `f"/api{route.path}"` used to double it into
+    "/api/api/status" etc. instead of listing the real paths."""
+    client, _ = client_and_server
+
+    response = client.get("/api/apis")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["count"] > 0
+    paths = {e["path"] for e in body["endpoints"]}
+    assert "/api/status" in paths
+    assert "/api/readvalue" in paths
+
+
 def test_fsp_properties(client_and_server):
     """GET /api/properties should return the FSP's fixed role/ws_mode."""
     client, _ = client_and_server
