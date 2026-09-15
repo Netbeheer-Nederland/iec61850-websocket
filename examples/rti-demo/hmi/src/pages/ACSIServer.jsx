@@ -773,17 +773,38 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
           <div className="form-group">
             <label htmlFor="acsi-server-instance-select">Instance</label>
-            <select id="acsi-server-instance-select" value={selectedInstanceName} onChange={handleInstanceSelect} disabled={loading}>
+            <select
+              id="acsi-server-instance-select"
+              value={selectedInstanceName}
+              onChange={handleInstanceSelect}
+              disabled={loading || connected}
+              title={connected ? 'Stop the server before switching instances' : undefined}
+            >
               <option value="" disabled>Select instance...</option>
-              {fspInstances.map(inst => (
-                <option key={inst.name} value={inst.name}>
-                  {/* WS address this instance's Passive endpoint listens on
-                      (what this page will dial into) - not its BFF port. */}
-                  {inst.name} ({inst.host}:{inst.ws_port || 'ws port not set'})
-                </option>
-              ))}
+              {fspInstances.map(inst => {
+                // Without a ws_port this instance has nowhere for the FSP to
+                // dial into - selecting it is a dead end (WS Port stays
+                // blank, Start Server just fails later) - disable it here
+                // instead, so the fix (configure it, or use Custom) is
+                // obvious upfront rather than after the fact.
+                const missingWsPort = !inst.ws_port;
+                return (
+                  <option key={inst.name} value={inst.name} disabled={missingWsPort}>
+                    {/* WS address this instance's Passive endpoint listens
+                        on (what this page will dial into) - not its BFF
+                        port. */}
+                    {inst.name} ({inst.host}:{inst.ws_port || '—'})
+                    {missingWsPort ? ' – WS port not configured' : ''}
+                  </option>
+                );
+              })}
               <option value="custom">Custom...</option>
             </select>
+            {connected && (
+              <small style={{ color: 'var(--text-muted)' }}>
+                Stop the server to switch to a different instance.
+              </small>
+            )}
           </div>
         </div>
 
