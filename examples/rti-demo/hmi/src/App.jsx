@@ -243,7 +243,7 @@ function App() {
         <main className="main-content">
           <Header bffStatus={bffStatus} />
           <Routes>
-            <Route path="/" element={<Setup settings={settings} />} />
+            <Route path="/" element={<Navigate to="/setup" replace />} />
             <Route path="/setup" element={<Setup settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections}/>} />
             <Route path="/connections" element={<Connections connections={connections} setConnections={setConnections} loading={connectionsLoading} onReload={fetchConnections} />} />
             <Route path="/model" element={<Model settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections} updateModel={updateModel} getModel={getModel} />} />
