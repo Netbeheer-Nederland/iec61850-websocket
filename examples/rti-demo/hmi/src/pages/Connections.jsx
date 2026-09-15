@@ -79,6 +79,12 @@ function Connections({ connections, setConnections, loading = false, onReload })
   // only type with a WebSocket endpoint of its own to configure a port
   // for, distinct from its BFF server port.
   const needsWsPort = formData.type === 'RTI-SO' || formData.type === 'Generic';
+  // RTI-FSP's `port` is just as much "its own BFF server's port" as
+  // RTI-SO's is - it just doesn't have a separate ws_port to configure
+  // (it dials out to whichever SO instance is selected on the ACSI Server
+  // page, rather than owning a fixed WS port itself) - so the label/
+  // explanation is shared with RTI-SO/Generic, same as ConnectionModal.jsx.
+  const isBffPortLabeled = needsWsPort || formData.type === 'RTI-FSP';
 
   return (
     <section className="page">
@@ -181,14 +187,14 @@ function Connections({ connections, setConnections, loading = false, onReload })
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="conn-port">{needsWsPort ? 'BFF Port' : 'Port'}</label>
+                    <label htmlFor="conn-port">{isBffPortLabeled ? 'BFF Port' : 'Port'}</label>
                     <input
                       type="number"
                       id="conn-port"
                       value={formData.port}
                       onChange={handleInputChange}
                     />
-                    {needsWsPort && (
+                    {isBffPortLabeled && (
                       <small style={{ color: 'var(--text-muted)' }}>
                         Port this instance's own BFF server listens on (used for all API calls to it).
                       </small>

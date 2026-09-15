@@ -53,15 +53,14 @@ describe('Connections page - Add/Edit modal', () => {
     expect(screen.getByLabelText('WS Port')).toBeInTheDocument();
   });
 
-  it('does not show a WS Port field for RTI-FSP - only a plain Port', async () => {
+  it('labels RTI-FSP\'s port "BFF Port" too, same as RTI-SO, but without a WS Port field', async () => {
     setup();
     const u = user();
 
     await u.click(screen.getByRole('button', { name: /add connection/i }));
     await u.selectOptions(screen.getByLabelText('Type'), 'RTI-FSP');
 
-    expect(screen.getByLabelText('Port')).toBeInTheDocument();
-    expect(screen.queryByLabelText('BFF Port')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('BFF Port')).toBeInTheDocument();
     expect(screen.queryByLabelText('WS Port')).not.toBeInTheDocument();
   });
 

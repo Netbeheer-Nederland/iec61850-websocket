@@ -340,6 +340,13 @@ function ConnectionModal({
   const isGeneric = formData.type === 'Generic';
   const isIDP = formData.type === 'IDP-Server';
   const isSO = formData.type === 'RTI-SO';
+  const isFSP = formData.type === 'RTI-FSP';
+  // RTI-FSP's `port` is just as much "its own BFF server's port" as
+  // RTI-SO's is - only RTI-SO also has a separate ws_port to configure
+  // (RTI-FSP dials out to whichever SO instance is selected on the ACSI
+  // Server page at start time, rather than owning a fixed WS port of its
+  // own), so the label/explanation is shared but the extra field isn't.
+  const isBffPortLabeled = isSO || isFSP;
 
   return (
     <>
@@ -387,14 +394,14 @@ function ConnectionModal({
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="port">{isSO ? 'BFF Port' : 'Port'}</label>
+                    <label htmlFor="port">{isBffPortLabeled ? 'BFF Port' : 'Port'}</label>
                     <input
                       type="number"
                       id="port"
                       value={formData.port}
                       onChange={handleInputChange}
                     />
-                    {isSO && (
+                    {isBffPortLabeled && (
                       <small style={{ color: 'var(--text-muted)' }}>
                         Port this instance's own BFF server listens on (used for all API calls to it).
                       </small>

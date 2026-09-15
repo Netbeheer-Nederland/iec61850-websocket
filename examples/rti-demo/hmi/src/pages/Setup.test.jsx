@@ -56,4 +56,15 @@ describe('Setup page - Register/Edit Instance modal', () => {
 
     expect(screen.getByLabelText('WS Port')).toHaveValue(9001);
   });
+
+  it('labels RTI-FSP\'s port "BFF Port" too, same as RTI-SO, but without a WS Port field', async () => {
+    renderSetup();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.selectOptions(screen.getByLabelText('Type'), 'RTI-FSP');
+
+    expect(screen.getByLabelText('BFF Port')).toBeInTheDocument();
+    expect(screen.queryByLabelText('WS Port')).not.toBeInTheDocument();
+  });
 });
