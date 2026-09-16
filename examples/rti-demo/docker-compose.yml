@@ -145,6 +145,8 @@ services:
 
   # Second FSP instance
   rti-fsp-2:
+    user:
+      root
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.rti-fsp
