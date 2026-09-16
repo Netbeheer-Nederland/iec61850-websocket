@@ -531,13 +531,14 @@ def create_bff_router(
                 },
             }
             has_tree = tree_data is not None
-            print(
+            server._log_action(
                 f"[GET /ap/model] "
                 f"ied_model={ied_model is not None} "
                 f"has_tree={has_tree} "
                 f"source={source!r} "
                 f"iedName={selected_ied!r} "
-                f"logicalDevices={logical_devices}"
+                f"logicalDevices={logical_devices}",
+                "info"
             )
             return result
         except Exception as exc:
@@ -918,9 +919,10 @@ def create_bff_router(
 
                 values = [normalized]
 
-                print(
+                server._log_action(
                     f"[POST /ap/readvalue] SUCCESS objRef={obj_ref!r} "
-                    f"fc={fc!r} type={normalized.get('type')!r} value={normalized.get('value')!r}"
+                    f"fc={fc!r} type={normalized.get('type')!r} value={normalized.get('value')!r}",
+                    "info"
                 )
 
                 server._log_action(

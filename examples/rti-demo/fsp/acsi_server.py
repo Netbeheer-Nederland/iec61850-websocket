@@ -87,8 +87,7 @@ class ACSIServer:
         self.runtime.endpoint.recv_msg_callback = self._on_recv_message
         self.runtime.endpoint.send_msg_callback = self._on_send_message
 
-        print(f"[DEBUG] New ACSIServer instance: model_path={model_path}, id={id(self.runtime)}")
-
+        self._log_action(f"[DEBUG] New ACSIServer instance: model_path={model_path}, id={id(self.runtime)}", "info")
         # Prefer the model already in runtime (freshly loaded from SCL/model.py)
         # Only reload from file as fallback if runtime model is missing
         #self.factory_dir = factory_dir
@@ -112,17 +111,18 @@ class ACSIServer:
 
         if self.runtime.ied_model is None:
             try:
-                print("[_start_server_async] No model in runtime, loading from file...")
+                self._log_action("[_start_server_async] No model in runtime, loading from file...",
+                                 "info")
                 self.runtime.ied_model = self.load_current_runtime_model()
             except FileNotFoundError:
-                print("[_start_server_async] Model file not found")
+                self._log_action("[_start_server_async] Model file not found",
+                                 "info")
                 raise RuntimeError("No model loaded. Create fsp/model.py first.")
         else:
-            print(
-                f"[_start_server_async] Using model from runtime: "
+            self._log_action(f"[_start_server_async] Using model from runtime: "
                 f"ied_model.name={self.runtime.ied_model.name!r} "
-                f"model_ied_name={self.runtime.model_ied_name!r}"
-            )
+                f"model_ied_name={self.runtime.model_ied_name!r}",
+                             "info")
 
         if self.runtime.ied_model is None:
             raise RuntimeError("No model loaded. Create fsp/model.py first.")
@@ -134,7 +134,6 @@ class ACSIServer:
 
         def control_handler(obj_ref, ctlVal_value, parameter):
             ctl_val = ctlVal_value['value']
-            print("entered control handler: obj_ref:", obj_ref, "ctlVal_value:", ctl_val, "parameter:", parameter)
 
             TYPE_MAP = {
                 "boolean": bool,

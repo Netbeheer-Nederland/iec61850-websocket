@@ -1613,13 +1613,10 @@ def create_bff_router(
         """
         try:
 
-            print("getting model for cp in fsp: ", rti_fsp.runtime.cp)
             ied_model: Optional[IedModel] = rti_fsp.runtime.ied_model
             source = rti_fsp.runtime.model_source
             selected_ied = rti_fsp.runtime.model_ied_name
             access_points = [rti_fsp.runtime.cp or "cp1"]
-
-            print("selected_ied in fsp: ", selected_ied)
 
             logical_devices: List[str] = []
             if ied_model is not None:
@@ -1652,7 +1649,7 @@ def create_bff_router(
                 },
             }
             has_tree = tree_data is not None
-            print(
+            logger.info(
                 f"[GET /ap/model] "
                 f"ied_model={ied_model is not None} "
                 f"has_tree={has_tree} "
@@ -2057,8 +2054,9 @@ def create_bff_router(
                 tls_version = ssl.TLSVersion.TLSv1_2
             else:
                 tls_version = ssl.TLSVersion.TLSv1_3
-            rti_fsp._log_action(f"TLS version determined: {tls_version} (from request: {request.tls_version})", "info")
-            print("tls_version in reconfig connection: ", tls_version, "(from request:", request.tls_version, ")")
+            logger.info(f"tls_version in reconfig connection: {tls_version} from request: {request.tls_version}")
+            rti_fsp._log_action(f"tls_version in reconfig connection: {tls_version} from request: {request.tls_version}",
+                                "info")
             host = request.host
             request_port = request.port
             if request.ws_mode.lower() == "active":
@@ -2077,7 +2075,7 @@ def create_bff_router(
                 loop = rti_fsp.runtime.loop
                 if loop is None or not loop.is_running():
                     rti_fsp._log_action("Server not running, starting server instance", "info")
-                    print("server not running, starting server instance")
+                    logger.info("server not running, starting server instance")
                     rti_fsp.start_server(host, int(request_port))
                     loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
                     rti_fsp._log_action("Server instance started", "info")
@@ -2104,13 +2102,12 @@ def create_bff_router(
                     rti_fsp._log_action("Connection reconfigured successfully", "info")
                 except Exception as e:
                     rti_fsp._log_action(f"Error during reconfigure_connection: {e}", "error")
-                    print(f"Error during reconfigure_connection: {e}")
-                    # Don't fail the endpoint - the connection may still have been restarted
-                    # Just log and continue
+                    logger.info(f"Error during reconfigure_connection: {e}")
+
 
                 rti_fsp.runtime.tasks["ws"] = endpoint._connect_task
 
-                print("Reconfigured connection with TLS enabled:", request.enable_tls)
+                logger.info(f"Reconfigured connection with TLS enabled: {request.enable_tls}")
                 return JSONResponse(
                     content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
                              "enable_tls": request.enable_tls},
@@ -2244,13 +2241,13 @@ def create_bff_router(
                 client_secret = None
                 ca_certificate = None
 
-            print("Reconfiguring OAuth with connection: ", connection_name)
-            print(f"OAuth enable: {request.enable_oauth}, token_endpoint: {token_endpoint}")
+            logger.info(f"Reconfiguring OAuth with connection: {connection_name}")
+            logger.info(f"OAuth enable: {request.enable_oauth}, token_endpoint: {token_endpoint}")
 
             loop = rti_fsp.runtime.loop
             if loop is None or not loop.is_running():
                 rti_fsp._log_action("Server not running, starting server instance for OAuth reconfig", "info")
-                print("server not running, starting server instance")
+                logger.info("server not running, starting server instance")
                 rti_fsp.start_server(host, int(oauth_port))
                 loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
                 rti_fsp._log_action("Server instance started for OAuth reconfig", "info")
@@ -2258,7 +2255,7 @@ def create_bff_router(
             # When disabling OAuth, stop the endpoint first to avoid issues with ClientCredentialsProvider
             if not request.enable_oauth:
                 rti_fsp._log_action("Disabling OAuth - stopping endpoint first", "info")
-                print("Disabling OAuth - stopping endpoint first")
+                logger.info("Disabling OAuth - stopping endpoint first")
                 # Stop the current connection if it exists
                 if hasattr(rti_fsp.runtime.endpoint, '_connect_task') and rti_fsp.runtime.endpoint._connect_task is not None:
                     stop_fut = asyncio.run_coroutine_threadsafe(
@@ -2267,7 +2264,7 @@ def create_bff_router(
                     )
                     await asyncio.wrap_future(stop_fut)
                 rti_fsp._log_action("Endpoint stopped, now reconfiguring with OAuth disabled", "info")
-                print("Endpoint stopped, now reconfiguring with OAuth disabled")
+                logger.info("Endpoint stopped, now reconfiguring with OAuth disabled")
 
             # Call reconfigure_oauth with settings from connection
             rti_fsp._log_action(f"Calling reconfigure_oauth for host: {host}, port: {oauth_port}, OAuth: {request.enable_oauth}", "info")
@@ -2295,9 +2292,7 @@ def create_bff_router(
                 status_code=200,
             )
         except Exception as exc:
-            import traceback
-            print("Reconfig OAuth error:", exc)
-            print("Traceback:", traceback.format_exc())
+            logger.info(f"Reconfig OAuth error: {exc}")
             rti_fsp._log_action(f"api_reconfig_oauth failed: {exc}", "error")
             return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
 
@@ -2512,7 +2507,7 @@ def create_bff_router(
 
 
 
-                print(
+                logger.info(
                     f"[POST /ap/readvalue] SUCCESS objRef={obj_ref!r} "
                     f"fc={fc!r} type={result.get('type')!r} value={result.get('value')!r}"
                 )
@@ -3124,7 +3119,7 @@ def create_bff_router(
                 # reported but don't fail this endpoint's response.
                 if _io_router_included:
                     result["io_bootstrap"] = await _bootstrap_io_client_after_connect(request.server_url, request.acsi_url)
-                    print("bootstrap result: ", result["io_bootstrap"])
+                    logger.info("bootstrap result: ", result["io_bootstrap"])
 
             result["io_plugin_enabled"] = _use_io_plugin
             result["io_router_included"] = _io_router_included

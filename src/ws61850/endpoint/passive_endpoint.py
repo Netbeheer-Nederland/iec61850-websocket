@@ -317,8 +317,6 @@ class PassiveEndpoint:
     async def start(self, hostname: str, port: int, protocol=None) -> None:
         ssl_ctx = build_tls_context_from_strings(self._tls_config) if self._tls_config else None
         scheme = "wss" if ssl_ctx else "ws"
-        print("the scheme is: ", scheme)
-
         serve_kwargs = dict(
             subprotocols=protocol if protocol is not None else None,
             process_request=self.process_request,
@@ -326,10 +324,8 @@ class PassiveEndpoint:
             ping_timeout=30,
             logger=self._websocket_server_logger,
         )
-        print("serve_kwargs: ", serve_kwargs)
         if ssl_ctx:
             serve_kwargs["ssl"] = ssl_ctx
-        print("serve_kwargs after ssl: ", serve_kwargs)
 
         async with serve(self.handle_client, hostname, port, **serve_kwargs) as server:
             self.server = server

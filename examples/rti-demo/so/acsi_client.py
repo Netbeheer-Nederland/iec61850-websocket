@@ -423,7 +423,6 @@ class ACSIClient:
         try:
             loop.run_forever()
         except Exception as exc:
-            print(f"Event loop error: {exc}")
             self._log_action(f"Event loop error: {exc}", "error")
         finally:
             pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
@@ -709,8 +708,7 @@ class ACSIClient:
                 result = await client.get_data_definition(obj_ref, websocket_info, None, None)
             return {"dataDefinition": result}
         except Exception as e:
-            print("error in get_data_definition:", e)
-            logger.error(f"Error in get_data_definition: {e}")
+            logger.exception(f"Error in get_data_definition: {e}")
             raise
 
     async def get_brcb_definition(self, obj_ref: str, cp: str) -> Dict[str, Any]:
@@ -802,7 +800,6 @@ class ACSIClient:
 
         rcb = self.create_rcb_from_frontend_data(data, "URCB")
 
-        print("created urcb:", rcb.__dict__)
         client = self.get_iec61850_client(cp)
         if not client:
             raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
@@ -827,7 +824,7 @@ class ACSIClient:
     def convert_value(self, type_name, raw_str, TYPE_MAP):
         expected_type = TYPE_MAP.get(type_name)
         if expected_type is None:
-            print(f"Unknown type: {type_name}")
+            logger.exception(f"Unknown type: {type_name}")
             return False, None
 
         if expected_type is bool:
@@ -837,7 +834,7 @@ class ACSIClient:
                 elif raw_str.lower() in ("false", "0"):
                     return True, False
                 else:
-                    print(f"Cannot convert '{raw_str}' to bool")
+                    logger.error(f"Cannot convert '{raw_str}' to bool")
                     return False, None
             else:
                 return True, bool(raw_str)
@@ -846,28 +843,28 @@ class ACSIClient:
             try:
                 return True, int(raw_str)
             except (ValueError, TypeError):
-                print(f"Cannot convert '{raw_str}' to int")
+                logger.exception(f"Cannot convert '{raw_str}' to int")
                 return False, None
 
         if expected_type is float:
             try:
                 return True, float(raw_str)
             except (ValueError, TypeError):
-                print(f"Cannot convert '{raw_str}' to float")
+                logger.exception(f"Cannot convert '{raw_str}' to float")
                 return False, None
 
         if expected_type is bytes:
             try:
                 return True, bytes.fromhex(raw_str)  # adjust if not hex-encoded
             except (ValueError, TypeError):
-                print(f"Cannot convert '{raw_str}' to bytes")
+                logger.exception(f"Cannot convert '{raw_str}' to bytes")
                 return False, None
 
         if expected_type is str:
             return True, raw_str  # already a string
 
         if expected_type is list:
-            print(f"No defined conversion for {type_name} (list) from string '{raw_str}'")
+            logger.error(f"No defined conversion for {type_name} (list) from string '{raw_str}'")
             return False, None
 
         return False, None
@@ -911,16 +908,9 @@ class ACSIClient:
             if converted is False:
                 raise RuntimeError(f"Type mismatch: '{value}' is not valid for {data_type}")
             else:
-                print("the value: ", value)
-                print("the type: ", data_type)
                 result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, converted_val)}], websocket_info,
                                                       self.runtime.write_callback, None)
 
-            #result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, self.runtime.write_callback, None)
-        print(result)
-        print("Write operation completed successfully.")
-        print("new value:", value)
-        print("obj_ref:", obj_ref)
         if result is True:
             return {"objRef": obj_ref, "value": value}
         else:

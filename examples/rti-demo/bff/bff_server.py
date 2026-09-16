@@ -450,12 +450,7 @@ async def create_tls_connection(request: TLSConnectionCreateConfigRequest):
     Raises:
         HTTPException 400: If required fields are missing.
     """
-    print("server_key: ", request.server_key)
-    print("server_cert: ", request.server_cert)
-
     ws_mode = request.ws_mode
-    print("debug 1")
-    
     # Validate required fields based on mode
     if ws_mode == "passive" or ws_mode == "Passive":
         if not request.server_key or not request.server_cert:
@@ -469,10 +464,8 @@ async def create_tls_connection(request: TLSConnectionCreateConfigRequest):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail='Missing required field: server_ca for active mode'
             )
-    print("debug 2")
 
     connection = conn_manager.get_connection(request.connection_name)
-    print("debug 3")
 
     if connection:
         if 'TLS' not in connection:
@@ -491,14 +484,11 @@ async def create_tls_connection(request: TLSConnectionCreateConfigRequest):
             connection['TLS']['server_ca'] = request.server_ca
         
         conn_manager.save_connections()
-        print("debug 4")
 
         return {
             "ok": True,
             "message": f"TLS config saved for {request.connection_name}"
         }
-
-    print("debug 5")
 
     return {
         "ok": False,
@@ -1196,9 +1186,6 @@ async def execute_dynamic_api(request: ExecuteRequest):
         }
 
     except Exception as e:
-
-        print("failed to execute dynamic API call:", e)
-        print("target:", target, "method:", method, "path:", path, "body:", body)
         logger.error(f"Dynamic API call failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

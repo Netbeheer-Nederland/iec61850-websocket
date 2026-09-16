@@ -279,13 +279,13 @@ class ACSIServer:
 
         if ied_model is None:
             try:
-                print("[_start_server_async] No model in runtime, loading from file...")
+                logger.info("[_start_server_async] No model in runtime, loading from file...")
                 ied_model = self.load_current_runtime_model()
             except FileNotFoundError:
-                print("[_start_server_async] Model file not found")
+                logger.info("[_start_server_async] Model file not found")
                 raise RuntimeError("No model loaded. Create fsp/model.py first.")
         else:
-            print(
+            logger.info(
                 f"[_start_server_async] Using model from runtime: "
                 f"ied_model.name={ied_model.name!r} "
                 f"model_ied_name={self.runtime.model_ied_name!r}"

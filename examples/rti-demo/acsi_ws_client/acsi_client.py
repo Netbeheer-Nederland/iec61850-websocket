@@ -62,11 +62,11 @@ class ACSIClient:
         self.runtime = ACSIClientRuntime()
 
     def received_msg_callback(msg, timestamp):
-        print(f"(received message): {timestamp}: {msg}")
+        logger.info(f"(received message): {timestamp}: {msg}")
 
 
     def send_msg_callback(msg, timestamp):
-        print(f"(sent message): {timestamp}: {msg}")
+        logger.info(f"(sent message): {timestamp}: {msg}")
 
     def _log_action(
         self, message: str, level: str = "info", detail: Optional[Dict[str, Any]] = None
