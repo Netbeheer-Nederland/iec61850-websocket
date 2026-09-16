@@ -30,27 +30,6 @@ from devices import DeviceType, LEDConfig, PotentiometerConfig, ButtonConfig, LC
 
 logger = logging.getLogger(__name__)
 
-
-# ==================== API KEY AUTHENTICATION ====================
-
-# API Key can be set via environment variable or will be None (no authentication required)
-API_KEY_ENV_VAR = "DEMO_IO_API_KEY"
-API_KEY: Optional[str] = os.getenv(API_KEY_ENV_VAR)
-
-# If API_KEY_FILE is set, read the key from that file
-API_KEY_FILE = os.getenv("DEMO_IO_API_KEY_FILE")
-if API_KEY_FILE and os.path.exists(API_KEY_FILE):
-    try:
-        with open(API_KEY_FILE, 'r') as f:
-            API_KEY = f.read().strip()
-        logger.info(f"Loaded API key from file: {API_KEY_FILE}")
-    except Exception as e:
-        logger.error(f"Failed to read API key from {API_KEY_FILE}: {e}")
-
-# Auth disabled by default if no key is configured
-AUTH_ENABLED = API_KEY is not None and API_KEY != ""
-
-
 # ==================== Pydantic Models ====================
 
 
@@ -280,41 +259,17 @@ def create_fastapi_app(io_controller: Optional[IOController] = None) -> FastAPI:
         allow_headers=["*"],
     )
     
-    # Add API key authentication middleware if enabled
-    if AUTH_ENABLED:
-        @app.middleware("http")
-        async def api_key_middleware(request: Request, call_next):
-            """Middleware to check API key on all requests when authentication is enabled."""
-            # Skip authentication for health check, auth status, and docs
-            if request.url.path in ["/api/io/health", "/api/io/auth/status", "/docs", "/openapi.json", "/redoc"]:
-                return await call_next(request)
-            
-            x_api_key = request.headers.get("x-api-key")
-            
-            if not x_api_key:
-                logger.warning(f"Missing API key in request: {request.method} {request.url}")
-                return JSONResponse(
-                    status_code=401,
-                    content={"detail": "Authentication required. Provide X-API-Key header."},
-                    headers={"WWW-Authenticate": "ApiKey"}
-                )
-            
-            if x_api_key != API_KEY:
-                logger.warning(f"Invalid API key attempt: {request.method} {request.url}")
-                return JSONResponse(
-                    status_code=401,
-                    content={"detail": "Invalid API key."},
-                    headers={"WWW-Authenticate": "ApiKey"}
-                )
-            
-            return await call_next(request)
-    
     # Create router with the controller
     router = create_io_router(app, io_controller)
     app.include_router(router)
     
     # Store controller reference in app state
     app.state.io_controller = io_controller
+    
+    # Include IO client file server router
+    from io_client_file_server import create_io_client_router
+    io_client_router = create_io_client_router()
+    app.include_router(io_client_router)
     
     return app
 
@@ -368,7 +323,6 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         endpoints = {
             "GET /api/io/": "API information",
             "GET /api/io/health": "Health check endpoint",
-            "GET /api/io/auth/status": "Authentication status",
             "GET /api/io/status": "Get IO controller status",
             "POST /api/io/initialize": "Initialize IO controller",
             "POST /api/io/cleanup": "Clean up IO resources",
@@ -414,7 +368,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
     @router.get(
         "/health",
         summary="Health Check",
-        description="Generic health endpoint used by external discovery systems. No authentication required.",
+        description="Generic health endpoint used by external discovery systems.",
         response_description="Health status",
         responses={
             200: {"description": "Service is healthy"},
@@ -433,30 +387,10 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
                 "version": "2.0.0",
                 "io_initialized": io_controller._initialized,
                 "device_count": device_count,
-                "auth_enabled": AUTH_ENABLED,
             }
         except Exception as exc:
             logger.error(f"Health check failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
-    @router.get(
-        "/auth/status",
-        summary="Authentication Status",
-        description="Check if API key authentication is enabled. No authentication required.",
-        response_description="Authentication status",
-        responses={
-            200: {"description": "Authentication status returned"}
-        },
-        tags=["Health"]
-    )
-    async def api_auth_status(request: Request):
-        """Check if authentication is enabled."""
-        return {
-            "auth_enabled": AUTH_ENABLED,
-            "api_key_configured": API_KEY is not None and API_KEY != "",
-            "api_key_env_var": API_KEY_ENV_VAR,
-            "message": "Authentication is enabled" if AUTH_ENABLED else "Authentication is disabled - no API key configured"
-        }
     
     @router.post(
         "/initialize",
@@ -1519,7 +1453,6 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
 
 
     return router
-
 
 if __name__ == "__main__":
     import uvicorn

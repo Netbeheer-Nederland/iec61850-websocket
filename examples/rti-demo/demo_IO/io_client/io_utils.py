@@ -9,7 +9,7 @@ import logging
 from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 if TYPE_CHECKING:
-    from .mapping_manager import IOMappingManager
+    from mapping_manager import IOMappingManager
 
 logger = logging.getLogger(__name__)
 

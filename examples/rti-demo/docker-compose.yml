@@ -112,6 +112,7 @@ services:
 
   # RTI-FSP (Acsi-Server)
   rti-fsp:
+    user: root
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.rti-fsp
@@ -144,6 +145,8 @@ services:
 
   # Second FSP instance
   rti-fsp-2:
+    user:
+      root
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.rti-fsp
@@ -175,6 +178,8 @@ services:
 
   # RTI SO (Acsi-Client)
   rti-so:
+    user:
+      root
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.rti-so

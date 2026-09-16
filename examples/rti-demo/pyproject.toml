@@ -16,6 +16,7 @@ dependencies = [
     "python-dotenv==1.0.0",
     "python-multipart>=0.0.32",
     "requests==2.31.0",
+    "smbus2>=0.6.1",
     "uvicorn>=0.51.0",
     "websockets>=16.1",
     "werkzeug==3.0.1",
