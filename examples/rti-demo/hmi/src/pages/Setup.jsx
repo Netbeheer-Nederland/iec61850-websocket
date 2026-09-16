@@ -198,7 +198,7 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
       }
       
       // For RTI-SO and RTI-FSP, host and port are required
-      if ((formData.type === 'RTI-SO' || formData.type === 'RTI-FSP' || formData.type === 'Generic') && (!formData.host || !formData.port)) {
+      if ((formData.type === 'RTI-SO' || formData.type === 'RTI-FSP' || formData.type === 'Custom') && (!formData.host || !formData.port)) {
         alert('Please fill in the host and port fields');
         return;
       }

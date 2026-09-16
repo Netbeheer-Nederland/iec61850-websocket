@@ -7,7 +7,7 @@ function Connections({ connections, setConnections, loading = false, onReload })
     name: '',
     host: '',
     port: 5000,
-    // Only meaningful for RTI-SO/Generic: the port its own WebSocket
+    // Only meaningful for RTI-SO/Custom: the port its own WebSocket
     // (Passive) endpoint listens on - distinct from `port` above (that
     // instance's BFF server port, used for every API call to it). A real
     // default value, same as `port`'s 5000 - not just a placeholder hint -
@@ -77,15 +77,15 @@ function Connections({ connections, setConnections, loading = false, onReload })
     onReload?.();
   };
 
-  // RTI-SO (and a "Custom" Generic connection standing in for one) is the
-  // only type with a WebSocket endpoint of its own to configure a port
-  // for, distinct from its BFF server port.
-  const needsWsPort = formData.type === 'RTI-SO' || formData.type === 'Generic';
+  // RTI-SO (and a "Custom" connection standing in for one) is the only
+  // type with a WebSocket endpoint of its own to configure a port for,
+  // distinct from its BFF server port.
+  const needsWsPort = formData.type === 'RTI-SO' || formData.type === 'Custom';
   // RTI-FSP's `port` is just as much "its own BFF server's port" as
   // RTI-SO's is - it just doesn't have a separate ws_port to configure
   // (it dials out to whichever SO instance is selected on the ACSI Server
   // page, rather than owning a fixed WS port itself) - so the label/
-  // explanation is shared with RTI-SO/Generic, same as ConnectionModal.jsx.
+  // explanation is shared with RTI-SO/Custom, same as ConnectionModal.jsx.
   const isBffPortLabeled = needsWsPort || formData.type === 'RTI-FSP';
 
   return (
@@ -227,7 +227,7 @@ function Connections({ connections, setConnections, loading = false, onReload })
                   value={formData.type} 
                   onChange={handleInputChange}
                 >
-                  <option value="Generic">Generic</option>
+                  <option value="Custom">Custom</option>
                   <option value="RTI-SO">RTI-SO (WS Passive/ACSI Client)</option>
                   <option value="RTI-FSP">RTI-FSP (WS Active/ACSI Server)</option>
                   <option value="IDP-Server">IDP-Server</option>

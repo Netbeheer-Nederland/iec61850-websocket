@@ -99,12 +99,12 @@ describe('Setup page - Register/Edit Instance modal', () => {
     expect(wsMode).toHaveValue('Active');
   });
 
-  it('keeps ACSI/WebSocket Mode as real, editable dropdowns for Generic', async () => {
+  it('keeps ACSI/WebSocket Mode as real, editable dropdowns for Custom', async () => {
     renderSetup();
     const u = user();
 
     await u.click(screen.getByRole('button', { name: /register instance/i }));
-    await u.selectOptions(screen.getByLabelText('Type'), 'Generic');
+    await u.selectOptions(screen.getByLabelText('Type'), 'Custom');
 
     const acsi = screen.getByLabelText('ACSI');
     const wsMode = screen.getByLabelText('WebSocket Mode');

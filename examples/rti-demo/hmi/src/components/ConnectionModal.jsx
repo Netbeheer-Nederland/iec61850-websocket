@@ -70,7 +70,7 @@ function ConnectionModal({
       
       // Only for connections that might have OAuth config
       const connType = currentConnection.type || formData.type || '';
-      if (connType !== 'RTI-SO' && connType !== 'RTI-FSP' && connType !== 'Generic') return;
+      if (connType !== 'RTI-SO' && connType !== 'RTI-FSP' && connType !== 'Custom') return;
       
       const connName = currentConnection.name || formData.name;
       if (!connName) return;
@@ -337,7 +337,7 @@ function ConnectionModal({
     }
   };
 
-  const isGeneric = formData.type === 'Generic';
+  const isCustom = formData.type === 'Custom';
   const isIDP = formData.type === 'IDP-Server';
   const isSO = formData.type === 'RTI-SO';
   const isFSP = formData.type === 'RTI-FSP';
@@ -376,7 +376,7 @@ function ConnectionModal({
                   value={formData.type}
                   onChange={handleTypeChange}
                 >
-                  <option value="Generic">Generic</option>
+                  <option value="Custom">Custom</option>
                   <option value="RTI-SO">RTI-SO (WS Passive/ACSI Client)</option>
                   <option value="RTI-FSP">RTI-FSP (WS Active/ACSI Server)</option>
                   <option value="IDP-Server">IDP-Server</option>
@@ -429,7 +429,7 @@ function ConnectionModal({
                 <>
                   <div className="form-group">
                     <label htmlFor="acsi">ACSI</label>
-                    {isGeneric ? (
+                    {isCustom ? (
                       <select
                         id="acsi"
                         value={formData.acsi || 'server'}
@@ -452,7 +452,7 @@ function ConnectionModal({
                   </div>
                   <div className="form-group">
                     <label htmlFor="ws_mode">WebSocket Mode</label>
-                    {isGeneric ? (
+                    {isCustom ? (
                       <select
                         id="ws_mode"
                         value={formData.ws_mode || ''}
@@ -474,8 +474,8 @@ function ConnectionModal({
                 </>
               )}
               
-              {/* IDP Server fields for SO and FSP types (and Generic) */}
-              {(formData.type === 'RTI-SO' || formData.type === 'RTI-FSP' || formData.type === 'Generic') && (
+              {/* IDP Server fields for SO and FSP types (and Custom) */}
+              {(formData.type === 'RTI-SO' || formData.type === 'RTI-FSP' || formData.type === 'Custom') && (
                 <>
                   <div className="form-group">
                     <label htmlFor="idp_server">IDP Server</label>

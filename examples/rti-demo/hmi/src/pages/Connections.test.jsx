@@ -42,12 +42,12 @@ describe('Connections page - Add/Edit modal', () => {
     expect(screen.getByLabelText('WS Port')).toBeInTheDocument();
   });
 
-  it('shows BFF Port and WS Port for a Generic ("custom") connection too', async () => {
+  it('shows BFF Port and WS Port for a Custom connection too', async () => {
     setup();
     const u = user();
 
     await u.click(screen.getByRole('button', { name: /add connection/i }));
-    await u.selectOptions(screen.getByLabelText('Type'), 'Generic');
+    await u.selectOptions(screen.getByLabelText('Type'), 'Custom');
 
     expect(screen.getByLabelText('BFF Port')).toBeInTheDocument();
     expect(screen.getByLabelText('WS Port')).toBeInTheDocument();
