@@ -863,13 +863,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         <div className="page-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <h1><i className="fas fa-server" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>ACSI Server</h1>
-            {endpoint && (
-              // Plain label, not the .acsi-endpoint-badge pill - it's just
-              // showing which instance this page is for, not a button.
-              <span id="acsi-endpoint-badge" style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-                {endpoint.name || `${endpoint.host}:${endpoint.port}`}
-              </span>
-            )}
           </div>
         </div>
 
