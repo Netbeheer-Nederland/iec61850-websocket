@@ -3569,7 +3569,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400
                 )
 
-            if fc != "cf" or fc != "sp":
+            if fc.lower() not in ("cf", "sp"):
                 rti_so._log_action("Access Violation: Write only allowed to CF and SP FCs", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "Access Violation: Write only allowed to CF and SP FCs"},
