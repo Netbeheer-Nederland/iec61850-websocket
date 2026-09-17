@@ -1699,7 +1699,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             # Build maps from results
             logical_device_map = {}
             logical_device_status = {}
-            all_ln_tasks = []  # List of (ld, ln_inst) tuples
+            all_ln_tasks = []
 
             for result in ld_results:
                 ld = result['ld']
@@ -2147,8 +2147,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 rti_so._log_action(error_msg, "error")
                 raise ValueError(error_msg)
 
-            # When disabling OAuth, pass None to signal that OAuth should be disabled
-            # The underlying library should handle None properly
             if not request.enable_oauth:
                 rti_so._log_action("Disabling OAuth for connection", "info")
                 certificate_endpoint = None
@@ -2220,12 +2218,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             }
         """
         try:
-            # Check the runtime endpoint's OAuth enable status
             if hasattr(rti_so.runtime, 'endpoint') and hasattr(rti_so.runtime.endpoint, '_oauth_enable'):
                 enable_oauth = rti_so.runtime.endpoint._oauth_enable
                 return {"ok": True, "enable_oauth": enable_oauth}
             else:
-                # If endpoint not available or attribute not found, check if OAuth is configured
                 return {"ok": True, "enable_oauth": False}
         except Exception as exc:
             return JSONResponse(
@@ -2836,7 +2832,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             HTTPException 404: If instance not available or timeout
         """
         try:
-            # ✅ Check WebSocket connection before attempting to read
+            # Check WebSocket connection before attempting to read
             _check_websocket_connection()
 
             obj_ref = request.objRef
@@ -2994,7 +2990,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             HTTPException 404: If instance not available or timeout
         """
         try:
-            # ✅ Check WebSocket connection before attempting to get data definition
+            # Check WebSocket connection before attempting to get data definition
             _check_websocket_connection()
 
             ld_inst = request.ld_inst
@@ -3077,7 +3073,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_get_brcb_values(request: ReadRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
-            # ✅ Check WebSocket connection before attempting to read BRCB
+            # Check WebSocket connection before attempting to read BRCB
             _check_websocket_connection()
 
             obj_ref = request.objRef
@@ -3154,7 +3150,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_set_brcb_values(request: WriteRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
-            # ✅ Check WebSocket connection before attempting to write BRCB
+            # Check WebSocket connection before attempting to write BRCB
             _check_websocket_connection()
 
             obj_ref = request.objRef
@@ -3231,7 +3227,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_get_urcb_values(request: ReadRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
-            # ✅ Check WebSocket connection before attempting to read URCB
+            # Check WebSocket connection before attempting to read URCB
             _check_websocket_connection()
 
             obj_ref = request.objRef
@@ -3308,7 +3304,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_set_urcb_values(request: WriteRCBValueRequest):
         """Read BRCB values from the connected server."""
         try:
-            # ✅ Check WebSocket connection before attempting to write URCB
+            # Check WebSocket connection before attempting to write URCB
             _check_websocket_connection()
 
             obj_ref = request.objRef
@@ -3385,7 +3381,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
     async def api_get_dataset_directory(request: GetDataSetDirectory):
 
         try:
-            # ✅ Check WebSocket connection before attempting to get dataset directory
+            # Check WebSocket connection before attempting to get dataset directory
             _check_websocket_connection()
 
             ld_inst = request.ld_inst
@@ -3527,7 +3523,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     HTTPException 500: If write operation fails
                 """
         try:
-            # ✅ Check WebSocket connection before attempting to write value
+            # Check WebSocket connection before attempting to write value
             _check_websocket_connection()
 
             obj_ref = request.objRef
@@ -3703,7 +3699,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     HTTPException 500: If write operation fails
                 """
         try:
-            # ✅ Check WebSocket connection before attempting to operate
+            # Check WebSocket connection before attempting to operate
             _check_websocket_connection()
 
             obj_ref = request.objRef

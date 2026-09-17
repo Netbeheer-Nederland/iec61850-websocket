@@ -88,8 +88,7 @@ class ACSIClient:
         self.runtime.endpoint = PassiveEndpoint()
         self.runtime.endpoint.recv_msg_callback = self._on_recv_message
         self.runtime.endpoint.send_msg_callback = self._on_send_message
-        #self.runtime.client = IEC61850Client(self.runtime.cp)
-        #self.runtime.endpoint.add_iec61850_client(self.runtime.client)
+
         self.runtime.client_list = self.runtime.endpoint.client_list
 
         # Model and tree caching
@@ -214,8 +213,8 @@ class ACSIClient:
     def get_model_info(self, cp):
         """Get or create ModelInfo for a CP."""
         if cp not in self._model_info_dict:
-            self._model_info_dict[cp] = ModelInfo(cp)  # New object (default values)
-        return self._model_info_dict[cp]  # ✅ Returns EXISTING object with all its data
+            self._model_info_dict[cp] = ModelInfo(cp)
+        return self._model_info_dict[cp]
 
     def get_iec61850_client(self, cp):
         return next((client for client in self.runtime.client_list if client.cp == cp), None)
@@ -334,22 +333,12 @@ class ACSIClient:
         )
 
         try:
-            
-            # Now client gets callbacks automatically
-            # endpoint.start() runs a reconnect loop forever, so we must NOT
-            # await it directly. Schedule it as a background task and instead
-            # wait for the client's ready_event, which is set once the IEC 61850
-            # association has been established.
+
             start_task = asyncio.create_task(
                 self.runtime.endpoint.start(host, port),
                 name="so-active"
             )
 
-            #client = self.get_iec61850_client(cp)
-            #if not client:
-            #    raise RuntimeError(f"ACSI Client for {cp} not found!")
-
-            # Remember the task so we can cancel it on disconnect.
             self._set_runtime_state(
                 endpoint=self.runtime.endpoint,
                 #client=client,
@@ -390,12 +379,11 @@ class ACSIClient:
     async def _disconnect_async(self) -> None:
         """Disconnect from the server asynchronously."""
         endpoint = self.runtime.endpoint
-        #client = self.runtime.client
 
         self._log_action("Disconnecting...")
         self._set_runtime_state(status="disconnecting")
 
-        # ✅ Cancel the background task first
+        # Cancel the background task
         if hasattr(self.runtime, '_start_task') and self.runtime._start_task:
             self.runtime._start_task.cancel()
 
@@ -520,10 +508,7 @@ class ACSIClient:
             "status": self.runtime.status,
             "host": self.runtime.host,
             "port": self.runtime.port,
-            #"cp": self.runtime.cp,
             "error": self.runtime.error,
-            #"modelStatus": model_info.model_status,
-            #"modelError": model_info.model_error,
         }
 
     async def get_server_directory_tree(self, cp: str, ws_info: Optional[Any] = None) -> Dict[str, Any]:
@@ -545,11 +530,6 @@ class ACSIClient:
         if not ws_info:
             raise RuntimeError('no-websocket-info')
 
-        # Serialize every request over this connection through the shared
-        # invoke_lock — without this, two calls issued close together (e.g.
-        # a background model-rebuild racing a manual UI click) can have
-        # their responses arrive out of order, which the passive endpoint
-        # treats as a protocol violation and closes the connection for.
         async with self.runtime.invoke_lock:
             ld_list = await client.get_server_directory(ws_info, None, None)
         if not isinstance(ld_list, list):
@@ -608,15 +588,10 @@ class ACSIClient:
         if not ws_info:
             raise RuntimeError('no-websocket-info')
 
-        # Fetch all directory types in parallel
         directory_types = ['dataObject', 'brcb', 'urcb', 'dataset']
 
         async def fetch_directory(directory_type):
             try:
-                # Still fetched "concurrently" from the caller's perspective,
-                # but each actual network call is serialized through the
-                # shared lock so responses can't arrive out of order on the
-                # wire.
                 async with self.runtime.invoke_lock:
                     items = await client.get_logical_node_directory(ld_inst, ln_inst, directory_type, ws_info, None, None)
                 return directory_type, items if items else []
@@ -661,7 +636,6 @@ class ACSIClient:
             defn = await client.get_data_definition(obj_ref, ws_info, None, None)
 
         # Build result with the data definition
-        # The data definition typically includes: cdc, fc, type, etc.
         result = {
             "dataObject": do_name,
             "objRef": obj_ref,
