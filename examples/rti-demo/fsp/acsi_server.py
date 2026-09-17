@@ -107,8 +107,6 @@ class ACSIServer:
         self._log_action(f"[DEBUG] New ACSIServer instance: model_path={model_path}, id={id(self.runtime)}", "info")
         # Prefer the model already in runtime (freshly loaded from SCL/model.py)
         # Only reload from file as fallback if runtime model is missing
-        #self.factory_dir = factory_dir
-        #self.model_file = factory_dir / "model.py"
         self.model_file = Path(model_path)
         # If model_path is a directory, append model.py
         if self.model_file.is_dir():
@@ -546,14 +544,6 @@ class ACSIServer:
             self._log_action(f"Hot-swap async execution failed: {exc}", "error")
             return False
 
-    async def _toggle_custom_value(self, server: IEC61850Server, obj_ref: str) -> None:
-        """Periodically update a value for demo purposes."""
-        while True:
-            value = randint(1, 5)
-            await server.update_value(obj_ref, value)
-            self._log_action(f"{obj_ref} updated to {value}")
-            await asyncio.sleep(5)
-
     def _set_runtime_state(self, **kwargs: Any) -> None:
         """Atomically update runtime state."""
         with self.runtime.lock:
@@ -607,8 +597,6 @@ class ACSIServer:
             self.runtime.old_server_cp = None
 
         self._set_runtime_state(
-            #endpoint=None,
-            #server_cp=None,
             tasks={},
             status="stopped",
             error=None,
@@ -822,8 +810,6 @@ class ACSIServer:
 
         coerced_value = self.coerce_server_write_value(value, resolved_data_type)
         self.invoke_on_runtime_loop(server.update_value(obj_ref, coerced_value), timeout=10)
-        #server.update_value(obj_ref, coerced_value)
-
         try:
             server.update_timestamp(item)
         except Exception:
@@ -883,63 +869,3 @@ class ACSIServer:
         """Clear message log."""
         with self.runtime.lock:
             self.runtime.messages.clear()
-
-    def reload_model_dynamically(self) -> bool:
-        """Reload the model from model.py file and apply it to the running server.
-        
-        This method loads the current model from the model.py file and performs
-        a hot-swap if the server is running.
-        
-        Returns:
-            bool: True if model was reloaded successfully, False otherwise
-        
-        Raises:
-            RuntimeError: If model file doesn't exist or model loading fails
-        """
-        if not self.model_file.exists():
-            raise RuntimeError(f"Model file not found: {self.model_file}")
-        
-        try:
-            # Load the current model from file
-            ied_model = self.load_current_runtime_model()
-            
-            # Update runtime state with new model
-            with self.runtime.model_lock:
-                self.runtime.model_version += 1
-                self.runtime.pending_model = ied_model
-                self.runtime.model_source = str(self.model_file)
-                self.runtime.model_ied_name = ied_model.name
-                self.runtime.ied_model = ied_model
-            
-            # Apply hot-swap if server is running
-            if self.runtime.status == "listening":
-                return self._apply_model_hot_swap()
-            else:
-                # Server not running, just update the model
-                with self.runtime.model_lock:
-                    self.runtime.pending_model = None
-                self._log_action(
-                    "Model reloaded (server not running)",
-                    detail={"source": str(self.model_file), "ied": ied_model.name}
-                )
-                return True
-                
-        except Exception as exc:
-            self._log_action(f"Dynamic model reload failed: {exc}", "error")
-            raise RuntimeError(f"Failed to reload model: {exc}")
-
-    def get_model_version_info(self) -> Dict[str, Any]:
-        """Get information about current and pending models.
-        
-        Returns:
-            dict: Model versioning information
-        """
-        with self.runtime.model_lock:
-            return {
-                "currentModelVersion": self.runtime.model_version,
-                "currentModelName": self.runtime.model_ied_name,
-                "currentModelSource": self.runtime.model_source,
-                "pendingModelAvailable": self.runtime.pending_model is not None,
-                "pendingModelName": self.runtime.pending_model.name if self.runtime.pending_model else None,
-                "reloadInProgress": self.runtime.model_reload_in_progress,
-            }

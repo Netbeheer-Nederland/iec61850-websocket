@@ -2249,8 +2249,6 @@ def create_bff_router(
                 rti_fsp._log_action(error_msg, "error")
                 raise ValueError(error_msg)
 
-            # When disabling OAuth, pass None to signal that OAuth should be disabled
-            # The underlying library should handle None properly
             if not request.enable_oauth:
                 rti_fsp._log_action("Disabling OAuth for connection", "info")
                 token_endpoint = None
@@ -2487,7 +2485,7 @@ def create_bff_router(
             HTTPException 404: If instance not available or timeout
         """
         try:
-            obj_ref = request.objRef  # Fixed typo from request,object
+            obj_ref = request.objRef
             fc = request.fc
 
             if not obj_ref:

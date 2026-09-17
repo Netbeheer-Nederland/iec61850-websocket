@@ -305,10 +305,6 @@ FSP (BFF, Port 5001) <--HTTP--> External Clients
 | `acsi_server.py` | WebSocket Server (active mode) | ACSIServerRuntime, ACSIServer |
 | `bff_endpoint.py` | REST API | FastAPI app, endpoint routes |
 | `model.py` | IED model | Generated data model |
-| `check_syntax.py` | Validation | Syntax checking |
-| `run_bff.py` | Runner | Simple execution |
-| `start_bff.bat` | Windows startup | Batch script |
-| `test_start.py` | Tests | Startup validation |
 | `BFF_API.md` | API docs | Endpoint specifications |
 | `Dockerfile` | Container | Multi-stage build |
 
