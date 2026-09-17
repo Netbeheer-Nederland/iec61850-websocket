@@ -90,7 +90,6 @@ function Model({ settings, connections = [], loading = false, onReload }) {
           }
         }
         
-        // If we still have the full BFF response, try result field
         if (modelData === result.payload && modelData?.result) {
           modelData = modelData.result;
         }
@@ -139,12 +138,10 @@ function Model({ settings, connections = [], loading = false, onReload }) {
         reader.readAsText(file);
       });
 
-      // Ensure content is valid
       if (!content || typeof content !== 'string') {
         throw new Error('Could not read file content');
       }
 
-      // Check if content is empty
       if (!content.trim()) {
         throw new Error('File content is empty');
       }
@@ -155,10 +152,7 @@ function Model({ settings, connections = [], loading = false, onReload }) {
       if (file.name.endsWith('.scl') || file.name.endsWith('.scd') || file.name.endsWith('.icd') || file.name.endsWith('.cid')) {
         modelPyContent = generateModelPyCode(content, null, null, file.name);
       }
-      // If .py file, use content directly
-      // Note: content already includes the file content as string
 
-      // Validate connection has required fields
       if (!conn) {
         throw new Error('No connection provided');
       }
@@ -169,7 +163,6 @@ function Model({ settings, connections = [], loading = false, onReload }) {
         throw new Error(`Connection ${conn.name || 'unknown'} has empty host or port (host: ${conn.host}, port: ${conn.port})`);
       }
 
-      // Call the update-iedmodel endpoint through the main BFF's /api/execute
       const targetValue = buildTargetValue(conn.host, conn.port);
       if (!targetValue) {
         throw new Error(`Could not build target value from host: ${conn.host}, port: ${conn.port}`);
@@ -213,19 +206,15 @@ function Model({ settings, connections = [], loading = false, onReload }) {
       setUploadStatus(`Error: ${error.message}`);
     } finally {
       setUploadingModel(false);
-      // Clear file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   }, [setUploadingModel, setUploadStatus]);
 
-  // Trigger file input click
   const handleUpdateModelClick = useCallback((conn) => {
-    // Store the connection for later use
     const currentConn = conn;
     
-    // Click the hidden file input
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.py,.scl,.scd,.icd,.cid';

@@ -95,7 +95,6 @@ function ConnectionModal({
       if (!connName) return;
       
       try {
-        // Try to get OAuth config from BFF - use the same endpoint used for saving
         const bffHost = localStorage.getItem('bffHost') || settings?.bffHost || 'localhost';
         const bffPort = localStorage.getItem('bffPort') || settings?.bffPort || '5000';
         const url = `http://${bffHost}:${bffPort}/api/connections/oauth-config?connection_name=${encodeURIComponent(connName)}`;
@@ -108,8 +107,7 @@ function ConnectionModal({
         if (response.ok) {
           const data = await response.json();
           const updates = {};
-          
-          // Extract OAuth fields from response - try both snake_case and camelCase variants
+
           const extractFields = (obj) => {
             const getField = (snake, camel, formField) => {
               const value = obj[snake] || obj[camel];
@@ -139,20 +137,16 @@ function ConnectionModal({
             }
           };
           
-          // Try to extract from root level
           extractFields(data);
           
-          // Also check nested config
           if (data.config) {
             extractFields(data.config);
           }
           
-          // Also check if wrapped in a connection object
           if (data.connection) {
             extractFields(data.connection);
           }
           
-          // Only update if we have values
           if (Object.keys(updates).length > 0) {
             onFormChange(prev => ({ ...prev, ...updates }));
           }
@@ -166,11 +160,9 @@ function ConnectionModal({
   }, [showModal, currentConnection, formData.name, formData.type, onFormChange, settings]);
 
 
-  // Find matching IDP server for the certificate endpoint when modal opens
   useEffect(() => {
     if (showModal && currentConnection) {
-      // Try to find IDP server by name from formData (set by Setup.jsx or fetched from backend)
-      const idpServerName = formData.idp_server || 
+      const idpServerName = formData.idp_server ||
                            currentConnection.idp_server || 
                            (currentConnection.OAuth || {}).idp_server ||
                            (currentConnection.oauth || {}).idp_server ||
@@ -180,11 +172,9 @@ function ConnectionModal({
         const matchingByName = idpServers.find(server => server.name === idpServerName);
         if (matchingByName) {
           setSelectedIdpServer(matchingByName.name);
-          // Also ensure formData.idp_server is set to match
           if (!formData.idp_server) {
             onFormChange(prev => ({ ...prev, idp_server: matchingByName.name }));
           }
-          // Only update certificate_endpoint if it's not already set
           if (matchingByName.endpoint && !formData.certificate_endpoint) {
             onFormChange(prev => ({
               ...prev,
@@ -195,7 +185,6 @@ function ConnectionModal({
         }
       }
       
-      // Fall back to matching by certificate endpoint
       const certEndpoint = formData.certificate_endpoint || '';
       if (certEndpoint) {
         const matchingIdp = idpServers.find(server => {
@@ -215,7 +204,6 @@ function ConnectionModal({
     }
   }, [showModal, currentConnection, formData.idp_server, formData.certificate_endpoint, idpServers, selectedIdpServer, onFormChange]);
 
-  // Auto-construct token endpoint from selected IDP server and realm
   useEffect(() => {
     if (selectedIdpServer && formData.realm && formData.ws_mode === 'active') {
       const selected = idpServers.find(server => server.name === selectedIdpServer);
@@ -239,7 +227,6 @@ function ConnectionModal({
     }
   }, [selectedIdpServer, formData.realm, formData.ws_mode, formData.token_endpoint, idpServers, onFormChange]);
 
-  // Auto-populate certificate endpoint from selected IDP server for active mode
   useEffect(() => {
     if (selectedIdpServer && formData.realm && formData.ws_mode === "active") {
       const selected = idpServers.find(server => server.name === selectedIdpServer);
@@ -269,7 +256,6 @@ function ConnectionModal({
     }
   }, [selectedIdpServer, formData.realm, formData.ws_mode, formData.certificate_endpoint, formData.token_issuer_url, idpServers, onFormChange]);
 
-  // Auto-construct token issuer URL and certificate endpoint for RTI-SO (passive mode)
   useEffect(() => {
     if (selectedIdpServer && formData.realm && formData.ws_mode === "passive") {
       const selected = idpServers.find(server => server.name === selectedIdpServer);
@@ -301,13 +287,10 @@ function ConnectionModal({
     }
   }, [selectedIdpServer, formData.realm, formData.ws_mode, formData.token_issuer_url, formData.certificate_endpoint, idpServers, onFormChange]);
 
-  // Auto-populate certificate endpoint when IDP server is selected
-  // Update both state and formData in the onChange handler to avoid timing issues
   const handleIdpServerChange = (e) => {
     const serverName = e.target.value;
     setSelectedIdpServer(serverName);
     
-    // Always update idp_server in formData when selection changes
     const updates = { idp_server: serverName };
     
     if (serverName) {

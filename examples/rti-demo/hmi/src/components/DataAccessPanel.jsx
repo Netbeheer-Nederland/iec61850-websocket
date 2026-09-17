@@ -61,9 +61,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
   const dataDefinitionCacheRef = useRef({});
 
 
-  // Tracks the previously-selected target so the dropdown-populate effect can
-  // tell "target actually changed" apart from "getModel/extractHierarchyFromModel
-  // got a new function identity from a parent re-render".
   const prevTargetRef = useRef('');
   
   // State for data operations
@@ -122,10 +119,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     return selectedConnection?.acsi === 'server';
   }, [selectedConnection]);
 
-  // True for "passive" websocket endpoints (e.g. RTI-SO). These need cp entered
-  // manually here rather than inferred from a client-side connection object.
-  // NOTE: adjust this check if your connection `type` strings differ from "RTI-SO",
-  // or if another connection type also happens to contain "SO" as a substring.
   const isWebsocketPassiveEndpoint = useMemo(() => {
     const t = (selectedConnection?.type || '').toUpperCase();
     return t.includes('SO');
@@ -142,10 +135,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     return isWritableFc(fc);
   }, [isServerEndpoint]);
 
-  // Look up the selected DO/SDO's own `cdc` field directly from the model.
-  // Unlike doChildren (which holds the DO's *children*, not the DO itself),
-  // this walks the same two model shapes extractDoDefinitionFromModel handles,
-  // but returns the DO node's cdc instead of its attribute definitions.
   const getDoCdc = (modelData, ldName, lnName, doPath) => {
     try {
       let data = modelData;
@@ -196,14 +185,12 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     }
   };
 
-  // Resolve the currently selected DO's own cdc for the Operate-button check.
   const selectedDoCdc = useMemo(() => {
     if (!selectedTarget || !selectedLD || !selectedLN || !selectedDO || !getModel) return '';
     const modelData = getModel(selectedTarget);
     return getDoCdc(modelData, selectedLD, selectedLN, selectedDO);
   }, [selectedTarget, selectedLD, selectedLN, selectedDO, getModel]);
 
-  // Does the selected DO's own (top-level) definition contain an Oper DA
   const hasOperDA = useMemo(() => {
     return doChildren.some(
         (child) => child.type === 'DA' && (child.name || '').toLowerCase() === 'oper'
@@ -409,12 +396,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
             // PATCH: normalize fc casing for buildDaNode's lookup
             dataAttributes.push({ ...child, fc: child.fc || child.Fc || child.FC || '' });
           } else {
-            // PATCH: classify by exclusion instead of an exact-string whitelist.
-            // Anything nested under a DO that isn't a DA is structurally a
-            // nested data object (SDO) — whatever tag the backend gives it
-            // ('SDO', 'DO', 'DataObject', 'SubDataObject', etc). Dropping
-            // unrecognized tags here is what was silently emptying out CMV/
-            // structured DOs like MMXU's "A" on FSP/server endpoints.
             subDataObjects.push(child);
           }
         });
@@ -430,7 +411,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
     }
   };
 
-  // Walk a path of selected names down the tree to find the node at that depth
   const findNodeAtPath = (nodes, path) => {
     let currentNodes = nodes, node = null;
     for (const name of path) {
@@ -503,7 +483,6 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
       }
       
       // Extract from model.tree structure (ACSIServer format with kind/name/children)
-      // This is the most complete format with full hierarchy including DAs
       if (data?.tree?.children) {
         // Extract from tree structure
         const tree = data.tree;

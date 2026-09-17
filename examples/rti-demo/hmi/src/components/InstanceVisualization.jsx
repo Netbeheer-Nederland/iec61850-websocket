@@ -82,9 +82,6 @@ function InstanceVisualization({
           Loading...
         </div>
       ) : hasConnected ? (
-        // alignItems defaults to 'stretch' here (removed 'flex-start') so the SO
-        // column and the FSP column share the same height, letting the SO side
-        // center itself against however tall the FSP stack ends up being.
         <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', minHeight: '300px' }}>
           {/* SO (Client) Side - Left - centers vertically against FSP column height */}
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minWidth: '180px' }}>
@@ -127,13 +124,8 @@ function InstanceVisualization({
               </React.Fragment>
             ))}
           </div>
-
-          {/* FSP (Server) Side - Right - each FSP is its own row: line + circle/label,
-              stacked vertically. This is what makes each line sit next to its own FSP
-              instead of clustering separately at the top. */}
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '24px' }}>
             {fspConnections.map((conn) => {
-              // Same "detected" signal the connection line already uses.
               const fspDetected = (conn.connectedClients ?? 0) > 0;
               const bothConnected = soDetected && fspDetected;
               const soFailed = !soDetected;

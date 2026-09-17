@@ -32,9 +32,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const navigate = useNavigate();
   const endpoint = location.state?.endpoint;
 
-  // Create instance-specific storage keys. Computed up front (before the
-  // host/port state below) so the port initializer can use portStorageKey
-  // without depending on state that doesn't exist yet.
   const instanceId = endpoint?.name || `${endpoint?.host || 'rti-so'}:${endpoint?.port || 8765}`;
   const storageKey = `acsi-server-connected-${instanceId}`;
   const portStorageKey = `acsi-server-port-${instanceId}`;
@@ -87,8 +84,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     localStorage.setItem(storageKey, String(connected));
   }, [connected, storageKey]);
 
-  // Persist the port for this instance whenever it changes, so it survives
-  // navigating away and back.
   useEffect(() => {
     localStorage.setItem(portStorageKey, port);
   }, [port, portStorageKey]);
@@ -102,8 +97,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     const value = e.target.value;
     setSelectedInstanceName(value);
     if (value === 'custom') {
-      // Fresh custom entry starts from the default port, not whatever was
-      // cached for a previously-selected instance.
       setPort(String(8765));
       return;
     }
@@ -121,10 +114,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   }, []);
 
   const [connectionsLoaded, setConnectionsLoaded] = useState(false);
-  // Fetch connections from BFF to get live TLS/status config.
-  // Returns the fetched list (or null on failure) so callers can act on
-  // freshly-fetched data instead of relying on component state that may
-  // lag behind a background status update.
   const fetchConnections = useCallback(async () => {
     try {
       const url = `${bffBaseUrl}/api/connections`;
@@ -148,7 +137,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     }
   }, [bffBaseUrl, fetchConnections]);
 
-  // Helper to parse Python dict string to JS object
   const parsePythonDictString = useCallback((pythonStr) => {
     if (!pythonStr || typeof pythonStr !== 'string') {
       return pythonStr;
@@ -167,7 +155,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     }
   }, []);
 
-  // Resolve the IDP server name associated with this connection's OAuth config
   const resolveIdpServerName = useCallback((ep) => {
     const oauthConfig = ep?.OAuth || ep?.oauth || {};
     return oauthConfig.idp_server || ep?.idp_server || '';
@@ -202,17 +189,14 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     try {
       const result = await executeApiCall('status', endpointTarget, null);
       if (result?.ok) {
-        // Parse Python dict string in status field
         const parsedPayload = result.payload;
         if (parsedPayload?.result?.status && typeof parsedPayload.result.status === 'string') {
           parsedPayload.result.status = parsePythonDictString(parsedPayload.result.status);
         }
         setStatusInfo(parsedPayload);
 
-        // Sync connected state with actual server status
         const serverStatus = parsedPayload.result?.status;
         if (serverStatus.status) {
-          // Server is considered connected if status is 'running', 'listening', 'connected', or 'starting'
           setConnected(['running', 'listening', 'connected', 'starting'].includes(serverStatus.status));
         }
         if (!cpUserEditedRef.current && Array.isArray(serverStatus?.accessPoints) && serverStatus.accessPoints.length > 0) {
@@ -222,15 +206,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     } catch (error) { console.error('Failed to load status:', error); }
   }, [endpointTarget, executeApiCall, parsePythonDictString]);
 
-  // Load server status and OAuth status on page load
   useEffect(() => {
     if (!endpointTarget) return;
     const fetchInitialData = async () => {
       try {
-        // Load server status
         await loadStatus();
 
-        // Fetch OAuth status
         const result = await executeApiCall('oauth-status', endpointTarget, {});
         if (result?.ok) {
           const enableOAuth = result.payload?.result?.enable_oauth ?? result.payload?.enable_oauth ?? false;
@@ -251,7 +232,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
 
     const syncInitialConfig = async () => {
       if (connected) {
-        // Already connected — trust the live server's own reported config
         try {
           const result = await executeApiCall('status', endpointTarget, null);
           if (result?.ok) {
@@ -269,7 +249,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           console.error('Failed to sync from live server status:', e);
         }
       } else {
-        if (!connectionsLoaded) return; // wait for the real fetch before deciding
+        if (!connectionsLoaded) return;
 
         if (selectedInstanceName === 'custom') {
           initialSyncDoneRef.current = true;
@@ -281,11 +261,9 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           : null;
 
         if (!selectedInstanceName) {
-          // Nothing selected yet — default to the first instance found
           inst = fspInstances[0] || null;
           if (inst) setSelectedInstanceName(inst.name);
         } else if (!inst) {
-          // A name came in (e.g. via navigation state) but it's not in the list
           setSelectedInstanceName('custom');
         }
 
@@ -482,7 +460,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         return;
       }
       try {
-        // Server role: no cp needed, it already owns the model
         const result = await executeApiCall('read', endpointTarget, { objRef, fc });
 
         const updateTreeWithValue = (nodes, targetRef, valueData, isError) => {
@@ -637,13 +614,10 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
               setUseOAuth(newValue);
               // Call reconfig-oauth immediately when checkbox is toggled
               try {
-                  // Build OAuth config from endpoint
                   const oauthConfig = endpoint?.OAuth || {};
 
-                  // For active mode (FSP), use the client's port for WebSocket connection
                   let connectionPort = endpoint?.port || port;
                   if (endpoint?.ws_mode === 'active' || endpoint?.ws_mode === 'Active') {
-                      // Find corresponding client connection (SO) by replacing Server with Client in endpoint name
                       const clientName = endpoint.name.replace('Server', 'Client');
                       const clientConnection = connections.find(c =>
                           (c.type === 'RTI-SO' || c.acsi === 'client') &&
@@ -654,7 +628,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
                       }
                   }
 
-                  // Use the connection's own host/port for the target endpoint
                   const targetHost = endpoint?.host || host;
                   const targetPort = endpoint?.port || port;
                   const connectionTarget = buildTargetValue(targetHost, targetPort);
@@ -666,7 +639,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
                     host: host || "127.0.0.1",
                     port: String(port) || "8675",
                     cp: cp,
-                    // Always send OAuth config fields (null when disabling)
                     token_endpoint_url: newValue ? (oauthConfig.token_endpoint || '') : null,
                     client_id: newValue ? (oauthConfig.client_id || '') : null,
                     client_secret: newValue ? (oauthConfig.client_secret || '') : null,
@@ -674,15 +646,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
                     enable_token_refresh: newValue ? (oauthConfig.enable_token_refresh || false) : false
                   };
 
-                  // Save to SO/FSP server
                   const soResult = await executeApiCall('reconfig-oauth', connectionTarget, requestBody);
 
-                  // Also save to BFF's connections.json
                   const bffOauthConfig = {
                     connection_name: endpoint?.name || host,
                     enable_oauth: newValue,
                     ws_mode: endpoint?.ws_mode || 'Active',
-                    // Always send OAuth config fields (null when disabling)
                     token_endpoint_url: newValue ? (oauthConfig.token_endpoint || '') : null,
                     client_id: newValue ? (oauthConfig.client_id || '') : null,
                     client_secret: newValue ? (oauthConfig.client_secret || '') : null,
@@ -770,9 +739,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         <button id="acsi-load-model-btn" className="btn-primary" onClick={loadServerModel} disabled={loading}>
           {loading ? 'Loading...' : 'Load Model'}
         </button>
-        {/*<button id="acsi-reload-status-btn" className="btn-secondary" onClick={loadStatus} disabled={!endpointTarget}>
-          Reload Status
-        </button>*/}
       </div>
 
       {message && (
@@ -864,7 +830,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         }}
         connection={(
           () => {
-            // Try to find matching connection from live connections (has updated TLS)
             const liveConn = connections.find(c =>
               (c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) ||
               (c.host === host && String(c.port) === String(port))
@@ -872,7 +837,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             if (liveConn) {
               return liveConn;
             }
-            // Fallback to endpoint with TLS if available
             if (endpoint?.TLS) {
               return {
                 name: endpoint.name || host,
@@ -888,7 +852,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
                 }
               };
             }
-            // Final fallback
             return {
               name: endpoint?.name || host,
               host: endpoint?.host || host,

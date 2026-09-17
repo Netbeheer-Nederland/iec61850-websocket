@@ -102,7 +102,7 @@ const WriteValueModal = ({ objRef, fc, endpoint, cp, onClose, onSuccess }) => {
       let result = await executeApiCall('write', endpointTarget, {
         objRef,
         fc,
-        value: newValue,      // send the raw string, like DataAccessPanel does
+        value: newValue,
         dataType: type,
         ...(cp ? { cp } : {}),
       });

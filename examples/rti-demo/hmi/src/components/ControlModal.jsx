@@ -108,11 +108,6 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess, 
       const params = getControlParameters();
       const endpointTarget = `${endpoint.host}:${endpoint.port}`;
       const response = await executeApiCall('operate', endpointTarget, params);
-
-      // response?.ok only reflects the HTTP call succeeding, not whether the
-      // control operation itself was accepted by the device. Check the actual
-      // result payload (same shape DataAccessPanel already unwraps for
-      // writeResult) so a device-level rejection isn't reported as success.
       const opSuccess = response?.ok &&
         (response?.payload?.result?.success ?? response?.payload?.success ?? true);
 

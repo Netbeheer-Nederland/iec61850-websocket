@@ -49,11 +49,8 @@ function App() {
     bffPort: '5000'
   });
 
-  // Single source of truth for the BFF base URL, derived from settings.
   const bffBaseUrl = `http://${settings.bffHost}:${settings.bffPort}`;
 
-  // Models state: stores endpoint -> model mapping
-  // updateModel: add/update a model for an endpoint
   const updateModel = useCallback((endpointId, modelData) => {
     setModels(prev => ({
       ...prev,
@@ -64,13 +61,10 @@ function App() {
     }));
   }, []);
 
-  // getModel: retrieve a model by endpoint ID
   const getModel = useCallback((endpointId) => {
     return models[endpointId]?.data;
   }, [models]);
 
-  // Parses the Python-dict-formatted status string the FSP's /api/status
-  // endpoint returns, e.g. "{'status': 'listening', 'connectedClients': 1, ...}".
   const parsePythonDictString = useCallback((pythonStr) => {
     if (!pythonStr || typeof pythonStr !== 'string') return null;
     try {
@@ -144,7 +138,6 @@ function App() {
     }
   }, [settings.bffHost, settings.bffPort, enrichFspClientCounts]);
 
-  // Fetch once on mount / whenever BFF settings change
   useEffect(() => {
     fetchConnections();
   }, [fetchConnections]);
@@ -156,7 +149,6 @@ function App() {
     return () => clearInterval(interval);
   }, [fetchConnections]);
 
-  // Load settings from localStorage
   useEffect(() => {
     const savedSettings = localStorage.getItem('rti-hmi-settings');
     if (savedSettings) {
@@ -168,17 +160,14 @@ function App() {
     }
   }, []);
 
-  // Save settings to localStorage
   useEffect(() => {
     localStorage.setItem('rti-hmi-settings', JSON.stringify(settings));
   }, [settings]);
 
-  // Save connections to localStorage
   useEffect(() => {
     localStorage.setItem('rti-hmi-connections', JSON.stringify(connections));
   }, [connections]);
 
-  // Function to fetch endpoints (memoized with useCallback)
   const fetchEndpoints = useCallback(async () => {
     try {
       setLoading(true);
@@ -196,33 +185,6 @@ function App() {
       setLoading(false);
     }
   }, [settings.bffHost, settings.bffPort]);
-
-  // Poll endpoints - COMMENTED OUT to stop automatic polling
-  // useEffect(() => {
-  //   fetchEndpoints();
-  //   const interval = setInterval(fetchEndpoints, 5000);
-  //   return () => clearInterval(interval);
-  // }, [fetchEndpoints]);
-
-  // Poll BFF status - COMMENTED OUT to stop automatic polling
-  // useEffect(() => {
-  //   const checkBffStatus = async () => {
-  //     try {
-  //       const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/health`);
-  //       if (response.ok) {
-  //         setBffStatus({ connected: true, text: 'BFF connected' });
-  //       } else {
-  //         setBffStatus({ connected: false, text: 'BFF disconnected' });
-  //       }
-  //     } catch (error) {
-  //       setBffStatus({ connected: false, text: 'BFF disconnected' });
-  //     }
-  //   };
-
-  //   checkBffStatus();
-  //   const interval = setInterval(checkBffStatus, 10000);
-  //   return () => clearInterval(interval);
-  // }, [settings.bffHost, settings.bffPort]);
 
   return (
     <Router>

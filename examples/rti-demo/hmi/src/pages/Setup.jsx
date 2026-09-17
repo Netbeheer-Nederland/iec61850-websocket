@@ -81,15 +81,11 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
   const handleEditConnection = (conn) => {
     setCurrentConnection(conn);
     
-    // Try to find OAuth config in multiple possible locations
     const oauthConfig = conn.OAuth || conn.oauth || conn.oauth_config || conn.OAuthConfig || conn.oauthConfig || {};
     
-    // Also check if OAuth config is nested differently
     const propertiesOauth = (conn.properties_info || {}).properties || {};
     const oauthFromProps = propertiesOauth.OAuth || propertiesOauth.oauth || {};
-    
-    // Load OAuth fields from OAuth object (primary) or fallback to top-level connection
-    // Check all possible field names for certificate endpoint
+
     let certificateEndpoint = oauthConfig.certificate_endpoint || 
                                   oauthConfig.certificate_endpoint_url || 
                                   oauthFromProps.certificate_endpoint || 
@@ -114,7 +110,6 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
                            oauthFromProps.token_issuer_url || 
                            conn.token_issuer_url || '';
     
-    // FSP-specific OAuth fields from OAuth object (primary) or fallback to top-level
     const realm = oauthConfig.realm || oauthFromProps.realm || conn.realm || '';
     const tokenEndpoint = oauthConfig.token_endpoint || 
                           oauthFromProps.token_endpoint || 
@@ -124,29 +119,23 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
     const clientId = oauthConfig.client_id || oauthFromProps.client_id || conn.client_id || '';
     const clientSecret = oauthConfig.client_secret || oauthFromProps.client_secret || conn.client_secret || '';
     const enableTokenRefresh = oauthConfig.enable_token_refresh || oauthFromProps.enable_token_refresh || conn.enable_token_refresh || false;
-    
-    // IDP Server name reference (to help with dropdown selection)
-    // Try many possible locations and field names
+
     let idpServer = oauthConfig.idp_server || 
                    oauthFromProps.idp_server || 
                    conn.idp_server || 
                    oauthConfig.idpServer || 
                    oauthFromProps.idpServer || 
                    conn.idpServer || 
-                   // Maybe it's stored as the IDP server name directly
-                   (conn.OAuth || {}).idp_server_name || 
+                   (conn.OAuth || {}).idp_server_name ||
                    (conn.oauth || {}).idp_server_name || 
                    conn.idp_server_name || 
-                   // Or maybe it's the endpoint URL which we can match to an IDP server
                    '';
     
-    // If certificate_endpoint is empty but we have an idp_server name, try to get it from the IDP server's endpoint
     if (!certificateEndpoint && idpServer) {
       const idpServers = connections.filter(c => c.type === 'IDP-Server');
       const matchingIdp = idpServers.find(server => server.name === idpServer);
       if (matchingIdp && matchingIdp.endpoint) {
         certificateEndpoint = matchingIdp.endpoint;
-        // If idp_server wasn't set, set it now
         if (!idpServer) {
           idpServer = matchingIdp.name;
         }
@@ -212,9 +201,6 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
         return;
       }
 
-      // Add auth_server_ca to formData if it exists
-      // Note: authServerCa is managed in ConnectionModal component state, not in formData
-      // For now, we'll include it in the save
       const saveData = { ...formData };
 
       if (currentConnection) {

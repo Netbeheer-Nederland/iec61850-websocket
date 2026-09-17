@@ -27,9 +27,6 @@ function Sidebar() {
     { path: '/traffic', icon: 'fa-exchange-alt', label: 'Traffic' },
     { path: '/tools', icon: 'fa-tools', label: 'Tools' },
     { path: '/settings', icon: 'fa-cog', label: 'Settings' },
-    // Hidden items from original HTML
-    // { path: '/reports', icon: 'fa-file-pdf', label: 'Reports', hidden: true },
-    // { path: '/diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics', hidden: true },
   ];
 
   return (

@@ -278,11 +278,7 @@ const TLSConfigModal = ({
   }, [connection, enableTLS, buildConfig, bffBaseUrl, onSuccess, onError, onClose, wsHost]);
 
   if (!isOpen || !connection) return null;
-  
-  // If wsMode is still 'N/A', we still want to show the modal with empty fields
-  // The user can configure TLS even if there's no existing config
 
-  // All styles use CSS variables from your theme
   const styles = {
     modal: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
