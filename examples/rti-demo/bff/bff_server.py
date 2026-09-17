@@ -15,20 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Backend for Frontend (BFF) Server for RTI Demo.
-
-This module provides a FastAPI-based REST API for managing RTI service discovery,
-connections, data operations, and proxy requests to backend services.
-
-Features:
-- Service discovery (Docker and network-based)
-- Connection management to remote endpoints
-- Data read/write operations
-- Dynamic API execution against registered targets
-- Health checks and status monitoring
-- Report generation and export
-"""
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -51,7 +37,6 @@ from pydantic_models import *
 from bffClient import BffClient
 
 from ConnectionManager import ConnectionManager
-from DataManager import DataManager
 
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
@@ -180,8 +165,6 @@ if (
 
 # Initialize managers
 conn_manager = ConnectionManager(bff_clients=_bff_clients, connections_file=CONNECTIONS_FILE, logger=logger)
-data_manager = DataManager(conn_manager, logger)
-
 
 # ==================== FastAPI Application Setup ====================
 from contextlib import asynccontextmanager
@@ -270,7 +253,7 @@ async def _check_target(key: str, client: BffClient) -> Dict[str, str]:
 @app.get(
     "/api/health",
     summary="Health Check",
-    description="Health check endpoint for frontend: BFF status, discovered targets, and optional target reachability.",
+    description="Health check endpoint for frontend: BFF status and optional target reachability.",
     response_description="Health status information",
     responses={
         200: {"description": "Service is healthy"},
@@ -367,34 +350,16 @@ def _fetch_endpoint_properties(endpoint: Dict) -> Dict:
     tags=["Endpoints"]
 )
 async def get_endpoints():
-    """Retrieve all configured and discovered endpoints.
+    """Retrieve all configured endpoints.
     
     This endpoint returns:
     - Manual connections from the connection manager
-    - Auto-discovered services (from Docker and network scans)
     - Properties information for each endpoint when available
     
     Returns:
-        JSON with endpoints list, counts, and discovery metadata.
+        JSON with endpoints list and count
     """
-    # Keep Docker-discovery cache fresh when enabled.
-    #if discovery.docker_enabled:
-    #    discovery.discover_services()
-    #    _register_bff_clients(discovery.discovered_services)
-
-    # Use statuses already kept fresh by the background status_monitor instead
-    # of blocking this request on a live health-check scan.
     endpoints = list(conn_manager.connections)
-    #discovered = dict(discovery.discovered_services)
-
-    # Add discovered services not already present in manual connections.
-    #for service_info in discovered.values():
-    #    exists = any(e['host'] == service_info['host'] and e['port'] == service_info['port'] for e in endpoints)
-    #    if not exists:
-    #        endpoints.append(service_info)
-
-    # Enrich every endpoint with its properties payload in parallel, off the
-    # event loop (the underlying call uses blocking `requests`).
     properties = await asyncio.gather(
         *(asyncio.to_thread(_fetch_endpoint_properties, endpoint) for endpoint in endpoints)
     )
@@ -403,10 +368,7 @@ async def get_endpoints():
 
     return {
         'endpoints': endpoints,
-        'count': len(endpoints),
-        #'discovered_count': len(discovered),
-        #'last_discovery': discovery.last_discovery,
-        #'docker_enabled': discovery.docker_enabled
+        'count': len(endpoints)
     }
 
 # -------------------- Connections Management --------------------
@@ -432,10 +394,7 @@ async def get_connections():
     for conn in conn_manager.connections:
         if 'status' not in conn:
             # Set default status based on type
-            if conn.get('type') == 'IDP-Server':
-                conn['status'] = 'connected'
-            else:
-                conn['status'] = 'disconnected'
+            conn['status'] = 'disconnected'
         connections_with_status.append(conn)
 
     return {
@@ -447,7 +406,7 @@ async def get_connections():
 @app.post(
     "/api/connections/tls-config",
     summary="update TLS Config for a specific connection",
-    description="update TLS Config for a specific connectio",
+    description="update TLS Config for a specific connection",
     response_description="apply result",
     responses={
         201: {"description": "Connection with TLS config created successfully"},
@@ -931,169 +890,6 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
     return connection
 
 
-# -------------------- Data Operations --------------------
-
-@app.post(
-    "/api/data/read",
-    summary="Read Data",
-    description="Read data from a connection.",
-    response_description="Read value result",
-    responses={
-        200: {"description": "Data read successfully"},
-        400: {"description": "Missing required fields or no connections configured"}
-    },
-    tags=["Data"]
-)
-async def read_data(request: DataReadRequest):
-    """Read data from a remote endpoint.
-    
-    Request Body:
-        DataReadRequest with objRef (object reference)
-    
-    Returns:
-        JSON with objRef, value, type, and timestamp.
-        If no connections are configured, returns mock data.
-        
-    Raises:
-        HTTPException 400: If objRef is missing or no connections configured.
-    """
-    if not conn_manager.connections:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail='No connections configured'
-        )
-    
-    connection = conn_manager.connections[0]
-    obj_ref = request.objRef
-    
-    # Call remote service
-    result = data_manager.read_data(connection, obj_ref)
-    
-    if result:
-        return {
-            'objRef': obj_ref,
-            'value': result.get('value'),
-            'type': result.get('type'),
-            'timestamp': datetime.now().isoformat()
-        }
-    else:
-        # Return mock data for demonstration
-        return {
-            'objRef': obj_ref,
-            'value': '42',
-            'type': 'float',
-            'timestamp': datetime.now().isoformat(),
-            'source': 'mock'
-        }
-
-
-@app.post(
-    "/api/data/write",
-    summary="Write Data",
-    description="Write data to a connection.",
-    response_description="Write operation result",
-    responses={
-        200: {"description": "Data written successfully"},
-        400: {"description": "Missing required fields or no connections configured"}
-    },
-    tags=["Data"]
-)
-async def write_data(request: DataWriteRequest):
-    """Write data to a remote endpoint.
-    
-    Request Body:
-        DataWriteRequest with objRef and value
-    
-    Returns:
-        JSON with objRef, value, status, and timestamp.
-        
-    Raises:
-        HTTPException 400: If objRef or value is missing, or no connections configured.
-    """
-    if not conn_manager.connections:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail='No connections configured'
-        )
-    
-    connection = conn_manager.connections[0]
-    obj_ref = request.objRef
-    value = request.value
-    
-    # Call remote service
-    result = data_manager.write_data(connection, obj_ref, value)
-    
-    if result:
-        return {
-            'objRef': obj_ref,
-            'value': value,
-            'status': 'success',
-            'timestamp': datetime.now().isoformat()
-        }
-    else:
-        return {
-            'objRef': obj_ref,
-            'value': value,
-            'status': 'success',
-            'timestamp': datetime.now().isoformat(),
-            'source': 'mock'
-        }
-
-
-# -------------------- Operate --------------------
-@app.post(
-    "/api/operate",
-    summary="Operate on DO",
-    description="Send Operate Command",
-    response_description="Operate result",
-    responses={
-        200: {"description": "Command operated successfully"},
-        400: {"description": "Missing required fields or no connections configured"}
-    },
-    tags=["Data"]
-)
-async def operate(request: DataWriteRequest):
-    """Operate on a remote endpoint.
-
-    Request Body:
-        OperateRequest with objRef and value
-
-    Returns:
-        JSON with objRef, value, status, and timestamp.
-
-    Raises:
-        HTTPException 400: If objRef or value is missing, or no connections configured.
-    """
-    if not conn_manager.connections:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail='No connections configured'
-        )
-
-    connection = conn_manager.connections[0]
-    obj_ref = request.objRef
-    value = request.value
-
-    # Call remote service
-    result = data_manager.operate(connection, obj_ref, value)
-
-    if result:
-        return {
-            'objRef': obj_ref,
-            'value': value,
-            'status': 'success',
-            'timestamp': datetime.now().isoformat()
-        }
-    else:
-        return {
-            'objRef': obj_ref,
-            'value': value,
-            'status': 'success',
-            'timestamp': datetime.now().isoformat(),
-            'source': 'mock'
-        }
-
-
 # -------------------- Dynamic API Execution --------------------
 
 @app.post(
@@ -1224,7 +1020,7 @@ async def execute_dynamic_api(request: ExecuteRequest):
 )
 async def get_reports():
     """Get a list of available reports.
-    
+
     Returns:
         JSON with list of mock reports for demonstration.
     """
@@ -1248,7 +1044,7 @@ async def get_reports():
             'timestamp': datetime.now().isoformat()
         }
     ]
-    
+
     return {'reports': mock_reports}
 
 
@@ -1264,7 +1060,7 @@ async def get_reports():
 )
 async def export_reports():
     """Export reports data including connections and summary.
-    
+
     Returns:
         JSON with exported data including connections and reports.
     """
@@ -1278,7 +1074,7 @@ async def export_reports():
             }
         ]
     }
-    
+
     return {'data': export_data, 'status': 'success'}
 
 

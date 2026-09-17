@@ -52,7 +52,6 @@ class ConnectionManager:
     - Loading/saving connections from/to connections.json
     - Creating BffClient instances for each connection
     - Monitoring connection health status
-    - Auto-registering discovered services
     - Providing connection lookup by name or host:port
     
     Attributes:
@@ -170,7 +169,7 @@ class ConnectionManager:
         """Add a new connection.
 
         Args:
-            name: Human-readable name for the connection
+            name: Unique Human-readable name for the connection
             host: Hostname or IP address
             port: Port number
             conn_type: Type of endpoint
@@ -408,30 +407,6 @@ class ConnectionManager:
                 self.logger.warning(
                     f"Could not persist status for {conn_name}: {e}"
                 )
-
-    def auto_register_discovered(self, discovered: Dict[str, Dict]) -> int:
-        """Auto-register discovered services as connections.
-
-        Args:
-            discovered: Dictionary of discovered services
-
-        Returns:
-            Number of services registered.
-        """
-        registered = 0
-        for service_name, service_info in discovered.items():
-            existing = self.get_connection_by_host_port(service_info['host'],
-                                                        service_info['port'])
-            if not existing:
-                self.add_connection(
-                    name=service_info['name'],
-                    host=service_info['host'],
-                    port=service_info['port'],
-                    conn_type=service_info['type'],
-                    auto_discovered=True
-                )
-                registered += 1
-        return registered
 
     async def check_connection(self, con, client):
         # For IDP-Server, check via endpoint or host:port
