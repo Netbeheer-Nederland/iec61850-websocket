@@ -37,7 +37,7 @@ RUN uv venv && \
     fi
 
 # Copy application code
-COPY demo_IO/io_api_server/ /app/demo_IO/
+COPY demo_IO/io_api_server/ /app/demo_IO/io_api_server/
 
 
 # ============================================================
