@@ -2,7 +2,7 @@
   {
     "id": 1,
     "name": "Demo_Pi1",
-    "host": "127.0.0.1",
+    "host": "192.168.178.33",
     "port": 5002,
     "type": "RTI-SO",
     "acsi": "client",
@@ -34,7 +34,7 @@
   {
     "id": 2,
     "name": "demo_pi2",
-    "host": "127.0.0.1",
+    "host": "192.168.178.33",
     "port": 5001,
     "type": "RTI-FSP",
     "acsi": "server",
@@ -66,7 +66,7 @@
   {
     "id": 3,
     "name": "testFSP2",
-    "host": "127.0.0.1",
+    "host": "192.168.178.33",
     "port": 5005,
     "type": "RTI-FSP",
     "acsi": "server",

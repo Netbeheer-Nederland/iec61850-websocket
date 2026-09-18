@@ -86,10 +86,6 @@ with OAuth fields from connections.json.
 * Connection types: RTI-FSP, RTI-SO, IDP-Server
 * Features: Load/save connections, add/update/delete, health monitoring, auto-discovery
 
-==== DataManager.py
-* Executes data operations against connected endpoints
-* Methods: call_remote_service, read_data, write_data, operate
-
 ==== bffClient.py
 * HTTP client wrapper for BFF-to-backend communication
 * Connection pooling, error handling, JSON parsing
@@ -118,13 +114,6 @@ with OAuth fields from connections.json.
 * **POST** `/api/connections/oauth-config` - Update OAuth for connection
 * **GET** `/api/connections/oauth-config` - Get OAuth config
 * **GET** `/api/connections/oauth-status` - Get OAuth enable status
-
-==== Data Operations
-* **POST** `/api/data/read` - Read data from connection
-* **POST** `/api/data/write` - Write data to connection
-
-==== Control Operations
-* **POST** `/api/operate` - Perform control operation
 
 ==== Dynamic Execution
 * **POST** `/api/execute` - Execute any API on registered target

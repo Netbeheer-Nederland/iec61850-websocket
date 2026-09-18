@@ -1,3 +1,22 @@
+/*
+ * SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Copyright 2025 Netbeheer Nederland
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 // src/pages/ACSIClient.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -14,15 +33,13 @@ const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG
 const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connections: propConnections = [] }) => {
   const location = useLocation();
   const endpoint = location.state?.endpoint;
-  // Store the original API endpoint (BFF) - this is used for all API calls
-  // WS host/port are only used in the body of connect/disconnect calls
   const apiTarget = endpoint ? `${endpoint.host}:${endpoint.port}` : null;
   const [wsHost, setWsHost] = useState('127.0.0.1');
   const [wsPort, setWsPort] = useState(8765);
   const [wsCp, setWsCp] = useState(endpoint?.cp || 'cp1');
   const [connected, setConnected] = useState(() => localStorage.getItem('acsi-connected') === 'true');
-  const [clientTrees, setClientTrees] = useState({}); // cp -> tree object, keyed so each client keeps its own model
-  const [clientLoading, setClientLoading] = useState({}); // cp -> boolean, tracks in-flight "Fetch Model" per client
+  const [clientTrees, setClientTrees] = useState({});
+  const [clientLoading, setClientLoading] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [statusInfo, setStatusInfo] = useState(null);
@@ -102,8 +119,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     localStorage.setItem('acsi-connected', String(connected));
   }, [connected]);
 
-  // Keep wsHost/wsPort in sync with the live status response — the user
-  // can't edit these; they always reflect what the SO server reports.
   useEffect(() => {
     const liveHost = statusInfo?.result?.host;
     const livePort = statusInfo?.result?.port;
@@ -111,11 +126,8 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     if (livePort !== undefined && livePort !== null) setWsPort(livePort);
   }, [statusInfo]);
 
-  // apiTarget for WS connection display (can be edited by user)
   const wsEndpointTarget = `${wsHost}:${wsPort}`;
 
-  // Color for the small connection-status dot next to "Websocket Connection",
-  // driven by the /api/status response's result.status field.
   const connectionStatusColor = (() => {
     const status = (statusInfo?.result?.status || '').toLowerCase();
     if (status === 'connected') return '#4caf50';
@@ -125,8 +137,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     return '#9e9e9e'; // unknown/not yet loaded
   })();
 
-  // Display label for the dot's tooltip — translates the raw backend status
-  // into the wording we want shown to the user.
   const connectionStatusLabel = (() => {
     const status = (statusInfo?.result?.status || '').toLowerCase();
     const STATUS_LABELS = {
@@ -176,12 +186,9 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     }
   }, [apiTarget]);
 
-    // Auto-poll SO status when endpoint is available — same pattern as
-    // ACSIServer.jsx, so the connection status and host/port stay fresh
-    // without requiring a manual "Reload Status" click.
     useEffect(() => {
       if (!apiTarget) return;
-      loadStatus(); // immediate fetch on mount / target change
+      loadStatus();
       statusIntervalRef.current = setInterval(loadStatus, 10000);
       return () => {
         if (statusIntervalRef.current) {
@@ -238,8 +245,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   }, [apiTarget]);
 
   // Load model tree
-  // cpParam lets callers (accordion "Fetch Model" buttons) target a specific
-  // cp; each cp's fetched tree is kept independently in clientTrees.
   const loadClientTree = useCallback(async (cpParam) => {
     if (!apiTarget) {
       setError('No API endpoint configured');
@@ -387,7 +392,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   });
 };
 
-  // Format value for display - matching the JS version logic
   const formatValueForDisplay = useCallback((valueData, isError = false) => {
     if (isError) {
       return { display: '✗ Error', color: '#c62828' };
@@ -526,9 +530,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     [apiTarget, wsCp, formatValueForDisplay]
   );
 
-  // Cache of DO definitions used ONLY to decide context-menu availability.
-  // Deliberately separate from clientTrees so checking it never expands a row.
-  // Cache key includes cp since the same ref string can exist under different clients.
   const fetchDoDefinition = useCallback(
     async (ref, cpParam) => {
       const cpToUse = cpParam || wsCp;
@@ -565,7 +566,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   const hasOperInDef = (def) =>
     !!def?.dataAttributes?.some((da) => (da.name || da.daRef?.split('.').pop() || '').toLowerCase() === 'oper');
 
-  // Handle context menu
   const handleContextMenu = useCallback(
     (e, nodeInfo) => {
       e.preventDefault();
@@ -577,7 +577,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
       const cachedDef = doDefinitionCacheRef.current[cacheKey];
       const isDO = nodeInfo.nodeType === 'DO';
 
-      // Open right away with whatever we already know.
       setContextMenuTarget({
         ...nodeInfo,
         cp: cpToUse,
@@ -586,13 +585,12 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
       });
       setContextMenu({ visible: true, x: clientX, y: clientY });
 
-      // If unknown, resolve in the background — no setClientTrees, no expand side-effect.
       if (isDO && !cachedDef) {
         fetchDoDefinition(nodeInfo.ref, cpToUse).then((def) => {
           setContextMenuTarget((prev) =>
             prev && prev.ref === nodeInfo.ref
               ? { ...prev, hasOperDA: hasOperInDef(def), operPending: false }
-              : prev // menu target changed/closed since — ignore stale result
+              : prev
           );
         });
       }
@@ -606,9 +604,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     setContextMenuTarget(null);
   }, []);
 
-  // Handle node click (for expanding DOs/SDOs)
-  // nodeInfo.cp identifies which client's tree/accordion this click came
-  // from — each accordion's <Tree> forces this explicitly on every callback.
 const handleNodeClick = useCallback(
   async (nodeInfo) => {
     const nodeRef = nodeInfo.ref;
@@ -658,7 +653,6 @@ const handleNodeClick = useCallback(
         console.error('Failed to fetch DataSet directory:', error);
       }
     } else if (nodeInfo.nodeType === 'ReportControl') {
-      // Open ReportControl modal (if implemented)
       console.log('ReportControl clicked:', nodeInfo.ref);
     }
   },
@@ -675,9 +669,7 @@ const handleNodeClick = useCallback(
     }
     return null;
   };
-  // Helper to update tree with children for DOs/SDOs
-  // Writes directly into clientTrees[cp] via functional setState, so it never
-  // relies on a possibly-stale closure over the current tree.
+
   const updateTreeWithChildren = useCallback((cp, ref, dataAttributes, subDataObjects) => {
 
     const buildSdaChildren = (sdaList, parentRef, parentFc) => {
@@ -734,28 +726,23 @@ const handleNodeClick = useCallback(
               });
 
             changed = true;
-            // Return same object reference if nothing new to add
             if (daChildren.length === 0 && sdoChildren.length === 0) return node;
             return { ...node, children: [...existingChildren, ...daChildren, ...sdoChildren] };
           }
 
           if (node.children && node.children.length > 0) {
             const updatedChildren = updateNode(node.children);
-            // Only create new object if children actually changed
             if (updatedChildren !== node.children) {
               return { ...node, children: updatedChildren };
             }
           }
-          // Return same reference for unchanged nodes — React skips re-rendering these
           return node;
         });
 
-        // Return same array reference if nothing changed
         return changed || result.some((n, i) => n !== nodes[i]) ? result : nodes;
       };
 
       const updatedChildren = updateNode(tree.children);
-      // Only trigger re-render if something actually changed
       if (updatedChildren === tree.children) return prevTrees;
       return { ...prevTrees, [cp]: { ...tree, children: updatedChildren } };
     });
@@ -803,7 +790,6 @@ const getContextMenuItems = () => {
             label: 'Operate',
             icon: 'fa-play',
             action: () => {
-              // Capture the target info before closing the context menu
               const {ref, name, cdc, endpoint: nodeEndpoint, cp: nodeCp} = contextMenuTarget;
               setControlModalTarget({ref, name, cdc, endpoint: nodeEndpoint, cp: nodeCp});
               setShowControlModal(true);
@@ -851,7 +837,6 @@ const getContextMenuItems = () => {
       label: 'Configure',
       icon: 'fa-cog',
       action: () => {
-        // Capture the target info before closing the context menu
         const { ref, rcbType: nodeRcbType, endpoint: nodeEndpoint, cp: nodeCp } = contextMenuTarget;
         setBrcbConfigTarget({ ref, rcbType: nodeRcbType || nodeType, endpoint: nodeEndpoint, cp: nodeCp });
         setShowBrcbConfigModal(true);
@@ -935,10 +920,8 @@ const getContextMenuItems = () => {
                   // Build OAuth config from endpoint
                   const oauthConfig = endpoint?.OAuth || {};
 
-                  // For active mode connections, use the client's port for WebSocket connection
                   let connectionPort = endpoint?.port || wsPort;
                   if (endpoint?.ws_mode === 'active' || endpoint?.ws_mode === 'Active') {
-                      // Find corresponding client connection (SO) by replacing Server with Client in endpoint name
                       const clientName = endpoint.name.replace('Server', 'Client');
                       const clientConnection = propConnections.find(c =>
                           (c.type === 'RTI-SO' || c.acsi === 'client') &&
@@ -949,7 +932,6 @@ const getContextMenuItems = () => {
                       }
                   }
 
-                  // Use the connection's own host/port for the target endpoint
                   const targetHost = endpoint?.host || wsHost;
                   const targetPort = endpoint?.port || wsPort;
                   const connectionTarget = buildTargetValue(targetHost, targetPort);
@@ -961,7 +943,6 @@ const getContextMenuItems = () => {
                     host: endpoint?.host || wsHost,
                     port: String(connectionPort),
                     cp: wsCp,
-                    // Always send OAuth config fields (null when disabling)
                     certificate_endpoint_url: newValue ? (oauthConfig.certificate_endpoint || '') : null,
                     token_issuer_url: newValue ? (oauthConfig.token_issuer || oauthConfig.token_endpoint || '') : null,
                     ca_certificate: newValue ? (oauthConfig.auth_server_ca || '').trim() : null
@@ -970,12 +951,10 @@ const getContextMenuItems = () => {
                   // Save to SO server
                   const soResult = await executeApiCall('reconfig-oauth', connectionTarget, requestBody);
 
-                  // Also save to BFF's connections.json
                   const bffOauthConfig = {
                     connection_name: endpoint?.name || wsHost,
                     enable_oauth: newValue,
                     ws_mode: endpoint?.ws_mode || 'passive',
-                    // Always send OAuth config fields (null when disabling)
                     certificate_endpoint_url: newValue ? (oauthConfig.certificate_endpoint || '') : null,
                     token_issuer_url: newValue ? (oauthConfig.token_issuer || oauthConfig.token_endpoint || '') : null,
                     ca_certificate: newValue ? (oauthConfig.auth_server_ca || '').trim() : null
@@ -1117,33 +1096,6 @@ const getContextMenuItems = () => {
           {error}
         </div>
       )}
-
-      {/* Status Info */}
-      {/*}
-      {statusInfo && (
-        <div style={{ marginBottom: '24px', padding: '16px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-          <h3 style={{ margin: 0, marginBottom: '12px', fontSize: '16px' }}>Connection Status</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Address</span>
-              <div style={{ fontWeight: '500' }}>{statusInfo.result?.host}:{statusInfo.result?.port}</div>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Status</span>
-              <div style={{ fontWeight: '500' }}>{JSON.stringify(statusInfo.result?.status)}</div>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Model</span>
-              <div style={{ fontWeight: '500' }}>{statusInfo.result?.status?.modelName || 'N/A'}</div>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Access Points</span>
-              <div style={{ fontWeight: '500' }}>{statusInfo.result?.accessPoints || 'N/A'}</div>
-            </div>
-          </div>
-        </div>
-      )}
-      */}
 
       <div className="page-header" style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

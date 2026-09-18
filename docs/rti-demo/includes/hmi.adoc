@@ -299,7 +299,7 @@ BFF (port 5000) expects these endpoints:
 
 *Connection Management*: POST /api/add-connection, PUT /api/edit-connection/{name}, DELETE /api/delete-connection/{name}
 
-*Data Operations*: POST /api/data/read, POST /api/data/write, POST /api/operate
+*Data Operations*: POST /api/readvalue, POST /api/writevalue, POST /api/operate
 
 *Model Operations*: POST /api/model/tree, POST /api/getDataDefinition, POST /api/model, POST /api/update-iedmodel
 
