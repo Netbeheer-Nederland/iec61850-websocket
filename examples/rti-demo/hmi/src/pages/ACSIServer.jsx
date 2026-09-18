@@ -40,7 +40,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [host, setHost] = useState(endpoint?.host || 'rti-so');
   const [port, setPort] = useState(() => {
     const cachedPort = localStorage.getItem(portStorageKey);
-    return cachedPort || String(endpoint?.port || 8765);
+    return cachedPort || String(8765);
   });
   const [cp, setCp] = useState(() => {
     const cachedCp = localStorage.getItem(cpStorageKey);
