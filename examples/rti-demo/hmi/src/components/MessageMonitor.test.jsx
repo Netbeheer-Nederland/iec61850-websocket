@@ -54,7 +54,13 @@ beforeEach(() => {
   isConnected.mockReset();
   liveMessageHandlers = [];
   liveStateHandlers = [];
-  vi.useFakeTimers();
+  // Scoped to what MessageMonitor.jsx actually uses (setInterval/
+  // clearInterval for fallback polling). Faking everything (the default)
+  // hangs every userEvent.click() forever under this project's current
+  // vitest/@testing-library versions - userEvent's internal event dispatch
+  // relies on real timers/microtasks that a full fake-timer install
+  // intercepts and never advances.
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 });
 
 async function startMonitoring() {
