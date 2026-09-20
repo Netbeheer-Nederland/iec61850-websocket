@@ -274,6 +274,11 @@ html {
 }
 
 .bff-status-dot {
+    /* Without this, width/height only ever applied when this <span> sat
+       inside a flex row (a flex item's display is "blockified") - inside a
+       plain <td> it stayed a true inline element with an empty box, so the
+       dot silently never rendered. */
+    display: inline-block;
     width: 10px;
     height: 10px;
     border-radius: 50%;

@@ -103,23 +103,30 @@ describe('Connections page - Add/Edit modal', () => {
 });
 
 describe('Connections page - table', () => {
-  it('shows the WS Port column value for RTI-SO rows and "-" for other types', () => {
+  it('shows Status, Name, Type, Host, BFF Port and Actions columns, in that order', () => {
     setup([
       { name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765, type: 'RTI-SO', status: 'connected' },
-      { name: 'fsp1', host: '10.0.0.2', port: 5001, type: 'RTI-FSP', status: 'connected' },
+    ]);
+
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
+    expect(headers).toEqual(['Status', 'Name', 'Type', 'Host', 'BFF Port', 'Actions']);
+  });
+
+  it('shows each row\'s status, name, type, host and BFF port', () => {
+    setup([
+      { name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765, type: 'RTI-SO', status: 'connected' },
+      { name: 'fsp1', host: '10.0.0.2', port: 5001, type: 'RTI-FSP', status: 'disconnected' },
     ]);
 
     const rows = screen.getAllByRole('row');
     // rows[0] is the header row.
-    expect(rows[1]).toHaveTextContent('8765');
-    expect(rows[2]).not.toHaveTextContent('8765');
-  });
+    expect(rows[1]).toHaveTextContent('Connected');
+    expect(rows[1]).toHaveTextContent('so1');
+    expect(rows[1]).toHaveTextContent('RTI-SO');
+    expect(rows[1]).toHaveTextContent('10.0.0.1');
+    expect(rows[1]).toHaveTextContent('5002');
 
-  it('shows an em dash when an RTI-SO connection has no ws_port set yet', () => {
-    setup([
-      { name: 'so1', host: '10.0.0.1', port: 5002, type: 'RTI-SO', status: 'connected' },
-    ]);
-
-    expect(screen.getAllByRole('row')[1]).toHaveTextContent('—');
+    expect(rows[2]).toHaveTextContent('Disconnected');
+    expect(rows[2]).toHaveTextContent('fsp1');
   });
 });

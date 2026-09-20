@@ -132,31 +132,27 @@ function Connections({ connections, setConnections, loading = false, onReload })
             <table className="table">
               <thead>
                 <tr>
+                  <th>Status</th>
                   <th>Name</th>
+                  <th>Type</th>
                   <th>Host</th>
                   <th>BFF Port</th>
-                  <th>WS Port</th>
-                  <th>Type</th>
-                  <th>Endpoint</th>
-                  <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {connections.map((conn, index) => (
                   <tr key={index}>
-                    <td>{conn.name}</td>
-                    <td>{conn.type === 'IDP-Server' ? '-' : conn.host}</td>
-                    <td>{conn.type === 'IDP-Server' ? '-' : conn.port}</td>
-                    <td>{conn.type === 'RTI-SO' ? (conn.ws_port || '—') : '-'}</td>
-                    <td>{conn.type}</td>
-                    <td>{conn.type === 'IDP-Server' ? conn.endpoint : '-'}</td>
                     <td>
                       <span className="endpoint-card-status">
                         {conn.status === 'connected' ? 'Connected' : 'Disconnected'}
                       </span>
                     </td>
-                    <td>
+                    <td>{conn.name}</td>
+                    <td>{conn.type}</td>
+                    <td>{conn.type === 'IDP-Server' ? '-' : conn.host}</td>
+                    <td>{conn.type === 'IDP-Server' ? '-' : conn.port}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
                       <button
                         className="btn-icon"
                         style={{ marginRight: '8px' }}

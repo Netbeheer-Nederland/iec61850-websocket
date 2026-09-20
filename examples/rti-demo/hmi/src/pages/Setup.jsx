@@ -315,65 +315,53 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
         {/* Instances Table */}
         <div style={{ paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
           {connections && connections.length > 0 ? (
-            <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-              {connections.map((conn, index) => (
-                <div 
-                  key={conn.name || index} 
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '16px 20px',
-                    borderBottom: index < connections.length - 1 ? '1px solid var(--border-color)' : 'none',
-                    background: index % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-hover)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontWeight: '500', minWidth: '100px' }}>
-                      {conn.type}
-                    </span>
-                    <span style={{ color: 'var(--text-muted)' }}>⋅</span>
-                    <span style={{ color: 'var(--text-primary)', fontWeight: '500', minWidth: '150px' }}>
-                      {conn.name}
-                    </span>
-                    <span style={{ color: 'var(--text-muted)' }}>⋅</span>
-                    {conn.type === 'IDP-Server' ? (
-                      <span style={{ color: 'var(--text-secondary)', minWidth: '150px' }}>
-                        {conn.endpoint}
-                      </span>
-                    ) : (
-                      <span style={{ color: 'var(--text-secondary)', minWidth: '150px' }}>
-                        {conn.host}:{conn.port}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <span 
-                      className="bff-status-dot" 
-                      style={{
-                        background: conn.status === 'connected' ? 'var(--success-color)' : 'var(--danger-color)'
-                      }}
-                    ></span>
-                    <button 
-                      className="btn-icon" 
-                      style={{ padding: '6px', fontSize: '14px' }}
-                      onClick={() => handleEditConnection(conn)}
-                      title="Edit"
-                    >
-                      <i className="fas fa-edit"></i>
-                    </button>
-                    <button 
-                      className="btn-icon" 
-                      style={{ padding: '6px', fontSize: '14px' }}
-                      onClick={() => handleDeleteConnection(conn)}
-                      title="Delete"
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Host</th>
+                  <th>BFF Port</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {connections.map((conn, index) => (
+                  <tr key={conn.name || index}>
+                    <td>
+                      <span
+                        className="bff-status-dot"
+                        style={{
+                          background: conn.status === 'connected' ? 'var(--success-color)' : 'var(--danger-color)'
+                        }}
+                      ></span>
+                    </td>
+                    <td>{conn.name}</td>
+                    <td>{conn.type}</td>
+                    <td>{conn.type === 'IDP-Server' ? '-' : conn.host}</td>
+                    <td>{conn.type === 'IDP-Server' ? '-' : conn.port}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <button
+                        className="btn-icon"
+                        style={{ marginRight: '8px' }}
+                        onClick={() => handleEditConnection(conn)}
+                        title="Edit"
+                      >
+                        <i className="fas fa-edit"></i>
+                      </button>
+                      <button
+                        className="btn-icon"
+                        onClick={() => handleDeleteConnection(conn)}
+                        title="Delete"
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
             <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
               No instances registered. Click "Register Instance" to get started.
