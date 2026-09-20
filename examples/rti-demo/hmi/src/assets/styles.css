@@ -526,6 +526,48 @@ body {
 .scl-tree-tag.BRCB { background: transparent; border-color: #3f51b5; color: #3f51b5; }
 .scl-tree-tag.URCB { background: transparent; border-color: #3f51b5; color: #3f51b5; }
 
+/* One icon per node type, colored to match that type's .scl-tree-tag
+   color above - reinforces the existing tag color-coding rather than
+   introducing a second scheme. Group nodes (DataSets/ReportControls)
+   all share type="Group" and get one shared color; the icon glyph
+   itself (fa-layer-group vs fa-broadcast-tower, picked by name in
+   Tree.jsx) is what tells them apart, not color. */
+.scl-tree-icon {
+    width: 14px;
+    font-size: 12px;
+    margin-right: 6px;
+    flex-shrink: 0;
+    text-align: center;
+    color: var(--text-muted);
+}
+.scl-tree-icon.LDevice { color: #673ab7; }
+.scl-tree-icon.LogicalNode { color: #ff5722; }
+.scl-tree-icon.DO { color: #4caf50; }
+.scl-tree-icon.DA { color: #009688; }
+.scl-tree-icon.SDA { color: #795548; }
+.scl-tree-icon.SDO { color: #9c27b0; }
+.scl-tree-icon.DataSet { color: #ff9800; }
+.scl-tree-icon.ReportControl,
+.scl-tree-icon.BRCB,
+.scl-tree-icon.URCB { color: #3f51b5; }
+.scl-tree-icon.FCDA { color: #e91e63; }
+.scl-tree-icon.Group { color: #607d8b; }
+
+.scl-tree-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 6px;
+    margin-left: 6px;
+    border-radius: 999px;
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+}
+
 .scl-tree-value {
     color: var(--text-primary);
     font-size: 14px;

@@ -40,6 +40,37 @@ const nodeTypeLabel = (type) => {
   return labels[type] || type || '';
 };
 
+// FA icon per node type, colored to match that type's existing
+// .scl-tree-tag.{Type} color (see styles.css) so the icon reinforces the
+// tag rather than introducing a second, uncoordinated color scheme.
+const NODE_ICONS = {
+  LDevice: 'fa-folder',
+  LogicalNode: 'fa-microchip',
+  DO: 'fa-cube',
+  DA: 'fa-circle',
+  SDA: 'fa-circle',
+  SDO: 'fa-cube',
+  DataSet: 'fa-list-ul',
+  ReportControl: 'fa-satellite-dish',
+  BRCB: 'fa-satellite-dish',
+  URCB: 'fa-satellite-dish',
+  FCDA: 'fa-link',
+};
+
+// Group nodes (e.g. "DataSets", "ReportControls") have no tag at all today
+// (see the `!isGroupNode` guard below) - an icon keyed by name is the only
+// way to tell them apart at a glance, inspired by scd-visualizer's
+// per-category icons in its IED tree.
+const GROUP_ICONS = {
+  DataSets: 'fa-layer-group',
+  ReportControls: 'fa-broadcast-tower',
+};
+
+const nodeIconClass = (node) => {
+  if (node.type === 'Group') return GROUP_ICONS[node.name] || 'fa-folder-open';
+  return NODE_ICONS[node.type] || null;
+};
+
 const TreeNode = React.memo(({
   node,
   depth = 0,
@@ -116,6 +147,8 @@ const TreeNode = React.memo(({
     );
   };
 
+  const iconClass = nodeIconClass(node);
+
   return (
     <li className={`scl-tree-item ${hasChildren ? 'has-children' : ''} ${isExpanded ? 'expanded' : 'collapsed'}`}>
       <div
@@ -129,12 +162,18 @@ const TreeNode = React.memo(({
             {isExpanded ? '▾' : '▸'}
           </button>
         )}
+        {iconClass && (
+          <i className={`fas ${iconClass} scl-tree-icon ${node.type}`} aria-hidden="true"></i>
+        )}
         {!isGroupNode && node.type && (
           <span className={`scl-tree-tag ${node.type}`}>{nodeTypeLabel(node.type)}</span>
         )}
         <span className={`scl-tree-value scl-node-${normalizeNodeType(node.type)}`}>
           {displayName}
         </span>
+        {isGroupNode && hasChildren && (
+          <span className="scl-tree-count">{node.children.length}</span>
+        )}
         {!isGroupNode && (
           <>
             {node.bType && <span className="tree-btype-tag">({node.bType})</span>}
