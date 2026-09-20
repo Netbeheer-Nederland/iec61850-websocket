@@ -35,6 +35,7 @@ from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, Ied
 from fastapi import FastAPI, APIRouter, Request, HTTPException, status, UploadFile, File
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field, ConfigDict
 import ssl
 from ws61850.security.tls import TLSConfig
@@ -82,6 +83,40 @@ logging.basicConfig(
 logging.getLogger().setLevel(LOG_LEVEL)
 
 logger = logging.getLogger(__name__)
+
+
+class HealthCheckAccessFilter(logging.Filter):
+    """Demote uvicorn access-log lines for health/status polls to DEBUG.
+
+    The Docker healthcheck hits ``/api/status`` (and service discovery hits
+    ``/api/health``, and the HMI's message monitor polls ``/api/messages``)
+    every few seconds; logged at INFO they bury the real request log.
+    Matching records are relabelled DEBUG and only pass through when the
+    ``uvicorn.access`` logger is actually at DEBUG.
+    """
+
+    QUIET_PATHS = ("/api/status", "/api/health", "/api/messages")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn access records: (client_addr, method, path, http_version, status)
+        if not isinstance(args, tuple) or len(args) < 3:
+            return True
+        path = str(args[2]).split("?", 1)[0]
+        if path not in self.QUIET_PATHS:
+            return True
+        record.levelno = logging.DEBUG
+        record.levelname = "DEBUG"
+        return logging.getLogger("uvicorn.access").isEnabledFor(logging.DEBUG)
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # Installed here (not before uvicorn.run) so it survives uvicorn's own
+    # logging dictConfig, which runs before app startup.
+    logging.getLogger("uvicorn.access").addFilter(HealthCheckAccessFilter())
+    yield
+
 
 # Global flag to control io_plugin usage
 _use_io_plugin = False  # Default to False, will be enabled if files exist
@@ -3341,6 +3376,7 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
+        lifespan=_lifespan,
         openapi_tags=[
             {
                 "name": "Server Control",

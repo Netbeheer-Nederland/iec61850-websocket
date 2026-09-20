@@ -93,12 +93,13 @@ class HealthCheckAccessFilter(logging.Filter):
     """Demote uvicorn access-log lines for health/status polls to DEBUG.
 
     The Docker health check hits ``/api/health`` (and the HMI polls it plus
-    ``/api/status``) every few seconds; logged at INFO they bury the real
-    request log. Matching records are relabeled DEBUG and only pass through
-    when the ``uvicorn.access`` logger is actually at DEBUG.
+    ``/api/status`` and ``/api/messages``) every few seconds; logged at INFO
+    they bury the real request log. Matching records are relabeled DEBUG and
+    only pass through when the ``uvicorn.access`` logger is actually at
+    DEBUG.
     """
 
-    QUIET_PATHS = ("/api/status", "/api/health")
+    QUIET_PATHS = ("/api/status", "/api/health", "/api/messages")
 
     def filter(self, record: logging.LogRecord) -> bool:
         args = record.args
