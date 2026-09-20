@@ -100,8 +100,15 @@ class ACSIClient:
 
         #start Websocket Passive instance
         try:
+            # connect() already sets runtime.status = "connecting" itself
+            # (synchronously, before spawning the background connect
+            # thread) - setting it again here raced with that thread: if it
+            # won the race and already flipped status to "connected" before
+            # this line ran, this clobbered it right back to "connecting"
+            # forever, with nothing left to ever set it to "connected"
+            # again, even though the WS server was genuinely up and
+            # accepting associations the whole time.
             self.connect("0.0.0.0", 8765)
-            self.runtime.status = "connecting"
         except Exception as e:
             self.status = "error"
             self.runtime.error = str(e)

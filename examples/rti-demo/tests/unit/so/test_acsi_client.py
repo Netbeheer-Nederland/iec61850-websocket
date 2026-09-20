@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -227,3 +228,26 @@ class TestActionsAndMessagesLog:
         client.clear_messages()
 
         assert client.get_messages() == []
+
+
+class TestInitDoesNotClobberConnectStatus:
+    def test_init_does_not_overwrite_status_set_by_connect(self):
+        # Regression test: __init__ used to call self.connect(...) - which
+        # already sets runtime.status = "connecting" itself, synchronously,
+        # before spawning a background thread that eventually flips it to
+        # "connected" - and then unconditionally set
+        # self.runtime.status = "connecting" again right after. connect()'s
+        # background thread can (and, per real container logs, reliably
+        # does) win that race and already reach "connected" before that
+        # extra line ran, silently clobbering it back to "connecting"
+        # forever - nothing was left to ever correct it, even though the WS
+        # server was genuinely up and accepting associations the whole
+        # time. Mocking connect() to land on "connected" synchronously
+        # reproduces exactly that race outcome without real threads/sockets.
+        def fake_connect(self, host, port):
+            self.runtime.status = "connected"
+
+        with patch.object(ACSIClient, "connect", fake_connect):
+            client = ACSIClient()
+
+        assert client.runtime.status == "connected"
