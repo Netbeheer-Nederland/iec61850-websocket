@@ -21,54 +21,8 @@
    RTI Demo UI - Modern Stylesheet
    ============================================== */
 
-:root {
-    --primary-color: #2563eb;
-    --primary-dark: #1e40af;
-    --primary-light: #3b82f6;
-    --secondary-color: #7c3aed;
-    --success-color: #10b981;
-    --warning-color: #f59e0b;
-    --danger-color: #ef4444;
-    --info-color: #0ea5e9;
-    
-    --bg-dark: #0f172a;
-    --bg-darker: #020617;
-    --bg-card: #1e293b;
-    --bg-hover: #334155;
-    
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-muted: #94a3b8;
-    
-    --border-color: #334155;
-    --border-light: #475569;
-    
-    --sidebar-width: 280px;
-    --header-height: 70px;
-    
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
-    
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
 html {
     font-size: 16px;
-}
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    background: var(--bg-dark);
-    color: var(--text-primary);
-    line-height: 1.6;
-    overflow: hidden;
 }
 
 /* ==============================================
@@ -310,19 +264,6 @@ body {
     grid-column: 1 / -1;
 }
 
-.page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 32px;
-}
-
-.page-header h1 {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
 .bff-connection-indicator {
     display: inline-flex;
     align-items: center;
@@ -440,35 +381,9 @@ body {
     padding-left: 22px;
 }
 
-.scl-tree-root {
-    padding-left: 0;
-}
-
-.scl-tree-item {
-    position: relative;
-    margin: 6px 0;
-}
-
 .scl-tree-list .scl-tree-item {
     border-left: 1px solid var(--border-light);
     padding-left: 14px;
-}
-
-.scl-tree-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 10px;
-    border-radius: 10px;
-    background: rgba(15, 23, 42, 0.55);
-    border: 1px solid rgba(71, 85, 105, 0.45);
-    transition: var(--transition);
-    cursor: pointer;
-}
-
-.scl-tree-row:hover {
-    background: rgba(30, 41, 59, 0.9);
-    border-color: rgba(59, 130, 246, 0.45);
 }
 
 .scl-tree-list .scl-tree-row::before {
@@ -480,39 +395,7 @@ body {
     border-top: 1px solid var(--border-light);
 }
 
-.scl-tree-toggle {
-    width: 20px;
-    height: 20px;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 13px;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-.scl-tree-toggle.hidden {
-    visibility: hidden;
-}
-
-.scl-tree-tag.hidden {
-    display: none;
-}
-
-.scl-tree-tag {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 90px;
-    padding: 3px 9px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.4px;
-    text-transform: uppercase;
-    border: 1px solid transparent;
-}
-//* Border-only type tags - matching acsi-client color schema */
+/* Border-only type tags - matching acsi-client color schema */
 .scl-tree-tag.LDevice { background: transparent; border-color: #673ab7; color: #673ab7; }
 .scl-tree-tag.LogicalNode { background: transparent; border-color: #ff5722; color: #ff5722; }
 .scl-tree-tag.DO { background: transparent; border-color: #4caf50; color: #4caf50; }
@@ -566,13 +449,6 @@ body {
     color: var(--text-muted);
     font-size: 10px;
     font-weight: 700;
-}
-
-.scl-tree-value {
-    color: var(--text-primary);
-    font-size: 14px;
-    font-weight: 500;
-    word-break: break-word;
 }
 
 .scl-node-group .scl-tree-value {
@@ -788,27 +664,6 @@ body {
     font-size: 14px;
 }
 
-.btn-primary {
-    background: var(--primary-color);
-    color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-    background: var(--primary-dark);
-    box-shadow: var(--shadow-lg);
-}
-
-.btn-secondary {
-    background: var(--bg-hover);
-    color: var(--text-secondary);
-    border: 1px solid var(--border-color);
-}
-
-.btn-secondary:hover:not(:disabled) {
-    background: var(--border-light);
-    color: var(--text-primary);
-}
-
 .btn-close {
     background: transparent;
     border: none;
@@ -957,17 +812,6 @@ body {
 
 .modal.active {
     display: flex;
-}
-
-.modal-content {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    width: 90%;
-    max-width: 500px;
-    box-shadow: var(--shadow-lg);
-    overflow: hidden;
-    animation: slideUp 0.3s ease-in-out;
 }
 
 @keyframes slideUp {
@@ -1122,8 +966,6 @@ body {
    Responsive
    ============================================== */
 
-
-
 @media (max-width: 1024px) {
     .monitoring-workspace {
         grid-template-columns: 1fr;
@@ -1167,35 +1009,6 @@ body {
 }
 
 /* ===== Form Group - Works Inside Flex Containers ===== */
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-bottom: 10px;  /* Parent handles bottom margin */
-    min-width: 180px;  /* Prevents squishing in flex container */
-}
-
-.form-group label {
-    font-weight: 500;
-    color: var(--text-secondary);
-    font-size: 14px;
-}
-
-.form-group input {
-    padding: 10px 14px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    color: var(--text-primary);
-    font-size: 14px;
-    transition: border-color 0.2s;
-}
-
-.form-group input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
-}
 
 /* ===== Fix Parent Container Alignment ===== */
 .acsi-connection-section {
@@ -1279,15 +1092,6 @@ body {
 .monitor-control-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-}
-
-.monitor-status {
-    font-size: 13px;
-    color: var(--text-muted);
-    text-align: center;
-    padding: 8px;
-    border-radius: 6px;
-    background: rgba(15, 23, 42, 0.5);
 }
 
 /* Message Cards */
@@ -1397,12 +1201,6 @@ body {
 }
 
 /* ===== ACSI Interface ===== */
-.tree-value-display {
-    margin-left: 8px;
-    font-family: monospace;
-    font-size: 0.9em;
-    color: #4caf50; /* Default: green for success */
-}
 
 .tree-value-display.error {
     color: #c62828; /* Red for errors */
@@ -1412,23 +1210,22 @@ body {
   display: none !important;
 }
 
-.control-result.success {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-.control-result.error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-}
-
 /* ==============================================
    ACSI Client - IEC 61850 Client Page Styles
    ============================================== */
 
 :root {
+    --bg-dark: #0f172a;
+    --bg-darker: #020617;
+    --bg-card: #1e293b;
+    --bg-hover: #334155;
+    --border-light: #475569;
+    --sidebar-width: 280px;
+    --header-height: 70px;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --primary-color: #2196f3;
     --primary-light: #64b5f6;
     --primary-dark: #1976d2;
@@ -1454,6 +1251,8 @@ body {
 }
 
 body {
+    background: var(--bg-dark);
+    overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
@@ -1461,6 +1260,9 @@ body {
 }
 
 .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 24px;
 }
 
@@ -1494,6 +1296,9 @@ h3 {
 }
 
 .form-group {
+    margin-bottom: 10px;
+    /* Parent handles bottom margin */
+    min-width: 180px;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -1506,6 +1311,7 @@ h3 {
 }
 
 .form-group input {
+    transition: border-color 0.2s;
     padding: 10px 12px;
     background: var(--bg-secondary);
     color: var(--text-primary);
@@ -1516,6 +1322,7 @@ h3 {
 }
 
 .form-group input:focus {
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
     outline: none;
     border-color: var(--primary-color);
 }
@@ -1540,6 +1347,7 @@ h3 {
 }
 
 .btn-primary:hover:not(:disabled) {
+    box-shadow: var(--shadow-lg);
     background: var(--primary-dark);
 }
 
@@ -1616,10 +1424,15 @@ h3 {
 }
 
 .scl-tree-item {
+    position: relative;
     margin: 2px 0;
 }
 
 .scl-tree-row {
+    gap: 10px;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(71, 85, 105, 0.45);
+    transition: var(--transition);
     display: flex;
     align-items: center;
     padding: 4px 8px;
@@ -1628,6 +1441,7 @@ h3 {
 }
 
 .scl-tree-row:hover {
+    border-color: rgba(59, 130, 246, 0.45);
     background: var(--bg-tertiary);
 }
 
@@ -1636,6 +1450,7 @@ h3 {
 }
 
 .scl-tree-toggle {
+    flex-shrink: 0;
     background: none;
     border: none;
     color: var(--text-secondary);
@@ -1654,10 +1469,19 @@ h3 {
 }
 
 .scl-tree-toggle.hidden {
+    visibility: hidden;
     display: none;
 }
 
 .scl-tree-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 90px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    border: 1px solid transparent;
     font-size: 11px;
     color: var(--primary-light);
     padding: 2px 6px;
@@ -1672,11 +1496,14 @@ h3 {
 }
 
 .scl-tree-value {
+    font-weight: 500;
+    word-break: break-word;
     font-size: 14px;
     color: var(--text-primary);
 }
 
 .tree-value-display {
+    /* Default: green for success */;
     font-size: 12px;
     color: var(--text-muted);
     margin-left: 12px;
@@ -1696,16 +1523,6 @@ h3 {
     padding: 20px;
     max-width: 1400px;
     margin: 0 auto;
-}
-
-.acsi-panel {
-    background: var(--bg-secondary);
-    border-radius: 8px;
-    margin-bottom: 20px;
-}
-
-.acsi-panel-main {
-    flex: 1;
 }
 
 /* Protocol Messages */
@@ -1745,6 +1562,7 @@ h3 {
 }
 
 .monitor-status {
+    text-align: center;
     font-size: 13px;
     color: var(--text-secondary);
     padding: 8px 12px;
@@ -1883,6 +1701,9 @@ h3 {
 }
 
 .modal-content {
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    animation: slideUp 0.3s ease-in-out;
     background: #1e1e1e;
     color: #e0e0e0;
     padding: 24px;
@@ -1912,6 +1733,7 @@ h3 {
 }
 
 .acsi-panel {
+    margin-bottom: 20px;
     grid-column: span 4;
     background: linear-gradient(165deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.85));
     border: 1px solid var(--border-color);
@@ -1925,6 +1747,7 @@ h3 {
 }
 
 .acsi-panel-main {
+    flex: 1;
     grid-column: 1 / span 12;
 }
 
@@ -1944,121 +1767,6 @@ h3 {
 
 .hidden {
     display: none !important;
-}
-
-/* Control Window - Completely separate from other modals */
-/* Control Window - Match modal styling exactly */
-.control-window {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
-
-.control-window.active {
-    display: flex;
-}
-
-/* Control window content - match modal-content exactly */
-.control-window .modal-content {
-    background: #1e1e1e;
-    color: #e0e0e0;
-    padding: 24px;
-    border-radius: 8px;
-    width: 500px;
-    max-width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-}
-
-/* Control Window - Uses .hidden class toggle (no JS changes required) */
-.control-window {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
-
-.control-window:not(.hidden) {
-    display: flex;
-}
-
-/* Control window content - match modal-content styling exactly */
-.control-window .modal-content {
-    background: #1e1e1e;
-    color: #e0e0e0;
-    padding: 24px;
-    border-radius: 8px;
-    width: 500px;
-    max-width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-}
-
-/* Form fields inside control window - match modal fields */
-.control-window .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-bottom: 16px;
-}
-
-.control-window .form-group label {
-    font-size: 14px;
-    color: var(--text-secondary);
-    font-weight: 500;
-}
-
-.control-window .form-group input,
-.control-window .form-group select {
-    padding: 10px 12px;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.control-window .form-group input:focus,
-.control-window .form-group select:focus {
-    outline: none;
-    border-color: var(--primary-color);
-}
-
-/* Button container - match modal button layout */
-.control-window .modal-buttons {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    margin-top: 24px;
-}
-
-/* Test mode checkbox alignment */
-.control-window .test-mode-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 16px;
-}
-
-.control-window .test-mode-container input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
 }
 
 /* Button styling - use existing btn-primary/btn-secondary classes */
@@ -2093,78 +1801,6 @@ h3 {
 .control-window .modal-buttons .btn-secondary:hover:not(:disabled) {
     background: var(--bg-secondary);
     color: var(--text-primary);
-}
-
-/* CSS - All classes prefixed with brcb- */
-.brcb-modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.5);
-}
-
-.brcb-modal-content {
-    background-color: #2d3748;
-    margin: 5% auto;
-    padding: 20px;
-    border-radius: 8px;
-    width: 600px;
-    max-width: 90%;
-    color: white;
-}
-
-.brcb-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.brcb-close-modal {
-    cursor: pointer;
-    font-size: 24px;
-}
-
-.brcb-modal-body {
-    margin-bottom: 20px;
-}
-
-.brcb-modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-}
-
-.brcb-form-group {
-    margin-bottom: 15px;
-}
-
-.brcb-checkbox-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.brcb-checkbox-grid label {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    cursor: pointer;
-}
-
-.brcb-form-control {
-    width: 100%;
-    padding: 8px;
-    margin-top: 5px;
-    background-color: #1a202c;
-    color: white;
-    border: 1px solid #4a5568;
-    border-radius: 4px;
 }
 
 /* Node type border colors */
@@ -2207,10 +1843,6 @@ h3 {
     align-items: center;
     justify-content: center;
     z-index: 9999;
-}
-
-.control-window:not(.hidden) {
-    display: flex;
 }
 
 .control-window .modal-content {
@@ -2304,13 +1936,13 @@ h3 {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
-
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .brcb-modal-content {
+    margin: 5% auto;
     background-color: #2d3748;
     padding: 20px;
     border-radius: 8px;
