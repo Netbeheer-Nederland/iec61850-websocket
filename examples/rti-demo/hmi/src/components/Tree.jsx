@@ -87,7 +87,16 @@ const TreeNode = React.memo(({
   const displayName = node.name || node.ref || 'Unknown';
   const isSelected = selectedRef === node.ref;
 
-  const isExpanded = expandedNodes[node.ref] || depth < 1;
+  // Depth-0 nodes (LDevices - Tree's top-level map renders data.children at
+  // depth 0) default to expanded, but only until the user actually touches
+  // the toggle: previously this was `expandedNodes[node.ref] || depth < 1`,
+  // which made `depth < 1` win unconditionally and left the LD collapse
+  // toggle completely non-functional (clicking it flipped the chevron's
+  // state internally but renderChildren() below never saw isExpanded turn
+  // false). Falling back to the depth-based default only when this ref has
+  // no explicit entry yet preserves the same default look while making the
+  // toggle (and Expand/Collapse All) actually take effect.
+  const isExpanded = expandedNodes[node.ref] !== undefined ? expandedNodes[node.ref] : depth < 1;
 
   const handleToggle = useCallback(
     (e) => {
@@ -188,6 +197,20 @@ const TreeNode = React.memo(({
   );
 });
 
+// Collects the ref of every node in the subtree that has children (i.e.
+// every node the toggle button would actually apply to), for Expand/
+// Collapse All. Nodes without a ref (currently: Group nodes like
+// "DataSets"/"ReportControls") are skipped - the same nodes whose
+// individual toggle already can't be addressed reliably today, since
+// TreeNode's own handleToggle keys expandedNodes by node.ref too.
+function collectExpandableRefs(node, acc) {
+  if (node?.children?.length) {
+    if (node.ref) acc.push(node.ref);
+    node.children.forEach((child) => collectExpandableRefs(child, acc));
+  }
+  return acc;
+}
+
 const Tree = ({ data, onNodeClick, onContextMenu, endpoint, cp, className = '', expandedNodes = {}, onExpandToggle }) => {
   const [selectedRef, setSelectedRef] = useState(null);
 
@@ -197,6 +220,16 @@ const Tree = ({ data, onNodeClick, onContextMenu, endpoint, cp, className = '', 
       if (onNodeClick) onNodeClick(nodeInfo);
     },
     [onNodeClick]
+  );
+
+  const setAllExpanded = useCallback(
+    (expanded) => {
+      if (!onExpandToggle || !data?.children) return;
+      const refs = [];
+      data.children.forEach((child) => collectExpandableRefs(child, refs));
+      refs.forEach((ref) => onExpandToggle(ref, expanded));
+    },
+    [data, onExpandToggle]
   );
 
   if (!data) {
@@ -211,6 +244,16 @@ const Tree = ({ data, onNodeClick, onContextMenu, endpoint, cp, className = '', 
 
   return (
     <div className={`model-tree ${className}`}>
+      {onExpandToggle && data.children?.length > 0 && (
+        <div className="scl-tree-toolbar">
+          <button type="button" className="scl-tree-toolbar-btn" onClick={() => setAllExpanded(true)}>
+            Expand All
+          </button>
+          <button type="button" className="scl-tree-toolbar-btn" onClick={() => setAllExpanded(false)}>
+            Collapse All
+          </button>
+        </div>
+      )}
       <ul className="scl-tree-root">
         {data.children?.map((child, index) => (
           <TreeNode

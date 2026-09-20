@@ -1412,6 +1412,29 @@ h3 {
 }
 
 /* Tree Styles */
+.scl-tree-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.scl-tree-toolbar-btn {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.scl-tree-toolbar-btn:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
 .scl-tree-root {
     list-style: none;
     padding-left: 0;
