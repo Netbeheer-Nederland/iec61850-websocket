@@ -4302,4 +4302,9 @@ if __name__ == "__main__":
 
     factory_dir = Path(__file__).parent
     app = create_fastapi_app(factory_dir)
-    uvicorn.run(app, host=args.host, port=args.port, log_level=uvicorn_log_level)
+    # log_config=None: don't let uvicorn apply its own logging dictConfig
+    # (separate formatter/handlers for the uvicorn/uvicorn.access/
+    # uvicorn.error loggers) - let those records propagate to the root
+    # logger instead, so they use the same timestamped format as the
+    # app's own logger.info(...) calls above.
+    uvicorn.run(app, host=args.host, port=args.port, log_level=uvicorn_log_level, log_config=None)
