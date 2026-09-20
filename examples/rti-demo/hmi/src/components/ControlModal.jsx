@@ -1,3 +1,22 @@
+/*
+ * SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Copyright 2025 Netbeheer Nederland
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 // src/components/ControlModal.jsx
 import React, { useState, useEffect } from 'react';
 import { executeApiCall, getApiById } from '../services/apiService';
@@ -89,11 +108,6 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess, 
       const params = getControlParameters();
       const endpointTarget = `${endpoint.host}:${endpoint.port}`;
       const response = await executeApiCall('operate', endpointTarget, params);
-
-      // response?.ok only reflects the HTTP call succeeding, not whether the
-      // control operation itself was accepted by the device. Check the actual
-      // result payload (same shape DataAccessPanel already unwraps for
-      // writeResult) so a device-level rejection isn't reported as success.
       const opSuccess = response?.ok &&
         (response?.payload?.result?.success ?? response?.payload?.success ?? true);
 

@@ -53,7 +53,6 @@ class ReportService:
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable"), None
 
     async def reset_report_task(self, brcb_ref, iec61850_server):
-        print("entering reset_report_task for brcb_ref:", brcb_ref)
         server_report_control, old_task = next(
             (
                 (src, task)
@@ -64,7 +63,6 @@ class ReportService:
         )
 
         if old_task:
-            print("canceling old task for brcb_ref:", brcb_ref)
             old_task.cancel()
             try:
                 await old_task

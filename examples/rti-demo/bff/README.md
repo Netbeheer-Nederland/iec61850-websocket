@@ -101,7 +101,6 @@ bff/
 +-- __pycache__/              # Python cache files (generated)
 +-- bff_server.py            # Main FastAPI application (1256 lines)
 +-- ConnectionManager.py      # Manages connections to RTI endpoints (388 lines)
-+-- DataManager.py           # Data read/write operations (55 lines)
 +-- bffClient.py             # HTTP client for BFF-to-backend communication (24 lines)
 +-- pydantic_models.py       # Request/Response data models (93 lines)
 +-- connections.json         # Persistent connection configurations

@@ -1,3 +1,22 @@
+/*
+ * SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Copyright 2025 Netbeheer Nederland
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 // src/components/Tree.jsx
 import React, { useState, useCallback } from 'react';
 
@@ -29,29 +48,27 @@ const TreeNode = React.memo(({
   selectedRef,
   endpoint,
   cp,
-  expandedNodes, // Receive expandedNodes from parent
-  onExpandToggle, // Receive toggle handler from parent
+  expandedNodes,
+  onExpandToggle,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const isGroupNode = node.type === 'Group';
   const displayName = node.name || node.ref || 'Unknown';
   const isSelected = selectedRef === node.ref;
 
-  // Use the expandedNodes state to determine if this node is expanded
   const isExpanded = expandedNodes[node.ref] || depth < 1;
 
   const handleToggle = useCallback(
     (e) => {
       e.stopPropagation();
-      onExpandToggle(node.ref, !isExpanded); // Toggle expansion state
+      onExpandToggle(node.ref, !isExpanded);
     },
     [isExpanded, onExpandToggle, node.ref]
   );
 
   const handleClick = useCallback(
     (e) => {
-      // Skip if this is a right-click (context menu)
-      if (e.button === 2) return;  // Right-click (button 2)
+      if (e.button === 2) return;
       e.stopPropagation();
       if (onNodeClick) onNodeClick({ ref: node.ref, fc: node.fc, nodeType: node.type, endpoint, cp });
     },
@@ -91,8 +108,8 @@ const TreeNode = React.memo(({
             selectedRef={selectedRef}
             endpoint={endpoint}
             cp={cp}
-            expandedNodes={expandedNodes} // Pass expandedNodes to children
-            onExpandToggle={onExpandToggle} // Pass toggle handler to children
+            expandedNodes={expandedNodes}
+            onExpandToggle={onExpandToggle}
           />
         ))}
       </ul>
@@ -166,8 +183,8 @@ const Tree = ({ data, onNodeClick, onContextMenu, endpoint, cp, className = '', 
             selectedRef={selectedRef}
             endpoint={endpoint}
             cp={cp}
-            expandedNodes={expandedNodes} // Pass expandedNodes to root TreeNode
-            onExpandToggle={onExpandToggle} // Pass toggle handler to root TreeNode
+            expandedNodes={expandedNodes}
+            onExpandToggle={onExpandToggle}
           />
         ))}
       </ul>

@@ -1,3 +1,20 @@
+# SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright 2025 Netbeheer Nederland
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 IO Router for ACSI BFF - Provides IO device control routes that proxy to demo_IO.
 
@@ -22,8 +39,8 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .async_client_io import AsyncDemoIOClient
-from .mapping_manager import IOMappingManager
+from async_client_io import AsyncDemoIOClient
+from mapping_manager import IOMappingManager
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +148,11 @@ class IOMappingRequest(BaseModel):
         description="Data type for ACSI values: BOOLEAN, INT8, INT16, INT32, FLOAT32, etc.",
         json_schema_extra={"example": "FLOAT32"}
     )
+    fc: Optional[str] = Field(
+        default="st",
+        description="Data Attribute FC",
+        json_schema_extra={"example": "st"}
+    )
 
 
 class IOMappingResponse(BaseModel):
@@ -146,6 +168,7 @@ class IOMappingResponse(BaseModel):
     initial_state: bool = False
     service: Optional[str] = None
     dataType: Optional[str] = None
+    fc: Optional[str] = "st"
 
 
 class MappingListResponse(BaseModel):
@@ -402,9 +425,7 @@ def create_io_router() -> APIRouter:
                     )
             return wrapper
         return decorator
-    
-    # ==================== Connection Management ====================
-    
+
     @router.post(
         "/connect",
         summary="Connect to demo_IO",
@@ -419,12 +440,12 @@ def create_io_router() -> APIRouter:
     )
     async def api_connect_io(config: IOConnectionConfig, request: Request):
         """Connect to a demo_IO service.
-        
+
         Request Body:
             IOConnectionConfig: {
                 "base_url": str  # Base URL of demo_IO service
             }
-        
+
         Returns:
             dict: Connection confirmation with health check
         """
@@ -434,14 +455,14 @@ def create_io_router() -> APIRouter:
             acsi_base_url = config.acsi_url  # From request body
             if not acsi_base_url:
                 acsi_base_url = os.getenv("ACSI_BASE_URL")  # From environment variable
-            
+
             if not acsi_base_url:
                 # Auto-detect FSP's LAN IP
                 import socket
-                
+
                 ip_address = None
                 hostname = socket.gethostname()
-                
+
                 try:
                     addr_info = socket.getaddrinfo(hostname, None)
                     for info in addr_info:
@@ -450,7 +471,7 @@ def create_io_router() -> APIRouter:
                             if ip.startswith("192.168."):
                                 ip_address = ip
                                 break
-                    
+
                     if ip_address:
                         acsi_base_url = f"http://{ip_address}:5001"
                     else:
@@ -462,25 +483,25 @@ def create_io_router() -> APIRouter:
                                 break
                 except:
                     pass
-            
+
             if not acsi_base_url:
                 acsi_base_url = "http://localhost:5001"
-            
+
             logger.info(f"Using ACSI base URL for IO server: {acsi_base_url}")
             client = AsyncDemoIOClient(base_url=config.base_url, acsi_base_url=acsi_base_url)
-            
+
             # Test connection (async)
             if not await client.is_healthy():
                 raise HTTPException(
                     status_code=400,
                     detail=f"demo_IO service at {config.base_url} is not responding"
                 )
-            
+
             set_io_client(client)
-            
+
             # Register input callbacks after connecting
             _register_all_input_callbacks()
-            
+
             logger.info(f"Connected to demo_IO at {config.base_url} with ACSI URL: {acsi_base_url}")
             return {
                 "ok": True,
@@ -494,145 +515,7 @@ def create_io_router() -> APIRouter:
         except Exception as exc:
             logger.error(f"Failed to connect to demo_IO: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
-    @router.get(
-        "/connection",
-        summary="Get IO Connection Status",
-        description="Returns the current demo_IO connection status.",
-        response_description="Connection status",
-        responses={
-            200: {"description": "Connection status returned"},
-            500: {"description": "Client not configured"}
-        },
-        tags=["IO Connection"]
-    )
-    async def api_get_connection_status(request: Request):
-        """Get current demo_IO connection status.
-        
-        Returns:
-            dict: Connection status including base URL and health
-        """
-        client = get_io_client()
-        if client is None:
-            return {
-                "connected": False,
-                "base_url": None,
-                "healthy": False,
-                "error": "Client not configured"
-            }
-        
-        return {
-            "connected": True,
-            "base_url": client.base_url,
-            "healthy": await client.is_healthy()
-        }
-    
-    @router.post(
-        "/disconnect",
-        summary="Disconnect from demo_IO",
-        description="Disconnect from the current demo_IO service.",
-        response_description="Disconnection confirmation",
-        responses={
-            200: {"description": "Disconnected successfully"}
-        },
-        tags=["IO Connection"]
-    )
-    async def api_disconnect_io(request: Request):
-        """Disconnect from demo_IO service.
-        
-        Returns:
-            dict: Disconnection confirmation
-        """
-        old_url = _router_state.io_client.base_url if _router_state.io_client else None
-        with _router_state._lock:
-            # Close the async client connection
-            if _router_state.io_client:
-                await _router_state.io_client.aclose()
-            _router_state.io_client = None
-        
-        logger.info(f"Disconnected from demo_IO at {old_url}")
-        return {
-            "ok": True,
-            "message": "Disconnected from demo_IO",
-            "old_base_url": old_url
-        }
-    
-    # ==================== ACSI Configuration ====================
-    
-    @router.post(
-        "/acsi-config",
-        summary="Configure ACSI Server URL",
-        description="Set the ACSI server base URL for IEC61850 writes from IO devices. "
-                    "Input device callbacks will use this URL to write to the IEC61850 server. "
-                    "Changing this URL also re-registers all input device callbacks.",
-        response_description="ACSI configuration confirmation",
-        responses={
-            200: {"description": "ACSI URL configured successfully"},
-            500: {"description": "Configuration failed - client not connected"}
-        },
-        tags=["IO Configuration"]
-    )
-    async def api_set_acsi_config(request: ACSIConfigRequest):
-        """Set the ACSI server base URL for IO→IEC61850 writes.
-        
-        When IO input devices change, they write to this ACSI URL.
-        Updating this URL also re-registers all input device callbacks.
-        
-        Request Body:
-            ACSIConfigRequest: {"base_url": "http://host:port"}
-        
-        Returns:
-            dict: {"ok": True, "base_url": str, "message": str}
-        """
-        client = get_io_client()
-        if client is None:
-            return JSONResponse(
-                content={"ok": False, "error": "demo_IO client not configured"},
-                status_code=500
-            )
-        
-        # Update ACSI URL
-        client.set_acsi_base_url(request.base_url)
-        
-        # Re-register all input callbacks with the new URL
-        _register_all_input_callbacks()
-        
-        logger.info(f"ACSI base URL set to: {request.base_url}")
-        return {
-            "ok": True,
-            "base_url": request.base_url,
-            "message": f"ACSI base URL set to {request.base_url}, input callbacks updated"
-        }
-    
-    @router.get(
-        "/acsi-config",
-        summary="Get ACSI Server URL",
-        description="Get the currently configured ACSI server base URL for IEC61850 writes.",
-        response_description="Current ACSI configuration",
-        responses={
-            200: {"description": "ACSI URL returned successfully"},
-            500: {"description": "Client not configured"}
-        },
-        tags=["IO Configuration"]
-    )
-    async def api_get_acsi_config():
-        """Get the currently configured ACSI server base URL.
-        
-        Returns:
-            dict: {"ok": True, "base_url": str}
-        """
-        client = get_io_client()
-        if client is None:
-            return JSONResponse(
-                content={"ok": False, "error": "demo_IO client not configured"},
-                status_code=500
-            )
-        
-        return {
-            "ok": True,
-            "base_url": client.get_acsi_base_url()
-        }
-    
+
     # ==================== Health and Status ====================
     
     @router.get(
@@ -1027,7 +910,8 @@ def create_io_router() -> APIRouter:
                 direction=request.direction,
                 device_type=request.device_type,
                 service=request.service,
-                dataType=request.dataType
+                dataType=request.dataType,
+                fc=request.fc,
             )
             manager.save()
             
@@ -1072,7 +956,8 @@ def create_io_router() -> APIRouter:
                     device_type=config.get("device_type"),
                     initial_state=config.get("initial_state", False),
                     service=config.get("service"),
-                    dataType=config.get("dataType")
+                    dataType=config.get("dataType"),
+                    fc=config.get("fc")
                 )
             
             return MappingListResponse(
