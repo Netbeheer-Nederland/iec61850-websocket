@@ -723,32 +723,47 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
               value={host}
               placeholder="0.0.0.0"
               onChange={(e) => setHost(e.target.value)}
-              disabled={loading || !isCustomInstance}
+              readOnly={!isCustomInstance}
+              disabled={loading}
             />
           </div>
           <div className="form-group">
             <label htmlFor="acsi-server-ws-port">WS Port</label>
             <input
               id="acsi-server-ws-port"
-              type="number"
+              type="text"
               value={port}
               placeholder="8765"
               onChange={(e) => setPort(e.target.value)}
-              disabled={loading || !isCustomInstance}
+              readOnly={!isCustomInstance}
+              disabled={loading}
             />
           </div>
           <div className="form-group">
             <label htmlFor="acsi-server-ws-mode">WS Mode</label>
-            <select
-              id="acsi-server-ws-mode"
-              value={mode}
-              onChange={(e) => setMode(e.target.value)}
-              disabled={loading || !isCustomInstance}
-            >
-              {!mode && <option value="" disabled>Select instance...</option>}
-              <option value="active">Active</option>
-              <option value="passive">Passive</option>
-            </select>
+            {isCustomInstance ? (
+              <select
+                id="acsi-server-ws-mode"
+                value={mode}
+                onChange={(e) => setMode(e.target.value)}
+                disabled={loading}
+              >
+                {!mode && <option value="" disabled>Select instance...</option>}
+                <option value="active">Active</option>
+                <option value="passive">Passive</option>
+              </select>
+            ) : (
+              // Fixed by the selected instance, not a real choice here -
+              // shown as read-only text, not a disabled dropdown that
+              // looks interactive but isn't (see ConnectionModal.jsx's
+              // identical ACSI/WebSocket Mode pattern).
+              <input
+                id="acsi-server-ws-mode"
+                type="text"
+                readOnly
+                value={mode === 'active' ? 'Active' : mode === 'passive' ? 'Passive' : ''}
+              />
+            )}
           </div>
         </div>
       </div>

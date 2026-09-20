@@ -56,7 +56,21 @@ describe('ACSIServer instance selection - ws_port vs BFF port', () => {
     });
 
     expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.1');
-    expect(screen.getByLabelText('WS Port')).toHaveValue(8765);
+    // WS Port is type="text" (not "number") specifically so a read-only
+    // instance-derived value renders as plain text, not a native
+    // number-input control.
+    expect(screen.getByLabelText('WS Port')).toHaveValue('8765');
+    // A real instance is selected - these fields are read-only, not just
+    // "disabled" (see ConnectionModal.jsx's identical ACSI/WebSocket Mode
+    // pattern: readOnly for "fixed by other state", disabled only for a
+    // genuinely temporary lock like `loading`).
+    expect(screen.getByLabelText('WS Host')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('WS Port')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('WS Host')).toBeEnabled();
+    // WS Mode renders as a read-only text display, not a disabled <select>,
+    // when a real instance is selected.
+    expect(screen.getByLabelText('WS Mode')).toHaveValue('Active');
+    expect(screen.getByLabelText('WS Mode').tagName).toBe('INPUT');
   });
 
   it('leaves WS Port blank (not the BFF port) when auto-selecting an instance with no ws_port', async () => {
@@ -75,7 +89,7 @@ describe('ACSIServer instance selection - ws_port vs BFF port', () => {
     expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.2');
     // Must NOT be 5003 (so2's BFF port) - this is the exact bug being
     // regression-tested: silently falling back to the BFF port.
-    expect(screen.getByLabelText('WS Port')).toHaveValue(null);
+    expect(screen.getByLabelText('WS Port')).toHaveValue('');
   });
 
   it('clears all WS fields when switching to "custom"', async () => {
@@ -89,10 +103,14 @@ describe('ACSIServer instance selection - ws_port vs BFF port', () => {
     await user.selectOptions(screen.getByLabelText('Instance'), 'custom');
 
     expect(screen.getByLabelText('WS Host')).toHaveValue('');
-    expect(screen.getByLabelText('WS Port')).toHaveValue(null);
+    expect(screen.getByLabelText('WS Port')).toHaveValue('');
     expect(screen.getByLabelText('WS Mode')).toHaveValue('active');
-    // Custom is the only state where these fields become editable.
+    // Custom is the only state where these fields become editable - a real
+    // <select> for WS Mode (not the read-only text display), and neither
+    // disabled nor readOnly for WS Host/Port.
     expect(screen.getByLabelText('WS Host')).toBeEnabled();
+    expect(screen.getByLabelText('WS Host')).not.toHaveAttribute('readonly');
+    expect(screen.getByLabelText('WS Mode').tagName).toBe('SELECT');
   });
 });
 
