@@ -84,10 +84,14 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     }
   }, [bffBaseUrl]);
 
-  // Fetch OAuth status from the SO server on page load
+  // Fetch OAuth status from the SO server on page load - only when this
+  // connection is actually configured for OAuth (endpoint.OAuth.enable_oauth,
+  // set via ConnectionModal). Connections that never use OAuth would always
+  // just get "false" back, so probing them on every load is pure noise -
+  // see the identical guard in ACSIServer.jsx.
   useEffect(() => {
     const fetchOAuthStatus = async () => {
-      if (!apiTarget) return;
+      if (!apiTarget || !endpoint?.OAuth?.enable_oauth) return;
       try {
         const result = await executeApiCall('oauth-status', apiTarget, {});
         if (result?.ok) {
@@ -99,7 +103,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
       }
     };
     fetchOAuthStatus();
-  }, [apiTarget]);
+  }, [apiTarget, endpoint]);
 
   // Fetch properties (includes acsi_client_list) once on mount for first
   // paint, then rely on the BFF's live push for updates instead of polling

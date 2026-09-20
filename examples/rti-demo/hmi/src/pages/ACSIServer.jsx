@@ -277,18 +277,24 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         // Load server status
         await loadStatus();
 
-        // Fetch OAuth status
-        const result = await executeApiCall('oauth-status', endpointTarget, {});
-        if (result?.ok) {
-          const enableOAuth = result.payload?.result?.enable_oauth ?? result.payload?.enable_oauth ?? false;
-          setUseOAuth(enableOAuth);
+        // Fetch OAuth status - only when this connection is actually
+        // configured for OAuth (endpoint.OAuth.enable_oauth, set via
+        // ConnectionModal). Connections that never use OAuth would always
+        // just get "false" back, so probing them on every load is pure
+        // noise - see the identical guard in ACSIClient.jsx.
+        if (endpoint?.OAuth?.enable_oauth) {
+          const result = await executeApiCall('oauth-status', endpointTarget, {});
+          if (result?.ok) {
+            const enableOAuth = result.payload?.result?.enable_oauth ?? result.payload?.enable_oauth ?? false;
+            setUseOAuth(enableOAuth);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch initial data:', error);
       }
     };
     fetchInitialData();
-  }, [endpointTarget, loadStatus]);
+  }, [endpointTarget, loadStatus, endpoint]);
 
   const initialSyncDoneRef = useRef(false);
 
