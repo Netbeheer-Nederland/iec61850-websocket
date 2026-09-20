@@ -56,19 +56,19 @@ services:
       start_period: 10s
 
   # RTI-FSP (Acsi-Server)
-  rti-fsp:
+  rti-fsp01:
     user: root
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.rti-fsp
-    container_name: rti-fsp
+    container_name: rti-fsp01
     ports:
       - "5001:5001"
     environment:
       - PORT=5001
       - PYTHONUNBUFFERED=1
       - CP=cp1
-      - MODELPATH=/models/model.py
+      - MODELPATH=/models/model_1.py
       - DEMO_IO_URL=http://demo_io:8000
     networks:
       - rti-network
@@ -89,13 +89,13 @@ services:
         - ./demo_IO:/app/demo_IO
 
   # Second FSP instance
-  rti-fsp-2:
+  rti-fsp02:
     user:
       root
     build:
       context: ../..
       dockerfile: examples/rti-demo/Dockerfile.rti-fsp
-    container_name: rti-fsp-2
+    container_name: rti-fsp02
     ports:
       - "5005:5005"  # Map to different host port, same container port
     networks:
