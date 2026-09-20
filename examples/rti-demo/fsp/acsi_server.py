@@ -740,6 +740,11 @@ class ACSIServer:
         """Execute a coroutine on the runtime event loop."""
         loop = self.runtime.loop
         if loop is None or not loop.is_running():
+            # coro was already constructed by the caller (e.g.
+            # server.get_data_value_and_type(obj_ref)) before this call -
+            # close it explicitly so it doesn't trigger a "coroutine was
+            # never awaited" RuntimeWarning now that it can't be scheduled.
+            coro.close()
             raise RuntimeError("server-not-running")
         future = asyncio.run_coroutine_threadsafe(coro, loop)
         return future.result(timeout=timeout)
