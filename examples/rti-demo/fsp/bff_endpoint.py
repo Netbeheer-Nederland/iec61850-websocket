@@ -40,7 +40,7 @@ import ssl
 from ws61850.security.tls import TLSConfig
 import asyncio
 import json
-import httpx
+import httpx2 as httpx
 
 def resolve_log_level(value: Optional[str], default: int = logging.INFO) -> int:
     """Map a level name (case-insensitive) to a logging constant.
@@ -291,7 +291,7 @@ io_plugin_REQUIRED_FILES = [
     "io_mapping.json"
 ]
 
-import httpx
+import httpx2 as httpx
 
 # ==================== Dynamic IO Plugin Loading ====================
 

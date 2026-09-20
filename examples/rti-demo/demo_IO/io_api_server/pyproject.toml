@@ -28,7 +28,7 @@ adc = [
 test = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "httpx>=0.23.0",
+    "httpx2>=2.13.0",
 ]
 
 [tool.demo_io]

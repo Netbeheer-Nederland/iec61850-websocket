@@ -14,7 +14,7 @@ pydantic>=1.10.0
 
 # For better async support (optional)
 anyio>=3.0.0
-httpx>=0.23.0
+httpx2>=2.13.0
 
 # Development dependencies (optional)
 # python-multipart
@@ -22,7 +22,7 @@ httpx>=0.23.0
 # requests
 
 # To install all dependencies:
-# pip install fastapi uvicorn pydantic anyio httpx
+# pip install fastapi uvicorn pydantic anyio httpx2
 
 # On Raspberry Pi, also install:
 # pip install gpiozero

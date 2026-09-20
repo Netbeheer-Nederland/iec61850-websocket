@@ -37,7 +37,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from bffClient import BffClient
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
-import httpx
+import httpx2 as httpx
 import os
 import json
 import tempfile

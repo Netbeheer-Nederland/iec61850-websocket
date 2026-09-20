@@ -149,7 +149,7 @@ those:
 
 ```bash
 cd examples/rti-demo
-docker compose -f demo_setup/docker-compose.yml up -d   # or your compose file of choice
+docker compose -f docker-compose.yml up -d   # or your compose file of choice
 uv run pytest tests/unit -m integration -q
 ```
 

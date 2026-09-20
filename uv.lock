@@ -146,13 +146,16 @@ wheels = [
 
 [[package]]
 name = "asn1tools"
-version = "0.167.0"
+version = "0.169.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bitstruct" },
     { name = "pyparsing" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9b/30/3338efbfe7a943b817a1d4feb795f14f5b32888097a202d42240dabc76db/asn1tools-0.167.0.tar.gz", hash = "sha256:cad53f6f6d788a6eec5e37543401cd8c39f138cc8016b64629ec29fb4735f5b2", size = 864481, upload-time = "2024-07-13T17:48:31.356Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1d/d3/80fef7cd73acd5909a3d1681b5e12af15e2012d2f37a49d0005e3a63bd1b/asn1tools-0.169.0.tar.gz", hash = "sha256:3d15caab63d8d27e8ddd0c3ad88975bbd3d48a359070d87be894bba1df767a50", size = 870347, upload-time = "2026-09-01T03:28:47.557Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a6/51/caff14a34bada6c900115ca49f9416fccb62116e5938c98da61a51b522fe/asn1tools-0.169.0-py3-none-any.whl", hash = "sha256:2efc6a83d3ad3c57aea313d7896ffeca82d83155668620a54c88f426ea0eded1", size = 119774, upload-time = "2026-09-01T03:28:46.158Z" },
+]
 
 [[package]]
 name = "async-timeout"
@@ -743,7 +746,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = "==3.13.3" },
-    { name = "asn1tools", specifier = "==0.167.0" },
+    { name = "asn1tools", specifier = "==0.169.0" },
     { name = "bitstruct", specifier = "==8.21.0" },
     { name = "certifi", specifier = "==2026.1.4" },
     { name = "cffi", specifier = "==2.0.0" },

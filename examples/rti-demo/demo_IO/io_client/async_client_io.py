@@ -62,7 +62,7 @@ import os
 import re
 from typing import Any, Dict, List, Optional, Union
 
-import httpx
+import httpx2 as httpx
 
 from mapping_manager import IOMappingManager
 
@@ -746,7 +746,7 @@ class AsyncIOClient:
         Returns:
             bool: True if write succeeded, False otherwise
         """
-        import httpx
+        import httpx2 as httpx
         try:
             async with httpx.AsyncClient(timeout=5.0) as http_client:
                 response = await http_client.post(
@@ -791,7 +791,7 @@ class AsyncIOClient:
         Returns:
             bool: True if operate succeeded, False otherwise
         """
-        import httpx
+        import httpx2 as httpx
         try:
             async with httpx.AsyncClient(timeout=5.0) as http_client:
                 response = await http_client.post(
@@ -1510,7 +1510,7 @@ class AsyncDemoIOClient:
         Returns:
             bool: True if write succeeded, False otherwise
         """
-        import httpx
+        import httpx2 as httpx
         try:
             async with httpx.AsyncClient(timeout=5.0) as http_client:
                 response = await http_client.post(
@@ -1555,7 +1555,7 @@ class AsyncDemoIOClient:
         Returns:
             bool: True if operate succeeded, False otherwise
         """
-        import httpx
+        import httpx2 as httpx
         try:
             async with httpx.AsyncClient(timeout=5.0) as http_client:
                 response = await http_client.post(

@@ -135,7 +135,7 @@ services:
     environment:
       - PORT=5002
       - PYTHONUNBUFFERED=1
-      - DEMO_IO_URL=http://demo_io:8000
+#      - DEMO_IO_URL=http://demo_io:8000
     networks:
       - rti-network
     healthcheck:

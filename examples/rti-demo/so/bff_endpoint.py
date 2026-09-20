@@ -43,7 +43,7 @@ from acsi_client import ACSIClient
 from ws61850.security.tls import TLSConfig
 import ssl
 import json
-import httpx
+import httpx2 as httpx
 
 
 def resolve_log_level(value: Optional[str], default: int = logging.INFO) -> int:

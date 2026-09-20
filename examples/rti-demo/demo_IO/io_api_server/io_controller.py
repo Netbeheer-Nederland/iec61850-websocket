@@ -679,7 +679,7 @@ async def write_to_acsi_async(obj_ref: str, value: Any, fc: str = "ST", data_typ
         return False
     
     try:
-        import httpx
+        import httpx2 as httpx
         async with httpx.AsyncClient(timeout=5.0) as http_client:
             response = await http_client.post(
                 f"{_acsi_config.url}/api/writevalue",
@@ -716,7 +716,7 @@ async def operate_to_acsi_async(obj_ref: str, value: Any, data_type: str = "") -
         return False
     
     try:
-        import httpx
+        import httpx2 as httpx
         async with httpx.AsyncClient(timeout=5.0) as http_client:
             # Note: /api/operate expects value_type (not dataType), and it's required
             # If data_type is empty, use "BOOLEAN" as default
@@ -756,7 +756,7 @@ def write_to_acsi(obj_ref: str, value: Any, fc: str = "ST", data_type: str = "")
         return False
     
     try:
-        import httpx
+        import httpx2 as httpx
         with httpx.Client(timeout=5.0) as http_client:
             response = http_client.post(
                 f"{_acsi_config.url}/api/writevalue",
@@ -793,7 +793,7 @@ def operate_to_acsi(obj_ref: str, value: Any, data_type: str = "") -> bool:
         return False
     
     try:
-        import httpx
+        import httpx2 as httpx
         with httpx.Client(timeout=5.0) as http_client:
             # Note: /api/operate expects value_type (not dataType), and it's required
             # If data_type is empty, use "BOOLEAN" as default

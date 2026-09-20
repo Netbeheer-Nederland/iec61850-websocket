@@ -8,7 +8,9 @@ against. Routes are flat (e.g. "/api/status", not
 
 from __future__ import annotations
 
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -22,6 +24,13 @@ from tests.conftest import import_module_from_path
 FSP_DIR = Path(__file__).resolve().parents[3] / "fsp"
 if str(FSP_DIR) not in sys.path:
     sys.path.insert(0, str(FSP_DIR))
+
+# bff_endpoint.py reads IO_PLUGIN_STORAGE at import time and defaults to
+# "/app/io_plugin_dynamic" (a Docker-only path) - unwritable outside a
+# container, so create_bff_router() below would fail on every test. Point it
+# at a throwaway temp dir before the import, same as the env var is meant to
+# be used for any non-Docker deployment.
+os.environ.setdefault("IO_PLUGIN_STORAGE", tempfile.mkdtemp(prefix="io_plugin_dynamic_"))
 
 # Loaded under a unique module name, not the generic "bff_endpoint" a plain
 # `import bff_endpoint` would use - so/bff_endpoint.py is also literally

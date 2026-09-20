@@ -21,7 +21,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "asn1tools ==0.167.0",
+    "asn1tools ==0.169.0",
     "websockets == 16.0",
     "bitstruct == 8.21.0",
     "certifi== 2026.1.4",

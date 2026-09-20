@@ -41,7 +41,7 @@ from ConnectionManager import ConnectionManager
 
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
-import httpx
+import httpx2 as httpx
 
 # Global state
 _bff_clients: Dict[str, BffClient] = {}
