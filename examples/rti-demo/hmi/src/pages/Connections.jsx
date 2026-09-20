@@ -121,59 +121,62 @@ function Connections({ connections, setConnections, loading = false, onReload })
           <i className={`fas fa-sync-alt${loading ? ' fa-spin' : ''}`}></i>
         </button>
       </div>
-      <div className="connections-table" id="connections-container">
-        {connections.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-            No connections configured. Click "Add Connection" to get started.
-          </p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Host</th>
-                <th>BFF Port</th>
-                <th>WS Port</th>
-                <th>Type</th>
-                <th>Endpoint</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {connections.map((conn, index) => (
-                <tr key={index}>
-                  <td>{conn.name}</td>
-                  <td>{conn.type === 'IDP-Server' ? '-' : conn.host}</td>
-                  <td>{conn.type === 'IDP-Server' ? '-' : conn.port}</td>
-                  <td>{conn.type === 'RTI-SO' ? (conn.ws_port || '—') : '-'}</td>
-                  <td>{conn.type}</td>
-                  <td>{conn.type === 'IDP-Server' ? conn.endpoint : '-'}</td>
-                  <td>
-                    <span className="endpoint-card-status">
-                      {conn.status === 'connected' ? 'Connected' : 'Disconnected'}
-                    </span>
-                  </td>
-                  <td>
-                    <button 
-                      className="btn-icon" 
-                      style={{ marginRight: '8px' }}
-                      onClick={() => handleEditConnection(conn)}
-                    >
-                      <i className="fas fa-edit"></i>
-                    </button>
-                    <button 
-                      className="btn-icon"
-                      onClick={() => handleDeleteConnection(index)}
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
-                  </td>
+      <div style={{ marginBottom: '24px', padding: '16px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+        <h3 style={{ margin: 0, marginBottom: '12px', fontSize: '16px' }}>Registered Instances</h3>
+        <div className="connections-table" id="connections-container">
+          {connections.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
+              No connections configured. Click "Add Connection" to get started.
+            </p>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Host</th>
+                  <th>BFF Port</th>
+                  <th>WS Port</th>
+                  <th>Type</th>
+                  <th>Endpoint</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {connections.map((conn, index) => (
+                  <tr key={index}>
+                    <td>{conn.name}</td>
+                    <td>{conn.type === 'IDP-Server' ? '-' : conn.host}</td>
+                    <td>{conn.type === 'IDP-Server' ? '-' : conn.port}</td>
+                    <td>{conn.type === 'RTI-SO' ? (conn.ws_port || '—') : '-'}</td>
+                    <td>{conn.type}</td>
+                    <td>{conn.type === 'IDP-Server' ? conn.endpoint : '-'}</td>
+                    <td>
+                      <span className="endpoint-card-status">
+                        {conn.status === 'connected' ? 'Connected' : 'Disconnected'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="btn-icon"
+                        style={{ marginRight: '8px' }}
+                        onClick={() => handleEditConnection(conn)}
+                      >
+                        <i className="fas fa-edit"></i>
+                      </button>
+                      <button
+                        className="btn-icon"
+                        onClick={() => handleDeleteConnection(index)}
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
       {/* Connection Modal */}

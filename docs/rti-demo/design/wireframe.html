@@ -282,10 +282,13 @@
             <div class="wf-h1" data-label="Connections"></div>
             <div class="btn btn-solid">+ Add Connection</div>
           </div>
-          <div class="table-wf">
-            <div class="thead"><div class="cell narrow">Status</div><div class="cell">Name</div><div class="cell">Type</div><div class="cell">Host</div><div class="cell narrow">BFF Port</div><div class="cell narrow">WS Port</div><div class="cell narrow">Actions</div></div>
-            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
-            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+          <div class="section-card">
+            <h3>Registered Instances</h3>
+            <div class="table-wf">
+              <div class="thead"><div class="cell narrow">Status</div><div class="cell">Name</div><div class="cell">Type</div><div class="cell">Host</div><div class="cell narrow">BFF Port</div><div class="cell narrow">WS Port</div><div class="cell narrow">Actions</div></div>
+              <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+              <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+            </div>
           </div>
           <p class="placeholder-text" style="margin-top:10px;">Simpler standalone form (Name / Host / BFF Port / WS Port / Type / Endpoint) — a lighter-weight alternative entry point to the same connection registry as Setup.</p>
         </div>
@@ -411,20 +414,17 @@
 
           <div class="wf-page-header">
             <div class="wf-h1" data-label="ACSI Server" style="width:160px;"></div>
-            <span class="wf-badge">rti-fsp:5001&nbsp;·&nbsp;AP: cp1</span>
           </div>
 
-          <div class="btn-row" style="margin-bottom:10px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;"><span style="width:12px;height:12px;border:1.5px solid var(--wf-line-soft);display:inline-block;"></span>Auto-refresh read values</label>
-          </div>
+<!--          <div class="btn-row" style="margin-bottom:10px;">-->
+<!--            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;"><span style="width:12px;height:12px;border:1.5px solid var(&#45;&#45;wf-line-soft);display:inline-block;"></span>Auto-refresh read values</label>-->
+<!--          </div>-->
 
           <div class="section-card">
             <h3>Connection Status</h3>
             <div class="grid-2">
-              <div class="field"><span class="label">Server Address</span><div class="line" style="height:16px;"></div></div>
-              <div class="field"><span class="label">State</span><div class="line" style="height:16px;"></div></div>
               <div class="field"><span class="label">Model</span><div class="line" style="height:16px;"></div></div>
-              <div class="field"><span class="label">Clients</span><div class="line" style="height:16px;"></div></div>
+              <div class="field"><span class="label">State</span><div class="line" style="height:16px;"></div></div>
             </div>
           </div>
 
