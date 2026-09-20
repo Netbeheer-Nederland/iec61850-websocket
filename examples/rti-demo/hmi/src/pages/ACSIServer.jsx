@@ -920,20 +920,11 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           </div>
         </div>
 
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'center' }}>
-        {/*<button id="acsi-reload-status-btn" className="btn-secondary" onClick={loadStatus} disabled={!endpointTarget}>
+      {/*<div style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'center' }}>
+        <button id="acsi-reload-status-btn" className="btn-secondary" onClick={loadStatus} disabled={!endpointTarget}>
           Reload Status
-        </button>*/}
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: treeData ? 'pointer' : 'default' }}>
-          <input
-            type="checkbox"
-            checked={autoRefreshValues}
-            disabled={!treeData}
-            onChange={(e) => setAutoRefreshValues(e.target.checked)}
-          />
-          Auto-refresh read values
-        </label>
-      </div>
+        </button>
+      </div>*/}
 
       {message && (
       <div className="alert" style={{
@@ -999,10 +990,19 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
                 borderTop: '1px solid var(--border-color)',
               }}
             >
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', alignItems: 'center' }}>
                 <button id="acsi-load-model-btn" className="btn-primary" onClick={loadServerModel} disabled={loading}>
                   {loading ? 'Loading...' : 'Load Model'}
                 </button>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: treeData ? 'pointer' : 'default' }}>
+                  <input
+                    type="checkbox"
+                    checked={autoRefreshValues}
+                    disabled={!treeData}
+                    onChange={(e) => setAutoRefreshValues(e.target.checked)}
+                  />
+                  Auto-refresh read values
+                </label>
               </div>
               <div id="acsi-modelPanel" className="model-tree">
                 {treeData ? (
