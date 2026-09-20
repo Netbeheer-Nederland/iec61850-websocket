@@ -364,12 +364,15 @@ function ConnectionModal({
             <div className="modal-body">
               <div className="form-group">
                 <label htmlFor="name">Name</label>
-                <input 
-                  type="text" 
-                  id="name" 
-                  value={formData.name} 
+                <input
+                  type="text"
+                  id="name"
+                  value={formData.name}
                   onChange={handleInputChange}
                 />
+                <small style={{ color: 'var(--text-muted)' }}>
+                  Human-readable label for this instance, shown throughout the HMI.
+                </small>
               </div>
               <div className="form-group">
                 <label htmlFor="type">Type</label>
@@ -383,6 +386,10 @@ function ConnectionModal({
                   <option value="RTI-FSP">RTI-FSP (WS Active/ACSI Server)</option>
                   <option value="IDP-Server">IDP-Server</option>
                 </select>
+                <small style={{ color: 'var(--text-muted)' }}>
+                  Determines which fields below apply, and fixes ACSI role/WebSocket
+                  mode for RTI-SO and RTI-FSP.
+                </small>
               </div>
               {!isIDP && (
                 <>
@@ -394,6 +401,9 @@ function ConnectionModal({
                       value={formData.host}
                       onChange={handleInputChange}
                     />
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      Hostname or IP address of this instance's own BFF server.
+                    </small>
                   </div>
                   <div className="form-group">
                     <label htmlFor="port">{isBffPortLabeled ? 'BFF Port' : 'Port'}</label>
@@ -425,6 +435,21 @@ function ConnectionModal({
                       </small>
                     </div>
                   )}
+                  {isFSP && (
+                    <div className="form-group">
+                      <label htmlFor="cp">Connection Point</label>
+                      <input
+                        type="text"
+                        id="cp"
+                        value={formData.cp || ''}
+                        onChange={handleInputChange}
+                        placeholder="e.g., cp1"
+                      />
+                      <small style={{ color: 'var(--text-muted)' }}>
+                        Connection point this Customer/Flexibility Service Provider registers under.
+                      </small>
+                    </div>
+                  )}
                 </>
               )}
               {!isIDP && (
@@ -451,6 +476,10 @@ function ConnectionModal({
                         value={formData.acsi === 'client' ? 'Client' : 'Server'}
                       />
                     )}
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      Server exposes an IEC 61850 model to be read from; Client connects
+                      out to read one.
+                    </small>
                   </div>
                   <div className="form-group">
                     <label htmlFor="ws_mode">WebSocket Mode</label>
@@ -472,6 +501,10 @@ function ConnectionModal({
                         value={formData.ws_mode === 'active' ? 'Active' : formData.ws_mode === 'passive' ? 'Passive' : ''}
                       />
                     )}
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      Active dials out to establish the WebSocket connection; Passive
+                      listens for an incoming one.
+                    </small>
                   </div>
                 </>
               )}
@@ -481,9 +514,9 @@ function ConnectionModal({
                 <>
                   <div className="form-group">
                     <label htmlFor="idp_server">IDP Server</label>
-                    <select 
+                    <select
                       id="idp_server"
-                      value={selectedIdpServer} 
+                      value={selectedIdpServer}
                       onChange={handleIdpServerChange}
                     >
                       <option value="">Select an IDP Server...</option>
@@ -491,6 +524,9 @@ function ConnectionModal({
                         <option key={server.name} value={server.name}>{server.name}</option>
                       ))}
                     </select>
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      Identity provider this instance authenticates against for OAuth.
+                    </small>
                   </div>
                   <div className="form-group">
                     <label htmlFor="realm">Realm</label>
@@ -501,6 +537,9 @@ function ConnectionModal({
                       onChange={handleInputChange}
                       placeholder="e.g., master"
                     />
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      OAuth realm on the selected IDP Server.
+                    </small>
                   </div>
                   <div className="form-group">
                     <label htmlFor="certificate_endpoint">Certificate Endpoint</label>
@@ -512,25 +551,33 @@ function ConnectionModal({
                       placeholder="Auto-constructed from IDP server and realm"
                       readOnly
                     />
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      Used to verify the IDP server's signing certificate during OAuth
+                      token validation.
+                    </small>
                   </div>
 
                   <div className="form-group">
                     <label htmlFor="auth_server_ca">Auth Server CA</label>
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
-                      <input 
-                        type="file" 
-                        id="auth_server_ca_file" 
-                        accept=".pem,.crt,.cer" 
+                      <input
+                        type="file"
+                        id="auth_server_ca_file"
+                        accept=".pem,.crt,.cer"
                         onChange={handleFileUpload}
                       />
                     </div>
-                    <textarea 
+                    <textarea
                       id="auth_server_ca"
                       value={formData.auth_server_ca || ''}
                       onChange={handleInputChange}
                       placeholder="-----BEGIN CERTIFICATE-----..."
                       style={{ minHeight: '80px', fontFamily: 'monospace' }}
                     />
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      CA certificate used to trust the IDP server's TLS connection -
+                      upload a file or paste it directly.
+                    </small>
                   </div>
                 </>
               )}
@@ -547,6 +594,9 @@ function ConnectionModal({
                     placeholder="Auto-constructed from IDP server and realm"
                     readOnly
                   />
+                  <small style={{ color: 'var(--text-muted)' }}>
+                    OIDC issuer URL this instance's OAuth tokens are validated against.
+                  </small>
                 </div>
               )}
               
@@ -554,73 +604,75 @@ function ConnectionModal({
               {formData.type === 'RTI-FSP' && (
                 <>
                   <div className="form-group">
-                    <label htmlFor="cp">CP</label>
+                    <label htmlFor="token_endpoint">Token Endpoint</label>
                     <input
                       type="text"
-                      id="cp"
-                      value={formData.cp || ''}
-                      onChange={handleInputChange}
-                      placeholder="e.g., cp1"
-                    />
-                    <small style={{ color: 'var(--text-muted)' }}>
-                      Connection point this FSP registers under.
-                    </small>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="token_endpoint">Token Endpoint</label>
-                    <input 
-                      type="text" 
-                      id="token_endpoint" 
+                      id="token_endpoint"
                       value={formData.token_endpoint || ''}
                       onChange={handleInputChange}
                       placeholder="Auto-constructed from certificate endpoint and realm"
                       readOnly
                     />
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      URL this FSP requests OAuth access tokens from.
+                    </small>
                   </div>
                   <div className="form-group">
                     <label htmlFor="client_id">Client ID</label>
-                    <input 
-                      type="text" 
-                      id="client_id" 
-                      value={formData.client_id || ''} 
+                    <input
+                      type="text"
+                      id="client_id"
+                      value={formData.client_id || ''}
                       onChange={handleInputChange}
                       placeholder="e.g., rti-fsp-client"
                     />
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      OAuth client ID this FSP authenticates as when requesting tokens.
+                    </small>
                   </div>
                   <div className="form-group">
                     <label htmlFor="client_secret">Client Secret</label>
-                    <input 
-                      type="password" 
-                      id="client_secret" 
-                      value={formData.client_secret || ''} 
+                    <input
+                      type="password"
+                      id="client_secret"
+                      value={formData.client_secret || ''}
                       onChange={handleInputChange}
                       placeholder="Client secret"
                     />
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      OAuth client secret paired with the Client ID above.
+                    </small>
                   </div>
                   <div className="form-group">
                     <label htmlFor="enable_token_refresh">Enable Token Refresh</label>
-                    <input 
-                      type="checkbox" 
-                      id="enable_token_refresh" 
+                    <input
+                      type="checkbox"
+                      id="enable_token_refresh"
                       checked={formData.enable_token_refresh || false}
                       onChange={(e) => onFormChange(prev => ({
                         ...prev,
                         enable_token_refresh: e.target.checked
                       }))}
                     />
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      Automatically renew the OAuth access token before it expires.
+                    </small>
                   </div>
                 </>
               )}
               {isIDP && (
                 <div className="form-group">
                   <label htmlFor="endpoint">Endpoint</label>
-                  <input 
-                    type="text" 
-                    id="endpoint" 
-                    value={formData.endpoint || ''} 
+                  <input
+                    type="text"
+                    id="endpoint"
+                    value={formData.endpoint || ''}
                     onChange={handleInputChange}
                     placeholder="e.g., /idp"
                   />
+                  <small style={{ color: 'var(--text-muted)' }}>
+                    Base URL of this identity provider's OAuth/OIDC endpoint.
+                  </small>
                 </div>
               )}
             </div>
