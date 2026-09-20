@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 import json
 import logging
 import re
@@ -627,13 +626,10 @@ def assign_brcb_value(server_brcb, values, iec61850_server):
             brcb.opt_flds = values["optFlds"]
 
         if "rptEna" in values:
-            task, cancellation_check = check_for_task_cancellation(
-                server_brcb.rptEna, values["rptEna"], server_brcb.rcb.get_objRef()
-            )
-
             server_brcb.rptEna = values["rptEna"]
-            if task is not None and cancellation_check == True:
-                restart_report_task(task, server_brcb, iec61850_server)
+            # Report task cancel/restart on rptEna False->True happens in
+            # ReportService.reset_report_task (awaited by the caller right
+            # after this function returns) - see report_service.py.
 
         if "rptID" in values:
             brcb.rpt_id = values["rptID"]
@@ -652,28 +648,6 @@ def assign_brcb_value(server_brcb, values, iec61850_server):
         return "ok"
     except (AttributeError, TypeError, ValueError, KeyError):
         return "failure"
-
-
-def check_for_task_cancellation(old_value, new_value, obj_ref):
-    """
-    Function used for finding the task that has to be canceled when rptEna is changed from True to False
-    """
-    if new_value == False and old_value == True:
-        for task in asyncio.all_tasks():
-            if task.get_name() == obj_ref:
-                return task, True
-    return None, False
-
-
-async def restart_report_task(task, server_rcb, iec61850_server):
-    logger.info("canceling the task with this name:", task.get_name())
-    task.cancel()
-    try:
-        await task  # <-- wait until it's really cancelled
-    except asyncio.CancelledError:
-        logger.info("Task cancelled successfully:", task.get_name())
-
-    asyncio.create_task(iec61850_server.periodic_report_task(server_rcb), name=server_rcb.rcb.get_objRef())
 
 
 def assign_urcb_value(server_urcb, values, iec61850_server):
@@ -700,15 +674,13 @@ def assign_urcb_value(server_urcb, values, iec61850_server):
             urcb.opt_flds = values["optFlds"]
 
         if "rptEna" in values:
-            task, cancellation_check = check_for_task_cancellation(
-                server_urcb.rptEna, values["rptEna"], server_urcb.rcb.get_objRef()
-            )
-
-            server_urcb.rptEna = values["rptEna"]
-            if task is not None and cancellation_check == True:
+            if server_urcb.rptEna is True and values["rptEna"] is False:
                 server_urcb.seq_num = 0
                 server_urcb.resv = False
-                restart_report_task(task, server_urcb, iec61850_server)
+            server_urcb.rptEna = values["rptEna"]
+            # Report task cancel/restart on rptEna False->True happens in
+            # ReportService.reset_report_task (awaited by the caller right
+            # after this function returns) - see report_service.py.
         if "rptID" in values:
             urcb.rpt_id = values["rptID"]
 
