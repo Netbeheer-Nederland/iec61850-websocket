@@ -34,7 +34,8 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
     client_id: '',
     client_secret: '',
     enable_token_refresh: false,
-    idp_server: ''
+    idp_server: '',
+    cp: ''
   });
   const [bffError, setBffError] = useState(null);
 
@@ -65,7 +66,7 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
   // Add connection
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, ws_port: 8765, type: 'RTI-SO', acsi: 'client', ws_mode: 'passive', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false, idp_server: '' });
+    setFormData({ name: '', host: '', port: 5000, ws_port: 8765, type: 'RTI-SO', acsi: 'client', ws_mode: 'passive', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false, idp_server: '', cp: '' });
     setShowModal(true);
   };
 
@@ -154,6 +155,7 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
       // make an unconfigured instance look configured, exactly what the WS
       // port split was meant to stop happening.
       ws_port: conn.ws_port || '',
+      cp: conn.cp || '',
       type: conn.type || 'RTI-SO',
       acsi: conn.acsi || 'server',
       ws_mode: conn.ws_mode || '',
@@ -226,6 +228,11 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
         saveData.ws_port = Number.isFinite(parsedWsPort) && parsedWsPort > 0 ? parsedWsPort : 8765;
       } else {
         delete saveData.ws_port;
+      }
+
+      // cp only applies to RTI-FSP (see ConnectionModal.jsx).
+      if (saveData.type !== 'RTI-FSP') {
+        delete saveData.cp;
       }
 
       if (currentConnection) {

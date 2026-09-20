@@ -548,9 +548,22 @@ function ConnectionModal({
                 </div>
               )}
               
-              {/* FSP-specific OAuth fields (only fields unique to FSP) */}
+              {/* FSP-specific fields */}
               {formData.type === 'RTI-FSP' && (
                 <>
+                  <div className="form-group">
+                    <label htmlFor="cp">CP</label>
+                    <input
+                      type="text"
+                      id="cp"
+                      value={formData.cp || ''}
+                      onChange={handleInputChange}
+                      placeholder="e.g., cp1"
+                    />
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      Connection point this FSP registers under.
+                    </small>
+                  </div>
                   <div className="form-group">
                     <label htmlFor="token_endpoint">Token Endpoint</label>
                     <input 

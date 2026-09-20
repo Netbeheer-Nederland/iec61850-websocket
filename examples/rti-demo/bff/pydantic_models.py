@@ -20,6 +20,7 @@ class ConnectionCreateRequest(BaseModel):
     client_secret: Optional[str] = Field(default=None, description="OAuth client secret for FSP")
     enable_token_refresh: Optional[bool] = Field(default=None, description="Enable token refresh for FSP", json_schema_extra={"example": True})
     idp_server: Optional[str] = Field(default=None, description="IDP Server name for OAuth", json_schema_extra={"example": "IDP-Server-01"})
+    cp: Optional[str] = Field(default=None, description="Connection point identifier this RTI-FSP registers under", json_schema_extra={"example": "cp1"})
     auto_discovered: bool = Field(default=False, description="Whether this connection was auto-discovered")
 
 class TLSConnectionCreateConfigRequest(BaseModel):
@@ -66,6 +67,7 @@ class ConnectionUpdateRequest(BaseModel):
     client_secret: Optional[str] = Field(default=None, description="OAuth client secret for FSP")
     enable_token_refresh: Optional[bool] = Field(default=None, description="Enable token refresh for FSP")
     idp_server: Optional[str] = Field(default=None, description="IDP Server name for OAuth")
+    cp: Optional[str] = Field(default=None, description="Connection point identifier this RTI-FSP registers under")
     status: Optional[str] = Field(default=None, description="Connection status")
 
 

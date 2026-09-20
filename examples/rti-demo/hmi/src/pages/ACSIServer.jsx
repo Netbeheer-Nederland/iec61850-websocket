@@ -115,7 +115,8 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       // so a misconfigured instance is visibly incomplete instead of
       // silently pointing at the wrong port again.
       setPort(inst.ws_port ? String(inst.ws_port) : '');
-      setCp(inst.cp || 'cp1');
+      // CP is owned by this RTI-FSP connection itself (endpoint.cp, seeded
+      // above), not by the target RTI-SO instance - don't clobber it here.
       // FSP only ever supports "active" mode (see fsp/bff_endpoint.py's
       // /start), and connection entries don't carry a per-instance mode -
       // but the field must have a valid value once a real instance is
@@ -309,7 +310,8 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           // See the identical comment in handleInstanceSelect: this is the
           // SO's ws_port (WS listen port), not its BFF port (inst.port).
           setPort(inst.ws_port ? String(inst.ws_port) : '');
-          setCp(inst.cp || 'cp1');
+          // CP is owned by this RTI-FSP connection itself (endpoint.cp,
+          // seeded at mount), not by the target RTI-SO instance.
           setMode('active');
         }
 

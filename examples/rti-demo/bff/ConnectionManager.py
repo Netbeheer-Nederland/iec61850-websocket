@@ -149,7 +149,8 @@ class ConnectionManager:
                        realm: Optional[str] = None, token_endpoint: Optional[str] = None,
                        client_id: Optional[str] = None, client_secret: Optional[str] = None,
                        enable_token_refresh: Optional[bool] = None, idp_server: Optional[str] = None,
-                       auto_discovered: bool = False, ws_port: Optional[int] = None) -> Dict:
+                       auto_discovered: bool = False, ws_port: Optional[int] = None,
+                       cp: Optional[str] = None) -> Dict:
         """Add a new connection.
 
         Args:
@@ -165,6 +166,8 @@ class ConnectionManager:
                 and only meaningful for RTI-SO connections. An RTI-FSP's
                 "Start Server" dials out to this SO-side ws_port/host, not to
                 the SO's BFF port.
+            cp: Connection point identifier this RTI-FSP registers under -
+                only meaningful for RTI-FSP connections.
 
         Returns:
             The created connection dictionary.
@@ -229,6 +232,8 @@ class ConnectionManager:
                 connection_in_file['ws_mode'] = ws_mode
                 if ws_port is not None:
                     connection_in_file['ws_port'] = ws_port
+                if cp is not None:
+                    connection_in_file['cp'] = cp
 
                 # Update OAuth fields for non-IDP-Server types
                 oauth_fields = {}
@@ -285,6 +290,9 @@ class ConnectionManager:
             'auto_discovered': auto_discovered,
             'created_at': datetime.now().isoformat()
         }
+
+        if cp is not None:
+            connection['cp'] = cp
 
         # Add endpoint for IDP-Server
         if conn_type == 'IDP-Server' and endpoint is not None:

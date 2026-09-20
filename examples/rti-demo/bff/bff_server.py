@@ -965,7 +965,8 @@ async def create_connection(request: ConnectionCreateRequest):
         client_secret=request.client_secret,
         enable_token_refresh=request.enable_token_refresh,
         idp_server=request.idp_server,
-        auto_discovered=request.auto_discovered
+        auto_discovered=request.auto_discovered,
+        cp=request.cp
     )
     conn_manager.save_connections()
     # Immediately probe the connection so its status is fresh right away instead
@@ -1051,6 +1052,8 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         connection['port'] = request.port
     if request.ws_port is not None:
         connection['ws_port'] = request.ws_port
+    if request.cp is not None:
+        connection['cp'] = request.cp
     if request.type is not None:
         connection['type'] = request.type
     if request.acsi is not None:
