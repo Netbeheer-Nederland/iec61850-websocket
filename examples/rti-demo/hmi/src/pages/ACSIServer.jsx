@@ -917,10 +917,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         <div className="page-header" style={{ position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <h1><i className="fas fa-server" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>ACSI Server</h1>
-            <span id="acsi-server-endpoint-badge" className="acsi-endpoint-badge" style={{ display: connected ? 'inline-flex' : 'none' }}>
-              {connected && statusInfo && `${statusInfo.result?.status?.host}:${statusInfo.result?.status?.port}`}
-              {statusInfo?.result?.status?.accessPoints && <span style={{ marginLeft: '8px' }}>AP: {statusInfo.result.status.accessPoints}</span>}
-            </span>
           </div>
         </div>
 
