@@ -296,7 +296,12 @@ class ConnectionManager:
             return connection_in_file
 
         connection = {
-            'id': len(self.connections) + 1,
+            # Not len(self.connections) + 1 - that reused ids once a
+            # connection had been deleted (e.g. 3 connections left after a
+            # delete, so the next add got id=4 again, even if a surviving
+            # connection already had id=4). Based on the highest id actually
+            # in use instead, so ids stay unique across deletes.
+            'id': max((c.get('id', 0) for c in self.connections), default=0) + 1,
             'name': name,
             'host': host,
             'port': port,
