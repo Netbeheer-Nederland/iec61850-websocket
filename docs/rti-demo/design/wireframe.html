@@ -327,12 +327,88 @@
         <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
         <div class="wf-content">
           <div class="wf-page-header"><div class="wf-h1" data-label="Traffic" style="width:120px;"></div></div>
+          <p class="placeholder-text" style="margin:-8px 0 16px;">SOs, FSP and Instances</p>
+
           <div class="section-card">
-            <h3>Same InstanceVisualization grid as Model — entry point for inspecting live protocol traffic per instance</h3>
+            <h3>InstanceVisualization — same grid as Model</h3>
             <div class="grid-cards">
               <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
               <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
               <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-head"><span>Data Access Panels &nbsp;<span class="placeholder-text">(+ / − adds/removes panels, one shown below)</span></span><span class="chev">▾</span></div>
+            <div class="accordion-body">
+              <div class="field-row">
+                <div class="field" style="min-width:240px;"><span class="label">Endpoint</span><div class="input"></div><span class="hint">ACSI: client / server</span></div>
+              </div>
+              <div class="btn-row">
+                <div class="btn btn-outline">Fetch Model</div>
+                <div class="field" style="min-width:110px;margin:0;"><div class="input"></div></div>
+              </div>
+              <div class="field-row">
+                <div class="field"><span class="label">LD</span><div class="input"></div></div>
+                <div class="field"><span class="label">LN</span><div class="input"></div></div>
+                <div class="field"><span class="label">DO</span><div class="input"></div></div>
+                <div class="field"><span class="label">DA / SDO</span><div class="input"></div></div>
+              </div>
+              <div class="section-card"><span class="placeholder-text">Object Reference: LD/LN.DO.DA [FC] …</span></div>
+              <div class="field-row">
+                <div class="field" style="min-width:260px;"><span class="label">Value to Write</span><div class="input"></div></div>
+              </div>
+              <div class="btn-row" style="margin-bottom:0;">
+                <div class="btn btn-solid">Read</div>
+                <div class="btn btn-outline">Write</div>
+                <div class="btn btn-outline">Operate</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion" style="margin-top:16px;margin-bottom:0;">
+            <div class="accordion-head"><span>Message Monitors</span><span class="chev">▾</span></div>
+            <div class="accordion-body">
+              <h3 style="margin:0 0 10px;font-size:11px;color:#6b7280;">ACSI Client Endpoints (RTI-SO)</h3>
+              <div class="grid-2" style="margin-bottom:20px;">
+                <div class="section-card" style="margin-bottom:0;">
+                  <div class="wf-page-header" style="margin-bottom:8px;">
+                    <div class="wf-h1" data-label="so1" style="height:16px;width:110px;"></div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                      <div class="input" style="height:22px;width:44px;"></div>
+                      <span class="placeholder-text">▶ ■ 🗑</span>
+                    </div>
+                  </div>
+                  <p class="placeholder-text" style="margin:0 0 6px;">Monitoring stopped</p>
+                  <p class="placeholder-text" style="margin:0;">No messages. Select an endpoint and start monitoring to see WebSocket traffic.</p>
+                </div>
+                <div class="section-card" style="margin-bottom:0;">
+                  <div class="wf-page-header" style="margin-bottom:8px;">
+                    <div class="wf-h1" data-label="so2" style="height:16px;width:110px;"></div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                      <div class="input" style="height:22px;width:44px;"></div>
+                      <span class="placeholder-text">▶ ■ 🗑</span>
+                    </div>
+                  </div>
+                  <p class="placeholder-text" style="margin:0 0 6px;">Monitoring stopped</p>
+                  <p class="placeholder-text" style="margin:0;">No messages. Select an endpoint and start monitoring to see WebSocket traffic.</p>
+                </div>
+              </div>
+
+              <h3 style="margin:0 0 10px;font-size:11px;color:#6b7280;">ACSI Server Endpoints (RTI-FSP)</h3>
+              <div class="grid-2">
+                <div class="section-card" style="margin-bottom:0;">
+                  <div class="wf-page-header" style="margin-bottom:8px;">
+                    <div class="wf-h1" data-label="fsp1" style="height:16px;width:110px;"></div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                      <div class="input" style="height:22px;width:44px;"></div>
+                      <span class="placeholder-text">▶ ■ 🗑</span>
+                    </div>
+                  </div>
+                  <p class="placeholder-text" style="margin:0 0 6px;">Monitoring stopped</p>
+                  <p class="placeholder-text" style="margin:0;">No messages. Select an endpoint and start monitoring to see WebSocket traffic.</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -416,9 +492,6 @@
             <div class="wf-h1" data-label="ACSI Server" style="width:160px;"></div>
           </div>
 
-<!--          <div class="btn-row" style="margin-bottom:10px;">-->
-<!--            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;"><span style="width:12px;height:12px;border:1.5px solid var(&#45;&#45;wf-line-soft);display:inline-block;"></span>Auto-refresh read values</label>-->
-<!--          </div>-->
 
           <div class="section-card">
             <h3>Connection Status</h3>
@@ -431,7 +504,11 @@
           <div class="accordion">
             <div class="accordion-head"><span>cp1 &nbsp;<span class="placeholder-text">(connection point — click to expand)</span></span><span class="chev">▾</span></div>
             <div class="accordion-body">
-              <div class="btn-row"><div class="btn btn-solid">Load Model</div></div>
+              <div class="btn-row">
+                <div class="btn btn-solid">Load Model</div>
+                <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;"><span style="width:12px;height:12px;border:1.5px solid var(--wf-line-soft);display:inline-block;"></span>Auto-refresh read values</label>
+              </div>
+
               <div class="tree-wf">
                 <div class="node l1">▾ IED_2</div>
                 <div class="node l2">▾ LD0</div>
@@ -442,6 +519,11 @@
           </div>
 
           <div class="wf-page-header" style="margin-top:8px;"><div class="wf-h1" data-label="Monitoring" style="width:150px;"></div></div>
+          <div class="btn-row">
+            <div class="btn btn-solid">Start Monitor</div>
+            <div class="btn btn-outline">Stop Monitor</div>
+            <div class="btn btn-outline">Clear Logs</div>
+          </div>
           <div class="section-card"><span class="placeholder-text">Protocol message log / actions log …</span></div>
 
         </div>
@@ -457,9 +539,19 @@
         <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
         <div class="wf-content">
 
+          <div class="wf-page-header"><div class="wf-h1" data-label="Websocket Connection" style="width:230px;"></div></div>
+
+          <div class="section-card">
+            <div class="field-row" style="margin-bottom:0;">
+              <div class="field"><span class="label">BFF Host</span><div class="input"></div></div>
+              <div class="field"><span class="label">BFF Port</span><div class="input"></div></div>
+              <div class="field"><span class="label">WS Host</span><div class="input"></div></div>
+              <div class="field"><span class="label">WS Port</span><div class="input"></div></div>
+            </div>
+            <p class="placeholder-text" style="margin:8px 0 0;">All four read-only — this is a fixed WebSocket Passive endpoint, not a dial-out connection (no Connect/Disconnect).</p>
+          </div>
+
           <div class="btn-row">
-            <div class="btn btn-solid">Connect</div>
-            <div class="btn btn-outline">Disconnect</div>
             <div class="btn btn-outline">🛡 TLS Config</div>
             <div class="btn btn-outline" style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;border:1.5px solid var(--wf-line);display:inline-block;"></span>Enable OAuth</div>
           </div>
@@ -488,6 +580,14 @@
               <div class="accordion-head"><span>cp2</span><span class="chev">▸</span></div>
             </div>
           </div>
+
+          <div class="wf-page-header" style="margin-top:8px;"><div class="wf-h1" data-label="Monitoring" style="width:150px;"></div></div>
+          <div class="btn-row">
+            <div class="btn btn-solid">Start Monitor</div>
+            <div class="btn btn-outline">Stop Monitor</div>
+            <div class="btn btn-outline">Clear Logs</div>
+          </div>
+          <div class="section-card"><span class="placeholder-text">Protocol message log / actions log …</span></div>
 
           <div class="section-card"><span class="placeholder-text">Context menu (right-click a tree node): Read Value · Write Value · Operate · Configure BRCB/URCB …</span></div>
 
