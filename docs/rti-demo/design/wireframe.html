@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RTI Demo HMI — Wireframes</title>
+<style>
+  :root {
+    --wf-bg: #ffffff;
+    --wf-line: #6b7280;
+    --wf-line-soft: #9ca3af;
+    --wf-fill: #f3f4f6;
+    --wf-fill-soft: #fafafa;
+    --wf-accent: #374151;
+    --wf-text: #1f2937;
+    --wf-muted: #9ca3af;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+    color: var(--wf-text);
+    background: #e5e7eb;
+  }
+  .page-shell {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .title-block {
+    margin-bottom: 20px;
+  }
+  .title-block h1 {
+    margin: 0 0 4px;
+    font-size: 22px;
+  }
+  .title-block p {
+    margin: 0;
+    color: #4b5563;
+    font-size: 13px;
+  }
+  .picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .picker button {
+    font: inherit;
+    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--wf-line-soft);
+    background: #fff;
+    color: var(--wf-text);
+    cursor: pointer;
+  }
+  .picker button.active {
+    background: var(--wf-accent);
+    color: #fff;
+    border-color: var(--wf-accent);
+  }
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .frame {
+    display: flex;
+    border: 2px solid var(--wf-line);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--wf-bg);
+    min-height: 640px;
+  }
+
+  /* ---- Sidebar ---- */
+  .wf-sidebar {
+    width: 170px;
+    flex: 0 0 170px;
+    border-right: 2px solid var(--wf-line);
+    background: var(--wf-fill-soft);
+    padding: 14px 0;
+  }
+  .wf-logo {
+    padding: 0 14px 14px;
+    border-bottom: 1px dashed var(--wf-line-soft);
+    margin-bottom: 10px;
+  }
+  .wf-logo .box { height: 14px; width: 70%; }
+  .wf-logo .sub { height: 8px; width: 50%; margin-top: 6px; }
+  .wf-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    font-size: 12px;
+    color: #4b5563;
+  }
+  .wf-nav-item .dot { width: 10px; height: 10px; border: 1.5px solid var(--wf-line); border-radius: 3px; flex: none; }
+  .wf-nav-item.active { background: #fff; border-left: 3px solid var(--wf-accent); font-weight: 600; color: var(--wf-text); }
+
+  /* ---- Header ---- */
+  .wf-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .wf-header {
+    height: 46px;
+    border-bottom: 2px solid var(--wf-line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 18px;
+    background: var(--wf-fill-soft);
+  }
+  .wf-header .crumb { height: 10px; width: 120px; background: var(--wf-fill); border: 1px dashed var(--wf-line-soft); }
+  .wf-header .actions { display: flex; gap: 8px; }
+  .wf-header .icon { width: 22px; height: 22px; border: 1.5px solid var(--wf-line-soft); border-radius: 50%; }
+
+  .wf-content { padding: 18px; overflow: auto; flex: 1; }
+
+  /* ---- Generic wireframe primitives ---- */
+  .box { background: var(--wf-fill); border: 1.5px dashed var(--wf-line-soft); }
+  .line { background: var(--wf-fill); border: 1px dashed var(--wf-line-soft); }
+  .placeholder-text { color: var(--wf-muted); font-size: 11px; font-style: italic; }
+
+  .wf-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .wf-h1 { height: 20px; width: 220px; background: var(--wf-fill); border: 1.5px dashed var(--wf-line-soft); position: relative; }
+  .wf-h1::after { content: attr(data-label); position: absolute; left: 8px; top: 2px; font-size: 13px; font-weight: 700; color: var(--wf-text); font-style: normal; }
+  .wf-badge { height: 20px; padding: 0 10px; border-radius: 10px; background: #d1d5db; display: inline-flex; align-items: center; font-size: 10px; color: #374151; margin-left: 10px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    border: 1.5px solid var(--wf-line);
+  }
+  .btn-solid { background: #d1d5db; font-weight: 600; }
+  .btn-outline { background: #fff; }
+  .btn-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+
+  .field-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .field { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+  .field .label { font-size: 10px; color: #6b7280; }
+  .field .input { height: 30px; border: 1.5px dashed var(--wf-line-soft); border-radius: 5px; background: var(--wf-fill); }
+  .field .hint { font-size: 9px; color: var(--wf-muted); font-style: italic; }
+
+  .section-card {
+    border: 1.5px solid var(--wf-line-soft);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 16px;
+    background: var(--wf-fill-soft);
+  }
+  .section-card h3 { margin: 0 0 10px; font-size: 12px; }
+
+  .accordion { border: 1.5px solid var(--wf-line-soft); border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+  .accordion-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--wf-fill-soft); font-size: 12px; font-weight: 600; }
+  .accordion-head .chev { font-size: 10px; color: var(--wf-muted); }
+  .accordion-body { padding: 14px; border-top: 1.5px dashed var(--wf-line-soft); }
+
+  .table-wf { border: 1.5px solid var(--wf-line-soft); border-radius: 8px; overflow: hidden; }
+  .table-wf .thead { display: flex; background: var(--wf-fill); font-size: 10px; font-weight: 700; padding: 8px 12px; }
+  .table-wf .trow { display: flex; padding: 8px 12px; border-top: 1px dashed var(--wf-line-soft); font-size: 11px; align-items: center; }
+  .table-wf .cell { flex: 1; }
+  .table-wf .cell.narrow { flex: 0 0 70px; }
+  .dot-status { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--wf-line); display: inline-block; margin-right: 6px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .endpoint-card { display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--wf-line-soft); border-radius: 8px; padding: 12px; background: var(--wf-fill-soft); }
+  .endpoint-card .icon-tile { width: 34px; height: 34px; border-radius: 6px; border: 1.5px solid var(--wf-line); flex: none; }
+  .endpoint-card .meta { flex: 1; min-width: 0; }
+  .endpoint-card .meta .name { height: 10px; width: 70%; background: var(--wf-fill); border: 1px dashed var(--wf-line-soft); margin-bottom: 6px; }
+  .endpoint-card .meta .sub { height: 8px; width: 45%; background: var(--wf-fill); border: 1px dashed var(--wf-line-soft); }
+  .endpoint-card .pill { width: 40px; height: 16px; border-radius: 8px; border: 1.5px solid var(--wf-line-soft); flex: none; }
+
+  .modal-overlay { border: 2px dashed var(--wf-line); border-radius: 10px; padding: 16px; background: #fff; margin-top: 18px; position: relative; }
+  .modal-overlay::before { content: "MODAL (on top of page)"; position: absolute; top: -11px; left: 14px; background: #fff; padding: 0 6px; font-size: 9px; color: var(--wf-muted); letter-spacing: .04em; }
+  .modal-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .modal-title .t { font-size: 13px; font-weight: 700; }
+  .modal-title .x { font-size: 14px; color: var(--wf-muted); }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+
+  .tree-wf { border: 1.5px dashed var(--wf-line-soft); border-radius: 6px; padding: 10px 12px; font-size: 11px; }
+  .tree-wf .node { padding: 3px 0; color: #4b5563; }
+  .tree-wf .node.l1 { padding-left: 0; font-weight: 600; }
+  .tree-wf .node.l2 { padding-left: 16px; }
+  .tree-wf .node.l3 { padding-left: 32px; color: var(--wf-muted); }
+
+  .legend { margin-top: 18px; font-size: 11px; color: #4b5563; display: flex; gap: 18px; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 14px; height: 14px; border: 1.5px dashed var(--wf-line-soft); background: var(--wf-fill); border-radius: 3px; }
+  .legend .swatch.solid { border-style: solid; background: #d1d5db; }
+</style>
+</head>
+<body>
+<div class="page-shell">
+
+  <div class="title-block">
+    <h1>RTI Demo HMI — Low-fidelity Wireframes</h1>
+    <p>Structural layout reference for the screens in <code>hmi/</code>, grouped by route. Grayscale/dashed boxes only — see <code>style-guide.md</code> in this folder for the actual visual design (colors, tokens, component classes).</p>
+  </div>
+
+  <div class="picker" id="picker"></div>
+
+  <!-- ============ SETUP ============ -->
+  <section class="screen" data-screen="setup">
+    <div class="frame">
+      <div class="wf-sidebar" data-active-nav="Setup"></div>
+      <div class="wf-main">
+        <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div><div class="icon"></div></div></div>
+        <div class="wf-content">
+          <div class="wf-page-header">
+            <div class="wf-h1" data-label="Setup"></div>
+            <div class="btn btn-solid">+ Register Instance</div>
+          </div>
+
+          <div class="table-wf">
+            <div class="thead">
+              <div class="cell narrow">Status</div>
+              <div class="cell">Name</div>
+              <div class="cell">Type</div>
+              <div class="cell">Host</div>
+              <div class="cell narrow">BFF Port</div>
+              <div class="cell narrow">Actions</div>
+            </div>
+            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">FSP01</div><div class="cell placeholder-text">RTI-FSP</div><div class="cell placeholder-text">rti-fsp</div><div class="cell narrow placeholder-text">5001</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">SO</div><div class="cell placeholder-text">RTI-SO</div><div class="cell placeholder-text">rti-so</div><div class="cell narrow placeholder-text">5002</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">IDP</div><div class="cell placeholder-text">IDP-Server</div><div class="cell placeholder-text">—</div><div class="cell narrow placeholder-text">—</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+          </div>
+
+          <div class="section-card" style="margin-top:16px;">
+            <h3>Instance Visualization (InstanceVisualization component)</h3>
+            <div class="grid-cards">
+              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+            </div>
+          </div>
+
+          <div class="modal-overlay">
+            <div class="modal-title"><span class="t">Register / Edit Instance</span><span class="x">×</span></div>
+            <div class="field-row">
+              <div class="field"><span class="label">Name</span><div class="input"></div><span class="hint">Human-readable label for this instance...</span></div>
+              <div class="field"><span class="label">Type</span><div class="input"></div><span class="hint">Determines which fields below apply...</span></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><span class="label">Host</span><div class="input"></div></div>
+              <div class="field"><span class="label">BFF Port</span><div class="input"></div><span class="hint">Port this instance's own BFF server...</span></div>
+              <div class="field"><span class="label">WS Port <em>(RTI-SO only)</em></span><div class="input"></div></div>
+              <div class="field"><span class="label">CP <em>(RTI-FSP only)</em></span><div class="input"></div><span class="hint">Connection point this FSP registers under</span></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><span class="label">ACSI</span><div class="input"></div></div>
+              <div class="field"><span class="label">WebSocket Mode</span><div class="input"></div></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><span class="label">IDP Server</span><div class="input"></div></div>
+              <div class="field"><span class="label">Realm</span><div class="input"></div></div>
+              <div class="field"><span class="label">Certificate Endpoint</span><div class="input"></div></div>
+            </div>
+            <div class="modal-footer"><div class="btn btn-outline">Cancel</div><div class="btn btn-solid">Save</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CONNECTIONS ============ -->
+  <section class="screen" data-screen="connections">
+    <div class="frame">
+      <div class="wf-sidebar" data-active-nav="none"></div>
+      <div class="wf-main">
+        <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
+        <div class="wf-content">
+          <div class="wf-page-header">
+            <div class="wf-h1" data-label="Connections"></div>
+            <div class="btn btn-solid">+ Add Connection</div>
+          </div>
+          <div class="table-wf">
+            <div class="thead"><div class="cell narrow">Status</div><div class="cell">Name</div><div class="cell">Type</div><div class="cell">Host</div><div class="cell narrow">BFF Port</div><div class="cell narrow">WS Port</div><div class="cell narrow">Actions</div></div>
+            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+          </div>
+          <p class="placeholder-text" style="margin-top:10px;">Simpler standalone form (Name / Host / BFF Port / WS Port / Type / Endpoint) — a lighter-weight alternative entry point to the same connection registry as Setup.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MODEL ============ -->
+  <section class="screen" data-screen="model">
+    <div class="frame">
+      <div class="wf-sidebar" data-active-nav="Model"></div>
+      <div class="wf-main">
+        <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
+        <div class="wf-content">
+          <div class="wf-page-header"><div class="wf-h1" data-label="Model" style="width:120px;"></div></div>
+          <div class="section-card">
+            <h3>InstanceVisualization — click a card to open its ACSI Client/Server page</h3>
+            <div class="grid-cards">
+              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+            </div>
+          </div>
+          <p class="placeholder-text">Selecting a card navigates to /acsi-client or /acsi-server (by instance type) with that connection passed as router state.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TRAFFIC ============ -->
+  <section class="screen" data-screen="traffic">
+    <div class="frame">
+      <div class="wf-sidebar" data-active-nav="Traffic"></div>
+      <div class="wf-main">
+        <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
+        <div class="wf-content">
+          <div class="wf-page-header"><div class="wf-h1" data-label="Traffic" style="width:120px;"></div></div>
+          <div class="section-card">
+            <h3>Same InstanceVisualization grid as Model — entry point for inspecting live protocol traffic per instance</h3>
+            <div class="grid-cards">
+              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TOOLS ============ -->
+  <section class="screen" data-screen="tools">
+    <div class="frame">
+      <div class="wf-sidebar" data-active-nav="Tools"></div>
+      <div class="wf-main">
+        <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
+        <div class="wf-content">
+          <div class="wf-page-header"><div class="wf-h1" data-label="Tools" style="width:110px;"></div></div>
+          <div class="grid-2">
+            <div class="section-card"><h3>Utility panel A</h3><div class="line" style="height:60px;"></div></div>
+            <div class="section-card"><h3>Utility panel B</h3><div class="line" style="height:60px;"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="screen" data-screen="settings">
+    <div class="frame">
+      <div class="wf-sidebar" data-active-nav="Settings"></div>
+      <div class="wf-main">
+        <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
+        <div class="wf-content">
+          <div class="wf-page-header"><div class="wf-h1" data-label="Settings" style="width:130px;"></div></div>
+          <div class="section-card">
+            <h3>BFF connection</h3>
+            <div class="field-row">
+              <div class="field"><span class="label">BFF Host</span><div class="input"></div></div>
+              <div class="field"><span class="label">BFF Port</span><div class="input"></div></div>
+            </div>
+          </div>
+          <div class="section-card">
+            <h3>Refresh intervals</h3>
+            <div class="field-row">
+              <div class="field"><span class="label">Auto-refresh interval</span><div class="input"></div></div>
+            </div>
+            <div class="btn btn-solid">Save Settings</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ACSI SERVER (FSP) ============ -->
+  <section class="screen" data-screen="acsi-server">
+    <div class="frame">
+      <div class="wf-sidebar" data-active-nav="none"></div>
+      <div class="wf-main">
+        <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
+        <div class="wf-content">
+
+          <div class="wf-page-header"><div class="wf-h1" data-label="WebSocket Connection" style="width:230px;"></div></div>
+
+          <div class="section-card">
+            <div class="field-row">
+              <div class="field" style="min-width:260px;"><span class="label">Instance</span><div class="input"></div><span class="hint">Stop the server to switch to a different instance</span></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><span class="label">WS Host</span><div class="input"></div></div>
+              <div class="field"><span class="label">WS Port</span><div class="input"></div></div>
+              <div class="field"><span class="label">WS Mode</span><div class="input"></div></div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <div class="btn btn-solid">Connect</div>
+            <div class="btn btn-outline">Disconnect</div>
+            <div class="btn btn-outline">🛡 TLS Config</div>
+            <div class="btn btn-outline" style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;border:1.5px solid var(--wf-line);display:inline-block;"></span>Enable OAuth</div>
+          </div>
+
+          <div class="wf-page-header">
+            <div class="wf-h1" data-label="ACSI Server" style="width:160px;"></div>
+            <span class="wf-badge">rti-fsp:5001&nbsp;·&nbsp;AP: cp1</span>
+          </div>
+
+          <div class="btn-row" style="margin-bottom:10px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;"><span style="width:12px;height:12px;border:1.5px solid var(--wf-line-soft);display:inline-block;"></span>Auto-refresh read values</label>
+          </div>
+
+          <div class="section-card">
+            <h3>Connection Status</h3>
+            <div class="grid-2">
+              <div class="field"><span class="label">Server Address</span><div class="line" style="height:16px;"></div></div>
+              <div class="field"><span class="label">State</span><div class="line" style="height:16px;"></div></div>
+              <div class="field"><span class="label">Model</span><div class="line" style="height:16px;"></div></div>
+              <div class="field"><span class="label">Clients</span><div class="line" style="height:16px;"></div></div>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-head"><span>cp1 &nbsp;<span class="placeholder-text">(connection point — click to expand)</span></span><span class="chev">▾</span></div>
+            <div class="accordion-body">
+              <div class="btn-row"><div class="btn btn-solid">Load Model</div></div>
+              <div class="tree-wf">
+                <div class="node l1">▾ IED_2</div>
+                <div class="node l2">▾ LD0</div>
+                <div class="node l3">LLN0 · Mod · Beh · Health</div>
+                <div class="node l3">LPHD1 · DWMX1 · MMXU1 …</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="wf-page-header" style="margin-top:8px;"><div class="wf-h1" data-label="Monitoring" style="width:150px;"></div></div>
+          <div class="section-card"><span class="placeholder-text">Protocol message log / actions log …</span></div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ACSI CLIENT (SO) ============ -->
+  <section class="screen" data-screen="acsi-client">
+    <div class="frame">
+      <div class="wf-sidebar" data-active-nav="none"></div>
+      <div class="wf-main">
+        <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
+        <div class="wf-content">
+
+          <div class="btn-row">
+            <div class="btn btn-solid">Connect</div>
+            <div class="btn btn-outline">Disconnect</div>
+            <div class="btn btn-outline">🛡 TLS Config</div>
+            <div class="btn btn-outline" style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;border:1.5px solid var(--wf-line);display:inline-block;"></span>Enable OAuth</div>
+          </div>
+
+          <div class="wf-page-header">
+            <div class="wf-h1" data-label="ACSI Client" style="width:160px;"></div>
+            <span class="wf-badge">rti-so:5002&nbsp;·&nbsp;AP: cp1</span>
+          </div>
+
+          <div class="section-card">
+            <h3>ACSI Clients (from properties API's acsi_client_list) — one accordion entry per connected client</h3>
+
+            <div class="accordion">
+              <div class="accordion-head"><span>cp1</span><span class="chev">▾</span></div>
+              <div class="accordion-body">
+                <div class="btn-row"><div class="btn btn-solid">Fetch Model</div></div>
+                <div class="tree-wf">
+                  <div class="node l1">▾ IED_1</div>
+                  <div class="node l2">▾ LD0 / LLN0</div>
+                  <div class="node l3">Mod · Beh · Health · NamPlt</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion">
+              <div class="accordion-head"><span>cp2</span><span class="chev">▸</span></div>
+            </div>
+          </div>
+
+          <div class="section-card"><span class="placeholder-text">Context menu (right-click a tree node): Read Value · Write Value · Operate · Configure BRCB/URCB …</span></div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><span class="swatch"></span> editable field / empty content region</span>
+    <span><span class="swatch solid"></span> primary action</span>
+    <span>Dashed border = placeholder for real content; not a literal UI element</span>
+  </div>
+
+</div>
+
+<script>
+  const screens = Array.from(document.querySelectorAll('.screen'));
+  const picker = document.getElementById('picker');
+  const labels = {
+    'setup': 'Setup',
+    'connections': 'Connections',
+    'model': 'Model',
+    'traffic': 'Traffic',
+    'tools': 'Tools',
+    'settings': 'Settings',
+    'acsi-server': 'ACSI Server (FSP)',
+    'acsi-client': 'ACSI Client (SO)',
+  };
+
+  screens.forEach((s) => {
+    const key = s.dataset.screen;
+    const btn = document.createElement('button');
+    btn.textContent = labels[key] || key;
+    btn.dataset.key = key;
+    btn.addEventListener('click', () => show(key));
+    picker.appendChild(btn);
+  });
+
+  // Build sidebar nav wireframe (shared markup) into every .wf-sidebar
+  const navItems = ['Setup', 'Model', 'Traffic', 'Tools', 'Settings'];
+  document.querySelectorAll('.wf-sidebar').forEach((sidebar) => {
+    const active = sidebar.dataset.activeNav;
+    const logo = document.createElement('div');
+    logo.className = 'wf-logo';
+    logo.innerHTML = '<div class="box"></div><div class="box sub"></div>';
+    sidebar.appendChild(logo);
+    navItems.forEach((label) => {
+      const item = document.createElement('div');
+      item.className = 'wf-nav-item' + (label === active ? ' active' : '');
+      item.innerHTML = '<span class="dot"></span><span>' + label + '</span>';
+      sidebar.appendChild(item);
+    });
+  });
+
+  function show(key) {
+    screens.forEach((s) => s.classList.toggle('active', s.dataset.screen === key));
+    Array.from(picker.children).forEach((b) => b.classList.toggle('active', b.dataset.key === key));
+    try { localStorage.setItem('rti-wireframe-screen', key); } catch (e) {}
+  }
+
+  let initial = 'setup';
+  try { initial = localStorage.getItem('rti-wireframe-screen') || 'setup'; } catch (e) {}
+  if (!labels[initial]) initial = 'setup';
+  show(initial);
+</script>
+</body>
+</html>
