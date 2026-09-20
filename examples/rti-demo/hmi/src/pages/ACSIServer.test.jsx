@@ -47,13 +47,55 @@ beforeEach(() => {
   ]);
 });
 
-describe('ACSIServer instance selection - ws_port vs BFF port', () => {
-  it('fills WS Port from the instance\'s ws_port (not its BFF port) on auto-select', async () => {
+describe('ACSIServer instance selection - fresh/no prior selection', () => {
+  it('leaves Instance blank and shows default WS fields when nothing is selected or persisted', async () => {
+    renderPage();
+
+    await waitFor(() => {
+      // fspInstances is populated once connections load, so the dropdown
+      // having its options is a proxy for "the fetch that would have
+      // driven an auto-select has already happened" - it still shouldn't
+      // pick one.
+      expect(screen.getByRole('option', { name: /^so1/ })).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText('Instance')).toHaveValue('');
+
+    // Localhost/8765/active are placeholder defaults, not derived from any
+    // instance - and read-only the same way a real selection's fields are,
+    // since nothing is selected yet (not "custom").
+    await waitFor(() => {
+      expect(screen.getByLabelText('WS Host')).toHaveValue('localhost');
+    });
+    expect(screen.getByLabelText('WS Port')).toHaveValue('8765');
+    expect(screen.getByLabelText('WS Mode')).toHaveValue('Active');
+    expect(screen.getByLabelText('WS Host')).toHaveAttribute('readonly');
+  });
+
+  it('restores a previously-selected instance on remount instead of the defaults', async () => {
+    // storageKey falls back to a constant "rti-so:8765" when there's no
+    // navigation-state endpoint (see ACSIServer.jsx's instanceId).
+    localStorage.setItem('acsi-server-selected-instance-rti-so:8765', 'so1');
     renderPage();
 
     await waitFor(() => {
       expect(screen.getByLabelText('Instance')).toHaveValue('so1');
     });
+    await waitFor(() => {
+      expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.1');
+    });
+    expect(screen.getByLabelText('WS Port')).toHaveValue('8765');
+  });
+});
+
+describe('ACSIServer instance selection - ws_port vs BFF port', () => {
+  it('fills WS Port from the instance\'s ws_port (not its BFF port) on selection', async () => {
+    renderPage();
+    const user = userEvent.setup({ delay: null });
+
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /^so1/ })).toBeInTheDocument();
+    });
+    await user.selectOptions(screen.getByLabelText('Instance'), 'so1');
 
     expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.1');
     // WS Port is type="text" (not "number") specifically so a read-only
@@ -73,20 +115,23 @@ describe('ACSIServer instance selection - ws_port vs BFF port', () => {
     expect(screen.getByLabelText('WS Mode').tagName).toBe('INPUT');
   });
 
-  it('leaves WS Port blank (not the BFF port) when auto-selecting an instance with no ws_port', async () => {
-    // so2 (no ws_port) is the only/first instance here, so it's the one
-    // auto-selected on load - exercising the "leave blank" behavior without
-    // going through the now-disabled dropdown option for it.
+  it('leaves WS Port blank (not the BFF port) for a selected instance with no ws_port', async () => {
+    // so2 has no ws_port - its dropdown option is disabled (see the
+    // "usability" tests below), so a user could never pick it live via the
+    // select. Land on it the way a persisted-but-now-misconfigured
+    // selection would: a prior selection restored from localStorage.
     mockConnections([
       { name: 'so2', host: '10.0.0.2', port: 5003, type: 'RTI-SO', status: 'connected' },
     ]);
+    localStorage.setItem('acsi-server-selected-instance-rti-so:8765', 'so2');
     renderPage();
 
     await waitFor(() => {
       expect(screen.getByLabelText('Instance')).toHaveValue('so2');
     });
-
-    expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.2');
+    await waitFor(() => {
+      expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.2');
+    });
     // Must NOT be 5003 (so2's BFF port) - this is the exact bug being
     // regression-tested: silently falling back to the BFF port.
     expect(screen.getByLabelText('WS Port')).toHaveValue('');
@@ -97,7 +142,11 @@ describe('ACSIServer instance selection - ws_port vs BFF port', () => {
     const user = userEvent.setup({ delay: null });
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Instance')).toHaveValue('so1');
+      expect(screen.getByRole('option', { name: /^so1/ })).toBeInTheDocument();
+    });
+    await user.selectOptions(screen.getByLabelText('Instance'), 'so1');
+    await waitFor(() => {
+      expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.1');
     });
 
     await user.selectOptions(screen.getByLabelText('Instance'), 'custom');
@@ -119,7 +168,7 @@ describe('ACSIServer instance dropdown - usability', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Instance')).toHaveValue('so1');
+      expect(screen.getByRole('option', { name: /^so1/ })).toBeInTheDocument();
     });
 
     const so2Option = screen.getByRole('option', { name: /so2/ });
@@ -129,10 +178,11 @@ describe('ACSIServer instance dropdown - usability', () => {
     const so1Option = screen.getByRole('option', { name: /^so1/ });
     expect(so1Option).toBeEnabled();
 
-    // A disabled option can't actually be selected via user interaction.
+    // A disabled option can't actually be selected via user interaction -
+    // the dropdown stays on its current (blank) value.
     const user = userEvent.setup({ delay: null });
     await user.selectOptions(screen.getByLabelText('Instance'), 'so2').catch(() => {});
-    expect(screen.getByLabelText('Instance')).toHaveValue('so1');
+    expect(screen.getByLabelText('Instance')).toHaveValue('');
   });
 
   it('disables the whole Instance dropdown while the server is connected, with an explanatory hint', async () => {

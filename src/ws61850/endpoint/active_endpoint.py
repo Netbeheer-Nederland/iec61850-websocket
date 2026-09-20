@@ -505,6 +505,16 @@ class ActiveEndpoint:
                 selected_client.is_connected = False
                 selected_client.disconnect_event.set()
 
+            # Without this, a closed session's WebSocketInfo lingers here
+            # until the *next* connect for the same cp replaces it (see the
+            # filter-then-append in _connect_once) - get_status()'s
+            # connectedClients is len(websocket_info_list), so it would stay
+            # stuck reporting the old session as connected the whole time
+            # in between, even though the WS is long gone.
+            self.websocket_info_list = [
+                ws_info for ws_info in self.websocket_info_list if ws_info.cp != cp
+            ]
+
             #selected_server = self._router.find_server(cp)
             #if selected_server is not None:
                 #selected_server.set_quality_to_questionable()

@@ -163,14 +163,14 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
                   <MessageMonitor
                     key={`client-monitor-${endpoint.host}-${endpoint.port}`}
                     endpoints={[endpoint]}
-                    title={`${endpoint.name || endpoint.host}:${endpoint.port}`}
+                    title={endpoint.name || endpoint.host}
                     defaultInterval={10000}
                     showEndpointSelect={false}
                   />
                 ))}
             </div>
           </div>
-          
+
           {/* ACSI Server endpoints (RTI-FSP) - Second row */}
           <div style={{ marginBottom: '0' }}>
             <h4 style={{ marginBottom: '12px', color: 'var(--text-muted)' }}>
@@ -188,7 +188,7 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
                   <MessageMonitor
                     key={`server-monitor-${endpoint.host}-${endpoint.port}`}
                     endpoints={[endpoint]}
-                    title={`${endpoint.name || endpoint.host}:${endpoint.port}`}
+                    title={endpoint.name || endpoint.host}
                     defaultInterval={10000}
                     showEndpointSelect={false}
                   />

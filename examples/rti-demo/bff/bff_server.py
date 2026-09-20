@@ -215,6 +215,11 @@ ws_hub = WSHub()
 # push_relay_loop() only broadcasts messages a browser hasn't seen yet.
 _last_relayed_message_id: Dict[str, int] = {}
 
+# Tracks the last-relayed acsi_client_list snapshot per "host:port" target
+# (RTI-SO only), so push_relay_loop() only broadcasts when it actually
+# changes (an FSP associating with, or dropping, one of the SO's cps).
+_last_relayed_client_list: Dict[str, List[str]] = {}
+
 
 def _parse_status_repr(raw: Any) -> Optional[Dict[str, Any]]:
     """Parse the FSP's /api/status 'status' field.
@@ -301,6 +306,28 @@ async def _relay_new_messages(target_key: str, client: BffClient) -> None:
     await ws_hub.broadcast({"type": "messages", "target": target_key, "data": new_items})
 
 
+async def _relay_acsi_client_list(target_key: str, client: BffClient) -> None:
+    """Broadcast an RTI-SO's acsi_client_list when a cp connects or drops.
+
+    so/acsi_client.py's get_cp_list() only returns cps with an established
+    association, so this is exactly the "connected clients" list the ACSI
+    Client page shows - it changes on every associate/disassociate, not on
+    a fixed schedule, hence relaying only on change rather than every cycle.
+    """
+    try:
+        result = await asyncio.to_thread(client.request, "GET", "/api/properties")
+    except Exception:
+        return
+    client_list = result.get("acsi_client_list") if isinstance(result, dict) else None
+    if not isinstance(client_list, list):
+        return
+
+    if _last_relayed_client_list.get(target_key) == client_list:
+        return
+    _last_relayed_client_list[target_key] = client_list
+    await ws_hub.broadcast({"type": "properties", "target": target_key, "data": {"acsi_client_list": client_list}})
+
+
 async def push_relay_loop(interval: float = 2.0) -> None:
     """Background task: poll once centrally, push deltas to every browser tab."""
     last_connections_snapshot: Optional[str] = None
@@ -319,9 +346,16 @@ async def push_relay_loop(interval: float = 2.0) -> None:
                 and c.get("status") == "connected"
                 and c.get("host") and c.get("port")
             ]
+            so_targets = [
+                (f"{c['host']}:{c['port']}", _bff_clients.get(f"{c['host']}:{c['port']}"))
+                for c in conn_manager.connections
+                if c.get("type") == "RTI-SO"
+                and c.get("status") == "connected"
+                and c.get("host") and c.get("port")
+            ]
             await asyncio.gather(*(
-                _relay_new_messages(key, client)
-                for key, client in live_targets if client is not None
+                [_relay_new_messages(key, client) for key, client in live_targets if client is not None]
+                + [_relay_acsi_client_list(key, client) for key, client in so_targets if client is not None]
             ))
         except Exception:
             logger.exception("push_relay_loop iteration failed")

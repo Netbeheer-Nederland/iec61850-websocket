@@ -102,3 +102,56 @@ class TestActiveEndpointStopPassive:
         import asyncio
         ep = ActiveEndpoint()
         asyncio.get_event_loop().run_until_complete(ep.stop_passive())  # should not raise
+
+
+class TestActiveEndpointConnectionClosed:
+    """get_status()'s connectedClients is len(websocket_info_list), so a
+    closed session left in that list understates a disconnect as still
+    connected until the next connect for the same cp overwrites it.
+    """
+
+    def test_removes_the_closed_cp_websocket_info(self):
+        import asyncio
+        from ws61850.endpoint.base import WebSocketInfo
+
+        ep = ActiveEndpoint()
+        client = _make_fake_client("cp1")
+        ep.add_iec61850_client(client)
+        ws = MagicMock()
+        info = WebSocketInfo(ws, "assoc-1", cp="cp1")
+        ep.websocket_info_list.append(info)
+
+        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+
+        assert ep.websocket_info_list == []
+
+    def test_leaves_other_cps_websocket_info_alone(self):
+        import asyncio
+        from ws61850.endpoint.base import WebSocketInfo
+
+        ep = ActiveEndpoint()
+        ep.add_iec61850_client(_make_fake_client("cp1"))
+        ep.add_iec61850_client(_make_fake_client("cp2"))
+        info1 = WebSocketInfo(MagicMock(), "assoc-1", cp="cp1")
+        info2 = WebSocketInfo(MagicMock(), "assoc-2", cp="cp2")
+        ep.websocket_info_list.extend([info1, info2])
+
+        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+
+        assert ep.websocket_info_list == [info2]
+
+    def test_clears_the_client_connection_flags(self):
+        import asyncio
+
+        ep = ActiveEndpoint()
+        client = _make_fake_client("cp1")
+        client.is_connected = True
+        client.ready_event = MagicMock()
+        client.disconnect_event = MagicMock()
+        ep.add_iec61850_client(client)
+
+        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+
+        assert client.is_connected is False
+        client.ready_event.clear.assert_called_once()
+        client.disconnect_event.set.assert_called_once()

@@ -39,6 +39,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const storageKey = `acsi-server-connected-${instanceId}`;
   const portStorageKey = `acsi-server-port-${instanceId}`;
   const cpStorageKey = `acsi-server-cp-${instanceId}`;
+  const selectedInstanceStorageKey = `acsi-server-selected-instance-${instanceId}`;
 
   // Start blank rather than guessing ("rti-so", 8765, "cp1", "active") - a
   // real value only appears once an instance is actually resolved, either
@@ -81,9 +82,22 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     [connections]
   );
 
-  const [selectedInstanceName, setSelectedInstanceName] = useState(() => endpoint?.name || '');
+  // A restart (or fresh visit with no navigation state) should not guess an
+  // instance - only a real prior selection counts as "preferred". Falls
+  // back to whatever was last picked (persisted below) rather than always
+  // landing on the first instance in the list.
+  const [selectedInstanceName, setSelectedInstanceName] = useState(() =>
+    endpoint?.name || localStorage.getItem(selectedInstanceStorageKey) || ''
+  );
   const instanceMatchedRef = useRef(false);
   const isCustomInstance = selectedInstanceName === 'custom';
+
+  // Remember the selection so it's preferred again on the next visit/restart
+  // - once the user has actually picked something (including "custom").
+  useEffect(() => {
+    if (!selectedInstanceName) return;
+    localStorage.setItem(selectedInstanceStorageKey, selectedInstanceName);
+  }, [selectedInstanceName, selectedInstanceStorageKey]);
 
   const [showTLSModal, setShowTLSModal] = useState(false);
   const [useOAuth, setUseOAuth] = useState(false);
@@ -317,12 +331,10 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           ? fspInstances.find(c => c.name === selectedInstanceName)
           : null;
 
-        if (!selectedInstanceName) {
-          // Nothing selected yet — default to the first instance found
-          inst = fspInstances[0] || null;
-          if (inst) setSelectedInstanceName(inst.name);
-        } else if (!inst) {
-          // A name came in (e.g. via navigation state) but it's not in the list
+        if (selectedInstanceName && !inst && selectedInstanceName !== 'custom') {
+          // A name came in (e.g. via navigation state, or a persisted
+          // selection whose instance was since removed) but it's not in
+          // the list.
           setSelectedInstanceName('custom');
         }
 
@@ -333,6 +345,13 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           setPort(inst.ws_port ? String(inst.ws_port) : '');
           // CP is owned by this RTI-FSP connection itself (endpoint.cp,
           // seeded at mount), not by the target RTI-SO instance.
+          setMode('active');
+        } else if (!selectedInstanceName) {
+          // Nothing selected (fresh page/restart, nothing preferred yet
+          // either) - show usable placeholder defaults instead of leaving
+          // the fields blank, without treating this as an actual selection.
+          setHost('localhost');
+          setPort('8765');
           setMode('active');
         }
 

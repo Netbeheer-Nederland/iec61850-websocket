@@ -1043,6 +1043,7 @@ html {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
     margin-bottom: 16px;
     padding-bottom: 16px;
     border-bottom: 1px solid var(--border-light);
@@ -1054,7 +1055,10 @@ html {
     gap: 12px;
     align-items: center;
     flex-wrap: wrap;
-    width: 100%;
+    /* No width: 100% - this sits next to the title in a space-between
+       .monitor-header row; forcing it to the container's full width made
+       it overlap the title instead of sharing the row with it. */
+    justify-content: flex-end;
 }
 
 .monitor-endpoint-select,
@@ -1074,6 +1078,12 @@ html {
     font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0;
 }
 
 .monitor-endpoint-select:focus,
@@ -1570,13 +1580,19 @@ h3 {
 }
 
 .monitor-interval-select {
-    padding: 8px 12px;
+    padding: 6px 8px;
     background: var(--bg-tertiary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    font-size: 14px;
+    font-size: 12px;
     cursor: pointer;
+    /* Override the shared flex:1/min-width:0 above - as a refresh-rate
+       picker (1s/5s/10s/30s) it doesn't need to grow with the row, and
+       doing so was part of what crowded it into the title. */
+    flex: none;
+    width: auto;
+    min-width: 56px;
 }
 
 .monitor-interval-select:focus {

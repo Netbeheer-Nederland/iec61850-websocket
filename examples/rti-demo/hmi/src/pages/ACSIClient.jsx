@@ -27,6 +27,7 @@ import WriteValueModal from '../components/WriteValueModal';
 import BrcbConfigModal from '../components/BrcbConfigModal';
 import TLSConfigModal from '../components/TLSConfigModal';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
+import { subscribe as subscribeLive } from '../services/liveSocket';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
@@ -100,7 +101,13 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     fetchOAuthStatus();
   }, [apiTarget]);
 
-  // Fetch properties (includes acsi_client_list) on page load
+  // Fetch properties (includes acsi_client_list) once on mount for first
+  // paint, then rely on the BFF's live push for updates instead of polling
+  // - acsi_client_list is filtered to only *connected* cps (see
+  // so/acsi_client.py's get_cp_list), so it changes exactly when a cp
+  // associates/disassociates, which is what the BFF's push_relay_loop
+  // (bff/bff_server.py) already watches for and broadcasts as "properties",
+  // same pattern as App.jsx's "connections" subscription.
   useEffect(() => {
     const fetchProperties = async () => {
       if (!apiTarget) return;
@@ -115,6 +122,15 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
       }
     };
     fetchProperties();
+  }, [apiTarget]);
+
+  useEffect(() => {
+    if (!apiTarget) return undefined;
+    return subscribeLive('properties', (msg) => {
+      if (msg.target !== apiTarget) return;
+      const clientList = msg.data?.acsi_client_list;
+      if (Array.isArray(clientList)) setAcsiClientList(clientList);
+    });
   }, [apiTarget]);
 
   const [showBrcbConfigModal, setShowBrcbConfigModal] = useState(false);

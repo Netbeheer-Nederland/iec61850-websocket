@@ -103,3 +103,50 @@ class TestPassiveEndpointInit:
     def test_oauth_validator_none_when_not_configured(self):
         ep = PassiveEndpoint(oauth_enable=False)
         assert ep._jwt_validator is None
+
+
+class TestPassiveEndpointConnectionClosed:
+    """Same leaked-session issue ActiveEndpoint had: a closed WebSocketInfo
+    left in the list would otherwise sit there until the next connect for
+    that cp overwrites it.
+    """
+
+    def test_removes_the_closed_cp_websocket_info(self):
+        import asyncio
+        from ws61850.endpoint.base import WebSocketInfo
+
+        ep = PassiveEndpoint()
+        client = _make_fake_client("cp1")
+        ep.add_iec61850_client(client)
+        info = WebSocketInfo(MagicMock(), "assoc-1", cp="cp1")
+        ep.websocket_info_list.append(info)
+
+        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+
+        assert ep.websocket_info_list == []
+
+    def test_leaves_other_cps_websocket_info_alone(self):
+        import asyncio
+        from ws61850.endpoint.base import WebSocketInfo
+
+        ep = PassiveEndpoint()
+        ep.add_iec61850_client(_make_fake_client("cp1"))
+        ep.add_iec61850_client(_make_fake_client("cp2"))
+        info1 = WebSocketInfo(MagicMock(), "assoc-1", cp="cp1")
+        info2 = WebSocketInfo(MagicMock(), "assoc-2", cp="cp2")
+        ep.websocket_info_list.extend([info1, info2])
+
+        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+
+        assert ep.websocket_info_list == [info2]
+
+    def test_removes_the_closed_cp_from_client_list(self):
+        import asyncio
+
+        ep = PassiveEndpoint()
+        client = _make_fake_client("cp1")
+        ep.add_iec61850_client(client)
+
+        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+
+        assert ep.client_list == []

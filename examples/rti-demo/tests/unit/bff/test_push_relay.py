@@ -75,8 +75,10 @@ def _isolated_relay_state(monkeypatch):
     """
     monkeypatch.setattr(bff_server.conn_manager, "connections", [])
     bff_server._last_relayed_message_id.clear()
+    bff_server._last_relayed_client_list.clear()
     yield
     bff_server._last_relayed_message_id.clear()
+    bff_server._last_relayed_client_list.clear()
 
 
 # -------------------- _parse_status_repr --------------------
@@ -321,6 +323,91 @@ async def test_relay_new_messages_swallows_request_errors(monkeypatch):
     broadcast.assert_not_awaited()
 
 
+# -------------------- _relay_acsi_client_list --------------------
+
+@pytest.mark.asyncio
+async def test_relay_acsi_client_list_broadcasts_on_first_seen(monkeypatch):
+    broadcasts = []
+    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
+    client = FakeBffClient(responses={
+        "/api/properties": {"ok": True, "acsi_role": "ACSI-Client", "acsi_client_list": ["cp1"]}
+    })
+
+    await bff_server._relay_acsi_client_list("10.0.0.1:5002", client)
+
+    assert broadcasts == [{
+        "type": "properties",
+        "target": "10.0.0.1:5002",
+        "data": {"acsi_client_list": ["cp1"]},
+    }]
+    assert bff_server._last_relayed_client_list["10.0.0.1:5002"] == ["cp1"]
+
+
+@pytest.mark.asyncio
+async def test_relay_acsi_client_list_no_broadcast_when_unchanged(monkeypatch):
+    bff_server._last_relayed_client_list["10.0.0.1:5002"] = ["cp1"]
+    broadcast = AsyncMock()
+    monkeypatch.setattr(bff_server.ws_hub, "broadcast", broadcast)
+    client = FakeBffClient(responses={
+        "/api/properties": {"ok": True, "acsi_client_list": ["cp1"]}
+    })
+
+    await bff_server._relay_acsi_client_list("10.0.0.1:5002", client)
+
+    broadcast.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_relay_acsi_client_list_broadcasts_when_a_cp_connects(monkeypatch):
+    # An FSP associating with a second cp - the list grows.
+    bff_server._last_relayed_client_list["10.0.0.1:5002"] = ["cp1"]
+    broadcasts = []
+    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
+    client = FakeBffClient(responses={
+        "/api/properties": {"ok": True, "acsi_client_list": ["cp1", "cp2"]}
+    })
+
+    await bff_server._relay_acsi_client_list("10.0.0.1:5002", client)
+
+    assert broadcasts[0]["data"] == {"acsi_client_list": ["cp1", "cp2"]}
+
+
+@pytest.mark.asyncio
+async def test_relay_acsi_client_list_broadcasts_when_a_cp_disconnects(monkeypatch):
+    bff_server._last_relayed_client_list["10.0.0.1:5002"] = ["cp1", "cp2"]
+    broadcasts = []
+    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
+    client = FakeBffClient(responses={
+        "/api/properties": {"ok": True, "acsi_client_list": ["cp1"]}
+    })
+
+    await bff_server._relay_acsi_client_list("10.0.0.1:5002", client)
+
+    assert broadcasts[0]["data"] == {"acsi_client_list": ["cp1"]}
+
+
+@pytest.mark.asyncio
+async def test_relay_acsi_client_list_swallows_request_errors(monkeypatch):
+    broadcast = AsyncMock()
+    monkeypatch.setattr(bff_server.ws_hub, "broadcast", broadcast)
+    client = FakeBffClient(raises=ConnectionError("refused"))
+
+    await bff_server._relay_acsi_client_list("10.0.0.1:5002", client)  # must not raise
+
+    broadcast.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_relay_acsi_client_list_ignores_malformed_response(monkeypatch):
+    broadcast = AsyncMock()
+    monkeypatch.setattr(bff_server.ws_hub, "broadcast", broadcast)
+    client = FakeBffClient(responses={"/api/properties": {"ok": True, "acsi_client_list": "not-a-list"}})
+
+    await bff_server._relay_acsi_client_list("10.0.0.1:5002", client)
+
+    broadcast.assert_not_awaited()
+
+
 # -------------------- push_relay_loop (single cycle) --------------------
 
 @pytest.mark.asyncio
@@ -359,6 +446,44 @@ async def test_push_relay_loop_broadcasts_connections_and_messages(monkeypatch):
         "target": "10.0.0.1:5001",
         "data": [{"id": 1, "message": "hello"}],
     }
+
+
+@pytest.mark.asyncio
+async def test_push_relay_loop_broadcasts_acsi_client_list_for_so_targets(monkeypatch):
+    connections = [
+        {"name": "fsp1", "type": "RTI-FSP", "status": "connected", "host": "10.0.0.1", "port": 5001},
+        {"name": "so1", "type": "RTI-SO", "status": "connected", "host": "10.0.0.2", "port": 5002},
+    ]
+    monkeypatch.setattr(bff_server.conn_manager, "connections", connections)
+    monkeypatch.setitem(
+        bff_server._bff_clients,
+        "10.0.0.1:5001",
+        FakeBffClient(responses={
+            "/api/status": {"ok": True, "status": "{'status': 'listening', 'connectedClients': 1}"},
+            "/api/messages": {"messages": []},
+        }),
+    )
+    monkeypatch.setitem(
+        bff_server._bff_clients,
+        "10.0.0.2:5002",
+        FakeBffClient(responses={"/api/properties": {"ok": True, "acsi_client_list": ["cp1"]}}),
+    )
+    broadcasts = []
+    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
+
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(bff_server.push_relay_loop(interval=10), timeout=0.2)
+
+    properties_msg = next(b for b in broadcasts if b["type"] == "properties")
+    assert properties_msg == {
+        "type": "properties",
+        "target": "10.0.0.2:5002",
+        "data": {"acsi_client_list": ["cp1"]},
+    }
+    # The FSP target only gets a "messages" relay, not "properties" - this
+    # push type is RTI-SO-only (acsi_client_list is a WS-Passive/ACSI-Client
+    # concept; an FSP has no equivalent list to relay).
+    assert not any(b["type"] == "properties" and b["target"] == "10.0.0.1:5001" for b in broadcasts)
 
 
 @pytest.mark.asyncio

@@ -579,6 +579,12 @@ class PassiveEndpoint:
                 selected_client.is_connected = False
                 selected_client.disconnect_event.set()
                 self.client_list[:] = [c for c in self.client_list if c.cp != cp]
+            # Same leaked-session issue ActiveEndpoint had (see its
+            # _on_connection_closed): a closed WebSocketInfo would otherwise
+            # sit here until the next connect for this cp overwrites it.
+            self.websocket_info_list = [
+                ws_info for ws_info in self.websocket_info_list if ws_info.cp != cp
+            ]
             if selected_server is not None:
                 selected_server.set_quality_to_questionable()
         except Exception as e:
