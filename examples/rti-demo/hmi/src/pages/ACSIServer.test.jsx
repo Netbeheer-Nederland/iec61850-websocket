@@ -156,3 +156,26 @@ describe('ACSIServer instance dropdown - usability', () => {
     expect(screen.queryByText(/Stop the server to switch/i)).not.toBeInTheDocument();
   });
 });
+
+describe('ACSIServer connection status label', () => {
+  it('shows the raw "listening" status as "Serving"', async () => {
+    executeApiCall.mockImplementation(async (apiId) => {
+      if (apiId === 'status') {
+        return {
+          ok: true,
+          payload: { result: { status: { status: 'listening', modelName: 'IED_2' } } },
+        };
+      }
+      return { ok: false };
+    });
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Serving')).toBeInTheDocument();
+    });
+    // The raw backend value is what drives the State color, but should
+    // never itself be the displayed text.
+    expect(screen.queryByText('listening')).not.toBeInTheDocument();
+    expect(screen.getByText('IED_2')).toBeInTheDocument();
+  });
+});

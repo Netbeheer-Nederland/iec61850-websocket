@@ -664,6 +664,28 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     stopStatusPolling();
   }, [stopMonitoring, stopStatusPolling]);
 
+  // Display-only translation of the raw backend status (see
+  // fsp/acsi_server.py's runtime.status docstring: stopped|starting|
+  // listening|stopping|error|reloading) - same approach as
+  // ACSIClient.jsx's connectionStatusLabel. The raw value itself is left
+  // untouched everywhere it's actually compared (the State color check
+  // below, connected-state checks elsewhere), only this label changes.
+  // "listening" reads as the passive/SO side's role; FSP is the active
+  // side that dials out and then serves ACSI data to that one client, so
+  // "Serving" fits its actual behavior better.
+  const rawState = statusInfo?.result?.status?.status;
+  const stateLabel = (() => {
+    const STATUS_LABELS = {
+      stopped: 'Stopped',
+      starting: 'Starting',
+      listening: 'Serving',
+      stopping: 'Stopping',
+      error: 'Error',
+      reloading: 'Reloading',
+    };
+    return STATUS_LABELS[rawState] || rawState || 'N/A';
+  })();
+
   return (
     <section className="page">
       <div className="page-header" style={{ position: 'relative' }}>
@@ -941,7 +963,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           <h3 style={{ margin: 0, marginBottom: '12px', fontSize: '16px' }}>Connection Status</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Model</span><div style={{ fontWeight: '500' }}>{statusInfo.result?.status?.modelName || 'N/A'}</div></div>
-            <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>State</span><div style={{ fontWeight: '500', color: ['running', 'listening', 'connected', 'starting'].includes(statusInfo.result?.status?.status) ? 'var(--success-color)' : 'var(--text-secondary)' }}>{statusInfo.result?.status?.status || 'N/A'}</div></div>
+            <div><span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>State</span><div style={{ fontWeight: '500', color: ['running', 'listening', 'connected', 'starting'].includes(rawState) ? 'var(--success-color)' : 'var(--text-secondary)' }}>{stateLabel}</div></div>
           </div>
         </div>
       )}
