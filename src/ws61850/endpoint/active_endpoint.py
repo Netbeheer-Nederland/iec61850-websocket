@@ -211,13 +211,6 @@ class ActiveEndpoint:
         """Reconfigure TLS settings and (re)start the connection."""
         async with self._reconfig_lock:
             self._tls_config = tls_config
-            print("entering reconfigure_connection with tls_enable:", tls_enable)
-            # Always restart the connection regardless of TLS enable state.
-            # Reuse whatever credential state OAuth reconfiguration last set,
-            # so toggling TLS alone never silently drops an active OAuth
-            # session's Authorization header.
-            # run_in_background cancels any existing loop and schedules the
-            # new one — never await start() directly, it runs forever.
             self.run_in_background(
                 host,
                 port,
@@ -225,8 +218,6 @@ class ActiveEndpoint:
                 access_token=self._access_token,
                 credentials_provider=self._credentials_provider,
             )
-            if tls_enable:
-                print("entered reconfigure_connection with tls_enable True, tls_config:", tls_config)
 
     async def reconfigure_oauth(self, host, port, cp, oauth_enable, token_endpoint=None,
                                 client_id=None, client_secret=None, kc_cert=None,
@@ -242,7 +233,6 @@ class ActiveEndpoint:
 
             if oauth_enable:
                 if kc_cert:
-                    print(f"### DIAG kc_cert repr (first 80 chars): {kc_cert[:80]!r}")
                     cert_file = tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False)
                     cert_file.write(kc_cert)
                     cert_file.flush()
@@ -322,28 +312,7 @@ class ActiveEndpoint:
             first = False
             try:
                 token = await credentials_provider.get_access_token() if credentials_provider else access_token
-                # --- DEBUG: decode without verifying signature/exp/iat, just to inspect claims ---
-                if token:
-                    try:
-                        unverified = pyjwt.decode(token, options={"verify_signature": False, "verify_exp": False,
-                                                                  "verify_iat": False})
-                        iat = unverified.get("iat")
-                        exp = unverified.get("exp")
-                        now = datetime.datetime.now(datetime.timezone.utc).timestamp()
-                        print(
-                            f"### DIAG token iat={iat} ({datetime.datetime.fromtimestamp(iat, tz=datetime.timezone.utc) if iat else None})")
-                        print(
-                            f"### DIAG token exp={exp} ({datetime.datetime.fromtimestamp(exp, tz=datetime.timezone.utc) if exp else None})")
-                        print(f"### DIAG local now={now} ({datetime.datetime.now(datetime.timezone.utc)})")
-                        if iat:
-                            print(
-                                f"### DIAG iat - now = {iat - now:.2f} seconds (positive means iat is in the FUTURE relative to this clock)")
-                    except Exception as decode_err:
-                        print(f"### DIAG failed to decode token for inspection: {decode_err}")
-                # --- END DEBUG ---
 
-                print(
-                    f"### DIAG task_id={id(asyncio.current_task())} has_provider={credentials_provider is not None} token_tail={token[-12:] if token else None}")
                 await self._connect_once(hostname, port, cp, access_token=token, protocol=protocol)
                 self._reconnect_policy.reset()
             except (ConnectionRefusedError, OSError) as e:
@@ -380,12 +349,7 @@ class ActiveEndpoint:
 
     async def _connect_once(self, hostname: str, port: int, cp: str, *, access_token=None, protocol=None) -> None:
         scheme = "wss" if self._tls_config else "ws"
-        print("schema in fsp active endpoint _connect_once:", scheme)
-        print(f"Connecting to {scheme}://{hostname}:{port}/{cp} with protocol={protocol}")
         uri = f"{scheme}://{hostname}:{int(port)}/{cp}"
-
-        print("fsp is connecting with tls_config:", self._tls_config)
-        print("fsp is connecting to uri: ", uri)
 
         connect_kwargs = dict(
             ssl=build_tls_context_from_strings(self._tls_config) if self._tls_config else None,

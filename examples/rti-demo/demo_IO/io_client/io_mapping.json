@@ -2,7 +2,7 @@
   "leds": {
     "led1": {
       "device_name": "led1",
-      "objRef": "connected",
+      "objRef": ["connected","stopped"],
       "direction": "output",
       "device_type": "led"
     },
@@ -27,9 +27,12 @@
         "rc_rcv",
         "connected",
         "oper_send",
+        "oper_rcv",
         "setpoint",
         "read",
-        "operate"
+        "operate",
+        "writeValue",
+        "stopped"
       ],
       "direction": "output",
       "device_type": "lcd"
@@ -40,7 +43,12 @@
         "rc_rcv",
         "connected",
         "oper_send",
-        "writeValue"
+        "oper_rcv",
+        "setpoint",
+        "read",
+        "operate",
+        "writeValue",
+        "stopped"
       ],
       "direction": "output",
       "device_type": "lcd_i2c",
@@ -56,7 +64,8 @@
       "device_name": "button1",
       "objRef": "LD0/DWMX1.DERAvail.stVal",
       "direction": "input",
-      "device_type": "button"
+      "device_type": "button",
+      "fc": "st"
     }
   },
   "potentiometers": {
@@ -64,7 +73,8 @@
       "device_name": "pot1",
       "objRef": "LD0/MMXU1.TotW.mag.f",
       "direction": "input",
-      "device_type": "potentiometer"
+      "device_type": "potentiometer",
+      "fc": "mx"
     },
     "pot2": {
       "device_name": "pot2",

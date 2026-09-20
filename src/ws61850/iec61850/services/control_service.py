@@ -120,7 +120,6 @@ class ControlService:
 
         control_handler = self._control_handler_ref()
         if control_handler is None:
-            print("check 1")
             return create_tpaa_response_operate(
                 invoke_id, associate_id, False, None, ServiceStatusKind.failedDueToServerConstraint.name
             ), None
@@ -131,7 +130,6 @@ class ControlService:
         from ws61850.iec61850.server.iec61850_server import IEC61850Server
         ctl_val = {"type": control_da.type.name, "value": ctlVal_request}
         result, error = handler_fn(control_da.get_objRef(), ctl_val, handler_param)
-        print("result is: ", result, "error is: ", error)
 
         ctl_num = next((da for da in operate_item.data_attributes if da.name == "ctlNum"), None)
 
@@ -146,23 +144,10 @@ class ControlService:
             return create_tpaa_response_operate(invoke_id, associate_id, True, None, None), \
                 control_do
 
-
-
-        #needs_quality_update = (control_do.get_objRef() == "LD0/DWMX1.WMaxSpt")
-
-
-        #if not server_control_obj.is_selected:
-        #    return create_tpaa_response_operate(
-        #        invoke_id, associate_id, False, None, ServiceStatusKind.controlMustBeSelected.name
-        #    ), None
-
-
-
         if isinstance(error, ControlServiceStatusKind):
             if ctl_num:
                 ctl_num.mmsValue += 1
             return create_tpaa_response_operate(invoke_id, associate_id, False, error.name, None), None
-        print("check 2")
         return create_tpaa_response_operate(
             invoke_id, associate_id, False, None, ServiceStatusKind.failedDueToServerConstraint.name
         ), None

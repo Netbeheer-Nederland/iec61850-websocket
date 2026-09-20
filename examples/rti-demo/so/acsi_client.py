@@ -1,3 +1,20 @@
+# SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright 2025 Netbeheer Nederland
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Core IEC 61850 WebSocket client module with ACSI operations.
 
 This module handles:
@@ -71,8 +88,7 @@ class ACSIClient:
         self.runtime.endpoint = PassiveEndpoint()
         self.runtime.endpoint.recv_msg_callback = self._on_recv_message
         self.runtime.endpoint.send_msg_callback = self._on_send_message
-        #self.runtime.client = IEC61850Client(self.runtime.cp)
-        #self.runtime.endpoint.add_iec61850_client(self.runtime.client)
+
         self.runtime.client_list = self.runtime.endpoint.client_list
 
         # Model and tree caching
@@ -197,8 +213,8 @@ class ACSIClient:
     def get_model_info(self, cp):
         """Get or create ModelInfo for a CP."""
         if cp not in self._model_info_dict:
-            self._model_info_dict[cp] = ModelInfo(cp)  # New object (default values)
-        return self._model_info_dict[cp]  # ✅ Returns EXISTING object with all its data
+            self._model_info_dict[cp] = ModelInfo(cp)
+        return self._model_info_dict[cp]
 
     def get_iec61850_client(self, cp):
         return next((client for client in self.runtime.client_list if client.cp == cp), None)
@@ -317,22 +333,12 @@ class ACSIClient:
         )
 
         try:
-            
-            # Now client gets callbacks automatically
-            # endpoint.start() runs a reconnect loop forever, so we must NOT
-            # await it directly. Schedule it as a background task and instead
-            # wait for the client's ready_event, which is set once the IEC 61850
-            # association has been established.
+
             start_task = asyncio.create_task(
                 self.runtime.endpoint.start(host, port),
                 name="so-active"
             )
 
-            #client = self.get_iec61850_client(cp)
-            #if not client:
-            #    raise RuntimeError(f"ACSI Client for {cp} not found!")
-
-            # Remember the task so we can cancel it on disconnect.
             self._set_runtime_state(
                 endpoint=self.runtime.endpoint,
                 #client=client,
@@ -373,12 +379,11 @@ class ACSIClient:
     async def _disconnect_async(self) -> None:
         """Disconnect from the server asynchronously."""
         endpoint = self.runtime.endpoint
-        #client = self.runtime.client
 
         self._log_action("Disconnecting...")
         self._set_runtime_state(status="disconnecting")
 
-        # ✅ Cancel the background task first
+        # Cancel the background task
         if hasattr(self.runtime, '_start_task') and self.runtime._start_task:
             self.runtime._start_task.cancel()
 
@@ -423,7 +428,6 @@ class ACSIClient:
         try:
             loop.run_forever()
         except Exception as exc:
-            print(f"Event loop error: {exc}")
             self._log_action(f"Event loop error: {exc}", "error")
         finally:
             pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
@@ -504,10 +508,7 @@ class ACSIClient:
             "status": self.runtime.status,
             "host": self.runtime.host,
             "port": self.runtime.port,
-            #"cp": self.runtime.cp,
             "error": self.runtime.error,
-            #"modelStatus": model_info.model_status,
-            #"modelError": model_info.model_error,
         }
 
     async def get_server_directory_tree(self, cp: str, ws_info: Optional[Any] = None) -> Dict[str, Any]:
@@ -529,11 +530,6 @@ class ACSIClient:
         if not ws_info:
             raise RuntimeError('no-websocket-info')
 
-        # Serialize every request over this connection through the shared
-        # invoke_lock — without this, two calls issued close together (e.g.
-        # a background model-rebuild racing a manual UI click) can have
-        # their responses arrive out of order, which the passive endpoint
-        # treats as a protocol violation and closes the connection for.
         async with self.runtime.invoke_lock:
             ld_list = await client.get_server_directory(ws_info, None, None)
         if not isinstance(ld_list, list):
@@ -592,15 +588,10 @@ class ACSIClient:
         if not ws_info:
             raise RuntimeError('no-websocket-info')
 
-        # Fetch all directory types in parallel
         directory_types = ['dataObject', 'brcb', 'urcb', 'dataset']
 
         async def fetch_directory(directory_type):
             try:
-                # Still fetched "concurrently" from the caller's perspective,
-                # but each actual network call is serialized through the
-                # shared lock so responses can't arrive out of order on the
-                # wire.
                 async with self.runtime.invoke_lock:
                     items = await client.get_logical_node_directory(ld_inst, ln_inst, directory_type, ws_info, None, None)
                 return directory_type, items if items else []
@@ -645,7 +636,6 @@ class ACSIClient:
             defn = await client.get_data_definition(obj_ref, ws_info, None, None)
 
         # Build result with the data definition
-        # The data definition typically includes: cdc, fc, type, etc.
         result = {
             "dataObject": do_name,
             "objRef": obj_ref,
@@ -709,8 +699,7 @@ class ACSIClient:
                 result = await client.get_data_definition(obj_ref, websocket_info, None, None)
             return {"dataDefinition": result}
         except Exception as e:
-            print("error in get_data_definition:", e)
-            logger.error(f"Error in get_data_definition: {e}")
+            logger.exception(f"Error in get_data_definition: {e}")
             raise
 
     async def get_brcb_definition(self, obj_ref: str, cp: str) -> Dict[str, Any]:
@@ -802,7 +791,6 @@ class ACSIClient:
 
         rcb = self.create_rcb_from_frontend_data(data, "URCB")
 
-        print("created urcb:", rcb.__dict__)
         client = self.get_iec61850_client(cp)
         if not client:
             raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
@@ -827,7 +815,7 @@ class ACSIClient:
     def convert_value(self, type_name, raw_str, TYPE_MAP):
         expected_type = TYPE_MAP.get(type_name)
         if expected_type is None:
-            print(f"Unknown type: {type_name}")
+            logger.exception(f"Unknown type: {type_name}")
             return False, None
 
         if expected_type is bool:
@@ -837,7 +825,7 @@ class ACSIClient:
                 elif raw_str.lower() in ("false", "0"):
                     return True, False
                 else:
-                    print(f"Cannot convert '{raw_str}' to bool")
+                    logger.error(f"Cannot convert '{raw_str}' to bool")
                     return False, None
             else:
                 return True, bool(raw_str)
@@ -846,28 +834,28 @@ class ACSIClient:
             try:
                 return True, int(raw_str)
             except (ValueError, TypeError):
-                print(f"Cannot convert '{raw_str}' to int")
+                logger.exception(f"Cannot convert '{raw_str}' to int")
                 return False, None
 
         if expected_type is float:
             try:
                 return True, float(raw_str)
             except (ValueError, TypeError):
-                print(f"Cannot convert '{raw_str}' to float")
+                logger.exception(f"Cannot convert '{raw_str}' to float")
                 return False, None
 
         if expected_type is bytes:
             try:
                 return True, bytes.fromhex(raw_str)  # adjust if not hex-encoded
             except (ValueError, TypeError):
-                print(f"Cannot convert '{raw_str}' to bytes")
+                logger.exception(f"Cannot convert '{raw_str}' to bytes")
                 return False, None
 
         if expected_type is str:
             return True, raw_str  # already a string
 
         if expected_type is list:
-            print(f"No defined conversion for {type_name} (list) from string '{raw_str}'")
+            logger.error(f"No defined conversion for {type_name} (list) from string '{raw_str}'")
             return False, None
 
         return False, None
@@ -911,16 +899,9 @@ class ACSIClient:
             if converted is False:
                 raise RuntimeError(f"Type mismatch: '{value}' is not valid for {data_type}")
             else:
-                print("the value: ", value)
-                print("the type: ", data_type)
                 result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, converted_val)}], websocket_info,
                                                       self.runtime.write_callback, None)
 
-            #result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, value)}], websocket_info, self.runtime.write_callback, None)
-        print(result)
-        print("Write operation completed successfully.")
-        print("new value:", value)
-        print("obj_ref:", obj_ref)
         if result is True:
             return {"objRef": obj_ref, "value": value}
         else:
