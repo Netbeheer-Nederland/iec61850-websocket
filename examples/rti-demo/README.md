@@ -113,7 +113,7 @@ docker-compose -f rti-demo/docker-compose.yml up -d
 
 ### BFF connection persistence in Docker
 
-The `bff-server` container persists `connections.json` in a dedicated `/config`
+The `rti-bff` container persists `connections.json` in a dedicated `/config`
 directory backed by the `bff-config` named volume (not in `/app` or the `./bff`
 code mount). On first start it is seeded from `bff/connections.json`; after that
 the volume is authoritative. To reset it:
@@ -121,7 +121,7 @@ the volume is authoritative. To reset it:
 ```bash
 docker-compose down
 docker volume rm rti-demo_bff-config   # prefix matches your compose project name
-docker-compose up -d bff-server
+docker-compose up -d rti-bff
 ```
 
 The `BFF_CONNECTIONS_FILE` env var overrides the path if you need a different

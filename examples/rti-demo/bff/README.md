@@ -283,11 +283,11 @@ Multi-stage Docker build with:
 ## Docker Integration
 
 The BFF service in docker-compose.yml:
-- Container: bff-server
+- Container: rti-bff
 - Port: 5000:5000
 - Network: rti-network
 - Volumes: connections.json persistence, Docker socket for discovery
-- Depends on: Healthy bff-server for HMI
+- Depends on: Healthy rti-bff for HMI
 
 All services communicate through rti-network Docker network.
 
@@ -299,7 +299,7 @@ All services communicate through rti-network Docker network.
 
 **With Docker**:
 ```bash
-docker-compose up bff-server
+docker-compose up rti-bff
 ```
 
 **Without Docker**:

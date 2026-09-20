@@ -47,7 +47,7 @@ Services:
     bff:        Backend for Frontend Server (default: port 5000)
     fsp:        RTI-FSP (default: port 5001)
     so:         RTI-SO (default: port 5002)
-    io:         IO Device Control API (default: port 8080)
+    io:         IO Device Control API (default: port 8000)
     
     Default: Running without arguments launches all services with --foreground -v
 """
@@ -114,9 +114,9 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
         docker_image="rti-demo-bff",
         health_check_path="/api/health",
         labels={
-            "rti.service": "bff-server",
+            "rti.service": "rti-bff",
             "rti.type": "RTI-BFF",
-            "rti.host": "bff-server",
+            "rti.host": "rti-bff",
             "rti.port": "5000"
         }
     ),
@@ -131,9 +131,9 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
         docker_image="rti-demo-fsp",
         health_check_path="/api/status",
         labels={
-            "rti.service": "rti-server",
+            "rti.service": "rti-fsp",
             "rti.type": "RTI-FSP",
-            "rti.host": "rti-server",
+            "rti.host": "rti-fsp",
             "rti.port": "5001"
         }
     ),
@@ -148,9 +148,9 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
         docker_image="rti-demo-fsp",
         health_check_path="/api/status",
         labels={
-            "rti.service": "rti-server-2",
+            "rti.service": "rti-fsp-2",
             "rti.type": "RTI-FSP",
-            "rti.host": "rti-server-2",
+            "rti.host": "rti-fsp-2",
             "rti.port": "5005"
         }
     ),
@@ -165,9 +165,9 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
         docker_image="rti-demo-so",
         health_check_path="/api/status",
         labels={
-            "rti.service": "rti-client",
+            "rti.service": "rti-so",
             "rti.type": "RTI-SO",
-            "rti.host": "rti-client",
+            "rti.host": "rti-so",
             "rti.port": "5002"
         }
     ),
@@ -176,16 +176,16 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
         service_type=ServiceType.IO,
         module="demo_IO.io_api_server.main",
         entry_point="demo_IO/io_api_server/main.py",
-        default_port=8080,
+        default_port=8000,
         description="IO Device Control API - REST API for Raspberry Pi IO devices",
-        env_vars={"PORT": "8080"},
+        env_vars={"PORT": "8000"},
         docker_image="rti-demo-io",
         health_check_path="/api/io/health",
         labels={
-            "rti.service": "io-server",
+            "rti.service": "demo_io",
             "rti.type": "IO-Device-Control",
-            "rti.host": "io-server",
-            "rti.port": "8080"
+            "rti.host": "demo_io",
+            "rti.port": "8000"
         }
     ),
 }

@@ -153,7 +153,7 @@ docker run --rm -p 5001:5001 --network rti-network --name rti-fsp rti-demo-fsp
 docker build -t rti-demo-fsp -f Dockerfile ../..
 
 # Run with network
-docker run --rm -p 5001:5001 --network rti-network --name rti-server rti-demo-fsp
+docker run --rm -p 5001:5001 --network rti-network --name rti-fsp rti-demo-fsp
 ```
 
 #### API Health Check

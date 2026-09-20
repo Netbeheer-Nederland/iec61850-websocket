@@ -1,10 +1,10 @@
 services:
   # BFF Server
-  bff-server:
+  rti-bff:
     build:
       context: .
       dockerfile: Dockerfile.bff
-    container_name: bff-server
+    container_name: rti-bff
     ports:
       - "5000:5000"
     environment:
@@ -30,9 +30,9 @@ services:
       retries: 5
       start_period: 30s
     labels:
-      - "rti.service=bff-server"
+      - "rti.service=rti-bff"
       - "rti.type=RTI-BFF"
-      - "rti.host=bff-server"
+      - "rti.host=rti-bff"
       - "rti.port=5000"
 
   # HMI Web Server
@@ -44,7 +44,7 @@ services:
     ports:
       - "3001:80"
     depends_on:
-      bff-server:
+      rti-bff:
         condition: service_healthy
     networks:
       - rti-network
