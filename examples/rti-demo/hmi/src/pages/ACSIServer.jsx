@@ -71,7 +71,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const valuesRefreshIntervalRef = useRef(null);
   const monitorIntervalRef = useRef(null);
   const statusIntervalRef = useRef(null);
-  const cpUserEditedRef = useRef(false);
 
   const fspInstances = useMemo(
     () => connections.filter(c => c.type === 'RTI-SO'),
@@ -111,11 +110,11 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     setSelectedInstanceName(value);
     if (value === 'custom') {
       // Fresh custom entry starts fully blank for the user to fill in, not
-      // whatever host/port/cp were left over from a previously-selected
-      // instance.
+      // whatever host/port were left over from a previously-selected
+      // instance. CP is read-only (this FSP's own connection point, see
+      // endpoint.cp) and isn't part of the per-instance custom entry.
       setHost('');
       setPort('');
-      setCp('');
       setMode('active');
       return;
     }
@@ -209,10 +208,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     [endpoint, host, port]
   );
 
-  useEffect(() => {
-    cpUserEditedRef.current = false;
-  }, [endpointTarget]);
-
   const stopMonitoring = useCallback(() => {
     if (monitorIntervalRef.current) {
       clearInterval(monitorIntervalRef.current);
@@ -246,7 +241,10 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           // Server is considered connected if status is 'running', 'listening', 'connected', or 'starting'
           setConnected(['running', 'listening', 'connected', 'starting'].includes(serverStatus.status));
         }
-        if (!cpUserEditedRef.current && Array.isArray(serverStatus?.accessPoints) && serverStatus.accessPoints.length > 0) {
+        // CP is read-only in this page now (see the "Connection Point"
+        // display next to Load Model), so the live server's reported
+        // access point always wins here - there's no manual edit to protect.
+        if (Array.isArray(serverStatus?.accessPoints) && serverStatus.accessPoints.length > 0) {
           setCp(serverStatus.accessPoints[0]);
         }
       }
@@ -666,6 +664,87 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </div>
       </div>
 
+      <div className="acsi-connection-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
+          <div className="form-group">
+            <label htmlFor="acsi-server-instance-select">Instance</label>
+            <select
+              id="acsi-server-instance-select"
+              value={selectedInstanceName}
+              onChange={handleInstanceSelect}
+              disabled={loading || connected}
+              title={connected ? 'Stop the server before switching instances' : undefined}
+            >
+              <option value="" disabled>Select instance...</option>
+              {fspInstances.map(inst => {
+                // Without a ws_port this instance has nowhere for the FSP to
+                // dial into - selecting it is a dead end (WS Port stays
+                // blank, Start Server just fails later) - disable it here
+                // instead, so the fix (configure it, or use Custom) is
+                // obvious upfront rather than after the fact.
+                const missingWsPort = !inst.ws_port;
+                return (
+                  <option key={inst.name} value={inst.name} disabled={missingWsPort}>
+                    {/* WS address this instance's Passive endpoint listens
+                        on (what this page will dial into) - not its BFF
+                        port. */}
+                    {inst.name} ({inst.host}:{inst.ws_port || '—'})
+                    {missingWsPort ? ' – WS port not configured' : ''}
+                  </option>
+                );
+              })}
+              <option value="custom">Custom...</option>
+            </select>
+            {connected && (
+              <small style={{ color: 'var(--text-muted)' }}>
+                Stop the server to switch to a different instance.
+              </small>
+            )}
+          </div>
+        </div>
+
+        {/* Only editable for a "custom" instance - picking a real one from
+            the dropdown above pre-fills these read-only, from that
+            instance's own configuration. */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
+          <div className="form-group">
+            <label htmlFor="acsi-server-ws-host">WS Host</label>
+            <input
+              id="acsi-server-ws-host"
+              type="text"
+              value={host}
+              placeholder="0.0.0.0"
+              onChange={(e) => setHost(e.target.value)}
+              disabled={loading || !isCustomInstance}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="acsi-server-ws-port">WS Port</label>
+            <input
+              id="acsi-server-ws-port"
+              type="number"
+              value={port}
+              placeholder="8765"
+              onChange={(e) => setPort(e.target.value)}
+              disabled={loading || !isCustomInstance}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="acsi-server-ws-mode">WS Mode</label>
+            <select
+              id="acsi-server-ws-mode"
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+              disabled={loading || !isCustomInstance}
+            >
+              {!mode && <option value="" disabled>Select instance...</option>}
+              <option value="active">Active</option>
+              <option value="passive">Passive</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Security Configuration Buttons */}
       <div style={{ display: 'flex', gap: '16px', marginLeft: 'auto', marginBottom: '24px' }}>
         <button id="acsi-start-btn" className={connected ? 'btn-secondary' : 'btn-primary'} onClick={handleStartServer} disabled={loading || connected}>
@@ -790,97 +869,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </label>
       </div>
 
-      <div className="acsi-connection-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
-          <div className="form-group">
-            <label htmlFor="acsi-server-instance-select">Instance</label>
-            <select
-              id="acsi-server-instance-select"
-              value={selectedInstanceName}
-              onChange={handleInstanceSelect}
-              disabled={loading || connected}
-              title={connected ? 'Stop the server before switching instances' : undefined}
-            >
-              <option value="" disabled>Select instance...</option>
-              {fspInstances.map(inst => {
-                // Without a ws_port this instance has nowhere for the FSP to
-                // dial into - selecting it is a dead end (WS Port stays
-                // blank, Start Server just fails later) - disable it here
-                // instead, so the fix (configure it, or use Custom) is
-                // obvious upfront rather than after the fact.
-                const missingWsPort = !inst.ws_port;
-                return (
-                  <option key={inst.name} value={inst.name} disabled={missingWsPort}>
-                    {/* WS address this instance's Passive endpoint listens
-                        on (what this page will dial into) - not its BFF
-                        port. */}
-                    {inst.name} ({inst.host}:{inst.ws_port || '—'})
-                    {missingWsPort ? ' – WS port not configured' : ''}
-                  </option>
-                );
-              })}
-              <option value="custom">Custom...</option>
-            </select>
-            {connected && (
-              <small style={{ color: 'var(--text-muted)' }}>
-                Stop the server to switch to a different instance.
-              </small>
-            )}
-          </div>
-        </div>
-
-        {/* Only editable for a "custom" instance - picking a real one from
-            the dropdown above pre-fills these read-only, from that
-            instance's own configuration. */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
-          <div className="form-group">
-            <label htmlFor="acsi-server-ws-host">WS Host</label>
-            <input
-              id="acsi-server-ws-host"
-              type="text"
-              value={host}
-              placeholder="0.0.0.0"
-              onChange={(e) => setHost(e.target.value)}
-              disabled={loading || !isCustomInstance}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="acsi-server-ws-port">WS Port</label>
-            <input
-              id="acsi-server-ws-port"
-              type="number"
-              value={port}
-              placeholder="8765"
-              onChange={(e) => setPort(e.target.value)}
-              disabled={loading || !isCustomInstance}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="acsi-server-ws-cp">WS CP</label>
-            <input
-              id="acsi-server-ws-cp"
-              type="text"
-              value={cp}
-              placeholder="cp1"
-              onChange={(e) => { cpUserEditedRef.current = true; setCp(e.target.value); }}
-              disabled={loading || !isCustomInstance}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="acsi-server-ws-mode">WS Mode</label>
-            <select
-              id="acsi-server-ws-mode"
-              value={mode}
-              onChange={(e) => setMode(e.target.value)}
-              disabled={loading || !isCustomInstance}
-            >
-              {!mode && <option value="" disabled>Select instance...</option>}
-              <option value="active">Active</option>
-              <option value="passive">Passive</option>
-            </select>
-          </div>
-        </div>
-      </div>
         <div className="page-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <h1><i className="fas fa-server" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>ACSI Server</h1>
@@ -891,6 +879,10 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         <button id="acsi-load-model-btn" className="btn-primary" onClick={loadServerModel} disabled={loading}>
           {loading ? 'Loading...' : 'Load Model'}
         </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Connection Point:</span>
+          <strong id="acsi-server-connection-point">{cp || '—'}</strong>
+        </div>
         {/*<button id="acsi-reload-status-btn" className="btn-secondary" onClick={loadStatus} disabled={!endpointTarget}>
           Reload Status
         </button>*/}

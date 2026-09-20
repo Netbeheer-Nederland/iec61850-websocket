@@ -90,7 +90,6 @@ describe('ACSIServer instance selection - ws_port vs BFF port', () => {
 
     expect(screen.getByLabelText('WS Host')).toHaveValue('');
     expect(screen.getByLabelText('WS Port')).toHaveValue(null);
-    expect(screen.getByLabelText('WS CP')).toHaveValue('');
     expect(screen.getByLabelText('WS Mode')).toHaveValue('active');
     // Custom is the only state where these fields become editable.
     expect(screen.getByLabelText('WS Host')).toBeEnabled();
