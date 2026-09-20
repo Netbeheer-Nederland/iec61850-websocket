@@ -15,7 +15,6 @@ Every module in `ws61850` uses `logging.getLogger(__name__)`, so logger names ma
 | `ws61850.iec61850.server.iec61850_server` | IEC 61850 server — association and service dispatch |
 | `ws61850.iec61850.server.request_handling` | Server-side service request handling |
 | `ws61850.iec61850.client.iec61850_client` | IEC 61850 client — association, select/operate, directory |
-| `ws61850.iec61850.client.compact` | Compact client helpers |
 | `ws61850.iec61850.client.reconstruct_tree_client` | Data-model tree reconstruction |
 | `ws61850.security.oauth2.jwks` | JWKS endpoint fetch and key cache |
 | `ws61850.security.oauth2.validator` | JWT decode and claim validation |
