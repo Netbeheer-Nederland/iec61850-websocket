@@ -68,6 +68,10 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [expandedNodes, setExpandedNodes] = useState({});
   const [connections, setConnections] = useState([]);
   const [autoRefreshValues, setAutoRefreshValues] = useState(false);
+  // Mirrors ACSIClient.jsx's per-cp expandedClients accordion, except this
+  // page only ever has the one connection point (its own), so a single
+  // boolean is enough instead of a map keyed by cp.
+  const [modelExpanded, setModelExpanded] = useState(false);
   const valuesRefreshIntervalRef = useRef(null);
   const monitorIntervalRef = useRef(null);
   const statusIntervalRef = useRef(null);
@@ -880,9 +884,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </div>
 
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'center' }}>
-        <button id="acsi-load-model-btn" className="btn-primary" onClick={loadServerModel} disabled={loading}>
-          {loading ? 'Loading...' : 'Load Model'}
-        </button>
         {/*<button id="acsi-reload-status-btn" className="btn-secondary" onClick={loadStatus} disabled={!endpointTarget}>
           Reload Status
         </button>*/}
@@ -928,18 +929,63 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </div>
       )}
 
-      <div id="acsi-modelPanel" className="model-tree" style={{ marginTop: '24px', padding: '20px' }}>
-        {treeData ? (
-            <Tree
-                data={treeData}
-                expandedNodes={expandedNodes}
-                onExpandToggle={handleExpandToggle}
-                onContextMenu={handleContextMenu}
-            />
-          ) :
-          <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-            {endpoint ? `Click "Load Model" to view the server model for ${endpoint.name || endpoint.host}:${endpoint.port}` : 'Configure and start the ACSI Server to load model'}
-          </p>}
+      {/* Connection point, expandable - same accordion approach as
+          ACSIClient.jsx's per-client list, just a single entry since this
+          page only ever has its own one connection point. */}
+      <div className="acsi-clients-list" style={{ marginBottom: '24px' }}>
+        <div
+          className="acsi-client-entry"
+          style={{
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            marginBottom: '8px',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            onClick={() => setModelExpanded(prev => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 16px',
+              cursor: 'pointer',
+              background: 'var(--bg-card)',
+            }}
+          >
+            <span style={{ fontWeight: 500 }}>{cp || 'Connection Point'}</span>
+            <i className={`fas fa-chevron-${modelExpanded ? 'up' : 'down'}`}></i>
+          </div>
+          {modelExpanded && (
+            <div
+              style={{
+                padding: '16px',
+                background: 'var(--bg-card)',
+                borderTop: '1px solid var(--border-color)',
+              }}
+            >
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                <button id="acsi-load-model-btn" className="btn-primary" onClick={loadServerModel} disabled={loading}>
+                  {loading ? 'Loading...' : 'Load Model'}
+                </button>
+              </div>
+              <div id="acsi-modelPanel" className="model-tree">
+                {treeData ? (
+                  <Tree
+                    data={treeData}
+                    expandedNodes={expandedNodes}
+                    onExpandToggle={handleExpandToggle}
+                    onContextMenu={handleContextMenu}
+                  />
+                ) : (
+                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
+                    {endpoint ? `Click "Load Model" to view the server model for ${endpoint.name || endpoint.host}:${endpoint.port}` : 'Configure and start the ACSI Server to load model'}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="page-header">
