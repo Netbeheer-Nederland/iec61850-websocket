@@ -460,6 +460,20 @@ class ACSIClient:
             if status in ("connecting", "connected"):
                 raise RuntimeError("Client is already connected or connecting")
             self.runtime.status = "connecting"
+            # disconnect() (_disconnect_async) clears runtime.endpoint to None
+            # once the passive server has stopped - recreate it here so a
+            # reconnect after a prior disconnect doesn't crash _connect_async
+            # with "'NoneType' object has no attribute 'start'". Re-wire the
+            # callbacks and client_list the same way __init__ does - a fresh
+            # PassiveEndpoint has its own new client_list object, so leaving
+            # runtime.client_list pointed at the old (discarded) endpoint's
+            # list would make every get_iec61850_client(cp) lookup miss even
+            # though the new endpoint is actually associated.
+            if self.runtime.endpoint is None:
+                self.runtime.endpoint = PassiveEndpoint()
+                self.runtime.endpoint.recv_msg_callback = self._on_recv_message
+                self.runtime.endpoint.send_msg_callback = self._on_send_message
+                self.runtime.client_list = self.runtime.endpoint.client_list
 
         t = threading.Thread(
             target=self._event_loop_thread, args=(host, port), daemon=True

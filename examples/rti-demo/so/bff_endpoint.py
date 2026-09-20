@@ -1928,7 +1928,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         "local_role": "ACSI-Client",
                         "ws_mode": "passive",
                         "remote_role": "ACSI_Server",
-                        "cp": rti_so.runtime.cp,
+                        "cp": acsi_client.cp,
                     }
 
             return connection_info
