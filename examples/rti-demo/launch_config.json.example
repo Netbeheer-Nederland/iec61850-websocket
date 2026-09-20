@@ -13,9 +13,9 @@
       },
       "health_check_path": "/api/health",
       "labels": {
-        "rti.service": "bff-server",
+        "rti.service": "rti-bff",
         "rti.type": "RTI-BFF",
-        "rti.host": "bff-server",
+        "rti.host": "rti-bff",
         "rti.port": "5000"
       }
     },
@@ -29,9 +29,9 @@
       },
       "health_check_path": "/api/status",
       "labels": {
-        "rti.service": "rti-server",
+        "rti.service": "rti-fsp",
         "rti.type": "RTI-FSP",
-        "rti.host": "rti-server",
+        "rti.host": "rti-fsp",
         "rti.port": "5001"
       }
     },
@@ -45,9 +45,9 @@
       },
       "health_check_path": "/api/status",
       "labels": {
-        "rti.service": "rti-client",
+        "rti.service": "rti-so",
         "rti.type": "RTI-SO",
-        "rti.host": "rti-client",
+        "rti.host": "rti-so",
         "rti.port": "5002"
       }
     },
