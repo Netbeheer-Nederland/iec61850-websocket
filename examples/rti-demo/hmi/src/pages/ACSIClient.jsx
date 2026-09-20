@@ -935,19 +935,19 @@ const getContextMenuItems = () => {
 
         <div className="form-group">
           <label htmlFor="acsi-client-bff-host">BFF Host</label>
-          <input type="text" id="acsi-client-bff-host" value={endpoint?.host || ''} placeholder="—" disabled />
+          <input type="text" id="acsi-client-bff-host" value={endpoint?.host || ''} placeholder="—" readOnly />
         </div>
         <div className="form-group">
           <label htmlFor="acsi-client-bff-port">BFF Port</label>
-          <input type="number" id="acsi-client-bff-port" value={endpoint?.port || ''} placeholder="—" disabled />
+          <input type="text" id="acsi-client-bff-port" value={endpoint?.port || ''} placeholder="—" readOnly />
         </div>
         <div className="form-group">
           <label htmlFor="acsi-client-ws-host-page">WS Host</label>
-          <input type="text" id="acsi-client-ws-host-page" value={wsHost} placeholder="0.0.0.0" disabled />
+          <input type="text" id="acsi-client-ws-host-page" value={wsHost} placeholder="0.0.0.0" readOnly />
         </div>
         <div className="form-group">
-          <label>WS Port</label>
-          <input type="number" id="acsi-client-ws-port" value={wsPort} placeholder="102" disabled />
+          <label htmlFor="acsi-client-ws-port">WS Port</label>
+          <input type="text" id="acsi-client-ws-port" value={wsPort} placeholder="102" readOnly />
         </div>
       </div>
 

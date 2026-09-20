@@ -82,11 +82,18 @@ describe('ACSIClient connection fields', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('BFF Host')).toHaveValue('10.0.0.2');
     });
-    expect(screen.getByLabelText('BFF Port')).toHaveValue(5002);
+    // Port fields are type="text" (not "number") specifically so they
+    // render as plain read-only text, not a native number-input control.
+    expect(screen.getByLabelText('BFF Port')).toHaveValue('5002');
     // WS Host/Port reflect the SO's own WebSocket endpoint (seeded from
     // endpoint.ws_port here; kept in sync with live status once connected).
     expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.2');
-    expect(screen.getByLabelText('BFF Host')).toBeDisabled();
+    expect(screen.getByLabelText('WS Port')).toHaveValue('8765');
+    // readOnly (not disabled): these are permanently fixed by the endpoint,
+    // not a control temporarily locked mid-action - see style-guide.md's
+    // "Editable vs. read-only vs. disabled fields".
+    expect(screen.getByLabelText('BFF Host')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('BFF Host')).not.toBeDisabled();
   });
 });
 
