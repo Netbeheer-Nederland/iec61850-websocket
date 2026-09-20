@@ -48,27 +48,30 @@ beforeEach(() => {
 });
 
 describe('ACSIServer instance selection - fresh/no prior selection', () => {
-  it('leaves Instance blank and shows default WS fields when nothing is selected or persisted', async () => {
+  it('defaults to "Custom" with editable localhost/8765/active when nothing is selected or persisted', async () => {
     renderPage();
 
     await waitFor(() => {
       // fspInstances is populated once connections load, so the dropdown
       // having its options is a proxy for "the fetch that would have
       // driven an auto-select has already happened" - it still shouldn't
-      // pick one.
+      // pick one of them.
       expect(screen.getByRole('option', { name: /^so1/ })).toBeInTheDocument();
     });
-    expect(screen.getByLabelText('Instance')).toHaveValue('');
+    expect(screen.getByLabelText('Instance')).toHaveValue('custom');
 
-    // Localhost/8765/active are placeholder defaults, not derived from any
-    // instance - and read-only the same way a real selection's fields are,
-    // since nothing is selected yet (not "custom").
+    // Landing on a blank/read-only Instance left the WS fields un-editable
+    // with no real instance backing them, so Connect used those defaults
+    // as-is instead of values the user could actually correct first -
+    // defaulting to "Custom" instead keeps them editable from the start.
     await waitFor(() => {
       expect(screen.getByLabelText('WS Host')).toHaveValue('localhost');
     });
     expect(screen.getByLabelText('WS Port')).toHaveValue('8765');
-    expect(screen.getByLabelText('WS Mode')).toHaveValue('Active');
-    expect(screen.getByLabelText('WS Host')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('WS Mode')).toHaveValue('active');
+    expect(screen.getByLabelText('WS Host')).not.toHaveAttribute('readonly');
+    expect(screen.getByLabelText('WS Host')).toBeEnabled();
+    expect(screen.getByLabelText('WS Mode').tagName).toBe('SELECT');
   });
 
   it('restores a previously-selected instance on remount instead of the defaults', async () => {
@@ -95,9 +98,17 @@ describe('ACSIServer instance selection - ws_port vs BFF port', () => {
     await waitFor(() => {
       expect(screen.getByRole('option', { name: /^so1/ })).toBeInTheDocument();
     });
+    // Wait for the default "Custom" landing state's own WS Host fill to
+    // settle first - otherwise it can race with (and clobber) the
+    // selection below, since both write to the same state.
+    await waitFor(() => {
+      expect(screen.getByLabelText('WS Host')).toHaveValue('localhost');
+    });
     await user.selectOptions(screen.getByLabelText('Instance'), 'so1');
 
-    expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.1');
+    await waitFor(() => {
+      expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.1');
+    });
     // WS Port is type="text" (not "number") specifically so a read-only
     // instance-derived value renders as plain text, not a native
     // number-input control.
@@ -179,10 +190,10 @@ describe('ACSIServer instance dropdown - usability', () => {
     expect(so1Option).toBeEnabled();
 
     // A disabled option can't actually be selected via user interaction -
-    // the dropdown stays on its current (blank) value.
+    // the dropdown stays on its current ("custom", the default) value.
     const user = userEvent.setup({ delay: null });
     await user.selectOptions(screen.getByLabelText('Instance'), 'so2').catch(() => {});
-    expect(screen.getByLabelText('Instance')).toHaveValue('');
+    expect(screen.getByLabelText('Instance')).toHaveValue('custom');
   });
 
   it('disables the whole Instance dropdown while the server is connected, with an explanatory hint', async () => {

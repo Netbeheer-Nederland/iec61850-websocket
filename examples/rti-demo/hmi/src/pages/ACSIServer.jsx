@@ -82,12 +82,16 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     [connections]
   );
 
-  // A restart (or fresh visit with no navigation state) should not guess an
-  // instance - only a real prior selection counts as "preferred". Falls
-  // back to whatever was last picked (persisted below) rather than always
-  // landing on the first instance in the list.
+  // A restart (or fresh visit with no navigation state) should not guess a
+  // real instance - only a real prior selection counts as "preferred".
+  // Falls back to whatever was last picked (persisted below); if nothing
+  // was ever picked, defaults to "custom" (with its own WS Host/Port/Mode
+  // defaults filled in below) rather than leaving the dropdown blank -
+  // blank left the WS fields read-only with no real instance backing them,
+  // so clicking Connect used those un-editable defaults as-is instead of
+  // values the user could actually correct first.
   const [selectedInstanceName, setSelectedInstanceName] = useState(() =>
-    endpoint?.name || localStorage.getItem(selectedInstanceStorageKey) || ''
+    endpoint?.name || localStorage.getItem(selectedInstanceStorageKey) || 'custom'
   );
   const instanceMatchedRef = useRef(false);
   const isCustomInstance = selectedInstanceName === 'custom';
@@ -329,6 +333,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         if (!connectionsLoaded) return; // wait for the real fetch before deciding
 
         if (selectedInstanceName === 'custom') {
+          // Fill in only whatever's still blank - a real host from
+          // navigation state, or a port already restored from
+          // portStorageKey, should win over these placeholder defaults.
+          if (!host) setHost('localhost');
+          if (!port) setPort('8765');
+          if (!mode) setMode('active');
           initialSyncDoneRef.current = true;
           return;
         }
@@ -337,7 +347,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           ? fspInstances.find(c => c.name === selectedInstanceName)
           : null;
 
-        if (selectedInstanceName && !inst && selectedInstanceName !== 'custom') {
+        if (selectedInstanceName && !inst) {
           // A name came in (e.g. via navigation state, or a persisted
           // selection whose instance was since removed) but it's not in
           // the list.
@@ -352,13 +362,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           // CP is owned by this RTI-FSP connection itself (endpoint.cp,
           // seeded at mount), not by the target RTI-SO instance.
           setMode('active');
-        } else if (!selectedInstanceName) {
-          // Nothing selected (fresh page/restart, nothing preferred yet
-          // either) - show usable placeholder defaults instead of leaving
-          // the fields blank, without treating this as an actual selection.
-          setHost('localhost');
-          setPort('8765');
-          setMode('active');
         }
 
         initialSyncDoneRef.current = true;
@@ -366,7 +369,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     };
 
     syncInitialConfig();
-  }, [connected, fspInstances, selectedInstanceName, connectionsLoaded, endpointTarget, executeApiCall, parsePythonDictString]);
+  }, [connected, fspInstances, selectedInstanceName, connectionsLoaded, endpointTarget, executeApiCall, parsePythonDictString, host, port, mode]);
 
   const handleStartServer = useCallback(async () => {
     if (!endpointTarget) { setError('No endpoint configured'); return; }
