@@ -45,6 +45,10 @@ function Model({ settings, connections = [], loading = false, onReload }) {
 
   const handleConnectionClick = (conn) => {
     setSelectedConnection(conn);
+    // Fresh load starts fully collapsed - but only here, not on the
+    // auto-refresh interval below, which reuses loadModel too and should
+    // preserve whatever the user has expanded while it silently refreshes.
+    setExpandedNodes({});
     loadModel(conn);
   };
 

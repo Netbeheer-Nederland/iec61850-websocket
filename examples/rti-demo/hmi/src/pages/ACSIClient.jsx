@@ -281,6 +281,11 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
           ...prev,
           [cpToUse]: tree.length > 0 ? { name: 'Server', type: 'server', children: tree } : null,
         }));
+        // Every fresh fetch for this cp starts fully collapsed, not
+        // whatever was expanded from a previous fetch (refs may
+        // coincidentally match between fetches of the "same" model) -
+        // other cps' expand state is untouched.
+        setExpandedNodesByClient((prev) => ({ ...prev, [cpToUse]: {} }));
         if (updateModel) {
           updateModel(apiTarget, result.payload);
         }

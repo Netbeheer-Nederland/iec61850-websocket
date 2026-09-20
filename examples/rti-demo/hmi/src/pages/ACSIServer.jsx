@@ -472,6 +472,10 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
 
         if (modelData && Object.keys(modelData).length > 0) {
           setTreeData(transformModelToTree(modelData));
+          // Every fresh load starts fully collapsed, not whatever was
+          // expanded from a previous load (refs may coincidentally match
+          // between loads of the "same" model).
+          setExpandedNodes({});
           // Save the model in the global models list
           updateModel(endpointTarget, modelData);
         } else {

@@ -87,16 +87,18 @@ const TreeNode = React.memo(({
   const displayName = node.name || node.ref || 'Unknown';
   const isSelected = selectedRef === node.ref;
 
-  // Depth-0 nodes (LDevices - Tree's top-level map renders data.children at
-  // depth 0) default to expanded, but only until the user actually touches
-  // the toggle: previously this was `expandedNodes[node.ref] || depth < 1`,
-  // which made `depth < 1` win unconditionally and left the LD collapse
-  // toggle completely non-functional (clicking it flipped the chevron's
-  // state internally but renderChildren() below never saw isExpanded turn
-  // false). Falling back to the depth-based default only when this ref has
-  // no explicit entry yet preserves the same default look while making the
-  // toggle (and Expand/Collapse All) actually take effect.
-  const isExpanded = expandedNodes[node.ref] !== undefined ? expandedNodes[node.ref] : depth < 1;
+  // A node is expanded only if explicitly marked so - no depth-based
+  // default. Every page resets expandedNodes to {} on each fresh fetch/load
+  // (see ACSIServer.jsx's loadServerModel, ACSIClient.jsx's loadClientTree),
+  // so a freshly loaded model always starts fully collapsed; explicit
+  // clicks (or Expand/Collapse All) are the only thing that opens a node.
+  //
+  // This used to default depth-0 nodes (LDevices - Tree's top-level map
+  // renders data.children at depth 0) to expanded via `depth < 1`, which
+  // also made the LD collapse toggle non-functional (clicking it flipped
+  // the chevron but renderChildren() below never saw isExpanded turn
+  // false, since `|| depth < 1` won unconditionally at depth 0).
+  const isExpanded = !!expandedNodes[node.ref];
 
   const handleToggle = useCallback(
     (e) => {
