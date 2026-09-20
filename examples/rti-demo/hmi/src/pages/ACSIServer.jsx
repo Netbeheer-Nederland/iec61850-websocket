@@ -869,9 +869,13 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </label>
       </div>
 
-        <div className="page-header">
+        <div className="page-header" style={{ position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <h1><i className="fas fa-server" style={{ marginRight: '10px', color: 'var(--primary-light)' }}></i>ACSI Server</h1>
+            <span id="acsi-server-endpoint-badge" className="acsi-endpoint-badge" style={{ display: connected ? 'inline-flex' : 'none' }}>
+              {connected && statusInfo && `${statusInfo.result?.status?.host}:${statusInfo.result?.status?.port}`}
+              {statusInfo?.result?.status?.accessPoints && <span style={{ marginLeft: '8px' }}>AP: {statusInfo.result.status.accessPoints}</span>}
+            </span>
           </div>
         </div>
 
@@ -879,10 +883,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         <button id="acsi-load-model-btn" className="btn-primary" onClick={loadServerModel} disabled={loading}>
           {loading ? 'Loading...' : 'Load Model'}
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Connection Point:</span>
-          <strong id="acsi-server-connection-point">{cp || '—'}</strong>
-        </div>
         {/*<button id="acsi-reload-status-btn" className="btn-secondary" onClick={loadStatus} disabled={!endpointTarget}>
           Reload Status
         </button>*/}
