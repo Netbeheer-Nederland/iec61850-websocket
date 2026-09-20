@@ -219,7 +219,10 @@ class ACSIClient:
     def get_iec61850_client(self, cp):
         return next((client for client in self.runtime.client_list if client.cp == cp), None)
     def get_cp_list(self):
-        return [client.cp for client in self.runtime.client_list]
+        # Only cps with an established association - client_list itself holds
+        # every configured access point, connected or not, so unfiltered this
+        # would list cps the HMI can't yet do anything with (no model to fetch).
+        return [client.cp for client in self.runtime.client_list if client.is_connected]
 
     def _log_action(
         self, message: str, level: str = "info", detail: Optional[Dict[str, Any]] = None
