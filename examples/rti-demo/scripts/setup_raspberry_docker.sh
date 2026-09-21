@@ -2,7 +2,7 @@
 
 # RTI Demo - Raspberry Pi Docker Setup Script
 # This script sets up Docker and Docker Compose on Raspberry Pi
-# Run with: bash setup_raspberry_docker.sh
+# Run with: bash scripts/setup_raspberry_docker.sh
 
 set -e
 

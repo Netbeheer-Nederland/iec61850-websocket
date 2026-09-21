@@ -268,6 +268,9 @@ rti-demo/
 ├── config/
 │   ├── launch_config.json.example
 │   └── models/                # IED model files (model_1.py, model_2.py)
+├── scripts/
+│   ├── set_docker_user.sh     # Detect/export host UID+GID for the demo_io build
+│   └── setup_raspberry_docker.sh  # Install Docker on a fresh Raspberry Pi
 └── modules/
     ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }
     ├── fsp/       { pyproject.toml, docker/Dockerfile, src/fsp/, tests/ }

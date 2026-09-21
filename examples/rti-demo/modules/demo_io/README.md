@@ -358,13 +358,15 @@ The `rti-io` (demo_io) container runs as a configurable user with access to GPIO
 If your system has different values, you can configure them in three ways:
 
 **Method 1: Auto-detect with username (Recommended)**
-Just pass the username - the script detects all IDs automatically:
+Just pass the username - the script detects all IDs automatically (run
+from `examples/rti-demo/`, so docker compose finds `docker-compose.yml`
+in the current directory):
 ```bash
-./set_docker_user.sh pi && docker-compose up --build
+./scripts/set_docker_user.sh pi && docker compose up --build
 ```
 For a different user:
 ```bash
-./set_docker_user.sh myuser && docker-compose up --build
+./scripts/set_docker_user.sh myuser && docker compose up --build
 ```
 
 **Method 2: Use .env file**

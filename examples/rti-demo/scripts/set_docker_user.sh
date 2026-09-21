@@ -4,13 +4,14 @@
 # Detects UID, GID, and group IDs for a given user and exports them as
 # environment variables for Docker Compose to use when building the rti-io container.
 #
-# Usage:
-#   ./set_docker_user.sh [username]
+# Usage (run from examples/rti-demo/, so docker compose still finds
+# docker-compose.yml in the current directory):
+#   ./scripts/set_docker_user.sh [username]
 #   Default username: pi
 #
 # Example:
-#   ./set_docker_user.sh pi && docker-compose up --build
-#   ./set_docker_user.sh myuser && docker-compose up --build
+#   ./scripts/set_docker_user.sh pi && docker compose up --build
+#   ./scripts/set_docker_user.sh myuser && docker compose up --build
 
 set -e
 
@@ -41,4 +42,4 @@ echo "Configuration for Docker build:"
 echo "  User:  $PI_USER (UID=$PI_UID, GID=$PI_GID)"
 echo "  Groups: gpio=$GPIO_GID, i2c=$I2C_GID, spi=$SPI_GID"
 echo ""
-echo "Now run: docker-compose up --build"
+echo "Now run: docker compose up --build"
