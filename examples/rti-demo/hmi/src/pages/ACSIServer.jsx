@@ -43,12 +43,14 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
 
   // Start blank rather than guessing ("rti-so", 8765, "cp1", "active") - a
   // real value only appears once an instance is actually resolved, either
-  // from navigation state (below) or from picking one on the page.
-  const [host, setHost] = useState(endpoint?.host || '');
-  const [port, setPort] = useState(() => {
-    const cachedPort = localStorage.getItem(portStorageKey);
-    return cachedPort || (endpoint?.port ? String(endpoint.port) : '');
-  });
+  // by matching a fetched RTI-SO connection (below) or by picking one on
+  // the page. Not endpoint.host/endpoint.port: `endpoint` here is this
+  // RTI-FSP's *own* connection record (its own host/BFF port, used
+  // correctly below for endpointTarget) - seeding the WS Host/Port fields
+  // from it pre-filled this FSP's own address as the WS dial-out target,
+  // which it can never actually be.
+  const [host, setHost] = useState('');
+  const [port, setPort] = useState(() => localStorage.getItem(portStorageKey) || '');
   const [cp, setCp] = useState(() => {
     const cachedCp = localStorage.getItem(cpStorageKey);
     return cachedCp || endpoint?.cp || '';
@@ -83,18 +85,28 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   );
 
   // A restart (or fresh visit with no navigation state) should not guess a
-  // real instance - only a real prior selection counts as "preferred".
-  // Falls back to whatever was last picked (persisted below); if nothing
-  // was ever picked, defaults to "custom" (with its own WS Host/Port/Mode
-  // defaults filled in below) rather than leaving the dropdown blank -
-  // blank left the WS fields read-only with no real instance backing them,
-  // so clicking Connect used those un-editable defaults as-is instead of
-  // values the user could actually correct first.
+  // real instance - only a real prior selection counts as "preferred", so
+  // the dropdown falls back to blank ("Select instance...") rather than
+  // guessing one. Blank is *not* itself a selection - it's just "nothing
+  // chosen yet" - so it's never persisted (see the effect below); whatever
+  // the dropdown's value actually is (a real instance name, or "custom")
+  // is the selection. Not endpoint?.name: `endpoint` is this RTI-FSP's own
+  // connection record, not a target RTI-SO instance, so its name never
+  // matches one in fspInstances - seeding it here just meant every arrival
+  // via a navigation link silently fell through to "custom" (see the sync
+  // effect's "not found in fspInstances" branch) instead of honoring the
+  // persisted preference or blank default like a direct visit would.
   const [selectedInstanceName, setSelectedInstanceName] = useState(() =>
-    endpoint?.name || localStorage.getItem(selectedInstanceStorageKey) || 'custom'
+    localStorage.getItem(selectedInstanceStorageKey) || ''
   );
   const instanceMatchedRef = useRef(false);
+  // WS Host/Port/Mode are editable in both states where there's no real
+  // instance backing them: "custom" (an explicit choice) and blank
+  // (nothing chosen yet, showing "Select instance..." with usable
+  // placeholder defaults instead of leaving the fields read-only and
+  // un-correctable - see the sync effect below).
   const isCustomInstance = selectedInstanceName === 'custom';
+  const isEditableInstance = isCustomInstance || selectedInstanceName === '';
 
   // Remember the selection so it's preferred again on the next visit/restart
   // - once the user has actually picked something (including "custom").
@@ -332,10 +344,13 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       } else {
         if (!connectionsLoaded) return; // wait for the real fetch before deciding
 
-        if (selectedInstanceName === 'custom') {
+        if (selectedInstanceName === 'custom' || selectedInstanceName === '') {
           // Fill in only whatever's still blank - a real host from
           // navigation state, or a port already restored from
           // portStorageKey, should win over these placeholder defaults.
+          // Applies to blank too (nothing chosen yet) so Connect has
+          // usable, editable values instead of empty ones - without
+          // treating "blank" itself as an actual selection.
           if (!host) setHost('localhost');
           if (!port) setPort('8765');
           if (!mode) setMode('active');
@@ -761,9 +776,11 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           </div>
         </div>
 
-        {/* Only editable for a "custom" instance - picking a real one from
-            the dropdown above pre-fills these read-only, from that
-            instance's own configuration. */}
+        {/* Editable when there's no real instance backing them yet: a
+            "custom" choice, or nothing chosen at all (blank, showing
+            "Select instance..." with usable defaults). Picking a real
+            instance from the dropdown above pre-fills these read-only,
+            from that instance's own configuration. */}
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
           <div className="form-group">
             <label htmlFor="acsi-server-ws-host">WS Host</label>
@@ -773,7 +790,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
               value={host}
               placeholder="0.0.0.0"
               onChange={(e) => setHost(e.target.value)}
-              readOnly={!isCustomInstance}
+              readOnly={!isEditableInstance}
               disabled={loading}
             />
           </div>
@@ -785,13 +802,13 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
               value={port}
               placeholder="8765"
               onChange={(e) => setPort(e.target.value)}
-              readOnly={!isCustomInstance}
+              readOnly={!isEditableInstance}
               disabled={loading}
             />
           </div>
           <div className="form-group">
             <label htmlFor="acsi-server-ws-mode">WS Mode</label>
-            {isCustomInstance ? (
+            {isEditableInstance ? (
               <select
                 id="acsi-server-ws-mode"
                 value={mode}

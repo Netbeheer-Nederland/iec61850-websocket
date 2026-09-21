@@ -13,9 +13,15 @@ vi.mock('../services/apiService', async (importOriginal) => {
   };
 });
 
-const renderPage = () =>
+const renderPage = (fspEndpoint = null) =>
   render(
-    <MemoryRouter>
+    <MemoryRouter
+      initialEntries={[
+        fspEndpoint
+          ? { pathname: '/acsi-server', state: { endpoint: fspEndpoint } }
+          : '/acsi-server',
+      ]}
+    >
       <ACSIServer settings={{}} updateModel={() => {}} getModel={() => {}} bffBaseUrl="http://bff.local:5000" />
     </MemoryRouter>
   );
@@ -48,7 +54,7 @@ beforeEach(() => {
 });
 
 describe('ACSIServer instance selection - fresh/no prior selection', () => {
-  it('defaults to "Custom" with editable localhost/8765/active when nothing is selected or persisted', async () => {
+  it('stays on "Select instance..." with editable localhost/8765/active when nothing is selected or persisted', async () => {
     renderPage();
 
     await waitFor(() => {
@@ -58,12 +64,14 @@ describe('ACSIServer instance selection - fresh/no prior selection', () => {
       // pick one of them.
       expect(screen.getByRole('option', { name: /^so1/ })).toBeInTheDocument();
     });
-    expect(screen.getByLabelText('Instance')).toHaveValue('custom');
+    // "" is the disabled "Select instance..." placeholder option's value -
+    // blank is not itself a selection.
+    expect(screen.getByLabelText('Instance')).toHaveValue('');
 
     // Landing on a blank/read-only Instance left the WS fields un-editable
     // with no real instance backing them, so Connect used those defaults
-    // as-is instead of values the user could actually correct first -
-    // defaulting to "Custom" instead keeps them editable from the start.
+    // as-is instead of values the user could actually correct first - so
+    // blank stays editable, the same as "custom" is.
     await waitFor(() => {
       expect(screen.getByLabelText('WS Host')).toHaveValue('localhost');
     });
@@ -85,6 +93,27 @@ describe('ACSIServer instance selection - fresh/no prior selection', () => {
     });
     await waitFor(() => {
       expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.1');
+    });
+    expect(screen.getByLabelText('WS Port')).toHaveValue('8765');
+  });
+
+  it('does not seed WS Host/Port from the navigated-in endpoint - that is this FSP\'s own address, not a WS target', async () => {
+    // Every real navigation to this page (from InstanceVisualization/
+    // Model's FSP card click) passes the clicked RTI-FSP's *own*
+    // connection record as `endpoint` - its own host/BFF port, e.g.
+    // rti-fsp01:5001 - never a target RTI-SO to dial into.
+    renderPage({ name: 'FSP01', host: 'rti-fsp01', port: 5001, type: 'RTI-FSP', cp: 'cp1' });
+
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /^so1/ })).toBeInTheDocument();
+    });
+    // Falls through to the same blank-with-defaults state a direct visit
+    // gets - not "rti-fsp01"/"5001" (this FSP's own address) and not
+    // "custom" (which endpoint.name failing to match any fspInstances
+    // used to force it into).
+    expect(screen.getByLabelText('Instance')).toHaveValue('');
+    await waitFor(() => {
+      expect(screen.getByLabelText('WS Host')).toHaveValue('localhost');
     });
     expect(screen.getByLabelText('WS Port')).toHaveValue('8765');
   });
@@ -190,10 +219,10 @@ describe('ACSIServer instance dropdown - usability', () => {
     expect(so1Option).toBeEnabled();
 
     // A disabled option can't actually be selected via user interaction -
-    // the dropdown stays on its current ("custom", the default) value.
+    // the dropdown stays on its current (blank, the default) value.
     const user = userEvent.setup({ delay: null });
     await user.selectOptions(screen.getByLabelText('Instance'), 'so2').catch(() => {});
-    expect(screen.getByLabelText('Instance')).toHaveValue('custom');
+    expect(screen.getByLabelText('Instance')).toHaveValue('');
   });
 
   it('disables the whole Instance dropdown while the server is connected, with an explanatory hint', async () => {
