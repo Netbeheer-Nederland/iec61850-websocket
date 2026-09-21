@@ -18,7 +18,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { executeApiCall, buildTargetValue, getApiById, getAutoRefreshIntervalMs } from '../services/apiService';
 import Tree from '../components/Tree';
 import { transformModelToTree } from '../utils/modelUtils';
@@ -30,7 +30,20 @@ import WriteValueModal from '../components/WriteValueModal.jsx';
 function ACSIServer({ settings, updateModel, getModel, connections: propConnections, bffBaseUrl = 'http://localhost:5000'}) {
   const location = useLocation();
   const navigate = useNavigate();
-  const endpoint = location.state?.endpoint;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const fspParam = searchParams.get('fsp');
+
+  // React Router's location.state.endpoint (the RTI-FSP this page manages)
+  // is only set by an in-app click (InstanceVisualization/Model) and is
+  // lost on a page refresh or a direct/bookmarked URL visit. paramEndpoint
+  // is the fallback: resolved asynchronously (see the effect below, once
+  // `connections` has actually loaded) from the ?fsp=<name> URL param that
+  // navigation now also seeds, so a refresh can recover the same instance
+  // instead of leaving this page permanently unusable until the user
+  // navigates back in via Setup/Model/Traffic again.
+  const navEndpoint = location.state?.endpoint;
+  const [paramEndpoint, setParamEndpoint] = useState(null);
+  const endpoint = navEndpoint || paramEndpoint;
 
   // Create instance-specific storage keys. Computed up front (before the
   // host/port state below) so the port initializer can use portStorageKey
@@ -213,6 +226,50 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       fetchConnections();
     }
   }, [bffBaseUrl, fetchConnections]);
+
+  // Resolve paramEndpoint from the ?fsp=<name> URL param once connections
+  // have loaded - only needed when we didn't already get a real endpoint
+  // from navigation state (that always wins; the URL param exists purely
+  // as a refresh/direct-visit fallback). Runs once per param value.
+  const paramResolvedForRef = useRef(null);
+  useEffect(() => {
+    if (navEndpoint) return;
+    if (!fspParam || !connectionsLoaded) return;
+    if (paramResolvedForRef.current === fspParam) return;
+    paramResolvedForRef.current = fspParam;
+    const found = connections.find(c => c.type === 'RTI-FSP' && c.name === fspParam);
+    if (found) setParamEndpoint(found);
+  }, [navEndpoint, fspParam, connections, connectionsLoaded]);
+
+  // port/cp/connected/selectedInstanceName were already initialized once,
+  // at mount, using the generic pre-resolution storage keys (paramEndpoint
+  // wasn't known synchronously - it needs the async connections fetch
+  // above). Once it resolves, re-read them from their now-correct
+  // instance-specific keys so a direct-URL/refresh visit with ?fsp=...
+  // ends up in the same state a normal in-app navigation would have, not
+  // stuck with whatever the generic fallback key happened to hold.
+  useEffect(() => {
+    if (!paramEndpoint) return;
+    setPort(localStorage.getItem(portStorageKey) || '');
+    setCp(localStorage.getItem(cpStorageKey) || paramEndpoint.cp || '');
+    setConnected(localStorage.getItem(storageKey) === 'true');
+    setSelectedInstanceName(localStorage.getItem(selectedInstanceStorageKey) || '');
+  }, [paramEndpoint, portStorageKey, cpStorageKey, storageKey, selectedInstanceStorageKey]);
+
+  // Keep the URL's ?fsp= param in sync with a real navigated-in endpoint,
+  // so a later refresh of this same page has something to recover from
+  // (see paramEndpoint above). Replaces history instead of pushing, so
+  // this doesn't add a back-button entry.
+  useEffect(() => {
+    if (!navEndpoint?.name) return;
+    if (searchParams.get('fsp') === navEndpoint.name) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('fsp', navEndpoint.name);
+    // Must pass `state` through explicitly - setSearchParams doesn't
+    // preserve the existing location.state on its own, so omitting this
+    // wiped navEndpoint out from under us on the very next render.
+    setSearchParams(next, { replace: true, state: location.state });
+  }, [navEndpoint, searchParams, setSearchParams, location.state]);
 
   // Helper to parse Python dict string to JS object
   const parsePythonDictString = useCallback((pythonStr) => {
@@ -747,13 +804,26 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </div>
       </div>
 
-      {!endpoint && (
+      {!endpoint && fspParam && !connectionsLoaded && (
+        <div className="alert" style={{ marginBottom: '16px', padding: '12px', background: 'var(--info-bg)', color: 'var(--text-secondary)', borderRadius: '4px' }}>
+          <i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i>
+          Resolving FSP instance "{fspParam}"...
+        </div>
+      )}
+      {!endpoint && fspParam && connectionsLoaded && (
+        <div className="alert alert-error" style={{ marginBottom: '16px', padding: '12px', background: 'var(--danger-bg)', color: 'var(--danger-color)', borderRadius: '4px' }}>
+          <i className="fas fa-exclamation-triangle" style={{ marginRight: '8px' }}></i>
+          FSP instance "{fspParam}" not found - it may have been removed or
+          renamed. Open this page again from a Setup, Model, or Traffic
+          page instead.
+        </div>
+      )}
+      {!endpoint && !fspParam && (
         <div className="alert alert-error" style={{ marginBottom: '16px', padding: '12px', background: 'var(--danger-bg)', color: 'var(--danger-color)', borderRadius: '4px' }}>
           <i className="fas fa-exclamation-triangle" style={{ marginRight: '8px' }}></i>
           No FSP instance selected. This page needs to know which RTI-FSP
           it's managing - open it from a Setup, Model, or Traffic page by
-          clicking that FSP's icon, rather than visiting this URL directly
-          or after a page refresh.
+          clicking that FSP's icon, rather than visiting this URL directly.
         </div>
       )}
 

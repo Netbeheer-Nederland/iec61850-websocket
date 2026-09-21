@@ -49,7 +49,11 @@ function InstanceVisualization({
   };
 
   const handleFspClick = (conn) => {
-    navigate('/acsi-server', { state: { endpoint: conn } });
+    // ?fsp=<name> lets ACSIServer.jsx recover which instance this is after
+    // a page refresh, when the state below (React Router in-memory only)
+    // is gone - see the paramEndpoint resolution there.
+    const search = conn?.name ? `?fsp=${encodeURIComponent(conn.name)}` : '';
+    navigate({ pathname: '/acsi-server', search }, { state: { endpoint: conn } });
   };
 
   const soConnections = connections.filter(conn => conn.type === 'RTI-SO' && conn.status === 'connected');

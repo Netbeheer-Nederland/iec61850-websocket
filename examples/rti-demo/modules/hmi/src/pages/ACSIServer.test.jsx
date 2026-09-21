@@ -31,6 +31,15 @@ const renderPage = (fspEndpoint = DEFAULT_ENDPOINT) =>
     </MemoryRouter>
   );
 
+// Simulates a page refresh / direct URL visit with only the ?fsp= param
+// surviving (no location.state - that's React Router in-memory only).
+const renderPageWithParam = (fspName) =>
+  render(
+    <MemoryRouter initialEntries={[`/acsi-server?fsp=${encodeURIComponent(fspName)}`]}>
+      <ACSIServer settings={{}} updateModel={() => {}} getModel={() => {}} bffBaseUrl="http://bff.local:5000" />
+    </MemoryRouter>
+  );
+
 const mockConnections = (connections) => {
   global.fetch = vi.fn(async (url) => {
     if (String(url).endsWith('/api/connections')) {
@@ -84,6 +93,41 @@ describe('ACSIServer without a navigated-in endpoint (direct visit / refresh)', 
     await waitFor(() => {
       expect(screen.getByText(/No FSP instance selected/i)).toBeInTheDocument();
     });
+    expect(executeApiCall).not.toHaveBeenCalled();
+  });
+});
+
+describe('ACSIServer recovering the endpoint from ?fsp= after a refresh', () => {
+  it('resolves the FSP from the fetched connections list and enables the controls', async () => {
+    mockConnections([
+      { name: 'FSP01', host: 'rti-fsp01', port: 5001, type: 'RTI-FSP', cp: 'cp1', status: 'connected' },
+      { name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765, type: 'RTI-SO', status: 'connected' },
+    ]);
+    renderPageWithParam('FSP01');
+
+    await waitFor(() => {
+      expect(screen.queryByText(/No FSP instance selected/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/not found/i)).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText('Instance')).toBeEnabled();
+    });
+    expect(document.getElementById('acsi-start-btn')).not.toBeDisabled();
+    // The status API call this triggers (loadStatus, on endpointTarget
+    // becoming available) must be routed to FSP01's own BFF address -
+    // rti-fsp01:5001 - not anything derived from the WS Host/Port fields.
+    await waitFor(() => {
+      expect(executeApiCall).toHaveBeenCalledWith('status', 'rti-fsp01:5001', null);
+    });
+  });
+
+  it('shows a "not found" error when the ?fsp= name has no matching connection', async () => {
+    renderPageWithParam('does-not-exist');
+
+    await waitFor(() => {
+      expect(screen.getByText(/"does-not-exist" not found/i)).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText('Instance')).toBeDisabled();
     expect(executeApiCall).not.toHaveBeenCalled();
   });
 });

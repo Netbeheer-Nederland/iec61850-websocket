@@ -152,7 +152,11 @@ function Model({ settings, connections = [], loading = false, onReload }) {
     if (conn.type === 'RTI-SO') {
       navigate('/acsi-client', { state: { endpoint: conn } });
     } else if (conn.type === 'RTI-FSP') {
-      navigate('/acsi-server', { state: { endpoint: conn } });
+      // ?fsp=<name> lets ACSIServer.jsx recover which instance this is
+      // after a page refresh, when the state below (React Router
+      // in-memory only) is gone - see the paramEndpoint resolution there.
+      const search = conn?.name ? `?fsp=${encodeURIComponent(conn.name)}` : '';
+      navigate({ pathname: '/acsi-server', search }, { state: { endpoint: conn } });
     }
   };
 
