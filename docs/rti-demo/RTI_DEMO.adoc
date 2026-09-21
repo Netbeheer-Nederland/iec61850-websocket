@@ -312,11 +312,11 @@ curl http://localhost:5000/api/endpoints
 This document was compiled from the following README files:
 
 - `examples/rti-demo/README.md` - (Main launch and services)
-- `examples/rti-demo/fsp/README.md` - (FSP implementation)
-- `examples/rti-demo/so/README.md` - (SO implementation)
-- `examples/rti-demo/bff/README.md` - (BFF implementation)
-- `examples/rti-demo/hmi/README.md` - (HMI implementation)
-- `examples/rti-demo/demo_IO/README.md` - (IO control)
+- `examples/rti-demo/modules/fsp/README.md` - (FSP implementation)
+- `examples/rti-demo/modules/so/README.md` - (SO implementation)
+- `examples/rti-demo/modules/bff/README.md` - (BFF implementation)
+- `examples/rti-demo/modules/hmi/README.md` - (HMI implementation)
+- `examples/rti-demo/modules/demo_io/README.md` - (IO control)
 - `examples/rti-demo/demo_setup/README.md` - (Deployment)
 
 For detailed information on specific components, refer to their respective README files in the `examples/rti-demo` directory.

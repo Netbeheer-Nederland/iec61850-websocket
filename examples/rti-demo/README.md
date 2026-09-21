@@ -99,16 +99,19 @@ echo [] > connections.json
 ## Docker
 
 ```bash
-# Build images
-docker build -t rti-demo-bff -f rti-demo/bff/Dockerfile .
-docker build -t rti-demo-fsp -f rti-demo/fsp/Dockerfile .
-docker build -t rti-demo-so -f rti-demo/so/Dockerfile .
+# Build images (each module's Dockerfile builds from the repo root, since
+# fsp/so need the ws61850 core library at src/)
+cd ../..   # repo root
+docker build -f examples/rti-demo/modules/bff/docker/Dockerfile -t rti-demo-bff .
+docker build -f examples/rti-demo/modules/fsp/docker/Dockerfile -t rti-demo-fsp .
+docker build -f examples/rti-demo/modules/so/docker/Dockerfile -t rti-demo-so .
 
 # Launch with Docker (all services by default)
 python launch.py --docker
 
 # Docker Compose
-docker-compose -f rti-demo/docker-compose.yml up -d
+cd examples/rti-demo
+docker compose up -d
 ```
 
 ### BFF connection persistence in Docker
@@ -259,17 +262,27 @@ See `demo_IO/io_api_server/devices.py` for all supported device types and config
 
 ```
 rti-demo/
-├── launch.py              # Main entry point
-├── README.md              # This file
-├── bff/
-│   └── bff_server.py      # BFF Server
-├── fsp/
-│   └── bff_endpoint.py    # FSP ACSI-Server
-├── so/
-│   └── bff_endpoint.py    # SO ACSI-Client
-└── front-end/
-    └── index.html         # Web HMI
+├── launch.py                  # Main entry point
+├── README.md                  # This file
+├── docker-compose.yml
+├── config/
+│   ├── launch_config.json.example
+│   └── models/                # IED model files (model_1.py, model_2.py)
+├── scripts/
+│   ├── set_docker_user.sh     # Detect/export host UID+GID for the demo_io build
+│   └── setup_raspberry_docker.sh  # Install Docker on a fresh Raspberry Pi
+└── modules/
+    ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }
+    ├── fsp/       { pyproject.toml, docker/Dockerfile, src/fsp/, tests/ }
+    ├── so/        { pyproject.toml, docker/Dockerfile, src/so/, tests/ }
+    ├── io/        { pyproject.toml, docker/Dockerfile, io_api_server/, io_client/ }
+    └── hmi/       { package.json, docker/Dockerfile, src/ }  # Web HMI (React)
 ```
+
+`bff`, `fsp` and `so` are members of a single uv workspace rooted at the
+repository root (alongside the `ws61850` core library at `src/`) - see
+`TESTING.md` for how to install/run them. `demo_io` and `hmi` build and
+run independently (Pi hardware deps / npm toolchain respectively).
 
 ## UV 
 UV is already implemented to manage the dependencies inside the dockers. To add a dependency to the project, you can use the following command:

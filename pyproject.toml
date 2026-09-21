@@ -22,19 +22,19 @@ classifiers = [
 
 dependencies = [
     "asn1tools ==0.169.0",
-    "websockets == 16.0",
+    "websockets == 16.1",
     "bitstruct == 8.21.0",
     "certifi== 2026.1.4",
     "cffi == 2.0.0",
     "charset-normalizer == 3.4.4",
     "cryptography == 46.0.5",
-    "idna == 3.11",
+    "idna == 3.18",
     "pycparser == 2.23",
     "pyjwt == 2.10.1",
     "pyparsing == 3.2.5",
     "requests == 2.32.5",
     "urllib3 == 2.6.3",
-    "aiohttp == 3.13.3",
+    "aiohttp == 3.14.1",
     "flask >= 3.1.3"
 ]
 
@@ -81,3 +81,15 @@ target-version = ["py310", "py311", "py312"]
 
 [tool.uv]
 package = true
+
+[tool.uv.workspace]
+# io deliberately excluded - it needs Raspberry Pi hardware packages
+# (gpiozero, gpiod, Adafruit-ADS1x15, smbus2) that won't resolve/install on
+# a non-Pi dev machine, and it already builds via its own fully independent
+# Docker-stage venv (modules/io/docker/Dockerfile), never sharing
+# this workspace's env.
+members = [
+    "examples/rti-demo/modules/so",
+    "examples/rti-demo/modules/fsp",
+    "examples/rti-demo/modules/bff",
+]

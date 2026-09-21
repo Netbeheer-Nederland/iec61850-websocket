@@ -63,7 +63,7 @@ A FastAPI application that provides REST endpoints for managing the ACSI client.
 
 ==== Docker
 ----
-docker build -t rti-demo-so -f examples/rti-demo/so/Dockerfile .
+docker build -t rti-demo-so -f examples/rti-demo/modules/so/docker/Dockerfile .
 docker run --rm -p 5002:5002 rti-demo-so
 docker network create rti-network
 docker run --rm -p 5002:5002 --network rti-network --name rti-so rti-demo-so

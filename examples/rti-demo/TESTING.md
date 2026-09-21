@@ -9,14 +9,16 @@ projects with their own dependencies.
 
 | Suite | Location | Tool | Command |
 |-------|----------|------|---------|
-| Backend unit tests | `tests/unit/` | pytest (via `uv`) | `uv run pytest tests/unit -m unit -q` |
-| Backend integration tests | `tests/unit/`, `tests/integration/` | pytest (via `uv`) | requires live Docker containers - see [Integration tests](#integration-tests-docker-required) |
-| Frontend unit tests | `hmi/src/**/*.test.{js,jsx}` | vitest (via `npm`) | `npm test` (from `hmi/`) |
-| Frontend build check | `hmi/` | vite | `npx vite build` (from `hmi/`) |
+| Backend unit tests | `modules/{bff,fsp,so}/tests/` | pytest (via `uv`) | `uv run --package so pytest modules/so/tests -m unit -q` (repeat per module, or see below) |
+| Backend integration tests | `tests/integration/` | pytest (via `uv`) | requires live Docker containers - see [Integration tests](#integration-tests-docker-required) |
+| Frontend unit tests | `modules/hmi/src/**/*.test.{js,jsx}` | vitest (via `npm`) | `npm test` (from `modules/hmi/`) |
+| Frontend build check | `modules/hmi/` | vite | `npx vite build` (from `modules/hmi/`) |
 
-As of this writing, the backend unit suite has 79 passing tests and the
-frontend suite has 21. If your numbers are close to that after a clean
-checkout, you're in a good state.
+`bff`, `fsp` and `so` are each their own package under `modules/`, with
+their own `pyproject.toml` and `tests/` - part of a single uv workspace
+rooted at the repo root (see the repo root's `pyproject.toml`), alongside
+the `ws61850` core library itself. There's no more single combined
+`examples/rti-demo` Python project/venv.
 
 ## Prerequisites
 
@@ -33,137 +35,128 @@ automatically the first time you run `uv sync` or `uv run ...`.
 
 ## Backend: Python unit tests
 
-All commands in this section are run from `examples/rti-demo/` (this
-directory - the one this file lives in).
+All commands in this section are run from the **repo root** (not
+`examples/rti-demo`) - `bff`, `fsp` and `so` are workspace members of the
+single uv workspace rooted there, alongside the `ws61850` core library.
 
 ### 1. Install dependencies
 
 ```bash
-cd examples/rti-demo
-uv sync --active
+uv sync --all-packages
 ```
 
-This creates/updates `.venv` inside `examples/rti-demo` and installs
-everything listed in `pyproject.toml`, including the `pytest` /
-`pytest-asyncio` dev dependencies.
+This creates/updates one shared `.venv` at the repo root and installs
+every workspace member together - `ws61850`, `bff`, `fsp` and `so` - each
+as an editable install, so `from so.acsi_client import ...` etc. resolve
+normally with no `sys.path` hacks. (A bare `uv sync`, without
+`--all-packages`, only installs the *root* project's own dependencies -
+use `--all-packages`, or `--package <name>` for just one module, to get
+`bff`/`fsp`/`so` installed too.)
+
+`demo_IO` (Raspberry Pi GPIO/I2C hardware packages) is deliberately **not**
+part of this workspace - it builds via its own fully independent
+Docker-stage venv (`modules/demo_io/docker/Dockerfile`), since its
+dependencies (`gpiozero`, `gpiod`, `Adafruit-ADS1x15`, ...) won't
+resolve/install on a non-Pi dev machine.
 
 ### 2. Run the unit tests
 
+Each module's tests run scoped to that module (`--package <name>` tells
+uv which workspace member's environment/dependencies to use):
+
 ```bash
-uv run pytest tests/unit -m unit -q
+uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q
+uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q
+uv run --package so  pytest examples/rti-demo/modules/so/tests  -m unit -q
 ```
 
 The `-m unit` flag matters: this project defines two pytest markers,
 `unit` (fast, fully isolated - no network, no Docker) and `integration`
-(needs live Docker containers). Without `-m unit`, you'll also pick up
-integration tests that fail loudly with connection-refused errors on a
-machine with nothing running - that's expected, not a regression.
+(needs live Docker containers, and lives separately under
+`examples/rti-demo/tests/integration/` - see below).
 
-Expected output ends with something like:
+You can also `cd` into a module directory first and drop the `--package`
+flag and path prefix - uv resolves the enclosing workspace automatically:
 
+```bash
+cd examples/rti-demo/modules/so
+uv run pytest -m unit -q
 ```
-79 passed, 22 deselected in ~3s
-```
 
-The "22 deselected" are the integration tests being correctly skipped by
-the marker filter.
-
-You'll see a `warning: VIRTUAL_ENV=... does not match the project
-environment path` line from `uv` if you have a *different* project's
-virtualenv active in your shell (e.g. the repo root's). It's harmless -
-`uv` still uses the correct `examples/rti-demo/.venv` - but if it bothers
-you, `deactivate` first or run `uv run --active pytest ...` instead.
-
-You'll also see a lot of stdout noise (`serve_kwargs: ...`,
-`the scheme is: ws`) from the `so` (ACSI client) tests - those tests
-exercise the real `connect()` code path, which really does spin up a
-background WebSocket server/thread. That's expected and harmless; the
-threads are daemon threads and don't block the test run or leak into
-other tests.
+You'll see a lot of stdout noise (`serve_kwargs: ...`, `the scheme is:
+ws`) from the `so` (ACSI client) tests - those tests exercise the real
+`connect()` code path, which really does spin up a background WebSocket
+server/thread. That's expected and harmless; the threads are daemon
+threads and don't block the test run or leak into other tests.
 
 ### 3. Run one file, or one test, while iterating
 
 ```bash
 # One file
-uv run pytest tests/unit/bff/test_push_relay.py -m unit -q
+uv run --package bff pytest examples/rti-demo/modules/bff/tests/test_push_relay.py -m unit -q
 
 # One test by name (substring match)
-uv run pytest tests/unit -m unit -k readvalue -q
+uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -k readvalue -q
 
 # Full tracebacks instead of the default one-liners
-uv run pytest tests/unit -m unit -q --tb=short
+uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q --tb=short
 ```
 
 ### Where things live
 
 ```
-tests/
-├── conftest.py                    # shared setup - see "Why does this work?" below
-└── unit/
-    ├── bff/test_push_relay.py     # bff/bff_server.py's WebSocket push relay
-    ├── bff/test_bff_endpoint.py   # older, Docker-only integration tests for the BFF
-    ├── fsp/test_bff_endpoint.py   # fsp/bff_endpoint.py (the IEC 61850 "server" role)
-    └── so/test_bff_endpoint.py    # so/bff_endpoint.py (the IEC 61850 "client" role)
+examples/rti-demo/modules/
+├── bff/
+│   ├── pyproject.toml
+│   ├── src/bff/bff_server.py, ConnectionManager.py, bffClient.py, ...
+│   ├── docker/Dockerfile
+│   └── tests/test_push_relay.py, test_connection_manager_ids.py, ...
+├── fsp/
+│   ├── pyproject.toml
+│   ├── src/fsp/bff_endpoint.py, acsi_server.py, model.py
+│   ├── docker/Dockerfile
+│   └── tests/test_bff_endpoint.py
+├── so/
+│   ├── pyproject.toml
+│   ├── src/so/bff_endpoint.py, acsi_client.py
+│   ├── docker/Dockerfile
+│   └── tests/test_bff_endpoint.py, test_acsi_client.py
+└── demo_io/   # not a workspace member - see above
 ```
 
 `fsp` and `so` are each tested through a `fastapi.testclient.TestClient`
-wrapping the real FastAPI router from `fsp/bff_endpoint.py` /
-`so/bff_endpoint.py` - no mocking of the HTTP layer, just of a few
+wrapping the real FastAPI router from `fsp.bff_endpoint` /
+`so.bff_endpoint` - no mocking of the HTTP layer, just of a few
 IEC 61850-specific internals (e.g. `server.read_value`) where actually
 talking to hardware/a real server would be needed otherwise.
 
-### Why does this work? (background, not required reading)
-
-Two things make the backend unit tests possible without pulling in the
-whole rest of the monorepo:
-
-1. **`ws61850` import.** `fsp/acsi_server.py` and `so/acsi_client.py` import
-   the core `ws61850` library, which lives at the repo root's `src/`, not
-   inside `examples/rti-demo`. Rather than making `examples/rti-demo` (its
-   own separate `uv` project, with its own `pyproject.toml`/`uv.lock`)
-   depend on the root project - which turned out to need reconciling
-   several mutually-incompatible pinned versions between the two - the
-   repo root's `src/` directory is added to `sys.path` in
-   `tests/conftest.py`.
-
-2. **Module name collision.** `fsp/bff_endpoint.py` and
-   `so/bff_endpoint.py` are both literally named `bff_endpoint.py`. A plain
-   `import bff_endpoint` from each test file would cache under the same
-   `sys.modules["bff_endpoint"]` key, so whichever file's tests ran first
-   would "win" and the other file would silently get handed the wrong
-   module when the whole suite ran together. `tests/conftest.py` exposes
-   `import_module_from_path()`, which each test file uses to load its own
-   `bff_endpoint.py` under a distinct name (`fsp_bff_endpoint` /
-   `so_bff_endpoint`).
-
-You don't need to do anything for either of these - they're already wired
-up in `tests/conftest.py` and the two test files. It's here so that if you
-ever see an `AttributeError` or a test behaving as if it's calling the
-*other* service's code, you know where to look.
-
 ### Integration tests (Docker required)
 
-`tests/unit/bff/test_bff_endpoint.py` and the tests under
-`tests/integration/` talk to real, running BFF/FSP/SO instances. To run
-those:
+The tests under `examples/rti-demo/tests/integration/` (including
+`test_bff_connections.py`, formerly `tests/unit/bff/test_bff_endpoint.py`)
+talk to real, running BFF/FSP/SO instances. To run those:
 
 ```bash
 cd examples/rti-demo
-docker compose -f docker-compose.yml up -d   # or your compose file of choice
-uv run pytest tests/unit -m integration -q
+docker compose up -d
+uv run pytest tests/integration -m integration -q
 ```
 
-If you don't have Docker running, skip this section entirely - `-m unit`
-(above) never touches it.
+(That last command still works run from `examples/rti-demo/` even though
+it has no `pyproject.toml` of its own anymore - uv resolves the enclosing
+workspace at the repo root automatically.)
+
+If you don't have Docker running, skip this section entirely - the unit
+test commands above never touch it.
 
 ## Frontend: HMI unit tests
 
-All commands in this section are run from `examples/rti-demo/hmi/`.
+All commands in this section are run from `examples/rti-demo/modules/hmi/`.
 
 ### 1. Install dependencies
 
 ```bash
-cd examples/rti-demo/hmi
+cd examples/rti-demo/modules/hmi
 npm ci
 ```
 
@@ -200,7 +193,7 @@ npm run test:watch
 ### Where things live
 
 ```
-hmi/src/
+modules/hmi/src/
 ├── services/liveSocket.js         # the WebSocket push client
 ├── services/liveSocket.test.js
 ├── components/MessageMonitor.jsx  # push/fallback-polling live-message viewer
@@ -230,10 +223,12 @@ rm -rf dist
 ## Running everything in one go
 
 ```bash
-# From examples/rti-demo/
-(cd . && uv run pytest tests/unit -m unit -q) \
-  && (cd hmi && npm test) \
-  && (cd hmi && npx vite build && rm -rf dist)
+# From the repo root
+(uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q) \
+  && (uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q) \
+  && (uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q) \
+  && (cd examples/rti-demo/modules/hmi && npm test) \
+  && (cd examples/rti-demo/modules/hmi && npx vite build && rm -rf dist)
 ```
 
 If all three steps print a passing summary with no errors, the codebase is

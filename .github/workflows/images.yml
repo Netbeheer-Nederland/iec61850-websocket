@@ -39,17 +39,16 @@ jobs:
               - '.github/workflows/images.yml'
             rti: &rti
               - *lib
-              - 'examples/rti-demo/pyproject.toml'
-              - 'examples/rti-demo/uv.lock'
-              - 'examples/rti-demo/demo_IO/**'
-              - 'examples/rti-demo/Dockerfile.service'
-            so:          [ *rti, 'examples/rti-demo/so/**' ]
-            fsp:         [ *rti, 'examples/rti-demo/fsp/**' ]
-            acsi_client: [ *rti, 'examples/rti-demo/acsi_ws_client/**' ]
-            acsi_server: [ *rti, 'examples/rti-demo/acsi_ws_server/**' ]
-            bff:         [ 'examples/rti-demo/bff/**', 'examples/rti-demo/pyproject.toml', 'examples/rti-demo/uv.lock', 'examples/rti-demo/Dockerfile.bff' ]
-            io:          [ 'examples/rti-demo/demo_IO/**', 'examples/rti-demo/Dockerfile.IO' ]
-            hmi:         [ 'examples/rti-demo/hmi/**' ]
+              # bff/fsp/so are now workspace members - the shared root
+              # pyproject.toml/uv.lock is what actually pins their deps
+              # (examples/rti-demo no longer has its own).
+            so:          [ *rti, 'examples/rti-demo/modules/so/**',  'examples/rti-demo/modules/so/pyproject.toml' ]
+            fsp:         [ *rti, 'examples/rti-demo/modules/fsp/**', 'examples/rti-demo/modules/fsp/pyproject.toml' ]
+            acsi_client: [ *rti, 'examples/rti-demo/acsi_ws_client/**', 'examples/rti-demo/Dockerfile.acsi-ws-client' ]
+            acsi_server: [ *rti, 'examples/rti-demo/acsi_ws_server/**', 'examples/rti-demo/Dockerfile.acsi-ws-server' ]
+            bff:         [ 'examples/rti-demo/modules/bff/**', 'pyproject.toml', 'uv.lock' ]
+            io:          [ 'examples/rti-demo/modules/io/**' ]
+            hmi:         [ 'examples/rti-demo/modules/hmi/**' ]
 
       - id: set
         env:
@@ -78,17 +77,13 @@ jobs:
       - id: img
         run: |
           case "${{ matrix.image }}" in
-            so)          c=. ; f=examples/rti-demo/Dockerfile.service ; n=ws61850-so ;
-                         a="SERVICE_DIR=so|SERVICE_MODULE=so/bff_endpoint.py|APP_PORT=5002" ;;
-            fsp)         c=. ; f=examples/rti-demo/Dockerfile.service ; n=ws61850-fsp ;
-                         a="SERVICE_DIR=fsp|SERVICE_MODULE=fsp/bff_endpoint.py|APP_PORT=5001" ;;
-            acsi_client) c=. ; f=examples/rti-demo/Dockerfile.service ; n=ws61850-acsi-ws-client ;
-                         a="SERVICE_DIR=acsi_ws_client|SERVICE_MODULE=acsi_ws_client/bff_endpoint.py|APP_PORT=5003" ;;
-            acsi_server) c=. ; f=examples/rti-demo/Dockerfile.service ; n=ws61850-acsi-ws-server ;
-                         a="SERVICE_DIR=acsi_ws_server|SERVICE_MODULE=acsi_ws_server/bff_endpoint.py|APP_PORT=5004" ;;
-            bff)         c=examples/rti-demo ; f=examples/rti-demo/Dockerfile.bff ; n=rti-demo-bff ;;
-            io)          c=examples/rti-demo ; f=examples/rti-demo/Dockerfile.IO  ; n=rti-demo-io ; p=linux/amd64,linux/arm64 ;;
-            hmi)         c=examples/rti-demo/hmi ; f=examples/rti-demo/hmi/Dockerfile ; n=rti-demo-hmi ;;
+            so)          c=. ; f=examples/rti-demo/modules/so/docker/Dockerfile  ; n=ws61850-so ;;
+            fsp)         c=. ; f=examples/rti-demo/modules/fsp/docker/Dockerfile ; n=ws61850-fsp ;;
+            acsi_client) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-client ; n=ws61850-acsi-ws-client ;;
+            acsi_server) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-server ; n=ws61850-acsi-ws-server ;;
+            bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=rti-demo-bff ;;
+            io)          c=examples/rti-demo/modules/io ; f=docker/Dockerfile ; n=rti-demo-io ; p=linux/amd64,linux/arm64 ;;
+            hmi)         c=examples/rti-demo/modules/hmi ; f=docker/Dockerfile ; n=rti-demo-hmi ;;
           esac
           {
             echo "ctx=$c"

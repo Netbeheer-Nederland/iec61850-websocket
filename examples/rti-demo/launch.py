@@ -107,7 +107,7 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
         name="BFF Server",
         service_type=ServiceType.BFF,
         module="bff.bff_server",
-        entry_point="bff/bff_server.py",
+        entry_point="modules/bff/src/bff/bff_server.py",
         default_port=5000,
         description="Backend for Frontend - REST API gateway",
         env_vars={"RTI_DOCKER_ENABLED": "true", "PORT": "5000"},
@@ -124,7 +124,7 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
         name="FSP ACSI-Server_WebsocketActive",
         service_type=ServiceType.FSP,
         module="fsp.bff_endpoint",
-        entry_point="fsp/bff_endpoint.py",
+        entry_point="modules/fsp/src/fsp/bff_endpoint.py",
         default_port=5001,
         description="RTI-FSP",
         env_vars={"PORT": "5001", "CP": "cp1"},
@@ -141,7 +141,7 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
         name="FSP2 ACSI-Server_WebsocketActive",
         service_type=ServiceType.FSP2,
         module="fsp.bff_endpoint",
-        entry_point="fsp/bff_endpoint.py",
+        entry_point="modules/fsp/src/fsp/bff_endpoint.py",
         default_port=5005,
         description="RTI-FSP (second instance)",
         env_vars={"PORT": "5005","CP": "cp2"},
@@ -158,7 +158,7 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
         name="SO ACSI-Client_WebsocketPassive",
         service_type=ServiceType.SO,
         module="so.bff_endpoint",
-        entry_point="so/bff_endpoint.py",
+        entry_point="modules/so/src/so/bff_endpoint.py",
         default_port=5002,
         description="RTI-SO",
         env_vars={"PORT": "5002"},
@@ -174,17 +174,17 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
     ServiceType.IO: ServiceConfig(
         name="IO Device Control API",
         service_type=ServiceType.IO,
-        module="demo_IO.io_api_server.main",
-        entry_point="demo_IO/io_api_server/main.py",
+        module="io.io_api_server.main",
+        entry_point="modules/io/io_api_server/main.py",
         default_port=8000,
         description="IO Device Control API - REST API for Raspberry Pi IO devices",
         env_vars={"PORT": "8000"},
         docker_image="rti-demo-io",
         health_check_path="/api/io/health",
         labels={
-            "rti.service": "demo_io",
+            "rti.service": "rti-io",
             "rti.type": "IO-Device-Control",
-            "rti.host": "demo_io",
+            "rti.host": "rti-io",
             "rti.port": "8000"
         }
     ),
@@ -258,7 +258,7 @@ class RTILauncher:
         parser.add_argument(
             '--config',
             type=str,
-            default='launch_config.json',
+            default='config/launch_config.json',
             help='Configuration file for custom service settings'
         )
         
@@ -709,7 +709,7 @@ class RTILauncher:
             logger.error(f"Invalid JSON in config file: {e}")
             return {}
     
-    def save_config(self, config: Dict, config_path: str = "launch_config.json") -> bool:
+    def save_config(self, config: Dict, config_path: str = "config/launch_config.json") -> bool:
         """Save configuration to JSON file.
         
         Args:
