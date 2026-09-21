@@ -79,7 +79,9 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const monitorIntervalRef = useRef(null);
   const statusIntervalRef = useRef(null);
 
-  const fspInstances = useMemo(
+  // Candidate RTI-SO instances this FSP can dial *into* as a WS client -
+  // not FSP instances (this page manages exactly one FSP, itself).
+  const soTargetInstances = useMemo(
     () => connections.filter(c => c.type === 'RTI-SO'),
     [connections]
   );
@@ -92,9 +94,9 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   // the dropdown's value actually is (a real instance name, or "custom")
   // is the selection. Not endpoint?.name: `endpoint` is this RTI-FSP's own
   // connection record, not a target RTI-SO instance, so its name never
-  // matches one in fspInstances - seeding it here just meant every arrival
+  // matches one in soTargetInstances - seeding it here just meant every arrival
   // via a navigation link silently fell through to "custom" (see the sync
-  // effect's "not found in fspInstances" branch) instead of honoring the
+  // effect's "not found in soTargetInstances" branch) instead of honoring the
   // persisted preference or blank default like a direct visit would.
   const [selectedInstanceName, setSelectedInstanceName] = useState(() =>
     localStorage.getItem(selectedInstanceStorageKey) || ''
@@ -152,7 +154,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       setMode('active');
       return;
     }
-    const inst = fspInstances.find(c => c.name === value);
+    const inst = soTargetInstances.find(c => c.name === value);
     if (inst) {
       setHost(inst.host || '');
       // Was missing: without this, port kept whatever was previously set
@@ -175,7 +177,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       // selected, not stay blank.
       setMode('active');
     }
-  }, [fspInstances]);
+  }, [soTargetInstances]);
 
   const handleExpandToggle = useCallback((ref, expanded) => {
     setExpandedNodes(prev => ({
@@ -237,9 +239,17 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     return oauthConfig.idp_server || ep?.idp_server || '';
   }, []);
 
-  const endpointTarget = useMemo(() =>
-    buildTargetValue(endpoint?.host || host, endpoint?.port || port),
-    [endpoint, host, port]
+  // This FSP's own BFF address (e.g. "rti-fsp01:5001") - every status/
+  // start/stop/model call is routed here. Deliberately no fallback to
+  // host/port: those are the *target SO's* WS Host/Port form fields, an
+  // entirely different address (see handleStartServer's request body) -
+  // falling back to them here used to silently misdirect every API call
+  // whenever `endpoint` was missing (a direct visit or refresh of this
+  // page loses React Router's in-memory location.state.endpoint), instead
+  // of failing visibly like ACSIClient.jsx's identical `apiTarget` does.
+  const endpointTarget = useMemo(
+    () => (endpoint ? buildTargetValue(endpoint.host, endpoint.port) : null),
+    [endpoint]
   );
 
   const stopMonitoring = useCallback(() => {
@@ -359,7 +369,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         }
 
         let inst = selectedInstanceName
-          ? fspInstances.find(c => c.name === selectedInstanceName)
+          ? soTargetInstances.find(c => c.name === selectedInstanceName)
           : null;
 
         if (selectedInstanceName && !inst) {
@@ -384,7 +394,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     };
 
     syncInitialConfig();
-  }, [connected, fspInstances, selectedInstanceName, connectionsLoaded, endpointTarget, executeApiCall, parsePythonDictString, host, port, mode]);
+  }, [connected, soTargetInstances, selectedInstanceName, connectionsLoaded, endpointTarget, executeApiCall, parsePythonDictString, host, port, mode]);
 
   const handleStartServer = useCallback(async () => {
     if (!endpointTarget) { setError('No endpoint configured'); return; }
@@ -737,6 +747,16 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </div>
       </div>
 
+      {!endpoint && (
+        <div className="alert alert-error" style={{ marginBottom: '16px', padding: '12px', background: 'var(--danger-bg)', color: 'var(--danger-color)', borderRadius: '4px' }}>
+          <i className="fas fa-exclamation-triangle" style={{ marginRight: '8px' }}></i>
+          No FSP instance selected. This page needs to know which RTI-FSP
+          it's managing - open it from a Setup, Model, or Traffic page by
+          clicking that FSP's icon, rather than visiting this URL directly
+          or after a page refresh.
+        </div>
+      )}
+
       <div className="acsi-connection-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
           <div className="form-group">
@@ -745,11 +765,11 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
               id="acsi-server-instance-select"
               value={selectedInstanceName}
               onChange={handleInstanceSelect}
-              disabled={loading || connected}
-              title={connected ? 'Stop the server before switching instances' : undefined}
+              disabled={!endpoint || loading || connected}
+              title={!endpoint ? 'No FSP instance selected' : connected ? 'Stop the server before switching instances' : undefined}
             >
               <option value="" disabled>Select instance...</option>
-              {fspInstances.map(inst => {
+              {soTargetInstances.map(inst => {
                 // Without a ws_port this instance has nowhere for the FSP to
                 // dial into - selecting it is a dead end (WS Port stays
                 // blank, Start Server just fails later) - disable it here
@@ -791,7 +811,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
               placeholder="0.0.0.0"
               onChange={(e) => setHost(e.target.value)}
               readOnly={!isEditableInstance}
-              disabled={loading}
+              disabled={loading || !endpoint}
             />
           </div>
           <div className="form-group">
@@ -803,7 +823,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
               placeholder="8765"
               onChange={(e) => setPort(e.target.value)}
               readOnly={!isEditableInstance}
-              disabled={loading}
+              disabled={loading || !endpoint}
             />
           </div>
           <div className="form-group">
@@ -813,7 +833,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
                 id="acsi-server-ws-mode"
                 value={mode}
                 onChange={(e) => setMode(e.target.value)}
-                disabled={loading}
+                disabled={loading || !endpoint}
               >
                 {!mode && <option value="" disabled>Select instance...</option>}
                 <option value="active">Active</option>
@@ -837,7 +857,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
 
       {/* Security Configuration Buttons */}
       <div style={{ display: 'flex', gap: '16px', marginLeft: 'auto', marginBottom: '24px' }}>
-        <button id="acsi-start-btn" className={connected ? 'btn-secondary' : 'btn-primary'} onClick={handleStartServer} disabled={loading || connected}>
+        <button id="acsi-start-btn" className={connected ? 'btn-secondary' : 'btn-primary'} onClick={handleStartServer} disabled={loading || connected || !endpoint}>
             {loading ? 'Starting...' : 'Connect'}
           </button>
           <button id="acsi-stop-btn" className={connected ? 'btn-primary' : 'btn-secondary'} onClick={handleStopServer} disabled={loading || !connected}>

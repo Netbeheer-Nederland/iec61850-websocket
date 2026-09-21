@@ -13,7 +13,12 @@ vi.mock('../services/apiService', async (importOriginal) => {
   };
 });
 
-const renderPage = (fspEndpoint = null) =>
+// What every real navigation into this page actually passes as `endpoint`
+// (via InstanceVisualization/Model's FSP card click): the clicked RTI-FSP's
+// own connection record - its own host/BFF port, never a target RTI-SO.
+const DEFAULT_ENDPOINT = { name: 'FSP01', host: 'rti-fsp01', port: 5001, type: 'RTI-FSP', cp: 'cp1' };
+
+const renderPage = (fspEndpoint = DEFAULT_ENDPOINT) =>
   render(
     <MemoryRouter
       initialEntries={[
@@ -53,15 +58,45 @@ beforeEach(() => {
   ]);
 });
 
+describe('ACSIServer without a navigated-in endpoint (direct visit / refresh)', () => {
+  // React Router's location.state.endpoint only exists when arriving via an
+  // in-app click (InstanceVisualization/Model) - it does not survive a
+  // direct URL visit or a page refresh, so `endpoint` is null here. This
+  // used to silently fall back to using the WS Host/Port fields (the
+  // target SO's address) as the API call target instead of failing
+  // visibly - see endpointTarget's useMemo in ACSIServer.jsx.
+  it('shows a clear warning and disables the connection controls instead of silently using the wrong target', async () => {
+    renderPage(null);
+
+    await waitFor(() => {
+      expect(screen.getByText(/No FSP instance selected/i)).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText('Instance')).toBeDisabled();
+    expect(screen.getByLabelText('WS Host')).toBeDisabled();
+    expect(screen.getByLabelText('WS Port')).toBeDisabled();
+    expect(screen.getByLabelText('WS Mode')).toBeDisabled();
+    expect(document.getElementById('acsi-start-btn')).toBeDisabled();
+  });
+
+  it('never calls the status API without a real endpoint', async () => {
+    renderPage(null);
+
+    await waitFor(() => {
+      expect(screen.getByText(/No FSP instance selected/i)).toBeInTheDocument();
+    });
+    expect(executeApiCall).not.toHaveBeenCalled();
+  });
+});
+
 describe('ACSIServer instance selection - fresh/no prior selection', () => {
   it('stays on "Select instance..." with editable localhost/8765/active when nothing is selected or persisted', async () => {
     renderPage();
 
     await waitFor(() => {
-      // fspInstances is populated once connections load, so the dropdown
-      // having its options is a proxy for "the fetch that would have
-      // driven an auto-select has already happened" - it still shouldn't
-      // pick one of them.
+      // soTargetInstances is populated once connections load, so the
+      // dropdown having its options is a proxy for "the fetch that would
+      // have driven an auto-select has already happened" - it still
+      // shouldn't pick one of them.
       expect(screen.getByRole('option', { name: /^so1/ })).toBeInTheDocument();
     });
     // "" is the disabled "Select instance..." placeholder option's value -
@@ -83,9 +118,7 @@ describe('ACSIServer instance selection - fresh/no prior selection', () => {
   });
 
   it('restores a previously-selected instance on remount instead of the defaults', async () => {
-    // storageKey falls back to a constant "rti-so:8765" when there's no
-    // navigation-state endpoint (see ACSIServer.jsx's instanceId).
-    localStorage.setItem('acsi-server-selected-instance-rti-so:8765', 'so1');
+    localStorage.setItem('acsi-server-selected-instance-FSP01', 'so1');
     renderPage();
 
     await waitFor(() => {
@@ -102,14 +135,14 @@ describe('ACSIServer instance selection - fresh/no prior selection', () => {
     // Model's FSP card click) passes the clicked RTI-FSP's *own*
     // connection record as `endpoint` - its own host/BFF port, e.g.
     // rti-fsp01:5001 - never a target RTI-SO to dial into.
-    renderPage({ name: 'FSP01', host: 'rti-fsp01', port: 5001, type: 'RTI-FSP', cp: 'cp1' });
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByRole('option', { name: /^so1/ })).toBeInTheDocument();
     });
     // Falls through to the same blank-with-defaults state a direct visit
     // gets - not "rti-fsp01"/"5001" (this FSP's own address) and not
-    // "custom" (which endpoint.name failing to match any fspInstances
+    // "custom" (which endpoint.name failing to match any soTargetInstances
     // used to force it into).
     expect(screen.getByLabelText('Instance')).toHaveValue('');
     await waitFor(() => {
@@ -163,7 +196,7 @@ describe('ACSIServer instance selection - ws_port vs BFF port', () => {
     mockConnections([
       { name: 'so2', host: '10.0.0.2', port: 5003, type: 'RTI-SO', status: 'connected' },
     ]);
-    localStorage.setItem('acsi-server-selected-instance-rti-so:8765', 'so2');
+    localStorage.setItem('acsi-server-selected-instance-FSP01', 'so2');
     renderPage();
 
     await waitFor(() => {
@@ -226,9 +259,7 @@ describe('ACSIServer instance dropdown - usability', () => {
   });
 
   it('disables the whole Instance dropdown while the server is connected, with an explanatory hint', async () => {
-    // storageKey falls back to a constant "rti-so:8765" when there's no
-    // navigation-state endpoint (see ACSIServer.jsx's instanceId).
-    localStorage.setItem('acsi-server-connected-rti-so:8765', 'true');
+    localStorage.setItem('acsi-server-connected-FSP01', 'true');
     renderPage();
 
     await waitFor(() => {
