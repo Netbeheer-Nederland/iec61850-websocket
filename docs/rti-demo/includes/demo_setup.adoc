@@ -226,7 +226,7 @@ SO Potentiometer 1 (Oper Float)
 . **Docker Desktop** (Windows) or **Docker Engine** (Linux/RPi) on all devices
 . **Dockerfiles** exist:
    - `Dockerfile.bff` (in rti-demo/)
-   - `hmi/Dockerfile` (in rti-demo/hmi/)
+   - `hmi/Dockerfile` (in rti-demo/modules/hmi/)
    - `Dockerfile.IO` (in rti-demo/)
    - `examples/rti-demo/Dockerfile.rti-fsp`
    - `examples/rti-demo/Dockerfile.rti-so`

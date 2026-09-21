@@ -38,7 +38,7 @@ services:
   # HMI Web Server
   rti-hmi:
     build:
-      context: hmi
+      context: modules/hmi
       dockerfile: Dockerfile
     container_name: rti-hmi
     ports:

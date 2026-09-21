@@ -11,8 +11,8 @@ projects with their own dependencies.
 |-------|----------|------|---------|
 | Backend unit tests | `modules/{bff,fsp,so}/tests/` | pytest (via `uv`) | `uv run --package so pytest modules/so/tests -m unit -q` (repeat per module, or see below) |
 | Backend integration tests | `tests/integration/` | pytest (via `uv`) | requires live Docker containers - see [Integration tests](#integration-tests-docker-required) |
-| Frontend unit tests | `hmi/src/**/*.test.{js,jsx}` | vitest (via `npm`) | `npm test` (from `hmi/`) |
-| Frontend build check | `hmi/` | vite | `npx vite build` (from `hmi/`) |
+| Frontend unit tests | `modules/hmi/src/**/*.test.{js,jsx}` | vitest (via `npm`) | `npm test` (from `modules/hmi/`) |
+| Frontend build check | `modules/hmi/` | vite | `npx vite build` (from `modules/hmi/`) |
 
 `bff`, `fsp` and `so` are each their own package under `modules/`, with
 their own `pyproject.toml` and `tests/` - part of a single uv workspace
@@ -151,12 +151,12 @@ test commands above never touch it.
 
 ## Frontend: HMI unit tests
 
-All commands in this section are run from `examples/rti-demo/hmi/`.
+All commands in this section are run from `examples/rti-demo/modules/hmi/`.
 
 ### 1. Install dependencies
 
 ```bash
-cd examples/rti-demo/hmi
+cd examples/rti-demo/modules/hmi
 npm ci
 ```
 
@@ -193,7 +193,7 @@ npm run test:watch
 ### Where things live
 
 ```
-hmi/src/
+modules/hmi/src/
 ├── services/liveSocket.js         # the WebSocket push client
 ├── services/liveSocket.test.js
 ├── components/MessageMonitor.jsx  # push/fallback-polling live-message viewer
@@ -227,8 +227,8 @@ rm -rf dist
 (uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q) \
   && (uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q) \
   && (uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q) \
-  && (cd examples/rti-demo/hmi && npm test) \
-  && (cd examples/rti-demo/hmi && npx vite build && rm -rf dist)
+  && (cd examples/rti-demo/modules/hmi && npm test) \
+  && (cd examples/rti-demo/modules/hmi && npx vite build && rm -rf dist)
 ```
 
 If all three steps print a passing summary with no errors, the codebase is

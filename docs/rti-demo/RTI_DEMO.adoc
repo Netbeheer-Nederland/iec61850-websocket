@@ -315,7 +315,7 @@ This document was compiled from the following README files:
 - `examples/rti-demo/fsp/README.md` - (FSP implementation)
 - `examples/rti-demo/so/README.md` - (SO implementation)
 - `examples/rti-demo/bff/README.md` - (BFF implementation)
-- `examples/rti-demo/hmi/README.md` - (HMI implementation)
+- `examples/rti-demo/modules/hmi/README.md` - (HMI implementation)
 - `examples/rti-demo/demo_IO/README.md` - (IO control)
 - `examples/rti-demo/demo_setup/README.md` - (Deployment)
 

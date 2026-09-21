@@ -261,7 +261,7 @@ npm run preview
 
 === Installation
 ----
-cd path/to/rti-demo/hmi
+cd path/to/rti-demo/modules/hmi
 npm install
 npm run dev
 npm run build

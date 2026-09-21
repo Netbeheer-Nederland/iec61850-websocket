@@ -176,15 +176,36 @@ the per-module READMEs' prose wasn't fully audited. Low priority - low
 risk of anyone being misled by it in practice, since it's usage
 documentation, not anything executable.
 
-## Step 5 - `hmi`
+## Step 5 - `hmi` - DONE
 
-- Already fits the target shape. Only decide: move it under `modules/hmi`
-  for consistency, or leave it where it is since it's not part of the uv
-  workspace at all (different toolchain - npm, not uv) and gains nothing
-  from the move besides a tidier top-level listing.
-- If moved: update `docker-compose.yml`'s `context: hmi` → `context: modules/hmi`.
-- **Verify**: `docker compose build rti-hmi`, `npx vitest run` still passes
-  from its new path.
+Moved to `modules/hmi` for consistency with the other four. Updated:
+`docker-compose.yml` (`context: hmi` → `context: modules/hmi`),
+`TESTING.md`'s frontend section, three `.adoc` doc files
+(`RTI_DEMO.adoc`, `includes/demo_setup.adoc`, `includes/hmi.adoc`), and
+`.github/workflows/images.yml` (its path filters and the build-context
+case statement for `so`/`fsp`/`bff`/`io`/`hmi` were all still pointing at
+pre-Step-1-4 paths - that workflow's actual `docker/build-push-action`
+step is commented out/dormant, so this wasn't breaking CI today, but was
+already fully stale and would have failed the moment someone re-enabled
+it). Left the workflow's `acsi_client`/`acsi_server` matrix entries
+alone - they reference `examples/rti-demo/acsi_ws_client`/`acsi_ws_server`,
+which don't exist anywhere in the repo and were already dead before this
+migration touched anything.
+
+Also caught and fixed a real regression risk in `.dockerignore`: it had a
+stale `examples/rti-demo/bff/connections.json` exclusion rule that
+pointed nowhere (the file had already moved), so it was a silent no-op -
+updating the path to the new, correct location would have started
+actually excluding bff's seed `connections.json` from the build context,
+breaking the fallback-connections behavior confirmed working in the
+Steps 1-4 Docker smoke test. Removed the exclusion entirely instead, with
+a comment explaining why it's deliberately shipped in the image.
+
+**Verified**: `docker compose config --quiet` (compose file still valid),
+`docker compose build rti-hmi` from the new location, `npx vitest run`
+(59 passed) + `npx vite build` from `modules/hmi/`, and a rebuild +
+smoke test of `bff` confirming its seed `connections.json` (3 targets)
+still ships after the `.dockerignore` fix.
 
 ## Step 6 - `config/`
 
