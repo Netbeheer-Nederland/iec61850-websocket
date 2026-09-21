@@ -1,10 +1,65 @@
 services:
+  # RTI Acsi-Client Server
+#  rti-client:
+#    build:
+#      context: ../../..
+#      dockerfile: demo/src/iec61850/client/Dockerfile.acsi-ws-server.acsi-ws-client.rti-so.frontend.rti-fsp.bff
+#    container_name: rti-demo-client
+#    ports:
+#      - "9000:5000"
+#    environment:
+#      - FLASK_ENV=development
+#      - FLASK_APP=app.py
+#      - PYTHONUNBUFFERED=1
+#    volumes:
+#      - ../iec61850:/app/iec61850
+#    networks:
+#      - rti-network
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:5000/api/status"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 20s
+#    labels:
+#      - "rti.service=rti-client"
+#      - "rti.type=RTI-SO"
+#      - "rti.host=rti-client"
+#      - "rti.port=5000"
+
+  # RTI Acsi-Server
+#  rti-server:
+#    build:
+#      context: ../../..
+#      dockerfile: demo/src/iec61850/server/Dockerfile.acsi-ws-server.acsi-ws-client.rti-so.frontend.rti-fsp.bff
+#    container_name: rti-demo-server
+#    ports:
+#      - "9001:5001"
+#    environment:
+#      - PORT=5001
+#      - PYTHONUNBUFFERED=1
+#    volumes:
+#      - ../iec61850:/app/demo/src/iec61850
+#    networks:
+#      - rti-network
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:5001/api/iec61850server/status"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 20s
+#    labels:
+#      - "rti.service=rti-server"
+#      - "rti.type=RTI-SO"
+#      - "rti.host=rti-server"
+#      - "rti.port=5001"
+
   # BFF Server
-  rti-bff:
+  bff-server:
     build:
       context: .
       dockerfile: Dockerfile.bff
-    container_name: rti-bff
+    container_name: bff-server
     ports:
       - "5000:5000"
     environment:
@@ -30,9 +85,9 @@ services:
       retries: 5
       start_period: 30s
     labels:
-      - "rti.service=rti-bff"
+      - "rti.service=bff-server"
       - "rti.type=RTI-BFF"
-      - "rti.host=rti-bff"
+      - "rti.host=bff-server"
       - "rti.port=5000"
 
   # HMI Web Server
@@ -44,7 +99,7 @@ services:
     ports:
       - "3001:80"
     depends_on:
-      rti-bff:
+      bff-server:
         condition: service_healthy
     networks:
       - rti-network
@@ -56,19 +111,22 @@ services:
       start_period: 10s
 
   # RTI-FSP (Acsi-Server)
-  rti-fsp01:
-    user: root
+  rti-fsp:
     build:
       context: ../..
-      dockerfile: examples/rti-demo/Dockerfile.rti-fsp
-    container_name: rti-fsp01
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: fsp
+        SERVICE_MODULE: fsp/bff_endpoint.py
+        APP_PORT: "5001"
+    container_name: rti-fsp
     ports:
       - "5001:5001"
     environment:
       - PORT=5001
       - PYTHONUNBUFFERED=1
       - CP=cp1
-      - MODELPATH=/models/model_1.py
+      - MODELPATH=/models/model.py
       - DEMO_IO_URL=http://demo_io:8000
     networks:
       - rti-network
@@ -89,13 +147,15 @@ services:
         - ./demo_IO:/app/demo_IO
 
   # Second FSP instance
-  rti-fsp02:
-    user:
-      root
+  rti-fsp-2:
     build:
       context: ../..
-      dockerfile: examples/rti-demo/Dockerfile.rti-fsp
-    container_name: rti-fsp02
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: fsp
+        SERVICE_MODULE: fsp/bff_endpoint.py
+        APP_PORT: "5001"
+    container_name: rti-fsp-2
     ports:
       - "5005:5005"  # Map to different host port, same container port
     networks:
@@ -123,11 +183,13 @@ services:
 
   # RTI SO (Acsi-Client)
   rti-so:
-    user:
-      root
     build:
       context: ../..
-      dockerfile: examples/rti-demo/Dockerfile.rti-so
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: so
+        SERVICE_MODULE: so/bff_endpoint.py
+        APP_PORT: "5002"
     container_name: rti-so
     ports:
       - "5002:5002"
@@ -135,7 +197,7 @@ services:
     environment:
       - PORT=5002
       - PYTHONUNBUFFERED=1
-#      - DEMO_IO_URL=http://demo_io:8000
+      - DEMO_IO_URL=http://demo_io:8000
     networks:
       - rti-network
     healthcheck:
@@ -152,6 +214,68 @@ services:
     volumes:
         - ./so:/app/so
         - ./demo_IO:/app/demo_IO
+  # RTI WS Client (Acsi-Client)
+  active-ws-acsi-client:
+    build:
+      context: ../..
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: acsi_ws_client
+        SERVICE_MODULE: acsi_ws_client/bff_endpoint.py
+        APP_PORT: "5003"
+    container_name: active-ws-acsi-client
+    ports:
+      - "5003:5003"
+      - "8766:8765"    # WebSocket port - MUST ADD
+    environment:
+      - PORT=5003
+      - PYTHONUNBUFFERED=1
+    networks:
+      - rti-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5003/api/status" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "rti.service=active-ws-acsi-client"
+      - "rti.type=active-ws-acsi-client"
+      - "rti.host=active-ws-acsi-client"
+      - "rti.port=5003"
+    volumes:
+      - ./acsi_ws_client:/app/acsi_ws_client
+
+  # RTI WS Server (Acsi-Server)
+  passive-ws-acsi-server:
+    build:
+      context: ../..
+      dockerfile: examples/rti-demo/Dockerfile.service
+      args:
+        SERVICE_DIR: acsi_ws_server
+        SERVICE_MODULE: acsi_ws_server/bff_endpoint.py
+        APP_PORT: "5004"
+    container_name: passive-ws-acsi-server
+    ports:
+      - "5004:5004"
+    environment:
+      - PORT=5004
+      - PYTHONUNBUFFERED=1
+    networks:
+      - rti-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5004/api/status" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "rti.service=passive-ws-acsi-server"
+      - "rti.type=passive-ws-acsi-server"
+      - "rti.host=passive-ws-acsi-server"
+      - "rti.port=5004"
+    volumes:
+      - ./acsi_ws_server:/app/acsi_ws_server
 
   # GPIO LED Control API (demo_IO)
   rti-io:
