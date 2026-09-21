@@ -27,15 +27,16 @@ HMI (React) -> HTTP REST -> BFF (FastAPI) -> HTTP/REST -> RTI-FSP (ACSI-Server)
 === Folder Structure
 
 ----
-bff/
-+-- __pycache__/              # Python cache files (generated)
-+-- bff_server.py            # Main FastAPI application
-+-- ConnectionManager.py      # Manages connections to RTI endpoints
-+-- DataManager.py           # Data read/write operations
-+-- bffClient.py             # HTTP client for BFF-to-backend communication
-+-- pydantic_models.py       # Request/Response data models
-+-- connections.json         # Persistent connection configurations
-+-- Dockerfile.bff           # Multi-stage Docker Build
+modules/bff/
++-- pyproject.toml
++-- docker/Dockerfile          # Multi-stage Docker build
++-- src/bff/
+|   +-- bff_server.py          # Main FastAPI application
+|   +-- ConnectionManager.py   # Manages connections to RTI endpoints
+|   +-- bffClient.py           # HTTP client for BFF-to-backend communication
+|   +-- pydantic_models.py     # Request/Response data models
+|   +-- connections.json       # Seed/default connection configurations
++-- tests/
 +-- README.md
 ----
 
@@ -185,19 +186,19 @@ Example SO:
 }
 ----
 
-==== Dockerfile.bff
-Multi-stage Docker build with:
+==== modules/bff/docker/Dockerfile
+Multi-stage Docker build (context: repo root) with:
 * Builder stage using uv for dependency management
 * Runtime stage with minimal image
 * Health check configuration
 
 === Docker Integration
 The BFF service in docker-compose.yml:
-* Container: bff-server
+* Container: rti-bff
 * Port: 5000:5000
 * Network: rti-network
 * Volumes: connections.json persistence, Docker socket for discovery
-* Depends on: Healthy bff-server for HMI
+* Depends on: Healthy rti-bff for HMI
 
 All services communicate through rti-network Docker network.
 
@@ -206,13 +207,14 @@ All services communicate through rti-network Docker network.
 ==== Starting the BFF Server
 With Docker:
 ----
-docker-compose up bff-server
+docker compose up rti-bff
 ----
 
-Without Docker:
+Without Docker (from repository root - `bff` is a member of the shared
+uv workspace):
 ----
-python -m pip install fastapi uvicorn httpx requests
-python bff_server.py
+uv sync --all-packages
+uv run --package bff python -m bff.bff_server
 ----
 
 ==== Health Check

@@ -225,11 +225,11 @@ SO Potentiometer 1 (Oper Float)
 === Prerequisites
 . **Docker Desktop** (Windows) or **Docker Engine** (Linux/RPi) on all devices
 . **Dockerfiles** exist:
-   - `Dockerfile.bff` (in rti-demo/)
-   - `hmi/Dockerfile` (in rti-demo/modules/hmi/)
-   - `Dockerfile.IO` (in rti-demo/)
-   - `examples/rti-demo/Dockerfile.rti-fsp`
-   - `examples/rti-demo/Dockerfile.rti-so`
+   - `examples/rti-demo/modules/bff/docker/Dockerfile`
+   - `examples/rti-demo/modules/hmi/Dockerfile`
+   - `examples/rti-demo/modules/demo_io/docker/Dockerfile`
+   - `examples/rti-demo/modules/fsp/docker/Dockerfile`
+   - `examples/rti-demo/modules/so/docker/Dockerfile`
 . All devices on same LAN network
 . **Firewall** allows traffic on ports: 5000, 5001, 5002, 8000, 8080, 8765
 
@@ -239,7 +239,7 @@ SO Potentiometer 1 (Oper Float)
 |===
 |Issue |Solution
 |Port already in use |`lsof -i :5000` then `kill -9 <PID>`
-|Build fails - missing Dockerfile |`ls -la Dockerfile.bff`
+|Build fails - missing Dockerfile |`ls -la examples/rti-demo/modules/bff/docker/Dockerfile`
 |GPIO access denied on Raspberry Pi |`sudo usermod -aG docker $USER` and `sudo usermod -aG gpio $USER`
 |Images not found |`docker images` then `docker pull rti-demo-bff`
 |Docker socket permission |Windows: `//var/run/docker.sock:/var/run/docker.sock`, Linux: `/var/run/docker.sock:/var/run/docker.sock`

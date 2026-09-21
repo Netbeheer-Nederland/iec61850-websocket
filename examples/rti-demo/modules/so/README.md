@@ -35,15 +35,19 @@ The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication 
 ### Directory Structure
 
 ```
-so/
-├── acsi_client.py                      # Core IEC 61850 WebSocket client implementation (passive mode)
-│                                        # - ACSIClientRuntime: Runtime state management
-│                                        # - ACSIClient: Main client controller
-│                                        # - WebSocket connection management
-│                                        # - Model building and caching
-│                                        # - Server directory navigation
-│
-├── bff_endpoint.py                     # REST API (FastAPI) for client management
+modules/so/
+├── pyproject.toml
+├── docker/Dockerfile
+├── tests/
+├── src/so/
+│   ├── acsi_client.py                  # Core IEC 61850 WebSocket client implementation (passive mode)
+│   │                                    # - ACSIClientRuntime: Runtime state management
+│   │                                    # - ACSIClient: Main client controller
+│   │                                    # - WebSocket connection management
+│   │                                    # - Model building and caching
+│   │                                    # - Server directory navigation
+│   │
+│   └── bff_endpoint.py                 # REST API (FastAPI) for client management
 │                                        # - Connection management (connect/disconnect)
 │                                        # - Server directory operations
 │                                        # - Model operations (get server/model tree)
@@ -97,25 +101,18 @@ A **FastAPI** application that provides REST endpoints for managing the ACSI cli
 
 #### Build and Run (from repository root)
 
+The build context must be the repository root - this Dockerfile also
+needs `src/ws61850` (the core library) and the shared uv workspace lock.
+
 ```bash
 # Build the Docker image
-docker build -t rti-demo-so -f examples/rti-demo/so/Dockerfile .
+docker build -t rti-demo-so -f examples/rti-demo/modules/so/docker/Dockerfile .
 
 # Run the container
 docker run --rm -p 5002:5002 rti-demo-so
 
 # With custom network (for multi-container setup)
 docker network create rti-network
-docker run --rm -p 5002:5002 --network rti-network --name rti-so rti-demo-so
-```
-
-#### Build and Run (from so directory)
-
-```bash
-# Build from so directory
-docker build -t rti-demo-so -f Dockerfile ../..
-
-# Run with network
 docker run --rm -p 5002:5002 --network rti-network --name rti-so rti-demo-so
 ```
 
@@ -129,28 +126,27 @@ curl http://localhost:5002/api/iec61850client/status
 
 #### Install Dependencies
 
-From repository root:
+From repository root - `so` is a member of the shared uv workspace
+(alongside `ws61850`, `fsp` and `bff`):
 
 ```bash
-# Install package and dependencies
-python -m pip install -e .
-python -m pip install Flask==3.0.0 Flask-CORS==4.0.0
+uv sync --all-packages
 ```
 
 #### Run SO API
 
-From `rti-demo/so`:
+From repository root:
 
 ```bash
 # Default port (5002)
-python bff_endpoint.py
+uv run --package so python -m so.bff_endpoint
 
 # Custom port (Linux/macOS/WSL/Git Bash)
-PORT=5002 python bff_endpoint.py
+PORT=5002 uv run --package so python -m so.bff_endpoint
 
 # Custom port (Windows PowerShell)
 $env:PORT="5002"
-python .\bff_endpoint.py
+uv run --package so python -m so.bff_endpoint
 ```
 
 #### Health Check

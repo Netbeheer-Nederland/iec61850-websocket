@@ -272,8 +272,8 @@ Persistent storage of all connection configurations with:
 - TLS configuration
 - Status and properties info
 
-### Dockerfile.bff
-Multi-stage Docker build with:
+### docker/Dockerfile
+Multi-stage Docker build (context: repo root) with:
 - Builder stage using uv for dependency management
 - Runtime stage with minimal image
 - Health check configuration
@@ -299,13 +299,14 @@ All services communicate through rti-network Docker network.
 
 **With Docker**:
 ```bash
-docker-compose up rti-bff
+docker compose up rti-bff
 ```
 
-**Without Docker**:
+**Without Docker** (from repository root - `bff` is a member of the
+shared uv workspace):
 ```bash
-python -m pip install fastapi uvicorn httpx requests
-python bff_server.py
+uv sync --all-packages
+uv run --package bff python -m bff.bff_server
 ```
 
 ### Health Check

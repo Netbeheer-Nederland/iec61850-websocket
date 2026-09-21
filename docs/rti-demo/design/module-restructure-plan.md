@@ -233,17 +233,49 @@ ast.parse(...)"` on `launch.py`, and a live `docker compose up
 rti-fsp01` confirming the model still loads correctly from the new
 mount path (`modelSource: '/models/model_1.py'`, `modelName: 'IED_2'`).
 
-## Step 7 - Cleanup
+## Step 7 - Cleanup - DONE
 
-- Delete the now-empty old `bff/`, `fsp/`, `so/`, `demo_IO/` top-level dirs
-  and the old `Dockerfile.bff`/`Dockerfile.rti-fsp`/`Dockerfile.rti-so`/
-  `Dockerfile.IO`/`Dockerfile` (root) once every service in
-  `docker-compose.yml` points at the new per-module Dockerfiles.
-- Update `README.md`, `TESTING.md`, and any docs (including the wireframe's
-  design notes if they reference file paths) for the new layout.
-- **Verify**: `git grep` for the old path fragments (`examples/rti-demo/bff/`,
-  `examples/rti-demo/fsp/`, etc.) to catch anything missed - CI configs,
-  `.dockerignore`, editor configs.
+The old flat `bff/`/`fsp/`/`so/`/`demo_IO/`/`hmi/` dirs and top-level
+`Dockerfile*` files were already gone by the end of Steps 1-5 (each step
+`git mv`'d its module out and removed its old Dockerfile as it went,
+rather than leaving that for a separate pass). This step was the final
+`git grep` sweep for anything missed, plus a stray leftover
+`examples/rti-demo/__pycache__`/`.pytest_cache` (untracked, deleted).
+
+Found and fixed, beyond what earlier steps already caught:
+
+- Root `pyproject.toml`'s own comment referencing `Dockerfile.IO` by its
+  old name/location.
+- Five `.adoc` files under `docs/rti-demo/` (`RTI_DEMO.adoc`,
+  `includes/bff.adoc`, `includes/demo_setup.adoc`, `includes/so.adoc`)
+  and four per-module `README.md`s (`modules/{bff,fsp,so}/README.md`,
+  `modules/demo_io/io_client/README_IO.md`) - directory-tree diagrams,
+  `docker build -f ...` examples, and "run without Docker" instructions
+  were all still describing the pre-migration flat layout (e.g. `python
+  bff_endpoint.py` / `pip install -e .` instead of `uv run --package so
+  python -m so.bff_endpoint`). Updated all of them to the new
+  `modules/<name>/` paths and `uv run --package <name> ...` invocations.
+- A real, if minor, bug: `bff.adoc`'s "Docker Integration" section named
+  the container `bff-server` in two places - the actual
+  `docker-compose.yml` service has always been `rti-bff`. Pre-existing
+  inaccuracy, unrelated to path moves, fixed while already in the file.
+
+**Not fixed** (pre-existing staleness unrelated to this restructure, out
+of scope for a path-migration cleanup pass): a handful of remaining
+`docker-compose` (old, deprecated hyphenated CLI form, vs. today's
+`docker compose`) and generic `pip install -e .` references scattered
+across `docs/rti-demo/includes/{so,fsp,demo_io}.adoc` and
+`examples/rti-demo/README.md` - these predate the module restructure and
+aren't path fragments this migration broke.
+
+**Verified**: the `git grep` sweep for every old path pattern
+(`examples/rti-demo/{bff,fsp,so,demo_IO,hmi}/`, `Dockerfile.bff`,
+`Dockerfile.rti-fsp`, `Dockerfile.rti-so`, `Dockerfile.IO`) now comes back
+empty repo-wide (excluding this plan doc's own history section); a clean
+`rm -rf .venv && uv sync --all-packages` plus all three modules' full
+unit suites (so 72, fsp 17, bff 41) and the root `ws61850` suite (183
+passed, the same 1 pre-existing unrelated failure) still pass; `docker
+compose config --quiet` still validates.
 
 ## Step 8 - Full-stack verification
 

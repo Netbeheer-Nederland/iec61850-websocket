@@ -167,7 +167,7 @@ state = client.get_led_state("led1")
 
 ### demo_IO Service
 
-The demo_IO service is configured in `examples/rti-demo/demo_IO/`.
+The demo_IO service is configured in `examples/rti-demo/modules/demo_io/`.
 
 **Default Configuration:**
 - Port: 8080
@@ -178,13 +178,13 @@ The demo_IO service is configured in `examples/rti-demo/demo_IO/`.
 
 ```bash
 # With default port
-python examples/rti-demo/demo_IO/main.py
+python examples/rti-demo/modules/demo_io/io_api_server/main.py
 
 # With custom port
-PORT=8000 python examples/rti-demo/demo_IO/main.py
+PORT=8000 python examples/rti-demo/modules/demo_io/io_api_server/main.py
 
 # With Docker
-# See Dockerfile.IO in examples/rti-demo/
+# See examples/rti-demo/modules/demo_io/docker/Dockerfile
 ```
 
 ### ACSI Service
@@ -282,8 +282,8 @@ services:
 
   demo-io:
     build:
-      context: examples/rti-demo
-      dockerfile: Dockerfile.IO
+      context: examples/rti-demo/modules/demo_io
+      dockerfile: docker/Dockerfile
     ports:
       - "8080:8080"
 ```
@@ -309,7 +309,7 @@ Run the test scripts:
 
 ```bash
 # Test async_client_io and io_router
-python examples/rti-demo/demo_IO/io_client/test_client_io.py
+python examples/rti-demo/modules/demo_io/io_client/test_client_io.py
 
 # Run standalone io_router tests
 python examples/rti-demo/acsi/test_io_router_standalone.py
@@ -401,7 +401,7 @@ python examples/rti-demo/acsi/example_usage.py
 - Python 3.10+
 - FastAPI 0.100+
 - requests library
-- demo_IO service (from examples/rti-demo/demo_IO/)
+- demo_IO service (from examples/rti-demo/modules/demo_io/)
 
 ## License
 

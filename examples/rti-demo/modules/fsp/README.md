@@ -34,33 +34,29 @@ The FSP directory implements a complete **IEC 61850 ACSI (Abstract Communication
 ### Directory Structure
 
 ```
-fsp/
-├── acsi_server.py                      # Core IEC 61850 WebSocket Server implementation (active mode)
-│                                        # - ACSIServerRuntime: Runtime state management
-│                                        # - ACSIServer: Main server controller
-│                                        # - WebSocket connection management
-│                                        # - Model loading and caching
-│
-├── bff_endpoint.py                     # REST API (FastAPI) for server management
-│                                        # - Server lifecycle control (start/stop)
-│                                        # - Model operations (read/write/update)
-│                                        # - Connection management
-│                                        # - Action/message logging
-│                                        # - IO client integration
-│
-├── model.py                            # IED model in Python format
-│                                        # - Can be modified as needed
+modules/fsp/
+├── pyproject.toml
+├── docker/Dockerfile                   # Multi-stage build, port 5001 exposed
+├── tests/
+├── src/fsp/
+│   ├── acsi_server.py                  # Core IEC 61850 WebSocket Server implementation (active mode)
+│   │                                    # - ACSIServerRuntime: Runtime state management
+│   │                                    # - ACSIServer: Main server controller
+│   │                                    # - WebSocket connection management
+│   │                                    # - Model loading and caching
+│   │
+│   ├── bff_endpoint.py                 # REST API (FastAPI) for server management
+│   │                                    # - Server lifecycle control (start/stop)
+│   │                                    # - Model operations (read/write/update)
+│   │                                    # - Connection management
+│   │                                    # - Action/message logging
+│   │                                    # - IO client integration
+│   │
+│   └── model.py                        # Default/fallback IED model in Python format
 │                                        # - Contains DataAttributes, DataObjects
 │                                        # - IEC 61850 data model definitions
-│
-├── BFF_API.md                          # Complete REST API documentation
-│                                        # - All endpoint specifications
-│                                        # - Curl examples
-│                                        # - Request/response formats
-│
-├── Dockerfile                          # Docker container configuration
-│                                        # - Multi-stage build
-│                                        # - Port 5001 exposed
+│                                        # - The live demo instead mounts
+│                                        #   config/models/model_N.py via MODELPATH
 │
 └── README.md                           # This file
 ```
@@ -134,25 +130,18 @@ A **FastAPI** application that provides REST endpoints for managing the ACSI Ser
 
 #### Build and Run (from repository root)
 
+The build context must be the repository root - this Dockerfile also
+needs `src/ws61850` (the core library) and the shared uv workspace lock.
+
 ```bash
 # Build the Docker image
-docker build -t rti-demo-fsp -f examples/rti-demo/fsp/Dockerfile .
+docker build -t rti-demo-fsp -f examples/rti-demo/modules/fsp/docker/Dockerfile .
 
 # Run the container
 docker run --rm -p 5001:5001 rti-demo-fsp
 
 # With custom network (for multi-container setup)
 docker network create rti-network
-docker run --rm -p 5001:5001 --network rti-network --name rti-fsp rti-demo-fsp
-```
-
-#### Build and Run (from fsp directory)
-
-```bash
-# Build from fsp directory
-docker build -t rti-demo-fsp -f Dockerfile ../..
-
-# Run with network
 docker run --rm -p 5001:5001 --network rti-network --name rti-fsp rti-demo-fsp
 ```
 
@@ -166,28 +155,27 @@ curl http://localhost:5001/api/iec61850server/status
 
 #### Install Dependencies
 
-From repository root:
+From repository root - `fsp` is a member of the shared uv workspace
+(alongside `ws61850`, `so` and `bff`):
 
 ```bash
-# Install package and dependencies
-python -m pip install -e .
-python -m pip install Flask==3.0.0 Flask-CORS==4.0.0
+uv sync --all-packages
 ```
 
 #### Run FSP API
 
-From `rti-demo/fsp`:
+From repository root:
 
 ```bash
 # Default port (5001)
-python bff_endpoint.py
+uv run --package fsp python -m fsp.bff_endpoint
 
 # Custom port (Linux/macOS/WSL/Git Bash)
-PORT=5001 python bff_endpoint.py
+PORT=5001 uv run --package fsp python -m fsp.bff_endpoint
 
 # Custom port (Windows PowerShell)
 $env:PORT="5001"
-python .\bff_endpoint.py
+uv run --package fsp python -m fsp.bff_endpoint
 ```
 
 #### Health Check
@@ -255,10 +243,10 @@ curl -X POST http://localhost:5001/api/io/disconnect
 
 | Issue | Solution |
 |-------|----------|
-| **Port 5001 in use** | Use different port: `PORT=5002 python bff_endpoint.py` |
+| **Port 5001 in use** | Use different port: `PORT=5002 uv run --package fsp python -m fsp.bff_endpoint` |
 | **Port 8765 in use** | Change WebSocket port in start request |
 | **Docker not found** | Install Docker Desktop and ensure it's running |
-| **Module not found** | Run `pip install -e .` from repository root |
+| **Module not found** | Run `uv sync --all-packages` from repository root |
 | **Server not starting** | Check logs, verify model.py exists and is valid |
 
 ### Debug Commands
