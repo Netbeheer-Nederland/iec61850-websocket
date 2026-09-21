@@ -1,5 +1,5 @@
 #!/bin/bash
-# set_docker_user.sh - Set Docker build variables for demo_io (rti-io) container
+# set_docker_user.sh - Set Docker build variables for the rti-io container
 #
 # Detects UID, GID, and group IDs for a given user and exports them as
 # environment variables for Docker Compose to use when building the rti-io container.

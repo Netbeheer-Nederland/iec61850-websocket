@@ -56,7 +56,7 @@ def create_io_client_router() -> APIRouter:
     )
     
     # Configuration for io_client files storage
-    IO_CLIENT_FILES_DIR = os.getenv("IO_CLIENT_FILES_DIR", "/app/demo_IO/io_client")
+    IO_CLIENT_FILES_DIR = os.getenv("IO_CLIENT_FILES_DIR", "/app/io/io_client")
     IO_CLIENT_VERSION = os.getenv("IO_CLIENT_VERSION", "1.0.0")
     
     def ensure_io_client_files_dir() -> bool:

@@ -69,7 +69,7 @@ services:
       - PYTHONUNBUFFERED=1
       - CP=cp1
       - MODELPATH=/models/model_1.py
-      - DEMO_IO_URL=http://demo_io:8000
+      - IO_URL=http://rti-io:8000
     networks:
       - rti-network
     healthcheck:
@@ -86,7 +86,7 @@ services:
     volumes:
         - ./modules/fsp/src/fsp:/app/examples/rti-demo/modules/fsp/src/fsp
         - ./config/models:/models
-        - ./modules/demo_io:/app/demo_IO
+        - ./modules/io:/app/io
 
   # Second FSP instance
   rti-fsp02:
@@ -104,7 +104,7 @@ services:
       - PORT=5005
       - CP=cp2
       - MODELPATH=/models/model_2.py
-      - DEMO_IO_URL=http://demo_io:8000
+      - IO_URL=http://rti-io:8000
     healthcheck: # ✅ Add healthcheck (optional but recommended)
       test: [ "CMD", "curl", "-f", "http://localhost:5001/api/status" ]
       interval: 30s
@@ -119,7 +119,7 @@ services:
     volumes: # ✅ Add volumes if needed
       - ./modules/fsp/src/fsp:/app/examples/rti-demo/modules/fsp/src/fsp
       - ./config/models:/models
-      - ./modules/demo_io:/app/demo_IO
+      - ./modules/io:/app/io
 
   # RTI SO (Acsi-Client)
   rti-so:
@@ -135,7 +135,7 @@ services:
     environment:
       - PORT=5002
       - PYTHONUNBUFFERED=1
-#      - DEMO_IO_URL=http://demo_io:8000
+#      - IO_URL=http://rti-io:8000
     networks:
       - rti-network
     healthcheck:
@@ -151,12 +151,12 @@ services:
       - "rti.port=5002"
     volumes:
         - ./modules/so/src/so:/app/examples/rti-demo/modules/so/src/so
-        - ./modules/demo_io:/app/demo_IO
+        - ./modules/io:/app/io
 
-  # GPIO LED Control API (demo_IO)
+  # GPIO LED Control API (io)
   rti-io:
     build:
-      context: modules/demo_io
+      context: modules/io
       dockerfile: docker/Dockerfile
       args:
         PI_USER: ${PI_USER:-pi}
@@ -165,7 +165,7 @@ services:
         GPIO_GID: ${GPIO_GID:-986}
         I2C_GID: ${I2C_GID:-988}
         SPI_GID: ${SPI_GID:-989}
-    container_name: demo_io
+    container_name: rti-io
     ports:
       - "8000:8000"
     environment:
@@ -204,13 +204,13 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      - "rti.service=demo_io"
+      - "rti.service=rti-io"
       - "rti.type=GPIO-LED-Control"
-      - "rti.host=demo_io"
+      - "rti.host=rti-io"
       - "rti.port=8000"
     volumes:
-      - ./modules/demo_io:/app/demo_IO
-    command: ["./.venv/bin/python", "-u", "demo_IO/io_api_server/main.py"]
+      - ./modules/io:/app/io
+    command: ["./.venv/bin/python", "-u", "io/io_api_server/main.py"]
 
 
 

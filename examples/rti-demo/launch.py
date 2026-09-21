@@ -174,17 +174,17 @@ SERVICES: Dict[ServiceType, ServiceConfig] = {
     ServiceType.IO: ServiceConfig(
         name="IO Device Control API",
         service_type=ServiceType.IO,
-        module="demo_IO.io_api_server.main",
-        entry_point="modules/demo_io/io_api_server/main.py",
+        module="io.io_api_server.main",
+        entry_point="modules/io/io_api_server/main.py",
         default_port=8000,
         description="IO Device Control API - REST API for Raspberry Pi IO devices",
         env_vars={"PORT": "8000"},
         docker_image="rti-demo-io",
         health_check_path="/api/io/health",
         labels={
-            "rti.service": "demo_io",
+            "rti.service": "rti-io",
             "rti.type": "IO-Device-Control",
-            "rti.host": "demo_io",
+            "rti.host": "rti-io",
             "rti.port": "8000"
         }
     ),

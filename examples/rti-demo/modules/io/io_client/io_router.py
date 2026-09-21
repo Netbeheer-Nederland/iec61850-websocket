@@ -230,9 +230,9 @@ def create_io_router() -> APIRouter:
     
     This router provides endpoints that proxy device control requests (IO devices)
     to a connected demo_IO service. The demo_IO connection is configured via
-    environment variable DEMO_IO_URL or through the /api/io/connect endpoint.
+    environment variable IO_URL or through the /api/io/connect endpoint.
     
-    Note: If DEMO_IO_URL is set, the client will be auto-configured on router creation.
+    Note: If IO_URL is set, the client will be auto-configured on router creation.
     
     Returns:
         APIRouter instance with all IO endpoints configured
@@ -244,11 +244,11 @@ def create_io_router() -> APIRouter:
     )
     
     # Initialize client from environment variable if explicitly set (not default)
-    demo_io_url = os.getenv("DEMO_IO_URL")
+    demo_io_url = os.getenv("IO_URL")
     acsi_base_url = os.getenv("ACSI_BASE_URL", "http://localhost:5001")
     if demo_io_url:
         set_io_client(AsyncDemoIOClient(base_url=demo_io_url, acsi_base_url=acsi_base_url))
-        logger.info(f"AsyncDemoIOClient auto-configured from DEMO_IO_URL: {demo_io_url}")
+        logger.info(f"AsyncDemoIOClient auto-configured from IO_URL: {demo_io_url}")
     
     # ==================== Startup Event ====================
     
@@ -266,7 +266,7 @@ def create_io_router() -> APIRouter:
             raise HTTPException(
                 status_code=500,
                 detail="demo_IO client not configured. "
-                       "Configure connection via POST /api/io/connect or set DEMO_IO_URL environment variable."
+                       "Configure connection via POST /api/io/connect or set IO_URL environment variable."
             )
         
         # Check if service is healthy (async call)
@@ -430,7 +430,7 @@ def create_io_router() -> APIRouter:
         "/connect",
         summary="Connect to demo_IO",
         description="Configure the connection to a demo_IO service. "
-                    "This must be called before using IO endpoints if DEMO_IO_URL is not set.",
+                    "This must be called before using IO endpoints if IO_URL is not set.",
         response_description="Connection confirmation",
         responses={
             200: {"description": "Connected successfully"},

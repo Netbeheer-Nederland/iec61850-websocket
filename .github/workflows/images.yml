@@ -47,7 +47,7 @@ jobs:
             acsi_client: [ *rti, 'examples/rti-demo/acsi_ws_client/**', 'examples/rti-demo/Dockerfile.acsi-ws-client' ]
             acsi_server: [ *rti, 'examples/rti-demo/acsi_ws_server/**', 'examples/rti-demo/Dockerfile.acsi-ws-server' ]
             bff:         [ 'examples/rti-demo/modules/bff/**', 'pyproject.toml', 'uv.lock' ]
-            io:          [ 'examples/rti-demo/modules/demo_io/**' ]
+            io:          [ 'examples/rti-demo/modules/io/**' ]
             hmi:         [ 'examples/rti-demo/modules/hmi/**' ]
 
       - id: set
@@ -82,7 +82,7 @@ jobs:
             acsi_client) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-client ; n=ws61850-acsi-ws-client ;;
             acsi_server) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-server ; n=ws61850-acsi-ws-server ;;
             bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=rti-demo-bff ;;
-            io)          c=examples/rti-demo/modules/demo_io ; f=docker/Dockerfile ; n=rti-demo-io ; p=linux/amd64,linux/arm64 ;;
+            io)          c=examples/rti-demo/modules/io ; f=docker/Dockerfile ; n=rti-demo-io ; p=linux/amd64,linux/arm64 ;;
             hmi)         c=examples/rti-demo/modules/hmi ; f=Dockerfile ; n=rti-demo-hmi ;;
           esac
           {

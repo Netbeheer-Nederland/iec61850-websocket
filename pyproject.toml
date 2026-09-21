@@ -83,10 +83,10 @@ target-version = ["py310", "py311", "py312"]
 package = true
 
 [tool.uv.workspace]
-# demo_io deliberately excluded - it needs Raspberry Pi hardware packages
+# io deliberately excluded - it needs Raspberry Pi hardware packages
 # (gpiozero, gpiod, Adafruit-ADS1x15, smbus2) that won't resolve/install on
 # a non-Pi dev machine, and it already builds via its own fully independent
-# Docker-stage venv (modules/demo_io/docker/Dockerfile), never sharing
+# Docker-stage venv (modules/io/docker/Dockerfile), never sharing
 # this workspace's env.
 members = [
     "examples/rti-demo/modules/so",
