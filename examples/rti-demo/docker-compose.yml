@@ -85,7 +85,7 @@ services:
       - "rti.port=5001"
     volumes:
         - ./modules/fsp/src/fsp:/app/examples/rti-demo/modules/fsp/src/fsp
-        - ./models:/models
+        - ./config/models:/models
         - ./modules/demo_io:/app/demo_IO
 
   # Second FSP instance
@@ -118,7 +118,7 @@ services:
       - "rti.port=5005"
     volumes: # ✅ Add volumes if needed
       - ./modules/fsp/src/fsp:/app/examples/rti-demo/modules/fsp/src/fsp
-      - ./models:/models
+      - ./config/models:/models
       - ./modules/demo_io:/app/demo_IO
 
   # RTI SO (Acsi-Client)

@@ -29,7 +29,7 @@ __pycache__/
 .docker/
 
 # Service state files
-bff/connections.json
+modules/bff/src/bff/connections.json
 stats.json
 
 # Temporary files

@@ -35,7 +35,7 @@ examples/ws61850_interactive
 examples/ws61850_mode
 examples/rti-demo/demo_setup
 examples/rti-demo/modules/hmi
-examples/rti-demo/models
+examples/rti-demo/config/models
 
 # Generated / local state
 **/*.log

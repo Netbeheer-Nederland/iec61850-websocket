@@ -258,7 +258,7 @@ class RTILauncher:
         parser.add_argument(
             '--config',
             type=str,
-            default='launch_config.json',
+            default='config/launch_config.json',
             help='Configuration file for custom service settings'
         )
         
@@ -709,7 +709,7 @@ class RTILauncher:
             logger.error(f"Invalid JSON in config file: {e}")
             return {}
     
-    def save_config(self, config: Dict, config_path: str = "launch_config.json") -> bool:
+    def save_config(self, config: Dict, config_path: str = "config/launch_config.json") -> bool:
         """Save configuration to JSON file.
         
         Args:

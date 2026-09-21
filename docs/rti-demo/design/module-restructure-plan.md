@@ -207,14 +207,31 @@ a comment explaining why it's deliberately shipped in the image.
 smoke test of `bff` confirming its seed `connections.json` (3 targets)
 still ships after the `.dockerignore` fix.
 
-## Step 6 - `config/`
+## Step 6 - `config/` - DONE
 
-- Move `launch_config.json.example` and `models/` to a top-level
-  `examples/rti-demo/config/`.
-- Update `launch.py`'s path references and `docker-compose.yml`'s volume
-  mount for `models/` (currently mounted into the FSP containers).
-- **Verify**: `python launch.py` (or whatever the actual entry point is) still
-  finds the config; FSP containers still load `model_1.py`/`model_2.py`.
+Moved `launch_config.json.example` and `models/` to
+`examples/rti-demo/config/`. Updated:
+
+- `docker-compose.yml`'s `./models:/models` volume mounts (both FSP
+  services) → `./config/models:/models` (container-side path unchanged -
+  `MODELPATH=/models/model_N.py` still points at the same place inside
+  the container).
+- `launch.py`'s `--config` default and `save_config()`'s default
+  parameter → `config/launch_config.json`. Turned out to be dead code
+  either way - `load_config()`/`save_config()` are defined but never
+  actually called anywhere in the file, and the parsed `--config` value
+  is stored in a dict that's never read back. Updated the path for
+  correctness/consistency regardless, in case that ever gets wired up.
+- `examples/rti-demo/.gitignore`'s `bff/connections.json` entry (a stale
+  leftover from the Steps 1-4 move, missed at the time) →
+  `modules/bff/src/bff/connections.json`.
+- Root `.dockerignore`'s `examples/rti-demo/models` entry →
+  `examples/rti-demo/config/models`.
+
+**Verified**: `docker compose config --quiet`, `python3 -c "import ast;
+ast.parse(...)"` on `launch.py`, and a live `docker compose up
+rti-fsp01` confirming the model still loads correctly from the new
+mount path (`modelSource: '/models/model_1.py'`, `modelName: 'IED_2'`).
 
 ## Step 7 - Cleanup
 
