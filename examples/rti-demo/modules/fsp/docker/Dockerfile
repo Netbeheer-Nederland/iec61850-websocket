@@ -13,11 +13,21 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# Workspace root files (needed for the shared uv.lock), ws61850 core, and
-# this module's own source - editable installs need the real source tree
-# present before `uv sync` runs (setuptools' egg_info step reads src/).
+# Dependency layer: workspace root files (shared uv.lock), ws61850 core,
+# and just this member's pyproject.toml (uv needs it on disk to resolve
+# `--package fsp` against the workspace, but not its actual source yet).
+# Kept separate from the COPY below so this layer - and the potentially
+# slow `uv sync` dependency install - stays cached across fsp/ source
+# changes, instead of invalidating on every edit.
 COPY pyproject.toml uv.lock ./
 COPY src/ ./src/
+COPY examples/rti-demo/modules/fsp/pyproject.toml ./examples/rti-demo/modules/fsp/pyproject.toml
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project --package fsp
+
+# Now bring in the actual source and finish the editable install - this
+# second sync only needs to link fsp's own files in, not reinstall deps.
 COPY examples/rti-demo/modules/fsp/ ./examples/rti-demo/modules/fsp/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -31,9 +41,13 @@ FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
+ARG APP_PORT=5001
+ARG HEALTH_PATH=/api/status
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=5001 \
+    PORT=${APP_PORT} \
+    HEALTH_PATH=${HEALTH_PATH} \
     PATH="/app/.venv/bin:$PATH"
 
 # curl is required for the health check
@@ -55,7 +69,11 @@ USER app
 
 EXPOSE 5001
 
+# Shell form (not exec-array) so $PORT/$HEALTH_PATH expand at healthcheck
+# time against the runtime env, not the build-time ARG default - matters
+# when docker-compose.yml overrides PORT (rti-fsp02 runs a second fsp
+# instance on a different port from the same image).
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:5001/api/status || exit 1
+    CMD curl -f http://localhost:$PORT$HEALTH_PATH || exit 1
 
 CMD ["python", "-u", "-m", "fsp.bff_endpoint"]

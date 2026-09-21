@@ -106,7 +106,7 @@ services:
       - MODELPATH=/models/model_2.py
       - IO_URL=http://rti-io:8000
     healthcheck: # ✅ Add healthcheck (optional but recommended)
-      test: [ "CMD", "curl", "-f", "http://localhost:5001/api/status" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:5005/api/status" ]
       interval: 30s
       timeout: 10s
       retries: 3
