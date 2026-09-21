@@ -39,7 +39,7 @@ services:
   rti-hmi:
     build:
       context: modules/hmi
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
     container_name: rti-hmi
     ports:
       - "3001:80"

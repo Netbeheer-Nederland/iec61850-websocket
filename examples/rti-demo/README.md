@@ -275,8 +275,8 @@ rti-demo/
     ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }
     ├── fsp/       { pyproject.toml, docker/Dockerfile, src/fsp/, tests/ }
     ├── so/        { pyproject.toml, docker/Dockerfile, src/so/, tests/ }
-    ├── demo_io/   { pyproject.toml, docker/Dockerfile, io_api_server/, io_client/ }
-    └── hmi/       { package.json, Dockerfile, src/ }       # Web HMI (React)
+    ├── io/        { pyproject.toml, docker/Dockerfile, io_api_server/, io_client/ }
+    └── hmi/       { package.json, docker/Dockerfile, src/ }  # Web HMI (React)
 ```
 
 `bff`, `fsp` and `so` are members of a single uv workspace rooted at the

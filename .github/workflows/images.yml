@@ -83,7 +83,7 @@ jobs:
             acsi_server) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-server ; n=ws61850-acsi-ws-server ;;
             bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=rti-demo-bff ;;
             io)          c=examples/rti-demo/modules/io ; f=docker/Dockerfile ; n=rti-demo-io ; p=linux/amd64,linux/arm64 ;;
-            hmi)         c=examples/rti-demo/modules/hmi ; f=Dockerfile ; n=rti-demo-hmi ;;
+            hmi)         c=examples/rti-demo/modules/hmi ; f=docker/Dockerfile ; n=rti-demo-hmi ;;
           esac
           {
             echo "ctx=$c"
