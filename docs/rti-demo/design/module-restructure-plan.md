@@ -282,17 +282,38 @@ unit suites (so 72, fsp 17, bff 41) and the root `ws61850` suite (183
 passed, the same 1 pre-existing unrelated failure) still pass; `docker
 compose config --quiet` still validates.
 
-## Step 8 - Full-stack verification
+## Step 8 - Full-stack verification - DONE
 
-- `docker compose build` (all services, from a clean state - `docker compose
-  build --no-cache` at least once to rule out stale-layer false confidence).
-- `docker compose up`, run `tests/integration -m integration` against the
-  live stack.
-- Full unit suite across every module workspace member:
-  `uv run pytest` from repo root should now discover and run all of them
-  in one invocation (that's the payoff of the workspace).
-- Manual HMI smoke test of the pages touched most in this session
-  (Connections, Setup, Traffic, ACSI Server, ACSI Client).
+- `docker compose build --no-cache` for all six services (bff, hmi,
+  fsp01, fsp02, so, io) succeeded clean, ruling out stale-layer false
+  confidence.
+- `docker compose up` for bff/hmi/fsp01/fsp02/so (`io` needs real
+  Raspberry Pi GPIO hardware - `/dev/gpiochip0` - so it builds but can't
+  run on a dev machine; already covered by its own build/create smoke
+  test in Step 9). All five came up healthy. `tests/integration -m
+  integration` against the live stack: 17 passed.
+- Full unit suite: **correction to the plan's original assumption** -
+  `uv run pytest` from the repo root does *not* pick up `so`/`fsp`/`bff`'s
+  tests automatically. Each workspace member's own `pyproject.toml` sets
+  `[tool.pytest.ini_options] testpaths = ["tests"]` scoped to *its own*
+  `tests/` dir, and the root's `testpaths` is likewise scoped to just the
+  root `tests/` - pytest's config discovery uses whichever
+  `pyproject.toml` is nearest the invocation directory, it doesn't merge
+  workspace members' testpaths. So each member still needs its own `uv
+  run --package <name> pytest` invocation, same as every earlier step.
+  Ran all four: root `ws61850` (183 passed, 1 pre-existing unrelated
+  failure - `test_operate_requires_select_first`, confirmed via `git
+  stash` back in Step 0 to predate this migration entirely), so (72
+  passed), fsp (17 passed), bff (41 passed).
+- HMI: `npx vitest run` (59 passed, unchanged from Step 5). No headless
+  browser available in this environment for a literal click-through of
+  the Connections/Setup/Traffic/ACSI Server/ACSI Client pages, so verified
+  the equivalent server-side signals instead: the built SPA serves at `/`
+  with its JS/CSS bundle loading (200s), and the live backend endpoints
+  those pages actually call return healthy real data - `bff:5000/api/health`
+  showing both `rti-fsp01`/`rti-fsp02` as `"reachable"`, `fsp01:5001/api/status`
+  and `so:5002/api/status` both responding with real (if not yet
+  connected) ACSI state.
 
 ## Step 9 - Rename `demo_io` to `io` - DONE
 
