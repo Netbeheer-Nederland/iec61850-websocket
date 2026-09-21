@@ -8,8 +8,6 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - RTI_DOCKER_ENABLED=true
-      - RTI_SERVICE_DISCOVERY_ENABLED=true
       - PORT=5000
       - PYTHONUNBUFFERED=1
       # Persist connection state in a dedicated /config dir (named volume below),
@@ -20,7 +18,6 @@ services:
     volumes:
       - ./modules/bff/src/bff:/app/examples/rti-demo/modules/bff/src/bff
       - bff-config:/config
-      - //var/run/docker.sock:/var/run/docker.sock
     networks:
       - rti-network
     healthcheck:
@@ -57,7 +54,6 @@ services:
 
   # RTI-FSP (Acsi-Server)
   rti-fsp01:
-    user: root
     build:
       context: ../..
       dockerfile: examples/rti-demo/modules/fsp/docker/Dockerfile
@@ -79,19 +75,16 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      - "rti.service=rti-fsp"
+      - "rti.service=rti-fsp01"
       - "rti.type=RTI-FSP"
-      - "rti.host=rti-fsp"
+      - "rti.host=rti-fsp01"
       - "rti.port=5001"
     volumes:
         - ./modules/fsp/src/fsp:/app/examples/rti-demo/modules/fsp/src/fsp
         - ./config/models:/models
-        - ./modules/io:/app/io
 
   # Second FSP instance
   rti-fsp02:
-    user:
-      root
     build:
       context: ../..
       dockerfile: examples/rti-demo/modules/fsp/docker/Dockerfile
@@ -105,26 +98,23 @@ services:
       - CP=cp2
       - MODELPATH=/models/model_2.py
       - IO_URL=http://rti-io:8000
-    healthcheck: # ✅ Add healthcheck (optional but recommended)
+    healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:5005/api/status" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
-    labels: # ✅ Add labels for consistency
-      - "rti.service=rti-fsp-2"
+    labels:
+      - "rti.service=rti-fsp02"
       - "rti.type=RTI-FSP"
-      - "rti.host=rti-fsp-2"
+      - "rti.host=rti-fsp02"
       - "rti.port=5005"
-    volumes: # ✅ Add volumes if needed
+    volumes:
       - ./modules/fsp/src/fsp:/app/examples/rti-demo/modules/fsp/src/fsp
       - ./config/models:/models
-      - ./modules/io:/app/io
 
   # RTI SO (Acsi-Client)
   rti-so:
-    user:
-      root
     build:
       context: ../..
       dockerfile: examples/rti-demo/modules/so/docker/Dockerfile
@@ -135,7 +125,6 @@ services:
     environment:
       - PORT=5002
       - PYTHONUNBUFFERED=1
-#      - IO_URL=http://rti-io:8000
     networks:
       - rti-network
     healthcheck:
@@ -151,7 +140,6 @@ services:
       - "rti.port=5002"
     volumes:
         - ./modules/so/src/so:/app/examples/rti-demo/modules/so/src/so
-        - ./modules/io:/app/io
 
   # GPIO LED Control API (io)
   rti-io:
@@ -176,7 +164,6 @@ services:
       - "gpio"
       - "i2c"
       - "spi"
- 
     devices:
       - "/dev/gpiochip0:/dev/gpiochip0"
       - "/dev/gpiochip4:/dev/gpiochip4"
@@ -189,7 +176,6 @@ services:
       - "/dev/i2c-14:/dev/i2c-14"
       - "/dev/spidev0.0:/dev/spidev0.0"
       - "/dev/spidev0.1:/dev/spidev0.1"
-
     ipc: host
     security_opt:
       - seccomp:unconfined
@@ -210,9 +196,6 @@ services:
       - "rti.port=8000"
     volumes:
       - ./modules/io:/app/io
-    command: ["./.venv/bin/python", "-u", "io/io_api_server/main.py"]
-
-
 
 networks:
   rti-network:
