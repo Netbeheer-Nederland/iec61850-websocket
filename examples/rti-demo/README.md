@@ -262,17 +262,24 @@ See `demo_IO/io_api_server/devices.py` for all supported device types and config
 
 ```
 rti-demo/
-├── launch.py              # Main entry point
-├── README.md              # This file
-├── bff/
-│   └── bff_server.py      # BFF Server
-├── fsp/
-│   └── bff_endpoint.py    # FSP ACSI-Server
-├── so/
-│   └── bff_endpoint.py    # SO ACSI-Client
-└── front-end/
-    └── index.html         # Web HMI
+├── launch.py                  # Main entry point
+├── README.md                  # This file
+├── docker-compose.yml
+├── config/
+│   ├── launch_config.json.example
+│   └── models/                # IED model files (model_1.py, model_2.py)
+└── modules/
+    ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }
+    ├── fsp/       { pyproject.toml, docker/Dockerfile, src/fsp/, tests/ }
+    ├── so/        { pyproject.toml, docker/Dockerfile, src/so/, tests/ }
+    ├── demo_io/   { pyproject.toml, docker/Dockerfile, io_api_server/, io_client/ }
+    └── hmi/       { package.json, Dockerfile, src/ }       # Web HMI (React)
 ```
+
+`bff`, `fsp` and `so` are members of a single uv workspace rooted at the
+repository root (alongside the `ws61850` core library at `src/`) - see
+`TESTING.md` for how to install/run them. `demo_io` and `hmi` build and
+run independently (Pi hardware deps / npm toolchain respectively).
 
 ## UV 
 UV is already implemented to manage the dependencies inside the dockers. To add a dependency to the project, you can use the following command:
