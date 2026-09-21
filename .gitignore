@@ -69,3 +69,13 @@ Thumbs.db
 # Resource or info files
 resources.txt
 **/data/client_credentials.json
+
+# RTI Demo - local configuration and generated files
+launch_config.json
+*.local.json
+*.pid
+*.bak
+.docker/
+stats.json
+launch.py.local
+config.local.py
