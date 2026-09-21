@@ -16,12 +16,17 @@ examples/rti-demo/
     bff/      { src/bff/, docker/Dockerfile, pyproject.toml, tests/ }
     fsp/      { src/fsp/, docker/Dockerfile, pyproject.toml, tests/ }
     so/       { src/so/,  docker/Dockerfile, pyproject.toml, tests/ }
-    demo_io/  { src/demo_io/, pyproject.toml, tests/ }
-    hmi/      (unchanged - already has its own src/, Dockerfile, package.json)
+    io/       { pyproject.toml, docker/Dockerfile, io_api_server/, io_client/ }
+    hmi/      { package.json, docker/Dockerfile, src/ }
   config/     launch_config.json.example, models/
   docker-compose.yml
   tests/integration/   (stays central - genuinely cross-module)
 ```
+
+(This reflects the layout as it stands after Steps 0-9 below; `demo_io` was
+renamed to `io` in Step 9, and `hmi`'s Dockerfile moved into its own
+`docker/` folder in Step 10, so every module now has an identical
+`docker/Dockerfile` convention.)
 
 Each numbered step below should land as its **own commit**, verified (tests +
 a docker build of whatever it touched) before moving to the next. Do not
@@ -289,19 +294,73 @@ compose config --quiet` still validates.
 - Manual HMI smoke test of the pages touched most in this session
   (Connections, Setup, Traffic, ACSI Server, ACSI Client).
 
+## Step 9 - Rename `demo_io` to `io` - DONE
+
+Requested separately from the numbered plan, after Step 7's cleanup pass -
+renamed the module (directory, package, container, hostname, and the
+functional `DEMO_IO_URL` env var) to `io`/`rti-io`, matching the short
+naming already used by `bff`/`fsp`/`so`.
+
+- `git mv modules/demo_io modules/io`.
+- `docker-compose.yml`: `container_name`/`rti.service`/`rti.host` →
+  `rti-io`, build context/volume mount → `modules/io`/`/app/io`,
+  `DEMO_IO_URL` → `IO_URL` (the one env var `io_router.py` actually reads).
+- `launch.py`, `images.yml`, `.dockerignore`, root `pyproject.toml`'s
+  workspace-exclusion comment: same path/name updates.
+- `io_client_file_server.py`'s `IO_CLIENT_FILES_DIR` default path.
+- `test_imports.py`: dropped an already-dead `import demo_IO` test block
+  (no such package structure ever existed, even pre-rename).
+- `io_api_server/pyproject.toml`: a separate, nested pyproject.toml
+  distinct from `modules/io/pyproject.toml`, confirmed unreferenced by the
+  actual Docker build and its `DEMO_IO_API_KEY(_FILE)` vars never read
+  anywhere - renamed anyway for consistency (`name`, `[tool.demo_io]` →
+  `[tool.io_api_server]`, env var names).
+- `scripts/setup_raspberry_docker.sh`: fixed three stale
+  `docker-compose build/up demo_io` lines → `docker compose build/up io`.
+- `scripts/set_docker_user.sh`: comment update.
+- Also `chmod +x` both scripts in `scripts/` - they were tracked
+  non-executable (`100644`) despite their own usage docs showing direct
+  `./scripts/foo.sh` invocation; pre-existing, unrelated to the rename,
+  fixed alongside it since it was flagged in the same pass.
+
+Deliberately left the ~75+ generic descriptive "demo_IO" mentions in
+`io_router.py`, `async_client_io.py`, `mapping_manager.py`, and various
+READMEs/docs untouched - prose/docstrings/labels, not paths or identifiers
+that affect behavior, out of scope for this pass.
+
+**Verified**: `uv sync --all-packages`, unit tests for so/fsp/bff all
+pass, `docker compose config --quiet` valid, `docker compose build rti-io`
+succeeds, and `docker compose up rti-io` correctly creates a container
+named `rti-io` (fails only on missing `/dev/gpiochip0`, a Pi-only hardware
+device unavailable on this dev machine - unrelated to the rename).
+
+## Step 10 - `hmi`'s Dockerfile into `docker/` - DONE
+
+Resolves open decision 2 below (partially - `hmi` was already under
+`modules/` since Step 5; this closes the remaining `docker/Dockerfile`
+convention gap). `git mv modules/hmi/Dockerfile modules/hmi/docker/Dockerfile`.
+Build context stays `modules/hmi` (so the Dockerfile's relative `COPY . .`
+etc. are unaffected) - only `docker-compose.yml`'s `dockerfile:` key and
+`images.yml`'s build-file path changed, to `docker/Dockerfile`. Also fixed
+two stale Dockerfile-path references in `README.md`'s project-structure
+tree and `demo_setup.adoc` (including two `demo_io` → `io` references
+missed by Step 9).
+
+**Verified**: `docker compose config --quiet` and `docker compose build
+rti-hmi` both succeed from the new location.
+
 ---
 
 ## Open decisions
 
 1. ~~Build context convention~~ - resolved: `bff`/`fsp`/`so` all build from
    repo-root context now (`fsp`/`so` need it for `ws61850`; `bff` doesn't
-   strictly need it but matches the others for consistency). `demo_io`
-   builds from its own narrower context (`modules/demo_io`) since it's
-   fully independent of the workspace anyway.
-2. **`hmi` in `modules/` or not**: still open, still low priority. It's a
-   different toolchain entirely (npm/vite, not uv) - moving it under
-   `modules/` (Step 5) is purely cosmetic consistency, not a functional
-   requirement.
+   strictly need it but matches the others for consistency). `io` builds
+   from its own narrower context (`modules/io`) since it's fully
+   independent of the workspace anyway.
+2. ~~`hmi` in `modules/` or not~~ - resolved: moved under `modules/` in
+   Step 5, and given the same `docker/Dockerfile` layout as the other
+   modules in Step 10, for full consistency across all five modules.
 3. ~~Lockfile granularity~~ - resolved: one shared `uv.lock` at the repo
    root, one shared `.venv`, `so`/`fsp`/`bff` each an editable workspace
    member with their own `pyproject.toml` scoping their own dependency
