@@ -2,8 +2,8 @@ services:
   # BFF Server
   rti-bff:
     build:
-      context: .
-      dockerfile: Dockerfile.bff
+      context: ../..
+      dockerfile: examples/rti-demo/modules/bff/docker/Dockerfile
     container_name: rti-bff
     ports:
       - "5000:5000"
@@ -13,12 +13,12 @@ services:
       - PORT=5000
       - PYTHONUNBUFFERED=1
       # Persist connection state in a dedicated /config dir (named volume below),
-      # not in the root-owned WORKDIR /app or the ./bff code mount. The atomic
-      # save (temp file + rename in the same dir) needs a real, writable dir -
-      # a single-file bind mount would also break os.replace() with EBUSY.
+      # not in the root-owned WORKDIR /app or the ./modules/bff code mount. The
+      # atomic save (temp file + rename in the same dir) needs a real, writable
+      # dir - a single-file bind mount would also break os.replace() with EBUSY.
       - BFF_CONNECTIONS_FILE=/config/connections.json
     volumes:
-      - ./bff:/app/bff
+      - ./modules/bff/src/bff:/app/examples/rti-demo/modules/bff/src/bff
       - bff-config:/config
       - //var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -60,7 +60,7 @@ services:
     user: root
     build:
       context: ../..
-      dockerfile: examples/rti-demo/Dockerfile.rti-fsp
+      dockerfile: examples/rti-demo/modules/fsp/docker/Dockerfile
     container_name: rti-fsp01
     ports:
       - "5001:5001"
@@ -84,9 +84,9 @@ services:
       - "rti.host=rti-fsp"
       - "rti.port=5001"
     volumes:
-        - ./fsp:/app/fsp
+        - ./modules/fsp/src/fsp:/app/examples/rti-demo/modules/fsp/src/fsp
         - ./models:/models
-        - ./demo_IO:/app/demo_IO
+        - ./modules/demo_io:/app/demo_IO
 
   # Second FSP instance
   rti-fsp02:
@@ -94,7 +94,7 @@ services:
       root
     build:
       context: ../..
-      dockerfile: examples/rti-demo/Dockerfile.rti-fsp
+      dockerfile: examples/rti-demo/modules/fsp/docker/Dockerfile
     container_name: rti-fsp02
     ports:
       - "5005:5005"  # Map to different host port, same container port
@@ -117,9 +117,9 @@ services:
       - "rti.host=rti-fsp-2"
       - "rti.port=5005"
     volumes: # ✅ Add volumes if needed
-      - ./fsp:/app/fsp
+      - ./modules/fsp/src/fsp:/app/examples/rti-demo/modules/fsp/src/fsp
       - ./models:/models
-      - ./demo_IO:/app/demo_IO
+      - ./modules/demo_io:/app/demo_IO
 
   # RTI SO (Acsi-Client)
   rti-so:
@@ -127,7 +127,7 @@ services:
       root
     build:
       context: ../..
-      dockerfile: examples/rti-demo/Dockerfile.rti-so
+      dockerfile: examples/rti-demo/modules/so/docker/Dockerfile
     container_name: rti-so
     ports:
       - "5002:5002"
@@ -150,14 +150,14 @@ services:
       - "rti.host=rti-so"
       - "rti.port=5002"
     volumes:
-        - ./so:/app/so
-        - ./demo_IO:/app/demo_IO
+        - ./modules/so/src/so:/app/examples/rti-demo/modules/so/src/so
+        - ./modules/demo_io:/app/demo_IO
 
   # GPIO LED Control API (demo_IO)
   rti-io:
     build:
-      context: .
-      dockerfile: Dockerfile.IO
+      context: modules/demo_io
+      dockerfile: docker/Dockerfile
       args:
         PI_USER: ${PI_USER:-pi}
         PI_UID: ${PI_UID:-1000}
@@ -209,7 +209,7 @@ services:
       - "rti.host=demo_io"
       - "rti.port=8000"
     volumes:
-      - ./demo_IO:/app/demo_IO
+      - ./modules/demo_io:/app/demo_IO
     command: ["./.venv/bin/python", "-u", "demo_IO/io_api_server/main.py"]
 
 

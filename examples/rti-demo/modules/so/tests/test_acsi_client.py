@@ -1,4 +1,4 @@
-"""Unit tests for so/acsi_client.py's ACSIClient controller.
+"""Unit tests for so.acsi_client's ACSIClient controller.
 
 Covers the pure/synchronous pieces of ACSIClient that don't require a live
 WebSocket connection or event loop thread: cp-list/model-info bookkeeping,
@@ -8,20 +8,12 @@ action/message logs.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-# Allow importing rti-demo/so modules (acsi_client, ...) as top-level
-# modules, same as tests/unit/so/test_bff_endpoint.py.
-SO_DIR = Path(__file__).resolve().parents[3] / "so"
-if str(SO_DIR) not in sys.path:
-    sys.path.insert(0, str(SO_DIR))
-
-from acsi_client import ACSIClient  # noqa: E402
-from ws61850.iec61850.client.iec61850_client import IEC61850Client  # noqa: E402
+from so.acsi_client import ACSIClient
+from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
 pytestmark = pytest.mark.unit
 

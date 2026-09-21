@@ -1,5 +1,5 @@
 # RTI Demo GPIO LED Control API Docker Image - Multi-stage
-# Build context: examples/rti-demo/
+# Build context: examples/rti-demo/modules/demo_io
 
 # ============================================================
 # Stage 1: Builder
@@ -24,8 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv (same approach as the original file)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Copy demo_IO project files
-COPY demo_IO/pyproject.toml /app/pyproject.toml
+# Copy demo_io project files
+COPY pyproject.toml /app/pyproject.toml
 
 # Create venv and install dependencies (gpiod is in pyproject.toml)
 RUN uv venv && \
@@ -37,7 +37,7 @@ RUN uv venv && \
     fi
 
 # Copy application code
-COPY demo_IO/io_api_server/ /app/demo_IO/io_api_server/
+COPY io_api_server/ /app/demo_IO/io_api_server/
 
 
 # ============================================================

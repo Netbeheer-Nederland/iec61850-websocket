@@ -68,66 +68,113 @@ examples/rti-demo/tests` works from the repo root too.
 failure - confirmed via `git stash` earlier in the session, not caused by
 this) and `cd examples/rti-demo && uv run pytest -m unit` (130 passed).
 
-## Step 1 - Migrate `so` (simplest: no `demo_IO` dependency)
+## Steps 1-4 - Migrate `so`, `fsp`, `bff`, `demo_IO` - DONE (one combined pass)
 
-- Create `examples/rti-demo/modules/so/{src/so/, pyproject.toml, docker/Dockerfile, tests/}`.
-- Move `so/*.py` → `modules/so/src/so/`, add `so/__init__.py` if not present.
-- `modules/so/pyproject.toml`: only `so`'s actual runtime deps (fastapi,
-  uvicorn, websockets, PyJWT, python-multipart, httpx2 - check against
-  actual imports, don't just copy the shared list) plus a path/workspace
-  dependency on `ws61850`.
-- Move `tests/unit/so/*` → `modules/so/tests/`, drop the
-  `import_module_from_path`/`sys.path.insert` workaround in favor of a
-  normal package import now that `so` is an installable package.
-- New `modules/so/docker/Dockerfile`, build context = repo root (needed for
-  `ws61850`), using `uv sync --package so`.
-- Add `so` to the workspace `members` list.
-- Update `docker-compose.yml`'s `rti-so` service: new `context`/`dockerfile`.
-- **Verify**: `uv run pytest modules/so/tests -m unit`, `docker compose build rti-so`,
-  `docker compose up rti-so` + the existing integration test
-  (`tests/integration/test_so_fsp.py`) against it.
+Step 1 (`so` alone) turned out to be blocked by something the plan didn't
+anticipate: **uv workspaces don't support a member's directory being
+nested inside another separate member's directory**, and don't support
+nested `[tool.uv.workspace]` declarations at all (`error: Nested
+workspaces are not supported`). With `examples/rti-demo` (still holding
+the not-yet-migrated `fsp`/`bff`) registered as one member and
+`examples/rti-demo/modules/so` registered as another, uv's per-package
+dependency resolution for `so` misidentified `examples/rti-demo` as its
+containing project instead of the true repo-root workspace, so `so`'s
+`iec61850-websocket = { workspace = true }` reference failed to resolve.
+That forced migrating all four together instead of one at a time, so
+there was never a moment with old-flat-and-new-modules coexisting as
+separate workspace members.
 
-## Step 2 - Migrate `fsp` (needs `demo_IO`, so do this after Step 4 if you'd
-rather not carry a temporary cross-reference - see note below)
+**A second, sharper version of the same issue** surfaced once `so`/`fsp`/
+`bff` were the only registered members: it turned out **any**
+`pyproject.toml` sitting in a parent directory of a workspace member
+blocks uv's discovery from reaching the true workspace root above it -
+even one with no `[project]` table at all (uv logs `WARN pyproject.toml
+does not contain a project table` and falls back to treating that
+directory as an independent, non-workspace project root). Fix:
+`examples/rti-demo/pyproject.toml` was deleted entirely (it had already
+been stripped down to just `[tool.pytest.ini_options]` for the
+integration tests) - that config moved to a plain `pyproject.toml` isn't
+needed for pytest, so it's just gone; `cd examples/rti-demo && uv run
+pytest tests/integration ...` still works unmodified, since uv resolves
+the enclosing workspace at the repo root automatically when there's no
+competing pyproject.toml in between.
 
-- Same shape as Step 1: `modules/fsp/{src/fsp/, pyproject.toml, docker/Dockerfile, tests/}`.
-- `fsp`'s Dockerfile currently also `COPY`s `demo_IO/` - until Step 4 lands,
-  keep that as a relative `COPY ../demo_IO` from repo root (still works,
-  just not yet using the workspace path); revisit once `demo_IO` is a
-  workspace member too.
-- Move `tests/unit/fsp/*` → `modules/fsp/tests/`.
-- Update `docker-compose.yml`'s two FSP services (`rti-fsp01`, `rti-fsp02`).
-- **Verify**: unit tests, `docker compose build rti-fsp01 rti-fsp02`,
-  `tests/integration/test_so_fsp.py` (now against the fully migrated `so` +
-  `fsp`).
+What actually landed, per module:
 
-## Step 3 - Migrate `bff`
+- **`so`**: `so/*.py` → `modules/so/src/so/`, `from acsi_client import
+  ACSIClient` → `from so.acsi_client import ACSIClient`. Deps: fastapi,
+  uvicorn, httpx2, `iec61850-websocket` (workspace source) - `websockets`/
+  `PyJWT`/`asn1tools`/`aiohttp` etc. all come along transitively via
+  `ws61850` and were never imported directly, so they're not redeclared.
+- **`fsp`**: same shape; `from acsi_server import ACSIServer` → `from
+  fsp.acsi_server import ACSIServer`. Deps: fastapi, uvicorn, httpx2,
+  `python-multipart` (file upload endpoints), `iec61850-websocket`. The
+  `demo_IO` cross-reference the original plan worried about doesn't
+  actually exist as a Python import - `fsp.bff_endpoint` loads IO-plugin
+  code dynamically from a filesystem directory (`IO_PLUGIN_STORAGE`) at
+  runtime, never a static `import demo_IO`, so there was no ordering
+  constraint with Step 4 after all.
+- **`bff`**: `from bffClient import BffClient` / `from ConnectionManager
+  import ConnectionManager` / `from pydantic_models import *` → `bff.`-
+  qualified. Deps: fastapi, uvicorn, requests, httpx2 (missed on the
+  first pass - `ConnectionManager.py` imports it even though
+  `bff_server.py` doesn't - caught by the Docker smoke test crashing with
+  `ModuleNotFoundError: No module named 'httpx2'`), `docker` (for the
+  `DockerClient` health-check integration). Does **not** depend on
+  `ws61850` - bff never imports it. Its one genuinely cross-cutting test
+  file, `test_bff_endpoint.py` (a live-container integration test, not a
+  unit test), moved to `examples/rti-demo/tests/integration/
+  test_bff_connections.py` instead of `modules/bff/tests/` - it doesn't
+  belong mixed in with bff's isolated unit tests.
+- **`demo_IO` → `modules/demo_io`**: directory move + `Dockerfile.IO` →
+  `modules/demo_io/docker/Dockerfile` (its own COPY paths de-prefixed to
+  match its own narrower build context). Deliberately **not** added to
+  the uv workspace - needs Raspberry Pi hardware packages (`gpiozero`,
+  `gpiod`, `Adafruit-ADS1x15`, `smbus2`) that won't resolve on a non-Pi
+  dev machine, and it already builds via its own fully independent
+  Docker-stage venv, never sharing the shared workspace env. Also trimmed
+  its own `pyproject.toml`'s unused `flask`/`flask-cors`/`werkzeug`/
+  `python-dotenv` (same dead-weight finding as Step 0, confirmed via the
+  same grep-for-imports check) and fixed its `name` field (`"rti-demo"` →
+  `"demo-io"` - it was a straight copy of the old shared pyproject.toml).
 
-- `modules/bff/{src/bff/, pyproject.toml, docker/Dockerfile, tests/}`.
-- `bff` doesn't need `ws61850` - simplest Dockerfile of the three, build
-  context can shrink back to just `modules/bff/` *unless* you want every
-  module's Dockerfile to share one repo-root-context convention for
-  consistency (recommended - see "Open decisions" below).
-- Move `tests/unit/bff/*` → `modules/bff/tests/`.
-- Update `docker-compose.yml`'s `rti-bff` service.
-- **Verify**: unit tests, `docker compose build rti-bff`, full stack
-  `docker compose up` + a manual HMI smoke test (Connections/Traffic pages
-  load, a live SO/FSP pair shows connected).
+Every unit test file's `sys.path.insert`/`import_module_from_path`
+boilerplate was deleted - `bff`/`fsp`/`so` being real installed packages
+means `from so.acsi_client import ACSIClient` etc. just works, and the
+module-name-collision problem `import_module_from_path` existed to solve
+(both `fsp/bff_endpoint.py` and `so/bff_endpoint.py` being literally
+named `bff_endpoint.py`) no longer exists either - they're
+`fsp.bff_endpoint` and `so.bff_endpoint` now, distinct names.
+`tests/conftest.py` (the `sys.path`-for-`ws61850` + `import_module_from_path`
+helper file) was deleted entirely as a result - nothing references it
+anymore.
 
-## Step 4 - Migrate `demo_IO` → `modules/demo_io`
+`docker-compose.yml`, `launch.py` (entry_point paths), the root and
+per-module Dockerfiles, and the old top-level `Dockerfile*` files were
+all updated/removed to match. One more real bug caught by the Docker
+smoke tests (not a migration-path issue, but found while verifying them):
+`WORKDIR /app` creates that directory as root *before* the later `COPY
+--chown=app:app` runs, and `--chown` only applies to what's copied in,
+not retroactively to the pre-existing directory node - so `/app` stayed
+root-owned and the non-root `app` user couldn't `mkdir` into it (e.g.
+fsp/so's IO-plugin dynamic-loading directory). Fixed with an explicit
+`RUN chown app:app /app` after the COPY, in all three Dockerfiles.
 
-- Rename for naming consistency (`demo_IO` → `demo_io`), move under
-  `modules/`.
-- It already has its own `pyproject.toml` and `io_api_server`/`io_client`
-  split - mostly a directory move + import path updates (grep for
-  `demo_IO` across `fsp/`, `so/`, `bff/`, `Dockerfile.IO`,
-  `docker-compose.yml`).
-- Update `fsp`'s dependency on it (the dynamic-import helpers in
-  `fsp/bff_endpoint.py` that load IO-plugin code) and `Dockerfile.IO`.
-- **Verify**: `docker compose build demo_io rti-fsp01`, IO-plugin smoke test
-  if you have the hardware/mock available, otherwise at least confirm the
-  dynamic-import fallback path (`_use_io_client=False`) still works cleanly
-  when `demo_io` isn't present.
+**Verified**: `rm -rf .venv && uv sync --all-packages` clean from repo
+root; all three modules' full unit suites (so: 72, fsp: 17, bff: 41, all
+passing) plus the root `ws61850` suite (183 passed / 1 pre-existing
+unrelated failure) and the 17 integration tests collecting correctly;
+`docker compose build` for all five services (bff, fsp01, fsp02, so, hmi,
+demo_io); a live `docker compose up` of bff+fsp01+fsp02+so with a real
+FSP→SO WebSocket association (`acsi_client_list: ["cp1"]`) and a BFF
+proxy call through to the SO, both working end to end.
+
+Not yet done: per-module `README.md` files (`modules/{bff,fsp,so,demo_io}/README.md`)
+still have some stale example paths/commands from before the move -
+`TESTING.md` and the root `README.md`'s Docker section were updated, but
+the per-module READMEs' prose wasn't fully audited. Low priority - low
+risk of anyone being misled by it in practice, since it's usage
+documentation, not anything executable.
 
 ## Step 5 - `hmi`
 
@@ -174,23 +221,23 @@ rather not carry a temporary cross-reference - see note below)
 
 ---
 
-## Open decisions (resolve before Step 1)
+## Open decisions
 
-1. **Build context convention**: standardize every module's Dockerfile on
-   repo-root context (like `fsp`/`so` need today for `ws61850`), or let
-   `bff`/`demo_io` (which don't need `ws61850`) use a narrower context? Repo
-   root everywhere is simpler to reason about; narrower contexts build
-   marginally faster. Recommend: repo root everywhere, for consistency -
-   the build-time cost difference is small.
-2. **`hmi` in the workspace or not**: it's a different toolchain entirely
-   (npm/vite, not uv) - moving it under `modules/` is purely cosmetic
-   consistency, not a functional requirement. Low priority either way.
-3. **Lockfile granularity**: one root `uv.lock` for the whole workspace
-   (recommended - simpler, one resolution, per-module `pyproject.toml`
-   still scopes what each *image* installs via `uv sync --package X`), vs.
-   fully independent lockfiles per module (more isolation, more files to
-   keep in sync, more CI time), Recommend the workspace-lockfile approach
-   described throughout this plan.
+1. ~~Build context convention~~ - resolved: `bff`/`fsp`/`so` all build from
+   repo-root context now (`fsp`/`so` need it for `ws61850`; `bff` doesn't
+   strictly need it but matches the others for consistency). `demo_io`
+   builds from its own narrower context (`modules/demo_io`) since it's
+   fully independent of the workspace anyway.
+2. **`hmi` in `modules/` or not**: still open, still low priority. It's a
+   different toolchain entirely (npm/vite, not uv) - moving it under
+   `modules/` (Step 5) is purely cosmetic consistency, not a functional
+   requirement.
+3. ~~Lockfile granularity~~ - resolved: one shared `uv.lock` at the repo
+   root, one shared `.venv`, `so`/`fsp`/`bff` each an editable workspace
+   member with their own `pyproject.toml` scoping their own dependency
+   *list* (not a separate resolution). `uv sync --package X` (used in each
+   Dockerfile) installs just that member + its deps into that same shared
+   lock's view.
 
 ## Rollback
 

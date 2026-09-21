@@ -1,4 +1,7 @@
-# RTI Demo BFF Server - Multi-stage Docker Image
+# RTI Demo BFF (Backend for Frontend) Docker Image - Multi-stage
+# Build context: repo root (kept consistent with fsp/so, which need it for
+# the shared uv workspace lock and the ws61850 core library at src/ - bff
+# itself doesn't depend on ws61850, but shares the same build convention).
 
 # ============================================================
 # Stage 1: Builder
@@ -11,17 +14,12 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# Copy dependency files
 COPY pyproject.toml uv.lock ./
+COPY src/ ./src/
+COPY examples/rti-demo/modules/bff/ ./examples/rti-demo/modules/bff/
 
-# Create the virtual environment and install dependencies
-RUN uv sync --locked --no-install-project --no-dev
-
-# Copy BFF application
-COPY bff/ ./bff/
-
-# Install project dependencies
-RUN uv sync --locked --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --package bff
 
 
 # ============================================================
@@ -42,9 +40,8 @@ RUN apt-get update && \
 
 RUN useradd --create-home --shell /usr/sbin/nologin app
 
-# Copy ONLY the virtual environment and BFF
-COPY --from=builder --chown=app:app /app/.venv /app/.venv
-COPY --from=builder --chown=app:app /app/bff /app/bff
+COPY --from=builder --chown=app:app /app /app
+RUN chown app:app /app
 
 # Writable location for runtime state (connections.json). Kept outside the
 # root-owned WORKDIR and the code bind mount; backed by a named volume in
@@ -59,4 +56,4 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:5000/api/health || exit 1
 
-CMD ["python", "-u", "bff/bff_server.py"]
+CMD ["python", "-u", "-m", "bff.bff_server"]

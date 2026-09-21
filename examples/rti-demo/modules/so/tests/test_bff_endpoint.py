@@ -1,6 +1,6 @@
 """Unit tests for SO ACSI-Client_WebsocketPassive BFF endpoint routes.
 
-so/bff_endpoint.py is a FastAPI router (create_bff_router), mounted under
+so.bff_endpoint is a FastAPI router (create_bff_router), mounted under
 the "/api" prefix - not the Flask blueprint this file originally tested
 against. Routes are flat (e.g. "/api/status", not
 "/api/iec61850client/status"), and a couple of routes changed method or
@@ -11,21 +11,11 @@ name entirely: GET /connections -> POST /connections, and
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from tests.conftest import import_module_from_path
-
-# Allow importing rti-demo/so modules (acsi_client, pydantic_models, ...) as
-# top-level modules - so/bff_endpoint.py imports them that way itself.
-SO_DIR = Path(__file__).resolve().parents[3] / "so"
-if str(SO_DIR) not in sys.path:
-    sys.path.insert(0, str(SO_DIR))
-
+from so import bff_endpoint
 
 pytestmark = pytest.mark.unit
 
@@ -37,12 +27,6 @@ def content_type(response) -> str:
 @pytest.fixture
 def app_client():
     """Create a FastAPI app wrapping the SO's BFF router."""
-    # Loaded under a unique module name, not the generic "bff_endpoint" a
-    # plain `import bff_endpoint` would use - fsp/bff_endpoint.py is also
-    # literally named "bff_endpoint.py" and would collide with it. See
-    # tests/conftest.py:import_module_from_path.
-    bff_endpoint = import_module_from_path("so_bff_endpoint", SO_DIR / "bff_endpoint.py")
-
     app = FastAPI()
     # create_bff_router's first parameter is typed `app: FastAPI` but is
     # unused - it isn't needed to build the router or the ACSIClient() it

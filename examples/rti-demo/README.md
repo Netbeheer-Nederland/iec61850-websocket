@@ -99,16 +99,19 @@ echo [] > connections.json
 ## Docker
 
 ```bash
-# Build images
-docker build -t rti-demo-bff -f rti-demo/bff/Dockerfile .
-docker build -t rti-demo-fsp -f rti-demo/fsp/Dockerfile .
-docker build -t rti-demo-so -f rti-demo/so/Dockerfile .
+# Build images (each module's Dockerfile builds from the repo root, since
+# fsp/so need the ws61850 core library at src/)
+cd ../..   # repo root
+docker build -f examples/rti-demo/modules/bff/docker/Dockerfile -t rti-demo-bff .
+docker build -f examples/rti-demo/modules/fsp/docker/Dockerfile -t rti-demo-fsp .
+docker build -f examples/rti-demo/modules/so/docker/Dockerfile -t rti-demo-so .
 
 # Launch with Docker (all services by default)
 python launch.py --docker
 
 # Docker Compose
-docker-compose -f rti-demo/docker-compose.yml up -d
+cd examples/rti-demo
+docker compose up -d
 ```
 
 ### BFF connection persistence in Docker

@@ -38,7 +38,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
 
-from acsi_client import ACSIClient
+from so.acsi_client import ACSIClient
 
 from ws61850.security.tls import TLSConfig
 import ssl

@@ -34,7 +34,7 @@ The ConnectionManager is a core component of the BFF server, enabling it to:
 """
 
 from typing import Any, Dict, List, Optional, Tuple
-from bffClient import BffClient
+from bff.bffClient import BffClient
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 import httpx2 as httpx

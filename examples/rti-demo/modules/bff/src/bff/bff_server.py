@@ -33,11 +33,11 @@ from fastapi import FastAPI, Request, HTTPException, status, Body, WebSocket, We
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from pydantic_models import *
+from bff.pydantic_models import *
 
-from bffClient import BffClient
+from bff.bffClient import BffClient
 
-from ConnectionManager import ConnectionManager
+from bff.ConnectionManager import ConnectionManager
 
 from concurrent.futures import ThreadPoolExecutor
 import asyncio

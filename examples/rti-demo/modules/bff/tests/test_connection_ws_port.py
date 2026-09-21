@@ -22,24 +22,18 @@ Covers two layers:
 from __future__ import annotations
 
 import os
-import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 from unittest.mock import AsyncMock
 
-BFF_DIR = Path(__file__).resolve().parents[3] / "bff"
-if str(BFF_DIR) not in sys.path:
-    sys.path.insert(0, str(BFF_DIR))
-
 _tmp_connections_file = Path(tempfile.mkdtemp()) / "connections.json"
 _tmp_connections_file.write_text("[]", encoding="utf-8")
 os.environ.setdefault("BFF_CONNECTIONS_FILE", str(_tmp_connections_file))
 
-import bff_server  # noqa: E402
-from ConnectionManager import ConnectionManager  # noqa: E402
-
+from bff import bff_server  # noqa: E402 - must follow the env var default above
+from bff.ConnectionManager import ConnectionManager  # noqa: E402
 
 pytestmark = pytest.mark.unit
 

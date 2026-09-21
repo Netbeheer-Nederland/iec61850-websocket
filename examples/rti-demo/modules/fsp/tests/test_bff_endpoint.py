@@ -1,6 +1,6 @@
 """Unit tests for FSP BFF endpoint routes.
 
-fsp/bff_endpoint.py is a FastAPI router (create_bff_router), mounted under
+fsp.bff_endpoint is a FastAPI router (create_bff_router), mounted under
 the "/api" prefix - not the Flask blueprint this file originally tested
 against. Routes are flat (e.g. "/api/status", not
 "/api/iec61850server/status").
@@ -9,21 +9,12 @@ against. Routes are flat (e.g. "/api/status", not
 from __future__ import annotations
 
 import os
-import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from tests.conftest import import_module_from_path
-
-# Allow importing rti-demo/fsp modules (acsi_server, pydantic_models, ...)
-# as top-level modules - fsp/bff_endpoint.py imports them that way itself.
-FSP_DIR = Path(__file__).resolve().parents[3] / "fsp"
-if str(FSP_DIR) not in sys.path:
-    sys.path.insert(0, str(FSP_DIR))
 
 # bff_endpoint.py reads IO_PLUGIN_STORAGE at import time and defaults to
 # "/app/io_plugin_dynamic" (a Docker-only path) - unwritable outside a
@@ -32,12 +23,7 @@ if str(FSP_DIR) not in sys.path:
 # be used for any non-Docker deployment.
 os.environ.setdefault("IO_PLUGIN_STORAGE", tempfile.mkdtemp(prefix="io_plugin_dynamic_"))
 
-# Loaded under a unique module name, not the generic "bff_endpoint" a plain
-# `import bff_endpoint` would use - so/bff_endpoint.py is also literally
-# named "bff_endpoint.py" and would collide with it. See
-# tests/conftest.py:import_module_from_path.
-bff_endpoint = import_module_from_path("fsp_bff_endpoint", FSP_DIR / "bff_endpoint.py")
-
+from fsp import bff_endpoint  # noqa: E402 - must follow the env var default above
 
 pytestmark = pytest.mark.unit
 

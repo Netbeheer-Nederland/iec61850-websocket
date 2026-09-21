@@ -30,7 +30,7 @@ from typing import Optional
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from acsi_server import ACSIServer
+from fsp.acsi_server import ACSIServer
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
 from fastapi import FastAPI, APIRouter, Request, HTTPException, status, UploadFile, File
 from fastapi.responses import JSONResponse, RedirectResponse

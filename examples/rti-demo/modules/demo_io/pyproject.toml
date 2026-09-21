@@ -1,7 +1,7 @@
 [project]
-name = "rti-demo"
+name = "demo-io"
 version = "0.1.0"
-description = "Add your description here"
+description = "RTI Demo IO service (Raspberry Pi GPIO/I2C device control API)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -10,17 +10,13 @@ dependencies = [
     "asn1tools>=0.167.0",
     "docker==6.1.0",
     "fastapi>=0.139.0",
-    "flask==3.0.0",
-    "flask-cors==4.0.0",
     "gpiozero",
     "gpiod",
     "smbus2",
     "httpx2>=2.13.0",
     "PyJWT>=2.0.0,<3.0.0",
-    "python-dotenv==1.0.0",
     "python-multipart>=0.0.32",
     "requests==2.31.0",
     "uvicorn>=0.51.0",
     "websockets>=16.1",
-    "werkzeug==3.0.1",
 ]

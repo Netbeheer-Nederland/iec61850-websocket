@@ -2,9 +2,9 @@
 
 Covers WSHub, push_relay_loop and its helpers (_parse_status_repr,
 _fetch_fsp_client_count, _build_enriched_connections, _relay_new_messages)
-in bff/bff_server.py. These are isolated unit tests - no Docker, no real
+in bff.bff_server. These are isolated unit tests - no Docker, no real
 RTI-SO/RTI-FSP instances - matching the pattern already used by
-tests/unit/fsp/test_bff_endpoint.py and tests/unit/so/test_bff_endpoint.py:
+fsp/tests/test_bff_endpoint.py and so/tests/test_bff_endpoint.py:
 a fake stand-in for the thing being talked to (here, BffClient.request)
 instead of a live server.
 """
@@ -13,29 +13,20 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
 
-# Allow importing rti-demo/bff modules as top-level modules (they use
-# unqualified imports like `from bffClient import BffClient`, so bff/ itself
-# must be on sys.path). Point BFF_CONNECTIONS_FILE at a throwaway, empty file
-# *before* importing bff_server, so its module-level ConnectionManager
-# doesn't load or seed from the real connections.json and doesn't register
-# any real BffClients.
-BFF_DIR = Path(__file__).resolve().parents[3] / "bff"
-if str(BFF_DIR) not in sys.path:
-    sys.path.insert(0, str(BFF_DIR))
-
+# Point BFF_CONNECTIONS_FILE at a throwaway, empty file *before* importing
+# bff_server, so its module-level ConnectionManager doesn't load or seed
+# from the real connections.json and doesn't register any real BffClients.
 _tmp_connections_file = Path(tempfile.mkdtemp()) / "connections.json"
 _tmp_connections_file.write_text("[]", encoding="utf-8")
 os.environ.setdefault("BFF_CONNECTIONS_FILE", str(_tmp_connections_file))
 
-import bff_server  # noqa: E402
-
+from bff import bff_server  # noqa: E402 - must follow the env var default above
 
 pytestmark = pytest.mark.unit
 
