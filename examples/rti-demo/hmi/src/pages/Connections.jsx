@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 
 function Connections({ connections, setConnections, loading = false, onReload }) {
   const [showModal, setShowModal] = useState(false);
@@ -52,9 +52,56 @@ function Connections({ connections, setConnections, loading = false, onReload })
     setShowModal(true);
   };
 
-  const handleDeleteConnection = (index) => {
-    setConnections(connections.filter((_, i) => i !== index));
+  const handleDeleteConnection = (connection) => {
+    // By identity, not index - the table can be sorted, so a row's
+    // displayed position no longer matches its index in `connections`.
+    setConnections(connections.filter((c) => c !== connection));
   };
+
+  // Sortable columns: Name, Type, Host, BFF Port ('name' | 'type' | 'host'
+  // | 'port', or null for unsorted).
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const sortedConnections = useMemo(() => {
+    if (!sortConfig.key) return connections;
+    const { key, direction } = sortConfig;
+    const sign = direction === 'asc' ? 1 : -1;
+    return [...connections].sort((a, b) => {
+      if (key === 'port') {
+        return sign * ((Number(a.port) || 0) - (Number(b.port) || 0));
+      }
+      const aVal = String(a[key] ?? '').toLowerCase();
+      const bVal = String(b[key] ?? '').toLowerCase();
+      if (aVal < bVal) return -1 * sign;
+      if (aVal > bVal) return 1 * sign;
+      return 0;
+    });
+  }, [connections, sortConfig]);
+
+  const sortIcon = (key) => {
+    if (sortConfig.key !== key) {
+      return <i className="fas fa-sort" style={{ marginLeft: '6px', fontSize: '11px', opacity: 0.4 }}></i>;
+    }
+    return (
+      <i
+        className={`fas fa-sort-${sortConfig.direction === 'asc' ? 'up' : 'down'}`}
+        style={{ marginLeft: '6px', fontSize: '11px' }}
+      ></i>
+    );
+  };
+
+  const sortableTh = (key, label) => (
+    <th onClick={() => handleSort(key)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+      {label}{sortIcon(key)}
+    </th>
+  );
 
   const handleSaveConnection = () => {
     if (currentConnection === null) {
@@ -133,16 +180,16 @@ function Connections({ connections, setConnections, loading = false, onReload })
               <thead>
                 <tr>
                   <th>Status</th>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Host</th>
-                  <th>BFF Port</th>
+                  {sortableTh('name', 'Name')}
+                  {sortableTh('type', 'Type')}
+                  {sortableTh('host', 'Host')}
+                  {sortableTh('port', 'BFF Port')}
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {connections.map((conn, index) => (
-                  <tr key={index}>
+                {sortedConnections.map((conn, index) => (
+                  <tr key={conn.name || index}>
                     <td>
                       <span className="endpoint-card-status">
                         {conn.status === 'connected' ? 'Connected' : 'Disconnected'}
@@ -152,20 +199,26 @@ function Connections({ connections, setConnections, loading = false, onReload })
                     <td>{conn.type}</td>
                     <td>{conn.type === 'IDP-Server' ? '-' : conn.host}</td>
                     <td>{conn.type === 'IDP-Server' ? '-' : conn.port}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <button
-                        className="btn-icon"
-                        style={{ marginRight: '8px' }}
-                        onClick={() => handleEditConnection(conn)}
-                      >
-                        <i className="fas fa-edit"></i>
-                      </button>
-                      <button
-                        className="btn-icon"
-                        onClick={() => handleDeleteConnection(index)}
-                      >
-                        <i className="fas fa-trash"></i>
-                      </button>
+                    <td>
+                      {/* .btn-icon is display:flex (block-outer), so as
+                          direct <td> children these would stack on
+                          separate lines instead of sitting side by side -
+                          a flex wrapper restores the row layout, the same
+                          way their old flex-row parent used to. */}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          className="btn-icon"
+                          onClick={() => handleEditConnection(conn)}
+                        >
+                          <i className="fas fa-edit"></i>
+                        </button>
+                        <button
+                          className="btn-icon"
+                          onClick={() => handleDeleteConnection(conn)}
+                        >
+                          <i className="fas fa-trash"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
