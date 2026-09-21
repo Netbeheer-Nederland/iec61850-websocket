@@ -30,16 +30,43 @@ away, not tangled up with three other changes.
 
 ---
 
-## Step 0 - Establish the uv workspace (no files moved yet)
+## Step 0 - Establish the uv workspace (no files moved yet) - DONE
 
-- Add `[tool.uv.workspace]` to the **repo root** `pyproject.toml`, with
-  `members = ["examples/rti-demo"]` initially (the existing flat layout,
-  unchanged) - just to prove the workspace mechanism resolves cleanly
-  end-to-end before anything else changes.
-- Run `uv sync` from repo root and `uv run pytest` (core `tests/`) and
-  `cd examples/rti-demo && uv run pytest` (rti-demo `tests/`) - both must
-  still pass unmodified.
-- **Verify**: nothing about behavior changed yet; this step is pure plumbing.
+Added `[tool.uv.workspace]` to the **repo root** `pyproject.toml` with
+`members = ["examples/rti-demo"]`. This immediately exposed real version
+conflicts between the two previously-independent projects (a single
+workspace resolves one shared environment, so it can't hold two versions
+of the same package) - resolved as follows, each verified against both
+projects' full test suites:
+
+- **`flask`, `flask-cors`, `werkzeug`**: removed entirely from
+  `examples/rti-demo/pyproject.toml`. Nothing in rti-demo imports them -
+  `grep` for `import flask`/`from flask`/`werkzeug` across the whole
+  module came back empty, and CORS is handled via FastAPI's own
+  `CORSMiddleware` (confirmed in `bff/bff_server.py`), not `flask-cors`.
+  Leftover from an earlier Flask-based implementation. Zero-risk removal.
+- **`aiohttp`**: root was `==3.13.3`, rti-demo needed `>=3.14.1` → bumped
+  root to `==3.14.1`.
+- **`websockets`**: root was `==16.0`, rti-demo needed `>=16.1` → bumped
+  root to `==16.1`.
+- **`requests`**: root was `==2.32.5` (newer), rti-demo was `==2.31.0`
+  (older) → bumped rti-demo to `==2.32.5` (root's already-vetted version).
+- **`idna`** (transitive, surfaced only after the above were fixed): root
+  pinned `==3.11`; rti-demo's `httpx2>=2.13.0` transitively requires
+  `idna>=3.18` → bumped root to `==3.18` (matching what rti-demo's own
+  lock already resolved to).
+
+Also deleted `examples/rti-demo/.venv` and `examples/rti-demo/uv.lock` -
+now stale, since the workspace uses one shared `.venv`/`uv.lock` at the
+repo root. Confirmed `cd examples/rti-demo && uv run pytest` still works
+unmodified (doesn't recreate a local venv/lock - correctly resolves
+against the workspace root's), and `uv run --package rti-demo pytest
+examples/rti-demo/tests` works from the repo root too.
+
+**Verified**: clean `rm -rf .venv && uv sync` from repo root, then both
+`uv run pytest tests/unit` (core, 183 passed / 1 pre-existing unrelated
+failure - confirmed via `git stash` earlier in the session, not caused by
+this) and `cd examples/rti-demo && uv run pytest -m unit` (130 passed).
 
 ## Step 1 - Migrate `so` (simplest: no `demo_IO` dependency)
 
