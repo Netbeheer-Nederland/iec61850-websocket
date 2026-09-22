@@ -26,6 +26,7 @@ import { transformModelToTree } from '../utils/modelUtils';
 import TLSConfigModal from '../components/TLSConfigModal';
 import ContextMenu  from "../components/ContextMenu.jsx";
 import WriteValueModal from '../components/WriteValueModal.jsx';
+import ActionLogPanel from '../components/ActionLogPanel.jsx';
 
 function ACSIServer({ settings, updateModel, getModel, connections: propConnections, bffBaseUrl = 'http://localhost:5000'}) {
   const location = useLocation();
@@ -1192,35 +1193,14 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-        <button id="messages-start-btn" className={isMonitoring ? 'btn-secondary' : 'btn-primary'} onClick={startMonitoring} disabled={!endpointTarget || isMonitoring}>
-          {isMonitoring ? 'Monitoring...' : 'Start Monitor'}
-        </button>
-        <button id="messages-stop-btn" className={isMonitoring ? 'btn-primary' : 'btn-secondary'} onClick={stopMonitoringHandler} disabled={!isMonitoring}>
-          Stop Monitor
-        </button>
-        <button id="messages-clear-btn" className="btn-secondary" onClick={clearMessages} disabled={!endpointTarget}>
-          Clear Logs
-        </button>
-      </div>
-
-      {isMonitoring && (
-        <div style={{ marginTop: '24px' }}>
-          <h3 style={{ fontSize: '16px', marginBottom: '12px' }}>Protocol Messages</h3>
-          <div style={{ background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)', maxHeight: '300px', overflowY: 'auto', padding: '12px' }}>
-            {protocolMessages.length === 0 ? <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No log messages yet. Messages will appear here when monitoring.</div> :
-              protocolMessages.map((msg, index) => (
-                <div key={index} style={{ padding: '8px 12px', marginBottom: '8px', borderRadius: '4px', background: 'var(--bg-hover)', fontSize: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>#{msg.id || index} - {msg.timestamp}</span>
-                    <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '3px', background: msg.level === 'error' ? 'var(--danger-bg)' : msg.level === 'warning' ? 'var(--warning-bg)' : 'var(--info-bg)' }}>{msg.level || 'info'}</span>
-                  </div>
-                  <div style={{ color: 'var(--text-primary)' }}>{msg.message}</div>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
+      <ActionLogPanel
+        messages={protocolMessages}
+        isMonitoring={isMonitoring}
+        disabled={!endpointTarget}
+        onStart={startMonitoring}
+        onStop={stopMonitoringHandler}
+        onClear={clearMessages}
+      />
 
       <TLSConfigModal
         isOpen={showTLSModal}
