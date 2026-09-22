@@ -227,6 +227,27 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     }
   }, [bffBaseUrl, fetchConnections]);
 
+  // True once we're sure selectedInstanceName (and the port/cp/connected
+  // state next to it) reflect their FINAL values, not just whatever the
+  // generic pre-resolution storage key happened to hold. navEndpoint
+  // resolves synchronously at mount (no gap), so it starts settled
+  // immediately in that case, same as when there's no ?fsp= param to
+  // resolve at all. Only the async paramEndpoint path (a refresh/direct
+  // visit landing on ?fsp=...) starts unsettled, and flips true once
+  // either a match is found *and re-synced* (see the effect below) or
+  // resolution completes with no match. syncInitialConfig further down
+  // waits on this - without it, it could run one render too early, see
+  // selectedInstanceName still at its stale generic-key value, and
+  // permanently lock itself out (via initialSyncDoneRef) before the
+  // restore had a chance to complete - leaving WS Host stuck on
+  // "localhost" forever instead of the restored instance's real host,
+  // even though the Instance dropdown and WS Port correctly show the
+  // restored selection a moment later (they're plain localStorage reads,
+  // not dependent on this cross-reference-with-soTargetInstances lookup).
+  const [identitySettled, setIdentitySettled] = useState(
+    () => Boolean(navEndpoint) || !fspParam
+  );
+
   // Resolve paramEndpoint from the ?fsp=<name> URL param once connections
   // have loaded - only needed when we didn't already get a real endpoint
   // from navigation state (that always wins; the URL param exists purely
@@ -238,7 +259,13 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     if (paramResolvedForRef.current === fspParam) return;
     paramResolvedForRef.current = fspParam;
     const found = connections.find(c => c.type === 'RTI-FSP' && c.name === fspParam);
-    if (found) setParamEndpoint(found);
+    if (found) {
+      setParamEndpoint(found);
+      // Don't settle yet - wait for the re-sync effect below to actually
+      // apply the now-correct instance-keyed state first.
+    } else {
+      setIdentitySettled(true); // resolution attempted, nothing found - settle with blanks
+    }
   }, [navEndpoint, fspParam, connections, connectionsLoaded]);
 
   // port/cp/connected/selectedInstanceName were already initialized once,
@@ -254,6 +281,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     setCp(localStorage.getItem(cpStorageKey) || paramEndpoint.cp || '');
     setConnected(localStorage.getItem(storageKey) === 'true');
     setSelectedInstanceName(localStorage.getItem(selectedInstanceStorageKey) || '');
+    setIdentitySettled(true);
   }, [paramEndpoint, portStorageKey, cpStorageKey, storageKey, selectedInstanceStorageKey]);
 
   // Keep the URL's ?fsp= param in sync with a real navigated-in endpoint,
@@ -409,7 +437,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           console.error('Failed to sync from live server status:', e);
         }
       } else {
-        if (!connectionsLoaded) return; // wait for the real fetch before deciding
+        if (!connectionsLoaded || !identitySettled) return; // wait for the real fetch, and for the ?fsp= restore, before deciding
 
         if (selectedInstanceName === 'custom' || selectedInstanceName === '') {
           // Fill in only whatever's still blank - a real host from
@@ -451,7 +479,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     };
 
     syncInitialConfig();
-  }, [connected, soTargetInstances, selectedInstanceName, connectionsLoaded, endpointTarget, executeApiCall, parsePythonDictString, host, port, mode]);
+  }, [connected, soTargetInstances, selectedInstanceName, connectionsLoaded, identitySettled, endpointTarget, executeApiCall, parsePythonDictString, host, port, mode]);
 
   const handleStartServer = useCallback(async () => {
     if (!endpointTarget) { setError('No endpoint configured'); return; }

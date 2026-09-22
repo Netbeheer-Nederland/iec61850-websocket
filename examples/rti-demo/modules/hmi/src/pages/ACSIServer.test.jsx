@@ -130,6 +130,36 @@ describe('ACSIServer recovering the endpoint from ?fsp= after a refresh', () => 
     expect(screen.getByLabelText('Instance')).toBeDisabled();
     expect(executeApiCall).not.toHaveBeenCalled();
   });
+
+  it('restores WS Host from a persisted instance selection, not just the Instance dropdown value', async () => {
+    // Regression test: paramEndpoint (and the selectedInstanceName it
+    // restores from localStorage) only resolves *after* the async
+    // connections fetch, one render later than connectionsLoaded itself.
+    // syncInitialConfig used to run its "nothing selected, use blank
+    // defaults" branch on that earlier render - while selectedInstanceName
+    // was still '' - and permanently lock itself out via
+    // initialSyncDoneRef before the restore could apply, leaving WS Host
+    // stuck on "localhost" forever even though the Instance dropdown and
+    // WS Port (both plain localStorage reads, not this cross-reference)
+    // correctly showed the restored selection a moment later.
+    mockConnections([
+      { name: 'FSP01', host: 'rti-fsp01', port: 5001, type: 'RTI-FSP', cp: 'cp1', status: 'connected' },
+      { name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765, type: 'RTI-SO', status: 'connected' },
+    ]);
+    localStorage.setItem('acsi-server-selected-instance-FSP01', 'so1');
+    localStorage.setItem('acsi-server-port-FSP01', '8765');
+    renderPageWithParam('FSP01');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Instance')).toHaveValue('so1');
+    });
+    // The bug: this stayed 'localhost' (the blank-state placeholder)
+    // instead of restoring to so1's real host.
+    await waitFor(() => {
+      expect(screen.getByLabelText('WS Host')).toHaveValue('10.0.0.1');
+    });
+    expect(screen.getByLabelText('WS Port')).toHaveValue('8765');
+  });
 });
 
 describe('ACSIServer instance selection - fresh/no prior selection', () => {
