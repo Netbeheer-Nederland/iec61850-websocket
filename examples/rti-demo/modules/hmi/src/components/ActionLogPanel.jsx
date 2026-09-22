@@ -32,21 +32,24 @@ import React, { useMemo, useState } from 'react';
  * survives navigating away) stays owned by the page, same as before.
  */
 
-// Real values _log_action ever sends (fsp/acsi_server.py, so/acsi_client.py):
+// Values _log_action currently sends (fsp/acsi_server.py, so/acsi_client.py):
 // "info" (default), "warn", "error" - NOT "warning". The inline
-// implementations this replaces checked for "warning", which never matched
+// implementations this replaced checked for "warning", which never matched
 // a real "warn" entry - those silently fell through to the default/info
-// styling. Order here also defines severity rank, high to low, for sorting.
-const SEVERITY_LEVELS = ['error', 'warn', 'info'];
+// styling. "debug" isn't emitted yet but is included here (recognized +
+// filterable + styled) so it isn't silently bucketed under "info" the
+// moment it is.
+const SEVERITY_LEVELS = ['error', 'warn', 'info', 'debug'];
 
 // --danger-bg/--warning-bg/--info-bg (used by the inline implementations
-// this replaces) aren't actually defined anywhere in styles.css - badges
+// this replaced) aren't actually defined anywhere in styles.css - badges
 // rendered with no background at all. Using the real --danger-color/
 // --warning-color/--info-color tokens directly, at low opacity, instead.
 const SEVERITY_STYLE = {
   error: { label: 'error', bg: 'rgba(244, 67, 54, 0.15)', color: 'var(--danger-color)' },
   warn: { label: 'warn', bg: 'rgba(255, 152, 0, 0.15)', color: 'var(--warning-color)' },
   info: { label: 'info', bg: 'rgba(3, 169, 244, 0.15)', color: 'var(--info-color)' },
+  debug: { label: 'debug', bg: 'rgba(148, 163, 184, 0.15)', color: 'var(--text-muted)' },
 };
 
 const styleFor = (level) => SEVERITY_STYLE[level] || SEVERITY_STYLE.info;
@@ -59,7 +62,7 @@ function ActionLogPanel({ messages, isMonitoring, disabled, onStart, onStop, onC
   const [sortOrder, setSortOrder] = useState('newest');
 
   const counts = useMemo(() => {
-    const c = { error: 0, warn: 0, info: 0 };
+    const c = { error: 0, warn: 0, info: 0, debug: 0 };
     for (const msg of messages) {
       const level = SEVERITY_LEVELS.includes(msg.level) ? msg.level : 'info';
       c[level] += 1;
@@ -108,16 +111,17 @@ function ActionLogPanel({ messages, isMonitoring, disabled, onStart, onStop, onC
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <select
                 id="messages-severity-filter"
+                className="action-log-select"
                 value={severityFilter}
                 onChange={(e) => setSeverityFilter(e.target.value)}
                 disabled={messages.length === 0}
-                style={{ fontSize: '12px' }}
                 title="Filter by severity"
               >
                 <option value="all">All levels</option>
                 <option value="error">Error only</option>
                 <option value="warn">Warning only</option>
                 <option value="info">Info only</option>
+                <option value="debug">Debug only</option>
               </select>
               <button
                 id="messages-sort-toggle"

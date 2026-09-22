@@ -70,6 +70,15 @@ describe('ActionLogPanel severity', () => {
     renderPanel({ messages: [{ id: 1, timestamp: '10:00:00', level: 'bogus', message: 'x' }] });
     expect(screen.getByText('info')).toBeInTheDocument();
   });
+
+  it('recognizes "debug" as its own severity, distinct from info', () => {
+    // Not emitted by the backend yet, but recognized/styled/filterable
+    // upfront so it isn't silently bucketed under "info" the moment it is.
+    renderPanel({ messages: [{ id: 1, timestamp: '10:00:00', level: 'debug', message: 'verbose trace' }] });
+    const debugBadge = screen.getByText('debug');
+    expect(debugBadge).toBeInTheDocument();
+    expect(screen.queryByText('info')).not.toBeInTheDocument();
+  });
 });
 
 describe('ActionLogPanel filtering', () => {
@@ -82,6 +91,16 @@ describe('ActionLogPanel filtering', () => {
     expect(screen.getByText('Stop failed: boom')).toBeInTheDocument();
     expect(screen.queryByText('objRef is required')).not.toBeInTheDocument();
     expect(screen.queryByText('Server started')).not.toBeInTheDocument();
+  });
+
+  it('has a "Debug only" filter option', () => {
+    renderPanel();
+    expect(screen.getByRole('option', { name: 'Debug only' })).toBeInTheDocument();
+  });
+
+  it('uses the styled select class, not an unstyled native default', () => {
+    renderPanel();
+    expect(screen.getByTitle('Filter by severity')).toHaveClass('action-log-select');
   });
 
   it('shows a distinct empty-state message when the filter excludes everything', async () => {

@@ -519,8 +519,14 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         if (Array.isArray(actions) && actions.length > 0) {
           setProtocolMessages(prev => {
             const existingIds = new Set(prev.map(msg => msg.id));
+            // `actions` comes back oldest-first (the backend appends to a
+            // deque) - reverse before prepending so a poll that catches
+            // more than one new entry doesn't put them in front of `prev`
+            // in their original oldest-first sub-order, which broke the
+            // newest-first ordering ActionLogPanel's default view relies on.
             const newMessages = actions.filter(msg => msg && msg.id && !existingIds.has(msg.id))
-              .map(msg => ({ ...msg, timestamp: new Date().toLocaleTimeString() }));
+              .map(msg => ({ ...msg, timestamp: new Date().toLocaleTimeString() }))
+              .reverse();
             return [...newMessages, ...prev].slice(0, 30);
           });
         }

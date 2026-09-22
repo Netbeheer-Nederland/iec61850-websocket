@@ -1098,6 +1098,30 @@ html {
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
+/* ActionLogPanel's severity filter - same treatment as the monitor
+   selects above (it sits in an identical header-row position), but a
+   distinct class since it's a different component/page. */
+.action-log-select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.action-log-select:focus {
+    outline: none;
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.action-log-select:disabled {
+    background: var(--bg-card);
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
 .monitor-control-btn {
     width: 36px;
     height: 36px;

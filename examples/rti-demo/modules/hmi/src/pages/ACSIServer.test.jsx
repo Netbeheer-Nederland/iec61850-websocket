@@ -374,3 +374,38 @@ describe('ACSIServer connection status label', () => {
     expect(screen.getByText('IED_2')).toBeInTheDocument();
   });
 });
+
+describe('ACSIServer monitoring - action log ordering', () => {
+  it('shows a batch of newly-fetched actions newest-first, not in the backend\'s oldest-first order', async () => {
+    // fsp/acsi_server.py's actions deque is oldest-first (appended to);
+    // GET /api/actions-logs returns it unchanged. A poll that catches
+    // multiple new entries at once used to prepend them in that same
+    // oldest-first sub-order, breaking the newest-first ordering
+    // ActionLogPanel's default view relies on.
+    executeApiCall.mockImplementation(async (apiId) => {
+      if (apiId === 'actions-logs') {
+        return {
+          ok: true,
+          payload: {
+            actions: [
+              { id: 1, time: '10:00:00', level: 'info', message: 'oldest' },
+              { id: 2, time: '10:00:01', level: 'info', message: 'middle' },
+              { id: 3, time: '10:00:02', level: 'info', message: 'newest' },
+            ],
+          },
+        };
+      }
+      return { ok: false };
+    });
+    renderPage();
+    const user = userEvent.setup({ delay: null });
+
+    await user.click(document.getElementById('messages-start-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByText('newest')).toBeInTheDocument();
+    });
+    const ids = screen.getAllByText(/^#\d+ -/).map((el) => el.textContent.match(/^#(\d+)/)[1]);
+    expect(ids).toEqual(['3', '2', '1']);
+  });
+});
