@@ -6,7 +6,13 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.139.0",
-    "uvicorn>=0.51.0",
+    # [standard] extra pulls in the 'websockets' library uvicorn needs to
+    # actually serve /ws - without it every WebSocket upgrade 404s (uvicorn
+    # logs "No supported WebSocket library detected" and falls through to
+    # its default 404 handler), silently killing the BFF's whole live-push
+    # mechanism (push_relay_loop -> ws_hub) - the HMI then only ever sees
+    # fresh connection/status data on mount or a manual reload, never live.
+    "uvicorn[standard]>=0.51.0",
     "requests==2.32.5",
     "httpx2>=2.13.0",
     "docker==6.1.0",
