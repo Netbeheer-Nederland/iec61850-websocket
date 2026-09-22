@@ -20,12 +20,7 @@ services:
       - bff-config:/config
     networks:
       - rti-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
-      interval: 30s
-      timeout: 30s
-      retries: 5
-      start_period: 30s
+    # Healthcheck already defined in the Dockerfile (with matching timing).
     labels:
       - "rti.service=rti-bff"
       - "rti.type=RTI-BFF"
@@ -67,12 +62,7 @@ services:
       - IO_URL=http://rti-io:8000
     networks:
       - rti-network
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5001/api/status" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
+    # Healthcheck already defined in the Dockerfile.
     labels:
       - "rti.service=rti-fsp01"
       - "rti.type=RTI-FSP"
@@ -100,12 +90,10 @@ services:
       - CP=cp2
       - MODELPATH=/models/model_2.py
       - IO_URL=http://rti-io:8000
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5005/api/status" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
+    # Healthcheck already defined in the Dockerfile - it reads $PORT at
+    # check time (see modules/fsp/docker/Dockerfile), so it correctly
+    # targets 5005 for this second instance without needing to be
+    # hardcoded here again.
     labels:
       - "rti.service=rti-fsp02"
       - "rti.type=RTI-FSP"
@@ -124,15 +112,9 @@ services:
     ports:
       - "5002:5002"
       - "8765:8765"    # WebSocket port - MUST ADD
-    # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
+    # PORT/PYTHONUNBUFFERED and healthcheck already set by the Dockerfile.
     networks:
       - rti-network
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5002/api/status" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
     labels:
       - "rti.service=rti-so"
       - "rti.type=RTI-SO"
@@ -181,12 +163,7 @@ services:
       - SYS_RAWIO
     networks:
       - rti-network
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/io/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
+    # Healthcheck already defined in the Dockerfile.
     labels:
       - "rti.service=rti-io"
       - "rti.type=GPIO-LED-Control"

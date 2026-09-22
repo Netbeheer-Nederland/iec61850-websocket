@@ -71,8 +71,12 @@ USER app
 EXPOSE 5000
 
 # Shell form (not exec-array) so $PORT/$HEALTH_PATH expand at healthcheck
-# time against the runtime env, not the build-time ARG default.
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+# time against the runtime env, not the build-time ARG default. Longer
+# timeout/start-period/retries than the other modules' Dockerfiles - bff
+# historically needed more startup slack; kept even though the docker.sock
+# dependency that motivated it has since been removed, to avoid changing
+# live behavior as a side effect of deduplicating this from compose.
+HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=5 \
     CMD curl -f http://localhost:$PORT$HEALTH_PATH || exit 1
 
 CMD ["python", "-u", "-m", "bff.bff_server"]
