@@ -104,7 +104,7 @@ class ACSIServer:
         self.runtime.endpoint.recv_msg_callback = self._on_recv_message
         self.runtime.endpoint.send_msg_callback = self._on_send_message
 
-        self._log_action(f"[DEBUG] New ACSIServer instance: model_path={model_path}, id={id(self.runtime)}", "info")
+        self._log_action(f"New ACSIServer instance: model_path={model_path}, id={id(self.runtime)}", "debug")
         # Prefer the model already in runtime (freshly loaded from SCL/model.py)
         # Only reload from file as fallback if runtime model is missing
         self.model_file = Path(model_path)
@@ -126,18 +126,20 @@ class ACSIServer:
 
         if self.runtime.ied_model is None:
             try:
-                self._log_action("[_start_server_async] No model in runtime, loading from file...",
-                                 "info")
+                self._log_action("No model in runtime, loading from file...",
+                                 "debug")
                 self.runtime.ied_model = self.load_current_runtime_model()
             except FileNotFoundError:
-                self._log_action("[_start_server_async] Model file not found",
-                                 "info")
+                # Precedes a raised RuntimeError below - a real failure, not
+                # routine tracing.
+                self._log_action("Model file not found",
+                                 "warn")
                 raise RuntimeError("No model loaded. Create fsp/model.py first.")
         else:
-            self._log_action(f"[_start_server_async] Using model from runtime: "
+            self._log_action(f"Using model from runtime: "
                 f"ied_model.name={self.runtime.ied_model.name!r} "
                 f"model_ied_name={self.runtime.model_ied_name!r}",
-                             "info")
+                             "debug")
 
         if self.runtime.ied_model is None:
             raise RuntimeError("No model loaded. Create fsp/model.py first.")

@@ -2102,7 +2102,7 @@ def create_bff_router(
     async def api_reconfig_connection(request: TLSConnectionCreateConfigRequest):
         """Reconfigure the connection with a new communication point."""
         try:
-            rti_fsp._log_action(f"Starting connection reconfiguration for host: {request.host}, port: {request.port}", "info")
+            rti_fsp._log_action(f"Starting connection reconfiguration for host: {request.host}, port: {request.port}", "debug")
             # Normalize tls_version to handle "1.2", "1.3", "TLSv1_2", "TLSv1_3" formats
             tls_version_str = (request.tls_version or "1.3").lower()
             if "1.2" in tls_version_str or "1_2" in tls_version_str:
@@ -2111,7 +2111,7 @@ def create_bff_router(
                 tls_version = ssl.TLSVersion.TLSv1_3
             logger.info(f"tls_version in reconfig connection: {tls_version} from request: {request.tls_version}")
             rti_fsp._log_action(f"tls_version in reconfig connection: {tls_version} from request: {request.tls_version}",
-                                "info")
+                                "debug")
             host = request.host
             request_port = request.port
             if request.ws_mode.lower() == "active":
@@ -2129,11 +2129,11 @@ def create_bff_router(
 
                 loop = rti_fsp.runtime.loop
                 if loop is None or not loop.is_running():
-                    rti_fsp._log_action("Server not running, starting server instance", "info")
+                    rti_fsp._log_action("Server not running, starting server instance", "debug")
                     logger.info("server not running, starting server instance")
                     rti_fsp.start_server(host, int(request_port))
                     loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
-                    rti_fsp._log_action("Server instance started", "info")
+                    rti_fsp._log_action("Server instance started", "debug")
 
                 endpoint = rti_fsp.runtime.endpoint
                 if endpoint is None:
@@ -2144,7 +2144,7 @@ def create_bff_router(
 
                 # Call reconfigure_connection on the endpoint's event loop
                 # The library handles TLS config and task restart internally
-                rti_fsp._log_action(f"Calling reconfigure_connection for host: {host}, port: {request_port}, TLS: {request.enable_tls}", "info")
+                rti_fsp._log_action(f"Calling reconfigure_connection for host: {host}, port: {request_port}, TLS: {request.enable_tls}", "debug")
                 fut = asyncio.run_coroutine_threadsafe(
                     endpoint.reconfigure_connection(
                         host, request_port, cp, request.enable_tls, tls_config=tls_config
@@ -2266,7 +2266,7 @@ def create_bff_router(
     async def api_reconfig_oauth(request: OAUTHCreateConfigRequest):
         """Reconfigure OAuth settings. OAuth config should be provided in the request by BFF."""
         try:
-            rti_fsp._log_action(f"Starting OAuth reconfiguration for connection: {request.connection_name or 'unknown'}", "info")
+            rti_fsp._log_action(f"Starting OAuth reconfiguration for connection: {request.connection_name or 'unknown'}", "debug")
             cp = request.cp or os.getenv("CP", "cp1")
             host = request.host
             oauth_port = request.port
@@ -2279,7 +2279,7 @@ def create_bff_router(
             enable_token_refresh = getattr(request, 'enable_token_refresh', False)
 
             connection_name = request.connection_name or "unknown"
-            rti_fsp._log_action(f"OAuth configuration - enable: {request.enable_oauth}, connection: {connection_name}", "info")
+            rti_fsp._log_action(f"OAuth configuration - enable: {request.enable_oauth}, connection: {connection_name}", "debug")
 
             # Validate that required OAuth settings are provided
             if request.enable_oauth and not token_endpoint:
@@ -2288,7 +2288,7 @@ def create_bff_router(
                 raise ValueError(error_msg)
 
             if not request.enable_oauth:
-                rti_fsp._log_action("Disabling OAuth for connection", "info")
+                rti_fsp._log_action("Disabling OAuth for connection", "debug")
                 token_endpoint = None
                 client_id = None
                 client_secret = None
@@ -2299,15 +2299,15 @@ def create_bff_router(
 
             loop = rti_fsp.runtime.loop
             if loop is None or not loop.is_running():
-                rti_fsp._log_action("Server not running, starting server instance for OAuth reconfig", "info")
+                rti_fsp._log_action("Server not running, starting server instance for OAuth reconfig", "debug")
                 logger.info("server not running, starting server instance")
                 rti_fsp.start_server(host, int(oauth_port))
                 loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
-                rti_fsp._log_action("Server instance started for OAuth reconfig", "info")
+                rti_fsp._log_action("Server instance started for OAuth reconfig", "debug")
 
             # When disabling OAuth, stop the endpoint first to avoid issues with ClientCredentialsProvider
             if not request.enable_oauth:
-                rti_fsp._log_action("Disabling OAuth - stopping endpoint first", "info")
+                rti_fsp._log_action("Disabling OAuth - stopping endpoint first", "debug")
                 logger.info("Disabling OAuth - stopping endpoint first")
                 # Stop the current connection if it exists
                 if hasattr(rti_fsp.runtime.endpoint, '_connect_task') and rti_fsp.runtime.endpoint._connect_task is not None:
@@ -2316,11 +2316,11 @@ def create_bff_router(
                         loop,
                     )
                     await asyncio.wrap_future(stop_fut)
-                rti_fsp._log_action("Endpoint stopped, now reconfiguring with OAuth disabled", "info")
+                rti_fsp._log_action("Endpoint stopped, now reconfiguring with OAuth disabled", "debug")
                 logger.info("Endpoint stopped, now reconfiguring with OAuth disabled")
 
             # Call reconfigure_oauth with settings from connection
-            rti_fsp._log_action(f"Calling reconfigure_oauth for host: {host}, port: {oauth_port}, OAuth: {request.enable_oauth}", "info")
+            rti_fsp._log_action(f"Calling reconfigure_oauth for host: {host}, port: {oauth_port}, OAuth: {request.enable_oauth}", "debug")
             fut = asyncio.run_coroutine_threadsafe(
                 rti_fsp.runtime.endpoint.reconfigure_oauth(
                     host=host,
