@@ -91,8 +91,11 @@ def _isolated_relay_state(monkeypatch):
 
 # -------------------- _parse_status_repr --------------------
 
+
 def test_parse_status_repr_passes_through_dict():
-    assert bff_server._parse_status_repr({"status": "listening"}) == {"status": "listening"}
+    assert bff_server._parse_status_repr({"status": "listening"}) == {
+        "status": "listening"
+    }
 
 
 def test_parse_status_repr_parses_python_dict_literal():
@@ -117,6 +120,7 @@ def test_parse_status_repr_rejects_non_dict_input(raw):
 
 
 # -------------------- WSHub --------------------
+
 
 @pytest.mark.asyncio
 async def test_wshub_broadcast_reaches_all_registered_clients():
@@ -168,11 +172,17 @@ async def test_wshub_broadcast_with_no_clients_is_a_noop():
 
 # -------------------- _fetch_fsp_client_count --------------------
 
+
 @pytest.mark.asyncio
 async def test_fetch_fsp_client_count_when_listening(monkeypatch):
-    client = FakeBffClient(responses={
-        "/api/status": {"ok": True, "status": "{'status': 'listening', 'connectedClients': 3}"}
-    })
+    client = FakeBffClient(
+        responses={
+            "/api/status": {
+                "ok": True,
+                "status": "{'status': 'listening', 'connectedClients': 3}",
+            }
+        }
+    )
     monkeypatch.setitem(bff_server._bff_clients, "10.0.0.1:5001", client)
 
     name, count = await bff_server._fetch_fsp_client_count(
@@ -183,9 +193,14 @@ async def test_fetch_fsp_client_count_when_listening(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_fetch_fsp_client_count_when_not_listening(monkeypatch):
-    client = FakeBffClient(responses={
-        "/api/status": {"ok": True, "status": "{'status': 'stopped', 'connectedClients': 0}"}
-    })
+    client = FakeBffClient(
+        responses={
+            "/api/status": {
+                "ok": True,
+                "status": "{'status': 'stopped', 'connectedClients': 0}",
+            }
+        }
+    )
     monkeypatch.setitem(bff_server._bff_clients, "10.0.0.1:5001", client)
 
     name, count = await bff_server._fetch_fsp_client_count(
@@ -215,20 +230,44 @@ async def test_fetch_fsp_client_count_defaults_to_zero_when_no_client_registered
 
 # -------------------- _build_enriched_connections --------------------
 
+
 @pytest.mark.asyncio
 async def test_build_enriched_connections_adds_fsp_client_counts(monkeypatch):
     connections = [
-        {"name": "fsp1", "type": "RTI-FSP", "status": "connected", "host": "10.0.0.1", "port": 5001},
-        {"name": "fsp2", "type": "RTI-FSP", "status": "disconnected", "host": "10.0.0.2", "port": 5001},
-        {"name": "so1", "type": "RTI-SO", "status": "connected", "host": "10.0.0.3", "port": 5002},
+        {
+            "name": "fsp1",
+            "type": "RTI-FSP",
+            "status": "connected",
+            "host": "10.0.0.1",
+            "port": 5001,
+        },
+        {
+            "name": "fsp2",
+            "type": "RTI-FSP",
+            "status": "disconnected",
+            "host": "10.0.0.2",
+            "port": 5001,
+        },
+        {
+            "name": "so1",
+            "type": "RTI-SO",
+            "status": "connected",
+            "host": "10.0.0.3",
+            "port": 5002,
+        },
     ]
     monkeypatch.setattr(bff_server.conn_manager, "connections", connections)
     monkeypatch.setitem(
         bff_server._bff_clients,
         "10.0.0.1:5001",
-        FakeBffClient(responses={
-            "/api/status": {"ok": True, "status": "{'status': 'listening', 'connectedClients': 5}"}
-        }),
+        FakeBffClient(
+            responses={
+                "/api/status": {
+                    "ok": True,
+                    "status": "{'status': 'listening', 'connectedClients': 5}",
+                }
+            }
+        ),
     )
 
     enriched = await bff_server._build_enriched_connections()
@@ -250,21 +289,35 @@ async def test_build_enriched_connections_empty_list():
 
 # -------------------- _relay_new_messages --------------------
 
+
 @pytest.mark.asyncio
 async def test_relay_new_messages_broadcasts_unseen_ids(monkeypatch):
     broadcasts = []
-    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
-    client = FakeBffClient(responses={"/api/messages": {"messages": [
-        {"id": 1, "message": "a"}, {"id": 2, "message": "b"},
-    ]}})
+    monkeypatch.setattr(
+        bff_server.ws_hub,
+        "broadcast",
+        AsyncMock(side_effect=lambda m: broadcasts.append(m)),
+    )
+    client = FakeBffClient(
+        responses={
+            "/api/messages": {
+                "messages": [
+                    {"id": 1, "message": "a"},
+                    {"id": 2, "message": "b"},
+                ]
+            }
+        }
+    )
 
     await bff_server._relay_new_messages("10.0.0.1:5001", client)
 
-    assert broadcasts == [{
-        "type": "messages",
-        "target": "10.0.0.1:5001",
-        "data": [{"id": 1, "message": "a"}, {"id": 2, "message": "b"}],
-    }]
+    assert broadcasts == [
+        {
+            "type": "messages",
+            "target": "10.0.0.1:5001",
+            "data": [{"id": 1, "message": "a"}, {"id": 2, "message": "b"}],
+        }
+    ]
     assert bff_server._last_relayed_message_id["10.0.0.1:5001"] == 2
 
 
@@ -272,18 +325,32 @@ async def test_relay_new_messages_broadcasts_unseen_ids(monkeypatch):
 async def test_relay_new_messages_only_sends_ids_past_the_watermark(monkeypatch):
     bff_server._last_relayed_message_id["10.0.0.1:5001"] = 2
     broadcasts = []
-    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
-    client = FakeBffClient(responses={"/api/messages": {"messages": [
-        {"id": 1, "message": "a"}, {"id": 2, "message": "b"}, {"id": 3, "message": "c"},
-    ]}})
+    monkeypatch.setattr(
+        bff_server.ws_hub,
+        "broadcast",
+        AsyncMock(side_effect=lambda m: broadcasts.append(m)),
+    )
+    client = FakeBffClient(
+        responses={
+            "/api/messages": {
+                "messages": [
+                    {"id": 1, "message": "a"},
+                    {"id": 2, "message": "b"},
+                    {"id": 3, "message": "c"},
+                ]
+            }
+        }
+    )
 
     await bff_server._relay_new_messages("10.0.0.1:5001", client)
 
-    assert broadcasts == [{
-        "type": "messages",
-        "target": "10.0.0.1:5001",
-        "data": [{"id": 3, "message": "c"}],
-    }]
+    assert broadcasts == [
+        {
+            "type": "messages",
+            "target": "10.0.0.1:5001",
+            "data": [{"id": 3, "message": "c"}],
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -293,7 +360,9 @@ async def test_relay_new_messages_no_broadcast_when_nothing_new(monkeypatch):
     bff_server._last_relayed_message_id["10.0.0.1:5001"] = 2
     broadcast = AsyncMock()
     monkeypatch.setattr(bff_server.ws_hub, "broadcast", broadcast)
-    client = FakeBffClient(responses={"/api/messages": {"messages": [{"id": 1}, {"id": 2}]}})
+    client = FakeBffClient(
+        responses={"/api/messages": {"messages": [{"id": 1}, {"id": 2}]}}
+    )
 
     await bff_server._relay_new_messages("10.0.0.1:5001", client)
 
@@ -307,16 +376,24 @@ async def test_relay_new_messages_resets_watermark_after_instance_restart(monkey
     # stale/already-seen.
     bff_server._last_relayed_message_id["10.0.0.1:5001"] = 50
     broadcasts = []
-    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
-    client = FakeBffClient(responses={"/api/messages": {"messages": [{"id": 1, "message": "fresh"}]}})
+    monkeypatch.setattr(
+        bff_server.ws_hub,
+        "broadcast",
+        AsyncMock(side_effect=lambda m: broadcasts.append(m)),
+    )
+    client = FakeBffClient(
+        responses={"/api/messages": {"messages": [{"id": 1, "message": "fresh"}]}}
+    )
 
     await bff_server._relay_new_messages("10.0.0.1:5001", client)
 
-    assert broadcasts == [{
-        "type": "messages",
-        "target": "10.0.0.1:5001",
-        "data": [{"id": 1, "message": "fresh"}],
-    }]
+    assert broadcasts == [
+        {
+            "type": "messages",
+            "target": "10.0.0.1:5001",
+            "data": [{"id": 1, "message": "fresh"}],
+        }
+    ]
     assert bff_server._last_relayed_message_id["10.0.0.1:5001"] == 1
 
 
@@ -333,21 +410,34 @@ async def test_relay_new_messages_swallows_request_errors(monkeypatch):
 
 # -------------------- _relay_acsi_client_list --------------------
 
+
 @pytest.mark.asyncio
 async def test_relay_acsi_client_list_broadcasts_on_first_seen(monkeypatch):
     broadcasts = []
-    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
-    client = FakeBffClient(responses={
-        "/api/properties": {"ok": True, "acsi_role": "ACSI-Client", "acsi_client_list": ["cp1"]}
-    })
+    monkeypatch.setattr(
+        bff_server.ws_hub,
+        "broadcast",
+        AsyncMock(side_effect=lambda m: broadcasts.append(m)),
+    )
+    client = FakeBffClient(
+        responses={
+            "/api/properties": {
+                "ok": True,
+                "acsi_role": "ACSI-Client",
+                "acsi_client_list": ["cp1"],
+            }
+        }
+    )
 
     await bff_server._relay_acsi_client_list("10.0.0.1:5002", client)
 
-    assert broadcasts == [{
-        "type": "properties",
-        "target": "10.0.0.1:5002",
-        "data": {"acsi_client_list": ["cp1"]},
-    }]
+    assert broadcasts == [
+        {
+            "type": "properties",
+            "target": "10.0.0.1:5002",
+            "data": {"acsi_client_list": ["cp1"]},
+        }
+    ]
     assert bff_server._last_relayed_client_list["10.0.0.1:5002"] == ["cp1"]
 
 
@@ -356,9 +446,9 @@ async def test_relay_acsi_client_list_no_broadcast_when_unchanged(monkeypatch):
     bff_server._last_relayed_client_list["10.0.0.1:5002"] = ["cp1"]
     broadcast = AsyncMock()
     monkeypatch.setattr(bff_server.ws_hub, "broadcast", broadcast)
-    client = FakeBffClient(responses={
-        "/api/properties": {"ok": True, "acsi_client_list": ["cp1"]}
-    })
+    client = FakeBffClient(
+        responses={"/api/properties": {"ok": True, "acsi_client_list": ["cp1"]}}
+    )
 
     await bff_server._relay_acsi_client_list("10.0.0.1:5002", client)
 
@@ -370,10 +460,14 @@ async def test_relay_acsi_client_list_broadcasts_when_a_cp_connects(monkeypatch)
     # An FSP associating with a second cp - the list grows.
     bff_server._last_relayed_client_list["10.0.0.1:5002"] = ["cp1"]
     broadcasts = []
-    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
-    client = FakeBffClient(responses={
-        "/api/properties": {"ok": True, "acsi_client_list": ["cp1", "cp2"]}
-    })
+    monkeypatch.setattr(
+        bff_server.ws_hub,
+        "broadcast",
+        AsyncMock(side_effect=lambda m: broadcasts.append(m)),
+    )
+    client = FakeBffClient(
+        responses={"/api/properties": {"ok": True, "acsi_client_list": ["cp1", "cp2"]}}
+    )
 
     await bff_server._relay_acsi_client_list("10.0.0.1:5002", client)
 
@@ -384,10 +478,14 @@ async def test_relay_acsi_client_list_broadcasts_when_a_cp_connects(monkeypatch)
 async def test_relay_acsi_client_list_broadcasts_when_a_cp_disconnects(monkeypatch):
     bff_server._last_relayed_client_list["10.0.0.1:5002"] = ["cp1", "cp2"]
     broadcasts = []
-    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
-    client = FakeBffClient(responses={
-        "/api/properties": {"ok": True, "acsi_client_list": ["cp1"]}
-    })
+    monkeypatch.setattr(
+        bff_server.ws_hub,
+        "broadcast",
+        AsyncMock(side_effect=lambda m: broadcasts.append(m)),
+    )
+    client = FakeBffClient(
+        responses={"/api/properties": {"ok": True, "acsi_client_list": ["cp1"]}}
+    )
 
     await bff_server._relay_acsi_client_list("10.0.0.1:5002", client)
 
@@ -409,7 +507,9 @@ async def test_relay_acsi_client_list_swallows_request_errors(monkeypatch):
 async def test_relay_acsi_client_list_ignores_malformed_response(monkeypatch):
     broadcast = AsyncMock()
     monkeypatch.setattr(bff_server.ws_hub, "broadcast", broadcast)
-    client = FakeBffClient(responses={"/api/properties": {"ok": True, "acsi_client_list": "not-a-list"}})
+    client = FakeBffClient(
+        responses={"/api/properties": {"ok": True, "acsi_client_list": "not-a-list"}}
+    )
 
     await bff_server._relay_acsi_client_list("10.0.0.1:5002", client)
 
@@ -418,22 +518,38 @@ async def test_relay_acsi_client_list_ignores_malformed_response(monkeypatch):
 
 # -------------------- push_relay_loop (single cycle) --------------------
 
+
 @pytest.mark.asyncio
 async def test_push_relay_loop_broadcasts_connections_and_messages(monkeypatch):
     connections = [
-        {"name": "fsp1", "type": "RTI-FSP", "status": "connected", "host": "10.0.0.1", "port": 5001},
+        {
+            "name": "fsp1",
+            "type": "RTI-FSP",
+            "status": "connected",
+            "host": "10.0.0.1",
+            "port": 5001,
+        },
     ]
     monkeypatch.setattr(bff_server.conn_manager, "connections", connections)
     monkeypatch.setitem(
         bff_server._bff_clients,
         "10.0.0.1:5001",
-        FakeBffClient(responses={
-            "/api/status": {"ok": True, "status": "{'status': 'listening', 'connectedClients': 1}"},
-            "/api/messages": {"messages": [{"id": 1, "message": "hello"}]},
-        }),
+        FakeBffClient(
+            responses={
+                "/api/status": {
+                    "ok": True,
+                    "status": "{'status': 'listening', 'connectedClients': 1}",
+                },
+                "/api/messages": {"messages": [{"id": 1, "message": "hello"}]},
+            }
+        ),
     )
     broadcasts = []
-    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
+    monkeypatch.setattr(
+        bff_server.ws_hub,
+        "broadcast",
+        AsyncMock(side_effect=lambda m: broadcasts.append(m)),
+    )
 
     # Let exactly one loop iteration run: a long sleep() means the timeout
     # below fires while the loop is parked in that sleep, after the body
@@ -459,25 +575,48 @@ async def test_push_relay_loop_broadcasts_connections_and_messages(monkeypatch):
 @pytest.mark.asyncio
 async def test_push_relay_loop_broadcasts_acsi_client_list_for_so_targets(monkeypatch):
     connections = [
-        {"name": "fsp1", "type": "RTI-FSP", "status": "connected", "host": "10.0.0.1", "port": 5001},
-        {"name": "so1", "type": "RTI-SO", "status": "connected", "host": "10.0.0.2", "port": 5002},
+        {
+            "name": "fsp1",
+            "type": "RTI-FSP",
+            "status": "connected",
+            "host": "10.0.0.1",
+            "port": 5001,
+        },
+        {
+            "name": "so1",
+            "type": "RTI-SO",
+            "status": "connected",
+            "host": "10.0.0.2",
+            "port": 5002,
+        },
     ]
     monkeypatch.setattr(bff_server.conn_manager, "connections", connections)
     monkeypatch.setitem(
         bff_server._bff_clients,
         "10.0.0.1:5001",
-        FakeBffClient(responses={
-            "/api/status": {"ok": True, "status": "{'status': 'listening', 'connectedClients': 1}"},
-            "/api/messages": {"messages": []},
-        }),
+        FakeBffClient(
+            responses={
+                "/api/status": {
+                    "ok": True,
+                    "status": "{'status': 'listening', 'connectedClients': 1}",
+                },
+                "/api/messages": {"messages": []},
+            }
+        ),
     )
     monkeypatch.setitem(
         bff_server._bff_clients,
         "10.0.0.2:5002",
-        FakeBffClient(responses={"/api/properties": {"ok": True, "acsi_client_list": ["cp1"]}}),
+        FakeBffClient(
+            responses={"/api/properties": {"ok": True, "acsi_client_list": ["cp1"]}}
+        ),
     )
     broadcasts = []
-    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
+    monkeypatch.setattr(
+        bff_server.ws_hub,
+        "broadcast",
+        AsyncMock(side_effect=lambda m: broadcasts.append(m)),
+    )
 
     with pytest.raises(asyncio.TimeoutError):
         await asyncio.wait_for(bff_server.push_relay_loop(interval=10), timeout=0.2)
@@ -491,7 +630,9 @@ async def test_push_relay_loop_broadcasts_acsi_client_list_for_so_targets(monkey
     # The FSP target only gets a "messages" relay, not "properties" - this
     # push type is RTI-SO-only (acsi_client_list is a WS-Passive/ACSI-Client
     # concept; an FSP has no equivalent list to relay).
-    assert not any(b["type"] == "properties" and b["target"] == "10.0.0.1:5001" for b in broadcasts)
+    assert not any(
+        b["type"] == "properties" and b["target"] == "10.0.0.1:5001" for b in broadcasts
+    )
 
 
 @pytest.mark.asyncio
@@ -500,7 +641,11 @@ async def test_push_relay_loop_skips_unchanged_connections_snapshot(monkeypatch)
     # shouldn't cause a "connections" broadcast on every single cycle.
     monkeypatch.setattr(bff_server.conn_manager, "connections", [])
     broadcasts = []
-    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock(side_effect=lambda m: broadcasts.append(m)))
+    monkeypatch.setattr(
+        bff_server.ws_hub,
+        "broadcast",
+        AsyncMock(side_effect=lambda m: broadcasts.append(m)),
+    )
 
     async def run_two_cycles():
         task = asyncio.ensure_future(bff_server.push_relay_loop(interval=0.01))
@@ -515,6 +660,7 @@ async def test_push_relay_loop_skips_unchanged_connections_snapshot(monkeypatch)
 
 
 # -------------------- /ws endpoint wiring --------------------
+
 
 def test_ws_endpoint_registers_and_unregisters_client():
     # Plain TestClient (no "with" block) never triggers the app's lifespan,

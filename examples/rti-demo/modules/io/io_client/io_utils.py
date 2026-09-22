@@ -21,9 +21,10 @@ Reusable across SO, FSP, and other projects.
 """
 
 from __future__ import annotations
+
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mapping_manager import IOMappingManager
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 async def sync_to_io_device(io_client, obj_ref: str, value):
     """Sync a write to IO devices. Fire-and-forget.
-    
+
     Args:
         io_client: IO client instance (must have write_iec61850_value method)
         obj_ref: IEC61850 object reference (e.g., "LD0/GGIO1.LED1")
@@ -49,15 +50,20 @@ async def sync_to_io_device(io_client, obj_ref: str, value):
         logger.warning(f"Device sync failed for {obj_ref}: {sync_exc}")
 
 
-async def write_to_lcd(io_client, obj_ref: str, text: Union[str, List[str]], mapping_manager: Optional[IOMappingManager] = None):
+async def write_to_lcd(
+    io_client,
+    obj_ref: str,
+    text: str | list[str],
+    mapping_manager: IOMappingManager | None = None,
+):
     """Write text to an LCD display. Fire-and-forget. Only works with LCD devices.
-    
+
     Args:
         io_client: IO client instance (must have write_lcd method)
         obj_ref: IEC61850 object reference to find mapped LCD devices
         text: Text to display on the LCD (can be a string or list of strings for multiple lines)
         mapping_manager: Optional IOMappingManager to find LCD devices mapped to obj_ref
-    
+
     Note: If mapping_manager is provided, finds LCD devices mapped to obj_ref.
           Writes to all LCD devices found. Uses io_client.write_lcd() which accepts text directly.
     """
@@ -72,12 +78,14 @@ async def write_to_lcd(io_client, obj_ref: str, text: Union[str, List[str]], map
     else:
         # Fallback: treat obj_ref as device name if no mapping_manager
         lcd_devices = [obj_ref]
-    
+
     # Skip if no LCD devices found
     if not lcd_devices:
-        logger.debug(f"Skipping LCD write for obj_ref '{obj_ref}' - no LCD devices mapped")
+        logger.debug(
+            f"Skipping LCD write for obj_ref '{obj_ref}' - no LCD devices mapped"
+        )
         return
-    
+
     try:
         if await io_client.is_healthy():
             # Write to all LCD devices mapped to this obj_ref
@@ -90,16 +98,18 @@ async def write_to_lcd(io_client, obj_ref: str, text: Union[str, List[str]], map
         logger.warning(f"LCD write failed for {lcd_devices}: {sync_exc}")
 
 
-async def blink_led_task(io_client, obj_ref: str, interval: float = 0.2, count: int = 1, mapping_manager=None):
+async def blink_led_task(
+    io_client, obj_ref: str, interval: float = 0.2, count: int = 1, mapping_manager=None
+):
     """Blink an LED. Fire-and-forget. Only works with LED devices.
-    
+
     Args:
         io_client: IO client instance
         obj_ref: IEC61850 object reference for the LED
         interval: Blink interval in seconds (default: 0.2s)
         count: Number of blink cycles (default: 1)
         mapping_manager: Optional IOMappingManager to get LED device names
-    
+
     Note: If mapping_manager is provided, only blinks LED devices mapped to the obj_ref.
           Writes directly to device names instead of obj_ref to avoid affecting non-LED devices.
     """
@@ -114,12 +124,12 @@ async def blink_led_task(io_client, obj_ref: str, interval: float = 0.2, count: 
     else:
         # Fallback: treat obj_ref as device name if no mapping_manager
         led_devices = [obj_ref]
-    
+
     # Skip if no LED devices found
     if not led_devices:
         logger.debug(f"Skipping blink for {obj_ref} - no LED devices found")
         return
-    
+
     try:
         if await io_client.is_healthy():
             for _ in range(count):

@@ -20,30 +20,33 @@
 This module exposes REST API endpoints that interact with the ACSI server,
 handling model management, server lifecycle, and value operations.
 """
+
 from __future__ import annotations
 
+import asyncio
 import importlib
 import logging
 import os
+import ssl
 import sys
-from typing import Optional
+import tempfile
 from concurrent.futures import TimeoutError as FuturesTimeoutError
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
+
+import httpx2 as httpx
+from fastapi import APIRouter, FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
 from fsp.acsi_server import ACSIServer
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
-from fastapi import FastAPI, APIRouter, Request, HTTPException, status, UploadFile, File
-from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from pydantic import BaseModel, Field, ConfigDict
-import ssl
 from ws61850.security.tls import TLSConfig
-import asyncio
-import json
-import httpx2 as httpx
 
-def resolve_log_level(value: Optional[str], default: int = logging.INFO) -> int:
+
+def resolve_log_level(value: str | None, default: int = logging.INFO) -> int:
     """Map a level name (case-insensitive) to a logging constant.
 
     Falls back to ``default`` for unknown/empty values instead of letting
@@ -68,11 +71,11 @@ LOG_LEVEL = resolve_log_level(os.getenv("LOG_LEVEL"))
 
 logging.basicConfig(
     level=LOG_LEVEL,
-    format='%(asctime)s - %(name)s - %(threadName)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(threadName)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout)  # Force stdout for Docker
     ],
-    force=True  # Override any existing config
+    force=True,  # Override any existing config
 )
 
 # Apply the severity to the root logger here at import time, not only in the
@@ -112,14 +115,14 @@ class HealthCheckAccessFilter(logging.Filter):
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    # Installed here (not before uvicorn.run) so it survives uvicorn's own
+    # Installed here (not before uvicorn.run), so it survives uvicorn's own
     # logging dictConfig, which runs before app startup.
     logging.getLogger("uvicorn.access").addFilter(HealthCheckAccessFilter())
     yield
 
 
 # Global flag to control io_plugin usage
-_use_io_plugin = False  # Default to False, will be enabled if files exist
+_use_io_plugin = False  # Default to False will be enabled if files exist
 
 # Directory for dynamically loaded io_plugin files
 # Configurable via IO_PLUGIN_STORAGE environment variable
@@ -140,7 +143,7 @@ _io_utils_module = None
 # needing a process restart. FastAPI/Starlette supports adding routers
 # at any time (it's just appending routes); it does not support removing
 # them, so _io_router_included is a one-way latch.
-_fastapi_app_ref: Optional[FastAPI] = None
+_fastapi_app_ref: FastAPI | None = None
 _io_router_included = False
 
 
@@ -158,7 +161,7 @@ def _try_include_io_router() -> bool:
     if _fastapi_app_ref is None:
         logger.warning("Cannot include IO router - app reference not set yet")
         return False
-    if _io_plugin_module is None or not hasattr(_io_plugin_module, 'create_io_router'):
+    if _io_plugin_module is None or not hasattr(_io_plugin_module, "create_io_router"):
         return False
     try:
         io_router = _io_plugin_module.create_io_router()
@@ -171,7 +174,9 @@ def _try_include_io_router() -> bool:
         return False
 
 
-async def _bootstrap_io_client_after_connect(demo_io_server_url: str, acsi_url: str) -> Dict[str, Any]:
+async def _bootstrap_io_client_after_connect(
+    demo_io_server_url: str, acsi_url: str
+) -> dict[str, Any]:
     """Chain the demo_IO device-proxy bootstrap sequence right after a
     successful /api/io-plugin/connect (files downloaded, modules loaded,
     IO router registered via _try_include_io_router()).
@@ -199,7 +204,7 @@ async def _bootstrap_io_client_after_connect(demo_io_server_url: str, acsi_url: 
     """
     self_port = os.getenv("PORT", "5001")
     base = f"http://127.0.0.1:{self_port}"
-    steps: Dict[str, Any] = {}
+    steps: dict[str, Any] = {}
 
     async def _call(step_name: str, method: str, path: str, **kwargs):
         try:
@@ -215,19 +220,27 @@ async def _bootstrap_io_client_after_connect(demo_io_server_url: str, acsi_url: 
                 "body": body,
             }
             if resp.status_code >= 400:
-                logger.warning(f"IO bootstrap step '{step_name}' returned HTTP {resp.status_code}: {body}")
+                logger.warning(
+                    f"IO bootstrap step '{step_name}' returned HTTP {resp.status_code}: {body}"
+                )
         except Exception as e:
             logger.error(f"IO bootstrap step '{step_name}' failed: {e}")
             steps[step_name] = {"ok": False, "error": str(e)}
 
-    await _call("io_connect", "POST", "/api/io/connect", json={"base_url": demo_io_server_url,
-                                                               "acsi_url": acsi_url})
+    await _call(
+        "io_connect",
+        "POST",
+        "/api/io/connect",
+        json={"base_url": demo_io_server_url, "acsi_url": acsi_url},
+    )
     await _call("sync_to_server", "POST", "/api/io/acsi/sync-to-server")
     await _call("enable_server_sync", "POST", "/api/io/acsi/enable-server-sync")
 
     return steps
 
+
 # ==================== IO Plugin Connection Management ====================
+
 
 class IOPluginConnectionStatus:
     """Track the connection status to IO server and file download status."""
@@ -247,42 +260,58 @@ class IOPluginConnectionStatus:
         """Mark connection as established."""
         self.connected = True
         self.io_server_url = server_url
-        self.last_connection_time = asyncio.get_event_loop().time() if asyncio.get_event_loop().is_running() else None
-        self.connection_history.append({
-            "action": "connect",
-            "timestamp": self.last_connection_time,
-            "server_url": server_url
-        })
+        self.last_connection_time = (
+            asyncio.get_event_loop().time()
+            if asyncio.get_event_loop().is_running()
+            else None
+        )
+        self.connection_history.append(
+            {
+                "action": "connect",
+                "timestamp": self.last_connection_time,
+                "server_url": server_url,
+            }
+        )
 
     def disconnect(self):
         """Mark connection as closed."""
         self.connected = False
-        self.last_disconnect_time = asyncio.get_event_loop().time() if asyncio.get_event_loop().is_running() else None
-        self.connection_history.append({
-            "action": "disconnect",
-            "timestamp": self.last_disconnect_time
-        })
+        self.last_disconnect_time = (
+            asyncio.get_event_loop().time()
+            if asyncio.get_event_loop().is_running()
+            else None
+        )
+        self.connection_history.append(
+            {"action": "disconnect", "timestamp": self.last_disconnect_time}
+        )
 
     def record_fetch(self, success: bool, error: str = None, files_fetched: int = 0):
         """Record a file fetch attempt."""
         self.fetch_attempts += 1
-        self.last_fetch_time = asyncio.get_event_loop().time() if asyncio.get_event_loop().is_running() else None
+        self.last_fetch_time = (
+            asyncio.get_event_loop().time()
+            if asyncio.get_event_loop().is_running()
+            else None
+        )
         if success:
             self.successful_fetches += 1
             self.last_error = None
         else:
             self.last_error = error
-        self.connection_history.append({
-            "action": "fetch",
-            "timestamp": self.last_fetch_time,
-            "success": success,
-            "error": error,
-            "files_fetched": files_fetched
-        })
+        self.connection_history.append(
+            {
+                "action": "fetch",
+                "timestamp": self.last_fetch_time,
+                "success": success,
+                "error": error,
+                "files_fetched": files_fetched,
+            }
+        )
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current connection status as dictionary."""
         import time
+
         current_time = time.time()
 
         # Calculate time since last activity
@@ -305,8 +334,11 @@ class IOPluginConnectionStatus:
             "last_error": self.last_error,
             "connection_duration": last_activity,
             "connection_history_count": len(self.connection_history),
-            "status": "connected" if self.connected else ("error" if self.last_error else "disconnected")
+            "status": "connected"
+            if self.connected
+            else ("error" if self.last_error else "disconnected"),
         }
+
 
 # Global IO Plugin connection status manager
 io_plugin_connection_status = IOPluginConnectionStatus()
@@ -323,12 +355,12 @@ io_plugin_REQUIRED_FILES = [
     "mapping_manager.py",
     "__init__.py",
     "async_client_io.py",
-    "io_mapping.json"
+    "io_mapping.json",
 ]
 
-import httpx2 as httpx
 
 # ==================== Dynamic IO Plugin Loading ====================
+
 
 def ensure_io_plugin_dir():
     """Ensure the dynamic io_plugin directory exists."""
@@ -349,7 +381,7 @@ def check_required_io_plugin_files() -> bool:
         "io_utils.py",
         "mapping_manager.py",
         "__init__.py",
-        "async_client_io.py"
+        "async_client_io.py",
     ]
 
     for file in required_files:
@@ -380,10 +412,16 @@ def _rebuild_pydantic_models(module) -> None:
 
     for name, obj in vars(module).items():
         try:
-            if isinstance(obj, type) and issubclass(obj, BaseModel) and obj is not BaseModel:
+            if (
+                isinstance(obj, type)
+                and issubclass(obj, BaseModel)
+                and obj is not BaseModel
+            ):
                 obj.model_rebuild(force=True, _types_namespace=vars(module))
         except Exception as e:
-            logger.warning(f"Could not rebuild Pydantic model '{name}' from {module.__name__}: {e}")
+            logger.warning(
+                f"Could not rebuild Pydantic model '{name}' from {module.__name__}: {e}"
+            )
 
 
 def load_io_plugin_modules() -> bool:
@@ -401,12 +439,16 @@ def load_io_plugin_modules() -> bool:
 
         # Load async_client_io module (dependency of io_router) — must load first
         async_client_io_path = get_io_plugin_file_path("async_client_io.py")
-        spec = importlib.util.spec_from_file_location("async_client_io", async_client_io_path)
+        spec = importlib.util.spec_from_file_location(
+            "async_client_io", async_client_io_path
+        )
         if spec and spec.loader:
             async_client_io_module = importlib.util.module_from_spec(spec)
             sys.modules["async_client_io"] = async_client_io_module
             spec.loader.exec_module(async_client_io_module)
-            logger.info(f"Successfully loaded async_client_io from {async_client_io_path}")
+            logger.info(
+                f"Successfully loaded async_client_io from {async_client_io_path}"
+            )
         else:
             logger.error(f"Failed to load async_client_io from {async_client_io_path}")
             return False
@@ -449,13 +491,17 @@ def load_io_plugin_modules() -> bool:
 
         # Load mapping_manager module
         mapping_manager_path = get_io_plugin_file_path("mapping_manager.py")
-        spec = importlib.util.spec_from_file_location("mapping_manager", mapping_manager_path)
+        spec = importlib.util.spec_from_file_location(
+            "mapping_manager", mapping_manager_path
+        )
         if spec and spec.loader:
             _mapping_manager_module = importlib.util.module_from_spec(spec)
             sys.modules["mapping_manager"] = _mapping_manager_module
             spec.loader.exec_module(_mapping_manager_module)
             _rebuild_pydantic_models(_mapping_manager_module)
-            logger.info(f"Successfully loaded mapping_manager from {mapping_manager_path}")
+            logger.info(
+                f"Successfully loaded mapping_manager from {mapping_manager_path}"
+            )
         else:
             logger.error(f"Failed to load mapping_manager from {mapping_manager_path}")
             return False
@@ -551,7 +597,7 @@ def clear_io_plugin_modules():
     # aclose() raises "Event loop is closed" from deep inside
     # httpx/httpcore with nothing awaiting the resulting task - logged
     # as "Task exception was never retrieved" on every reload cycle.
-    if _io_plugin_module is not None and hasattr(_io_plugin_module, 'get_io_client'):
+    if _io_plugin_module is not None and hasattr(_io_plugin_module, "get_io_client"):
         try:
             old_client = _io_plugin_module.get_io_client()
             if old_client is not None:
@@ -577,7 +623,10 @@ def clear_io_plugin_modules():
 
 # ==================== IO Plugin HTTP Client Functions ====================
 
-async def download_file_from_io_server(server_url: str, filename: str, timeout: float = 10.0) -> Optional[str]:
+
+async def download_file_from_io_server(
+    server_url: str, filename: str, timeout: float = 10.0
+) -> str | None:
     """Download a single file from the IO server.
 
     Args:
@@ -599,16 +648,22 @@ async def download_file_from_io_server(server_url: str, filename: str, timeout: 
                 data = response.json()
                 if data.get("ok", False):
                     content = data.get("content", "")
-                    logger.info(f"Successfully downloaded file '{filename}' ({len(content)} bytes)")
+                    logger.info(
+                        f"Successfully downloaded file '{filename}' ({len(content)} bytes)"
+                    )
                     return content
                 else:
-                    logger.error(f"Server returned error for file '{filename}': {data.get('error', 'Unknown error')}")
+                    logger.error(
+                        f"Server returned error for file '{filename}': {data.get('error', 'Unknown error')}"
+                    )
                     return None
             elif response.status_code == 404:
                 logger.warning(f"File '{filename}' not found on IO server")
                 return None
             else:
-                logger.error(f"Failed to download file '{filename}': HTTP {response.status_code}")
+                logger.error(
+                    f"Failed to download file '{filename}': HTTP {response.status_code}"
+                )
                 return None
 
     except httpx.TimeoutException:
@@ -621,7 +676,10 @@ async def download_file_from_io_server(server_url: str, filename: str, timeout: 
         logger.error(f"Error downloading file '{filename}': {e}")
         return None
 
-async def download_io_plugin_files(server_url: str, files: List[str] = None, timeout: float = 10.0) -> Dict[str, Any]:
+
+async def download_io_plugin_files(
+    server_url: str, files: list[str] = None, timeout: float = 10.0
+) -> dict[str, Any]:
     """Download multiple io_plugin files from the IO server with retry logic.
 
     Args:
@@ -641,7 +699,7 @@ async def download_io_plugin_files(server_url: str, files: List[str] = None, tim
         "failed": [],
         "errors": {},
         "total_files": len(files),
-        "downloaded_count": 0
+        "downloaded_count": 0,
     }
 
     try:
@@ -651,12 +709,14 @@ async def download_io_plugin_files(server_url: str, files: List[str] = None, tim
         for filename in files:
             for attempt in range(io_plugin_MAX_RETRIES):
                 try:
-                    content = await download_file_from_io_server(server_url, filename, timeout)
+                    content = await download_file_from_io_server(
+                        server_url, filename, timeout
+                    )
 
                     if content is not None:
                         # Save the file
                         file_path = get_io_plugin_file_path(filename)
-                        with open(file_path, 'w', encoding='utf-8') as f:
+                        with open(file_path, "w", encoding="utf-8") as f:
                             f.write(content)
 
                         results["downloaded"].append(filename)
@@ -689,7 +749,10 @@ async def download_io_plugin_files(server_url: str, files: List[str] = None, tim
         results["error"] = str(e)
         return results
 
-async def check_io_server_health(server_url: str, timeout: float = 5.0) -> Dict[str, Any]:
+
+async def check_io_server_health(
+    server_url: str, timeout: float = 5.0
+) -> dict[str, Any]:
     """Check if the IO server is healthy and available.
 
     Args:
@@ -715,14 +778,14 @@ async def check_io_server_health(server_url: str, timeout: float = 5.0) -> Dict[
                     "service": data.get("service", "unknown"),
                     "version": data.get("version", "unknown"),
                     "files_available": data.get("files_available", False),
-                    "files_count": data.get("files_count", 0)
+                    "files_count": data.get("files_count", 0),
                 }
             else:
                 return {
                     "healthy": False,
                     "server_url": server_url,
                     "error": f"HTTP {response.status_code}",
-                    "status": "unreachable"
+                    "status": "unreachable",
                 }
 
     except httpx.TimeoutException:
@@ -730,24 +793,25 @@ async def check_io_server_health(server_url: str, timeout: float = 5.0) -> Dict[
             "healthy": False,
             "server_url": server_url,
             "error": "Timeout",
-            "status": "timeout"
+            "status": "timeout",
         }
     except httpx.ConnectError:
         return {
             "healthy": False,
             "server_url": server_url,
             "error": "Connection failed",
-            "status": "connection_failed"
+            "status": "connection_failed",
         }
     except Exception as e:
         return {
             "healthy": False,
             "server_url": server_url,
             "error": str(e),
-            "status": "error"
+            "status": "error",
         }
 
-async def fetch_and_load_io_plugin_files(server_url: str) -> Dict[str, Any]:
+
+async def fetch_and_load_io_plugin_files(server_url: str) -> dict[str, Any]:
     """Connect to IO server, download files, and load modules.
 
     This is the main function for on-demand IO Plugin connection.
@@ -766,14 +830,16 @@ async def fetch_and_load_io_plugin_files(server_url: str) -> Dict[str, Any]:
         "files_downloaded": [],
         "files_failed": [],
         "modules_loaded": [],
-        "errors": {}
+        "errors": {},
     }
 
     try:
         # Step 1: Check server health
         health_check = await check_io_server_health(server_url)
         if not health_check.get("healthy", False):
-            results["errors"]["server_check"] = health_check.get("error", "Server unhealthy")
+            results["errors"]["server_check"] = health_check.get(
+                "error", "Server unhealthy"
+            )
             return results
 
         results["server_healthy"] = True
@@ -798,7 +864,12 @@ async def fetch_and_load_io_plugin_files(server_url: str) -> Dict[str, Any]:
         if modules_loaded:
             update_io_plugin_usage()
             results["load_success"] = True
-            results["modules_loaded"] = ["async_client_io", "io_router", "io_utils", "mapping_manager"]
+            results["modules_loaded"] = [
+                "async_client_io",
+                "io_router",
+                "io_utils",
+                "mapping_manager",
+            ]
             results["use_io_plugin_enabled"] = _use_io_plugin
         else:
             results["errors"]["load"] = "Failed to load modules"
@@ -812,75 +883,84 @@ async def fetch_and_load_io_plugin_files(server_url: str) -> Dict[str, Any]:
         results["errors"]["general"] = str(e)
         return results
 
+
 # ==================== Pydantic Models ====================
 class WritevalueRequest(BaseModel):
-
     """Request body for writing a value to the ACSI server model."""
+
     objRef: str = Field(
         ...,
         description="Object reference in ACSI format (e.g., 'LD0/LLN0$ST$Mod')",
-        json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
+        json_schema_extra={"example": "LD0/LLN0$ST$Mod"},
     )
     fc: str = Field(
         ...,
         description="Functional constraint (ST, MX, CO, etc.)",
-        json_schema_extra={"example": "ST"}
+        json_schema_extra={"example": "ST"},
     )
     value: str = Field(
         ...,
         description="Value to write as string representation",
-        json_schema_extra={"example": "ON"}
+        json_schema_extra={"example": "ON"},
     )
     dataType: str = Field(
         default="",
         description="Optional data type for value coercion",
-        json_schema_extra={"example": "BOOLEAN"}
+        json_schema_extra={"example": "BOOLEAN"},
     )
+
 
 class UpdateIedmodelRequest(BaseModel):
     """Request body for updating the IED model file."""
+
     modelPy: str = Field(
         ...,
         description="Complete Python code for model.py file",
-        json_schema_extra={"example": "from ws61850... import IedModel\nmodel = IedModel(...)"}
+        json_schema_extra={
+            "example": "from ws61850... import IedModel\nmodel = IedModel(...)"
+        },
     )
+
 
 class StartRequest(BaseModel):
     """Request body for starting the ACSI WebSocket Passive."""
+
     host: str = Field(
         default="0.0.0.0",
         description="Hostname or IP address to bind to",
-        json_schema_extra={"example": "0.0.0.0"}
+        json_schema_extra={"example": "0.0.0.0"},
     )
     port: str = Field(
         default="8765",
         description="Port number to listen on",
-        json_schema_extra={"example": "8765"}
+        json_schema_extra={"example": "8765"},
     )
     mode: str = Field(
         default="server",
         description="Operating mode (only 'server' supported)",
-        json_schema_extra={"example": "server"}
+        json_schema_extra={"example": "server"},
     )
     cp: str = Field(
         default="cp1",
         description="Communication point identifier",
-        json_schema_extra={"example": "cp1"}
+        json_schema_extra={"example": "cp1"},
     )
 
-class ReadvalueRequest(BaseModel):
 
+class ReadvalueRequest(BaseModel):
     """Request body for reading a value from the ACSI server model."""
+
     objRef: str = Field(
         ...,
         description="Object reference in ACSI format",
-        json_schema_extra={"example": "LD0/MMXU1$MX$volA"}
+        json_schema_extra={"example": "LD0/MMXU1$MX$volA"},
     )
     fc: str = Field(
         default="",
         description="Functional constraint (optional)",
-        json_schema_extra={"example": "MX"}
+        json_schema_extra={"example": "MX"},
     )
+
 
 class TLSConnectionCreateConfigRequest(BaseModel):
     """Request body for creating a new connection."""
@@ -888,17 +968,25 @@ class TLSConnectionCreateConfigRequest(BaseModel):
     host: str = Field(
         default="0.0.0.0",
         description="Hostname or IP address to bind to",
-        json_schema_extra={"example": "0.0.0.0"}
+        json_schema_extra={"example": "0.0.0.0"},
     )
     port: str = Field(
         default="8765",
         description="Port number to listen on",
-        json_schema_extra={"example": "8765"}
+        json_schema_extra={"example": "8765"},
     )
 
-    connection_name: str = Field(..., description="Human-readable name for the connection", json_schema_extra={"example": "RTI-FSP-01"})
-    enable_tls: bool = Field(default=False, description="enable TLS", json_schema_extra={"example": False})
-    tls_version: str = Field(default= "1.2", description="TLS version", json_schema_extra={"example": "1.2"})
+    connection_name: str = Field(
+        ...,
+        description="Human-readable name for the connection",
+        json_schema_extra={"example": "RTI-FSP-01"},
+    )
+    enable_tls: bool = Field(
+        default=False, description="enable TLS", json_schema_extra={"example": False}
+    )
+    tls_version: str = Field(
+        default="1.2", description="TLS version", json_schema_extra={"example": "1.2"}
+    )
 
     server_key: str | None = Field(
         default=None,
@@ -916,138 +1004,185 @@ class TLSConnectionCreateConfigRequest(BaseModel):
         json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
     )
 
-    ws_mode : str = Field(default="passive", description="WebSocket mode (passive or active)", json_schema_extra={"example": "passive"})
+    ws_mode: str = Field(
+        default="passive",
+        description="WebSocket mode (passive or active)",
+        json_schema_extra={"example": "passive"},
+    )
+
 
 class OAUTHCreateConfigRequest(BaseModel):
     """Request body for OAuth reconfiguration."""
-    connection_name: Optional[str] = Field(default=None, description="Connection name (optional, auto-detected)", json_schema_extra={"example": "RTI-FSP-01"})
-    enable_oauth: bool = Field(default=False, description="Enable OAuth authentication", json_schema_extra={"example": False})
-    host: str = Field(default="127.0.0.1", description="ws host", json_schema_extra={"example": "127.0.0.1"})
-    port: str = Field(default="8765", description="ws port", json_schema_extra={"example": "8765"})
-    cp: str = Field(default="cp1", description="Communication point identifier", json_schema_extra={"example": "cp1"})
-    ws_mode: str = Field(default="active", description="WebSocket mode (passive or active)", json_schema_extra={"example": "active"})
+
+    connection_name: str | None = Field(
+        default=None,
+        description="Connection name (optional, auto-detected)",
+        json_schema_extra={"example": "RTI-FSP-01"},
+    )
+    enable_oauth: bool = Field(
+        default=False,
+        description="Enable OAuth authentication",
+        json_schema_extra={"example": False},
+    )
+    host: str = Field(
+        default="127.0.0.1",
+        description="ws host",
+        json_schema_extra={"example": "127.0.0.1"},
+    )
+    port: str = Field(
+        default="8765", description="ws port", json_schema_extra={"example": "8765"}
+    )
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"},
+    )
+    ws_mode: str = Field(
+        default="active",
+        description="WebSocket mode (passive or active)",
+        json_schema_extra={"example": "active"},
+    )
     # OAuth settings for FSP (active mode)
-    token_endpoint_url: Optional[str] = Field(default=None, description="OAuth Token endpoint URL", json_schema_extra={"example": "https://auth.example.com/token"})
-    client_id: Optional[str] = Field(default=None, description="OAuth Client ID", json_schema_extra={"example": "my-client-id"})
-    client_secret: Optional[str] = Field(default=None, description="OAuth Client Secret", json_schema_extra={"example": "my-client-secret"})
-    ca_certificate: Optional[str] = Field(default=None, description="Server CA certificate", json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."})
-    enable_token_refresh: bool = Field(default=False, description="Enable token refresh", json_schema_extra={"example": False})
+    token_endpoint_url: str | None = Field(
+        default=None,
+        description="OAuth Token endpoint URL",
+        json_schema_extra={"example": "https://auth.example.com/token"},
+    )
+    client_id: str | None = Field(
+        default=None,
+        description="OAuth Client ID",
+        json_schema_extra={"example": "my-client-id"},
+    )
+    client_secret: str | None = Field(
+        default=None,
+        description="OAuth Client Secret",
+        json_schema_extra={"example": "my-client-secret"},
+    )
+    ca_certificate: str | None = Field(
+        default=None,
+        description="Server CA certificate",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+    enable_token_refresh: bool = Field(
+        default=False,
+        description="Enable token refresh",
+        json_schema_extra={"example": False},
+    )
+
 
 class IoPluginConfigRequest(BaseModel):
     """Request body for enabling/disabling io_plugin usage."""
+
     enabled: bool = Field(
         ...,
         description="Whether to enable io_plugin for device sync",
-        json_schema_extra={"example": True}
+        json_schema_extra={"example": True},
     )
+
 
 class IoPluginFileUploadRequest(BaseModel):
     """Request body for uploading io_plugin files."""
+
     file_path: str = Field(
         ...,
         description="The path where the file should be stored (relative to io_plugin dynamic directory)",
-        json_schema_extra={"example": "io_router.py"}
+        json_schema_extra={"example": "io_router.py"},
     )
     overwrite: bool = Field(
         default=False,
         description="Whether to overwrite existing files",
-        json_schema_extra={"example": False}
+        json_schema_extra={"example": False},
     )
 
 
 class IoClientReloadRequest(BaseModel):
     """Request body for reloading io_plugin modules."""
+
     force: bool = Field(
         default=False,
         description="Force reload even if files haven't changed",
-        json_schema_extra={"example": False}
+        json_schema_extra={"example": False},
     )
 
 
 # ==================== IO Plugin Connection Models ====================
 
+
 class IoClientConnectRequest(BaseModel):
     """Request body for connecting to IO server and fetching files."""
+
     server_url: str = Field(
         default=IO_SERVER_URL,
         description="URL of the IO server to connect to",
-        json_schema_extra={"example": "http://localhost:8000"}
+        json_schema_extra={"example": "http://localhost:8000"},
     )
     acsi_url: str = Field(
-        default= "http://localhost:5001",
+        default="http://localhost:5001",
         description="URL of the FSP",
-        json_schema_extra={"example": "http://localhost:5001"}
+        json_schema_extra={"example": "http://localhost:5001"},
     )
     timeout: float = Field(
         default=10.0,
         description="Timeout in seconds for file downloads",
-        json_schema_extra={"example": 10.0}
+        json_schema_extra={"example": 10.0},
     )
     enable_io_plugin: bool = Field(
         default=True,
         description="Whether to enable io_plugin usage after successful connection",
-        json_schema_extra={"example": True}
+        json_schema_extra={"example": True},
     )
+
 
 class IoClientDisconnectRequest(BaseModel):
     """Request body for disconnecting from IO server."""
+
     clear_files: bool = Field(
         default=False,
         description="Whether to clear downloaded files from the dynamic directory",
-        json_schema_extra={"example": False}
+        json_schema_extra={"example": False},
     )
     disable_io_plugin: bool = Field(
         default=True,
         description="Whether to disable io_plugin usage after disconnection",
-        json_schema_extra={"example": True}
+        json_schema_extra={"example": True},
     )
+
 
 class IOPluginConnectionStatusResponse(BaseModel):
     """Response model for IO Plugin connection status."""
+
     connected: bool = Field(
-        default=False,
-        description="Whether currently connected to IO server"
+        default=False, description="Whether currently connected to IO server"
     )
-    io_server_url: Optional[str] = Field(
-        default=None,
-        description="Current IO server URL"
+    io_server_url: str | None = Field(default=None, description="Current IO server URL")
+    last_connection_time: float | None = Field(
+        default=None, description="Timestamp of last successful connection"
     )
-    last_connection_time: Optional[float] = Field(
-        default=None,
-        description="Timestamp of last successful connection"
+    last_disconnect_time: float | None = Field(
+        default=None, description="Timestamp of last disconnection"
     )
-    last_disconnect_time: Optional[float] = Field(
-        default=None,
-        description="Timestamp of last disconnection"
+    last_fetch_time: float | None = Field(
+        default=None, description="Timestamp of last file fetch"
     )
-    last_fetch_time: Optional[float] = Field(
-        default=None,
-        description="Timestamp of last file fetch"
-    )
-    fetch_attempts: int = Field(
-        default=0,
-        description="Total number of fetch attempts"
-    )
+    fetch_attempts: int = Field(default=0, description="Total number of fetch attempts")
     successful_fetches: int = Field(
-        default=0,
-        description="Number of successful fetches"
+        default=0, description="Number of successful fetches"
     )
-    last_error: Optional[str] = Field(
-        default=None,
-        description="Last error message if any"
+    last_error: str | None = Field(
+        default=None, description="Last error message if any"
     )
-    connection_duration: Optional[float] = Field(
-        default=None,
-        description="Time since last connection activity in seconds"
+    connection_duration: float | None = Field(
+        default=None, description="Time since last connection activity in seconds"
     )
     status: str = Field(
         default="disconnected",
-        description="Connection status: connected, disconnected, error"
+        description="Connection status: connected, disconnected, error",
     )
+
 
 def create_bff_router(
     factory_dir,
-    scl_default_path: Optional[Path] = None,
+    scl_default_path: Path | None = None,
 ) -> tuple[APIRouter, ACSIServer]:
     """Create a FastAPI router for the ACSI server BFF API.
 
@@ -1059,14 +1194,17 @@ def create_bff_router(
         Tuple of (APIRouter, ACSIServer instance)
     """
 
-        # Initialize dynamic io_plugin loading system
+    # Initialize dynamic io_plugin loading system
     ensure_io_plugin_dir()
     update_io_plugin_usage()
 
     router = APIRouter(
         prefix="/api",
         tags=["ACSI-Server"],
-        responses={404: {"description": "Not found"}, 500: {"description": "Internal server error"}}
+        responses={
+            404: {"description": "Not found"},
+            500: {"description": "Internal server error"},
+        },
     )
 
     rti_fsp = ACSIServer(factory_dir)
@@ -1083,8 +1221,15 @@ def create_bff_router(
                 sync_to_io_device = get_sync_to_io_device_dynamic()
                 write_to_lcd = get_write_to_lcd_dynamic()
 
-                if io_plugin is None or mapping_manager is None or sync_to_io_device is None or write_to_lcd is None:
-                    logger.warning("Dynamic io_plugin loading failed, falling back to disabled state")
+                if (
+                    io_plugin is None
+                    or mapping_manager is None
+                    or sync_to_io_device is None
+                    or write_to_lcd is None
+                ):
+                    logger.warning(
+                        "Dynamic io_plugin loading failed, falling back to disabled state"
+                    )
                     _use_io_plugin = False
                     return
                 logger.info(f"[FSP] IO Plugin for connected: {io_plugin}")
@@ -1100,23 +1245,39 @@ def create_bff_router(
                     # this loop.
                     loop = rti_fsp.runtime.loop
                     if loop is None or not loop.is_running():
-                        logger.warning("[FSP] Cannot schedule IO sync - runtime loop not available")
+                        logger.warning(
+                            "[FSP] Cannot schedule IO sync - runtime loop not available"
+                        )
                         return
 
-                    associate_id = associate_response.get("associateId", "fsp_connected")
+                    associate_id = associate_response.get(
+                        "associateId", "fsp_connected"
+                    )
                     value = f"FSP Connected: {associate_id}"
 
                     fut1 = asyncio.run_coroutine_threadsafe(
                         sync_to_io_device(io_plugin, "connected", True), loop
                     )
-                    fut1.add_done_callback(lambda f: _log_io_sync_result(f, "LED sync on connect"))
+                    fut1.add_done_callback(
+                        lambda f: _log_io_sync_result(f, "LED sync on connect")
+                    )
 
                     fut2 = asyncio.run_coroutine_threadsafe(
-                        write_to_lcd(io_plugin, "connected", value, mapping_manager=mapping_manager), loop
+                        write_to_lcd(
+                            io_plugin,
+                            "connected",
+                            value,
+                            mapping_manager=mapping_manager,
+                        ),
+                        loop,
                     )
-                    fut2.add_done_callback(lambda f: _log_io_sync_result(f, "LCD write on connect"))
+                    fut2.add_done_callback(
+                        lambda f: _log_io_sync_result(f, "LCD write on connect")
+                    )
                 else:
-                    logger.warning("[FSP] IO Plugin is None - cannot turn on LED. Call /api/io/connect first.")
+                    logger.warning(
+                        "[FSP] IO Plugin is None - cannot turn on LED. Call /api/io/connect first."
+                    )
             except ImportError as e:
                 logger.error(f"[FSP] ImportError - Cannot import IO Plugin: {e}")
             except Exception as e:
@@ -1146,8 +1307,14 @@ def create_bff_router(
                 mapping_manager = get_mapping_manager_dynamic()
                 blink_led_task = get_blink_led_task_dynamic()
 
-                if io_plugin is None or mapping_manager is None or blink_led_task is None:
-                    logger.warning("Dynamic io_plugin loading failed, falling back to disabled state")
+                if (
+                    io_plugin is None
+                    or mapping_manager is None
+                    or blink_led_task is None
+                ):
+                    logger.warning(
+                        "Dynamic io_plugin loading failed, falling back to disabled state"
+                    )
                     _use_io_plugin = False
                     return
                 if io_plugin:
@@ -1155,21 +1322,34 @@ def create_bff_router(
                     # this also runs directly on the FSP event-loop thread.
                     loop = rti_fsp.runtime.loop
                     if loop is None or not loop.is_running():
-                        logger.warning("[FSP] Cannot schedule IO sync - runtime loop not available")
+                        logger.warning(
+                            "[FSP] Cannot schedule IO sync - runtime loop not available"
+                        )
                         return
 
                     fut = asyncio.run_coroutine_threadsafe(
-                        blink_led_task(io_plugin, "oper_rcv", interval=0.2, count=1, mapping_manager=mapping_manager), loop
+                        blink_led_task(
+                            io_plugin,
+                            "oper_rcv",
+                            interval=0.2,
+                            count=1,
+                            mapping_manager=mapping_manager,
+                        ),
+                        loop,
                     )
-                    fut.add_done_callback(lambda f: _log_io_sync_result(f, "LED blink on operate received"))
+                    fut.add_done_callback(
+                        lambda f: _log_io_sync_result(
+                            f, "LED blink on operate received"
+                        )
+                    )
                 else:
-                    logger.warning("[FSP] IO Plugin is None - cannot blink LED. Call /api/io/connect first.")
+                    logger.warning(
+                        "[FSP] IO Plugin is None - cannot blink LED. Call /api/io/connect first."
+                    )
             except ImportError as e:
                 logger.error(f"[FSP] ImportError - Cannot import IO Plugin: {e}")
             except Exception as e:
                 logger.error(f"[FSP] Exception in operate received callback: {e}")
-
-
 
     def on_operate_response_callback(operate_response):
         """Callback for sent operate response messages - prints to LCD."""
@@ -1184,7 +1364,9 @@ def create_bff_router(
                 write_to_lcd = get_write_to_lcd_dynamic()
 
                 if io_plugin is None or mapping_manager is None or write_to_lcd is None:
-                    logger.warning("Dynamic io_plugin loading failed, falling back to disabled state")
+                    logger.warning(
+                        "Dynamic io_plugin loading failed, falling back to disabled state"
+                    )
                     _use_io_plugin = False
                     return
 
@@ -1192,7 +1374,9 @@ def create_bff_router(
                     # Same non-blocking rationale as on_connected_callback.
                     loop = rti_fsp.runtime.loop
                     if loop is None or not loop.is_running():
-                        logger.warning("[FSP] Cannot schedule IO sync - runtime loop not available")
+                        logger.warning(
+                            "[FSP] Cannot schedule IO sync - runtime loop not available"
+                        )
                         return
 
                     success = operate_response.get("success", False)
@@ -1201,26 +1385,41 @@ def create_bff_router(
                     if success:
                         value = "Operation: SUCCESS"
                     else:
-                        value = f"Operation: FAILED - {add_cause}" if add_cause else "Operation: FAILED"
+                        value = (
+                            f"Operation: FAILED - {add_cause}"
+                            if add_cause
+                            else "Operation: FAILED"
+                        )
 
                     fut = asyncio.run_coroutine_threadsafe(
-                        write_to_lcd(io_plugin, "oper_send", value, mapping_manager=mapping_manager), loop
+                        write_to_lcd(
+                            io_plugin,
+                            "oper_send",
+                            value,
+                            mapping_manager=mapping_manager,
+                        ),
+                        loop,
                     )
-                    fut.add_done_callback(lambda f: _log_io_sync_result(f, "LCD write on operate response"))
+                    fut.add_done_callback(
+                        lambda f: _log_io_sync_result(
+                            f, "LCD write on operate response"
+                        )
+                    )
                 else:
-                    logger.warning("[FSP] IO Plugin is None - cannot write to LCD. Call /api/io/connect first.")
+                    logger.warning(
+                        "[FSP] IO Plugin is None - cannot write to LCD. Call /api/io/connect first."
+                    )
             except ImportError as e:
                 logger.error(f"[FSP] ImportError - Cannot import IO Plugin: {e}")
             except Exception as e:
                 logger.error(f"[FSP] Exception in operate response callback: {e}")
-
 
     rti_fsp.install_connected_callback(on_connected_callback)
     rti_fsp.install_operate_received_callback(on_operate_received_callback)
     rti_fsp.install_operate_response_callback(on_operate_response_callback)
 
     # ==================== Helper Functions ====================
-    def serialize_data_attribute(da: DataAttribute) -> Dict[str, Any]:
+    def serialize_data_attribute(da: DataAttribute) -> dict[str, Any]:
         """Serialize a DataAttribute to JSON-compatible dict."""
         return {
             "kind": "DA",
@@ -1228,12 +1427,14 @@ def create_bff_router(
             "name": da.name,
             "fc": da.fc.name if da.fc is not None else None,
             "bType": da.type.name if da.type is not None else None,
-            "children": [serialize_data_attribute(child) for child in (da.data_attributes or [])],
+            "children": [
+                serialize_data_attribute(child) for child in (da.data_attributes or [])
+            ],
         }
 
-    def serialize_data_object(do: DataObject) -> Dict[str, Any]:
+    def serialize_data_object(do: DataObject) -> dict[str, Any]:
         """Serialize a DataObject to JSON-compatible dict."""
-        children: List[Dict[str, Any]] = []
+        children: list[dict[str, Any]] = []
         for item in do.do_or_da or []:
             if isinstance(item, DataObject):
                 children.append(serialize_data_object(item))
@@ -1248,7 +1449,7 @@ def create_bff_router(
             "children": children,
         }
 
-    def serialize_ied_tree(ied: IedModel) -> Dict[str, Any]:
+    def serialize_ied_tree(ied: IedModel) -> dict[str, Any]:
         """Serialize an IED model tree to JSON-compatible dict."""
         return {
             "kind": "IED",
@@ -1276,13 +1477,16 @@ def create_bff_router(
                                                 "kind": "DataSet",
                                                 "type": "DataSet",
                                                 "name": ds.name,
-                                                "ref": f"{ld.name}/{ln.name}.{ds.name}"
+                                                "ref": f"{ld.name}/{ln.name}.{ds.name}",
                                             }
                                             for ds in (ln.data_sets or [])
-                                        ]
+                                        ],
                                     }
-                                ] if (ln.data_sets or []) else []
-                            ) + (
+                                ]
+                                if (ln.data_sets or [])
+                                else []
+                            )
+                            + (
                                 [
                                     {
                                         "kind": "Group",
@@ -1290,18 +1494,24 @@ def create_bff_router(
                                         "name": "ReportControls",
                                         "children": [
                                             {
-                                                "kind": "BRCB" if rcb.buffered else "URCB",
+                                                "kind": "BRCB"
+                                                if rcb.buffered
+                                                else "URCB",
                                                 "type": "ReportControl",
                                                 "name": rcb.name,
-                                                "ref": f"{ld.name}/{ln.name}.{rcb.name}"
+                                                "ref": f"{ld.name}/{ln.name}.{rcb.name}",
                                             }
                                             for rcb in (ln.rcbs or [])
-                                        ]
+                                        ],
                                     }
-                                ] if (ln.rcbs or []) else []
-                            ) + [
-                                serialize_data_object(do) for do in (ln.data_objects or [])
-                            ]
+                                ]
+                                if (ln.rcbs or [])
+                                else []
+                            )
+                            + [
+                                serialize_data_object(do)
+                                for do in (ln.data_objects or [])
+                            ],
                         }
                         for ln in (ld.logical_nodes or [])
                     ],
@@ -1310,10 +1520,10 @@ def create_bff_router(
             ],
         }
 
-    def collect_da_paths_from_do(data_object: DataObject, prefix: str) -> List[tuple]:
+    def collect_da_paths_from_do(data_object: DataObject, prefix: str) -> list[tuple]:
         """Collect flattened (path, fc_name) tuples under a DO path."""
-        results: List[tuple] = []
-        for item in (data_object.do_or_da or []):
+        results: list[tuple] = []
+        for item in data_object.do_or_da or []:
             if isinstance(item, DataAttribute):
                 da_path = f"{prefix}.{item.name}"
                 fc_name = item.fc.name if item.fc is not None else None
@@ -1324,32 +1534,36 @@ def create_bff_router(
                 results.extend(collect_da_paths_from_do(item, sub_prefix))
         return results
 
-    def collect_da_paths_from_da(data_attribute: DataAttribute, prefix: str) -> List[tuple]:
+    def collect_da_paths_from_da(
+        data_attribute: DataAttribute, prefix: str
+    ) -> list[tuple]:
         """Collect flattened (path, fc_name) tuples for nested DA paths."""
-        results: List[tuple] = []
-        for child in (data_attribute.data_attributes or []):
+        results: list[tuple] = []
+        for child in data_attribute.data_attributes or []:
             child_path = f"{prefix}.{child.name}"
             fc_name = child.fc.name if child.fc is not None else None
             results.append((child_path, fc_name))
             results.extend(collect_da_paths_from_da(child, child_path))
         return results
 
-    def build_logical_node_details(ied_model: Optional[IedModel]) -> Dict[str, Dict[str, Any]]:
+    def build_logical_node_details(
+        ied_model: IedModel | None,
+    ) -> dict[str, dict[str, Any]]:
         """Build UI-friendly logical node details."""
-        details: Dict[str, Dict[str, Any]] = {}
+        details: dict[str, dict[str, Any]] = {}
         if ied_model is None:
             return details
 
-        for ld in (ied_model.logical_devices or []):
-            for ln in (ld.logical_nodes or []):
-                data_objects: List[Dict[str, Any]] = []
-                data_attributes: List[str] = []
-                da_fc_map: Dict[str, str] = {}
-                report_control_blocks: List[Dict[str, Any]] = []
-                datasets: List[Dict[str, Any]] = []
+        for ld in ied_model.logical_devices or []:
+            for ln in ld.logical_nodes or []:
+                data_objects: list[dict[str, Any]] = []
+                data_attributes: list[str] = []
+                da_fc_map: dict[str, str] = {}
+                report_control_blocks: list[dict[str, Any]] = []
+                datasets: list[dict[str, Any]] = []
                 ln_prefix = f"{ld.name}/{ln.name}."
 
-                for data_object in (ln.data_objects or []):
+                for data_object in ln.data_objects or []:
                     cdc = (data_object.cdc or "").lower()
                     obj_info = {"name": data_object.name, "cdc": data_object.cdc}
 
@@ -1361,17 +1575,19 @@ def create_bff_router(
                         report_control_blocks.append(obj_info)
 
                     data_objects.append(obj_info)
-                    for da_path, fc_name in collect_da_paths_from_do(data_object, data_object.name):
+                    for da_path, fc_name in collect_da_paths_from_do(
+                        data_object, data_object.name
+                    ):
                         data_attributes.append(da_path)
                         if fc_name:
                             da_fc_map[f"{ln_prefix}{da_path}"] = fc_name
 
                 # Also collect DataSets from ln.data_sets
-                for ds in (ln.data_sets or []):
+                for ds in ln.data_sets or []:
                     datasets.append({"name": ds.name, "cdc": "dataset"})
 
                 # Also collect ReportControls from ln.rcbs
-                for rcb in (ln.rcbs or []):
+                for rcb in ln.rcbs or []:
                     report_control_blocks.append({"name": rcb.name, "cdc": "rcb"})
 
                 ln_key = f"{ld.name}/{ln.name}"
@@ -1385,7 +1601,7 @@ def create_bff_router(
 
         return details
 
-    def extract_tpa_info(websocket_info: Any) -> Dict[str, Any]:
+    def extract_tpa_info(websocket_info: Any) -> dict[str, Any]:
         """Extract TPA (Three Part Address) and connection info from websocket_info."""
         info = {
             "peer_address": None,
@@ -1411,7 +1627,9 @@ def create_bff_router(
 
             if hasattr(websocket_info, "tpa"):
                 info["tpa"] = str(websocket_info.tpa)
-            elif hasattr(websocket_info, "request") and hasattr(websocket_info.request, "headers"):
+            elif hasattr(websocket_info, "request") and hasattr(
+                websocket_info.request, "headers"
+            ):
                 headers = websocket_info.request.headers
                 if "X-TPA" in headers:
                     info["tpa"] = headers["X-TPA"]
@@ -1432,7 +1650,7 @@ def create_bff_router(
         summary="List All API Endpoints",
         description="Returns a comprehensive list of all available API endpoints with their HTTP methods, request body schemas, and response formats.",
         response_description="List of all endpoints with their metadata",
-        tags=["Discovery"]
+        tags=["Discovery"],
     )
     async def api_list_all_endpoints():
         """List all API endpoints with their schemas and metadata.
@@ -1468,7 +1686,7 @@ def create_bff_router(
             methods = list(route.methods)
 
             body_schema = None
-            if hasattr(route, 'body_field') and route.body_field:
+            if hasattr(route, "body_field") and route.body_field:
                 try:
                     model = route.body_field.annotation
                     if model is not Any:
@@ -1477,12 +1695,14 @@ def create_bff_router(
                 except Exception:
                     body_schema = None
 
-            routes.append({
-                "path": path,
-                "methods": methods,
-                "endpoint": route.name,
-                "body_schema": body_schema
-            })
+            routes.append(
+                {
+                    "path": path,
+                    "methods": methods,
+                    "endpoint": route.name,
+                    "body_schema": body_schema,
+                }
+            )
 
         return {
             "ok": True,
@@ -1497,9 +1717,9 @@ def create_bff_router(
         response_description="Server status information",
         responses={
             200: {"description": "Server status returned successfully"},
-            500: {"description": "Error retrieving server status"}
+            500: {"description": "Error retrieving server status"},
         },
-        tags=["Server Control"]
+        tags=["Server Control"],
     )
     def api_status():
         """Get current server status.
@@ -1513,12 +1733,11 @@ def create_bff_router(
         try:
             return JSONResponse(
                 content={"ok": True, "status": str(rti_fsp.get_status())},
-                status_code=200
+                status_code=200,
             )
         except Exception as exc:
             return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=500
+                content={"ok": False, "error": str(exc)}, status_code=500
             )
 
     @router.get(
@@ -1528,9 +1747,9 @@ def create_bff_router(
         response_description="Health status and service information",
         responses={
             200: {"description": "Service is healthy and running"},
-            500: {"description": "Service is unhealthy"}
+            500: {"description": "Service is unhealthy"},
         },
-        tags=["Health"]
+        tags=["Health"],
     )
     def api_health():
         """Generic health endpoint used by external discovery (e.g., BFF network scan).
@@ -1559,8 +1778,7 @@ def create_bff_router(
             }
         except Exception as exc:
             return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=500
+                content={"ok": False, "error": str(exc)}, status_code=500
             )
 
     @router.get(
@@ -1570,9 +1788,9 @@ def create_bff_router(
         response_description="List of active WebSocket connections",
         responses={
             200: {"description": "List of connections returned successfully"},
-            500: {"description": "Error retrieving connections"}
+            500: {"description": "Error retrieving connections"},
         },
-        tags=["Connections"]
+        tags=["Connections"],
     )
     def api_connections():
         """Get TPA information for all connected servers.
@@ -1605,8 +1823,7 @@ def create_bff_router(
         except Exception as exc:
             rti_fsp._log_action(f"Get connections failed: {exc}", "error")
             return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=500
+                content={"ok": False, "error": str(exc)}, status_code=500
             )
 
     @router.get(
@@ -1614,7 +1831,7 @@ def create_bff_router(
         summary="Get Server Properties",
         description="Returns the static properties and capabilities of the ACSI server.",
         response_description="Server role and mode properties",
-        tags=["Server Control"]
+        tags=["Server Control"],
     )
     def api_roles():
         """Get property information for the server.
@@ -1639,9 +1856,9 @@ def create_bff_router(
         response_description="Complete IED model tree structure",
         responses={
             200: {"description": "IED model data returned successfully"},
-            500: {"description": "Error retrieving model"}
+            500: {"description": "Error retrieving model"},
         },
-        tags=["Model"]
+        tags=["Model"],
     )
     def api_model():
         """Return current loaded model descriptor for UI rendering.
@@ -1667,13 +1884,12 @@ def create_bff_router(
             }
         """
         try:
-
-            ied_model: Optional[IedModel] = rti_fsp.runtime.ied_model
+            ied_model: IedModel | None = rti_fsp.runtime.ied_model
             source = rti_fsp.runtime.model_source
             selected_ied = rti_fsp.runtime.model_ied_name
             access_points = [rti_fsp.runtime.cp or "cp1"]
 
-            logical_devices: List[str] = []
+            logical_devices: list[str] = []
             if ied_model is not None:
                 logical_devices = [ld.name for ld in (ied_model.logical_devices or [])]
 
@@ -1715,8 +1931,7 @@ def create_bff_router(
             return result
         except Exception as exc:
             return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=500
+                content={"ok": False, "error": str(exc)}, status_code=500
             )
 
     @router.post(
@@ -1728,9 +1943,9 @@ def create_bff_router(
             200: {"description": "Model updated successfully"},
             202: {"description": "Model update accepted, hot-swap in progress"},
             400: {"description": "Invalid request"},
-            500: {"description": "Error updating model"}
+            500: {"description": "Error updating model"},
         },
-        tags=["Model"]
+        tags=["Model"],
     )
     def api_update_iedmodel(request: UpdateIedmodelRequest):
         """Update model.py in fsp directory and reload IED model.
@@ -1757,8 +1972,11 @@ def create_bff_router(
 
             if not isinstance(model_py, str) or not model_py.strip():
                 return JSONResponse(
-                    content={"ok": False, "error": "modelPy is required and must be a non-empty string."},
-                    status_code=400
+                    content={
+                        "ok": False,
+                        "error": "modelPy is required and must be a non-empty string.",
+                    },
+                    status_code=400,
                 )
 
             # Check server status
@@ -1774,7 +1992,7 @@ def create_bff_router(
                     "source": str(rti_fsp.model_file),
                     "ied": ied_model.name,
                     "dynamic": is_running,
-                    "version": rti_fsp.runtime.model_version
+                    "version": rti_fsp.runtime.model_version,
                 },
             )
 
@@ -1787,9 +2005,9 @@ def create_bff_router(
                         "ied": ied_model.name,
                         "modelVersion": rti_fsp.runtime.model_version,
                         "dynamicReload": True,
-                        "status": "reloading"
+                        "status": "reloading",
                     },
-                    status_code=202  # Accepted - hot-swap in progress
+                    status_code=202,  # Accepted - hot-swap in progress
                 )
             else:
                 return {
@@ -1798,14 +2016,13 @@ def create_bff_router(
                     "ied": ied_model.name,
                     "modelVersion": rti_fsp.runtime.model_version,
                     "dynamicReload": is_running,
-                    "status": "loaded"
+                    "status": "loaded",
                 }
 
         except Exception as exc:
             rti_fsp._log_action(f"IED model update failed: {exc}", "error")
             return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=400
+                content={"ok": False, "error": str(exc)}, status_code=400
             )
 
     @router.post(
@@ -1817,9 +2034,9 @@ def create_bff_router(
             200: {"description": "Model updated successfully"},
             202: {"description": "Model update accepted, hot-swap in progress"},
             400: {"description": "Invalid request"},
-            500: {"description": "Error updating model"}
+            500: {"description": "Error updating model"},
         },
-        tags=["Model"]
+        tags=["Model"],
     )
     async def api_update_iedmodel_file(file: UploadFile = File(...)):
         """Upload model.py file directly for update.
@@ -1843,12 +2060,12 @@ def create_bff_router(
         try:
             # Read file content as string
             model_py = await file.read()
-            model_py = model_py.decode('utf-8')
+            model_py = model_py.decode("utf-8")
 
             if not model_py.strip():
                 return JSONResponse(
                     content={"ok": False, "error": "Uploaded file is empty."},
-                    status_code=400
+                    status_code=400,
                 )
 
             # Reuse existing logic
@@ -1864,7 +2081,7 @@ def create_bff_router(
                     "ied": ied_model.name,
                     "dynamic": is_running,
                     "version": rti_fsp.runtime.model_version,
-                    "filename": file.filename
+                    "filename": file.filename,
                 },
             )
 
@@ -1877,9 +2094,9 @@ def create_bff_router(
                         "ied": ied_model.name,
                         "modelVersion": rti_fsp.runtime.model_version,
                         "dynamicReload": True,
-                        "status": "reloading"
+                        "status": "reloading",
                     },
-                    status_code=202  # Accepted - hot-swap in progress
+                    status_code=202,  # Accepted - hot-swap in progress
                 )
             else:
                 return {
@@ -1888,14 +2105,13 @@ def create_bff_router(
                     "ied": ied_model.name,
                     "modelVersion": rti_fsp.runtime.model_version,
                     "dynamicReload": is_running,
-                    "status": "loaded"
+                    "status": "loaded",
                 }
 
         except Exception as exc:
             rti_fsp._log_action(f"IED model file update failed: {exc}", "error")
             return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=400
+                content={"ok": False, "error": str(exc)}, status_code=400
             )
 
     @router.post(
@@ -1905,9 +2121,9 @@ def create_bff_router(
         response_description="Server start confirmation",
         responses={
             200: {"description": "Server started successfully"},
-            400: {"description": "Invalid parameters or server error"}
+            400: {"description": "Invalid parameters or server error"},
         },
-        tags=["Server Control"]
+        tags=["Server Control"],
     )
     def api_start(request: StartRequest):
         """Start the ACSI WebSocket server.
@@ -1939,17 +2155,22 @@ def create_bff_router(
             cp = request.cp
 
             if mode != "active":
-                rti_fsp._log_action("Only 'active' mode is supported in this app", "error")
+                rti_fsp._log_action(
+                    "Only 'active' mode is supported in this app", "error"
+                )
                 return JSONResponse(
-                    content={"ok": False, "error": "Only 'active' mode is supported in this app."},
-                    status_code=400
+                    content={
+                        "ok": False,
+                        "error": "Only 'active' mode is supported in this app.",
+                    },
+                    status_code=400,
                 )
             try:
                 port = int(raw_port)
             except (TypeError, ValueError):
                 return JSONResponse(
                     content={"ok": False, "error": f"Invalid port value: {raw_port!r}"},
-                    status_code=400
+                    status_code=400,
                 )
 
             if cp:
@@ -1957,8 +2178,11 @@ def create_bff_router(
                     rti_fsp._set_runtime_state(cp=cp)
                 except Exception as exc:
                     return JSONResponse(
-                        content={"ok": False, "error": f"Failed to set runtime state: {exc}"},
-                        status_code=400
+                        content={
+                            "ok": False,
+                            "error": f"Failed to set runtime state: {exc}",
+                        },
+                        status_code=400,
                     )
 
             try:
@@ -1966,14 +2190,14 @@ def create_bff_router(
             except Exception as exc:
                 return JSONResponse(
                     content={"ok": False, "error": f"Failed to start server: {exc}"},
-                    status_code=400
+                    status_code=400,
                 )
 
             return {"ok": True, "status": "listening", "host": host, "port": port}
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": f"Unexpected error: {exc}"},
-                status_code=400
+                status_code=400,
             )
 
     @router.post(
@@ -1983,9 +2207,9 @@ def create_bff_router(
         response_description="Server stop confirmation",
         responses={
             200: {"description": "Server stopped or stopping"},
-            500: {"description": "Error stopping server"}
+            500: {"description": "Error stopping server"},
         },
-        tags=["Server Control"]
+        tags=["Server Control"],
     )
     def api_stop():
         """Stop the ACSI WebSocket Active.
@@ -2004,7 +2228,9 @@ def create_bff_router(
             status = rti_fsp.runtime.status
             logger.info(f"[FSP STOP] current status={status!r}")
             if status in (None, "stopped"):
-                logger.info("[FSP STOP] early-return: already stopped, skipping IO sync")
+                logger.info(
+                    "[FSP STOP] early-return: already stopped, skipping IO sync"
+                )
                 return {"ok": True, "status": "stopped"}
 
             try:
@@ -2016,8 +2242,15 @@ def create_bff_router(
                         sync_to_io_device = get_sync_to_io_device_dynamic()
                         write_to_lcd = get_write_to_lcd_dynamic()
 
-                        if io_plugin is None or mapping_manager is None or sync_to_io_device is None or write_to_lcd is None:
-                            logger.warning("Dynamic io_plugin loading failed, falling back to disabled state")
+                        if (
+                            io_plugin is None
+                            or mapping_manager is None
+                            or sync_to_io_device is None
+                            or write_to_lcd is None
+                        ):
+                            logger.warning(
+                                "Dynamic io_plugin loading failed, falling back to disabled state"
+                            )
                             _use_io_plugin = False
                             return
                         logger.info(f"[FSP] IO Plugin for connected: {io_plugin}")
@@ -2035,24 +2268,38 @@ def create_bff_router(
                             if loop is not None and loop.is_running():
                                 try:
                                     fut1 = asyncio.run_coroutine_threadsafe(
-                                        sync_to_io_device(io_plugin, "stopped", False), loop
+                                        sync_to_io_device(io_plugin, "stopped", False),
+                                        loop,
                                     )
                                     fut2 = asyncio.run_coroutine_threadsafe(
-                                        write_to_lcd(io_plugin, "stopped", "Stopped", mapping_manager=mapping_manager),
-                                        loop
+                                        write_to_lcd(
+                                            io_plugin,
+                                            "stopped",
+                                            "Stopped",
+                                            mapping_manager=mapping_manager,
+                                        ),
+                                        loop,
                                     )
                                     # Block here (we're on a worker thread, not the loop) until
                                     # the device write actually completes, or time out.
                                     fut1.result(timeout=5)
                                     fut2.result(timeout=5)
                                 except Exception as e:
-                                    logger.error(f"[FSP] IO sync on stop failed or timed out: {e}")
+                                    logger.error(
+                                        f"[FSP] IO sync on stop failed or timed out: {e}"
+                                    )
                             else:
-                                logger.warning("[FSP] Cannot schedule IO sync on stop - runtime loop not available")
+                                logger.warning(
+                                    "[FSP] Cannot schedule IO sync on stop - runtime loop not available"
+                                )
                         else:
-                            logger.warning("[FSP] IO Plugin is None - cannot turn on LED. Call /api/io/connect first.")
+                            logger.warning(
+                                "[FSP] IO Plugin is None - cannot turn on LED. Call /api/io/connect first."
+                            )
                     except ImportError as e:
-                        logger.error(f"[FSP] ImportError - Cannot import IO Plugin: {e}")
+                        logger.error(
+                            f"[FSP] ImportError - Cannot import IO Plugin: {e}"
+                        )
                     except Exception as e:
                         logger.error(f"[FSP] Exception in IO connected callback: {e}")
 
@@ -2068,15 +2315,17 @@ def create_bff_router(
                 rti_fsp._log_action(f"Stop failed: {exc}", "error")
                 return JSONResponse(
                     content={"ok": False, "error": f"Unexpected error: {exc}"},
-                    status_code=500
+                    status_code=500,
                 )
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": f"Unexpected error: {exc}"},
-                status_code=500
+                status_code=500,
             )
 
-    async def _wait_for_runtime_loop(rti_fsp, timeout: float = 5.0) -> asyncio.AbstractEventLoop:
+    async def _wait_for_runtime_loop(
+        rti_fsp, timeout: float = 5.0
+    ) -> asyncio.AbstractEventLoop:
         """Poll until the server's background event loop is created and running,
         or raise if it doesn't show up within `timeout` seconds."""
         deadline = asyncio.get_event_loop().time() + timeout
@@ -2095,41 +2344,56 @@ def create_bff_router(
         response_description="Connection details",
         responses={
             200: {"description": "Connection information returned successfully"},
-            500: {"description": "Error retrieving connection info"}
+            500: {"description": "Error retrieving connection info"},
         },
-        tags=["Client Status"]
+        tags=["Client Status"],
     )
     async def api_reconfig_connection(request: TLSConnectionCreateConfigRequest):
         """Reconfigure the connection with a new communication point."""
         try:
-            rti_fsp._log_action(f"Starting connection reconfiguration for host: {request.host}, port: {request.port}", "debug")
+            rti_fsp._log_action(
+                f"Starting connection reconfiguration for host: {request.host}, port: {request.port}",
+                "debug",
+            )
             # Normalize tls_version to handle "1.2", "1.3", "TLSv1_2", "TLSv1_3" formats
             tls_version_str = (request.tls_version or "1.3").lower()
             if "1.2" in tls_version_str or "1_2" in tls_version_str:
                 tls_version = ssl.TLSVersion.TLSv1_2
             else:
                 tls_version = ssl.TLSVersion.TLSv1_3
-            logger.info(f"tls_version in reconfig connection: {tls_version} from request: {request.tls_version}")
-            rti_fsp._log_action(f"tls_version in reconfig connection: {tls_version} from request: {request.tls_version}",
-                                "debug")
+            logger.info(
+                f"tls_version in reconfig connection: {tls_version} from request: {request.tls_version}"
+            )
+            rti_fsp._log_action(
+                f"tls_version in reconfig connection: {tls_version} from request: {request.tls_version}",
+                "debug",
+            )
             host = request.host
             request_port = request.port
             if request.ws_mode.lower() == "active":
                 # Only create TLSConfig if TLS is enabled
                 tls_config = None
                 if request.enable_tls:
+                    keylog_file = tempfile.NamedTemporaryFile(
+                        mode="w",
+                        prefix="tlskeys",
+                        suffix=".log",
+                        delete=True,
+                    )
                     tls_config = TLSConfig(
                         mode="client",
                         cafile=request.server_ca,
                         min_version=tls_version,
                         max_version=tls_version,
-                        keylog_file=os.path.join("/app/fsp", "tlskeys.log"),
+                        keylog_file=keylog_file.name,
                     )
                 cp = os.getenv("CP", "cp1")
 
                 loop = rti_fsp.runtime.loop
                 if loop is None or not loop.is_running():
-                    rti_fsp._log_action("Server not running, starting server instance", "debug")
+                    rti_fsp._log_action(
+                        "Server not running, starting server instance", "debug"
+                    )
                     logger.info("server not running, starting server instance")
                     rti_fsp.start_server(host, int(request_port))
                     loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
@@ -2144,10 +2408,17 @@ def create_bff_router(
 
                 # Call reconfigure_connection on the endpoint's event loop
                 # The library handles TLS config and task restart internally
-                rti_fsp._log_action(f"Calling reconfigure_connection for host: {host}, port: {request_port}, TLS: {request.enable_tls}", "debug")
+                rti_fsp._log_action(
+                    f"Calling reconfigure_connection for host: {host}, port: {request_port}, TLS: {request.enable_tls}",
+                    "debug",
+                )
                 fut = asyncio.run_coroutine_threadsafe(
                     endpoint.reconfigure_connection(
-                        host, request_port, cp, request.enable_tls, tls_config=tls_config
+                        host,
+                        request_port,
+                        cp,
+                        request.enable_tls,
+                        tls_config=tls_config,
                     ),
                     loop,
                 )
@@ -2156,26 +2427,38 @@ def create_bff_router(
                     await asyncio.wrap_future(fut)
                     rti_fsp._log_action("Connection reconfigured successfully", "info")
                 except Exception as e:
-                    rti_fsp._log_action(f"Error during reconfigure_connection: {e}", "error")
+                    rti_fsp._log_action(
+                        f"Error during reconfigure_connection: {e}", "error"
+                    )
                     logger.info(f"Error during reconfigure_connection: {e}")
-
 
                 rti_fsp.runtime.tasks["ws"] = endpoint._connect_task
 
-                logger.info(f"Reconfigured connection with TLS enabled: {request.enable_tls}")
+                logger.info(
+                    f"Reconfigured connection with TLS enabled: {request.enable_tls}"
+                )
                 return JSONResponse(
-                    content={"ok": True, "status": "reconfigured", "ws_mode": request.ws_mode,
-                             "enable_tls": request.enable_tls},
+                    content={
+                        "ok": True,
+                        "status": "reconfigured",
+                        "ws_mode": request.ws_mode,
+                        "enable_tls": request.enable_tls,
+                    },
                     status_code=200,
                 )
             else:
                 return JSONResponse(
-                    content={"ok": False, "error": "Only active mode is supported for reconfiguration."},
+                    content={
+                        "ok": False,
+                        "error": "Only active mode is supported for reconfiguration.",
+                    },
                     status_code=400,
                 )
         except Exception as exc:
             rti_fsp._log_action(f"api_reconfig_connection failed: {exc}", "error")
-            return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)}, status_code=500
+            )
 
     @router.get(
         "/tls-config",
@@ -2184,9 +2467,9 @@ def create_bff_router(
         response_description="TLS configuration from runtime",
         responses={
             200: {"description": "TLS configuration returned successfully"},
-            500: {"description": "Error retrieving TLS configuration"}
+            500: {"description": "Error retrieving TLS configuration"},
         },
-        tags=["TLS"]
+        tags=["TLS"],
     )
     def api_get_tls_config():
         """Get current TLS configuration from runtime.
@@ -2204,7 +2487,7 @@ def create_bff_router(
             if endpoint is None:
                 return JSONResponse(
                     content={"ok": False, "error": "Endpoint not available"},
-                    status_code=500
+                    status_code=500,
                 )
 
             # Get TLS config from runtime
@@ -2214,27 +2497,27 @@ def create_bff_router(
             server_cert = None
             server_ca = None
 
-            if hasattr(endpoint, '_tls_config') and endpoint._tls_config is not None:
+            if hasattr(endpoint, "_tls_config") and endpoint._tls_config is not None:
                 tls_config = endpoint._tls_config
                 enable_tls = True
                 # Extract TLS version from config
-                if hasattr(tls_config, 'min_version'):
+                if hasattr(tls_config, "min_version"):
                     if tls_config.min_version == ssl.TLSVersion.TLSv1_3:
                         tls_version = "1.3"
                     elif tls_config.min_version == ssl.TLSVersion.TLSv1_2:
                         tls_version = "1.2"
-                if hasattr(tls_config, 'cafile'):
+                if hasattr(tls_config, "cafile"):
                     server_ca = tls_config.cafile
-                if hasattr(tls_config, 'certfile'):
+                if hasattr(tls_config, "certfile"):
                     server_cert = tls_config.certfile
-                if hasattr(tls_config, 'keyfile'):
+                if hasattr(tls_config, "keyfile"):
                     server_key = tls_config.keyfile
 
             # Get ws_mode
             ws_mode = "active"
-            if hasattr(endpoint, 'ws_mode'):
+            if hasattr(endpoint, "ws_mode"):
                 ws_mode = endpoint.ws_mode
-            elif hasattr(rti_fsp.runtime, 'ws_mode'):
+            elif hasattr(rti_fsp.runtime, "ws_mode"):
                 ws_mode = rti_fsp.runtime.ws_mode
 
             return {
@@ -2244,12 +2527,11 @@ def create_bff_router(
                 "server_key": server_key,
                 "server_cert": server_cert,
                 "server_ca": server_ca,
-                "ws_mode": ws_mode
+                "ws_mode": ws_mode,
             }
         except Exception as exc:
             return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=500
+                content={"ok": False, "error": str(exc)}, status_code=500
             )
 
     @router.post(
@@ -2259,27 +2541,35 @@ def create_bff_router(
         response_description="Connection details",
         responses={
             200: {"description": "Connection information returned successfully"},
-            500: {"description": "Error retrieving connection info"}
+            500: {"description": "Error retrieving connection info"},
         },
-        tags=["Client Status"]
+        tags=["Client Status"],
     )
     async def api_reconfig_oauth(request: OAUTHCreateConfigRequest):
         """Reconfigure OAuth settings. OAuth config should be provided in the request by BFF."""
         try:
-            rti_fsp._log_action(f"Starting OAuth reconfiguration for connection: {request.connection_name or 'unknown'}", "debug")
+            rti_fsp._log_action(
+                f"Starting OAuth reconfiguration for connection: {request.connection_name or 'unknown'}",
+                "debug",
+            )
             cp = request.cp or os.getenv("CP", "cp1")
             host = request.host
             oauth_port = request.port
 
             # Get OAuth settings from request (BFF should provide these from connections.json)
-            token_endpoint = getattr(request, 'token_endpoint_url', None) or getattr(request, 'token_endpoint', None)
-            client_id = getattr(request, 'client_id', None)
-            client_secret = getattr(request, 'client_secret', None)
-            ca_certificate = getattr(request, 'ca_certificate', None)
-            enable_token_refresh = getattr(request, 'enable_token_refresh', False)
+            token_endpoint = getattr(request, "token_endpoint_url", None) or getattr(
+                request, "token_endpoint", None
+            )
+            client_id = getattr(request, "client_id", None)
+            client_secret = getattr(request, "client_secret", None)
+            ca_certificate = getattr(request, "ca_certificate", None)
+            enable_token_refresh = getattr(request, "enable_token_refresh", False)
 
             connection_name = request.connection_name or "unknown"
-            rti_fsp._log_action(f"OAuth configuration - enable: {request.enable_oauth}, connection: {connection_name}", "debug")
+            rti_fsp._log_action(
+                f"OAuth configuration - enable: {request.enable_oauth}, connection: {connection_name}",
+                "debug",
+            )
 
             # Validate that required OAuth settings are provided
             if request.enable_oauth and not token_endpoint:
@@ -2295,32 +2585,51 @@ def create_bff_router(
                 ca_certificate = None
 
             logger.info(f"Reconfiguring OAuth with connection: {connection_name}")
-            logger.info(f"OAuth enable: {request.enable_oauth}, token_endpoint: {token_endpoint}")
+            logger.info(
+                f"OAuth enable: {request.enable_oauth}, token_endpoint: {token_endpoint}"
+            )
 
             loop = rti_fsp.runtime.loop
             if loop is None or not loop.is_running():
-                rti_fsp._log_action("Server not running, starting server instance for OAuth reconfig", "debug")
+                rti_fsp._log_action(
+                    "Server not running, starting server instance for OAuth reconfig",
+                    "debug",
+                )
                 logger.info("server not running, starting server instance")
                 rti_fsp.start_server(host, int(oauth_port))
                 loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
-                rti_fsp._log_action("Server instance started for OAuth reconfig", "debug")
+                rti_fsp._log_action(
+                    "Server instance started for OAuth reconfig", "debug"
+                )
 
             # When disabling OAuth, stop the endpoint first to avoid issues with ClientCredentialsProvider
             if not request.enable_oauth:
-                rti_fsp._log_action("Disabling OAuth - stopping endpoint first", "debug")
+                rti_fsp._log_action(
+                    "Disabling OAuth - stopping endpoint first", "debug"
+                )
                 logger.info("Disabling OAuth - stopping endpoint first")
                 # Stop the current connection if it exists
-                if hasattr(rti_fsp.runtime.endpoint, '_connect_task') and rti_fsp.runtime.endpoint._connect_task is not None:
+                if (
+                    hasattr(rti_fsp.runtime.endpoint, "_connect_task")
+                    and rti_fsp.runtime.endpoint._connect_task is not None
+                ):
                     stop_fut = asyncio.run_coroutine_threadsafe(
-                        rti_fsp.runtime.endpoint._cancel_task(rti_fsp.runtime.endpoint._connect_task),
+                        rti_fsp.runtime.endpoint._cancel_task(
+                            rti_fsp.runtime.endpoint._connect_task
+                        ),
                         loop,
                     )
                     await asyncio.wrap_future(stop_fut)
-                rti_fsp._log_action("Endpoint stopped, now reconfiguring with OAuth disabled", "debug")
+                rti_fsp._log_action(
+                    "Endpoint stopped, now reconfiguring with OAuth disabled", "debug"
+                )
                 logger.info("Endpoint stopped, now reconfiguring with OAuth disabled")
 
             # Call reconfigure_oauth with settings from connection
-            rti_fsp._log_action(f"Calling reconfigure_oauth for host: {host}, port: {oauth_port}, OAuth: {request.enable_oauth}", "debug")
+            rti_fsp._log_action(
+                f"Calling reconfigure_oauth for host: {host}, port: {oauth_port}, OAuth: {request.enable_oauth}",
+                "debug",
+            )
             fut = asyncio.run_coroutine_threadsafe(
                 rti_fsp.runtime.endpoint.reconfigure_oauth(
                     host=host,
@@ -2340,14 +2649,20 @@ def create_bff_router(
             rti_fsp.runtime.tasks["ws"] = rti_fsp.runtime.endpoint._connect_task
 
             return JSONResponse(
-                content={"ok": True, "status": "reconfigured", "ws_mode": "active",
-                         "enable_oauth": request.enable_oauth},
+                content={
+                    "ok": True,
+                    "status": "reconfigured",
+                    "ws_mode": "active",
+                    "enable_oauth": request.enable_oauth,
+                },
                 status_code=200,
             )
         except Exception as exc:
             logger.info(f"Reconfig OAuth error: {exc}")
             rti_fsp._log_action(f"api_reconfig_oauth failed: {exc}", "error")
-            return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
+            return JSONResponse(
+                content={"ok": False, "error": str(exc)}, status_code=500
+            )
 
     @router.get(
         "/oauth-status",
@@ -2356,9 +2671,9 @@ def create_bff_router(
         response_description="OAuth enable status",
         responses={
             200: {"description": "OAuth status returned successfully"},
-            500: {"description": "Error retrieving OAuth status"}
+            500: {"description": "Error retrieving OAuth status"},
         },
-        tags=["OAuth"]
+        tags=["OAuth"],
     )
     def api_get_oauth_status():
         """Get current OAuth enable/disable status from the FSP server.
@@ -2371,7 +2686,9 @@ def create_bff_router(
         """
         try:
             # Check the runtime endpoint's OAuth enable status
-            if hasattr(rti_fsp.runtime, 'endpoint') and hasattr(rti_fsp.runtime.endpoint, '_oauth_enable'):
+            if hasattr(rti_fsp.runtime, "endpoint") and hasattr(
+                rti_fsp.runtime.endpoint, "_oauth_enable"
+            ):
                 enable_oauth = rti_fsp.runtime.endpoint._oauth_enable
                 return {"ok": True, "enable_oauth": enable_oauth}
             else:
@@ -2379,8 +2696,7 @@ def create_bff_router(
                 return {"ok": True, "enable_oauth": False}
         except Exception as exc:
             return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=500
+                content={"ok": False, "error": str(exc)}, status_code=500
             )
 
     @router.get(
@@ -2390,9 +2706,9 @@ def create_bff_router(
         response_description="List of logged actions",
         responses={
             200: {"description": "List of actions returned successfully"},
-            500: {"description": "Error retrieving actions"}
+            500: {"description": "Error retrieving actions"},
         },
-        tags=["Logging"]
+        tags=["Logging"],
     )
     def api_actions():
         """Get logged server actions.
@@ -2405,7 +2721,7 @@ def create_bff_router(
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": f"Unexpected error: {exc}"},
-                status_code=500
+                status_code=500,
             )
 
     @router.post(
@@ -2415,9 +2731,9 @@ def create_bff_router(
         response_description="Action log clear confirmation",
         responses={
             200: {"description": "Actions cleared successfully"},
-            500: {"description": "Error clearing actions"}
+            500: {"description": "Error clearing actions"},
         },
-        tags=["Logging"]
+        tags=["Logging"],
     )
     def api_actions_clear():
         """Clear action log.
@@ -2431,7 +2747,7 @@ def create_bff_router(
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": f"Unexpected error: {exc}"},
-                status_code=500
+                status_code=500,
             )
 
     @router.get(
@@ -2441,9 +2757,9 @@ def create_bff_router(
         response_description="List of logged protocol messages",
         responses={
             200: {"description": "List of messages returned successfully"},
-            500: {"description": "Error retrieving messages"}
+            500: {"description": "Error retrieving messages"},
         },
-        tags=["Logging"]
+        tags=["Logging"],
     )
     def api_messages():
         """Get logged protocol messages.
@@ -2456,7 +2772,7 @@ def create_bff_router(
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": f"Unexpected error: {exc}"},
-                status_code=500
+                status_code=500,
             )
 
     @router.post(
@@ -2466,9 +2782,9 @@ def create_bff_router(
         response_description="Message log clear confirmation",
         responses={
             200: {"description": "Messages cleared successfully"},
-            500: {"description": "Error clearing messages"}
+            500: {"description": "Error clearing messages"},
         },
-        tags=["Logging"]
+        tags=["Logging"],
     )
     def api_messages_clear():
         """Clear message log.
@@ -2482,7 +2798,7 @@ def create_bff_router(
         except Exception as exc:
             return JSONResponse(
                 content={"ok": False, "error": f"Unexpected error: {exc}"},
-                status_code=500
+                status_code=500,
             )
 
     @router.post(
@@ -2495,9 +2811,9 @@ def create_bff_router(
             400: {"description": "Missing objRef parameter"},
             403: {"description": "Server is not running"},
             404: {"description": "Instance not available or read timeout"},
-            500: {"description": "Error reading value"}
+            500: {"description": "Error reading value"},
         },
-        tags=["Data Access"]
+        tags=["Data Access"],
     )
     def api_read_value(request: ReadvalueRequest):
         """Read a value from the server IED model.
@@ -2530,7 +2846,7 @@ def create_bff_router(
                 rti_fsp._log_action("Server readvalue rejected: missing objRef", "warn")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
-                    status_code=400
+                    status_code=400,
                 )
 
             if rti_fsp.runtime.server is None:
@@ -2541,7 +2857,7 @@ def create_bff_router(
                 )
                 return JSONResponse(
                     content={"ok": False, "error": "Server is not running"},
-                    status_code=503
+                    status_code=503,
                 )
 
             try:
@@ -2555,10 +2871,8 @@ def create_bff_router(
                     )
                     return JSONResponse(
                         content={"ok": False, "error": "instanceNotAvailable"},
-                        status_code=404
+                        status_code=404,
                     )
-
-
 
                 logger.info(
                     f"[POST /ap/readvalue] SUCCESS objRef={obj_ref!r} "
@@ -2589,25 +2903,21 @@ def create_bff_router(
                     detail={"objRef": obj_ref, "fc": fc},
                 )
                 return JSONResponse(
-                    content={"ok": False, "error": "read timeout"},
-                    status_code=404
+                    content={"ok": False, "error": "read timeout"}, status_code=404
                 )
             except ValueError as exc:
                 rti_fsp._log_action(f"Server readvalue failed: {exc}", "warn")
                 return JSONResponse(
-                    content={"ok": False, "error": str(exc)},
-                    status_code=404
+                    content={"ok": False, "error": str(exc)}, status_code=404
                 )
             except Exception as exc:
                 rti_fsp._log_action(f"Server readvalue failed: {exc}", "error")
                 return JSONResponse(
-                    content={"ok": False, "error": str(exc)},
-                    status_code=500
+                    content={"ok": False, "error": str(exc)}, status_code=500
                 )
         except Exception as exc:
             return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=404
+                content={"ok": False, "error": str(exc)}, status_code=404
             )
 
     @router.post(
@@ -2620,9 +2930,9 @@ def create_bff_router(
             400: {"description": "Missing parameters or invalid value"},
             403: {"description": "Server is not running"},
             404: {"description": "Write timeout"},
-            500: {"description": "Error writing value"}
+            500: {"description": "Error writing value"},
         },
-        tags=["Data Access"]
+        tags=["Data Access"],
     )
     async def api_write_value(request: WritevalueRequest):
         """Write a value in the server IED model.
@@ -2658,10 +2968,12 @@ def create_bff_router(
             data_type = request.dataType
 
             if not obj_ref:
-                rti_fsp._log_action("Server writevalue rejected: missing objRef", "warn")
+                rti_fsp._log_action(
+                    "Server writevalue rejected: missing objRef", "warn"
+                )
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
-                    status_code=400
+                    status_code=400,
                 )
 
             if value is None:
@@ -2671,8 +2983,7 @@ def create_bff_router(
                     detail={"objRef": obj_ref, "fc": fc},
                 )
                 return JSONResponse(
-                    content={"ok": False, "error": "value is required"},
-                    status_code=400
+                    content={"ok": False, "error": "value is required"}, status_code=400
                 )
 
             if rti_fsp.runtime.server is None:
@@ -2683,7 +2994,7 @@ def create_bff_router(
                 )
                 return JSONResponse(
                     content={"ok": False, "error": "Server is not running"},
-                    status_code=503
+                    status_code=503,
                 )
 
             try:
@@ -2697,8 +3008,15 @@ def create_bff_router(
                         sync_to_io_device = get_sync_to_io_device_dynamic()
                         write_to_lcd = get_write_to_lcd_dynamic()
 
-                        if io_plugin is None or mapping_manager is None or sync_to_io_device is None or write_to_lcd is None:
-                            logger.warning("Dynamic io_plugin loading failed, falling back to disabled state")
+                        if (
+                            io_plugin is None
+                            or mapping_manager is None
+                            or sync_to_io_device is None
+                            or write_to_lcd is None
+                        ):
+                            logger.warning(
+                                "Dynamic io_plugin loading failed, falling back to disabled state"
+                            )
                             _use_io_plugin = False
                             return
                         logger.info(f"IO Plugin for sync: {io_plugin}")
@@ -2712,15 +3030,21 @@ def create_bff_router(
                             value_write = f"{obj_ref} : {value}"
 
                             asyncio.create_task(
-                                write_to_lcd(io_plugin, "writeValue", value_write, mapping_manager=mapping_manager)
+                                write_to_lcd(
+                                    io_plugin,
+                                    "writeValue",
+                                    value_write,
+                                    mapping_manager=mapping_manager,
+                                )
                             )
                         else:
-                            logger.warning("IO Plugin is None - cannot sync to device. Call /api/io/connect first.")
+                            logger.warning(
+                                "IO Plugin is None - cannot sync to device. Call /api/io/connect first."
+                            )
                     except ImportError as e:
                         logger.error(f"ImportError - Cannot import IO Plugin: {e}")
                     except Exception as e:
                         logger.error(f"Exception in IO sync setup: {e}")
-
 
                 return {
                     "ok": True,
@@ -2738,25 +3062,21 @@ def create_bff_router(
                     detail={"objRef": obj_ref, "fc": fc},
                 )
                 return JSONResponse(
-                    content={"ok": False, "error": "write timeout"},
-                    status_code=504
+                    content={"ok": False, "error": "write timeout"}, status_code=504
                 )
             except ValueError as exc:
                 rti_fsp._log_action(f"Server writevalue failed: {exc}", "warn")
                 return JSONResponse(
-                    content={"ok": False, "error": str(exc)},
-                    status_code=404
+                    content={"ok": False, "error": str(exc)}, status_code=404
                 )
             except Exception as exc:
                 rti_fsp._log_action(f"Server writevalue failed: {exc}", "error")
                 return JSONResponse(
-                    content={"ok": False, "error": str(exc)},
-                    status_code=500
+                    content={"ok": False, "error": str(exc)}, status_code=500
                 )
         except Exception as exc:
             return JSONResponse(
-                content={"ok": False, "error": str(exc)},
-                status_code=500
+                content={"ok": False, "error": str(exc)}, status_code=500
             )
 
     # ==================== IO Plugin Connection Endpoints ====================
@@ -2766,10 +3086,8 @@ def create_bff_router(
         summary="Get IO Plugin Status",
         description="Returns whether io_plugin is enabled for device sync.",
         response_description="IO Plugin status",
-        responses={
-            200: {"description": "IO Plugin status returned successfully"}
-        },
-        tags=["IO Plugin"]
+        responses={200: {"description": "IO Plugin status returned successfully"}},
+        tags=["IO Plugin"],
     )
     def api_get_io_plugin_status():
         """Get current io_plugin usage status.
@@ -2786,9 +3104,9 @@ def create_bff_router(
         response_description="IO Plugin configuration confirmation",
         responses={
             200: {"description": "IO Plugin configuration updated successfully"},
-            500: {"description": "Error updating configuration"}
+            500: {"description": "Error updating configuration"},
         },
-        tags=["IO Plugin"]
+        tags=["IO Plugin"],
     )
     def api_set_io_plugin(request: IoPluginConfigRequest):
         """Enable or disable io_plugin usage.
@@ -2817,7 +3135,9 @@ def create_bff_router(
                 else:
                     # Required files are missing, disable io_plugin
                     _use_io_plugin = False
-                    logger.warning("Required IO plugin files are missing, disabling IO plugin")
+                    logger.warning(
+                        "Required IO plugin files are missing, disabling IO plugin"
+                    )
             except Exception as e:
                 logger.error(f"Error enabling IO Plugin: {e}")
                 _use_io_plugin = False
@@ -2826,7 +3146,7 @@ def create_bff_router(
         return {
             "ok": True,
             "enabled": _use_io_plugin,
-            "message": f"IO Plugin {'enabled' if _use_io_plugin else 'disabled'}"
+            "message": f"IO Plugin {'enabled' if _use_io_plugin else 'disabled'}",
         }
 
     @router.post(
@@ -2837,11 +3157,13 @@ def create_bff_router(
         responses={
             200: {"description": "File uploaded successfully"},
             400: {"description": "Invalid request or file"},
-            500: {"description": "Error uploading file"}
+            500: {"description": "Error uploading file"},
         },
-        tags=["IO Plugin"]
+        tags=["IO Plugin"],
     )
-    async def api_upload_io_plugin_file(file: UploadFile = File(...), request: IoPluginFileUploadRequest = None):
+    async def api_upload_io_plugin_file(
+        file: UploadFile = File(...), request: IoPluginFileUploadRequest = None
+    ):
         """Upload a file to the dynamic io_plugin directory.
 
         Files can be uploaded one at a time. After uploading all required files,
@@ -2869,17 +3191,19 @@ def create_bff_router(
                 return {
                     "ok": False,
                     "error": f"File already exists: {file_path.name}",
-                    "message": "Use overwrite=true to replace existing files"
+                    "message": "Use overwrite=true to replace existing files",
                 }
 
             # Ensure directory exists
             ensure_io_plugin_dir()
 
             # Write file
-            with open(file_path, 'wb') as f:
+            with open(file_path, "wb") as f:
                 f.write(file_content)
 
-            logger.info(f"Uploaded io_plugin file: {file_path} ({len(file_content)} bytes)")
+            logger.info(
+                f"Uploaded io_plugin file: {file_path} ({len(file_content)} bytes)"
+            )
 
             # Check if we now have all required files
             if check_required_io_plugin_files():
@@ -2891,7 +3215,7 @@ def create_bff_router(
                 "full_path": str(file_path),
                 "size": len(file_content),
                 "message": f"File uploaded successfully: {file.filename}",
-                "files_present": check_required_io_plugin_files()
+                "files_present": check_required_io_plugin_files(),
             }
 
         except Exception as e:
@@ -2905,9 +3229,9 @@ def create_bff_router(
         response_description="List of files",
         responses={
             200: {"description": "List of files returned successfully"},
-            500: {"description": "Error listing files"}
+            500: {"description": "Error listing files"},
         },
-        tags=["IO Plugin"]
+        tags=["IO Plugin"],
     )
     def api_list_io_plugin_files():
         """List all files in the dynamic io_plugin directory.
@@ -2922,23 +3246,33 @@ def create_bff_router(
             all_files = []
             for item in io_plugin_dynamic_DIR.iterdir():
                 if item.is_file():
-                    all_files.append({
-                        "name": item.name,
-                        "path": str(item.relative_to(io_plugin_dynamic_DIR)),
-                        "size": item.stat().st_size,
-                        "modified": item.stat().st_mtime
-                    })
+                    all_files.append(
+                        {
+                            "name": item.name,
+                            "path": str(item.relative_to(io_plugin_dynamic_DIR)),
+                            "size": item.stat().st_size,
+                            "modified": item.stat().st_mtime,
+                        }
+                    )
 
             # Check which required files are missing
-            required_files = ["io_router.py", "io_utils.py", "mapping_manager.py", "__init__.py", "async_client_io.py"]
-            present_files = [f.name for f in io_plugin_dynamic_DIR.iterdir() if f.is_file()]
+            required_files = [
+                "io_router.py",
+                "io_utils.py",
+                "mapping_manager.py",
+                "__init__.py",
+                "async_client_io.py",
+            ]
+            present_files = [
+                f.name for f in io_plugin_dynamic_DIR.iterdir() if f.is_file()
+            ]
             missing_files = [f for f in required_files if f not in present_files]
 
             return {
                 "files": all_files,
                 "required_files_present": len(missing_files) == 0,
                 "missing_files": missing_files,
-                "directory": str(io_plugin_dynamic_DIR)
+                "directory": str(io_plugin_dynamic_DIR),
             }
 
         except Exception as e:
@@ -2953,9 +3287,9 @@ def create_bff_router(
         responses={
             200: {"description": "Modules reloaded successfully"},
             400: {"description": "Required files missing"},
-            500: {"description": "Error reloading modules"}
+            500: {"description": "Error reloading modules"},
         },
-        tags=["IO Plugin"]
+        tags=["IO Plugin"],
     )
     def api_reload_io_plugin_modules(request: IoClientReloadRequest = None):
         """Reload io_plugin modules from the dynamic directory.
@@ -2967,8 +3301,6 @@ def create_bff_router(
             dict: {"ok": True, "loaded": bool, "message": str, "modules": list}
         """
         try:
-            force = request.force if request else False
-
             # Clear existing modules first
             clear_io_plugin_modules()
 
@@ -2978,8 +3310,17 @@ def create_bff_router(
                     "ok": False,
                     "loaded": False,
                     "message": "Required files are missing",
-                    "missing_files": [f for f in ["io_router.py", "io_utils.py", "mapping_manager.py", "__init__.py", "async_client_io.py"]
-                                    if not get_io_plugin_file_path(f).exists()]
+                    "missing_files": [
+                        f
+                        for f in [
+                            "io_router.py",
+                            "io_utils.py",
+                            "mapping_manager.py",
+                            "__init__.py",
+                            "async_client_io.py",
+                        ]
+                        if not get_io_plugin_file_path(f).exists()
+                    ],
                 }
 
             # Load modules
@@ -2997,15 +3338,20 @@ def create_bff_router(
                     "ok": True,
                     "loaded": True,
                     "message": "IO Plugin modules reloaded successfully",
-                    "modules": ["async_client_io", "io_router", "io_utils", "mapping_manager"],
+                    "modules": [
+                        "async_client_io",
+                        "io_router",
+                        "io_utils",
+                        "mapping_manager",
+                    ],
                     "io_plugin_enabled": _use_io_plugin,
-                    "io_router_included": _io_router_included
+                    "io_router_included": _io_router_included,
                 }
             else:
                 return {
                     "ok": False,
                     "loaded": False,
-                    "message": "Failed to load io_plugin modules"
+                    "message": "Failed to load io_plugin modules",
                 }
 
         except Exception as e:
@@ -3020,9 +3366,9 @@ def create_bff_router(
         responses={
             200: {"description": "File deleted successfully"},
             404: {"description": "File not found"},
-            500: {"description": "Error deleting file"}
+            500: {"description": "Error deleting file"},
         },
-        tags=["IO Plugin"]
+        tags=["IO Plugin"],
     )
     def api_delete_io_plugin_file(file_path: str):
         """Delete a file from the dynamic io_plugin directory.
@@ -3040,7 +3386,7 @@ def create_bff_router(
                 return {
                     "ok": False,
                     "deleted": False,
-                    "message": f"File not found: {file_path}"
+                    "message": f"File not found: {file_path}",
                 }
 
             file_to_delete.unlink()
@@ -3050,7 +3396,7 @@ def create_bff_router(
                 "ok": True,
                 "deleted": True,
                 "file_path": file_path,
-                "message": f"File deleted successfully: {file_path}"
+                "message": f"File deleted successfully: {file_path}",
             }
 
         except Exception as e:
@@ -3062,10 +3408,8 @@ def create_bff_router(
         summary="Get IO Plugin Status",
         description="Get detailed status of io_plugin dynamic loading including file availability and module loading status.",
         response_description="Detailed status",
-        responses={
-            200: {"description": "Status returned successfully"}
-        },
-        tags=["IO Plugin"]
+        responses={200: {"description": "Status returned successfully"}},
+        tags=["IO Plugin"],
     )
     def api_get_io_plugin_detailed_status():
         """Get detailed status of io_plugin dynamic loading.
@@ -3075,7 +3419,11 @@ def create_bff_router(
         """
         try:
             files_present = check_required_io_plugin_files()
-            modules_loaded = _io_plugin_module is not None and _mapping_manager_module is not None and _io_utils_module is not None
+            modules_loaded = (
+                _io_plugin_module is not None
+                and _mapping_manager_module is not None
+                and _io_utils_module is not None
+            )
 
             return {
                 "enabled": _use_io_plugin,
@@ -3086,8 +3434,8 @@ def create_bff_router(
                 "details": {
                     "io_router_loaded": _io_plugin_module is not None,
                     "io_utils_loaded": _io_utils_module is not None,
-                    "mapping_manager_loaded": _mapping_manager_module is not None
-                }
+                    "mapping_manager_loaded": _mapping_manager_module is not None,
+                },
             }
 
         except Exception as e:
@@ -3102,9 +3450,9 @@ def create_bff_router(
         responses={
             200: {"description": "Connection and file download completed successfully"},
             400: {"description": "Invalid request or configuration"},
-            500: {"description": "Error connecting to IO server or downloading files"}
+            500: {"description": "Error connecting to IO server or downloading files"},
         },
-        tags=["IO Plugin Connection"]
+        tags=["IO Plugin Connection"],
     )
     async def api_io_plugin_connect(request: IoClientConnectRequest):
         """Connect to IO server and fetch io_plugin files.
@@ -3154,8 +3502,9 @@ def create_bff_router(
             # Update connection status
             io_plugin_connection_status.record_fetch(
                 success=result.get("connection_success", False),
-                error=result.get("errors", {}).get("general") or ", ".join(result.get("errors", {}).values()),
-                files_fetched=len(result.get("files_downloaded", []))
+                error=result.get("errors", {}).get("general")
+                or ", ".join(result.get("errors", {}).values()),
+                files_fetched=len(result.get("files_downloaded", [])),
             )
 
             # Enable io_plugin usage if requested and if connection was successful
@@ -3171,7 +3520,9 @@ def create_bff_router(
                 # server-side ACSI sync. Best-effort - failures here are
                 # reported but don't fail this endpoint's response.
                 if _io_router_included:
-                    result["io_bootstrap"] = await _bootstrap_io_client_after_connect(request.server_url, request.acsi_url)
+                    result["io_bootstrap"] = await _bootstrap_io_client_after_connect(
+                        request.server_url, request.acsi_url
+                    )
                     logger.info("bootstrap result: ", result["io_bootstrap"])
 
             result["io_plugin_enabled"] = _use_io_plugin
@@ -3182,7 +3533,9 @@ def create_bff_router(
                 logger.info(f"IO Plugin connection successful: {request.server_url}")
                 result["status"] = "connected"
             else:
-                logger.warning(f"IO Plugin connection failed: {result.get('errors', {})}")
+                logger.warning(
+                    f"IO Plugin connection failed: {result.get('errors', {})}"
+                )
                 result["status"] = "failed"
 
             return result
@@ -3195,7 +3548,7 @@ def create_bff_router(
                 "ok": False,
                 "connection_success": False,
                 "error": error_msg,
-                "status": "error"
+                "status": "error",
             }
 
     @router.post(
@@ -3205,9 +3558,9 @@ def create_bff_router(
         response_description="Disconnection confirmation",
         responses={
             200: {"description": "Disconnected successfully"},
-            500: {"description": "Error during disconnection"}
+            500: {"description": "Error during disconnection"},
         },
-        tags=["IO Plugin Connection"]
+        tags=["IO Plugin Connection"],
     )
     async def api_io_plugin_disconnect(request: IoClientDisconnectRequest):
         """Disconnect from IO server.
@@ -3269,7 +3622,7 @@ def create_bff_router(
                 "disconnected": True,
                 "files_cleared": files_cleared,
                 "io_plugin_disabled": io_plugin_disabled,
-                "message": "Disconnected from IO server successfully"
+                "message": "Disconnected from IO server successfully",
             }
 
         except Exception as e:
@@ -3278,7 +3631,7 @@ def create_bff_router(
                 "ok": False,
                 "disconnected": False,
                 "error": str(e),
-                "message": "Failed to disconnect from IO server"
+                "message": "Failed to disconnect from IO server",
             }
 
     @router.get(
@@ -3286,10 +3639,8 @@ def create_bff_router(
         summary="Get IO Plugin Connection Status",
         description="Returns the current connection status to the IO server, including connection history and download statistics.",
         response_description="Connection status information",
-        responses={
-            200: {"description": "Connection status returned successfully"}
-        },
-        tags=["IO Plugin Connection"]
+        responses={200: {"description": "Connection status returned successfully"}},
+        tags=["IO Plugin Connection"],
     )
     async def api_get_io_plugin_connection_status():
         """Get current IO Plugin connection status.
@@ -3313,10 +3664,7 @@ def create_bff_router(
             return IOPluginConnectionStatusResponse(**status)
         except Exception as e:
             logger.error(f"Error getting IO Plugin connection status: {e}")
-            return JSONResponse(
-                content={"ok": False, "error": str(e)},
-                status_code=500
-            )
+            return JSONResponse(content={"ok": False, "error": str(e)}, status_code=500)
 
     @router.post(
         "/io-plugin/check-server",
@@ -3325,9 +3673,9 @@ def create_bff_router(
         response_description="Server health check result",
         responses={
             200: {"description": "Health check completed successfully"},
-            500: {"description": "Error performing health check"}
+            500: {"description": "Error performing health check"},
         },
-        tags=["IO Plugin Connection"]
+        tags=["IO Plugin Connection"],
     )
     async def api_check_io_server_health(request: IoClientConnectRequest):
         """Check IO server health.
@@ -3357,21 +3705,21 @@ def create_bff_router(
                 "healthy": False,
                 "server_url": request.server_url,
                 "error": str(e),
-                "status": "error"
+                "status": "error",
             }
 
     return router, rti_fsp
 
-def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
 
+def create_fastapi_app(factory_dir: Path | None = None) -> FastAPI:
     """Create and configure the FastAPI application for ACSI server BFF."""
     global _fastapi_app_ref
 
     app = FastAPI(
         title="ACSI Server WS Active",
         description="Backend for Frontend (BFF) endpoint providing REST API for ACSI Server control. "
-                    "This service manages ACSI Server WebSocket Active lifecycle, IED models, data access, "
-                    "and provides comprehensive monitoring capabilities.",
+        "This service manages ACSI Server WebSocket Active lifecycle, IED models, data access, "
+        "and provides comprehensive monitoring capabilities.",
         version="1.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
@@ -3380,37 +3728,34 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
         openapi_tags=[
             {
                 "name": "Server Control",
-                "description": "Start, stop, and manage the ACSI Server WebSocket Active lifecycle"
+                "description": "Start, stop, and manage the ACSI Server WebSocket Active lifecycle",
             },
-            {
-                "name": "Model",
-                "description": "Load, update, and manage IED models"
-            },
+            {"name": "Model", "description": "Load, update, and manage IED models"},
             {
                 "name": "Data Access",
-                "description": "Read and write values to/from the IED model"
+                "description": "Read and write values to/from the IED model",
             },
             {
                 "name": "Connections",
-                "description": "View and manage active WebSocket connections"
+                "description": "View and manage active WebSocket connections",
             },
             {
                 "name": "Logging",
-                "description": "View and clear action and message logs"
+                "description": "View and clear action and message logs",
             },
             {
                 "name": "Health",
-                "description": "Service health checks and status monitoring"
+                "description": "Service health checks and status monitoring",
             },
             {
                 "name": "Discovery",
-                "description": "API introspection and endpoint discovery"
+                "description": "API introspection and endpoint discovery",
             },
             {
                 "name": "IO Client",
-                "description": "Enable/disable and check IO client sync with physical devices"
-            }
-        ]
+                "description": "Enable/disable and check IO client sync with physical devices",
+            },
+        ],
     )
 
     # Capture the app reference so the IO router can be registered later
@@ -3418,7 +3763,9 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
     # a process restart.
     _fastapi_app_ref = app
 
-    resolved_factory_dir = os.getenv('MODELPATH') or factory_dir or Path(__file__).parent
+    resolved_factory_dir = (
+        os.getenv("MODELPATH") or factory_dir or Path(__file__).parent
+    )
     router, _server = create_bff_router(resolved_factory_dir)
     app.include_router(router)
 
@@ -3442,22 +3789,27 @@ def create_fastapi_app(factory_dir: Optional[Path] = None) -> FastAPI:
                 update_io_plugin_usage()
                 _try_include_io_router()
             else:
-                logger.debug("IO router not available - required files missing for dynamic loading")
-                
+                logger.debug(
+                    "IO router not available - required files missing for dynamic loading"
+                )
+
     except Exception as e:
         logger.error(f"Failed to include IO router from dynamic loading: {e}")
-       
-    
+
     app.state.server = _server
     return app
 
+
 if __name__ == "__main__":
     import argparse
+
     import uvicorn
 
     _LOG_CHOICES = ["critical", "error", "warning", "info", "debug", "trace"]
 
-    parser = argparse.ArgumentParser(description="RTI Demo FSP (ACSI server) BFF endpoint")
+    parser = argparse.ArgumentParser(
+        description="RTI Demo FSP (ACSI server) BFF endpoint"
+    )
     parser.add_argument(
         "--host",
         default=os.getenv("HOST", "0.0.0.0"),
@@ -3472,7 +3824,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--log-level",
         default=os.getenv("LOG_LEVEL", "info"),
-        help="Log level: %s (default: %%(default)s, env: LOG_LEVEL)" % ", ".join(_LOG_CHOICES),
+        help="Log level: {} (default: %(default)s, env: LOG_LEVEL)".format(
+            ", ".join(_LOG_CHOICES)
+        ),
     )
     args = parser.parse_args()
 
@@ -3489,7 +3843,9 @@ if __name__ == "__main__":
 
     logger.info(
         "Starting RTI Demo FSP BFF on %s:%d (log level %s)",
-        args.host, args.port, logging.getLevelName(resolved),
+        args.host,
+        args.port,
+        logging.getLevelName(resolved),
     )
 
     factory_dir = Path(__file__).parent
@@ -3499,4 +3855,10 @@ if __name__ == "__main__":
     # uvicorn.error loggers) - let those records propagate to the root
     # logger instead, so they use the same timestamped format as the
     # app's own logger.info(...) calls above.
-    uvicorn.run(app, host=args.host, port=args.port, log_level=uvicorn_log_level, log_config=None)
+    uvicorn.run(
+        app,
+        host=args.host,
+        port=args.port,
+        log_level=uvicorn_log_level,
+        log_config=None,
+    )

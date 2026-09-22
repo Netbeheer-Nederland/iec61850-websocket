@@ -30,18 +30,18 @@ It uses the devices module for device-specific implementations.
 Usage:
     from io_controller import IOController
     from devices import LEDConfig, PotentiometerConfig, DeviceType
-    
+
     controller = IOController()
-    
+
     # Add an LED
     controller.add_device(LEDConfig(name="led1", gpio_pin=17))
-    
+
     # Add a potentiometer
     controller.add_device(PotentiometerConfig(name="pot1", adc_channel=0))
-    
+
     # Initialize all devices
     controller.initialize()
-    
+
     # Control devices
     controller.write("led1", True)
     value = controller.read("pot1")
@@ -50,43 +50,35 @@ Usage:
 from __future__ import annotations
 
 import logging
-import sys
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 # Handle both relative and absolute imports
 try:
     from .devices import (
+        RASPBERRY_PI_VALID_GPIO,
+        ButtonConfig,
         DeviceConfig,
+        DeviceDirection,
         DeviceFactory,
         DeviceType,
-        DeviceDirection,
+        DigitalDeviceConfig,
         IODevice,
+        LCDConfig,
         LEDConfig,
         PotentiometerConfig,
-        ButtonConfig,
-        DigitalDeviceConfig,
         PWMConfig,
-        LCDConfig,
         validate_device_config,
-        RASPBERRY_PI_VALID_GPIO,
     )
 except ImportError:
     # Fallback to absolute import when running as standalone
     from devices import (
         DeviceConfig,
+        DeviceDirection,
         DeviceFactory,
         DeviceType,
-        DeviceDirection,
         IODevice,
-        LEDConfig,
-        PotentiometerConfig,
-        ButtonConfig,
-        DigitalDeviceConfig,
-        PWMConfig,
-        LCDConfig,
         validate_device_config,
-        RASPBERRY_PI_VALID_GPIO,
     )
 
 logger = logging.getLogger(__name__)
@@ -94,18 +86,19 @@ logger = logging.getLogger(__name__)
 
 # ==================== NEW IO CONTROLLER ====================
 
+
 @dataclass
 class IOController:
     """
     Controller for managing all types of IO devices on Raspberry Pi.
-    
+
     This is the main interface for IO device management, providing:
     - Device registration and configuration
     - Device initialization and cleanup
     - Unified read/write operations
     - Device state management
     - Bulk operations
-    
+
     Supports multiple device types:
     - LEDs (digital output)
     - Potentiometers (analog input)
@@ -113,134 +106,148 @@ class IOController:
     - PWM outputs
     - DACs
     - Relays
-    
+
     Usage:
         controller = IOController()
-        
+
         # Add devices
         controller.add_device(LEDConfig(name="led1", gpio_pin=17))
         controller.add_device(PotentiometerConfig(name="pot1", adc_channel=0))
-        
+
         # Initialize
         controller.initialize()
-        
+
         # Control
         controller.write("led1", True)
         value = controller.read("pot1")
     """
-    
-    devices: Dict[str, IODevice] = field(default_factory=dict)  # name -> IODevice
-    configs: Dict[str, DeviceConfig] = field(default_factory=dict)  # name -> DeviceConfig
+
+    devices: dict[str, IODevice] = field(default_factory=dict)  # name -> IODevice
+    configs: dict[str, DeviceConfig] = field(
+        default_factory=dict
+    )  # name -> DeviceConfig
     _initialized: bool = False
-    
+
     def __post_init__(self):
         """Initialize the controller."""
         self.devices = {}
         self.configs = {}
         self._initialized = False
-    
+
     # ==================== Device Management ====================
-    
+
     def add_device(self, config: DeviceConfig) -> None:
         """
         Add a device to the controller configuration.
-        
+
         Args:
             config: Device configuration
-            
+
         Raises:
             ValueError: If device name already exists or config is invalid
         """
         # Validate configuration
         validate_device_config(config)
-        
+
         # Check for duplicate name
         if config.name in self.configs:
-            raise ValueError(f"Device '{config.name}' already exists. Use a unique name.")
-        
+            raise ValueError(
+                f"Device '{config.name}' already exists. Use a unique name."
+            )
+
         # Store configuration
         self.configs[config.name] = config
-        logger.info(f"Added device configuration: {config.name} (type: {config.device_type.value})")
-    
+        logger.info(
+            f"Added device configuration: {config.name} (type: {config.device_type.value})"
+        )
+
     def remove_device(self, name: str) -> bool:
         """
         Remove a device from the controller.
-        
+
         Args:
             name: Device name
-            
+
         Returns:
             True if removed, False if not found
         """
         if name not in self.configs:
             return False
-        
+
         # Clean up the device if initialized
         if name in self.devices:
             self.devices[name].close()
             del self.devices[name]
-        
+
         del self.configs[name]
         logger.info(f"Removed device: {name}")
         return True
-    
-    def get_device(self, name: str) -> Optional[IODevice]:
+
+    def get_device(self, name: str) -> IODevice | None:
         """Get a device by name."""
         return self.devices.get(name)
-    
-    def get_config(self, name: str) -> Optional[DeviceConfig]:
+
+    def get_config(self, name: str) -> DeviceConfig | None:
         """Get device configuration by name."""
         return self.configs.get(name)
-    
-    def list_devices(self) -> List[str]:
+
+    def list_devices(self) -> list[str]:
         """List all configured device names."""
         return list(self.configs.keys())
-    
-    def list_device_types(self) -> Dict[str, DeviceType]:
+
+    def list_device_types(self) -> dict[str, DeviceType]:
         """List all devices with their types."""
         return {name: config.device_type for name, config in self.configs.items()}
-    
+
     # ==================== Initialization ====================
-    
+
     def initialize(self) -> bool:
         """
         Initialize all configured devices.
-        
+
         Returns:
             True if initialization succeeded, False otherwise
         """
         if self._initialized:
             logger.warning("IO already initialized")
             return True
-        
+
         self._initialized = True
-        
+
         factory = DeviceFactory()
-        
+
         init_errors = []
         for name, config in self.configs.items():
             try:
                 device = factory.create_device(config)
-                
+
                 self.devices[name] = device
-                logger.info(f"Initialized device '{name}' (type: {config.device_type.value})")
-                
+                logger.info(
+                    f"Initialized device '{name}' (type: {config.device_type.value})"
+                )
+
             except Exception as e:
                 error_msg = f"Failed to initialize device '{name}': {e}"
                 logger.error(error_msg)
                 init_errors.append(error_msg)
-        
+
         if init_errors:
             for error in init_errors:
                 logger.error(error)
-            logger.warning(f"Initialized {len(self.devices)}/{len(self.configs)} devices (some failed)")
+            logger.warning(
+                f"Initialized {len(self.devices)}/{len(self.configs)} devices (some failed)"
+            )
         else:
             logger.info(f"IO Controller initialized with {len(self.devices)} devices")
-        
+
         # Blink all LEDs at startup for visual confirmation
         import time
-        led_devices = [name for name, config in self.configs.items() 
-                       if config.device_type == DeviceType.LED]
+
+        led_devices = [
+            name
+            for name, config in self.configs.items()
+            if config.device_type == DeviceType.LED
+        ]
         if led_devices:
             logger.info(f"Blinking {len(led_devices)} LEDs at startup...")
             for _ in range(3):  # Blink 3 times
@@ -251,92 +258,92 @@ class IOController:
                     self.write(name, False)
                 time.sleep(0.3)
             logger.info("LED blink sequence complete")
-        
+
         return len(self.devices) > 0
-    
+
     def cleanup(self) -> None:
         """Clean up all device resources."""
         if not self._initialized:
             return
-        
+
         try:
             for name, device in self.devices.items():
                 try:
                     device.close()
                 except Exception as e:
                     logger.error(f"Error cleaning up device '{name}': {e}")
-            
+
             self.devices.clear()
             self._initialized = False
             logger.info("IO Controller cleaned up")
-            
+
         except Exception as e:
             logger.error(f"Error during IO cleanup: {e}")
-    
+
     # ==================== Read/Write Operations ====================
-    
-    def read(self, name: str) -> Optional[Union[bool, float]]:
+
+    def read(self, name: str) -> bool | float | None:
         """
         Read value from a device.
-        
+
         Args:
             name: Device name
-            
+
         Returns:
             Device value (bool for digital, float for analog), or None on error
         """
         if not self._initialized:
             logger.warning("IO not initialized. Call initialize() first.")
             return None
-        
+
         device = self.devices.get(name)
         if device is None:
             logger.error(f"Device '{name}' not found")
             return None
-        
+
         try:
             return device.read()
         except Exception as e:
             logger.error(f"Failed to read from device '{name}': {e}")
             return None
-    
-    def write(self, name: str, value: Union[bool, float]) -> bool:
+
+    def write(self, name: str, value: bool | float) -> bool:
         """
         Write value to a device.
-        
+
         Args:
             name: Device name
             value: Value to write (bool for digital, float for analog)
-            
+
         Returns:
             True if successful, False on error
         """
         if not self._initialized:
             logger.warning("IO not initialized. Call initialize() first.")
             return False
-        
+
         device = self.devices.get(name)
         if device is None:
             logger.error(f"Device '{name}' not found")
             return False
-        
+
         try:
             return device.write(value)
         except Exception as e:
             logger.error(f"Failed to write to device '{name}': {e}")
             return False
-    
-    def read_all(self) -> Dict[str, Optional[Union[bool, float]]]:
+
+    def read_all(self) -> dict[str, bool | float | None]:
         """
         Read values from all devices.
-        
+
         Returns:
             Dictionary mapping device names to their values
         """
         if not self._initialized:
             logger.warning("IO not initialized. Call initialize() first.")
             return {}
-        
+
         results = {}
         for name, device in self.devices.items():
             try:
@@ -345,21 +352,21 @@ class IOController:
                 logger.error(f"Failed to read from device '{name}': {e}")
                 results[name] = None
         return results
-    
-    def write_all(self, value: Union[bool, float]) -> Dict[str, bool]:
+
+    def write_all(self, value: bool | float) -> dict[str, bool]:
         """
         Write value to all writable devices.
-        
+
         Args:
             value: Value to write
-            
+
         Returns:
             Dictionary mapping device names to success status
         """
         if not self._initialized:
             logger.warning("IO not initialized. Call initialize() first.")
             return {}
-        
+
         results = {}
         for name, device in self.devices.items():
             try:
@@ -368,16 +375,16 @@ class IOController:
                 logger.error(f"Failed to write to device '{name}': {e}")
                 results[name] = False
         return results
-    
+
     # ==================== Device-Specific Operations ====================
-    
-    def reset_latch(self, name: str) -> Optional[bool]:
+
+    def reset_latch(self, name: str) -> bool | None:
         """
         Reset the latched state of a latching button.
-        
+
         Args:
             name: Device name
-            
+
         Returns:
             True if successful, None on error
         """
@@ -385,8 +392,8 @@ class IOController:
         if device is None:
             logger.error(f"Device '{name}' not found")
             return None
-        
-        if hasattr(device, 'reset_latch'):
+
+        if hasattr(device, "reset_latch"):
             try:
                 device.reset_latch()
                 return True
@@ -397,13 +404,13 @@ class IOController:
             logger.warning(f"Device '{name}' does not support latch reset")
             return None
 
-    def toggle(self, name: str) -> Optional[bool]:
+    def toggle(self, name: str) -> bool | None:
         """
         Toggle a device state (for devices that support it).
-        
+
         Args:
             name: Device name
-            
+
         Returns:
             New state if successful, None on error
         """
@@ -411,8 +418,8 @@ class IOController:
         if device is None:
             logger.error(f"Device '{name}' not found")
             return None
-        
-        if hasattr(device, 'toggle'):
+
+        if hasattr(device, "toggle"):
             try:
                 return device.toggle()
             except Exception as e:
@@ -427,25 +434,25 @@ class IOController:
             if new_state is not None and self.write(name, new_state):
                 return new_state
             return None
-    
-    def get_device_status(self, name: str) -> Dict[str, Any]:
+
+    def get_device_status(self, name: str) -> dict[str, Any]:
         """
         Get detailed status of a specific device.
-        
+
         Args:
             name: Device name
-            
+
         Returns:
             Dictionary with device information
         """
         config = self.configs.get(name)
         device = self.devices.get(name)
-        
+
         if config is None:
             return {"error": f"Device '{name}' not found"}
-        
+
         value = device.read() if device else None
-        
+
         return {
             "name": name,
             "type": config.device_type.value,
@@ -455,16 +462,16 @@ class IOController:
             "value": value,
             "is_connected": device.is_connected if device else False,
         }
-    
+
     # ==================== Bulk Operations ====================
-    
-    def set_all_outputs(self, value: Union[bool, float]) -> Dict[str, bool]:
+
+    def set_all_outputs(self, value: bool | float) -> dict[str, bool]:
         """
         Set all output devices to a value.
-        
+
         Args:
             value: Value to set
-            
+
         Returns:
             Dictionary mapping device names to success status
         """
@@ -473,11 +480,11 @@ class IOController:
             if config.direction == DeviceDirection.OUTPUT:
                 results[name] = self.write(name, value)
         return results
-    
-    def read_all_inputs(self) -> Dict[str, Optional[Union[bool, float]]]:
+
+    def read_all_inputs(self) -> dict[str, bool | float | None]:
         """
         Read all input devices.
-        
+
         Returns:
             Dictionary mapping device names to their values
         """
@@ -486,13 +493,13 @@ class IOController:
             if config.direction == DeviceDirection.INPUT:
                 results[name] = self.read(name)
         return results
-    
+
     # ==================== Utility Methods ====================
-    
-    def get_output_devices(self) -> List[str]:
+
+    def get_output_devices(self) -> list[str]:
         """
         Get the current status of the IO controller (backward compatibility).
-        
+
         Returns:
             Dictionary containing:
             - initialized: Whether IO is initialized
@@ -506,35 +513,44 @@ class IOController:
                 "description": config.description,
                 "direction": config.direction.value,
             }
-        
+
         return {
             "initialized": self._initialized,
             "device_count": len(self.devices),
             "device_config": device_info,
             "states": self.get_all_states(),
         }
-    
+
     # ==================== Utility Methods ====================
-    
-    def get_output_devices(self) -> List[str]:
+
+    def get_output_devices(self) -> list[str]:
         """Get list of output device names."""
-        return [name for name, config in self.configs.items() 
-                if config.direction == DeviceDirection.OUTPUT]
-    
-    def get_input_devices(self) -> List[str]:
+        return [
+            name
+            for name, config in self.configs.items()
+            if config.direction == DeviceDirection.OUTPUT
+        ]
+
+    def get_input_devices(self) -> list[str]:
         """Get list of input device names."""
-        return [name for name, config in self.configs.items() 
-                if config.direction == DeviceDirection.INPUT]
-    
-    def get_devices_by_type(self, device_type: DeviceType) -> List[str]:
+        return [
+            name
+            for name, config in self.configs.items()
+            if config.direction == DeviceDirection.INPUT
+        ]
+
+    def get_devices_by_type(self, device_type: DeviceType) -> list[str]:
         """Get list of device names of a specific type."""
-        return [name for name, config in self.configs.items() 
-                if config.device_type == device_type]
-    
-    def get_status(self) -> Dict[str, Any]:
+        return [
+            name
+            for name, config in self.configs.items()
+            if config.device_type == device_type
+        ]
+
+    def get_status(self) -> dict[str, Any]:
         """
         Get the current status of the IO controller.
-        
+
         Returns:
             Dictionary containing:
             - initialized: Whether IO is initialized
@@ -549,59 +565,61 @@ class IOController:
                 "description": config.description,
                 "direction": config.direction.value,
             }
-        
+
         return {
             "initialized": self._initialized,
             "device_count": len(self.devices),
             "device_config": device_info,
             "states": self.read_all(),
         }
-    
+
     # ==================== Configuration Persistence ====================
-    
+
     def save_config(self, path: str = None) -> bool:
         """
         Save all device configurations to a JSON file.
-        
+
         Args:
             path: Path to save the configuration file (uses IO_CONFIG_FILE env var if not provided)
-            
+
         Returns:
             True if saved successfully, False otherwise
         """
-        from io_config import save_config as _save_config, get_config_path
-        
+        from io_config import get_config_path
+        from io_config import save_config as _save_config
+
         save_path = path or get_config_path()
         return _save_config(self.configs, save_path)
-    
+
     def load_config(self, path: str = None) -> bool:
         """
         Load device configurations from a JSON file and add them to the controller.
-        
+
         Args:
             path: Path to the configuration file (uses IO_CONFIG_FILE env var if not provided)
-            
+
         Returns:
             True if loaded successfully, False otherwise
         """
-        from io_config import load_config as _load_config, get_config_path
-        
+        from io_config import get_config_path
+        from io_config import load_config as _load_config
+
         load_path = path or get_config_path()
         configs = _load_config(load_path)
-        
+
         if configs is None:
             return False
-        
+
         for name, config in configs.items():
             try:
                 self.add_device(config)
             except Exception as e:
                 logger.error(f"Failed to add device '{name}' from config: {e}")
                 return False
-        
+
         logger.info(f"Loaded {len(configs)} device configurations")
         return True
-    
+
     def clear_config(self) -> None:
         """Clear all device configurations."""
         self.configs.clear()
@@ -615,30 +633,34 @@ class IOController:
 
 class ACSIConfig:
     """Configuration for ACSI server connection."""
-    
+
     def __init__(self, url: str = "http://localhost:5001", enabled: bool = False):
         self.url = url
         self.enabled = enabled
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         return {"url": self.url, "enabled": self.enabled}
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ACSIConfig":
+    def from_dict(cls, data: dict[str, Any]) -> ACSIConfig:
         return cls(
             url=data.get("url", "http://localhost:5001"),
-            enabled=data.get("enabled", False)
+            enabled=data.get("enabled", False),
         )
 
 
 # Global ACSI configuration
-_acsi_config: Optional[ACSIConfig] = None
-_device_mappings: Dict[str, Dict[str, Any]] = {}  # device_name -> {"objRef": ..., "fc": ...}
+_acsi_config: ACSIConfig | None = None
+_device_mappings: dict[
+    str, dict[str, Any]
+] = {}  # device_name -> {"objRef": ..., "fc": ...}
 
 
-def configure_acsi(acsi_config: ACSIConfig, device_mappings: Optional[Dict[str, Dict[str, Any]]] = None) -> None:
+def configure_acsi(
+    acsi_config: ACSIConfig, device_mappings: dict[str, dict[str, Any]] | None = None
+) -> None:
     """Configure ACSI server connection and device mappings.
-    
+
     Args:
         acsi_config: ACSI server configuration
         device_mappings: Optional dict mapping device names to {"objRef": ..., "fc": ...}
@@ -647,39 +669,44 @@ def configure_acsi(acsi_config: ACSIConfig, device_mappings: Optional[Dict[str, 
     _acsi_config = acsi_config
     if device_mappings:
         _device_mappings = device_mappings
-    logger.info(f"ACSI server configured: {acsi_config.url} (enabled={acsi_config.enabled})")
+    logger.info(
+        f"ACSI server configured: {acsi_config.url} (enabled={acsi_config.enabled})"
+    )
     if device_mappings:
         logger.info(f"Loaded {len(device_mappings)} device mappings for ACSI")
 
 
-def get_acsi_config() -> Optional[ACSIConfig]:
+def get_acsi_config() -> ACSIConfig | None:
     """Get the current ACSI configuration."""
     return _acsi_config
 
 
-def get_device_mapping(device_name: str) -> Optional[Dict[str, Any]]:
+def get_device_mapping(device_name: str) -> dict[str, Any] | None:
     """Get the ACSI mapping for a device."""
     return _device_mappings.get(device_name)
 
 
-async def write_to_acsi_async(obj_ref: str, value: Any, fc: str = "ST", data_type: str = "") -> bool:
+async def write_to_acsi_async(
+    obj_ref: str, value: Any, fc: str = "ST", data_type: str = ""
+) -> bool:
     """Write a value to the ACSI server via HTTP POST (async version).
-    
+
     Args:
         obj_ref: IEC61850 object reference
         value: Value to write
         fc: Functional constraint
         data_type: Data type for the value (e.g., "BOOLEAN", "INT32", "FLOAT32")
-        
+
     Returns:
         True if write succeeded, False otherwise
     """
     if not _acsi_config or not _acsi_config.enabled:
         logger.debug("ACSI server not configured or disabled, skipping write")
         return False
-    
+
     try:
         import httpx2 as httpx
+
         async with httpx.AsyncClient(timeout=5.0) as http_client:
             response = await http_client.post(
                 f"{_acsi_config.url}/api/writevalue",
@@ -687,8 +714,8 @@ async def write_to_acsi_async(obj_ref: str, value: Any, fc: str = "ST", data_typ
                     "objRef": obj_ref,
                     "fc": fc,
                     "value": str(value),
-                    "dataType": data_type
-                }
+                    "dataType": data_type,
+                },
             )
             if response.status_code == 200:
                 logger.info(f"ACSI write successful: {obj_ref}={value}")
@@ -702,61 +729,63 @@ async def write_to_acsi_async(obj_ref: str, value: Any, fc: str = "ST", data_typ
 
 async def operate_to_acsi_async(obj_ref: str, value: Any, data_type: str = "") -> bool:
     """Send an Operate command to the ACSI server via HTTP POST (async version).
-    
+
     Args:
         obj_ref: IEC61850 object reference
         value: Value to operate with
         data_type: Data type for the value (e.g., "BOOLEAN", "INT32", "FLOAT32")
-        
+
     Returns:
         True if operate succeeded, False otherwise
     """
     if not _acsi_config or not _acsi_config.enabled:
         logger.debug("ACSI server not configured or disabled, skipping operate")
         return False
-    
+
     try:
         import httpx2 as httpx
+
         async with httpx.AsyncClient(timeout=5.0) as http_client:
             # Note: /api/operate expects value_type (not dataType), and it's required
             # If data_type is empty, use "BOOLEAN" as default
             value_type = data_type if data_type else "BOOLEAN"
             response = await http_client.post(
                 f"{_acsi_config.url}/api/operate",
-                json={
-                    "objRef": obj_ref,
-                    "value": str(value),
-                    "value_type": value_type
-                }
+                json={"objRef": obj_ref, "value": str(value), "value_type": value_type},
             )
             if response.status_code == 200:
                 logger.info(f"ACSI operate successful: {obj_ref}={value}")
                 return True
-            logger.error(f"ACSI operate failed: {response.status_code} - {response.text}")
+            logger.error(
+                f"ACSI operate failed: {response.status_code} - {response.text}"
+            )
             return False
     except Exception as e:
         logger.error(f"ACSI operate error: {e}")
         return False
 
 
-def write_to_acsi(obj_ref: str, value: Any, fc: str = "ST", data_type: str = "") -> bool:
+def write_to_acsi(
+    obj_ref: str, value: Any, fc: str = "ST", data_type: str = ""
+) -> bool:
     """Write a value to the ACSI server via HTTP POST (synchronous version).
-    
+
     Args:
         obj_ref: IEC61850 object reference
         value: Value to write
         fc: Functional constraint
         data_type: Data type for the value (e.g., "BOOLEAN", "INT32", "FLOAT32")
-        
+
     Returns:
         True if write succeeded, False otherwise
     """
     if not _acsi_config or not _acsi_config.enabled:
         logger.debug("ACSI server not configured or disabled, skipping write")
         return False
-    
+
     try:
         import httpx2 as httpx
+
         with httpx.Client(timeout=5.0) as http_client:
             response = http_client.post(
                 f"{_acsi_config.url}/api/writevalue",
@@ -764,8 +793,8 @@ def write_to_acsi(obj_ref: str, value: Any, fc: str = "ST", data_type: str = "")
                     "objRef": obj_ref,
                     "fc": fc,
                     "value": str(value),
-                    "dataType": data_type
-                }
+                    "dataType": data_type,
+                },
             )
             if response.status_code == 200:
                 logger.info(f"ACSI write successful: {obj_ref}={value}")
@@ -779,37 +808,36 @@ def write_to_acsi(obj_ref: str, value: Any, fc: str = "ST", data_type: str = "")
 
 def operate_to_acsi(obj_ref: str, value: Any, data_type: str = "") -> bool:
     """Send an Operate command to the ACSI server via HTTP POST (synchronous version).
-    
+
     Args:
         obj_ref: IEC61850 object reference
         value: Value to operate with
         data_type: Data type for the value (e.g., "BOOLEAN", "INT32", "FLOAT32")
-        
+
     Returns:
         True if operate succeeded, False otherwise
     """
     if not _acsi_config or not _acsi_config.enabled:
         logger.debug("ACSI server not configured or disabled, skipping operate")
         return False
-    
+
     try:
         import httpx2 as httpx
+
         with httpx.Client(timeout=5.0) as http_client:
             # Note: /api/operate expects value_type (not dataType), and it's required
             # If data_type is empty, use "BOOLEAN" as default
             value_type = data_type if data_type else "BOOLEAN"
             response = http_client.post(
                 f"{_acsi_config.url}/api/operate",
-                json={
-                    "objRef": obj_ref,
-                    "value": str(value),
-                    "value_type": value_type
-                }
+                json={"objRef": obj_ref, "value": str(value), "value_type": value_type},
             )
             if response.status_code == 200:
                 logger.info(f"ACSI operate successful: {obj_ref}={value}")
                 return True
-            logger.error(f"ACSI operate failed: {response.status_code} - {response.text}")
+            logger.error(
+                f"ACSI operate failed: {response.status_code} - {response.text}"
+            )
             return False
     except Exception as e:
         logger.error(f"ACSI operate error: {e}")
@@ -818,26 +846,26 @@ def operate_to_acsi(obj_ref: str, value: Any, data_type: str = "") -> bool:
 
 def sync_device_to_acsi(device_name: str, value: Any) -> bool:
     """Sync an IO device change to ACSI server if mapping exists (synchronous version).
-    
+
     Args:
         device_name: Name of the IO device that changed
         value: New value of the device
-        
+
     Returns:
         True if sync succeeded, False otherwise
     """
     mapping = get_device_mapping(device_name)
     if not mapping:
         return False
-    
+
     obj_ref = mapping.get("objRef")
     fc = mapping.get("fc", "ST")
     service = mapping.get("service", "writeValue")
     data_type = mapping.get("dataType", "")
-    
+
     if not obj_ref:
         return False
-    
+
     # Handle both single string and array of strings for objRef
     obj_refs = [obj_ref] if isinstance(obj_ref, str) else obj_ref
     success = True
@@ -853,26 +881,26 @@ def sync_device_to_acsi(device_name: str, value: Any) -> bool:
 
 async def sync_device_to_acsi_async(device_name: str, value: Any) -> bool:
     """Sync an IO device change to ACSI server if mapping exists (async version).
-    
+
     Args:
         device_name: Name of the IO device that changed
         value: New value of the device
-        
+
     Returns:
         True if sync succeeded, False otherwise
     """
     mapping = get_device_mapping(device_name)
     if not mapping:
         return False
-    
+
     obj_ref = mapping.get("objRef")
     fc = mapping.get("fc", "ST")
     service = mapping.get("service", "writeValue")
     data_type = mapping.get("dataType", "")
-    
+
     if not obj_ref:
         return False
-    
+
     # Handle both single string and array of strings for objRef
     obj_refs = [obj_ref] if isinstance(obj_ref, str) else obj_ref
     success = True
@@ -887,10 +915,10 @@ async def sync_device_to_acsi_async(device_name: str, value: Any) -> bool:
 
 
 # Global IOController instance
-_io_controller: Optional[IOController] = None
+_io_controller: IOController | None = None
 
 
-def get_io_controller() -> Optional[IOController]:
+def get_io_controller() -> IOController | None:
     """Get the global IOController instance, creating it if necessary."""
     global _io_controller
     if _io_controller is None:

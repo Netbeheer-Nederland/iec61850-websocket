@@ -73,15 +73,19 @@ def test_add_connection_requires_name_and_type():
 
 
 def test_add_edit_delete_so_connection():
-    r = requests.post(f"{BFF_URL}/add-connection", json={
-        "name": SO_NAME,
-        "host": "rti-so",
-        "port": 5002,
-        "ws_port": 8765,
-        "type": "RTI-SO",
-        "acsi": "client",
-        "ws_mode": "passive",
-    }, timeout=5)
+    r = requests.post(
+        f"{BFF_URL}/add-connection",
+        json={
+            "name": SO_NAME,
+            "host": "rti-so",
+            "port": 5002,
+            "ws_port": 8765,
+            "type": "RTI-SO",
+            "acsi": "client",
+            "ws_mode": "passive",
+        },
+        timeout=5,
+    )
     assert r.status_code == 201
     created = r.json()
     assert created["name"] == SO_NAME
@@ -92,8 +96,9 @@ def test_add_edit_delete_so_connection():
     names = [c["name"] for c in r.json()["connections"]]
     assert SO_NAME in names
 
-    r = requests.put(f"{BFF_URL}/edit-connection/{SO_NAME}",
-                      json={"ws_port": 8766}, timeout=5)
+    r = requests.put(
+        f"{BFF_URL}/edit-connection/{SO_NAME}", json={"ws_port": 8766}, timeout=5
+    )
     assert r.status_code == 200
     assert r.json()["ws_port"] == 8766
 
@@ -112,20 +117,25 @@ def test_add_fsp_connection_stores_cp():
     Regression test for the RTI-FSP connection-type schema: `cp` must be
     persisted on create and editable afterwards, not silently dropped.
     """
-    r = requests.post(f"{BFF_URL}/add-connection", json={
-        "name": FSP_NAME,
-        "host": "rti-fsp",
-        "port": 5001,
-        "type": "RTI-FSP",
-        "acsi": "server",
-        "ws_mode": "active",
-        "cp": "cp1",
-    }, timeout=5)
+    r = requests.post(
+        f"{BFF_URL}/add-connection",
+        json={
+            "name": FSP_NAME,
+            "host": "rti-fsp",
+            "port": 5001,
+            "type": "RTI-FSP",
+            "acsi": "server",
+            "ws_mode": "active",
+            "cp": "cp1",
+        },
+        timeout=5,
+    )
     assert r.status_code == 201
     assert r.json()["cp"] == "cp1"
 
-    r = requests.put(f"{BFF_URL}/edit-connection/{FSP_NAME}",
-                      json={"cp": "cp2"}, timeout=5)
+    r = requests.put(
+        f"{BFF_URL}/edit-connection/{FSP_NAME}", json={"cp": "cp2"}, timeout=5
+    )
     assert r.status_code == 200
     assert r.json()["cp"] == "cp2"
 

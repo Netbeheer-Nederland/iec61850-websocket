@@ -22,8 +22,8 @@ Test script to verify the io module can be imported correctly.
 Run this script to check that all modules are properly structured.
 """
 
-import sys
 import os
+import sys
 
 # Add the io_api_server directory to the path
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,6 +36,7 @@ print()
 # Test 1: Import io_controller
 try:
     from io_controller import IOController
+
     print("✓ Successfully imported from io_controller")
     print(f"  - IOController: {IOController}")
 except Exception as e:
@@ -45,6 +46,7 @@ except Exception as e:
 # Test 2: Import api_endpoint
 try:
     from api_endpoint import create_fastapi_app, create_io_router
+
     print("✓ Successfully imported from api_endpoint")
     print(f"  - create_fastapi_app: {create_fastapi_app}")
     print(f"  - create_io_router: {create_io_router}")
@@ -55,6 +57,7 @@ except Exception as e:
 # Test 3: Import main
 try:
     from main import create_app, main
+
     print("✓ Successfully imported from main")
     print(f"  - create_app: {create_app}")
     print(f"  - main: {main}")
@@ -65,37 +68,37 @@ except Exception as e:
 # Test 4: Create a IOController and test basic functionality
 try:
     from devices import LEDConfig
-    
+
     controller = IOController()
     print("✓ Created IOController instance")
-    
+
     # Add an LED device
-    controller.add_device(LEDConfig(
-        name="test_led",
-        gpio_pin=17,
-        description="Test LED",
-        initial_state=False
-    ))
+    controller.add_device(
+        LEDConfig(
+            name="test_led", gpio_pin=17, description="Test LED", initial_state=False
+        )
+    )
     print("✓ Added test LED device configuration")
-    
+
     # Initialize (should work in mock mode)
     if controller.initialize():
         print("✓ IOController initialized (mock mode)")
     else:
         print("✗ IOController initialization failed")
         sys.exit(1)
-    
+
     # Get status
     status = controller.get_status()
     print(f"✓ Got controller status: {status}")
-    
+
     # Cleanup
     controller.cleanup()
     print("✓ IOController cleaned up")
-    
+
 except Exception as e:
     print(f"✗ Failed IOController test: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 
@@ -105,15 +108,16 @@ try:
     print(f"✓ Created FastAPI app: {app}")
     print(f"  - App title: {app.title}")
     print(f"  - App version: {app.version}")
-    
+
     # Check if the router is included
     routes = [route.path for route in app.routes]
     print(f"  - Number of routes: {len(routes)}")
     print(f"  - API routes: {[r for r in routes if '/api/io' in r]}")
-    
+
 except Exception as e:
     print(f"✗ Failed to create FastAPI app: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 

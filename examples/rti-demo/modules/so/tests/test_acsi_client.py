@@ -28,8 +28,8 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-
 from so.acsi_client import ACSIClient
+
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
 pytestmark = pytest.mark.unit
@@ -172,14 +172,24 @@ class TestExtractMessageMeta:
 
         meta = client._extract_message_meta(raw)
 
-        assert meta == {"service_type": "associateRequest", "category": "associate", "cp": "cp1"}
+        assert meta == {
+            "service_type": "associateRequest",
+            "category": "associate",
+            "cp": "cp1",
+        }
 
     def test_associate_response(self, client):
-        raw = '{"associate": {"service": {"associateResponse": {"associateId": "cp1"}}}}'
+        raw = (
+            '{"associate": {"service": {"associateResponse": {"associateId": "cp1"}}}}'
+        )
 
         meta = client._extract_message_meta(raw)
 
-        assert meta == {"service_type": "associateResponse", "category": "associate", "cp": "cp1"}
+        assert meta == {
+            "service_type": "associateResponse",
+            "category": "associate",
+            "cp": "cp1",
+        }
 
     def test_unrecognized_shape_returns_unknowns(self, client):
         raw = '{"somethingElse": {}}'
@@ -191,7 +201,11 @@ class TestExtractMessageMeta:
     def test_invalid_json_returns_parse_error(self, client):
         meta = client._extract_message_meta("not json")
 
-        assert meta == {"service_type": "parse-error", "category": "parse-error", "cp": ""}
+        assert meta == {
+            "service_type": "parse-error",
+            "category": "parse-error",
+            "cp": "",
+        }
 
     def test_non_dict_json_returns_unknowns(self, client):
         meta = client._extract_message_meta("[1, 2, 3]")
@@ -222,7 +236,9 @@ class TestActionsAndMessagesLog:
         assert client.get_actions() == []
 
     def test_log_message_appends_and_get_messages_returns_it(self, client):
-        client._log_message("recv", '{"request": {"associateId": "cp1", "service": {"read": {}}}}', None)
+        client._log_message(
+            "recv", '{"request": {"associateId": "cp1", "service": {"read": {}}}}', None
+        )
 
         messages = client.get_messages()
 

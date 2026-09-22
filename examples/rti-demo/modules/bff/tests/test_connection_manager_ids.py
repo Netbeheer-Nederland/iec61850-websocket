@@ -55,23 +55,35 @@ def _fresh_manager(tmp_path):
 def test_ids_increment_sequentially_for_fresh_connections(tmp_path):
     manager = _fresh_manager(tmp_path)
 
-    a = manager.add_connection(name="a", host="10.0.0.1", port=5001, conn_type="RTI-FSP")
+    a = manager.add_connection(
+        name="a", host="10.0.0.1", port=5001, conn_type="RTI-FSP"
+    )
     b = manager.add_connection(name="b", host="10.0.0.2", port=5002, conn_type="RTI-SO")
-    c = manager.add_connection(name="c", host="10.0.0.3", port=5003, conn_type="RTI-FSP")
+    c = manager.add_connection(
+        name="c", host="10.0.0.3", port=5003, conn_type="RTI-FSP"
+    )
 
     assert [a["id"], b["id"], c["id"]] == [1, 2, 3]
 
 
 def test_new_id_does_not_collide_after_deleting_a_middle_connection(tmp_path):
     manager = _fresh_manager(tmp_path)
-    manager.add_connection(name="a", host="10.0.0.1", port=5001, conn_type="RTI-FSP")  # id 1
-    manager.add_connection(name="b", host="10.0.0.2", port=5002, conn_type="RTI-SO")   # id 2
-    c = manager.add_connection(name="c", host="10.0.0.3", port=5003, conn_type="RTI-FSP")  # id 3
+    manager.add_connection(
+        name="a", host="10.0.0.1", port=5001, conn_type="RTI-FSP"
+    )  # id 1
+    manager.add_connection(
+        name="b", host="10.0.0.2", port=5002, conn_type="RTI-SO"
+    )  # id 2
+    c = manager.add_connection(
+        name="c", host="10.0.0.3", port=5003, conn_type="RTI-FSP"
+    )  # id 3
 
     manager.delete_connection("b")
     # len(self.connections) is now 2, so the old "len + 1" scheme would
     # hand out id=3 again here - colliding with "c", which is still id=3.
-    d = manager.add_connection(name="d", host="10.0.0.4", port=5004, conn_type="RTI-FSP")
+    d = manager.add_connection(
+        name="d", host="10.0.0.4", port=5004, conn_type="RTI-FSP"
+    )
 
     ids = [conn["id"] for conn in manager.connections]
     assert len(ids) == len(set(ids)), f"duplicate id among {manager.connections}"
@@ -81,12 +93,16 @@ def test_new_id_does_not_collide_after_deleting_a_middle_connection(tmp_path):
 def test_new_id_is_higher_than_any_existing_id_even_after_deletes(tmp_path):
     manager = _fresh_manager(tmp_path)
     for i in range(5):
-        manager.add_connection(name=f"c{i}", host="10.0.0.1", port=5000 + i, conn_type="RTI-FSP")
+        manager.add_connection(
+            name=f"c{i}", host="10.0.0.1", port=5000 + i, conn_type="RTI-FSP"
+        )
 
     manager.delete_connection("c0")
     manager.delete_connection("c1")
     manager.delete_connection("c2")
-    new_conn = manager.add_connection(name="new", host="10.0.0.9", port=5099, conn_type="RTI-FSP")
+    new_conn = manager.add_connection(
+        name="new", host="10.0.0.9", port=5099, conn_type="RTI-FSP"
+    )
 
     existing_ids = [c["id"] for c in manager.connections if c["name"] != "new"]
     assert new_conn["id"] > max(existing_ids)

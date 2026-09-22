@@ -59,13 +59,18 @@ def _connect():
     requests.post(f"{FSP_URL}/stop", timeout=5)
     time.sleep(0.5)
 
-    r = requests.post(f"{SO_URL}/connect",
-                       json={"host": "0.0.0.0", "port": WS_PORT, "cp": CP}, timeout=5)
+    r = requests.post(
+        f"{SO_URL}/connect",
+        json={"host": "0.0.0.0", "port": WS_PORT, "cp": CP},
+        timeout=5,
+    )
     assert r.status_code == 200 and r.json().get("ok")
 
-    r = requests.post(f"{FSP_URL}/start",
-                       json={"host": "rti-so", "port": str(WS_PORT), "mode": "active", "cp": CP},
-                       timeout=5)
+    r = requests.post(
+        f"{FSP_URL}/start",
+        json={"host": "rti-so", "port": str(WS_PORT), "mode": "active", "cp": CP},
+        timeout=5,
+    )
     assert r.status_code == 200 and r.json().get("ok")
 
     deadline = time.time() + 12
@@ -110,8 +115,11 @@ def test_so_reads_value_over_websocket(connected):
     "passing" a wrong value once someone fixes the extraction bug - update
     this test's assertions when that's fixed instead.
     """
-    r = requests.post(f"{SO_URL}/readvalue",
-                       json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "cp": CP}, timeout=5)
+    r = requests.post(
+        f"{SO_URL}/readvalue",
+        json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "cp": CP},
+        timeout=5,
+    )
     assert r.status_code == 200
     body = r.json()
     assert body["ok"] is True
@@ -136,8 +144,10 @@ def test_so_writes_value_over_websocket(connected):
     the FC access-control check runs before the write is attempted.
     """
     # "st" is not a writable FC - rejected before any WS traffic happens.
-    r = requests.post(f"{SO_URL}/writevalue",
-                       json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "value": "on", "cp": CP},
-                       timeout=5)
+    r = requests.post(
+        f"{SO_URL}/writevalue",
+        json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "value": "on", "cp": CP},
+        timeout=5,
+    )
     assert r.status_code == 400
     assert "Write only allowed to CF and SP" in r.json()["error"]

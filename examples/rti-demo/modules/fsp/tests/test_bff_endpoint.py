@@ -38,7 +38,9 @@ from fastapi.testclient import TestClient
 # container, so create_bff_router() below would fail on every test. Point it
 # at a throwaway temp dir before the import, same as the env var is meant to
 # be used for any non-Docker deployment.
-os.environ.setdefault("IO_PLUGIN_STORAGE", tempfile.mkdtemp(prefix="io_plugin_dynamic_"))
+os.environ.setdefault(
+    "IO_PLUGIN_STORAGE", tempfile.mkdtemp(prefix="io_plugin_dynamic_")
+)
 
 from fsp import bff_endpoint  # noqa: E402 - must follow the env var default above
 
@@ -251,7 +253,9 @@ def test_update_iedmodel_success(client_and_server):
 
     response = client.post(
         "/api/update-iedmodel",
-        json={"modelPy": "from ws61850.iec61850.data_model.ied_model import IedModel\nied = IedModel(name='UpdatedIED')\n"},
+        json={
+            "modelPy": "from ws61850.iec61850.data_model.ied_model import IedModel\nied = IedModel(name='UpdatedIED')\n"
+        },
     )
 
     assert response.status_code == 200

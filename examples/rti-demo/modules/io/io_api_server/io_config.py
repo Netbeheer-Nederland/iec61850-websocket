@@ -30,18 +30,17 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from devices import (
+    ButtonConfig,
     DeviceConfig,
     DeviceType,
-    DeviceDirection,
-    LEDConfig,
-    ButtonConfig,
-    PotentiometerConfig,
-    PWMConfig,
     LCDConfig,
     LCDI2CConfig,
+    LEDConfig,
+    PotentiometerConfig,
+    PWMConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,21 +83,20 @@ DEFAULT_CONFIG_FILE = "io_config.json"
 
 def get_default_config_path() -> str:
     """Get the default config path, first checking script directory, then current directory."""
-    import os
     from pathlib import Path
-    
+
     # Try to get the script directory
     script_dir = Path(__file__).parent
     script_config = script_dir / DEFAULT_CONFIG_FILE
-    
+
     if script_config.exists():
         return str(script_config)
-    
+
     # Fall back to current directory
     return DEFAULT_CONFIG_FILE
 
 
-def _config_to_dict(config: DeviceConfig) -> Dict[str, Any]:
+def _config_to_dict(config: DeviceConfig) -> dict[str, Any]:
     """Convert a device config object to a dictionary for JSON serialization."""
     base_dict = {
         "name": config.name,
@@ -107,37 +105,45 @@ def _config_to_dict(config: DeviceConfig) -> Dict[str, Any]:
         "description": config.description,
         "direction": config.direction.value,
     }
-    
+
     # Add type-specific fields
     if config.device_type == DeviceType.LED:
         base_dict["type"] = "led"
-        base_dict["gpio_pin"] = config.identifier if isinstance(config.identifier, int) else 0
+        base_dict["gpio_pin"] = (
+            config.identifier if isinstance(config.identifier, int) else 0
+        )
         base_dict["initial_state"] = getattr(config, "initial_state", False)
         base_dict["is_active_high"] = getattr(config, "is_active_high", True)
-    
+
     elif config.device_type == DeviceType.BUTTON:
         base_dict["type"] = "button"
-        base_dict["gpio_pin"] = config.identifier if isinstance(config.identifier, int) else 0
+        base_dict["gpio_pin"] = (
+            config.identifier if isinstance(config.identifier, int) else 0
+        )
         base_dict["debounce_time"] = getattr(config, "debounce_time", 0.05)
         base_dict["pull_up"] = getattr(config, "pull_up", True)
         base_dict["latching"] = getattr(config, "latching", False)
         base_dict["is_active_high"] = getattr(config, "is_active_high", True)
-    
+
     elif config.device_type == DeviceType.POTENTIOMETER:
         base_dict["type"] = "potentiometer"
-        base_dict["adc_channel"] = config.identifier if isinstance(config.identifier, int) else 0
+        base_dict["adc_channel"] = (
+            config.identifier if isinstance(config.identifier, int) else 0
+        )
         base_dict["min_value"] = getattr(config, "min_value", 0.0)
         base_dict["max_value"] = getattr(config, "max_value", 100.0)
         base_dict["i2c_address"] = getattr(config, "i2c_address", 0x48)
         base_dict["i2c_bus"] = getattr(config, "i2c_bus", 1)
         base_dict["adc_type"] = getattr(config, "adc_type", "ads1115")
-    
+
     elif config.device_type == DeviceType.PWM:
         base_dict["type"] = "pwm"
-        base_dict["gpio_pin"] = config.identifier if isinstance(config.identifier, int) else 0
+        base_dict["gpio_pin"] = (
+            config.identifier if isinstance(config.identifier, int) else 0
+        )
         base_dict["frequency"] = getattr(config, "frequency", 100)
         base_dict["initial_duty_cycle"] = getattr(config, "initial_duty_cycle", 0.0)
-    
+
     elif config.device_type == DeviceType.LCD:
         base_dict["type"] = "lcd"
         base_dict["gpio_rs"] = getattr(config, "gpio_rs", 26)
@@ -148,7 +154,7 @@ def _config_to_dict(config: DeviceConfig) -> Dict[str, Any]:
         base_dict["rows"] = getattr(config, "rows", 2)
         base_dict["backlight"] = getattr(config, "backlight", True)
         base_dict["backlight_pin"] = getattr(config, "backlight_pin", None)
-    
+
     elif config.device_type == DeviceType.LCD_I2C:
         base_dict["type"] = "lcd_i2c"
         base_dict["i2c_address"] = getattr(config, "i2c_address", 0x27)
@@ -164,14 +170,14 @@ def _config_to_dict(config: DeviceConfig) -> Dict[str, Any]:
         base_dict["d5_bit"] = getattr(config, "d5_bit", 5)
         base_dict["d6_bit"] = getattr(config, "d6_bit", 6)
         base_dict["d7_bit"] = getattr(config, "d7_bit", 7)
-    
+
     return base_dict
 
 
-def _dict_to_config(device_dict: Dict[str, Any]) -> Optional[DeviceConfig]:
+def _dict_to_config(device_dict: dict[str, Any]) -> DeviceConfig | None:
     """Convert a dictionary from JSON to a device config object."""
     device_type_str = device_dict.get("device_type", "").lower()
-    
+
     try:
         if device_type_str == "led" or device_dict.get("type") == "led":
             return LEDConfig(
@@ -181,7 +187,7 @@ def _dict_to_config(device_dict: Dict[str, Any]) -> Optional[DeviceConfig]:
                 initial_state=device_dict.get("initial_state", False),
                 is_active_high=device_dict.get("is_active_high", True),
             )
-        
+
         elif device_type_str == "button" or device_dict.get("type") == "button":
             return ButtonConfig(
                 name=device_dict.get("name", ""),
@@ -192,11 +198,16 @@ def _dict_to_config(device_dict: Dict[str, Any]) -> Optional[DeviceConfig]:
                 latching=device_dict.get("latching", False),
                 is_active_high=device_dict.get("is_active_high", True),
             )
-        
-        elif device_type_str == "potentiometer" or device_dict.get("type") == "potentiometer":
+
+        elif (
+            device_type_str == "potentiometer"
+            or device_dict.get("type") == "potentiometer"
+        ):
             return PotentiometerConfig(
                 name=device_dict.get("name", ""),
-                adc_channel=device_dict.get("adc_channel", device_dict.get("identifier", 0)),
+                adc_channel=device_dict.get(
+                    "adc_channel", device_dict.get("identifier", 0)
+                ),
                 description=device_dict.get("description", ""),
                 min_value=device_dict.get("min_value", 0.0),
                 max_value=device_dict.get("max_value", 100.0),
@@ -204,7 +215,7 @@ def _dict_to_config(device_dict: Dict[str, Any]) -> Optional[DeviceConfig]:
                 i2c_bus=device_dict.get("i2c_bus", 1),
                 adc_type=device_dict.get("adc_type", "ads1115"),
             )
-        
+
         elif device_type_str == "pwm" or device_dict.get("type") == "pwm":
             return PWMConfig(
                 name=device_dict.get("name", ""),
@@ -213,7 +224,7 @@ def _dict_to_config(device_dict: Dict[str, Any]) -> Optional[DeviceConfig]:
                 frequency=device_dict.get("frequency", 100),
                 initial_duty_cycle=device_dict.get("initial_duty_cycle", 0.0),
             )
-        
+
         elif device_type_str == "lcd" or device_dict.get("type") == "lcd":
             return LCDConfig(
                 name=device_dict.get("name", ""),
@@ -227,7 +238,7 @@ def _dict_to_config(device_dict: Dict[str, Any]) -> Optional[DeviceConfig]:
                 backlight_pin=device_dict.get("backlight_pin", None),
                 description=device_dict.get("description", ""),
             )
-        
+
         elif device_type_str == "lcd_i2c" or device_dict.get("type") == "lcd_i2c":
             return LCDI2CConfig(
                 name=device_dict.get("name", ""),
@@ -247,24 +258,26 @@ def _dict_to_config(device_dict: Dict[str, Any]) -> Optional[DeviceConfig]:
                 d6_bit=device_dict.get("d6_bit", 6),
                 d7_bit=device_dict.get("d7_bit", 7),
             )
-        
+
         else:
             logger.warning(f"Unknown device type: {device_type_str}")
             return None
-            
+
     except Exception as e:
         logger.error(f"Failed to create config from dict: {e}")
         return None
 
 
-def save_config(configs: Dict[str, DeviceConfig], path: str = DEFAULT_CONFIG_FILE) -> bool:
+def save_config(
+    configs: dict[str, DeviceConfig], path: str = DEFAULT_CONFIG_FILE
+) -> bool:
     """
     Save IO device configurations to a JSON file.
-    
+
     Args:
         configs: Dictionary of device name to DeviceConfig objects
         path: Path to the JSON file
-        
+
     Returns:
         True if saved successfully, False otherwise
     """
@@ -272,54 +285,51 @@ def save_config(configs: Dict[str, DeviceConfig], path: str = DEFAULT_CONFIG_FIL
         devices_list = []
         for name, config in configs.items():
             devices_list.append(_config_to_dict(config))
-        
-        config_data = {
-            "devices": devices_list,
-            "version": 1
-        }
-        
+
+        config_data = {"devices": devices_list, "version": 1}
+
         # Ensure directory exists
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        
+
         with open(path, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=2, ensure_ascii=False)
-        
+
         logger.info(f"Saved IO configuration to {path}")
         return True
-        
+
     except Exception as e:
         logger.error(f"Failed to save IO configuration: {e}")
         return False
 
 
-def load_config(path: str = DEFAULT_CONFIG_FILE) -> Optional[Dict[str, DeviceConfig]]:
+def load_config(path: str = DEFAULT_CONFIG_FILE) -> dict[str, DeviceConfig] | None:
     """
     Load IO device configurations from a JSON file.
-    
+
     Args:
         path: Path to the JSON file
-        
+
     Returns:
         Dictionary of device name to DeviceConfig objects, or None on error
     """
     if not os.path.exists(path):
         logger.warning(f"IO configuration file not found: {path}")
         return None
-    
+
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             config_data = json.load(f)
-        
+
         configs = {}
         for device_dict in config_data.get("devices", []):
             config = _dict_to_config(device_dict)
             if config:
                 configs[config.name] = config
-        
+
         if configs:
             logger.info(f"Loaded {len(configs)} device configurations from {path}")
         return configs
-        
+
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON in IO configuration file {path}: {e}")
         return None
@@ -336,22 +346,22 @@ def get_config_path() -> str:
     return get_default_config_path()
 
 
-def load_full_config(path: str = DEFAULT_CONFIG_FILE) -> Optional[Dict[str, Any]]:
+def load_full_config(path: str = DEFAULT_CONFIG_FILE) -> dict[str, Any] | None:
     """
     Load full IO configuration from a JSON file, including devices, ACSI server, and mappings.
-    
+
     Args:
         path: Path to the JSON file
-        
+
     Returns:
         Full configuration dictionary or None on error
     """
     if not os.path.exists(path):
         logger.warning(f"IO configuration file not found: {path}")
         return None
-    
+
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON in IO configuration file {path}: {e}")
@@ -362,80 +372,79 @@ def load_full_config(path: str = DEFAULT_CONFIG_FILE) -> Optional[Dict[str, Any]
 
 
 def save_full_config(
-    devices_config: Optional[Dict[str, DeviceConfig]] = None,
-    acsi_config: Optional[Dict[str, Any]] = None,
-    device_mappings: Optional[Dict[str, Dict[str, Any]]] = None,
-    path: str = DEFAULT_CONFIG_FILE
+    devices_config: dict[str, DeviceConfig] | None = None,
+    acsi_config: dict[str, Any] | None = None,
+    device_mappings: dict[str, dict[str, Any]] | None = None,
+    path: str = DEFAULT_CONFIG_FILE,
 ) -> bool:
     """
     Save full IO configuration to a JSON file, including devices, ACSI server, and mappings.
-    
+
     Args:
         devices_config: Dictionary of device name to DeviceConfig objects
         acsi_config: ACSI server configuration dict with 'url' and 'enabled' keys
         device_mappings: Dictionary of device name to mapping dict
         path: Path to the JSON file
-        
+
     Returns:
         True if saved successfully, False otherwise
     """
     try:
-        config_data: Dict[str, Any] = {}
-        
+        config_data: dict[str, Any] = {}
+
         # Save devices
         if devices_config:
             devices_list = []
             for name, config in devices_config.items():
                 devices_list.append(_config_to_dict(config))
             config_data["devices"] = devices_list
-        
+
         # Save version
         config_data["version"] = 1
-        
+
         # Save ACSI config if provided
         if acsi_config:
             config_data["acsi_server"] = acsi_config
-        
+
         # Save mappings if provided
         if device_mappings:
             config_data["mappings"] = device_mappings
-        
+
         # Ensure directory exists
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        
+
         with open(path, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=2, ensure_ascii=False)
-        
+
         logger.info(f"Saved full IO configuration to {path}")
         return True
-        
+
     except Exception as e:
         logger.error(f"Failed to save full IO configuration: {e}")
         return False
 
 
-def create_default_config() -> Dict[str, DeviceConfig]:
+def create_default_config() -> dict[str, DeviceConfig]:
     """Create a default IO configuration with common devices."""
-    from devices import DeviceType, DeviceDirection
-    
+
     return {
         "led1": LEDConfig(
             name="led1",
             gpio_pin=17,
             description="LED 1 on GPIO 17 (Pin 11)",
-            initial_state=False
+            initial_state=False,
         ),
         "led2": LEDConfig(
             name="led2",
             gpio_pin=18,
             description="LED 2 on GPIO 18 (Pin 12)",
-            initial_state=False
+            initial_state=False,
         ),
         "led3": LEDConfig(
             name="led3",
             gpio_pin=22,
             description="LED 3 on GPIO 22 (Pin 15)",
-            initial_state=False
+            initial_state=False,
         ),
         "button1": ButtonConfig(
             name="button1",
@@ -443,6 +452,6 @@ def create_default_config() -> Dict[str, DeviceConfig]:
             description="Button on GPIO 10 (Pin 19)",
             debounce_time=0.05,
             pull_up=False,
-            latching=True
+            latching=True,
         ),
     }

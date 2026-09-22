@@ -35,15 +35,12 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List, Optional, Union
 
-from fastapi import FastAPI, APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse
+from devices import ButtonConfig, DeviceType, LEDConfig, PotentiometerConfig
+from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-
 from io_controller import IOController
-from devices import DeviceType, LEDConfig, PotentiometerConfig, ButtonConfig, LCDConfig
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -52,221 +49,249 @@ logger = logging.getLogger(__name__)
 
 class DeviceConfigRequest(BaseModel):
     """Request body for configuring any IO device.
-    
+
     Used by: POST /api/io/devices/config
-    
+
     The device_type field determines which specific fields are used:
     - "led": uses identifier as gpio_pin
     - "potentiometer": uses adc_channel (or identifier)
     - "button": uses identifier as gpio_pin
     """
+
     name: str = Field(
         ...,
         description="Unique identifier for the device",
-        json_schema_extra={"example": "led1"}
+        json_schema_extra={"example": "led1"},
     )
     device_type: str = Field(
         ...,
         description="Type of device: led, potentiometer, button, pwm, etc.",
-        json_schema_extra={"example": "led"}
+        json_schema_extra={"example": "led"},
     )
-    identifier: Optional[int] = Field(
+    identifier: int | None = Field(
         default=None,
         description="GPIO pin or ADC channel number",
         ge=0,
-        json_schema_extra={"example": 17}
+        json_schema_extra={"example": 17},
     )
     description: str = Field(
         default="",
         description="Optional description of the device",
-        json_schema_extra={"example": "Status indicator LED"}
+        json_schema_extra={"example": "Status indicator LED"},
     )
-    initial_state: Optional[bool] = Field(
+    initial_state: bool | None = Field(
         default=None,
         description="Initial state for output devices",
-        json_schema_extra={"example": False}
+        json_schema_extra={"example": False},
     )
     # Potentiometer-specific
-    adc_channel: Optional[int] = Field(
+    adc_channel: int | None = Field(
         default=None,
         description="ADC channel number (for potentiometer)",
         ge=0,
         le=7,
-        json_schema_extra={"example": 0}
+        json_schema_extra={"example": 0},
     )
-    min_value: Optional[float] = Field(
+    min_value: float | None = Field(
         default=None,
         description="Minimum value for potentiometer readings",
-        json_schema_extra={"example": 0.0}
+        json_schema_extra={"example": 0.0},
     )
-    max_value: Optional[float] = Field(
+    max_value: float | None = Field(
         default=None,
         description="Maximum value for potentiometer readings",
-        json_schema_extra={"example": 100.0}
+        json_schema_extra={"example": 100.0},
     )
-    is_inverted: Optional[bool] = Field(
+    is_inverted: bool | None = Field(
         default=None,
         description="Whether to invert potentiometer readings",
-        json_schema_extra={"example": False}
+        json_schema_extra={"example": False},
     )
     # Button-specific
-    debounce_time: Optional[float] = Field(
+    debounce_time: float | None = Field(
         default=None,
         description="Debounce time in seconds for buttons",
-        json_schema_extra={"example": 0.05}
+        json_schema_extra={"example": 0.05},
     )
-    pull_up: Optional[bool] = Field(
+    pull_up: bool | None = Field(
         default=None,
         description="Use internal pull-up resistor for buttons",
-        json_schema_extra={"example": True}
+        json_schema_extra={"example": True},
     )
 
 
 class DeviceWriteRequest(BaseModel):
     """Request body for writing to a device."""
-    value: Union[bool, float] = Field(
+
+    value: bool | float = Field(
         ...,
         description="Value to write (bool for digital, float for analog)",
-        json_schema_extra={"example": True}
+        json_schema_extra={"example": True},
     )
 
 
 class DeviceSetStateRequest(BaseModel):
     """Request body for setting device state (bool only)."""
+
     state: bool = Field(
         ...,
         description="True for ON/High, False for OFF/Low",
-        json_schema_extra={"example": True}
+        json_schema_extra={"example": True},
     )
 
 
 class LCDWriteRequest(BaseModel):
     """Request body for writing text to an LCD display."""
-    text: Union[str, List[str]] = Field(
+
+    text: str | list[str] = Field(
         ...,
         description="Text to display. Can be a single string or list of strings (one per line)",
-        json_schema_extra={"example": ["Hello, World!", "Line 2"]}
+        json_schema_extra={"example": ["Hello, World!", "Line 2"]},
     )
 
 
 class LCDWriteLineRequest(BaseModel):
     """Request body for writing text to a specific LCD line."""
+
     line_number: int = Field(
         ...,
         description="Line number (0-indexed)",
         ge=0,
         le=3,
-        json_schema_extra={"example": 0}
+        json_schema_extra={"example": 0},
     )
     text: str = Field(
         ...,
         description="Text to display on the line",
-        json_schema_extra={"example": "Hello, World!"}
+        json_schema_extra={"example": "Hello, World!"},
     )
 
 
 class LCDCursorRequest(BaseModel):
     """Request body for setting LCD cursor position."""
+
     row: int = Field(
         ...,
         description="Row position (0-indexed)",
         ge=0,
         le=3,
-        json_schema_extra={"example": 0}
+        json_schema_extra={"example": 0},
     )
     col: int = Field(
         ...,
         description="Column position (0-indexed)",
         ge=0,
         le=39,
-        json_schema_extra={"example": 0}
+        json_schema_extra={"example": 0},
     )
 
 
 class LCDControlRequest(BaseModel):
     """Request body for controlling LCD display and backlight."""
-    display_on: Optional[bool] = Field(
+
+    display_on: bool | None = Field(
         default=None,
         description="Turn display on/off",
-        json_schema_extra={"example": True}
+        json_schema_extra={"example": True},
     )
-    backlight_on: Optional[bool] = Field(
+    backlight_on: bool | None = Field(
         default=None,
         description="Turn backlight on/off",
-        json_schema_extra={"example": True}
+        json_schema_extra={"example": True},
     )
-    clear: Optional[bool] = Field(
+    clear: bool | None = Field(
         default=None,
         description="Clear the display",
-        json_schema_extra={"example": True}
+        json_schema_extra={"example": True},
     )
 
 
 # ==================== ACSI Integration Models ====================
 
+
 class ACSIMappingRequest(BaseModel):
     """Request body for setting ACSI mapping for a device."""
+
     objRef: str = Field(
         ...,
         description="IEC61850 object reference to map to",
-        json_schema_extra={"example": "LD0/LLN0$ST$Mod"}
+        json_schema_extra={"example": "LD0/LLN0$ST$Mod"},
     )
     fc: str = Field(
         default="ST",
         description="Functional constraint",
-        json_schema_extra={"example": "ST"}
+        json_schema_extra={"example": "ST"},
     )
 
 
 class ACSIConfigRequest(BaseModel):
     """Request body for configuring ACSI server connection."""
+
     url: str = Field(
         default="http://localhost:5001",
         description="ACSI server URL",
-        json_schema_extra={"example": "http://localhost:5001"}
+        json_schema_extra={"example": "http://localhost:5001"},
     )
-    enabled: bool = Field(
-        default=True,
-        description="Whether ACSI sync is enabled"
-    )
+    enabled: bool = Field(default=True, description="Whether ACSI sync is enabled")
 
 
 # ==================== FastAPI Application ====================
 
 
-def create_fastapi_app(io_controller: Optional[IOController] = None) -> FastAPI:
+def create_fastapi_app(io_controller: IOController | None = None) -> FastAPI:
     """Create and configure the FastAPI application for IO device control.
-    
+
     Args:
         io_controller: Optional IOController instance. If None, a new one is created.
-        
+
     Returns:
         FastAPI application instance
     """
     # Create IO controller if not provided
     if io_controller is None:
         io_controller = IOController()
-    
+
     app = FastAPI(
         title="Raspberry Pi IO Device Control API",
         description="REST API for Raspberry Pi IO device control. "
-                    "Manages various IO devices (LEDs, potentiometers, buttons), "
-                    "provides remote control capabilities, and offers comprehensive device monitoring.",
+        "Manages various IO devices (LEDs, potentiometers, buttons), "
+        "provides remote control capabilities, and offers comprehensive device monitoring.",
         version="2.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
         openapi_tags=[
-            {"name": "Discovery", "description": "API introspection and endpoint discovery"},
-            {"name": "Health", "description": "Service health checks and status monitoring"},
-            {"name": "Device Configuration", "description": "Configure and manage IO devices"},
-            {"name": "Device Control", "description": "Control individual IO device states"},
-            {"name": "Bulk Operations", "description": "Control multiple devices at once"},
-            {"name": "Device Status", "description": "Get IO controller and device status"},
-            {"name": "ACSI Integration", "description": "IEC61850 ACSI server integration"},
-        ]
+            {
+                "name": "Discovery",
+                "description": "API introspection and endpoint discovery",
+            },
+            {
+                "name": "Health",
+                "description": "Service health checks and status monitoring",
+            },
+            {
+                "name": "Device Configuration",
+                "description": "Configure and manage IO devices",
+            },
+            {
+                "name": "Device Control",
+                "description": "Control individual IO device states",
+            },
+            {
+                "name": "Bulk Operations",
+                "description": "Control multiple devices at once",
+            },
+            {
+                "name": "Device Status",
+                "description": "Get IO controller and device status",
+            },
+            {
+                "name": "ACSI Integration",
+                "description": "IEC61850 ACSI server integration",
+            },
+        ],
     )
-    
+
     # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
@@ -275,40 +300,44 @@ def create_fastapi_app(io_controller: Optional[IOController] = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # Create router with the controller
     router = create_io_router(app, io_controller)
     app.include_router(router)
-    
+
     # Store controller reference in app state
     app.state.io_controller = io_controller
-    
+
     # Include IO client file server router
     from io_client_file_server import create_io_client_router
+
     io_client_router = create_io_client_router()
     app.include_router(io_client_router)
-    
+
     return app
 
 
 def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
     """Create a FastAPI router for the IO device control API.
-    
+
     Args:
         app: FastAPI application instance
         io_controller: IOController instance
-        
+
     Returns:
         APIRouter instance with all endpoints configured
     """
     router = APIRouter(
         prefix="/api/io",
         tags=["io-device-control"],
-        responses={404: {"description": "Not found"}, 500: {"description": "Internal server error"}}
+        responses={
+            404: {"description": "Not found"},
+            500: {"description": "Internal server error"},
+        },
     )
-    
+
     # ==================== Helper Functions ====================
-    
+
     def _ensure_initialized() -> bool:
         """Ensure IO controller is initialized."""
         if not io_controller._initialized:
@@ -316,24 +345,24 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
                 logger.error("Failed to initialize IO controller")
                 return False
         return True
-    
+
     def _get_device_or_404(name: str):
         """Get device config or raise 404."""
         if name not in io_controller.configs:
             raise HTTPException(
                 status_code=404,
-                detail=f"Device '{name}' not found. Available devices: {list(io_controller.configs.keys())}"
+                detail=f"Device '{name}' not found. Available devices: {list(io_controller.configs.keys())}",
             )
         return io_controller.configs[name]
-    
+
     # ==================== Route Handlers ====================
-    
+
     @router.get(
         "/",
         summary="API Root",
         description="Returns basic API information and available endpoints.",
         response_description="API information",
-        tags=["Discovery"]
+        tags=["Discovery"],
     )
     async def api_root(request: Request):
         """Get API root information."""
@@ -354,14 +383,14 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             "POST /api/io/devices/inputs/read-all": "Read all input devices",
             "POST /api/io/devices/outputs/set-all": "Set all output devices",
         }
-        
+
         return {
             "message": "Raspberry Pi IO Device Control API",
             "version": "2.0.0",
             "docs": "/api/io/docs",
-            "available_endpoints": endpoints
+            "available_endpoints": endpoints,
         }
-    
+
     @router.get(
         "/status",
         summary="Get IO Controller Status",
@@ -369,9 +398,9 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         response_description="IO controller status",
         responses={
             200: {"description": "IO status returned successfully"},
-            500: {"description": "Error retrieving IO status"}
+            500: {"description": "Error retrieving IO status"},
         },
-        tags=["Device Status"]
+        tags=["Device Status"],
     )
     async def api_status(request: Request):
         """Get current IO controller status."""
@@ -381,7 +410,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             logger.error(f"Get IO status failed: {exc}")
             logger.exception("Exception in api_status")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.get(
         "/health",
         summary="Health Check",
@@ -389,15 +418,15 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         response_description="Health status",
         responses={
             200: {"description": "Service is healthy"},
-            500: {"description": "Service is unhealthy"}
+            500: {"description": "Service is unhealthy"},
         },
-        tags=["Health"]
+        tags=["Health"],
     )
     async def api_health(request: Request):
         """Generic health endpoint for external discovery."""
         try:
             device_count = len(io_controller.devices)
-            
+
             return {
                 "status": "ok",
                 "service": "IO Device Control",
@@ -408,7 +437,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         except Exception as exc:
             logger.error(f"Health check failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/initialize",
         summary="Initialize IO",
@@ -416,9 +445,9 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         response_description="Initialization confirmation",
         responses={
             200: {"description": "IO initialized successfully"},
-            500: {"description": "Error initializing IO"}
+            500: {"description": "Error initializing IO"},
         },
-        tags=["Device Status"]
+        tags=["Device Status"],
     )
     async def api_initialize(request: Request):
         """Initialize IO controller."""
@@ -430,14 +459,14 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
                 return {
                     "ok": True,
                     "message": "IO controller initialized",
-                    "device_count": device_count
+                    "device_count": device_count,
                 }
             else:
                 raise HTTPException(status_code=500, detail="Failed to initialize IO")
         except Exception as exc:
             logger.error(f"IO initialization failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/cleanup",
         summary="Cleanup IO",
@@ -445,25 +474,22 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         response_description="Cleanup confirmation",
         responses={
             200: {"description": "IO cleaned up successfully"},
-            500: {"description": "Error during cleanup"}
+            500: {"description": "Error during cleanup"},
         },
-        tags=["Device Status"]
+        tags=["Device Status"],
     )
     async def api_cleanup(request: Request):
         """Clean up IO resources."""
         try:
             io_controller.cleanup()
             logger.info("IO controller cleaned up via API")
-            return {
-                "ok": True,
-                "message": "IO resources cleaned up"
-            }
+            return {"ok": True, "message": "IO resources cleaned up"}
         except Exception as exc:
             logger.error(f"IO cleanup failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     # ==================== DEVICE ENDPOINTS ====================
-    
+
     @router.get(
         "/devices",
         summary="List All Devices",
@@ -471,52 +497,49 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         response_description="All device information",
         responses={
             200: {"description": "Device list returned successfully"},
-            500: {"description": "Error retrieving device list"}
+            500: {"description": "Error retrieving device list"},
         },
-        tags=["Device Configuration"]
+        tags=["Device Configuration"],
     )
     async def api_list_devices(request: Request):
         """Get list of all configured devices."""
         try:
             if not _ensure_initialized():
                 raise HTTPException(status_code=500, detail="Failed to initialize IO")
-            
+
             devices = io_controller.list_devices()
             device_types = io_controller.list_device_types()
             device_details = {}
-            
+
             for name in devices:
                 status = io_controller.get_device_status(name)
                 device_details[name] = status
-            
+
             return {
                 "ok": True,
                 "devices": devices,
                 "device_types": {name: dt.value for name, dt in device_types.items()},
-                "details": device_details
+                "details": device_details,
             }
         except Exception as exc:
             logger.error(f"List devices failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.get(
         "/devices/types",
         summary="List Device Types",
         description="Returns list of supported device types.",
         response_description="Supported device types",
-        tags=["Device Configuration"]
+        tags=["Device Configuration"],
     )
     async def api_list_device_types(request: Request):
         """Get list of supported device types."""
         try:
-            return {
-                "ok": True,
-                "types": [dt.value for dt in DeviceType]
-            }
+            return {"ok": True, "types": [dt.value for dt in DeviceType]}
         except Exception as exc:
             logger.error(f"List device types failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.get(
         "/devices/{name}",
         summary="Get Device Status",
@@ -525,9 +548,9 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "Device status returned successfully"},
             404: {"description": "Device not found"},
-            500: {"description": "Error retrieving device status"}
+            500: {"description": "Error retrieving device status"},
         },
-        tags=["Device Configuration"]
+        tags=["Device Configuration"],
     )
     async def api_get_device(name: str, request: Request):
         """Get detailed status of a specific device."""
@@ -539,7 +562,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         except Exception as exc:
             logger.error(f"Get device '{name}' status failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/devices/config",
         summary="Configure Device",
@@ -548,22 +571,22 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "Device configured successfully"},
             400: {"description": "Invalid configuration"},
-            500: {"description": "Error configuring device"}
+            500: {"description": "Error configuring device"},
         },
-        tags=["Device Configuration"]
+        tags=["Device Configuration"],
     )
     async def api_config_device(request: DeviceConfigRequest):
         """Configure a new IO device."""
         try:
             device_type = DeviceType(request.device_type)
-            
+
             # Create appropriate config based on device type
             if device_type == DeviceType.LED:
                 config = LEDConfig(
                     name=request.name,
                     gpio_pin=request.identifier or 0,
                     description=request.description or "",
-                    initial_state=request.initial_state or False
+                    initial_state=request.initial_state or False,
                 )
             elif device_type == DeviceType.POTENTIOMETER:
                 config = PotentiometerConfig(
@@ -572,7 +595,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
                     description=request.description or "",
                     min_value=request.min_value or 0.0,
                     max_value=request.max_value or 100.0,
-                    is_inverted=request.is_inverted or False
+                    is_inverted=request.is_inverted or False,
                 )
             elif device_type == DeviceType.BUTTON:
                 config = ButtonConfig(
@@ -581,29 +604,31 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
                     description=request.description or "",
                     initial_state=request.initial_state or False,
                     debounce_time=request.debounce_time or 0.05,
-                    pull_up=request.pull_up or True
+                    pull_up=request.pull_up or True,
                 )
             else:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Device type '{request.device_type}' not yet supported for configuration via API"
+                    detail=f"Device type '{request.device_type}' not yet supported for configuration via API",
                 )
-            
+
             io_controller.add_device(config)
-            logger.info(f"Configured device: {request.name} (type: {request.device_type})")
-            
+            logger.info(
+                f"Configured device: {request.name} (type: {request.device_type})"
+            )
+
             return {
                 "ok": True,
                 "message": f"Device '{request.name}' configured",
                 "name": request.name,
-                "device_type": request.device_type
+                "device_type": request.device_type,
             }
         except HTTPException:
             raise
         except Exception as exc:
             logger.error(f"Configure device failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/devices/{name}/write",
         summary="Write to Device",
@@ -613,9 +638,9 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             200: {"description": "Value written successfully"},
             404: {"description": "Device not found"},
             400: {"description": "Invalid value for device"},
-            500: {"description": "Error writing to device"}
+            500: {"description": "Error writing to device"},
         },
-        tags=["Device Control"]
+        tags=["Device Control"],
     )
     async def api_write_device(name: str, request: DeviceWriteRequest):
         """Write a value to a device."""
@@ -623,26 +648,28 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             _get_device_or_404(name)
             if not _ensure_initialized():
                 raise HTTPException(status_code=500, detail="Failed to initialize IO")
-            
+
             success = io_controller.write(name, request.value)
             if not success:
-                raise HTTPException(status_code=500, detail=f"Failed to write to device '{name}'")
-            
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to write to device '{name}'"
+                )
+
             new_value = io_controller.read(name)
             logger.info(f"Wrote to device '{name}': {request.value}")
-            
+
             return {
                 "ok": True,
                 "name": name,
                 "value": request.value,
-                "actual_value": new_value
+                "actual_value": new_value,
             }
         except HTTPException:
             raise
         except Exception as exc:
             logger.error(f"Write to device '{name}' failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/devices/{name}/read",
         summary="Read from Device",
@@ -651,9 +678,9 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "Value read successfully"},
             404: {"description": "Device not found"},
-            500: {"description": "Error reading from device"}
+            500: {"description": "Error reading from device"},
         },
-        tags=["Device Control"]
+        tags=["Device Control"],
     )
     async def api_read_device(name: str, request: Request):
         """Read the current value from a device."""
@@ -661,21 +688,17 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             _get_device_or_404(name)
             if not _ensure_initialized():
                 raise HTTPException(status_code=500, detail="Failed to initialize IO")
-            
+
             value = io_controller.read(name)
             logger.info(f"Read from device '{name}': {value}")
-            
-            return {
-                "ok": True,
-                "name": name,
-                "value": value
-            }
+
+            return {"ok": True, "name": name, "value": value}
         except HTTPException:
             raise
         except Exception as exc:
             logger.error(f"Read from device '{name}' failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/devices/{name}/reset-latch",
         summary="Reset Latch",
@@ -684,9 +707,9 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "Latch reset successfully"},
             404: {"description": "Device not found or not a latching button"},
-            500: {"description": "Error resetting latch"}
+            500: {"description": "Error resetting latch"},
         },
-        tags=["Device Control"]
+        tags=["Device Control"],
     )
     async def api_reset_latch(name: str, request: Request):
         """Reset the latched state of a button to False."""
@@ -694,20 +717,16 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             _get_device_or_404(name)
             if not _ensure_initialized():
                 raise HTTPException(status_code=500, detail="Failed to initialize IO")
-            
+
             result = io_controller.reset_latch(name)
             if result is None:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Device '{name}' not found or does not support latch reset"
+                    detail=f"Device '{name}' not found or does not support latch reset",
                 )
-            
+
             logger.info(f"Reset latch for device '{name}'")
-            return {
-                "ok": True,
-                "name": name,
-                "message": "Latch reset successfully"
-            }
+            return {"ok": True, "name": name, "message": "Latch reset successfully"}
         except HTTPException:
             raise
         except Exception as exc:
@@ -722,9 +741,9 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "Device toggled successfully"},
             404: {"description": "Device not found"},
-            500: {"description": "Error toggling device"}
+            500: {"description": "Error toggling device"},
         },
-        tags=["Device Control"]
+        tags=["Device Control"],
     )
     async def api_toggle_device(name: str, request: Request):
         """Toggle a device state."""
@@ -732,24 +751,22 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             _get_device_or_404(name)
             if not _ensure_initialized():
                 raise HTTPException(status_code=500, detail="Failed to initialize IO")
-            
+
             new_state = io_controller.toggle(name)
             if new_state is None:
-                raise HTTPException(status_code=500, detail=f"Failed to toggle device '{name}'")
-            
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to toggle device '{name}'"
+                )
+
             logger.info(f"Toggled device '{name}' to {'ON' if new_state else 'OFF'}")
-            
-            return {
-                "ok": True,
-                "name": name,
-                "state": new_state
-            }
+
+            return {"ok": True, "name": name, "state": new_state}
         except HTTPException:
             raise
         except Exception as exc:
             logger.error(f"Toggle device '{name}' failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/devices/{name}/set",
         summary="Set Device State",
@@ -758,9 +775,9 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "Device state set successfully"},
             404: {"description": "Device not found"},
-            500: {"description": "Error setting device state"}
+            500: {"description": "Error setting device state"},
         },
-        tags=["Device Control"]
+        tags=["Device Control"],
     )
     async def api_set_device(name: str, request: DeviceSetStateRequest):
         """Set a device to a specific boolean state."""
@@ -768,77 +785,74 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             _get_device_or_404(name)
             if not _ensure_initialized():
                 raise HTTPException(status_code=500, detail="Failed to initialize IO")
-            
+
             success = io_controller.write(name, request.state)
             if not success:
-                raise HTTPException(status_code=500, detail=f"Failed to set device '{name}'")
-            
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to set device '{name}'"
+                )
+
             new_value = io_controller.read(name)
             logger.info(f"Set device '{name}' to {'ON' if request.state else 'OFF'}")
-            
+
             return {
                 "ok": True,
                 "name": name,
                 "state": request.state,
-                "actual_value": new_value
+                "actual_value": new_value,
             }
         except HTTPException:
             raise
         except Exception as exc:
             logger.error(f"Set device '{name}' failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/devices/inputs/read-all",
         summary="Read All Inputs",
         description="Read values from all input devices.",
         response_description="All input device values",
-        tags=["Bulk Operations"]
+        tags=["Bulk Operations"],
     )
     async def api_read_all_inputs(request: Request):
         """Read all input devices."""
         try:
             if not _ensure_initialized():
                 raise HTTPException(status_code=500, detail="Failed to initialize IO")
-            
+
             values = io_controller.read_all_inputs()
             logger.info(f"Read all {len(values)} input devices")
-            
-            return {
-                "ok": True,
-                "inputs": values
-            }
+
+            return {"ok": True, "inputs": values}
         except Exception as exc:
             logger.error(f"Read all inputs failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/devices/outputs/set-all",
         summary="Set All Outputs",
         description="Set all output devices to a specific state.",
         response_description="Bulk set confirmation",
-        tags=["Bulk Operations"]
+        tags=["Bulk Operations"],
     )
     async def api_set_all_outputs(request: DeviceSetStateRequest):
         """Set all output devices to a specific state."""
         try:
             if not _ensure_initialized():
                 raise HTTPException(status_code=500, detail="Failed to initialize IO")
-            
+
             results = io_controller.set_all_outputs(request.state)
-            logger.info(f"Set all {len(results)} output devices to {'ON' if request.state else 'OFF'}")
-            
-            return {
-                "ok": True,
-                "state": request.state,
-                "results": results
-            }
+            logger.info(
+                f"Set all {len(results)} output devices to {'ON' if request.state else 'OFF'}"
+            )
+
+            return {"ok": True, "state": request.state, "results": results}
         except Exception as exc:
             logger.error(f"Set all outputs failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     # ==================== Configuration Management ====================
-    
+
     @router.post(
         "/config/save",
         summary="Save Configuration",
@@ -846,27 +860,29 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         response_description="Save confirmation",
         responses={
             200: {"description": "Configuration saved successfully"},
-            500: {"description": "Failed to save configuration"}
+            500: {"description": "Failed to save configuration"},
         },
-        tags=["Configuration"]
+        tags=["Configuration"],
     )
     async def api_save_config(request: Request):
         """Save all device configurations to the io_config.json file."""
         try:
             success = io_controller.save_config()
             if not success:
-                raise HTTPException(status_code=500, detail="Failed to save configuration")
-            
+                raise HTTPException(
+                    status_code=500, detail="Failed to save configuration"
+                )
+
             logger.info("IO configuration saved successfully")
             return {
                 "ok": True,
                 "message": "Configuration saved successfully",
-                "device_count": len(io_controller.configs)
+                "device_count": len(io_controller.configs),
             }
         except Exception as exc:
             logger.error(f"Save configuration failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/config/load",
         summary="Load Configuration",
@@ -875,38 +891,43 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "Configuration loaded successfully"},
             404: {"description": "Configuration file not found"},
-            500: {"description": "Failed to load configuration"}
+            500: {"description": "Failed to load configuration"},
         },
-        tags=["Configuration"]
+        tags=["Configuration"],
     )
     async def api_load_config(request: Request):
         """Load device configurations from the io_config.json file."""
         try:
             # Clear existing configs first
             io_controller.clear_config()
-            
+
             success = io_controller.load_config()
             if not success:
-                raise HTTPException(status_code=404, detail="Configuration file not found")
-            
+                raise HTTPException(
+                    status_code=404, detail="Configuration file not found"
+                )
+
             # Re-initialize with loaded configs
             init_success = io_controller.initialize()
             if not init_success:
-                raise HTTPException(status_code=500, detail="Failed to initialize devices from configuration")
-            
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to initialize devices from configuration",
+                )
+
             logger.info("IO configuration loaded successfully")
             return {
                 "ok": True,
                 "message": "Configuration loaded successfully",
                 "device_count": len(io_controller.configs),
-                "devices": list(io_controller.configs.keys())
+                "devices": list(io_controller.configs.keys()),
             }
         except HTTPException:
             raise
         except Exception as exc:
             logger.error(f"Load configuration failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.get(
         "/config",
         summary="Get Full Configuration",
@@ -914,37 +935,42 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         response_description="Full configuration",
         responses={
             200: {"description": "Configuration returned successfully"},
-            500: {"description": "Failed to get configuration"}
+            500: {"description": "Failed to get configuration"},
         },
-        tags=["Configuration"]
+        tags=["Configuration"],
     )
     async def api_get_config(request: Request):
         """Get the full IO configuration."""
         try:
             from io_config import _config_to_dict
-            from io_controller import get_acsi_config, _device_mappings as global_mappings
-            
+            from io_controller import (
+                _device_mappings as global_mappings,
+            )
+            from io_controller import (
+                get_acsi_config,
+            )
+
             devices_list = []
             for name, config in io_controller.configs.items():
                 devices_list.append(_config_to_dict(config))
-            
+
             # Get ACSI configuration
             acsi_config = get_acsi_config()
             acsi_dict = None
             if acsi_config:
                 acsi_dict = {"url": acsi_config.url, "enabled": acsi_config.enabled}
-            
+
             return {
                 "ok": True,
                 "devices": devices_list,
                 "device_count": len(devices_list),
                 "acsi_server": acsi_dict,
-                "mappings": dict(global_mappings)
+                "mappings": dict(global_mappings),
             }
         except Exception as exc:
             logger.error(f"Get configuration failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/config/reload",
         summary="Reload Configuration",
@@ -953,56 +979,62 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "Configuration reloaded successfully"},
             404: {"description": "Configuration file not found"},
-            500: {"description": "Failed to reload configuration"}
+            500: {"description": "Failed to reload configuration"},
         },
-        tags=["Configuration"]
+        tags=["Configuration"],
     )
     async def api_reload_config(request: Request):
         """Reload device configurations from the io_config.json file (adds to existing)."""
         try:
             success = io_controller.load_config()
             if not success:
-                raise HTTPException(status_code=404, detail="Configuration file not found")
-            
+                raise HTTPException(
+                    status_code=404, detail="Configuration file not found"
+                )
+
             # Re-initialize with updated configs
             init_success = io_controller.initialize()
             if not init_success:
-                raise HTTPException(status_code=500, detail="Failed to initialize devices from configuration")
-            
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to initialize devices from configuration",
+                )
+
             logger.info("IO configuration reloaded successfully")
             return {
                 "ok": True,
                 "message": "Configuration reloaded successfully",
                 "device_count": len(io_controller.configs),
-                "devices": list(io_controller.configs.keys())
+                "devices": list(io_controller.configs.keys()),
             }
         except HTTPException:
             raise
         except Exception as exc:
             logger.error(f"Reload configuration failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     @router.post(
         "/config/update",
         summary="Update Full Configuration",
         description="Update the full IO configuration including devices, ACSI server settings, and mappings. "
-                    "This endpoint saves all changes to the io_config.json file.",
+        "This endpoint saves all changes to the io_config.json file.",
         response_description="Update confirmation",
         responses={
             200: {"description": "Configuration updated successfully"},
             400: {"description": "Invalid configuration"},
-            500: {"description": "Failed to update configuration"}
+            500: {"description": "Failed to update configuration"},
         },
-        tags=["Configuration"]
+        tags=["Configuration"],
     )
     async def api_update_full_config(request: Request):
         """Update the full IO configuration from request body and save to file."""
         try:
             body = await request.json()
-            
+
             # Update device configurations if provided
             if "devices" in body:
                 from io_config import _dict_to_config
+
                 new_configs = body["devices"]
                 for device_dict in new_configs:
                     config = _dict_to_config(device_dict)
@@ -1011,119 +1043,132 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
                         if config.name in io_controller.configs:
                             io_controller.remove_device(config.name)
                         io_controller.add_device(config)
-            
+
             # Update ACSI configuration if provided
             if "acsi_server" in body:
                 acsi_data = body["acsi_server"]
-                from io_controller import configure_acsi, ACSIConfig
+                from io_controller import ACSIConfig, configure_acsi
+
                 acsi_config = ACSIConfig(
                     url=acsi_data.get("url", "http://localhost:5001"),
-                    enabled=acsi_data.get("enabled", False)
+                    enabled=acsi_data.get("enabled", False),
                 )
                 configure_acsi(acsi_config)
-            
+
             # Update mappings if provided
             if "mappings" in body:
                 from io_controller import _device_mappings as global_mappings
+
                 new_mappings = body["mappings"]
                 for device_name, mapping in new_mappings.items():
                     global_mappings[device_name] = mapping
-            
+
             # Save full configuration to file
-            from io_config import save_full_config, get_config_path
-            from io_controller import _acsi_config, _device_mappings as global_mappings
+            from io_config import get_config_path, save_full_config
+            from io_controller import _acsi_config
+            from io_controller import _device_mappings as global_mappings
+
             config_path = get_config_path()
-            acsi_dict = {"url": _acsi_config.url, "enabled": _acsi_config.enabled} if _acsi_config else None
+            acsi_dict = (
+                {"url": _acsi_config.url, "enabled": _acsi_config.enabled}
+                if _acsi_config
+                else None
+            )
             success = save_full_config(
                 devices_config=io_controller.configs,
                 acsi_config=acsi_dict,
                 device_mappings=global_mappings,
-                path=config_path
+                path=config_path,
             )
-            
+
             if not success:
-                raise HTTPException(status_code=500, detail="Failed to save configuration to file")
-            
+                raise HTTPException(
+                    status_code=500, detail="Failed to save configuration to file"
+                )
+
             # Re-initialize with updated configs
             init_success = io_controller.initialize()
             if not init_success:
-                raise HTTPException(status_code=500, detail="Failed to initialize devices from configuration")
-            
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to initialize devices from configuration",
+                )
+
             logger.info("Full IO configuration updated and saved successfully")
             return {
                 "ok": True,
                 "message": "Full configuration updated and saved",
                 "device_count": len(io_controller.configs),
-                "devices": list(io_controller.configs.keys())
+                "devices": list(io_controller.configs.keys()),
             }
         except HTTPException:
             raise
         except Exception as exc:
             logger.error(f"Update full configuration failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-    
+
     # ==================== ACSI Mappings ====================
 
     @router.post(
         "/acsi/mappings/{device_name}",
         summary="Set ACSI Mapping",
         description="Set the IEC61850 object reference mapping for an IO device. "
-                    "When the device value changes, it will be written to the ACSI server at the mapped objRef.",
+        "When the device value changes, it will be written to the ACSI server at the mapped objRef.",
         response_description="Mapping set confirmation",
         responses={
             200: {"description": "Mapping set successfully"},
             404: {"description": "Device not found"},
-            500: {"description": "Failed to set mapping"}
+            500: {"description": "Failed to set mapping"},
         },
-        tags=["ACSI Integration"]
+        tags=["ACSI Integration"],
     )
-    async def api_set_acsi_mapping(
-        device_name: str,
-        request: ACSIMappingRequest
-    ):
+    async def api_set_acsi_mapping(device_name: str, request: ACSIMappingRequest):
         """Set ACSI mapping for a specific device.
-        
+
         Args:
             device_name: Name of the IO device
             request: ACSIMappingRequest with objRef and fc
-            
+
         Returns:
             JSONResponse: {"ok": True, "device": str, "objRef": str, "fc": str}
         """
         from io_controller import _device_mappings as global_mappings
-        
+
         # Check if device exists
         if device_name not in io_controller.configs:
             raise HTTPException(
-                status_code=404,
-                detail=f"Device '{device_name}' not found"
+                status_code=404, detail=f"Device '{device_name}' not found"
             )
-        
+
         # Update the global device mappings
-        global_mappings[device_name] = {
-            "objRef": request.objRef,
-            "fc": request.fc
-        }
-        
+        global_mappings[device_name] = {"objRef": request.objRef, "fc": request.fc}
+
         # Persist mappings to file
+        from io_config import get_config_path, save_full_config
         from io_controller import _acsi_config
-        from io_config import save_full_config, get_config_path
+
         config_path = get_config_path()
-        acsi_dict = {"url": _acsi_config.url, "enabled": _acsi_config.enabled} if _acsi_config else None
+        acsi_dict = (
+            {"url": _acsi_config.url, "enabled": _acsi_config.enabled}
+            if _acsi_config
+            else None
+        )
         save_full_config(
             devices_config=io_controller.configs,
             device_mappings=global_mappings,
             acsi_config=acsi_dict,
-            path=config_path
+            path=config_path,
         )
-        
-        logger.info(f"Set ACSI mapping: {device_name} -> {request.objRef} (fc={request.fc})")
+
+        logger.info(
+            f"Set ACSI mapping: {device_name} -> {request.objRef} (fc={request.fc})"
+        )
         return {
             "ok": True,
             "device": device_name,
             "objRef": request.objRef,
             "fc": request.fc,
-            "message": "Mapping set and saved to config file"
+            "message": "Mapping set and saved to config file",
         }
 
     @router.get(
@@ -1131,18 +1176,17 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         summary="Get All ACSI Mappings",
         description="Returns all device-to-ACSI mappings.",
         response_description="All ACSI mappings",
-        responses={
-            200: {"description": "List of all ACSI mappings"}
-        },
-        tags=["ACSI Integration"]
+        responses={200: {"description": "List of all ACSI mappings"}},
+        tags=["ACSI Integration"],
     )
     async def api_get_acsi_mappings(request: Request):
         """Get all device-to-ACSI mappings."""
         from io_controller import _device_mappings as global_mappings
+
         return {
             "ok": True,
             "mappings": dict(global_mappings),
-            "count": len(global_mappings)
+            "count": len(global_mappings),
         }
 
     @router.get(
@@ -1152,26 +1196,22 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         response_description="ACSI mapping for device",
         responses={
             200: {"description": "Mapping found"},
-            404: {"description": "Device or mapping not found"}
+            404: {"description": "Device or mapping not found"},
         },
-        tags=["ACSI Integration"]
+        tags=["ACSI Integration"],
     )
     async def api_get_acsi_mapping(device_name: str):
         """Get ACSI mapping for a specific device."""
         from io_controller import get_device_mapping
-        
+
         mapping = get_device_mapping(device_name)
         if not mapping:
             raise HTTPException(
                 status_code=404,
-                detail=f"No ACSI mapping found for device '{device_name}'"
+                detail=f"No ACSI mapping found for device '{device_name}'",
             )
-        
-        return {
-            "ok": True,
-            "device": device_name,
-            "mapping": mapping
-        }
+
+        return {"ok": True, "device": device_name, "mapping": mapping}
 
     @router.delete(
         "/acsi/mappings/{device_name}",
@@ -1180,27 +1220,23 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         response_description="Mapping removed confirmation",
         responses={
             200: {"description": "Mapping removed"},
-            404: {"description": "Device or mapping not found"}
+            404: {"description": "Device or mapping not found"},
         },
-        tags=["ACSI Integration"]
+        tags=["ACSI Integration"],
     )
     async def api_remove_acsi_mapping(device_name: str):
         """Remove ACSI mapping for a specific device."""
         from io_controller import _device_mappings as global_mappings
-        
+
         if device_name not in global_mappings:
             raise HTTPException(
                 status_code=404,
-                detail=f"No ACSI mapping found for device '{device_name}'"
+                detail=f"No ACSI mapping found for device '{device_name}'",
             )
-        
+
         del global_mappings[device_name]
         logger.info(f"Removed ACSI mapping for device: {device_name}")
-        return {
-            "ok": True,
-            "device": device_name,
-            "message": "ACSI mapping removed"
-        }
+        return {"ok": True, "device": device_name, "message": "ACSI mapping removed"}
 
     @router.post(
         "/acsi/config",
@@ -1209,18 +1245,22 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         response_description="ACSI configuration confirmation",
         responses={
             200: {"description": "ACSI server configured"},
-            500: {"description": "Failed to configure ACSI server"}
+            500: {"description": "Failed to configure ACSI server"},
         },
-        tags=["ACSI Integration"]
+        tags=["ACSI Integration"],
     )
     async def api_configure_acsi(request: ACSIConfigRequest):
         """Configure ACSI server connection."""
-        from io_controller import configure_acsi, ACSIConfig, _acsi_config, _device_mappings
-        from io_config import save_full_config, get_config_path
-        
+        from io_config import get_config_path, save_full_config
+        from io_controller import (
+            ACSIConfig,
+            _device_mappings,
+            configure_acsi,
+        )
+
         acsi_config = ACSIConfig(url=request.url, enabled=request.enabled)
         configure_acsi(acsi_config)
-        
+
         # Persist ACSI config to file along with current devices and mappings
         acsi_dict = {"url": request.url, "enabled": request.enabled}
         config_path = get_config_path()
@@ -1228,15 +1268,17 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             devices_config=io_controller.configs,
             acsi_config=acsi_dict,
             device_mappings=_device_mappings,
-            path=config_path
+            path=config_path,
         )
-        
-        logger.info(f"ACSI server configured: {request.url} (enabled={request.enabled})")
+
+        logger.info(
+            f"ACSI server configured: {request.url} (enabled={request.enabled})"
+        )
         return {
             "ok": True,
             "url": request.url,
             "enabled": request.enabled,
-            "message": "ACSI server configuration updated and saved to file"
+            "message": "ACSI server configuration updated and saved to file",
         }
 
     @router.get(
@@ -1244,28 +1286,26 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         summary="Get ACSI Configuration",
         description="Get the current ACSI server configuration.",
         response_description="ACSI configuration",
-        responses={
-            200: {"description": "ACSI configuration"}
-        },
-        tags=["ACSI Integration"]
+        responses={200: {"description": "ACSI configuration"}},
+        tags=["ACSI Integration"],
     )
     async def api_get_acsi_config(request: Request):
         """Get current ACSI server configuration."""
         from io_controller import get_acsi_config
-        
+
         config = get_acsi_config()
         if not config:
             return {
                 "ok": True,
                 "configured": False,
-                "message": "ACSI server not configured"
+                "message": "ACSI server not configured",
             }
-        
+
         return {
             "ok": True,
             "configured": True,
             "url": config.url,
-            "enabled": config.enabled
+            "enabled": config.enabled,
         }
 
     @router.post(
@@ -1275,51 +1315,55 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         response_description="Mappings synced confirmation",
         responses={
             200: {"description": "Mappings synced successfully"},
-            500: {"description": "Failed to sync mappings"}
+            500: {"description": "Failed to sync mappings"},
         },
-        tags=["ACSI Integration"]
+        tags=["ACSI Integration"],
     )
     async def api_sync_acsi_mappings(request: Request):
         """Replace all ACSI mappings with mappings from the request body.
-        
+
         Request body should be: {"mappings": {"device_name": {"objRef": "...", "fc": "...", "service": "writeValue"|"operate", "dataType": "BOOLEAN"|"INT32"|"FLOAT32"}, ...}}
         """
         from io_controller import _device_mappings as global_mappings
-        
+
         try:
             body = await request.json()
             new_mappings = body.get("mappings", {})
-            
+
             # Clear existing mappings
             global_mappings.clear()
-            
+
             # Add new mappings
             for device_name, mapping in new_mappings.items():
                 global_mappings[device_name] = mapping
-            
+
             # Persist mappings to file
+            from io_config import get_config_path, save_full_config
             from io_controller import _acsi_config
-            from io_config import save_full_config, get_config_path
+
             config_path = get_config_path()
-            acsi_dict = {"url": _acsi_config.url, "enabled": _acsi_config.enabled} if _acsi_config else None
+            acsi_dict = (
+                {"url": _acsi_config.url, "enabled": _acsi_config.enabled}
+                if _acsi_config
+                else None
+            )
             save_full_config(
                 devices_config=io_controller.configs,
                 device_mappings=global_mappings,
                 acsi_config=acsi_dict,
-                path=config_path
+                path=config_path,
             )
-            
+
             logger.info(f"Synced {len(new_mappings)} ACSI mappings")
             return {
                 "ok": True,
                 "count": len(global_mappings),
                 "mappings": new_mappings,
-                "message": "ACSI mappings synced successfully and saved to file"
+                "message": "ACSI mappings synced successfully and saved to file",
             }
         except Exception as exc:
             logger.error(f"Failed to sync ACSI mappings: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-
 
     # ==================== LCD SPECIFIC ENDPOINTS ====================
 
@@ -1331,30 +1375,33 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "Text written successfully"},
             404: {"description": "Device not found or not LCD"},
-            500: {"description": "Failed to write to LCD"}
+            500: {"description": "Failed to write to LCD"},
         },
-        tags=["LCD Display"]
+        tags=["LCD Display"],
     )
     async def api_lcd_write(device_name: str, request: LCDWriteRequest):
         """Write text to an LCD display."""
         device = io_controller.get_device(device_name)
         if device is None:
-            raise HTTPException(status_code=404, detail=f"Device '{device_name}' not found")
-        
-        if not hasattr(device, 'write_line') and not hasattr(device, 'write'):
-            raise HTTPException(status_code=400, detail=f"Device '{device_name}' is not an LCD display")
-        
+            raise HTTPException(
+                status_code=404, detail=f"Device '{device_name}' not found"
+            )
+
+        if not hasattr(device, "write_line") and not hasattr(device, "write"):
+            raise HTTPException(
+                status_code=400, detail=f"Device '{device_name}' is not an LCD display"
+            )
+
         try:
             result = device.write(request.text)
             return {
                 "ok": result,
                 "device": device_name,
-                "message": f"Text written to LCD '{device_name}'"
+                "message": f"Text written to LCD '{device_name}'",
             }
         except Exception as exc:
             logger.error(f"Failed to write to LCD '{device_name}': {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-
 
     @router.post(
         "/lcd/{device_name}/write-line",
@@ -1364,31 +1411,34 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "Text written to line successfully"},
             404: {"description": "Device not found or not LCD"},
-            500: {"description": "Failed to write to LCD"}
+            500: {"description": "Failed to write to LCD"},
         },
-        tags=["LCD Display"]
+        tags=["LCD Display"],
     )
     async def api_lcd_write_line(device_name: str, request: LCDWriteLineRequest):
         """Write text to a specific line on an LCD display."""
         device = io_controller.get_device(device_name)
         if device is None:
-            raise HTTPException(status_code=404, detail=f"Device '{device_name}' not found")
-        
-        if not hasattr(device, 'write_line'):
-            raise HTTPException(status_code=400, detail=f"Device '{device_name}' is not an LCD display")
-        
+            raise HTTPException(
+                status_code=404, detail=f"Device '{device_name}' not found"
+            )
+
+        if not hasattr(device, "write_line"):
+            raise HTTPException(
+                status_code=400, detail=f"Device '{device_name}' is not an LCD display"
+            )
+
         try:
             result = device.write_line(request.line_number, request.text)
             return {
                 "ok": result,
                 "device": device_name,
                 "line": request.line_number,
-                "message": f"Text written to line {request.line_number} on LCD '{device_name}'"
+                "message": f"Text written to line {request.line_number} on LCD '{device_name}'",
             }
         except Exception as exc:
             logger.error(f"Failed to write to LCD line: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-
 
     @router.post(
         "/lcd/{device_name}/control",
@@ -1398,41 +1448,48 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "LCD controlled successfully"},
             404: {"description": "Device not found or not LCD"},
-            500: {"description": "Failed to control LCD"}
+            500: {"description": "Failed to control LCD"},
         },
-        tags=["LCD Display"]
+        tags=["LCD Display"],
     )
     async def api_lcd_control(device_name: str, request: LCDControlRequest):
         """Control LCD display and backlight."""
         device = io_controller.get_device(device_name)
         if device is None:
-            raise HTTPException(status_code=404, detail=f"Device '{device_name}' not found")
-        
-        if not hasattr(device, 'display_on') and not hasattr(device, 'backlight_on') and not hasattr(device, 'clear'):
-            raise HTTPException(status_code=400, detail=f"Device '{device_name}' is not an LCD display")
-        
+            raise HTTPException(
+                status_code=404, detail=f"Device '{device_name}' not found"
+            )
+
+        if (
+            not hasattr(device, "display_on")
+            and not hasattr(device, "backlight_on")
+            and not hasattr(device, "clear")
+        ):
+            raise HTTPException(
+                status_code=400, detail=f"Device '{device_name}' is not an LCD display"
+            )
+
         try:
             results = {}
-            
+
             if request.clear is not None and request.clear:
                 results["clear"] = device.clear()
-            
+
             if request.display_on is not None:
                 results["display_on"] = device.display_on(request.display_on)
-            
+
             if request.backlight_on is not None:
                 results["backlight_on"] = device.backlight_on(request.backlight_on)
-            
+
             return {
                 "ok": True,
                 "device": device_name,
                 "results": results,
-                "message": f"LCD '{device_name}' controlled successfully"
+                "message": f"LCD '{device_name}' controlled successfully",
             }
         except Exception as exc:
             logger.error(f"Failed to control LCD '{device_name}': {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
-
 
     @router.post(
         "/lcd/{device_name}/cursor",
@@ -1442,19 +1499,23 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         responses={
             200: {"description": "Cursor set successfully"},
             404: {"description": "Device not found or not LCD"},
-            500: {"description": "Failed to set cursor"}
+            500: {"description": "Failed to set cursor"},
         },
-        tags=["LCD Display"]
+        tags=["LCD Display"],
     )
     async def api_lcd_cursor(device_name: str, request: LCDCursorRequest):
         """Set cursor position on an LCD display."""
         device = io_controller.get_device(device_name)
         if device is None:
-            raise HTTPException(status_code=404, detail=f"Device '{device_name}' not found")
-        
-        if not hasattr(device, 'set_cursor'):
-            raise HTTPException(status_code=400, detail=f"Device '{device_name}' is not an LCD display")
-        
+            raise HTTPException(
+                status_code=404, detail=f"Device '{device_name}' not found"
+            )
+
+        if not hasattr(device, "set_cursor"):
+            raise HTTPException(
+                status_code=400, detail=f"Device '{device_name}' is not an LCD display"
+            )
+
         try:
             result = device.set_cursor(request.row, request.col)
             return {
@@ -1462,32 +1523,33 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
                 "device": device_name,
                 "row": request.row,
                 "col": request.col,
-                "message": f"Cursor set to ({request.row}, {request.col}) on LCD '{device_name}'"
+                "message": f"Cursor set to ({request.row}, {request.col}) on LCD '{device_name}'",
             }
         except Exception as exc:
             logger.error(f"Failed to set LCD cursor: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
 
-
     return router
 
+
 if __name__ == "__main__":
-    import uvicorn
     import os
     import platform
-    
+
+    import uvicorn
+
     # Create the FastAPI app with an IOController
     app = create_fastapi_app()
-    
+
     # Get port from environment or use default
     # On Windows, port 8000 might be reserved, so we use 8080 as default
     port = int(os.getenv("PORT", "8080"))
-    
+
     # On Windows, use localhost instead of 0.0.0.0 to avoid permission issues
     if platform.system() == "Windows":
         host = "localhost"
     else:
         host = "0.0.0.0"
-    
+
     # Run the server
     uvicorn.run(app, host=host, port=port)

@@ -18,36 +18,36 @@
 from __future__ import annotations
 
 import ast
-from datetime import datetime
+import asyncio
 import json
-import os
 import logging
+import os
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any
+
 import requests
-import threading
-import time
-from urllib.parse import urlparse
-
-from fastapi import FastAPI, Request, HTTPException, status, Body, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
-
-from bff.pydantic_models import *
+from fastapi.responses import JSONResponse
 
 from bff.bffClient import BffClient
-
 from bff.ConnectionManager import ConnectionManager
-
-from concurrent.futures import ThreadPoolExecutor
-import asyncio
-import httpx2 as httpx
+from bff.pydantic_models import *
 
 # Global state
-_bff_clients: Dict[str, BffClient] = {}
+_bff_clients: dict[str, BffClient] = {}
+
 
 # Configure logging
-def resolve_log_level(value: Optional[str], default: int = logging.INFO) -> int:
+def resolve_log_level(value: str | None, default: int = logging.INFO) -> int:
     """Map a level name (case-insensitive) to a logging constant.
 
     Falls back to ``default`` for unknown/empty values instead of letting
@@ -72,11 +72,11 @@ LOG_LEVEL = resolve_log_level(os.getenv("LOG_LEVEL"))
 
 logging.basicConfig(
     level=LOG_LEVEL,
-    format='%(asctime)s - %(name)s - %(threadName)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(threadName)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout)  # Force stdout for Docker
     ],
-    force=True  # Override any existing config
+    force=True,  # Override any existing config
 )
 
 # Apply the severity to the root logger here at import time, not only in the
@@ -113,25 +113,29 @@ class HealthCheckAccessFilter(logging.Filter):
         record.levelname = "DEBUG"
         return logging.getLogger("uvicorn.access").isEnabledFor(logging.DEBUG)
 
+
 # Try to import docker for auto-discovery
 DOCKER_AVAILABLE = False
 try:
     import docker
     from docker import DockerClient
+
     DOCKER_AVAILABLE = True
 except ImportError:
-    logger.warning("Docker Python SDK not available. Container auto-discovery disabled.")
+    logger.warning(
+        "Docker Python SDK not available. Container auto-discovery disabled."
+    )
 
 # Determine base directory - check /app (Docker), then script dir, then parent dir
 script_dir = os.path.dirname(os.path.abspath(__file__))
-if os.path.exists('/app'):
-    BASE_DIR = '/app'
-elif os.path.exists(os.path.join(script_dir, 'connections.json')):
+if os.path.exists("/app"):
+    BASE_DIR = "/app"
+elif os.path.exists(os.path.join(script_dir, "connections.json")):
     BASE_DIR = script_dir
 else:
     # Try parent directory
     parent_dir = os.path.dirname(script_dir)
-    if os.path.exists(os.path.join(parent_dir, 'connections.json')):
+    if os.path.exists(os.path.join(parent_dir, "connections.json")):
         BASE_DIR = parent_dir
     else:
         BASE_DIR = script_dir
@@ -144,13 +148,15 @@ os.makedirs(BASE_DIR, exist_ok=True)
 # runs as the unprivileged 'app' user, so the atomic save (temp file + rename in
 # the same directory) fails with EACCES. docker-compose.yml points this at a
 # dedicated, writable /config directory backed by a named volume.
-CONNECTIONS_FILE = os.environ.get('BFF_CONNECTIONS_FILE') or os.path.join(BASE_DIR, 'connections.json')
-STATS_FILE = os.path.join(BASE_DIR, 'stats.json')
+CONNECTIONS_FILE = os.environ.get("BFF_CONNECTIONS_FILE") or os.path.join(
+    BASE_DIR, "connections.json"
+)
+STATS_FILE = os.path.join(BASE_DIR, "stats.json")
 
 # Seed a freshly mounted config location (e.g. an empty Docker volume) once from
 # the connections.json shipped next to this module, so existing connections
 # survive the first start. After that the configured file is authoritative.
-_seed_connections = os.path.join(script_dir, 'connections.json')
+_seed_connections = os.path.join(script_dir, "connections.json")
 if (
     not os.path.exists(CONNECTIONS_FILE)
     and os.path.exists(_seed_connections)
@@ -158,15 +164,20 @@ if (
 ):
     try:
         import shutil
+
         os.makedirs(os.path.dirname(CONNECTIONS_FILE) or ".", exist_ok=True)
         shutil.copyfile(_seed_connections, CONNECTIONS_FILE)
         logger.info("Seeded %s from %s", CONNECTIONS_FILE, _seed_connections)
     except OSError as e:
-        logger.warning("Could not seed %s from %s: %s", CONNECTIONS_FILE, _seed_connections, e)
+        logger.warning(
+            "Could not seed %s from %s: %s", CONNECTIONS_FILE, _seed_connections, e
+        )
 
 
 # Initialize managers
-conn_manager = ConnectionManager(bff_clients=_bff_clients, connections_file=CONNECTIONS_FILE, logger=logger)
+conn_manager = ConnectionManager(
+    bff_clients=_bff_clients, connections_file=CONNECTIONS_FILE, logger=logger
+)
 
 # ==================== Browser Push Relay (WebSocket) ====================
 #
@@ -176,6 +187,7 @@ conn_manager = ConnectionManager(bff_clients=_bff_clients, connections_file=CONN
 # a single /ws endpoint, and push_relay_loop() is the one place that polls the
 # RTI-SO/RTI-FSP instances on their behalf, so N open tabs cost one poll
 # cycle instead of N.
+
 
 class WSHub:
     """Tracks connected browser WebSocket clients and broadcasts JSON messages."""
@@ -192,7 +204,7 @@ class WSHub:
         async with self._lock:
             self._clients.discard(ws)
 
-    async def broadcast(self, message: Dict[str, Any]) -> None:
+    async def broadcast(self, message: dict[str, Any]) -> None:
         async with self._lock:
             clients = list(self._clients)
         if not clients:
@@ -213,15 +225,15 @@ ws_hub = WSHub()
 
 # Tracks the highest message "id" already relayed per "host:port" target, so
 # push_relay_loop() only broadcasts messages a browser hasn't seen yet.
-_last_relayed_message_id: Dict[str, int] = {}
+_last_relayed_message_id: dict[str, int] = {}
 
 # Tracks the last-relayed acsi_client_list snapshot per "host:port" target
 # (RTI-SO only), so push_relay_loop() only broadcasts when it actually
 # changes (an FSP associating with, or dropping, one of the SO's cps).
-_last_relayed_client_list: Dict[str, List[str]] = {}
+_last_relayed_client_list: dict[str, list[str]] = {}
 
 
-def _parse_status_repr(raw: Any) -> Optional[Dict[str, Any]]:
+def _parse_status_repr(raw: Any) -> dict[str, Any] | None:
     """Parse the FSP's /api/status 'status' field.
 
     fsp/acsi_server.py's api_status() returns str(dict) - a Python repr
@@ -239,7 +251,7 @@ def _parse_status_repr(raw: Any) -> Optional[Dict[str, Any]]:
         return None
 
 
-async def _fetch_fsp_client_count(con: Dict[str, Any]) -> Tuple[str, int]:
+async def _fetch_fsp_client_count(con: dict[str, Any]) -> tuple[str, int]:
     """Look up an RTI-FSP connection's live connected-client count."""
     key = f"{con.get('host')}:{con.get('port')}"
     client = _bff_clients.get(key)
@@ -247,7 +259,11 @@ async def _fetch_fsp_client_count(con: Dict[str, Any]) -> Tuple[str, int]:
         return con.get("name"), 0
     try:
         result = await asyncio.to_thread(client.request, "GET", "/api/status")
-        parsed = _parse_status_repr(result.get("status")) if isinstance(result, dict) else None
+        parsed = (
+            _parse_status_repr(result.get("status"))
+            if isinstance(result, dict)
+            else None
+        )
         if parsed and parsed.get("status") == "listening":
             return con.get("name"), parsed.get("connectedClients", 0) or 0
     except Exception:
@@ -255,19 +271,21 @@ async def _fetch_fsp_client_count(con: Dict[str, Any]) -> Tuple[str, int]:
     return con.get("name"), 0
 
 
-async def _build_enriched_connections() -> List[Dict[str, Any]]:
+async def _build_enriched_connections() -> list[dict[str, Any]]:
     """Mirror the HMI's former client-side enrichFspClientCounts, server-side."""
     conns = conn_manager.connections
     fsp_conns = [
-        c for c in conns
-        if c.get("type") == "RTI-FSP" and c.get("status") == "connected"
-        and c.get("host") and c.get("port")
+        c
+        for c in conns
+        if c.get("type") == "RTI-FSP"
+        and c.get("status") == "connected"
+        and c.get("host")
+        and c.get("port")
     ]
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
     if fsp_conns:
         results = await asyncio.gather(
-            *(_fetch_fsp_client_count(c) for c in fsp_conns),
-            return_exceptions=True
+            *(_fetch_fsp_client_count(c) for c in fsp_conns), return_exceptions=True
         )
         for r in results:
             if isinstance(r, tuple):
@@ -293,17 +311,23 @@ async def _relay_new_messages(target_key: str, client: BffClient) -> None:
         return
 
     last_id = _last_relayed_message_id.get(target_key, 0)
-    current_max = max((m.get("id", 0) for m in messages if isinstance(m, dict)), default=0)
+    current_max = max(
+        (m.get("id", 0) for m in messages if isinstance(m, dict)), default=0
+    )
     if current_max < last_id:
         # message ids reset - the instance restarted (or logs were cleared).
         last_id = 0
 
-    new_items = [m for m in messages if isinstance(m, dict) and m.get("id", 0) > last_id]
+    new_items = [
+        m for m in messages if isinstance(m, dict) and m.get("id", 0) > last_id
+    ]
     if not new_items:
         return
 
     _last_relayed_message_id[target_key] = current_max
-    await ws_hub.broadcast({"type": "messages", "target": target_key, "data": new_items})
+    await ws_hub.broadcast(
+        {"type": "messages", "target": target_key, "data": new_items}
+    )
 
 
 async def _relay_acsi_client_list(target_key: str, client: BffClient) -> None:
@@ -325,12 +349,18 @@ async def _relay_acsi_client_list(target_key: str, client: BffClient) -> None:
     if _last_relayed_client_list.get(target_key) == client_list:
         return
     _last_relayed_client_list[target_key] = client_list
-    await ws_hub.broadcast({"type": "properties", "target": target_key, "data": {"acsi_client_list": client_list}})
+    await ws_hub.broadcast(
+        {
+            "type": "properties",
+            "target": target_key,
+            "data": {"acsi_client_list": client_list},
+        }
+    )
 
 
 async def push_relay_loop(interval: float = 2.0) -> None:
     """Background task: poll once centrally, push deltas to every browser tab."""
-    last_connections_snapshot: Optional[str] = None
+    last_connections_snapshot: str | None = None
     while True:
         try:
             enriched = await _build_enriched_connections()
@@ -340,23 +370,41 @@ async def push_relay_loop(interval: float = 2.0) -> None:
                 await ws_hub.broadcast({"type": "connections", "data": enriched})
 
             live_targets = [
-                (f"{c['host']}:{c['port']}", _bff_clients.get(f"{c['host']}:{c['port']}"))
+                (
+                    f"{c['host']}:{c['port']}",
+                    _bff_clients.get(f"{c['host']}:{c['port']}"),
+                )
                 for c in conn_manager.connections
                 if c.get("type") in ("RTI-SO", "RTI-FSP")
                 and c.get("status") == "connected"
-                and c.get("host") and c.get("port")
+                and c.get("host")
+                and c.get("port")
             ]
             so_targets = [
-                (f"{c['host']}:{c['port']}", _bff_clients.get(f"{c['host']}:{c['port']}"))
+                (
+                    f"{c['host']}:{c['port']}",
+                    _bff_clients.get(f"{c['host']}:{c['port']}"),
+                )
                 for c in conn_manager.connections
                 if c.get("type") == "RTI-SO"
                 and c.get("status") == "connected"
-                and c.get("host") and c.get("port")
+                and c.get("host")
+                and c.get("port")
             ]
-            await asyncio.gather(*(
-                [_relay_new_messages(key, client) for key, client in live_targets if client is not None]
-                + [_relay_acsi_client_list(key, client) for key, client in so_targets if client is not None]
-            ))
+            await asyncio.gather(
+                *(
+                    [
+                        _relay_new_messages(key, client)
+                        for key, client in live_targets
+                        if client is not None
+                    ]
+                    + [
+                        _relay_acsi_client_list(key, client)
+                        for key, client in so_targets
+                        if client is not None
+                    ]
+                )
+            )
         except Exception:
             logger.exception("push_relay_loop iteration failed")
 
@@ -366,15 +414,14 @@ async def push_relay_loop(interval: float = 2.0) -> None:
 # ==================== FastAPI Application Setup ====================
 from contextlib import asynccontextmanager
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Installed here (not before uvicorn.run) so it survives uvicorn's own
     # logging dictConfig, which runs before app startup.
     logging.getLogger("uvicorn.access").addFilter(HealthCheckAccessFilter())
 
-    asyncio.create_task(
-        conn_manager.status_monitor(interval=10)
-    )
+    asyncio.create_task(conn_manager.status_monitor(interval=10))
     asyncio.create_task(push_relay_loop(interval=2))
 
     yield
@@ -395,33 +442,24 @@ app = FastAPI(
     openapi_tags=[
         {
             "name": "Health",
-            "description": "Health check and status monitoring endpoints"
+            "description": "Health check and status monitoring endpoints",
         },
         {
             "name": "Endpoints",
-            "description": "Service discovery and endpoint management"
+            "description": "Service discovery and endpoint management",
         },
         {
             "name": "Connections",
-            "description": "Manage connections to remote RTI endpoints"
+            "description": "Manage connections to remote RTI endpoints",
         },
-        {
-            "name": "Data",
-            "description": "Read and write data to ACSI endpoints"
-        },
-        {
-            "name": "Reports",
-            "description": "Generate and export reports"
-        },
-        {
-            "name": "Stats",
-            "description": "System statistics and metrics"
-        },
+        {"name": "Data", "description": "Read and write data to ACSI endpoints"},
+        {"name": "Reports", "description": "Generate and export reports"},
+        {"name": "Stats", "description": "System statistics and metrics"},
         {
             "name": "Execution",
-            "description": "Execute dynamic API calls against registered targets"
-        }
-    ]
+            "description": "Execute dynamic API calls against registered targets",
+        },
+    ],
 )
 
 # Configure CORS
@@ -437,6 +475,7 @@ app.add_middleware(
 # ==================== API Endpoints ====================
 
 # -------------------- Live Updates (WebSocket) --------------------
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -462,15 +501,16 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # -------------------- Health & Status --------------------
 
-async def _check_target(key: str, client: BffClient) -> Dict[str, str]:
+
+async def _check_target(key: str, client: BffClient) -> dict[str, str]:
     try:
         await asyncio.wait_for(
-            asyncio.to_thread(client.request, "GET", "/api/health"),
-            timeout=3.0
+            asyncio.to_thread(client.request, "GET", "/api/health"), timeout=3.0
         )
         return {"target": key, "status": "reachable"}
     except Exception:
         return {"target": key, "status": "unreachable"}
+
 
 @app.get(
     "/api/health",
@@ -479,9 +519,9 @@ async def _check_target(key: str, client: BffClient) -> Dict[str, str]:
     response_description="Health status information",
     responses={
         200: {"description": "Service is healthy"},
-        500: {"description": "Health check failed"}
+        500: {"description": "Health check failed"},
     },
-    tags=["Health"]
+    tags=["Health"],
 )
 async def health_check():
     try:
@@ -495,15 +535,17 @@ async def health_check():
             "ok": True,
             "bff": bff_status,
             "targets": targets,
-            "count": len(targets)
+            "count": len(targets),
         }
 
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
 
 
-def _fetch_endpoint_properties(endpoint: Dict) -> Dict:
+def _fetch_endpoint_properties(endpoint: dict) -> dict:
     """Fetch endpoint properties from server/client properties APIs when available.
 
     Args:
@@ -512,14 +554,14 @@ def _fetch_endpoint_properties(endpoint: Dict) -> Dict:
     Returns:
         Dictionary with properties information or error.
     """
-    host = endpoint.get('host')
-    port = endpoint.get('port')
-    endpoint_type = str(endpoint.get('type', '')).upper()
+    host = endpoint.get("host")
+    port = endpoint.get("port")
+    str(endpoint.get("type", "")).upper()
 
     if not host or not port:
-        return {'available': False, 'error': 'missing host or port'}
+        return {"available": False, "error": "missing host or port"}
 
-    paths = ['/api/properties', '/api/properties']
+    paths = ["/api/properties", "/api/properties"]
 
     last_error = None
     for path in paths:
@@ -532,78 +574,68 @@ def _fetch_endpoint_properties(endpoint: Dict) -> Dict:
 
             payload = response.json()
             if isinstance(payload, dict):
-                if 'properties' in payload:
+                if "properties" in payload:
                     return {
-                        'available': True,
-                        'source': path,
-                        'properties': payload.get('properties')
+                        "available": True,
+                        "source": path,
+                        "properties": payload.get("properties"),
                     }
-                return {
-                    'available': True,
-                    'source': path,
-                    'properties': payload
-                }
+                return {"available": True, "source": path, "properties": payload}
 
-            return {
-                'available': True,
-                'source': path,
-                'properties': payload
-            }
+            return {"available": True, "source": path, "properties": payload}
         except Exception as e:
             last_error = str(e)
 
     return {
-        'available': False,
-        'error': last_error or 'properties endpoint not reachable'
+        "available": False,
+        "error": last_error or "properties endpoint not reachable",
     }
 
 
-
 # -------------------- Endpoints Management --------------------
+
 
 @app.get(
     "/api/endpoints",
     summary="Get All Endpoints",
     description="Get all configured endpoints (including cached auto-discovered).",
     response_description="List of all endpoints with their properties",
-    responses={
-        200: {"description": "List of endpoints returned successfully"}
-    },
-    tags=["Endpoints"]
+    responses={200: {"description": "List of endpoints returned successfully"}},
+    tags=["Endpoints"],
 )
 async def get_endpoints():
     """Retrieve all configured endpoints.
-    
+
     This endpoint returns:
     - Manual connections from the connection manager
     - Properties information for each endpoint when available
-    
+
     Returns:
         JSON with endpoints list and count
     """
     endpoints = list(conn_manager.connections)
     properties = await asyncio.gather(
-        *(asyncio.to_thread(_fetch_endpoint_properties, endpoint) for endpoint in endpoints)
+        *(
+            asyncio.to_thread(_fetch_endpoint_properties, endpoint)
+            for endpoint in endpoints
+        )
     )
     for endpoint, props in zip(endpoints, properties):
-        endpoint['properties_info'] = props
+        endpoint["properties_info"] = props
 
-    return {
-        'endpoints': endpoints,
-        'count': len(endpoints)
-    }
+    return {"endpoints": endpoints, "count": len(endpoints)}
+
 
 # -------------------- Connections Management --------------------
+
 
 @app.get(
     "/api/connections",
     summary="Get All Connections",
     description="Get all configured connections to remote endpoints.",
     response_description="List of all connections",
-    responses={
-        200: {"description": "Connections retrieved successfully"}
-    },
-    tags=["Connections"]
+    responses={200: {"description": "Connections retrieved successfully"}},
+    tags=["Connections"],
 )
 async def get_connections():
     """Retrieve all configured connections.
@@ -614,14 +646,14 @@ async def get_connections():
     # Ensure all connections have a status field
     connections_with_status = []
     for conn in conn_manager.connections:
-        if 'status' not in conn:
+        if "status" not in conn:
             # Set default status based on type
-            conn['status'] = 'disconnected'
+            conn["status"] = "disconnected"
         connections_with_status.append(conn)
 
     return {
         "connections": connections_with_status,
-        "count": len(connections_with_status)
+        "count": len(connections_with_status),
     }
 
 
@@ -632,9 +664,9 @@ async def get_connections():
     response_description="apply result",
     responses={
         201: {"description": "Connection with TLS config created successfully"},
-        400: {"description": "Missing required fields"}
+        400: {"description": "Missing required fields"},
     },
-    tags=["TLS"]
+    tags=["TLS"],
 )
 async def create_tls_connection(request: TLSConnectionCreateConfigRequest):
     """Create a new connection to a remote RTI endpoint.
@@ -654,44 +686,41 @@ async def create_tls_connection(request: TLSConnectionCreateConfigRequest):
         if not request.server_key or not request.server_cert:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail='Missing required fields: server_key and server_cert for passive mode'
+                detail="Missing required fields: server_key and server_cert for passive mode",
             )
     elif ws_mode == "active" or ws_mode == "Active":
         if not request.server_ca:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail='Missing required field: server_ca for active mode'
+                detail="Missing required field: server_ca for active mode",
             )
 
     connection = conn_manager.get_connection(request.connection_name)
 
     if connection:
-        if 'TLS' not in connection:
-            connection['TLS'] = {}
-        connection['TLS']['enable_tls'] = request.enable_tls
-        connection['TLS']['tls_version'] = request.tls_version
-        
+        if "TLS" not in connection:
+            connection["TLS"] = {}
+        connection["TLS"]["enable_tls"] = request.enable_tls
+        connection["TLS"]["tls_version"] = request.tls_version
+
         # Store certificates based on mode
         if ws_mode == "passive" or ws_mode == "Passive":
-            connection['TLS']['server_key'] = request.server_key
-            connection['TLS']['server_cert'] = request.server_cert
-            connection['TLS']['server_ca'] = None
+            connection["TLS"]["server_key"] = request.server_key
+            connection["TLS"]["server_cert"] = request.server_cert
+            connection["TLS"]["server_ca"] = None
         elif ws_mode == "active" or ws_mode == "Active":
-            connection['TLS']['server_key'] = None
-            connection['TLS']['server_cert'] = None
-            connection['TLS']['server_ca'] = request.server_ca
-        
+            connection["TLS"]["server_key"] = None
+            connection["TLS"]["server_cert"] = None
+            connection["TLS"]["server_ca"] = request.server_ca
+
         conn_manager.save_connections()
 
         return {
             "ok": True,
-            "message": f"TLS config saved for {request.connection_name}"
+            "message": f"TLS config saved for {request.connection_name}",
         }
 
-    return {
-        "ok": False,
-        "message": "Connection not found"
-    }
+    return {"ok": False, "message": "Connection not found"}
 
 
 @app.get(
@@ -701,9 +730,9 @@ async def create_tls_connection(request: TLSConnectionCreateConfigRequest):
     response_description="TLS configuration",
     responses={
         200: {"description": "TLS config returned successfully"},
-        404: {"description": "Connection not found"}
+        404: {"description": "Connection not found"},
     },
-    tags=["TLS"]
+    tags=["TLS"],
 )
 async def get_tls_config(connection_name: str):
     """Get TLS configuration for a connection.
@@ -721,22 +750,19 @@ async def get_tls_config(connection_name: str):
     connection = conn_manager.get_connection(connection_name)
 
     if connection:
-        tls_config = connection.get('TLS', {})
+        tls_config = connection.get("TLS", {})
         return {
             "ok": True,
             "connection_name": connection_name,
-            "enable_tls": tls_config.get('enable_tls', False),
-            "tls_version": tls_config.get('tls_version'),
-            "server_key": tls_config.get('server_key'),
-            "server_cert": tls_config.get('server_cert'),
-            "server_ca": tls_config.get('server_ca'),
-            "ws_mode": connection.get('ws_mode')
+            "enable_tls": tls_config.get("enable_tls", False),
+            "tls_version": tls_config.get("tls_version"),
+            "server_key": tls_config.get("server_key"),
+            "server_cert": tls_config.get("server_cert"),
+            "server_ca": tls_config.get("server_ca"),
+            "ws_mode": connection.get("ws_mode"),
         }
 
-    return {
-        "ok": False,
-        "message": f"Connection '{connection_name}' not found"
-    }
+    return {"ok": False, "message": f"Connection '{connection_name}' not found"}
 
 
 @app.post(
@@ -747,9 +773,9 @@ async def get_tls_config(connection_name: str):
     responses={
         200: {"description": "OAuth config updated successfully"},
         400: {"description": "Missing required fields"},
-        404: {"description": "Connection not found"}
+        404: {"description": "Connection not found"},
     },
-    tags=["OAuth"]
+    tags=["OAuth"],
 )
 async def create_oauth_connection(request: OAUTHConnectionCreateConfigRequest):
     """Update OAuth configuration for a connection.
@@ -767,54 +793,55 @@ async def create_oauth_connection(request: OAUTHConnectionCreateConfigRequest):
     connection = conn_manager.get_connection(request.connection_name)
 
     if connection:
-        if 'OAuth' not in connection:
-            connection['OAuth'] = {}
-        
-        connection['OAuth']['enable_oauth'] = request.enable_oauth
-        
+        if "OAuth" not in connection:
+            connection["OAuth"] = {}
+
+        connection["OAuth"]["enable_oauth"] = request.enable_oauth
+
         # Store OAuth fields based on mode
         if request.ws_mode == "passive" or request.ws_mode == "Passive":
             # Server mode - store server OAuth config
             if request.certificate_endpoint_url:
-                connection['OAuth']['certificate_endpoint'] = request.certificate_endpoint_url
+                connection["OAuth"]["certificate_endpoint"] = (
+                    request.certificate_endpoint_url
+                )
             if request.token_issuer_url:
-                connection['OAuth']['token_issuer'] = request.token_issuer_url
+                connection["OAuth"]["token_issuer"] = request.token_issuer_url
             if request.ca_certificate:
-                connection['OAuth']['auth_server_ca'] = request.ca_certificate
+                connection["OAuth"]["auth_server_ca"] = request.ca_certificate
             # Clear client-specific fields for server mode
-            connection['OAuth'].pop('token_endpoint', None)
-            connection['OAuth'].pop('client_id', None)
-            connection['OAuth'].pop('client_secret', None)
-            connection['OAuth'].pop('client_ca_cert', None)
+            connection["OAuth"].pop("token_endpoint", None)
+            connection["OAuth"].pop("client_id", None)
+            connection["OAuth"].pop("client_secret", None)
+            connection["OAuth"].pop("client_ca_cert", None)
         else:
             # Client mode - store client OAuth config
             if request.token_endpoint_url:
-                connection['OAuth']['token_endpoint'] = request.token_endpoint_url
+                connection["OAuth"]["token_endpoint"] = request.token_endpoint_url
             if request.client_id:
-                connection['OAuth']['client_id'] = request.client_id
+                connection["OAuth"]["client_id"] = request.client_id
             if request.client_secret:
-                connection['OAuth']['client_secret'] = request.client_secret
+                connection["OAuth"]["client_secret"] = request.client_secret
             if request.ca_certificate:
-                connection['OAuth']['auth_server_ca'] = request.ca_certificate
+                connection["OAuth"]["auth_server_ca"] = request.ca_certificate
             if request.client_ca_cert:
-                connection['OAuth']['client_ca_cert'] = request.client_ca_cert
+                connection["OAuth"]["client_ca_cert"] = request.client_ca_cert
             if request.enable_token_refresh is not None:
-                connection['OAuth']['enable_token_refresh'] = request.enable_token_refresh
+                connection["OAuth"]["enable_token_refresh"] = (
+                    request.enable_token_refresh
+                )
             # Clear server-specific fields for client mode
-            connection['OAuth'].pop('certificate_endpoint', None)
-            connection['OAuth'].pop('token_issuer', None)
+            connection["OAuth"].pop("certificate_endpoint", None)
+            connection["OAuth"].pop("token_issuer", None)
 
         conn_manager.save_connections()
 
         return {
             "ok": True,
-            "message": f"OAuth config saved for {request.connection_name}"
+            "message": f"OAuth config saved for {request.connection_name}",
         }
 
-    return {
-        "ok": False,
-        "message": "Connection not found"
-    }
+    return {"ok": False, "message": "Connection not found"}
 
 
 @app.get(
@@ -824,9 +851,9 @@ async def create_oauth_connection(request: OAUTHConnectionCreateConfigRequest):
     response_description="OAuth status",
     responses={
         200: {"description": "OAuth status returned successfully"},
-        404: {"description": "Connection not found"}
+        404: {"description": "Connection not found"},
     },
-    tags=["OAuth"]
+    tags=["OAuth"],
 )
 async def get_oauth_status(connection_name: str):
     """Get OAuth enable/disable status for a connection.
@@ -843,17 +870,14 @@ async def get_oauth_status(connection_name: str):
     connection = conn_manager.get_connection(connection_name)
 
     if connection:
-        oauth_status = connection.get('OAuth', {}).get('enable_oauth', False)
+        oauth_status = connection.get("OAuth", {}).get("enable_oauth", False)
         return {
             "ok": True,
             "connection_name": connection_name,
-            "enable_oauth": oauth_status
+            "enable_oauth": oauth_status,
         }
 
-    return {
-        "ok": False,
-        "message": f"Connection '{connection_name}' not found"
-    }
+    return {"ok": False, "message": f"Connection '{connection_name}' not found"}
 
 
 @app.get(
@@ -863,9 +887,9 @@ async def get_oauth_status(connection_name: str):
     response_description="OAuth configuration",
     responses={
         200: {"description": "OAuth config returned successfully"},
-        404: {"description": "Connection not found"}
+        404: {"description": "Connection not found"},
     },
-    tags=["OAuth"]
+    tags=["OAuth"],
 )
 async def get_oauth_config(connection_name: str):
     """Get full OAuth configuration for a connection.
@@ -883,27 +907,24 @@ async def get_oauth_config(connection_name: str):
     connection = conn_manager.get_connection(connection_name)
 
     if connection:
-        oauth_config = connection.get('OAuth', {})
+        oauth_config = connection.get("OAuth", {})
         return {
             "ok": True,
             "connection_name": connection_name,
-            "certificate_endpoint": oauth_config.get('certificate_endpoint'),
-            "token_issuer_url": oauth_config.get('token_issuer'),
-            "token_endpoint": oauth_config.get('token_endpoint'),
-            "client_id": oauth_config.get('client_id'),
-            "client_secret": oauth_config.get('client_secret'),
-            "auth_server_ca": oauth_config.get('auth_server_ca'),
-            "ca_certificate": oauth_config.get('ca_certificate'),
-            "realm": oauth_config.get('realm'),
-            "idp_server": oauth_config.get('idp_server'),
-            "enable_oauth": oauth_config.get('enable_oauth', False),
-            "enable_token_refresh": oauth_config.get('enable_token_refresh', False)
+            "certificate_endpoint": oauth_config.get("certificate_endpoint"),
+            "token_issuer_url": oauth_config.get("token_issuer"),
+            "token_endpoint": oauth_config.get("token_endpoint"),
+            "client_id": oauth_config.get("client_id"),
+            "client_secret": oauth_config.get("client_secret"),
+            "auth_server_ca": oauth_config.get("auth_server_ca"),
+            "ca_certificate": oauth_config.get("ca_certificate"),
+            "realm": oauth_config.get("realm"),
+            "idp_server": oauth_config.get("idp_server"),
+            "enable_oauth": oauth_config.get("enable_oauth", False),
+            "enable_token_refresh": oauth_config.get("enable_token_refresh", False),
         }
 
-    return {
-        "ok": False,
-        "message": f"Connection '{connection_name}' not found"
-    }
+    return {"ok": False, "message": f"Connection '{connection_name}' not found"}
 
 
 @app.post(
@@ -913,41 +934,41 @@ async def get_oauth_config(connection_name: str):
     response_description="Created connection details",
     responses={
         201: {"description": "Connection created successfully"},
-        400: {"description": "Missing required fields"}
+        400: {"description": "Missing required fields"},
     },
-    tags=["Connections"]
+    tags=["Connections"],
 )
 async def create_connection(request: ConnectionCreateRequest):
     """Create a new connection to a remote RTI endpoint.
-    
+
     Request Body:
         ConnectionCreateRequest with name, host, port, type
-    
+
     Returns:
         JSON with the created connection details.
-        
+
     Raises:
         HTTPException 400: If required fields are missing.
     """
     if not request.name or not request.type:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail='Missing required fields: name, type'
+            detail="Missing required fields: name, type",
         )
-    
+
     # For IDP-Server, host and port are not required but endpoint is
-    if request.type == 'IDP-Server':
+    if request.type == "IDP-Server":
         if not request.endpoint:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail='Missing required field: endpoint'
+                detail="Missing required field: endpoint",
             )
     else:
         # For other types, host and port are required
         if not request.host or not request.port:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail='Missing required fields: host, port'
+                detail="Missing required fields: host, port",
             )
     connection = conn_manager.add_connection(
         name=request.name,
@@ -967,7 +988,7 @@ async def create_connection(request: ConnectionCreateRequest):
         enable_token_refresh=request.enable_token_refresh,
         idp_server=request.idp_server,
         auto_discovered=request.auto_discovered,
-        cp=request.cp
+        cp=request.cp,
     )
     conn_manager.save_connections()
     # Immediately probe the connection so its status is fresh right away instead
@@ -984,26 +1005,25 @@ async def create_connection(request: ConnectionCreateRequest):
     response_description="Deletion confirmation",
     responses={
         200: {"description": "Connection deleted successfully"},
-        404: {"description": "Connection not found"}
+        404: {"description": "Connection not found"},
     },
-    tags=["Connections"]
+    tags=["Connections"],
 )
 async def delete_connection(conn_name: str):
     """Delete a connection by its ID.
-    
+
     Path Parameters:
         conn_id: The ID of the connection to delete
-    
+
     Returns:
         JSON with deletion status.
     """
     success = conn_manager.delete_connection(conn_name)
     if not success:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail='Connection not found'
+            status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found"
         )
-    return {'status': 'deleted'}
+    return {"status": "deleted"}
 
 
 @app.put(
@@ -1013,98 +1033,105 @@ async def delete_connection(conn_name: str):
     response_description="Updated connection details",
     responses={
         200: {"description": "Connection updated successfully"},
-        404: {"description": "Connection not found"}
+        404: {"description": "Connection not found"},
     },
-    tags=["Connections"]
+    tags=["Connections"],
 )
 async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
     """Update a connection by its ID.
-    
+
     Path Parameters:
         conn_id: The ID of the connection to update
-    
+
     Request Body:
         ConnectionUpdateRequest with fields to update
-    
+
     Returns:
         JSON with the updated connection details.
-        
+
     Raises:
         HTTPException 404: If connection is not found.
     """
     connection = conn_manager.get_connection(conn_name)
     if not connection:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail='Connection not found'
+            status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found"
         )
-    
+
     # Track old host:port for _bff_clients cleanup
-    old_host = connection.get('host')
-    old_port = connection.get('port')
+    old_host = connection.get("host")
+    old_port = connection.get("port")
     old_key = f"{old_host}:{old_port}" if old_host and old_port else None
-    
+
     # Update fields from request
     if request.name is not None:
-        connection['name'] = request.name
+        connection["name"] = request.name
     if request.host is not None:
-        connection['host'] = request.host
+        connection["host"] = request.host
     if request.port is not None:
-        connection['port'] = request.port
+        connection["port"] = request.port
     if request.ws_port is not None:
-        connection['ws_port'] = request.ws_port
+        connection["ws_port"] = request.ws_port
     if request.cp is not None:
-        connection['cp'] = request.cp
+        connection["cp"] = request.cp
     if request.type is not None:
-        connection['type'] = request.type
+        connection["type"] = request.type
     if request.acsi is not None:
-        connection['acsi'] = request.acsi
+        connection["acsi"] = request.acsi
     if request.ws_mode is not None:
-        connection['ws_mode'] = request.ws_mode
+        connection["ws_mode"] = request.ws_mode
     if request.endpoint is not None:
-        connection['endpoint'] = request.endpoint
+        connection["endpoint"] = request.endpoint
     if request.status is not None:
-        connection['status'] = request.status
-    
+        connection["status"] = request.status
+
     # Handle OAuth fields - nest them under OAuth object
     oauth_fields = {}
     if request.certificate_endpoint is not None:
-        oauth_fields['certificate_endpoint'] = request.certificate_endpoint
+        oauth_fields["certificate_endpoint"] = request.certificate_endpoint
     if request.token_issuer_url is not None:
-        oauth_fields['token_issuer'] = request.token_issuer_url
+        oauth_fields["token_issuer"] = request.token_issuer_url
     if request.auth_server_ca is not None:
-        oauth_fields['auth_server_ca'] = request.auth_server_ca
+        oauth_fields["auth_server_ca"] = request.auth_server_ca
     if request.realm is not None:
-        oauth_fields['realm'] = request.realm
+        oauth_fields["realm"] = request.realm
     if request.token_endpoint is not None:
-        oauth_fields['token_endpoint'] = request.token_endpoint
+        oauth_fields["token_endpoint"] = request.token_endpoint
     if request.client_id is not None:
-        oauth_fields['client_id'] = request.client_id
+        oauth_fields["client_id"] = request.client_id
     if request.client_secret is not None:
-        oauth_fields['client_secret'] = request.client_secret
+        oauth_fields["client_secret"] = request.client_secret
     if request.enable_token_refresh is not None:
-        oauth_fields['enable_token_refresh'] = request.enable_token_refresh
+        oauth_fields["enable_token_refresh"] = request.enable_token_refresh
     if request.idp_server is not None:
-        oauth_fields['idp_server'] = request.idp_server
-    
+        oauth_fields["idp_server"] = request.idp_server
+
     # If we have OAuth fields, create/update the OAuth object
     if oauth_fields:
-        if 'OAuth' not in connection:
-            connection['OAuth'] = {}
-        connection['OAuth'].update(oauth_fields)
-    
+        if "OAuth" not in connection:
+            connection["OAuth"] = {}
+        connection["OAuth"].update(oauth_fields)
+
     # Clean up any OAuth fields that were previously at top level
-    top_level_oauth_fields = ['certificate_endpoint', 'auth_server_ca', 'realm', 
-                               'token_endpoint', 'client_id', 'client_secret', 'enable_token_refresh', 'idp_server']
+    top_level_oauth_fields = [
+        "certificate_endpoint",
+        "auth_server_ca",
+        "realm",
+        "token_endpoint",
+        "client_id",
+        "client_secret",
+        "enable_token_refresh",
+        "idp_server",
+    ]
     for field in top_level_oauth_fields:
         if field in connection:
             del connection[field]
-    
+
     # Update _bff_clients if host or port changed
-    new_host = connection.get('host')
-    new_port = connection.get('port')
+    new_host = connection.get("host")
+    new_port = connection.get("port")
     new_key = f"{new_host}:{new_port}" if new_host and new_port else None
-    
+
     if old_key and new_key and old_key != new_key:
         # Remove old entry
         if old_key in _bff_clients:
@@ -1112,13 +1139,14 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         # Add new entry
         if new_key not in _bff_clients:
             _bff_clients[new_key] = BffClient(f"http://{new_host}:{new_port}")
-    
+
     conn_manager.save_connections()
-    
+
     return connection
 
 
 # -------------------- Dynamic API Execution --------------------
+
 
 @app.post(
     "/api/execute",
@@ -1129,21 +1157,21 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         200: {"description": "API call executed successfully"},
         400: {"description": "Missing required parameters"},
         404: {"description": "Unknown target"},
-        500: {"description": "API call failed"}
+        500: {"description": "API call failed"},
     },
-    tags=["Execution"]
+    tags=["Execution"],
 )
 async def execute_dynamic_api(request: ExecuteRequest):
     """Execute a dynamic API call against a registered BFF target.
-    
+
     This endpoint allows the frontend to dynamically call any API on a registered backend.
-    
+
     Request Body:
         ExecuteRequest with target, path, method (default GET), and optional body
-    
+
     Returns:
         JSON with execution result including target, method, path, and result.
-        
+
     Raises:
         HTTPException 400: If target or path is missing.
         HTTPException 404: If target is not registered.
@@ -1157,7 +1185,7 @@ async def execute_dynamic_api(request: ExecuteRequest):
     if not target or not path:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="target and path are required"
+            detail="target and path are required",
         )
 
     # Special handling for OAuth reconfiguration
@@ -1170,35 +1198,40 @@ async def execute_dynamic_api(request: ExecuteRequest):
             if connection:
                 # Get OAuth config from connection
                 oauth_config = connection.get("OAuth", {})
-                
+
                 # Extract cp from connection
                 cp = connection.get("cp") or body.get("cp", "cp1")
-                
+
                 # Enrich the request body with OAuth fields from the connection
                 # Only add fields that exist in the OAuth config and are not already in the body
                 enriched_body = dict(body)
-                
+
                 # Add cp if not already present
                 if "cp" not in enriched_body:
                     enriched_body["cp"] = cp
-                
+
                 # Add OAuth fields from connection if not already in body
                 # Map connection field names to request field names
                 oauth_fields = {
-                    "token_endpoint_url": oauth_config.get("token_endpoint") or oauth_config.get("token_issuer"),
-                    "certificate_endpoint_url": oauth_config.get("certificate_endpoint"),
+                    "token_endpoint_url": oauth_config.get("token_endpoint")
+                    or oauth_config.get("token_issuer"),
+                    "certificate_endpoint_url": oauth_config.get(
+                        "certificate_endpoint"
+                    ),
                     "token_issuer_url": oauth_config.get("token_issuer"),
                     "client_id": oauth_config.get("client_id"),
                     "client_secret": oauth_config.get("client_secret"),
                     "ca_certificate": oauth_config.get("auth_server_ca"),
-                    "enable_token_refresh": oauth_config.get("enable_token_refresh", False),
+                    "enable_token_refresh": oauth_config.get(
+                        "enable_token_refresh", False
+                    ),
                 }
-                
+
                 for field, value in oauth_fields.items():
                     # Only add if value exists and not already in body
                     if value is not None and field not in enriched_body:
                         enriched_body[field] = value
-                
+
                 body = enriched_body
 
     try:
@@ -1208,43 +1241,37 @@ async def execute_dynamic_api(request: ExecuteRequest):
         if not client:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Unknown target: {target}"
+                detail=f"Unknown target: {target}",
             )
 
         # Call API dynamically
-        result = client.request(
-            method=method,
-            path=path,
-            json=body
-        )
+        result = client.request(method=method, path=path, json=body)
 
         return {
             "ok": True,
             "target": target,
             "method": method,
             "path": path,
-            "result": result
+            "result": result,
         }
 
     except Exception as e:
         logger.error(f"Dynamic API call failed: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
 
 
 # -------------------- Reports --------------------
+
 
 @app.get(
     "/api/reports",
     summary="Get Reports",
     description="Get available reports.",
     response_description="List of available reports",
-    responses={
-        200: {"description": "Reports list returned successfully"}
-    },
-    tags=["Reports"]
+    responses={200: {"description": "Reports list returned successfully"}},
+    tags=["Reports"],
 )
 async def get_reports():
     """Get a list of available reports.
@@ -1254,26 +1281,26 @@ async def get_reports():
     """
     mock_reports = [
         {
-            'id': 1,
-            'name': 'Connection Status Report',
-            'description': 'Current status of all connections',
-            'timestamp': datetime.now().isoformat()
+            "id": 1,
+            "name": "Connection Status Report",
+            "description": "Current status of all connections",
+            "timestamp": datetime.now().isoformat(),
         },
         {
-            'id': 2,
-            'name': 'Data Access Log',
-            'description': 'Log of all data read/write operations',
-            'timestamp': datetime.now().isoformat()
+            "id": 2,
+            "name": "Data Access Log",
+            "description": "Log of all data read/write operations",
+            "timestamp": datetime.now().isoformat(),
         },
         {
-            'id': 3,
-            'name': 'System Performance',
-            'description': 'System metrics and performance data',
-            'timestamp': datetime.now().isoformat()
-        }
+            "id": 3,
+            "name": "System Performance",
+            "description": "System metrics and performance data",
+            "timestamp": datetime.now().isoformat(),
+        },
     ]
 
-    return {'reports': mock_reports}
+    return {"reports": mock_reports}
 
 
 @app.post(
@@ -1281,10 +1308,8 @@ async def get_reports():
     summary="Export Reports",
     description="Export reports data.",
     response_description="Exported reports data",
-    responses={
-        200: {"description": "Reports exported successfully"}
-    },
-    tags=["Reports"]
+    responses={200: {"description": "Reports exported successfully"}},
+    tags=["Reports"],
 )
 async def export_reports():
     """Export reports data including connections and summary.
@@ -1293,54 +1318,50 @@ async def export_reports():
         JSON with exported data including connections and reports.
     """
     export_data = {
-        'exported_at': datetime.now().isoformat(),
-        'connections': conn_manager.connections,
-        'reports': [
-            {
-                'name': 'Export Summary',
-                'timestamp': datetime.now().isoformat()
-            }
-        ]
+        "exported_at": datetime.now().isoformat(),
+        "connections": conn_manager.connections,
+        "reports": [
+            {"name": "Export Summary", "timestamp": datetime.now().isoformat()}
+        ],
     }
 
-    return {'data': export_data, 'status': 'success'}
+    return {"data": export_data, "status": "success"}
 
 
 # -------------------- Statistics --------------------
+
 
 @app.get(
     "/api/stats",
     summary="Get Statistics",
     description="Get system statistics.",
     response_description="System statistics",
-    responses={
-        200: {"description": "Statistics returned successfully"}
-    },
-    tags=["Stats"]
+    responses={200: {"description": "Statistics returned successfully"}},
+    tags=["Stats"],
 )
 async def get_stats():
     """Get system statistics including report updates, BFF targets count, and uptime.
-    
+
     Returns:
         JSON with system statistics.
     """
     return {
-        'reportUpdates': 0,
-        'bffTargets': len(conn_manager.connections),
-        'totalRequests': 0,
-        'uptime': '00:00:00'
+        "reportUpdates": 0,
+        "bffTargets": len(conn_manager.connections),
+        "totalRequests": 0,
+        "uptime": "00:00:00",
     }
 
 
 # ==================== Error Handling ====================
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """Handle HTTP exceptions and return JSON responses."""
     logger.error(f"HTTP error: {exc.status_code} - {exc.detail}")
     return JSONResponse(
-        status_code=exc.status_code,
-        content={"ok": False, "error": exc.detail}
+        status_code=exc.status_code, content={"ok": False, "error": exc.detail}
     )
 
 
@@ -1350,9 +1371,7 @@ async def storage_exception_handler(request: Request, exc: OSError):
     of collapsing them into a generic 500 with no detail. Covers
     PermissionError, read-only filesystem, and no-space-left errors raised
     while persisting connection changes."""
-    logger.error(
-        "Storage error on %s %s: %s", request.method, request.url.path, exc
-    )
+    logger.error("Storage error on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"ok": False, "error": f"Failed to persist data to disk: {exc}"},
@@ -1365,14 +1384,15 @@ async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"Internal server error: {exc}")
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"ok": False, "error": "Internal server error"}
+        content={"ok": False, "error": "Internal server error"},
     )
 
 
 # ==================== Application Entry Point ====================
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
+
     import uvicorn
 
     _LOG_CHOICES = ["critical", "error", "warning", "info", "debug", "trace"]
@@ -1392,7 +1412,9 @@ if __name__ == '__main__':
     parser.add_argument(
         "--log-level",
         default=os.getenv("LOG_LEVEL", "info"),
-        help="Log level: %s (default: %%(default)s, env: LOG_LEVEL)" % ", ".join(_LOG_CHOICES),
+        help="Log level: {} (default: %(default)s, env: LOG_LEVEL)".format(
+            ", ".join(_LOG_CHOICES)
+        ),
     )
     args = parser.parse_args()
 
@@ -1408,11 +1430,19 @@ if __name__ == '__main__':
 
     logger.info(
         "Starting RTI Demo BFF Server (FastAPI) on %s:%d (log level %s)...",
-        args.host, args.port, logging.getLevelName(resolved),
+        args.host,
+        args.port,
+        logging.getLevelName(resolved),
     )
     # log_config=None: don't let uvicorn apply its own logging dictConfig
     # (separate formatter/handlers for the uvicorn/uvicorn.access/
     # uvicorn.error loggers) - let those records propagate to the root
     # logger instead, so they use the same timestamped format as the
     # app's own logger.info(...) calls above.
-    uvicorn.run(app, host=args.host, port=args.port, log_level=uvicorn_log_level, log_config=None)
+    uvicorn.run(
+        app,
+        host=args.host,
+        port=args.port,
+        log_level=uvicorn_log_level,
+        log_config=None,
+    )

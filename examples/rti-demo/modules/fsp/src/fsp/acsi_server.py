@@ -27,25 +27,26 @@ This module handles:
 from __future__ import annotations
 
 import asyncio
-from concurrent.futures import TimeoutError as FuturesTimeoutError
-import importlib
 import json
 import os
 import sys
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from datetime import datetime
 from pathlib import Path
-from random import randint
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from ws61850.endpoint import ActiveEndpoint
 from ws61850.iec61850.data_model.ied_model import DataAttribute, IedModel
+from ws61850.iec61850.server.control_handling import (
+    ControlHandlerResult,
+    ControlServiceStatusKind,
+)
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
-from ws61850.iec61850.server.control_handling import ControlHandlerResult, ControlServiceStatusKind
 from ws61850.iec61850.server.service_error import ServiceStatusKind
-
 
 
 class ACSIServerRuntime:
@@ -54,40 +55,44 @@ class ACSIServerRuntime:
     def __init__(self):
         self.endpoint = None
         self.server = None
-        self.status: str = "stopped"  # stopped|starting|listening|stopping|error|reloading
+        self.status: str = (
+            "stopped"  # stopped|starting|listening|stopping|error|reloading
+        )
         self.host: str = "localhost"
         self.port: int = 8765
-        self.loop: Optional[asyncio.AbstractEventLoop] = None
-        self.thread: Optional[threading.Thread] = None
-        self.tasks: Dict[str, asyncio.Task] = {}
-        self.error: Optional[str] = None
+        self.loop: asyncio.AbstractEventLoop | None = None
+        self.thread: threading.Thread | None = None
+        self.tasks: dict[str, asyncio.Task] = {}
+        self.error: str | None = None
         self.actions: deque = deque(maxlen=200)
         self.messages: deque = deque(maxlen=500)
         self.action_seq: int = 0
         self.message_seq: int = 0
-        self.ied_model: Optional[IedModel] = None
-        self.model_ied_name: Optional[str] = None
-        self.model_source: Optional[str] = None
-        self.cp: str =  os.getenv('CP', 'cp1')
-        self.last_status_log_signature: Optional[tuple] = None
+        self.ied_model: IedModel | None = None
+        self.model_ied_name: str | None = None
+        self.model_source: str | None = None
+        self.cp: str = os.getenv("CP", "cp1")
+        self.last_status_log_signature: tuple | None = None
         self.lock: threading.Lock = threading.Lock()
-        self.model_lock: threading.Lock = threading.Lock()  # Separate lock for model operations
-        
+        self.model_lock: threading.Lock = (
+            threading.Lock()
+        )  # Separate lock for model operations
+
         # Dynamic model reloading state
         self.model_version: int = 0  # Incremented on each model update
-        self.pending_model: Optional[IedModel] = None  # New model waiting to be applied
+        self.pending_model: IedModel | None = None  # New model waiting to be applied
         self.model_reload_in_progress: bool = False
-        self.old_server_cp: Optional[IEC61850Server] = None  # For cleanup after hot-swap
-        
+        self.old_server_cp: IEC61850Server | None = None  # For cleanup after hot-swap
+
         # Callbacks for message logging
-        self.recv_msg_callback: Optional[Callable] = None
-        self.send_msg_callback: Optional[Callable] = None
+        self.recv_msg_callback: Callable | None = None
+        self.send_msg_callback: Callable | None = None
 
         # Service-specific callbacks
-        self.write_callback: Optional[Callable] = None
-        self.connected_callback: Optional[Callable] = None
-        self.operate_received_callback: Optional[Callable] = None
-        self.operate_response_callback: Optional[Callable] = None
+        self.write_callback: Callable | None = None
+        self.connected_callback: Callable | None = None
+        self.operate_received_callback: Callable | None = None
+        self.operate_response_callback: Callable | None = None
 
 
 class ACSIServer:
@@ -104,7 +109,10 @@ class ACSIServer:
         self.runtime.endpoint.recv_msg_callback = self._on_recv_message
         self.runtime.endpoint.send_msg_callback = self._on_send_message
 
-        self._log_action(f"New ACSIServer instance: model_path={model_path}, id={id(self.runtime)}", "debug")
+        self._log_action(
+            f"New ACSIServer instance: model_path={model_path}, id={id(self.runtime)}",
+            "debug",
+        )
         # Prefer the model already in runtime (freshly loaded from SCL/model.py)
         # Only reload from file as fallback if runtime model is missing
         self.model_file = Path(model_path)
@@ -123,23 +131,22 @@ class ACSIServer:
                 "Create model.py in the fsp directory before starting the server."
             )
 
-
         if self.runtime.ied_model is None:
             try:
-                self._log_action("No model in runtime, loading from file...",
-                                 "debug")
+                self._log_action("No model in runtime, loading from file...", "debug")
                 self.runtime.ied_model = self.load_current_runtime_model()
             except FileNotFoundError:
                 # Precedes a raised RuntimeError below - a real failure, not
                 # routine tracing.
-                self._log_action("Model file not found",
-                                 "warn")
+                self._log_action("Model file not found", "warn")
                 raise RuntimeError("No model loaded. Create fsp/model.py first.")
         else:
-            self._log_action(f"Using model from runtime: "
+            self._log_action(
+                f"Using model from runtime: "
                 f"ied_model.name={self.runtime.ied_model.name!r} "
                 f"model_ied_name={self.runtime.model_ied_name!r}",
-                             "debug")
+                "debug",
+            )
 
         if self.runtime.ied_model is None:
             raise RuntimeError("No model loaded. Create fsp/model.py first.")
@@ -150,12 +157,12 @@ class ACSIServer:
         )
 
         def control_handler(obj_ref, ctlVal_value, parameter):
-            ctl_val = ctlVal_value['value']
+            ctl_val = ctlVal_value["value"]
 
             TYPE_MAP = {
                 "boolean": bool,
                 "int32": int,
-                "float32" : float,
+                "float32": float,
                 "string": str,
             }
             if ctlVal_value is not None:
@@ -163,11 +170,13 @@ class ACSIServer:
                     if isinstance(ctl_val[1], TYPE_MAP[ctl_val[0]]):
                         return ControlHandlerResult.OK, None
                     else:
-                        return ControlHandlerResult.FAILED, ControlServiceStatusKind.invalidPosition
+                        return (
+                            ControlHandlerResult.FAILED,
+                            ControlServiceStatusKind.invalidPosition,
+                        )
             else:
                 return None, ServiceStatusKind.instanceNotAvailable
             return None, None
-
 
         iec61850_instance = IEC61850Server(self.runtime.ied_model, self.runtime.cp)
         iec61850_instance.set_control_handler(control_handler, None)
@@ -182,21 +191,21 @@ class ACSIServer:
 
     def install_connected_callback(self, callback):
         """Install a callback to be invoked when associateResponse messages are received.
-        
+
         The callback receives: associateResponse data (dict)
         """
         self.runtime.connected_callback = callback
 
     def install_operate_received_callback(self, callback):
         """Install a callback to be invoked when operate request messages are received.
-        
+
         The callback receives: operate request data (dict)
         """
         self.runtime.operate_received_callback = callback
 
     def install_operate_response_callback(self, callback):
         """Install a callback to be invoked when operate response messages are sent.
-        
+
         The callback receives: operate response data (dict)
         """
         self.runtime.operate_response_callback = callback
@@ -208,7 +217,10 @@ class ACSIServer:
 
         # Use importlib.util to load without polluting sys.modules
         import importlib.util
-        spec = importlib.util.spec_from_file_location(self.model_file.stem, self.model_file)
+
+        spec = importlib.util.spec_from_file_location(
+            self.model_file.stem, self.model_file
+        )
         model_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(model_module)
 
@@ -216,22 +228,26 @@ class ACSIServer:
         if ied is None and hasattr(model_module, "build_ied_model"):
             ied = model_module.build_ied_model()
         if ied is None:
-            raise RuntimeError(f"{self.model_file.stem}.py does not define 'ied' or build_ied_model()")
+            raise RuntimeError(
+                f"{self.model_file.stem}.py does not define 'ied' or build_ied_model()"
+            )
         if not isinstance(ied, IedModel):
             raise RuntimeError(f"Model in {self.model_file.stem}.py is not an IedModel")
         return ied
 
-    def update_model_file(self, model_source: str, apply_dynamically: bool = True) -> IedModel:
+    def update_model_file(
+        self, model_source: str, apply_dynamically: bool = True
+    ) -> IedModel:
         """Update model.py and reload runtime model. Reverts on validation failure.
-        
+
         Args:
             model_source: Complete Python code for model.py
             apply_dynamically: If True and server is running, apply model hot-swap.
                             If False, only update the model file and runtime state.
-        
+
         Returns:
             IedModel: The newly loaded model
-        
+
         Raises:
             ValueError: If model_source is invalid
             Exception: If model validation fails
@@ -239,7 +255,11 @@ class ACSIServer:
         if not isinstance(model_source, str) or not model_source.strip():
             raise ValueError("modelPy must be a non-empty string")
 
-        previous_content = self.model_file.read_text(encoding="utf-8") if self.model_file.exists() else None
+        previous_content = (
+            self.model_file.read_text(encoding="utf-8")
+            if self.model_file.exists()
+            else None
+        )
         self.model_file.write_text(model_source, encoding="utf-8")
 
         try:
@@ -271,30 +291,32 @@ class ACSIServer:
 
     def _apply_model_hot_swap(self) -> bool:
         """Apply pending model to running server via hot-swap.
-        
+
         This method updates the existing IEC61850Server instance with the new model
         by calling update_ied_model(), preserving WebSocket connections.
-        
+
         Returns:
             bool: True if hot-swap was successful, False otherwise
         """
         with self.runtime.model_lock:
             if self.runtime.status != "listening":
-                self._log_action("Hot-swap aborted: server not in listening state", "warn")
+                self._log_action(
+                    "Hot-swap aborted: server not in listening state", "warn"
+                )
                 return False
-                
+
             if self.runtime.model_reload_in_progress:
                 self._log_action("Hot-swap aborted: reload already in progress", "warn")
                 return False
-                
+
             if self.runtime.pending_model is None:
                 self._log_action("Hot-swap aborted: no pending model", "warn")
                 return False
-                
+
             self.runtime.model_reload_in_progress = True
             pending_model = self.runtime.pending_model
             old_server = self.runtime.server
-            
+
             # Set reload status
             self._set_runtime_state(status="reloading")
 
@@ -303,14 +325,13 @@ class ACSIServer:
             loop = self.runtime.loop
             if loop is None or not loop.is_running():
                 raise RuntimeError("Event loop not available for hot-swap")
-                
+
             # Use run_coroutine_threadsafe to execute on the server's event loop
             future = asyncio.run_coroutine_threadsafe(
-                self._perform_hot_swap_async(pending_model, old_server),
-                loop
+                self._perform_hot_swap_async(pending_model, old_server), loop
             )
             result = future.result(timeout=30)
-            
+
             with self.runtime.model_lock:
                 self.runtime.model_reload_in_progress = False
                 if result:
@@ -318,14 +339,17 @@ class ACSIServer:
                     self._set_runtime_state(status="listening")
                     self._log_action(
                         "Model hot-swap completed successfully",
-                        detail={"ied": pending_model.name, "version": self.runtime.model_version}
+                        detail={
+                            "ied": pending_model.name,
+                            "version": self.runtime.model_version,
+                        },
                     )
                 else:
                     self._set_runtime_state(status="listening")
                     self._log_action("Model hot-swap completed with warnings", "warn")
-                
+
             return result
-            
+
         except Exception as exc:
             with self.runtime.model_lock:
                 self.runtime.model_reload_in_progress = False
@@ -336,7 +360,7 @@ class ACSIServer:
             return False
 
     def _log_action(
-        self, message: str, level: str = "info", detail: Optional[Dict[str, Any]] = None
+        self, message: str, level: str = "info", detail: dict[str, Any] | None = None
     ) -> None:
         """Log an action to the runtime actions deque."""
         if detail is None:
@@ -353,7 +377,7 @@ class ACSIServer:
                 }
             )
 
-    def _extract_message_meta(self, raw: str) -> Dict[str, str]:
+    def _extract_message_meta(self, raw: str) -> dict[str, str]:
         """Extract metadata from a message (service type, category)."""
         service_type = "unknown"
         category = "unknown"
@@ -402,25 +426,28 @@ class ACSIServer:
                 msg_dict = json.loads(message)
             except (json.JSONDecodeError, AttributeError):
                 msg_dict = {}
-        
+
         if isinstance(msg_dict, dict):
             # Check for associateResponse in sent messages
             service_data = msg_dict.get("associate", {}).get("service", {})
-            
+
             if isinstance(service_data, dict):
                 service_name = next(iter(service_data.keys())) if service_data else None
                 if service_name == "associateResponse":
                     associate_response = service_data.get("associateResponse", {})
                     if self.runtime.connected_callback is not None:
                         self.runtime.connected_callback(associate_response)
-            
+
             # Check for operate response in sent messages
             response_service_data = msg_dict.get("response", {}).get("service", {})
-            if isinstance(response_service_data, dict) and "operate" in response_service_data:
+            if (
+                isinstance(response_service_data, dict)
+                and "operate" in response_service_data
+            ):
                 operate_response = response_service_data.get("operate", {})
                 if self.runtime.operate_response_callback is not None:
                     self.runtime.operate_response_callback(operate_response)
-        
+
         self._log_message("send", message, timestamp)
 
     def _on_recv_message(self, msg, ts):
@@ -437,7 +464,7 @@ class ACSIServer:
                 msg_dict = json.loads(msg)
             except (json.JSONDecodeError, AttributeError):
                 msg_dict = {}
-        
+
         if isinstance(msg_dict, dict):
             # Check for operate request
             service_data = msg_dict.get("request", {}).get("service", {})
@@ -445,7 +472,7 @@ class ACSIServer:
                 operate_data = service_data.get("operate", {})
                 if self.runtime.operate_received_callback is not None:
                     self.runtime.operate_received_callback(operate_data)
-        
+
         self._log_message("recv", msg, ts)
 
     def _log_message(self, direction: str, message: Any, timestamp: Any) -> None:
@@ -476,17 +503,17 @@ class ACSIServer:
             )
 
     async def _perform_hot_swap_async(
-        self, new_model: IedModel, old_server: Optional[IEC61850Server]
+        self, new_model: IedModel, old_server: IEC61850Server | None
     ) -> bool:
         """Perform the actual hot-swap operation on the event loop.
-        
+
         This coroutine updates the existing IEC61850Server instance with the new model
         by calling update_ied_model(), preserving WebSocket connections.
-        
+
         Args:
             new_model: The new IedModel to use
             old_server: The current IEC61850Server instance to update
-            
+
         Returns:
             bool: True if swap was successful
         """
@@ -495,53 +522,56 @@ class ACSIServer:
             if endpoint is None:
                 self._log_action("Hot-swap failed: endpoint is None", "error")
                 return False
-            
+
             cp = self.runtime.cp or "cp1"
-            
+
             # Update the existing server in-place with new model
             if old_server is not None:
                 # Call the new update_ied_model method to refresh services
                 old_server.update_ied_model(new_model)
-                
+
                 # Cancel periodic reporting from old server (will be restarted below)
                 try:
                     for task_name, task in list(self.runtime.tasks.items()):
-                        if task_name.startswith(f"{cp}-periodic-report") and not task.done():
+                        if (
+                            task_name.startswith(f"{cp}-periodic-report")
+                            and not task.done()
+                        ):
                             task.cancel()
                             try:
                                 await task
                             except asyncio.CancelledError:
                                 pass
                 except Exception as cancel_exc:
-                    self._log_action(f"Warning: Failed to cancel old tasks: {cancel_exc}", "warn")
-                
+                    self._log_action(
+                        f"Warning: Failed to cancel old tasks: {cancel_exc}", "warn"
+                    )
+
                 # Update runtime state references (server instance stays the same)
                 # Use lock to ensure atomic update
                 with self.runtime.model_lock:
                     self.runtime.ied_model = new_model
                     self.runtime.model_ied_name = new_model.name
-                
+
                 # Restart periodic reporting with updated server
                 report_task = asyncio.create_task(
-                    old_server.periodic_report_start(), 
-                    name=f"{cp}-periodic-report"
+                    old_server.periodic_report_start(), name=f"{cp}-periodic-report"
                 )
                 self.runtime.tasks["report"] = report_task
-                
+
                 self._log_action(
                     "Server services updated with new model",
-                    detail={
-                        "server": str(old_server),
-                        "model": new_model.name
-                    }
+                    detail={"server": str(old_server), "model": new_model.name},
                 )
             else:
                 # No existing server, this shouldn't happen but handle it
-                self._log_action("Hot-swap failed: no existing server to update", "error")
+                self._log_action(
+                    "Hot-swap failed: no existing server to update", "error"
+                )
                 return False
-            
+
             return True
-            
+
         except Exception as exc:
             self._log_action(f"Hot-swap async execution failed: {exc}", "error")
             return False
@@ -613,9 +643,10 @@ class ACSIServer:
         cp = self.runtime.cp or "cp1"
 
         if (
-                self.runtime.server is not None
-                and self.runtime.ied_model is not None
-                and getattr(self.runtime.server, "ied_model", None) is not self.runtime.ied_model
+            self.runtime.server is not None
+            and self.runtime.ied_model is not None
+            and getattr(self.runtime.server, "ied_model", None)
+            is not self.runtime.ied_model
         ):
             self.runtime.server.update_ied_model(self.runtime.ied_model)
             self._log_action(
@@ -628,7 +659,7 @@ class ACSIServer:
         report_task = asyncio.create_task(
             self.runtime.server.periodic_report_start(), name=f"{cp}-periodic-report"
         )
-        tasks: Dict[str, asyncio.Task] = {"report": report_task}
+        tasks: dict[str, asyncio.Task] = {"report": report_task}
 
         ws_task = self.runtime.endpoint.run_in_background(host, port, cp)
         tasks["ws"] = ws_task
@@ -646,12 +677,16 @@ class ACSIServer:
 
         if self.runtime.status != "stopping":
             self._set_runtime_state(status="listening")
-            self._log_action("Server listening", detail={"host": host, "port": port, "cps": [cp]})
+            self._log_action(
+                "Server listening", detail={"host": host, "port": port, "cps": [cp]}
+            )
 
         try:
             results = await asyncio.gather(*tasks.values(), return_exceptions=True)
             for (name, task), result in zip(tasks.items(), results):
-                if isinstance(result, Exception) and not isinstance(result, asyncio.CancelledError):
+                if isinstance(result, Exception) and not isinstance(
+                    result, asyncio.CancelledError
+                ):
                     self._log_action(f"Task '{name}' failed: {result}", "error")
         except asyncio.CancelledError:
             pass
@@ -666,7 +701,9 @@ class ACSIServer:
         asyncio.set_event_loop(loop)
         self._set_runtime_state(loop=loop)
 
-        startup_task = loop.create_task(self._start_server_async(host, port), name="server-startup")
+        startup_task = loop.create_task(
+            self._start_server_async(host, port), name="server-startup"
+        )
 
         def _on_startup_done(task: asyncio.Task) -> None:
             try:
@@ -687,7 +724,9 @@ class ACSIServer:
             for task in pending:
                 task.cancel()
             if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
             loop.close()
             self._set_runtime_state(loop=None, thread=None)
 
@@ -704,10 +743,14 @@ class ACSIServer:
             self.runtime.port = port
             self.runtime.error = None
 
-        t = threading.Thread(target=self._event_loop_thread, args=(host, port), daemon=True)
+        t = threading.Thread(
+            target=self._event_loop_thread, args=(host, port), daemon=True
+        )
         self._set_runtime_state(thread=t)
         t.start()
-        self._log_action("Server startup initiated", detail={"host": host, "port": port})
+        self._log_action(
+            "Server startup initiated", detail={"host": host, "port": port}
+        )
 
     def stop_server(self) -> None:
         """Stop the server."""
@@ -783,21 +826,25 @@ class ACSIServer:
 
         return value
 
-    def read_value(self, obj_ref: str) -> Dict[str, Any]:
+    def read_value(self, obj_ref: str) -> dict[str, Any]:
         """Read a value from the server."""
         server = self.runtime.server
         if server is None:
             raise RuntimeError("Server is not running")
 
-        result = self.invoke_on_runtime_loop(server.get_data_value_and_type(obj_ref), timeout=10)
-        #result = server.read_value(obj_ref)
+        result = self.invoke_on_runtime_loop(
+            server.get_data_value_and_type(obj_ref), timeout=10
+        )
+        # result = server.read_value(obj_ref)
 
         if result is None:
             raise ValueError(f"instanceNotAvailable: {obj_ref}")
 
         return result
 
-    def write_value(self, obj_ref: str, value: Any, data_type: str = "unknown") -> Dict[str, Any]:
+    def write_value(
+        self, obj_ref: str, value: Any, data_type: str = "unknown"
+    ) -> dict[str, Any]:
         """Write a value to the server."""
         server = self.runtime.server
         if server is None:
@@ -816,7 +863,9 @@ class ACSIServer:
             resolved_data_type = item.type.name
 
         coerced_value = self.coerce_server_write_value(value, resolved_data_type)
-        self.invoke_on_runtime_loop(server.update_value(obj_ref, coerced_value), timeout=10)
+        self.invoke_on_runtime_loop(
+            server.update_value(obj_ref, coerced_value), timeout=10
+        )
         try:
             server.update_timestamp(item)
         except Exception:
@@ -829,7 +878,7 @@ class ACSIServer:
             "dataType": resolved_data_type,
         }
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current server status including model versioning information."""
         endpoint = self.runtime.endpoint
         connected = len(endpoint.websocket_info_list) if endpoint is not None else 0
@@ -850,19 +899,19 @@ class ACSIServer:
             "modelName": self.runtime.model_ied_name,
             "modelSource": self.runtime.model_source,
         }
-        
+
         # Add model reload progress if in reloading state
         if self.runtime.status == "reloading":
             status_info["reloadProgress"] = "swapping_server_instances"
-        
+
         return status_info
 
-    def get_actions(self) -> List[Dict[str, Any]]:
+    def get_actions(self) -> list[dict[str, Any]]:
         """Get logged actions."""
         with self.runtime.lock:
             return list(self.runtime.actions)
 
-    def get_messages(self) -> List[Dict[str, Any]]:
+    def get_messages(self) -> list[dict[str, Any]]:
         """Get logged messages."""
         with self.runtime.lock:
             return list(self.runtime.messages)

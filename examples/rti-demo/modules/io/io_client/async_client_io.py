@@ -26,19 +26,19 @@ Perfect for use in async FastAPI applications or any async context.
 Usage:
     import asyncio
     from async_client_io import AsyncIOClient
-    
+
     async def main():
         async with AsyncIOClient(base_url="http://localhost:8080") as client:
             # Configure a device
             await client.config_led(name="led1", gpio_pin=17)
-            
+
             # Turn device on
             await client.set_device("led1", state=True)
-            
+
             # Read state
             state = await client.get_led_state("led1")
             print(f"LED state: {state}")
-            
+
             # Configure potentiometer
             await client.config_potentiometer(
                 name="pot1",
@@ -46,11 +46,11 @@ Usage:
                 min_value=0,
                 max_value=100
             )
-            
+
             # Read potentiometer
             value = await client.read_potentiometer_scaled("pot1")
             print(f"Potentiometer value: {value}")
-    
+
     asyncio.run(main())
 """
 
@@ -60,18 +60,19 @@ import asyncio
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import httpx2 as httpx
-
 from mapping_manager import IOMappingManager
 
 logger = logging.getLogger(__name__)
+
 
 # Lazy import to avoid circular dependencies
 def _get_shared_mapping_manager() -> IOMappingManager:
     """Get the shared mapping manager instance from io_router."""
     from .io_router import get_mapping_manager
+
     return get_mapping_manager()
 
 
@@ -86,29 +87,42 @@ DEFAULT_RETRY_STATUS_CODES = [429, 500, 502, 503, 504]
 # ==================== EXCEPTION CLASSES ====================
 # Define exception classes locally (previously imported from client_io)
 
+
 class IOClientError(Exception):
     """Base exception for demo_IO client errors."""
+
     pass
+
 
 class ConnectionError(Exception):
     """Connection to demo_IO server failed."""
+
     pass
+
 
 class RequestTimeoutError(Exception):
     """Request to demo_IO server timed out."""
+
     pass
+
 
 class APIError(Exception):
     """API error from demo_IO server."""
+
     pass
+
 
 class DeviceNotFoundError(Exception):
     """Requested device not found in demo_IO."""
+
     pass
+
 
 class AuthenticationError(Exception):
     """Authentication failed for demo_IO."""
+
     pass
+
 
 __all__ = [
     "AsyncIOClient",
@@ -124,39 +138,39 @@ __all__ = [
 
 class AsyncIOClient:
     """Async HTTP client for the demo_IO IO Device Control API.
-    
+
     Uses httpx.AsyncClient for async HTTP requests, providing:
     - Full async/await support
     - Connection pooling
     - Automatic retry with exponential backoff
     - Context manager support
     - Same interface as sync DemoIOClient
-    
+
     Usage:
         from async_client_io import AsyncIOClient
-        
+
         async with AsyncIOClient(base_url="http://localhost:8080") as client:
             await client.set_device("led1", True)
             state = await client.get_led_state("led1")
     """
-    
+
     def __init__(
         self,
         base_url: str = "http://localhost:8080",
-        mapping_file: Optional[str] = None,
+        mapping_file: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
         backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
-        retry_status_codes: Optional[List[int]] = None,
-        api_key: Optional[str] = None,
+        retry_status_codes: list[int] | None = None,
+        api_key: str | None = None,
         # httpx specific options
         follow_redirects: bool = True,
-        limits: Optional[httpx.Limits] = None,
+        limits: httpx.Limits | None = None,
         # ACSI server URL for IEC61850 writes
-        acsi_base_url: Optional[str] = None
+        acsi_base_url: str | None = None,
     ):
         """Initialize the async demo_IO client.
-        
+
         Args:
             base_url: Base URL of the demo_IO service (without /api/io suffix)
             mapping_file: Optional path to io_mapping.json file
@@ -169,7 +183,7 @@ class AsyncIOClient:
             limits: httpx connection limits
             acsi_base_url: Base URL of ACSI server for IEC61850 writes (optional)
         """
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         self.io_base = f"{self.base_url}/api/io"
         self.timeout = timeout
         self.max_retries = max_retries
@@ -177,18 +191,22 @@ class AsyncIOClient:
         self.retry_status_codes = retry_status_codes or DEFAULT_RETRY_STATUS_CODES
         self.api_key = api_key
         self.follow_redirects = follow_redirects
-        self.limits = limits or httpx.Limits(max_connections=10, max_keepalive_connections=5)
-        
+        self.limits = limits or httpx.Limits(
+            max_connections=10, max_keepalive_connections=5
+        )
+
         # ACSI server configuration for IEC61850 writes
-        self._acsi_base_url = acsi_base_url or os.getenv("ACSI_BASE_URL", "http://localhost:5001")
-        
+        self._acsi_base_url = acsi_base_url or os.getenv(
+            "ACSI_BASE_URL", "http://localhost:5001"
+        )
+
         # Use shared mapping manager if available, otherwise create local instance
         try:
             self.mapping = _get_shared_mapping_manager()
         except (ImportError, AttributeError):
             # Fallback to local instance if io_router is not available
             self.mapping = IOMappingManager(mapping_file=mapping_file)
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
         self._is_closed = True
         # Tracks which running event loop self._client's pooled connections
         # belong to. This client instance is long-lived (cached/reused
@@ -202,7 +220,7 @@ class AsyncIOClient:
         # request after a loop switch look like a silent no-op instead of
         # a real failure. We detect the loop change in _get_client() and
         # recreate the client instead of reusing stale connections.
-        self._client_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
 
         logger.info(f"Initialized AsyncIOClient with base URL: {self.io_base}")
 
@@ -215,7 +233,11 @@ class AsyncIOClient:
         """
         current_loop = asyncio.get_running_loop()
 
-        if self._client is not None and not self._is_closed and self._client_loop is not current_loop:
+        if (
+            self._client is not None
+            and not self._is_closed
+            and self._client_loop is not current_loop
+        ):
             logger.info(
                 "Detected event loop change - recreating httpx.AsyncClient "
                 "to avoid reusing stale pooled connections from a dead loop"
@@ -234,7 +256,7 @@ class AsyncIOClient:
                 timeout=self.timeout,
                 follow_redirects=self.follow_redirects,
                 limits=self.limits,
-                headers=headers
+                headers=headers,
             )
             self._client_loop = current_loop
             self._is_closed = False
@@ -244,9 +266,9 @@ class AsyncIOClient:
         self,
         method: str,
         endpoint: str,
-        json: Optional[dict] = None,
-        params: Optional[dict] = None,
-        raise_on_error: bool = True
+        json: dict | None = None,
+        params: dict | None = None,
+        raise_on_error: bool = True,
     ) -> Any:
         """Make an async HTTP request to the demo_IO API.
 
@@ -285,7 +307,7 @@ class AsyncIOClient:
                     json=json,
                     params=params,
                     headers=headers,
-                    timeout=self.timeout
+                    timeout=self.timeout,
                 )
 
                 # Check for authentication failure
@@ -306,22 +328,29 @@ class AsyncIOClient:
                                     raise DeviceNotFoundError(match.group(1))
                         except:
                             pass
-                        raise APIError(f"Not found", response.status_code, endpoint)
+                        raise APIError("Not found", response.status_code, endpoint)
                     return None
 
                 # Retry on server errors
                 if response.status_code >= 400:
-                    if response.status_code in self.retry_status_codes and attempt < self.max_retries:
+                    if (
+                        response.status_code in self.retry_status_codes
+                        and attempt < self.max_retries
+                    ):
                         attempt += 1
                         delay = self.backoff_factor * (2 ** (attempt - 1))
-                        logger.warning(f"Request to {url} failed with {response.status_code}, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})")
+                        logger.warning(
+                            f"Request to {url} failed with {response.status_code}, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})"
+                        )
                         await asyncio.sleep(delay)
                         continue
                     else:
                         if raise_on_error:
                             try:
                                 error_data = response.json()
-                                error_msg = error_data.get("detail", "") or error_data.get("message", "")
+                                error_msg = error_data.get(
+                                    "detail", ""
+                                ) or error_data.get("message", "")
                             except:
                                 error_msg = response.text
                             raise APIError(error_msg, response.status_code, endpoint)
@@ -338,7 +367,9 @@ class AsyncIOClient:
                 if attempt < self.max_retries:
                     attempt += 1
                     delay = self.backoff_factor * (2 ** (attempt - 1))
-                    logger.warning(f"Request to {url} timed out, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})")
+                    logger.warning(
+                        f"Request to {url} timed out, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})"
+                    )
                     await asyncio.sleep(delay)
                     continue
                 else:
@@ -351,7 +382,9 @@ class AsyncIOClient:
                 if attempt < self.max_retries:
                     attempt += 1
                     delay = self.backoff_factor * (2 ** (attempt - 1))
-                    logger.warning(f"Connection to {url} failed, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})")
+                    logger.warning(
+                        f"Connection to {url} failed, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})"
+                    )
                     await asyncio.sleep(delay)
                     continue
                 else:
@@ -371,7 +404,7 @@ class AsyncIOClient:
 
     # ==================== HEALTH AND STATUS ====================
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Check the health of the demo_IO service."""
         return await self._request("GET", "/health")
 
@@ -390,22 +423,27 @@ class AsyncIOClient:
             logger.debug(f"Health check failed: {e}")
             return False
 
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Get the current IO controller status."""
         return await self._request("GET", "/status")
 
-    async def get_api_info(self) -> Dict[str, Any]:
+    async def get_api_info(self) -> dict[str, Any]:
         """Get API information and available endpoints."""
         return await self._request("GET", "/")
 
-    async def get_auth_status(self) -> Dict[str, Any]:
+    async def get_auth_status(self) -> dict[str, Any]:
         """Check if API key authentication is enabled and configured."""
         return await self._request("GET", "/auth/status")
 
     # ==================== LED METHODS (Convenience wrappers for device API) ====================
 
-    async def config_led(self, name: str, gpio_pin: int, description: str = "",
-                        initial_state: bool = False) -> Dict[str, Any]:
+    async def config_led(
+        self,
+        name: str,
+        gpio_pin: int,
+        description: str = "",
+        initial_state: bool = False,
+    ) -> dict[str, Any]:
         """Configure an LED on the demo_IO service.
 
         This is a convenience method that uses the device API internally.
@@ -415,11 +453,11 @@ class AsyncIOClient:
             "device_type": "led",
             "identifier": gpio_pin,
             "description": description,
-            "initial_state": initial_state
+            "initial_state": initial_state,
         }
         return await self._request("POST", "/devices/config", json=data)
 
-    async def list_leds(self) -> Dict[str, Any]:
+    async def list_leds(self) -> dict[str, Any]:
         """List all configured LEDs and their states.
 
         This is a convenience method that filters devices by LED type.
@@ -433,7 +471,7 @@ class AsyncIOClient:
                     leds[name] = detail.get("value", False)
         return leds
 
-    async def get_led_state(self, name: str) -> Dict[str, Any]:
+    async def get_led_state(self, name: str) -> dict[str, Any]:
         """Get the current state of a specific LED.
 
         This is a convenience method that uses the device API internally.
@@ -443,7 +481,7 @@ class AsyncIOClient:
             return {"name": name, "state": bool(result["value"])}
         return {"name": name, "state": False}
 
-    async def set_device(self, name: str, state: bool) -> Dict[str, Any]:
+    async def set_device(self, name: str, state: bool) -> dict[str, Any]:
         """Set a specific device to ON or OFF state.
 
         This is a convenience method that uses the device API internally.
@@ -451,14 +489,14 @@ class AsyncIOClient:
         data = {"state": state}
         return await self._request("POST", f"/devices/{name}/set", json=data)
 
-    async def toggle_led(self, name: str) -> Dict[str, Any]:
+    async def toggle_led(self, name: str) -> dict[str, Any]:
         """Toggle the state of a specific LED.
 
         This is a convenience method that uses the device API internally.
         """
         return await self._request("POST", f"/devices/{name}/toggle", json={})
 
-    async def set_all_leds(self, state: bool) -> Dict[str, Any]:
+    async def set_all_leds(self, state: bool) -> dict[str, Any]:
         """Set all configured LEDs to a specific state.
 
         This is a convenience method that uses the device API internally.
@@ -473,58 +511,63 @@ class AsyncIOClient:
         result["results"] = led_results
         return result
 
-    async def all_leds_on(self) -> Dict[str, Any]:
+    async def all_leds_on(self) -> dict[str, Any]:
         """Turn all configured LEDs ON.
 
         This is a convenience method that calls set_all_leds(True).
         """
         return await self.set_all_leds(True)
 
-    async def all_leds_off(self) -> Dict[str, Any]:
+    async def all_leds_off(self) -> dict[str, Any]:
         """Turn all configured LEDs OFF.
 
         This is a convenience method that calls set_all_leds(False).
         """
         return await self.set_all_leds(False)
 
-    async def initialize(self) -> Dict[str, Any]:
+    async def initialize(self) -> dict[str, Any]:
         """Initialize the IO controller on the demo_IO service."""
         return await self._request("POST", "/initialize")
 
-    async def cleanup(self) -> Dict[str, Any]:
+    async def cleanup(self) -> dict[str, Any]:
         """Clean up IO resources on the demo_IO service."""
         return await self._request("POST", "/cleanup")
 
     # ==================== CONVENIENCE METHODS (LEGACY) ====================
 
-    async def turn_on(self, name: str) -> Dict[str, Any]:
+    async def turn_on(self, name: str) -> dict[str, Any]:
         """Turn a device ON."""
         return await self.set_device(name, state=True)
 
-    async def turn_off(self, name: str) -> Dict[str, Any]:
+    async def turn_off(self, name: str) -> dict[str, Any]:
         """Turn a device OFF."""
         return await self.set_device(name, state=False)
 
-    async def add_led(self, name: str, gpio_pin: int, description: str = "",
-                     initial_state: bool = False) -> Dict[str, Any]:
+    async def add_led(
+        self,
+        name: str,
+        gpio_pin: int,
+        description: str = "",
+        initial_state: bool = False,
+    ) -> dict[str, Any]:
         """Add and configure an LED."""
         return await self.config_led(name, gpio_pin, description, initial_state)
 
-    async def get_all_states(self) -> Dict[str, bool]:
+    async def get_all_states(self) -> dict[str, bool]:
         """Get the state of all LEDs."""
         return await self.list_leds()
 
     # ==================== NEW DEVICE METHODS (v2.0+) ====================
 
-    async def list_devices(self) -> Dict[str, Any]:
+    async def list_devices(self) -> dict[str, Any]:
         """List all configured devices."""
         return await self._request("GET", "/devices")
 
-    async def list_device_types(self) -> Dict[str, Any]:
+    async def list_device_types(self) -> dict[str, Any]:
         """List supported device types."""
         return await self._request("GET", "/devices/types")
 
-    async def get_device_status(self, name: str) -> Dict[str, Any]:
+    async def get_device_status(self, name: str) -> dict[str, Any]:
         """Get detailed status of a specific device."""
         return await self._request("GET", f"/devices/{name}")
 
@@ -532,43 +575,43 @@ class AsyncIOClient:
         self,
         name: str,
         device_type: str,
-        identifier: Optional[int] = None,
+        identifier: int | None = None,
         description: str = "",
-        **kwargs
-    ) -> Dict[str, Any]:
+        **kwargs,
+    ) -> dict[str, Any]:
         """Configure a new IO device."""
         data = {
             "name": name,
             "device_type": device_type,
             "identifier": identifier,
             "description": description,
-            **kwargs
+            **kwargs,
         }
         return await self._request("POST", "/devices/config", json=data)
 
-    async def write_device(self, name: str, value: Union[bool, float]) -> Dict[str, Any]:
+    async def write_device(self, name: str, value: bool | float) -> dict[str, Any]:
         """Write a value to a device."""
         data = {"value": value}
         return await self._request("POST", f"/devices/{name}/write", json=data)
 
-    async def read_device(self, name: str) -> Dict[str, Any]:
+    async def read_device(self, name: str) -> dict[str, Any]:
         """Read the current value from a device."""
         return await self._request("POST", f"/devices/{name}/read")
 
-    async def toggle_device(self, name: str) -> Dict[str, Any]:
+    async def toggle_device(self, name: str) -> dict[str, Any]:
         """Toggle a device state."""
         return await self._request("POST", f"/devices/{name}/toggle")
 
-    async def set_device(self, name: str, state: bool) -> Dict[str, Any]:
+    async def set_device(self, name: str, state: bool) -> dict[str, Any]:
         """Set a device to a specific boolean state."""
         data = {"state": state}
         return await self._request("POST", f"/devices/{name}/set", json=data)
 
-    async def read_all_inputs(self) -> Dict[str, Any]:
+    async def read_all_inputs(self) -> dict[str, Any]:
         """Read values from all input devices."""
         return await self._request("POST", "/devices/inputs/read-all")
 
-    async def set_all_outputs(self, state: bool) -> Dict[str, Any]:
+    async def set_all_outputs(self, state: bool) -> dict[str, Any]:
         """Set all output devices to a specific state."""
         data = {"state": state}
         return await self._request("POST", "/devices/outputs/set-all", json=data)
@@ -582,8 +625,8 @@ class AsyncIOClient:
         min_value: float = 0.0,
         max_value: float = 100.0,
         description: str = "",
-        is_inverted: bool = False
-    ) -> Dict[str, Any]:
+        is_inverted: bool = False,
+    ) -> dict[str, Any]:
         """Configure a potentiometer device."""
         return await self.config_device(
             name=name,
@@ -592,10 +635,10 @@ class AsyncIOClient:
             min_value=min_value,
             max_value=max_value,
             description=description,
-            is_inverted=is_inverted
+            is_inverted=is_inverted,
         )
 
-    async def read_potentiometer(self, name: str) -> Dict[str, Any]:
+    async def read_potentiometer(self, name: str) -> dict[str, Any]:
         """Read the current value from a potentiometer."""
         return await self.read_device(name)
 
@@ -612,8 +655,8 @@ class AsyncIOClient:
         gpio_pin: int,
         description: str = "",
         debounce_time: float = 0.05,
-        pull_up: bool = True
-    ) -> Dict[str, Any]:
+        pull_up: bool = True,
+    ) -> dict[str, Any]:
         """Configure a button device."""
         return await self.config_device(
             name=name,
@@ -621,7 +664,7 @@ class AsyncIOClient:
             gpio_pin=gpio_pin,
             description=description,
             debounce_time=debounce_time,
-            pull_up=pull_up
+            pull_up=pull_up,
         )
 
     async def read_button(self, name: str) -> bool:
@@ -637,11 +680,11 @@ class AsyncIOClient:
         self,
         device_name: str,
         gpio_pin: int,
-        obj_ref: Optional[str] = None,
+        obj_ref: str | None = None,
         description: str = "",
         initial_state: bool = False,
-        **extra_properties: Any
-    ) -> Dict[str, Any]:
+        **extra_properties: Any,
+    ) -> dict[str, Any]:
         """Configure an IO device with IEC 61850 mapping."""
         demoio_config = self.mapping.config_device_with_mapping(
             device_name=device_name,
@@ -649,14 +692,14 @@ class AsyncIOClient:
             obj_ref=obj_ref,
             description=description,
             initial_state=initial_state,
-            **extra_properties
+            **extra_properties,
         )
 
         demo_io_result = await self.config_led(
             name=device_name,
             gpio_pin=gpio_pin,
             description=description or f"Mapped to {obj_ref}" if obj_ref else "",
-            initial_state=initial_state
+            initial_state=initial_state,
         )
 
         self.mapping.save()
@@ -665,16 +708,14 @@ class AsyncIOClient:
             "demo_io": demo_io_result,
             "mapping": demoio_config,
             "device_name": device_name,
-            "objRef": obj_ref
+            "objRef": obj_ref,
         }
 
     # ==================== LCD SPECIFIC METHODS ====================
 
     async def write_lcd(
-        self,
-        device_name: str,
-        text: Union[str, List[str]]
-    ) -> Dict[str, Any]:
+        self, device_name: str, text: str | list[str]
+    ) -> dict[str, Any]:
         """Write text to an LCD display.
 
         Args:
@@ -688,11 +729,8 @@ class AsyncIOClient:
         return await self._request("POST", f"/lcd/{device_name}/write", json=data)
 
     async def write_lcd_line(
-        self,
-        device_name: str,
-        line_number: int,
-        text: str
-    ) -> Dict[str, Any]:
+        self, device_name: str, line_number: int, text: str
+    ) -> dict[str, Any]:
         """Write text to a specific line on an LCD display.
 
         Args:
@@ -706,7 +744,7 @@ class AsyncIOClient:
         data = {"line_number": line_number, "text": text}
         return await self._request("POST", f"/lcd/{device_name}/write-line", json=data)
 
-    async def clear_lcd(self, device_name: str) -> Dict[str, Any]:
+    async def clear_lcd(self, device_name: str) -> dict[str, Any]:
         """Clear an LCD display.
 
         Args:
@@ -717,20 +755,14 @@ class AsyncIOClient:
         """
         return await self._request("POST", f"/lcd/{device_name}/clear")
 
-    async def write_iec61850_value(
-        self,
-        obj_ref: str,
-        value: Any
-    ) -> bool:
+    async def write_iec61850_value(self, obj_ref: str, value: Any) -> bool:
         """Handle IEC 61850 write by syncing to mapped device."""
-        return await self.mapping.sync_device_from_iec61850_async(obj_ref, value, client=self)
+        return await self.mapping.sync_device_from_iec61850_async(
+            obj_ref, value, client=self
+        )
 
     async def write_to_iec61850(
-        self,
-        obj_ref: str,
-        value: Any,
-        fc: str = "ST",
-        data_type: str = ""
+        self, obj_ref: str, value: Any, fc: str = "ST", data_type: str = ""
     ) -> bool:
         """Write to IEC61850 server via standard /writevalue endpoint.
 
@@ -747,6 +779,7 @@ class AsyncIOClient:
             bool: True if write succeeded, False otherwise
         """
         import httpx2 as httpx
+
         try:
             async with httpx.AsyncClient(timeout=5.0) as http_client:
                 response = await http_client.post(
@@ -755,24 +788,22 @@ class AsyncIOClient:
                         "objRef": obj_ref,
                         "fc": fc,
                         "value": str(value),
-                        "dataType": data_type
-                    }
+                        "dataType": data_type,
+                    },
                 )
                 if response.status_code == 200:
                     logger.info(f"IEC61850 write successful: {obj_ref}={value}")
                     return True
-                logger.error(f"IEC61850 write failed: {response.status_code} - {response.text}")
+                logger.error(
+                    f"IEC61850 write failed: {response.status_code} - {response.text}"
+                )
                 return False
         except Exception as e:
             logger.error(f"IEC61850 write error: {e}")
             return False
 
     async def operate_to_iec61850(
-        self,
-        obj_ref: str,
-        value: Any,
-        value_type: str = "BOOLEAN",
-        cp: str = "cp1"
+        self, obj_ref: str, value: Any, value_type: str = "BOOLEAN", cp: str = "cp1"
     ) -> bool:
         """Send an Operate command to IEC61850 server via /api/operate endpoint.
 
@@ -792,6 +823,7 @@ class AsyncIOClient:
             bool: True if operate succeeded, False otherwise
         """
         import httpx2 as httpx
+
         try:
             async with httpx.AsyncClient(timeout=5.0) as http_client:
                 response = await http_client.post(
@@ -800,13 +832,15 @@ class AsyncIOClient:
                         "objRef": obj_ref,
                         "value": value,
                         "value_type": value_type,
-                        "cp": cp
-                    }
+                        "cp": cp,
+                    },
                 )
                 if response.status_code == 200:
                     logger.info(f"IEC61850 operate successful: {obj_ref}={value}")
                     return True
-                logger.error(f"IEC61850 operate failed: {response.status_code} - {response.text}")
+                logger.error(
+                    f"IEC61850 operate failed: {response.status_code} - {response.text}"
+                )
                 return False
         except Exception as e:
             logger.error(f"IEC61850 operate error: {e}")
@@ -821,7 +855,7 @@ class AsyncIOClient:
         Args:
             url: Base URL of the ACSI server (e.g., "http://localhost:5001")
         """
-        self._acsi_base_url = url.rstrip('/')
+        self._acsi_base_url = url.rstrip("/")
         logger.info(f"ACSI base URL updated to: {self._acsi_base_url}")
 
     def get_acsi_base_url(self) -> str:
@@ -859,7 +893,7 @@ class AsyncIOClient:
         """Destructor - ensure session is closed."""
         # Note: In async contexts, prefer using async with or explicit aclose()
         # This is a fallback for garbage collection
-        if hasattr(self, '_client') and self._client and not self._is_closed:
+        if hasattr(self, "_client") and self._client and not self._is_closed:
             # We can't await in __del__, so we schedule the close
             # This is not ideal but prevents resource leaks
             try:
@@ -903,19 +937,19 @@ class AsyncDemoIOClient:
     """
 
     def __init__(
-            self,
-            base_url: str = "http://localhost:8080",
-            mapping_file: Optional[str] = None,
-            timeout: float = DEFAULT_TIMEOUT,
-            max_retries: int = DEFAULT_MAX_RETRIES,
-            backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
-            retry_status_codes: Optional[List[int]] = None,
-            api_key: Optional[str] = None,
-            # httpx specific options
-            follow_redirects: bool = True,
-            limits: Optional[httpx.Limits] = None,
-            # ACSI server URL for IEC61850 writes
-            acsi_base_url: Optional[str] = None
+        self,
+        base_url: str = "http://localhost:8080",
+        mapping_file: str | None = None,
+        timeout: float = DEFAULT_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
+        retry_status_codes: list[int] | None = None,
+        api_key: str | None = None,
+        # httpx specific options
+        follow_redirects: bool = True,
+        limits: httpx.Limits | None = None,
+        # ACSI server URL for IEC61850 writes
+        acsi_base_url: str | None = None,
     ):
         """Initialize the async demo_IO client.
 
@@ -931,7 +965,7 @@ class AsyncDemoIOClient:
             limits: httpx connection limits
             acsi_base_url: Base URL of ACSI server for IEC61850 writes (optional)
         """
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         self.io_base = f"{self.base_url}/api/io"
         self.timeout = timeout
         self.max_retries = max_retries
@@ -939,10 +973,14 @@ class AsyncDemoIOClient:
         self.retry_status_codes = retry_status_codes or DEFAULT_RETRY_STATUS_CODES
         self.api_key = api_key
         self.follow_redirects = follow_redirects
-        self.limits = limits or httpx.Limits(max_connections=10, max_keepalive_connections=5)
+        self.limits = limits or httpx.Limits(
+            max_connections=10, max_keepalive_connections=5
+        )
 
         # ACSI server configuration for IEC61850 writes
-        self._acsi_base_url = acsi_base_url or os.getenv("ACSI_BASE_URL", "http://localhost:5001")
+        self._acsi_base_url = acsi_base_url or os.getenv(
+            "ACSI_BASE_URL", "http://localhost:5001"
+        )
 
         # Use shared mapping manager if available, otherwise create local instance
         try:
@@ -950,7 +988,7 @@ class AsyncDemoIOClient:
         except (ImportError, AttributeError):
             # Fallback to local instance if io_router is not available
             self.mapping = IOMappingManager(mapping_file=mapping_file)
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
         self._is_closed = True
         # See the matching comment in AsyncIOClient.__init__: this client
         # instance is cached/reused (get_io_client() returns the same
@@ -965,7 +1003,7 @@ class AsyncDemoIOClient:
         # a reconnect look like a no-op ("no exception, but no HTTP call
         # either") instead of a real, loggable failure. We track which
         # loop the cached client belongs to and recreate it on mismatch.
-        self._client_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
 
         logger.info(f"Initialized AsyncDemoIOClient with base URL: {self.io_base}")
 
@@ -978,7 +1016,11 @@ class AsyncDemoIOClient:
         """
         current_loop = asyncio.get_running_loop()
 
-        if self._client is not None and not self._is_closed and self._client_loop is not current_loop:
+        if (
+            self._client is not None
+            and not self._is_closed
+            and self._client_loop is not current_loop
+        ):
             logger.info(
                 "Detected event loop change - recreating httpx.AsyncClient "
                 "to avoid reusing stale pooled connections from a dead loop"
@@ -997,19 +1039,19 @@ class AsyncDemoIOClient:
                 timeout=self.timeout,
                 follow_redirects=self.follow_redirects,
                 limits=self.limits,
-                headers=headers
+                headers=headers,
             )
             self._client_loop = current_loop
             self._is_closed = False
         return self._client
 
     async def _request(
-            self,
-            method: str,
-            endpoint: str,
-            json: Optional[dict] = None,
-            params: Optional[dict] = None,
-            raise_on_error: bool = True
+        self,
+        method: str,
+        endpoint: str,
+        json: dict | None = None,
+        params: dict | None = None,
+        raise_on_error: bool = True,
     ) -> Any:
         """Make an async HTTP request to the demo_IO API.
 
@@ -1048,7 +1090,7 @@ class AsyncDemoIOClient:
                     json=json,
                     params=params,
                     headers=headers,
-                    timeout=self.timeout
+                    timeout=self.timeout,
                 )
 
                 # Check for authentication failure
@@ -1069,23 +1111,29 @@ class AsyncDemoIOClient:
                                     raise DeviceNotFoundError(match.group(1))
                         except:
                             pass
-                        raise APIError(f"Not found", response.status_code, endpoint)
+                        raise APIError("Not found", response.status_code, endpoint)
                     return None
 
                 # Retry on server errors
                 if response.status_code >= 400:
-                    if response.status_code in self.retry_status_codes and attempt < self.max_retries:
+                    if (
+                        response.status_code in self.retry_status_codes
+                        and attempt < self.max_retries
+                    ):
                         attempt += 1
                         delay = self.backoff_factor * (2 ** (attempt - 1))
                         logger.warning(
-                            f"Request to {url} failed with {response.status_code}, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})")
+                            f"Request to {url} failed with {response.status_code}, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})"
+                        )
                         await asyncio.sleep(delay)
                         continue
                     else:
                         if raise_on_error:
                             try:
                                 error_data = response.json()
-                                error_msg = error_data.get("detail", "") or error_data.get("message", "")
+                                error_msg = error_data.get(
+                                    "detail", ""
+                                ) or error_data.get("message", "")
                             except:
                                 error_msg = response.text
                             raise APIError(error_msg, response.status_code, endpoint)
@@ -1103,7 +1151,8 @@ class AsyncDemoIOClient:
                     attempt += 1
                     delay = self.backoff_factor * (2 ** (attempt - 1))
                     logger.warning(
-                        f"Request to {url} timed out, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})")
+                        f"Request to {url} timed out, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})"
+                    )
                     await asyncio.sleep(delay)
                     continue
                 else:
@@ -1117,7 +1166,8 @@ class AsyncDemoIOClient:
                     attempt += 1
                     delay = self.backoff_factor * (2 ** (attempt - 1))
                     logger.warning(
-                        f"Connection to {url} failed, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})")
+                        f"Connection to {url} failed, retrying in {delay:.1f}s (attempt {attempt}/{self.max_retries})"
+                    )
                     await asyncio.sleep(delay)
                     continue
                 else:
@@ -1137,7 +1187,7 @@ class AsyncDemoIOClient:
 
     # ==================== HEALTH AND STATUS ====================
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Check the health of the demo_IO service."""
         return await self._request("GET", "/health")
 
@@ -1154,22 +1204,27 @@ class AsyncDemoIOClient:
             logger.debug(f"Health check failed: {e}")
             return False
 
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Get the current IO controller status."""
         return await self._request("GET", "/status")
 
-    async def get_api_info(self) -> Dict[str, Any]:
+    async def get_api_info(self) -> dict[str, Any]:
         """Get API information and available endpoints."""
         return await self._request("GET", "/")
 
-    async def get_auth_status(self) -> Dict[str, Any]:
+    async def get_auth_status(self) -> dict[str, Any]:
         """Check if API key authentication is enabled and configured."""
         return await self._request("GET", "/auth/status")
 
     # ==================== LED METHODS (Convenience wrappers for device API) ====================
 
-    async def config_led(self, name: str, gpio_pin: int, description: str = "",
-                         initial_state: bool = False) -> Dict[str, Any]:
+    async def config_led(
+        self,
+        name: str,
+        gpio_pin: int,
+        description: str = "",
+        initial_state: bool = False,
+    ) -> dict[str, Any]:
         """Configure an LED on the demo_IO service.
 
         This is a convenience method that uses the device API internally.
@@ -1179,11 +1234,11 @@ class AsyncDemoIOClient:
             "device_type": "led",
             "identifier": gpio_pin,
             "description": description,
-            "initial_state": initial_state
+            "initial_state": initial_state,
         }
         return await self._request("POST", "/devices/config", json=data)
 
-    async def list_leds(self) -> Dict[str, Any]:
+    async def list_leds(self) -> dict[str, Any]:
         """List all configured LEDs and their states.
 
         This is a convenience method that filters devices by LED type.
@@ -1197,7 +1252,7 @@ class AsyncDemoIOClient:
                     leds[name] = detail.get("value", False)
         return leds
 
-    async def get_led_state(self, name: str) -> Dict[str, Any]:
+    async def get_led_state(self, name: str) -> dict[str, Any]:
         """Get the current state of a specific LED.
 
         This is a convenience method that uses the device API internally.
@@ -1207,7 +1262,7 @@ class AsyncDemoIOClient:
             return {"name": name, "state": bool(result["value"])}
         return {"name": name, "state": False}
 
-    async def set_device(self, name: str, state: bool) -> Dict[str, Any]:
+    async def set_device(self, name: str, state: bool) -> dict[str, Any]:
         """Set a specific device to ON or OFF state.
 
         This is a convenience method that uses the device API internally.
@@ -1215,14 +1270,14 @@ class AsyncDemoIOClient:
         data = {"state": state}
         return await self._request("POST", f"/devices/{name}/set", json=data)
 
-    async def toggle_led(self, name: str) -> Dict[str, Any]:
+    async def toggle_led(self, name: str) -> dict[str, Any]:
         """Toggle the state of a specific LED.
 
         This is a convenience method that uses the device API internally.
         """
         return await self._request("POST", f"/devices/{name}/toggle", json={})
 
-    async def set_all_leds(self, state: bool) -> Dict[str, Any]:
+    async def set_all_leds(self, state: bool) -> dict[str, Any]:
         """Set all configured LEDs to a specific state.
 
         This is a convenience method that uses the device API internally.
@@ -1237,102 +1292,107 @@ class AsyncDemoIOClient:
         result["results"] = led_results
         return result
 
-    async def all_leds_on(self) -> Dict[str, Any]:
+    async def all_leds_on(self) -> dict[str, Any]:
         """Turn all configured LEDs ON.
 
         This is a convenience method that calls set_all_leds(True).
         """
         return await self.set_all_leds(True)
 
-    async def all_leds_off(self) -> Dict[str, Any]:
+    async def all_leds_off(self) -> dict[str, Any]:
         """Turn all configured LEDs OFF.
 
         This is a convenience method that calls set_all_leds(False).
         """
         return await self.set_all_leds(False)
 
-    async def initialize(self) -> Dict[str, Any]:
+    async def initialize(self) -> dict[str, Any]:
         """Initialize the IO controller on the demo_IO service."""
         return await self._request("POST", "/initialize")
 
-    async def cleanup(self) -> Dict[str, Any]:
+    async def cleanup(self) -> dict[str, Any]:
         """Clean up IO resources on the demo_IO service."""
         return await self._request("POST", "/cleanup")
 
     # ==================== CONVENIENCE METHODS (LEGACY) ====================
 
-    async def turn_on(self, name: str) -> Dict[str, Any]:
+    async def turn_on(self, name: str) -> dict[str, Any]:
         """Turn a device ON."""
         return await self.set_device(name, state=True)
 
-    async def turn_off(self, name: str) -> Dict[str, Any]:
+    async def turn_off(self, name: str) -> dict[str, Any]:
         """Turn a device OFF."""
         return await self.set_device(name, state=False)
 
-    async def add_led(self, name: str, gpio_pin: int, description: str = "",
-                      initial_state: bool = False) -> Dict[str, Any]:
+    async def add_led(
+        self,
+        name: str,
+        gpio_pin: int,
+        description: str = "",
+        initial_state: bool = False,
+    ) -> dict[str, Any]:
         """Add and configure an LED."""
         return await self.config_led(name, gpio_pin, description, initial_state)
 
-    async def get_all_states(self) -> Dict[str, bool]:
+    async def get_all_states(self) -> dict[str, bool]:
         """Get the state of all LEDs."""
         return await self.list_leds()
 
     # ==================== NEW DEVICE METHODS (v2.0+) ====================
 
-    async def list_devices(self) -> Dict[str, Any]:
+    async def list_devices(self) -> dict[str, Any]:
         """List all configured devices."""
         return await self._request("GET", "/devices")
 
-    async def list_device_types(self) -> Dict[str, Any]:
+    async def list_device_types(self) -> dict[str, Any]:
         """List supported device types."""
         return await self._request("GET", "/devices/types")
 
-    async def get_device_status(self, name: str) -> Dict[str, Any]:
+    async def get_device_status(self, name: str) -> dict[str, Any]:
         """Get detailed status of a specific device."""
         return await self._request("GET", f"/devices/{name}")
 
     async def config_device(
-            self,
-            name: str,
-            device_type: str,
-            identifier: Optional[int] = None,
-            description: str = "",
-            **kwargs
-    ) -> Dict[str, Any]:
+        self,
+        name: str,
+        device_type: str,
+        identifier: int | None = None,
+        description: str = "",
+        **kwargs,
+    ) -> dict[str, Any]:
         """Configure a new IO device."""
         data = {
             "name": name,
             "device_type": device_type,
             "identifier": identifier,
             "description": description,
-            **kwargs
+            **kwargs,
         }
         return await self._request("POST", "/devices/config", json=data)
 
-    async def write_device(self, name: str, value: Union[bool, float]) -> Dict[str, Any]:
+    async def write_device(self, name: str, value: bool | float) -> dict[str, Any]:
         """Write a value to a device."""
         data = {"value": value}
         return await self._request("POST", f"/devices/{name}/write", json=data)
 
-    async def read_device(self, name: str) -> Dict[str, Any]:
+    async def read_device(self, name: str) -> dict[str, Any]:
         """Read the current value from a device."""
         return await self._request("POST", f"/devices/{name}/read")
 
-    async def toggle_device(self, name: str) -> Dict[str, Any]:
+    async def toggle_device(self, name: str) -> dict[str, Any]:
         """Toggle a device state."""
         return await self._request("POST", f"/devices/{name}/toggle")
 
-    async def set_device(self, name: str, state: bool) -> Dict[str, Any]:
+    async def set_device(self, name: str, state: bool) -> dict[str, Any]:
         """Set a device to a specific boolean state."""
         data = {"state": state}
         return await self._request("POST", f"/devices/{name}/set", json=data)
 
-    async def read_all_inputs(self) -> Dict[str, Any]:
+    async def read_all_inputs(self) -> dict[str, Any]:
         """Read values from all input devices."""
         return await self._request("POST", "/devices/inputs/read-all")
 
-    async def set_all_outputs(self, state: bool) -> Dict[str, Any]:
+    async def set_all_outputs(self, state: bool) -> dict[str, Any]:
         """Set all output devices to a specific state."""
         data = {"state": state}
         return await self._request("POST", "/devices/outputs/set-all", json=data)
@@ -1340,14 +1400,14 @@ class AsyncDemoIOClient:
     # ==================== DEVICE-SPECIFIC CONVENIENCE METHODS ====================
 
     async def config_potentiometer(
-            self,
-            name: str,
-            adc_channel: int,
-            min_value: float = 0.0,
-            max_value: float = 100.0,
-            description: str = "",
-            is_inverted: bool = False
-    ) -> Dict[str, Any]:
+        self,
+        name: str,
+        adc_channel: int,
+        min_value: float = 0.0,
+        max_value: float = 100.0,
+        description: str = "",
+        is_inverted: bool = False,
+    ) -> dict[str, Any]:
         """Configure a potentiometer device."""
         return await self.config_device(
             name=name,
@@ -1356,10 +1416,10 @@ class AsyncDemoIOClient:
             min_value=min_value,
             max_value=max_value,
             description=description,
-            is_inverted=is_inverted
+            is_inverted=is_inverted,
         )
 
-    async def read_potentiometer(self, name: str) -> Dict[str, Any]:
+    async def read_potentiometer(self, name: str) -> dict[str, Any]:
         """Read the current value from a potentiometer."""
         return await self.read_device(name)
 
@@ -1371,13 +1431,13 @@ class AsyncDemoIOClient:
         return 0.0
 
     async def config_button(
-            self,
-            name: str,
-            gpio_pin: int,
-            description: str = "",
-            debounce_time: float = 0.05,
-            pull_up: bool = True
-    ) -> Dict[str, Any]:
+        self,
+        name: str,
+        gpio_pin: int,
+        description: str = "",
+        debounce_time: float = 0.05,
+        pull_up: bool = True,
+    ) -> dict[str, Any]:
         """Configure a button device."""
         return await self.config_device(
             name=name,
@@ -1385,7 +1445,7 @@ class AsyncDemoIOClient:
             gpio_pin=gpio_pin,
             description=description,
             debounce_time=debounce_time,
-            pull_up=pull_up
+            pull_up=pull_up,
         )
 
     async def read_button(self, name: str) -> bool:
@@ -1398,14 +1458,14 @@ class AsyncDemoIOClient:
     # ==================== IEC 61850 MAPPING METHODS ====================
 
     async def config_device_with_mapping(
-            self,
-            device_name: str,
-            gpio_pin: int,
-            obj_ref: Optional[str] = None,
-            description: str = "",
-            initial_state: bool = False,
-            **extra_properties: Any
-    ) -> Dict[str, Any]:
+        self,
+        device_name: str,
+        gpio_pin: int,
+        obj_ref: str | None = None,
+        description: str = "",
+        initial_state: bool = False,
+        **extra_properties: Any,
+    ) -> dict[str, Any]:
         """Configure an IO device with IEC 61850 mapping."""
         demoio_config = self.mapping.config_device_with_mapping(
             device_name=device_name,
@@ -1413,14 +1473,14 @@ class AsyncDemoIOClient:
             obj_ref=obj_ref,
             description=description,
             initial_state=initial_state,
-            **extra_properties
+            **extra_properties,
         )
 
         demo_io_result = await self.config_led(
             name=device_name,
             gpio_pin=gpio_pin,
             description=description or f"Mapped to {obj_ref}" if obj_ref else "",
-            initial_state=initial_state
+            initial_state=initial_state,
         )
 
         self.mapping.save()
@@ -1429,16 +1489,14 @@ class AsyncDemoIOClient:
             "demo_io": demo_io_result,
             "mapping": demoio_config,
             "device_name": device_name,
-            "objRef": obj_ref
+            "objRef": obj_ref,
         }
 
     # ==================== LCD SPECIFIC METHODS ====================
 
     async def write_lcd(
-            self,
-            device_name: str,
-            text: Union[str, List[str]]
-    ) -> Dict[str, Any]:
+        self, device_name: str, text: str | list[str]
+    ) -> dict[str, Any]:
         """Write text to an LCD display.
 
         Args:
@@ -1452,11 +1510,8 @@ class AsyncDemoIOClient:
         return await self._request("POST", f"/lcd/{device_name}/write", json=data)
 
     async def write_lcd_line(
-            self,
-            device_name: str,
-            line_number: int,
-            text: str
-    ) -> Dict[str, Any]:
+        self, device_name: str, line_number: int, text: str
+    ) -> dict[str, Any]:
         """Write text to a specific line on an LCD display.
 
         Args:
@@ -1470,7 +1525,7 @@ class AsyncDemoIOClient:
         data = {"line_number": line_number, "text": text}
         return await self._request("POST", f"/lcd/{device_name}/write-line", json=data)
 
-    async def clear_lcd(self, device_name: str) -> Dict[str, Any]:
+    async def clear_lcd(self, device_name: str) -> dict[str, Any]:
         """Clear an LCD display.
 
         Args:
@@ -1481,20 +1536,14 @@ class AsyncDemoIOClient:
         """
         return await self._request("POST", f"/lcd/{device_name}/clear")
 
-    async def write_iec61850_value(
-            self,
-            obj_ref: str,
-            value: Any
-    ) -> bool:
+    async def write_iec61850_value(self, obj_ref: str, value: Any) -> bool:
         """Handle IEC 61850 write by syncing to mapped device."""
-        return await self.mapping.sync_device_from_iec61850_async(obj_ref, value, client=self)
+        return await self.mapping.sync_device_from_iec61850_async(
+            obj_ref, value, client=self
+        )
 
     async def write_to_iec61850(
-            self,
-            obj_ref: str,
-            value: Any,
-            fc: str = "ST",
-            data_type: str = ""
+        self, obj_ref: str, value: Any, fc: str = "ST", data_type: str = ""
     ) -> bool:
         """Write to IEC61850 server via standard /writevalue endpoint.
 
@@ -1511,6 +1560,7 @@ class AsyncDemoIOClient:
             bool: True if write succeeded, False otherwise
         """
         import httpx2 as httpx
+
         try:
             async with httpx.AsyncClient(timeout=5.0) as http_client:
                 response = await http_client.post(
@@ -1519,24 +1569,22 @@ class AsyncDemoIOClient:
                         "objRef": obj_ref,
                         "fc": fc,
                         "value": str(value),
-                        "dataType": data_type
-                    }
+                        "dataType": data_type,
+                    },
                 )
                 if response.status_code == 200:
                     logger.info(f"IEC61850 write successful: {obj_ref}={value}")
                     return True
-                logger.error(f"IEC61850 write failed: {response.status_code} - {response.text}")
+                logger.error(
+                    f"IEC61850 write failed: {response.status_code} - {response.text}"
+                )
                 return False
         except Exception as e:
             logger.error(f"IEC61850 write error: {e}")
             return False
 
     async def operate_to_iec61850(
-            self,
-            obj_ref: str,
-            value: Any,
-            value_type: str = "BOOLEAN",
-            cp: str = "cp1"
+        self, obj_ref: str, value: Any, value_type: str = "BOOLEAN", cp: str = "cp1"
     ) -> bool:
         """Send an Operate command to IEC61850 server via /api/operate endpoint.
 
@@ -1556,6 +1604,7 @@ class AsyncDemoIOClient:
             bool: True if operate succeeded, False otherwise
         """
         import httpx2 as httpx
+
         try:
             async with httpx.AsyncClient(timeout=5.0) as http_client:
                 response = await http_client.post(
@@ -1564,13 +1613,15 @@ class AsyncDemoIOClient:
                         "objRef": obj_ref,
                         "value": value,
                         "value_type": value_type,
-                        "cp": cp
-                    }
+                        "cp": cp,
+                    },
                 )
                 if response.status_code == 200:
                     logger.info(f"IEC61850 operate successful: {obj_ref}={value}")
                     return True
-                logger.error(f"IEC61850 operate failed: {response.status_code} - {response.text}")
+                logger.error(
+                    f"IEC61850 operate failed: {response.status_code} - {response.text}"
+                )
                 return False
         except Exception as e:
             logger.error(f"IEC61850 operate error: {e}")
@@ -1585,7 +1636,7 @@ class AsyncDemoIOClient:
         Args:
             url: Base URL of the ACSI server (e.g., "http://localhost:5001")
         """
-        self._acsi_base_url = url.rstrip('/')
+        self._acsi_base_url = url.rstrip("/")
         logger.info(f"ACSI base URL updated to: {self._acsi_base_url}")
 
     def get_acsi_base_url(self) -> str:
@@ -1623,7 +1674,7 @@ class AsyncDemoIOClient:
         """Destructor - ensure session is closed."""
         # Note: In async contexts, prefer using async with or explicit aclose()
         # This is a fallback for garbage collection
-        if hasattr(self, '_client') and self._client and not self._is_closed:
+        if hasattr(self, "_client") and self._client and not self._is_closed:
             # We can't await in __del__, so we schedule the close
             # This is not ideal but prevents resource leaks
             try:
@@ -1644,42 +1695,43 @@ class AsyncDemoIOClient:
             except Exception:
                 pass
 
+
 class DemoIOClient:
     """Synchronous wrapper for AsyncIOClient.
-    
+
     This class provides a synchronous interface to the demo_IO API by wrapping
     the async methods of AsyncIOClient. It uses asyncio.run() to execute
     async code synchronously.
-    
+
     Note: This should only be used in synchronous contexts. For async applications,
     use AsyncIOClient directly.
-    
+
     Usage:
         from demo_IO.io_client.async_client_io import DemoIOClient
-        
+
         client = DemoIOClient(base_url="http://localhost:8080")
         # Use synchronous methods
         state = client.get_led_state("led1")
         client.set_device("led1", state=True)
     """
-    
+
     def __init__(
         self,
         base_url: str = "http://localhost:8080",
-        mapping_file: Optional[str] = None,
+        mapping_file: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
         backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
-        retry_status_codes: Optional[List[int]] = None,
-        api_key: Optional[str] = None,
+        retry_status_codes: list[int] | None = None,
+        api_key: str | None = None,
         follow_redirects: bool = True,
-        limits: Optional[httpx.Limits] = None,
-        acsi_base_url: Optional[str] = None
+        limits: httpx.Limits | None = None,
+        acsi_base_url: str | None = None,
     ):
         """Initialize the synchronous demo_IO client.
-        
+
         This creates an AsyncIOClient internally and wraps its methods.
-        
+
         Args:
             base_url: Base URL of the demo_IO service
             mapping_file: Optional path to io_mapping.json file
@@ -1702,203 +1754,239 @@ class DemoIOClient:
             api_key=api_key,
             follow_redirects=follow_redirects,
             limits=limits,
-            acsi_base_url=acsi_base_url
+            acsi_base_url=acsi_base_url,
         )
-    
+
     def _sync(self, coro):
         """Run an async coroutine synchronously."""
         return asyncio.run(coro)
-    
+
     # Properties that delegate to async client
     @property
     def base_url(self):
         return self._async_client.base_url
-    
+
     @property
     def io_base(self):
         return self._async_client.io_base
-    
+
     @property
     def timeout(self):
         return self._async_client.timeout
-    
+
     @timeout.setter
     def timeout(self, value):
         self._async_client.timeout = value
-    
+
     @property
     def max_retries(self):
         return self._async_client.max_retries
-    
+
     @max_retries.setter
     def max_retries(self, value):
         self._async_client.max_retries = value
-    
+
     @property
     def api_key(self):
         return self._async_client.api_key
-    
+
     @api_key.setter
     def api_key(self, value):
         self._async_client.api_key = value
-    
+
     @property
     def mapping(self):
         return self._async_client.mapping
-    
+
     def get_mapping_manager(self):
         return self._async_client.get_mapping_manager()
-    
+
     def set_acsi_base_url(self, url: str):
         return self._async_client.set_acsi_base_url(url)
-    
+
     def get_acsi_base_url(self) -> str:
         return self._async_client.get_acsi_base_url()
-    
+
     # Synchronous wrapper methods for all async methods
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         return self._sync(self._async_client.health_check())
-    
+
     def is_healthy(self) -> bool:
         return self._sync(self._async_client.is_healthy())
-    
-    def get_status(self) -> Dict[str, Any]:
+
+    def get_status(self) -> dict[str, Any]:
         return self._sync(self._async_client.get_status())
-    
-    def get_api_info(self) -> Dict[str, Any]:
+
+    def get_api_info(self) -> dict[str, Any]:
         return self._sync(self._async_client.get_api_info())
-    
-    def get_auth_status(self) -> Dict[str, Any]:
+
+    def get_auth_status(self) -> dict[str, Any]:
         return self._sync(self._async_client.get_auth_status())
-    
-    def config_led(self, name: str, gpio_pin: int, description: str = "", 
-                  initial_state: bool = False) -> Dict[str, Any]:
-        return self._sync(self._async_client.config_led(name, gpio_pin, description, initial_state))
-    
-    def list_leds(self) -> Dict[str, Any]:
+
+    def config_led(
+        self,
+        name: str,
+        gpio_pin: int,
+        description: str = "",
+        initial_state: bool = False,
+    ) -> dict[str, Any]:
+        return self._sync(
+            self._async_client.config_led(name, gpio_pin, description, initial_state)
+        )
+
+    def list_leds(self) -> dict[str, Any]:
         return self._sync(self._async_client.list_leds())
-    
-    def get_led_state(self, name: str) -> Dict[str, Any]:
+
+    def get_led_state(self, name: str) -> dict[str, Any]:
         return self._sync(self._async_client.get_led_state(name))
-    
-    def set_led(self, name: str, state: bool) -> Dict[str, Any]:
+
+    def set_led(self, name: str, state: bool) -> dict[str, Any]:
         return self._sync(self._async_client.set_led(name, state))
-    
-    def toggle_led(self, name: str) -> Dict[str, Any]:
+
+    def toggle_led(self, name: str) -> dict[str, Any]:
         return self._sync(self._async_client.toggle_led(name))
-    
-    def set_all_leds(self, state: bool) -> Dict[str, Any]:
+
+    def set_all_leds(self, state: bool) -> dict[str, Any]:
         return self._sync(self._async_client.set_all_leds(state))
-    
-    def all_leds_on(self) -> Dict[str, Any]:
+
+    def all_leds_on(self) -> dict[str, Any]:
         return self._sync(self._async_client.all_leds_on())
-    
-    def all_leds_off(self) -> Dict[str, Any]:
+
+    def all_leds_off(self) -> dict[str, Any]:
         return self._sync(self._async_client.all_leds_off())
-    
-    def initialize(self) -> Dict[str, Any]:
+
+    def initialize(self) -> dict[str, Any]:
         return self._sync(self._async_client.initialize())
-    
-    def cleanup(self) -> Dict[str, Any]:
+
+    def cleanup(self) -> dict[str, Any]:
         return self._sync(self._async_client.cleanup())
-    
-    def get_device(self, name: str) -> Dict[str, Any]:
+
+    def get_device(self, name: str) -> dict[str, Any]:
         return self._sync(self._async_client.get_device(name))
-    
-    def set_device(self, name: str, state: Union[bool, int, float]) -> Dict[str, Any]:
+
+    def set_device(self, name: str, state: bool | int | float) -> dict[str, Any]:
         return self._sync(self._async_client.set_device(name, state))
-    
-    def get_device_state(self, name: str) -> Dict[str, Any]:
+
+    def get_device_state(self, name: str) -> dict[str, Any]:
         return self._sync(self._async_client.get_device_state(name))
-    
-    def set_all_devices(self, state: Union[bool, int, float]) -> Dict[str, Any]:
+
+    def set_all_devices(self, state: bool | int | float) -> dict[str, Any]:
         return self._sync(self._async_client.set_all_devices(state))
-    
-    def get_all_states(self) -> Dict[str, Any]:
+
+    def get_all_states(self) -> dict[str, Any]:
         return self._sync(self._async_client.get_all_states())
-    
-    def list_devices(self) -> List[str]:
+
+    def list_devices(self) -> list[str]:
         return self._sync(self._async_client.list_devices())
-    
-    def get_device_info(self, name: str) -> Dict[str, Any]:
+
+    def get_device_info(self, name: str) -> dict[str, Any]:
         return self._sync(self._async_client.get_device_info(name))
-    
-    def delete_device(self, name: str) -> Dict[str, Any]:
+
+    def delete_device(self, name: str) -> dict[str, Any]:
         return self._sync(self._async_client.delete_device(name))
-    
+
     # Convenience methods
-    def turn_on(self, name: str) -> Dict[str, Any]:
+    def turn_on(self, name: str) -> dict[str, Any]:
         return self.set_device(name, True)
-    
-    def turn_off(self, name: str) -> Dict[str, Any]:
+
+    def turn_off(self, name: str) -> dict[str, Any]:
         return self.set_device(name, False)
-    
-    def add_led(self, name: str, gpio_pin: int, description: str = "", initial_state: bool = False) -> Dict[str, Any]:
+
+    def add_led(
+        self,
+        name: str,
+        gpio_pin: int,
+        description: str = "",
+        initial_state: bool = False,
+    ) -> dict[str, Any]:
         return self.config_led(name, gpio_pin, description, initial_state)
-    
-    def create_led(self, name: str, gpio_pin: int, description: str = "", initial_state: bool = False) -> Dict[str, Any]:
+
+    def create_led(
+        self,
+        name: str,
+        gpio_pin: int,
+        description: str = "",
+        initial_state: bool = False,
+    ) -> dict[str, Any]:
         return self.config_led(name, gpio_pin, description, initial_state)
-    
+
     # Potentiometer methods
-    def config_potentiometer(self, name: str, adc_channel: int, min_value: float = 0.0, 
-                            max_value: float = 100.0, description: str = "") -> Dict[str, Any]:
-        return self._sync(self._async_client.config_potentiometer(name, adc_channel, min_value, max_value, description))
-    
-    def read_potentiometer(self, name: str) -> Dict[str, Any]:
+    def config_potentiometer(
+        self,
+        name: str,
+        adc_channel: int,
+        min_value: float = 0.0,
+        max_value: float = 100.0,
+        description: str = "",
+    ) -> dict[str, Any]:
+        return self._sync(
+            self._async_client.config_potentiometer(
+                name, adc_channel, min_value, max_value, description
+            )
+        )
+
+    def read_potentiometer(self, name: str) -> dict[str, Any]:
         return self._sync(self._async_client.read_potentiometer(name))
-    
+
     def read_potentiometer_scaled(self, name: str) -> float:
         return self._sync(self._async_client.read_potentiometer_scaled(name))
-    
-    def list_potentiometers(self) -> List[str]:
+
+    def list_potentiometers(self) -> list[str]:
         return self._sync(self._async_client.list_potentiometers())
-    
+
     # Button methods
-    def config_button(self, name: str, gpio_pin: int, description: str = "", 
-                     debounce_ms: int = 50) -> Dict[str, Any]:
-        return self._sync(self._async_client.config_button(name, gpio_pin, description, debounce_ms))
-    
-    def get_button_state(self, name: str) -> Dict[str, Any]:
+    def config_button(
+        self, name: str, gpio_pin: int, description: str = "", debounce_ms: int = 50
+    ) -> dict[str, Any]:
+        return self._sync(
+            self._async_client.config_button(name, gpio_pin, description, debounce_ms)
+        )
+
+    def get_button_state(self, name: str) -> dict[str, Any]:
         return self._sync(self._async_client.get_button_state(name))
-    
-    def list_buttons(self) -> List[str]:
+
+    def list_buttons(self) -> list[str]:
         return self._sync(self._async_client.list_buttons())
-    
+
     # Generic IO methods
-    def read_analog(self, channel: int) -> Dict[str, Any]:
+    def read_analog(self, channel: int) -> dict[str, Any]:
         return self._sync(self._async_client.read_analog(channel))
-    
-    def read_digital(self, pin: int) -> Dict[str, Any]:
+
+    def read_digital(self, pin: int) -> dict[str, Any]:
         return self._sync(self._async_client.read_digital(pin))
-    
-    def write_digital(self, pin: int, state: bool) -> Dict[str, Any]:
+
+    def write_digital(self, pin: int, state: bool) -> dict[str, Any]:
         return self._sync(self._async_client.write_digital(pin, state))
-    
-    def write_pwm(self, pin: int, duty_cycle: float) -> Dict[str, Any]:
+
+    def write_pwm(self, pin: int, duty_cycle: float) -> dict[str, Any]:
         return self._sync(self._async_client.write_pwm(pin, duty_cycle))
-    
+
     # IEC61850 write method
     def write_iec61850(self, obj_ref: str, value: Any, fc: str = "ST") -> bool:
         return self._sync(self._async_client.write_iec61850(obj_ref, value, fc))
-    
+
     # IEC61850 operate method
-    def operate_to_iec61850(self, obj_ref: str, value: Any, value_type: str = "BOOLEAN", cp: str = "cp1") -> bool:
-        return self._sync(self._async_client.operate_to_iec61850(obj_ref, value, value_type, cp))
-    
+    def operate_to_iec61850(
+        self, obj_ref: str, value: Any, value_type: str = "BOOLEAN", cp: str = "cp1"
+    ) -> bool:
+        return self._sync(
+            self._async_client.operate_to_iec61850(obj_ref, value, value_type, cp)
+        )
+
     # Session management
     def close(self):
         """Close the underlying async client."""
         self._sync(self._async_client.aclose())
-    
+
     def __enter__(self):
         """Context manager entry."""
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         self.close()
         return False
-    
+
     def __del__(self):
         """Destructor - ensure session is closed."""
         try:

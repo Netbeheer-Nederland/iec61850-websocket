@@ -28,56 +28,62 @@ from __future__ import annotations
 
 import asyncio
 import logging
+
 logger = logging.getLogger(__name__)
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 import json
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
+
 from ws61850.endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
-from datetime import datetime
+
 
 class ModelInfo:
     def __init__(self, cp):
         self.model_status: str = "idle"  # idle|building|ready|error
-        self.model_data: Optional[Dict[str, Any]] = None
-        self.model_error: Optional[str] = None
-        self.model_progress: Optional[Dict[str, Any]] = None
+        self.model_data: dict[str, Any] | None = None
+        self.model_error: str | None = None
+        self.model_progress: dict[str, Any] | None = None
         self.model_ready_event = asyncio.Event()
         self.cp = cp
+
 
 class ACSIClientRuntime:
     """Manages IEC 61850 WebSocket client runtime state and lifecycle."""
 
     def __init__(self):
-        self.status: str = "disconnected"  # disconnected|connecting|connected|disconnecting|error
+        self.status: str = (
+            "disconnected"  # disconnected|connecting|connected|disconnecting|error
+        )
         self.host: str = "localhost"
         self.port: int = 8765
-        #self.cp: str = "cp1"
-        self.loop: Optional[asyncio.AbstractEventLoop] = None
-        self.thread: Optional[threading.Thread] = None
+        # self.cp: str = "cp1"
+        self.loop: asyncio.AbstractEventLoop | None = None
+        self.thread: threading.Thread | None = None
         self.client = None
         self.endpoint = None
-        self.error: Optional[str] = None
+        self.error: str | None = None
         self.actions: deque = deque(maxlen=200)
         self.messages: deque = deque(maxlen=500)
         self.action_seq: int = 0
         self.message_seq: int = 0
-        self.last_status_log_signature: Optional[tuple] = None
+        self.last_status_log_signature: tuple | None = None
         self.lock: threading.Lock = threading.Lock()
         self.invoke_lock: asyncio.Lock = asyncio.Lock()
         self.client_list = None
 
         # Callbacks for message logging
-        self.recv_msg_callback: Optional[Callable] = None
-        self.send_msg_callback: Optional[Callable] = None
+        self.recv_msg_callback: Callable | None = None
+        self.send_msg_callback: Callable | None = None
 
-        self.write_callback: Optional[Callable] = None
-        self.report_callback: Optional[Callable] = None
-        self.connected_callback: Optional[Callable] = None
+        self.write_callback: Callable | None = None
+        self.report_callback: Callable | None = None
+        self.connected_callback: Callable | None = None
 
 
 class ACSIClient:
@@ -98,7 +104,7 @@ class ACSIClient:
         self._model_info_dict = {}  # cp -> ModelInfo
         self._update_model_info_dict()
 
-        #start Websocket Passive instance
+        # start Websocket Passive instance
         try:
             # connect() already sets runtime.status = "connecting" itself
             # (synchronously, before spawning the background connect
@@ -115,28 +121,28 @@ class ACSIClient:
             logger.exception("Failed to start passive WebSocket endpoint")
 
     def install_write_callback(self, callback):
-       self.runtime.write_callback = callback;
+        self.runtime.write_callback = callback
 
     def install_report_callback(self, callback):
         """Install a callback to be invoked when report messages are received.
-        
+
         The callback receives: rptID, dataSet, data (list of {dataRef, value})
         """
-        self.runtime.report_callback = callback;
+        self.runtime.report_callback = callback
 
     def install_connected_callback(self, callback):
         """Install a callback to be invoked when associateResponse messages are received.
-        
+
         The callback receives: associateResponse data (dict)
         """
-        self.runtime.connected_callback = callback;
+        self.runtime.connected_callback = callback
 
     def _on_recv_message(self, msg, ts):
         """Callback for received WebSocket messages."""
         # Check if this is a report service message
         is_report = False
         report_info = {}
-        
+
         # Parse msg if it's a string or bytes
         msg_dict = msg
         if isinstance(msg, bytes):
@@ -149,13 +155,13 @@ class ACSIClient:
                 msg_dict = json.loads(msg)
             except (json.JSONDecodeError, AttributeError):
                 msg_dict = {}
-        
+
         if isinstance(msg_dict, dict):
             # Get service_data from either unconfirmed or associate path
             service_data = msg_dict.get("unconfirmed", {}).get("service", {})
             if not service_data:
                 service_data = msg_dict.get("associate", {}).get("service", {})
-            
+
             if isinstance(service_data, dict):
                 service_name = next(iter(service_data.keys())) if service_data else None
                 is_report = service_name == "report"
@@ -164,7 +170,7 @@ class ACSIClient:
                     report_info = {
                         "rptID": report_data.get("rptID"),
                         "dataSet": report_data.get("dataSet"),
-                        "data": []
+                        "data": [],
                     }
                     # Extract dataRef + values from entryData
                     entry_data = report_data.get("entryData", [])
@@ -173,24 +179,23 @@ class ACSIClient:
                             if isinstance(entry, dict):
                                 data_ref = entry.get("dataRef")
                                 value = entry.get("value")
-                                report_info["data"].append({
-                                    "dataRef": data_ref,
-                                    "value": value
-                                })
-                    
+                                report_info["data"].append(
+                                    {"dataRef": data_ref, "value": value}
+                                )
+
                     # Call external report callback if installed
                     if self.runtime.report_callback is not None:
                         self.runtime.report_callback(
                             report_info["rptID"],
                             report_info["dataSet"],
-                            report_info["data"]
+                            report_info["data"],
                         )
                 elif service_name == "associateResponse":
                     # Handle associateResponse service
                     associate_response = service_data.get("associateResponse", {})
                     if self.runtime.connected_callback is not None:
                         self.runtime.connected_callback(associate_response)
-        
+
         self._log_message("recv", msg, ts)
 
     def _on_send_message(self, msg, ts):
@@ -211,7 +216,6 @@ class ACSIClient:
             if cp not in current_cps:
                 del self._model_info_dict[cp]
 
-
     @property
     def model_info_list(self):
         """Returns list of ModelInfo objects (preserves state between calls)"""
@@ -224,7 +228,10 @@ class ACSIClient:
         return self._model_info_dict[cp]
 
     def get_iec61850_client(self, cp):
-        return next((client for client in self.runtime.client_list if client.cp == cp), None)
+        return next(
+            (client for client in self.runtime.client_list if client.cp == cp), None
+        )
+
     def get_cp_list(self):
         # Only cps with an established association - client_list itself holds
         # every configured access point, connected or not, so unfiltered this
@@ -232,7 +239,7 @@ class ACSIClient:
         return [client.cp for client in self.runtime.client_list if client.is_connected]
 
     def _log_action(
-        self, message: str, level: str = "info", detail: Optional[Dict[str, Any]] = None
+        self, message: str, level: str = "info", detail: dict[str, Any] | None = None
     ) -> None:
         """Log an action to the runtime actions deque."""
         if detail is None:
@@ -249,7 +256,7 @@ class ACSIClient:
                 }
             )
 
-    def _extract_message_meta(self, raw: str) -> Dict[str, str]:
+    def _extract_message_meta(self, raw: str) -> dict[str, str]:
         """Extract metadata from a message (service type, category)."""
         service_type = "unknown"
         category = "unknown"
@@ -318,7 +325,7 @@ class ACSIClient:
                     "category": meta["category"],
                     "message": text,
                     "preview": text[:220] + ("..." if len(text) > 220 else ""),
-                    "cp": meta["cp"]
+                    "cp": meta["cp"],
                 }
             )
 
@@ -343,22 +350,20 @@ class ACSIClient:
         )
 
         try:
-
             start_task = asyncio.create_task(
-                self.runtime.endpoint.start(host, port),
-                name="so-active"
+                self.runtime.endpoint.start(host, port), name="so-active"
             )
 
             self._set_runtime_state(
                 endpoint=self.runtime.endpoint,
-                #client=client,
+                # client=client,
                 _start_task=start_task,
             )
 
             try:
                 await asyncio.wait_for(
                     self.runtime.endpoint._endpoint_running_event.wait(),
-                    timeout=30  # Match timeout in reconfig-connection
+                    timeout=30,  # Match timeout in reconfig-connection
                 )
             except asyncio.TimeoutError as e:
                 start_task.cancel()
@@ -366,10 +371,8 @@ class ACSIClient:
                 self.runtime.error = str(e)
                 raise RuntimeError("Endpoint failed to start within timeout")
 
-
             if self.runtime.endpoint.get_endpoint_status():
                 self.runtime.status = "connected"
-
 
             self._set_runtime_state(
                 status=self.runtime.status,
@@ -394,7 +397,7 @@ class ACSIClient:
         self._set_runtime_state(status="disconnecting")
 
         # Cancel the background task
-        if hasattr(self.runtime, '_start_task') and self.runtime._start_task:
+        if hasattr(self.runtime, "_start_task") and self.runtime._start_task:
             self.runtime._start_task.cancel()
 
         if endpoint is not None:
@@ -444,7 +447,9 @@ class ACSIClient:
             for task in pending:
                 task.cancel()
             if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
             loop.close()
             self._set_runtime_state(loop=None, thread=None)
 
@@ -530,7 +535,7 @@ class ACSIClient:
         future = asyncio.run_coroutine_threadsafe(coro, loop)
         return future.result(timeout=timeout)
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current client status."""
         return {
             "status": self.runtime.status,
@@ -539,33 +544,37 @@ class ACSIClient:
             "error": self.runtime.error,
         }
 
-    async def get_server_directory_tree(self, cp: str, ws_info: Optional[Any] = None) -> Dict[str, Any]:
+    async def get_server_directory_tree(
+        self, cp: str, ws_info: Any | None = None
+    ) -> dict[str, Any]:
         """Get list of all Logical Devices on the server.
-        
+
         Args:
             cp: Communication point identifier
             ws_info: Optional WebSocketInfo (auto-fetched if None)
-            
+
         Returns:
             dict: {"logicalDevices": [...], "source": "live"}
         """
         client = self.get_iec61850_client(cp)
         if not client:
             raise RuntimeError(f"ACSI Client for {cp} not found")
-        
+
         if ws_info is None:
             ws_info = self.runtime.endpoint.get_websocket_info(client)
         if not ws_info:
-            raise RuntimeError('no-websocket-info')
+            raise RuntimeError("no-websocket-info")
 
         async with self.runtime.invoke_lock:
             ld_list = await client.get_server_directory(ws_info, None, None)
         if not isinstance(ld_list, list):
-            raise RuntimeError('unexpected-server-directory')
+            raise RuntimeError("unexpected-server-directory")
 
         return {"logicalDevices": ld_list, "source": "live"}
 
-    async def get_logical_device_tree(self, ld_inst: str, cp: str, ws_info: Optional[Any] = None) -> Dict[str, Any]:
+    async def get_logical_device_tree(
+        self, ld_inst: str, cp: str, ws_info: Any | None = None
+    ) -> dict[str, Any]:
         """Get all Logical Nodes for a specific Logical Device.
 
         Args:
@@ -583,16 +592,20 @@ class ACSIClient:
         if ws_info is None:
             ws_info = self.runtime.endpoint.get_websocket_info(client)
         if not ws_info:
-            raise RuntimeError('no-websocket-info')
+            raise RuntimeError("no-websocket-info")
 
         async with self.runtime.invoke_lock:
-            ln_list = await client.get_logical_device_directory(ld_inst, ws_info, None, None)
+            ln_list = await client.get_logical_device_directory(
+                ld_inst, ws_info, None, None
+            )
         if not isinstance(ln_list, list):
-            raise RuntimeError('unexpected-ln-list')
+            raise RuntimeError("unexpected-ln-list")
 
         return {"logicalDevice": ld_inst, "logicalNodes": ln_list, "source": "live"}
 
-    async def get_logical_node_tree(self, ld_inst: str, ln_inst: str, cp: str, ws_info: Optional[Any] = None) -> Dict[str, Any]:
+    async def get_logical_node_tree(
+        self, ld_inst: str, ln_inst: str, cp: str, ws_info: Any | None = None
+    ) -> dict[str, Any]:
         """Get complete tree for a specific Logical Node.
 
         Fetches DO, DA, BRCB, URCB, and DataSet directories in parallel.
@@ -614,14 +627,16 @@ class ACSIClient:
         if ws_info is None:
             ws_info = self.runtime.endpoint.get_websocket_info(client)
         if not ws_info:
-            raise RuntimeError('no-websocket-info')
+            raise RuntimeError("no-websocket-info")
 
-        directory_types = ['dataObject', 'brcb', 'urcb', 'dataset']
+        directory_types = ["dataObject", "brcb", "urcb", "dataset"]
 
         async def fetch_directory(directory_type):
             try:
                 async with self.runtime.invoke_lock:
-                    items = await client.get_logical_node_directory(ld_inst, ln_inst, directory_type, ws_info, None, None)
+                    items = await client.get_logical_node_directory(
+                        ld_inst, ln_inst, directory_type, ws_info, None, None
+                    )
                 return directory_type, items if items else []
             except Exception:
                 return directory_type, []
@@ -635,7 +650,14 @@ class ACSIClient:
 
         return result
 
-    async def get_data_object_details(self, ld_inst: str, ln_inst: str, do_name: str, cp: str, ws_info: Optional[Any] = None) -> Dict[str, Any]:
+    async def get_data_object_details(
+        self,
+        ld_inst: str,
+        ln_inst: str,
+        do_name: str,
+        cp: str,
+        ws_info: Any | None = None,
+    ) -> dict[str, Any]:
         """Get complete details for a specific Data Object including its data attributes.
 
         Args:
@@ -655,7 +677,7 @@ class ACSIClient:
         if ws_info is None:
             ws_info = self.runtime.endpoint.get_websocket_info(client)
         if not ws_info:
-            raise RuntimeError('no-websocket-info')
+            raise RuntimeError("no-websocket-info")
 
         obj_ref = f"{ld_inst}/{ln_inst}.{do_name}"
 
@@ -668,17 +690,17 @@ class ACSIClient:
             "dataObject": do_name,
             "objRef": obj_ref,
             "definition": defn if isinstance(defn, dict) else {},
-            "source": "live"
+            "source": "live",
         }
 
         return result
 
-    def get_actions(self) -> List[Dict[str, Any]]:
+    def get_actions(self) -> list[dict[str, Any]]:
         """Get logged actions."""
         with self.runtime.lock:
             return list(self.runtime.actions)
 
-    def get_messages(self) -> List[Dict[str, Any]]:
+    def get_messages(self) -> list[dict[str, Any]]:
         """Get logged messages."""
         with self.runtime.lock:
             return list(self.runtime.messages)
@@ -693,7 +715,7 @@ class ACSIClient:
         with self.runtime.lock:
             self.runtime.messages.clear()
 
-    async def read_value(self, obj_ref: str, fc: str, cp: str) -> Dict[str, Any]:
+    async def read_value(self, obj_ref: str, fc: str, cp: str) -> dict[str, Any]:
         """Read a value from the server."""
         client = self.get_iec61850_client(cp)
         if not client:
@@ -701,10 +723,14 @@ class ACSIClient:
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
         async with self.runtime.invoke_lock:
-            result = await client.get_data_values(obj_ref, fc, False, websocket_info, None, None)
+            result = await client.get_data_values(
+                obj_ref, fc, False, websocket_info, None, None
+            )
         return {"value": result}
 
-    async def get_dataset_directory(self, ld_inst: str, ln_inst: str, ds_inst: str, cp: str) -> Dict[str, Any]:
+    async def get_dataset_directory(
+        self, ld_inst: str, ln_inst: str, ds_inst: str, cp: str
+    ) -> dict[str, Any]:
         """Read a value from the server."""
         client = self.get_iec61850_client(cp)
         if not client:
@@ -712,10 +738,12 @@ class ACSIClient:
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
         async with self.runtime.invoke_lock:
-            result = await client.get_dataset_directory(ld_inst, ln_inst, ds_inst, websocket_info, None, None)
+            result = await client.get_dataset_directory(
+                ld_inst, ln_inst, ds_inst, websocket_info, None, None
+            )
         return {"value": result}
 
-    async def get_data_definition(self, obj_ref: str, cp: str) -> Dict[str, Any]:
+    async def get_data_definition(self, obj_ref: str, cp: str) -> dict[str, Any]:
         """Read a value from the server."""
         try:
             client = self.get_iec61850_client(cp)
@@ -724,13 +752,15 @@ class ACSIClient:
 
             websocket_info = self.runtime.endpoint.get_websocket_info(client)
             async with self.runtime.invoke_lock:
-                result = await client.get_data_definition(obj_ref, websocket_info, None, None)
+                result = await client.get_data_definition(
+                    obj_ref, websocket_info, None, None
+                )
             return {"dataDefinition": result}
         except Exception as e:
             logger.exception(f"Error in get_data_definition: {e}")
             raise
 
-    async def get_brcb_definition(self, obj_ref: str, cp: str) -> Dict[str, Any]:
+    async def get_brcb_definition(self, obj_ref: str, cp: str) -> dict[str, Any]:
         """Read a value from the server."""
 
         client = self.get_iec61850_client(cp)
@@ -754,45 +784,47 @@ class ACSIClient:
             Configured ClientReportControlBlock
         """
         # Extract from nested data structure
-        obj_ref = rcb_data.get('ref', '')
-        is_buffered = True if type == 'BRCB' else False
+        obj_ref = rcb_data.get("ref", "")
+        is_buffered = True if type == "BRCB" else False
 
         # Create BRCB instance
-        rcb = IEC61850Client.ClientReportControlBlock(obj_ref, rcb_data.get('rptEna', is_buffered))
+        rcb = IEC61850Client.ClientReportControlBlock(
+            obj_ref, rcb_data.get("rptEna", is_buffered)
+        )
 
         # Map fields from frontend
-        rcb.dataSet = rcb_data.get('dataSet', '')
-        rcb.intgPd = rcb_data.get('intgPd', 0)
-        rcb.rptEna = rcb_data.get('rptEna', True)
+        rcb.dataSet = rcb_data.get("dataSet", "")
+        rcb.intgPd = rcb_data.get("intgPd", 0)
+        rcb.rptEna = rcb_data.get("rptEna", True)
 
         # Map optFlds - convert dict to expected format
-        opt_flds_data = rcb_data.get('optFlds', {})
+        opt_flds_data = rcb_data.get("optFlds", {})
         rcb.optFlds = {
-            'seqNum': opt_flds_data.get('seqNum', False),
-            'timeStamp': opt_flds_data.get('timeStamp', True),
-            'dataSet': opt_flds_data.get('dataSet', True),
-            'bufOvfl': opt_flds_data.get('bufOvfl', True),
-            'configRef': opt_flds_data.get('configRef', False),
-            'entryID': opt_flds_data.get('entryID', True),
-            'dataRef': opt_flds_data.get('dataRef', True),
-            'reasonCode': opt_flds_data.get('reasonCode', False)
+            "seqNum": opt_flds_data.get("seqNum", False),
+            "timeStamp": opt_flds_data.get("timeStamp", True),
+            "dataSet": opt_flds_data.get("dataSet", True),
+            "bufOvfl": opt_flds_data.get("bufOvfl", True),
+            "configRef": opt_flds_data.get("configRef", False),
+            "entryID": opt_flds_data.get("entryID", True),
+            "dataRef": opt_flds_data.get("dataRef", True),
+            "reasonCode": opt_flds_data.get("reasonCode", False),
         }
 
         # Map trgOps (note: capital O in BRCB)
-        trg_op_data = rcb_data.get('trgOp', {})
+        trg_op_data = rcb_data.get("trgOp", {})
         rcb.trgOps = {
-            'dchg': trg_op_data.get('dchg', False),
-            'qchg': trg_op_data.get('qchg', False),
-            'dupd': trg_op_data.get('dupd', False),
-            'integrity': trg_op_data.get('integrity', True),
-            'gi': trg_op_data.get('gi', False)
+            "dchg": trg_op_data.get("dchg", False),
+            "qchg": trg_op_data.get("qchg", False),
+            "dupd": trg_op_data.get("dupd", False),
+            "integrity": trg_op_data.get("integrity", True),
+            "gi": trg_op_data.get("gi", False),
         }
 
         # Set defaults for other required fields
         rcb.confRev = 1
         rcb.bufTm = 1000
         rcb.sqNum = 0
-        rcb.gi = rcb.trgOps.get('gi', False)
+        rcb.gi = rcb.trgOps.get("gi", False)
         rcb.purgeBuf = False
         rcb.entryId = b"\x01\x02\x03\x04\x05\x06\x07\x08"
         rcb.timeOfEntry = datetime.now()
@@ -800,7 +832,7 @@ class ACSIClient:
 
         return rcb
 
-    async def set_brcb_values(self, cp: str, data: Any) -> Dict[str, Any]:
+    async def set_brcb_values(self, cp: str, data: Any) -> dict[str, Any]:
         """Read a value from the server."""
 
         brcb = self.create_rcb_from_frontend_data(data, "BRCB")
@@ -811,10 +843,10 @@ class ACSIClient:
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
         async with self.runtime.invoke_lock:
-            result = await client.set_BRCB_values(brcb, websocket_info , None, None)
+            result = await client.set_BRCB_values(brcb, websocket_info, None, None)
         return {"result": result}
 
-    async def set_urcb_values(self, cp: str, data: Any) -> Dict[str, Any]:
+    async def set_urcb_values(self, cp: str, data: Any) -> dict[str, Any]:
         """Read a value from the server."""
 
         rcb = self.create_rcb_from_frontend_data(data, "URCB")
@@ -825,10 +857,10 @@ class ACSIClient:
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
         async with self.runtime.invoke_lock:
-            result = await client.set_URCB_values(rcb, websocket_info , None, None)
+            result = await client.set_URCB_values(rcb, websocket_info, None, None)
         return {"result": result}
 
-    async def get_urcb_definition(self, obj_ref: str, cp: str) -> Dict[str, Any]:
+    async def get_urcb_definition(self, obj_ref: str, cp: str) -> dict[str, Any]:
         """Read a value from the server."""
 
         client = self.get_iec61850_client(cp)
@@ -883,12 +915,16 @@ class ACSIClient:
             return True, raw_str  # already a string
 
         if expected_type is list:
-            logger.error(f"No defined conversion for {type_name} (list) from string '{raw_str}'")
+            logger.error(
+                f"No defined conversion for {type_name} (list) from string '{raw_str}'"
+            )
             return False, None
 
         return False, None
 
-    async def write_value(self, obj_ref: str, value: Any, fc: str, data_type: str, cp:str) -> Dict[str, Any]:
+    async def write_value(
+        self, obj_ref: str, value: Any, fc: str, data_type: str, cp: str
+    ) -> dict[str, Any]:
         """Write a value to the server."""
         client = self.get_iec61850_client(cp)
         if not client:
@@ -925,17 +961,27 @@ class ACSIClient:
             converted, converted_val = self.convert_value(data_type, value, TYPE_MAP)
 
             if converted is False:
-                raise RuntimeError(f"Type mismatch: '{value}' is not valid for {data_type}")
+                raise RuntimeError(
+                    f"Type mismatch: '{value}' is not valid for {data_type}"
+                )
             else:
-                result = await client.set_data_values(obj_ref, fc, [{"data": (data_type, converted_val)}], websocket_info,
-                                                      self.runtime.write_callback, None)
+                result = await client.set_data_values(
+                    obj_ref,
+                    fc,
+                    [{"data": (data_type, converted_val)}],
+                    websocket_info,
+                    self.runtime.write_callback,
+                    None,
+                )
 
         if result is True:
             return {"objRef": obj_ref, "value": value}
         else:
             return {"objRef": obj_ref, "value": None, "error": result}
 
-    async def operate(self, obj_ref, oper_val, val_type: str, cp: str) -> Dict[str, Any]:
+    async def operate(
+        self, obj_ref, oper_val, val_type: str, cp: str
+    ) -> dict[str, Any]:
         """Perform an operate command on the server."""
         client = self.get_iec61850_client(cp)
         if not client:
@@ -945,7 +991,10 @@ class ACSIClient:
 
         oper_val = {
             "ref": obj_ref,
-            "ctlVal": (val_type, self._convert_operate_val_to_its_type(oper_val, val_type)),
+            "ctlVal": (
+                val_type,
+                self._convert_operate_val_to_its_type(oper_val, val_type),
+            ),
             "origin": {"orCat": "stationControl", "orIdent": b"ORIGIN_ID_1234567890"},
             "ctlNum": 0,
             "t": {

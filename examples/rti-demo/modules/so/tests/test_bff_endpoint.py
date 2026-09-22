@@ -31,7 +31,6 @@ from __future__ import annotations
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from so import bff_endpoint
 
 pytestmark = pytest.mark.unit
@@ -183,8 +182,7 @@ class TestConnectEndpoint:
         """Test connect with a non-numeric port string is rejected."""
         client, _ = app_client
         response = client.post(
-            "/api/connect",
-            json={"host": "localhost", "port": "invalid"}
+            "/api/connect", json={"host": "localhost", "port": "invalid"}
         )
         # port is a pydantic `int` field, so a non-numeric string is now
         # rejected by request validation (422) rather than the handler's own
@@ -197,10 +195,7 @@ class TestConnectEndpoint:
         # connect() starts a background thread and returns immediately
         # without waiting for the connection to actually succeed - safe to
         # call for real here, nothing to mock.
-        response = client.post(
-            "/api/connect",
-            json={"host": "localhost", "port": 8765}
-        )
+        response = client.post("/api/connect", json={"host": "localhost", "port": 8765})
         assert "application/json" in content_type(response)
 
 
@@ -274,10 +269,7 @@ class TestReadValueEndpoint:
     def test_readvalue_missing_objref(self, app_client):
         """Test readvalue with a missing (required) objRef is rejected."""
         client, _ = app_client
-        response = client.post(
-            "/api/readvalue",
-            json={}
-        )
+        response = client.post("/api/readvalue", json={})
         # objRef is a required field on ReadvalueRequest - rejected by
         # request validation (422) before the handler runs.
         assert response.status_code == 422
@@ -285,10 +277,7 @@ class TestReadValueEndpoint:
     def test_readvalue_error_response_is_json(self, app_client):
         """Test readvalue error response is JSON."""
         client, _ = app_client
-        response = client.post(
-            "/api/readvalue",
-            json={}
-        )
+        response = client.post("/api/readvalue", json={})
         assert "application/json" in content_type(response)
 
 
@@ -298,10 +287,7 @@ class TestWriteValueEndpoint:
     def test_writevalue_missing_objref(self, app_client):
         """Test writevalue with a missing (required) objRef is rejected."""
         client, _ = app_client
-        response = client.post(
-            "/api/writevalue",
-            json={"value": 1}
-        )
+        response = client.post("/api/writevalue", json={"value": 1})
         # fc and objRef are both required fields on WriteValueRequest and
         # neither is present here - 422 from request validation.
         assert response.status_code == 422
@@ -309,20 +295,14 @@ class TestWriteValueEndpoint:
     def test_writevalue_missing_value(self, app_client):
         """Test writevalue with a missing (required) value is rejected."""
         client, _ = app_client
-        response = client.post(
-            "/api/writevalue",
-            json={"objRef": "LD0/LLN0.Mod.stVal"}
-        )
+        response = client.post("/api/writevalue", json={"objRef": "LD0/LLN0.Mod.stVal"})
         # fc and value are both required and neither is present here.
         assert response.status_code == 422
 
     def test_writevalue_error_response_is_json(self, app_client):
         """Test writevalue error response is JSON."""
         client, _ = app_client
-        response = client.post(
-            "/api/writevalue",
-            json={}
-        )
+        response = client.post("/api/writevalue", json={})
         assert "application/json" in content_type(response)
 
 
@@ -369,7 +349,7 @@ class TestErrorHandling:
         response = client.post(
             "/api/connect",
             content="not json",
-            headers={"content-type": "application/json"}
+            headers={"content-type": "application/json"},
         )
         # Should handle gracefully, not crash with a 500.
         assert response.status_code != 500
@@ -377,10 +357,7 @@ class TestErrorHandling:
     def test_readvalue_error_message_present(self, app_client):
         """Test readvalue error includes some error/detail message."""
         client, _ = app_client
-        response = client.post(
-            "/api/readvalue",
-            json={}
-        )
+        response = client.post("/api/readvalue", json={})
         body = response.json()
         # FastAPI's own request-validation errors use "detail" rather than
         # this app's usual custom {"ok": False, "error": ...} shape.

@@ -29,7 +29,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class IOMappingManager:
 
     DEFAULT_MAPPING_FILE = "io_mapping.json"
 
-    def __init__(self, mapping_file: Optional[str] = None, mapping_dir: Optional[str] = None):
+    def __init__(self, mapping_file: str | None = None, mapping_dir: str | None = None):
         """Initialize the mapping manager.
 
         Args:
@@ -78,13 +78,13 @@ class IOMappingManager:
             module_dir = Path(__file__).parent
             self.mapping_path = module_dir / self.DEFAULT_MAPPING_FILE
 
-        self._mappings: Dict[str, Dict[str, Any]] = {}
-        self._objref_index: Dict[str, List[str]] = {}  # objRef -> list of device_names
+        self._mappings: dict[str, dict[str, Any]] = {}
+        self._objref_index: dict[str, list[str]] = {}  # objRef -> list of device_names
 
         # Load existing mappings
         self.load()
 
-    def load(self, path: Optional[str] = None) -> bool:
+    def load(self, path: str | None = None) -> bool:
         """Load mappings from JSON file.
 
         Args:
@@ -102,38 +102,50 @@ class IOMappingManager:
             return False
 
         try:
-            with open(load_path, "r", encoding="utf-8") as f:
+            with open(load_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             # Handle both formats: flat dict or {"leds": {...}, "buttons": {...}, etc.}
             if isinstance(data, dict):
                 # Normalize all device type sections (leds, buttons, potentiometers, etc.)
                 self._mappings = {}
-                
+
                 # Process each device type section
-                for device_type_section in ["leds", "buttons", "potentiometers", "sensors", "lcds"]:
+                for device_type_section in [
+                    "leds",
+                    "buttons",
+                    "potentiometers",
+                    "sensors",
+                    "lcds",
+                ]:
                     if device_type_section in data:
                         for key, config in data[device_type_section].items():
                             device_name = key
                             # Normalize the config to include device_name
-                            normalized_config = {k: v for k, v in config.items() if k != "led_name"}
+                            normalized_config = {
+                                k: v for k, v in config.items() if k != "led_name"
+                            }
                             self._mappings[device_name] = {
                                 **normalized_config,
-                                "device_name": device_name
+                                "device_name": device_name,
                             }
-                
+
                 # Also handle old objRef-indexed format for backward compatibility
                 if not self._mappings and "mappings" in data:
                     # Convert from objRef-indexed format
                     self._mappings = {}
                     for objref, device_config in data["mappings"].items():
-                        device_name = device_config.get("device_name") or device_config.get("led_name", objref)
+                        device_name = device_config.get(
+                            "device_name"
+                        ) or device_config.get("led_name", objref)
                         # Normalize the config to use device_name
-                        normalized_config = {k: v for k, v in device_config.items() if k != "led_name"}
+                        normalized_config = {
+                            k: v for k, v in device_config.items() if k != "led_name"
+                        }
                         self._mappings[device_name] = {
                             **normalized_config,
                             "device_name": device_name,
-                            "objRef": objref
+                            "objRef": objref,
                         }
 
             # Build objRef index (support multiple devices per objRef and multiple objRefs per device)
@@ -146,14 +158,16 @@ class IOMappingManager:
                         refs = objrefs
                     else:
                         refs = [objrefs]
-                    
+
                     for objref in refs:
                         if objref not in self._objref_index:
                             self._objref_index[objref] = []
                         if device_name not in self._objref_index[objref]:
                             self._objref_index[objref].append(device_name)
 
-            logger.info(f"Loaded {len(self._mappings)} IO device mappings from {load_path}")
+            logger.info(
+                f"Loaded {len(self._mappings)} IO device mappings from {load_path}"
+            )
             return True
 
         except json.JSONDecodeError as e:
@@ -167,7 +181,7 @@ class IOMappingManager:
             self._objref_index = {}
             return False
 
-    def save(self, path: Optional[str] = None) -> bool:
+    def save(self, path: str | None = None) -> bool:
         """Save mappings to JSON file.
 
         Args:
@@ -180,16 +194,30 @@ class IOMappingManager:
 
         try:
             # Organize mappings by device type based on direction
-            leds = {k: v for k, v in self._mappings.items() 
-                    if v.get("direction") == "output" or not v.get("direction")}
-            buttons = {k: v for k, v in self._mappings.items() 
-                      if v.get("direction") == "input" and v.get("device_type") == "button"}
-            potentiometers = {k: v for k, v in self._mappings.items() 
-                            if v.get("direction") == "input" and v.get("device_type") == "potentiometer"}
+            leds = {
+                k: v
+                for k, v in self._mappings.items()
+                if v.get("direction") == "output" or not v.get("direction")
+            }
+            buttons = {
+                k: v
+                for k, v in self._mappings.items()
+                if v.get("direction") == "input" and v.get("device_type") == "button"
+            }
+            potentiometers = {
+                k: v
+                for k, v in self._mappings.items()
+                if v.get("direction") == "input"
+                and v.get("device_type") == "potentiometer"
+            }
             # Input devices without specific device_type
-            other_inputs = {k: v for k, v in self._mappings.items() 
-                           if v.get("direction") == "input" and v.get("device_type") not in ["button", "potentiometer"]}
-            
+            other_inputs = {
+                k: v
+                for k, v in self._mappings.items()
+                if v.get("direction") == "input"
+                and v.get("device_type") not in ["button", "potentiometer"]
+            }
+
             # Build data structure
             data = {}
             if leds:
@@ -200,7 +228,7 @@ class IOMappingManager:
                 data["potentiometers"] = potentiometers
             if other_inputs:
                 data["inputs"] = other_inputs
-            
+
             # If no type was specified, use flat format for backward compatibility
             if not data:
                 data = {"leds": self._mappings}
@@ -211,7 +239,9 @@ class IOMappingManager:
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
-            logger.info(f"Saved {len(self._mappings)} IO device mappings to {save_path}")
+            logger.info(
+                f"Saved {len(self._mappings)} IO device mappings to {save_path}"
+            )
             return True
 
         except Exception as e:
@@ -223,13 +253,13 @@ class IOMappingManager:
     def add_mapping(
         self,
         device_name: str,
-        obj_ref: Optional[str] = None,
+        obj_ref: str | None = None,
         description: str = "",
         initial_state: bool = False,
-        **extra_properties: Any
-    ) -> Dict[str, Any]:
+        **extra_properties: Any,
+    ) -> dict[str, Any]:
         """Add or update a mapping.
-        
+
         Supports multiple objRefs mapping to the same device (many-to-one).
         If a device already exists, the new objRef is appended to its objRefs list.
 
@@ -246,9 +276,9 @@ class IOMappingManager:
         # Get existing config for this device, or create new
         if device_name not in self._mappings:
             self._mappings[device_name] = {"device_name": device_name}
-        
+
         config = self._mappings[device_name]
-        
+
         # Handle objRef: support multiple objRefs per device
         if obj_ref is not None:
             # Store objRefs as a list to support multiple mappings
@@ -262,12 +292,12 @@ class IOMappingManager:
                     config["objRef"] = [existing_objref, obj_ref]
             else:
                 config["objRef"] = obj_ref
-        
+
         if description:
             config["description"] = description
         if initial_state:
             config["initial_state"] = initial_state
-        
+
         config.update(extra_properties)
 
         # Update objRef index (support multiple devices per objRef)
@@ -296,14 +326,14 @@ class IOMappingManager:
         # Remove from objRef index if present
         config = self._mappings[device_name]
         obj_refs = config.get("objRef")
-        
+
         # Handle objRef as either string or list
         if obj_refs:
             if isinstance(obj_refs, list):
                 refs_to_remove = obj_refs
             else:
                 refs_to_remove = [obj_refs]
-            
+
             for obj_ref in refs_to_remove:
                 if obj_ref in self._objref_index:
                     # Remove device_name from the list
@@ -320,7 +350,7 @@ class IOMappingManager:
 
     def remove_mapping_by_objref(self, obj_ref: str) -> bool:
         """Remove a specific objRef from mappings.
-        
+
         If a device has multiple objRefs, only the specified objRef is removed from that device.
         If a device has only that objRef, the entire device mapping is removed.
 
@@ -335,11 +365,13 @@ class IOMappingManager:
             return False
 
         removed = False
-        for device_name in device_names[:]:  # Copy list to avoid modification during iteration
+        for device_name in device_names[
+            :
+        ]:  # Copy list to avoid modification during iteration
             if device_name in self._mappings:
                 config = self._mappings[device_name]
                 obj_refs = config.get("objRef")
-                
+
                 if obj_refs:
                     if isinstance(obj_refs, list):
                         # Remove this obj_ref from the list
@@ -349,24 +381,30 @@ class IOMappingManager:
                             # If no more objRefs, remove the entire device mapping
                             if not obj_refs:
                                 del self._mappings[device_name]
-                                logger.info(f"Removed device {device_name} (no objRefs left)")
+                                logger.info(
+                                    f"Removed device {device_name} (no objRefs left)"
+                                )
                             else:
                                 # Just this objRef was removed
-                                logger.info(f"Removed objRef '{obj_ref}' from device {device_name}")
+                                logger.info(
+                                    f"Removed objRef '{obj_ref}' from device {device_name}"
+                                )
                     else:
                         # Single objRef - if it matches, remove entire device
                         if obj_refs == obj_ref:
                             del self._mappings[device_name]
                             removed = True
-                            logger.info(f"Removed mapping: {device_name} (objRef: {obj_ref})")
-        
+                            logger.info(
+                                f"Removed mapping: {device_name} (objRef: {obj_ref})"
+                            )
+
         # Remove from objRef index
         if obj_ref in self._objref_index:
             del self._objref_index[obj_ref]
-        
+
         return removed
 
-    def get_mapping(self, device_name: str) -> Optional[Dict[str, Any]]:
+    def get_mapping(self, device_name: str) -> dict[str, Any] | None:
         """Get mapping configuration by IO device name.
 
         Args:
@@ -377,7 +415,7 @@ class IOMappingManager:
         """
         return self._mappings.get(device_name)
 
-    def get_device_by_objref(self, obj_ref: str) -> Optional[Dict[str, Any]]:
+    def get_device_by_objref(self, obj_ref: str) -> dict[str, Any] | None:
         """Get IO device configuration by IEC 61850 object reference.
 
         Args:
@@ -400,7 +438,7 @@ class IOMappingManager:
             return {**config, "device_name": device_name}
         return None
 
-    def get_devices_by_objref(self, obj_ref: str) -> List[Dict[str, Any]]:
+    def get_devices_by_objref(self, obj_ref: str) -> list[dict[str, Any]]:
         """Get all IO device configurations mapped to an IEC 61850 object reference.
 
         Args:
@@ -418,7 +456,7 @@ class IOMappingManager:
                 results.append({**config, "device_name": device_name})
         return results
 
-    def get_all_mappings(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_mappings(self) -> dict[str, dict[str, Any]]:
         """Get all mappings.
 
         Returns:
@@ -426,7 +464,7 @@ class IOMappingManager:
         """
         return dict(self._mappings)
 
-    def get_all_by_objref(self) -> Dict[str, List[Dict[str, Any]]]:
+    def get_all_by_objref(self) -> dict[str, list[dict[str, Any]]]:
         """Get all mappings indexed by objRef.
 
         Returns:
@@ -452,10 +490,7 @@ class IOMappingManager:
     # ==================== Sync Utilities ====================
 
     def sync_device_from_iec61850(
-        self,
-        obj_ref: str,
-        value: Any,
-        client: Any = None
+        self, obj_ref: str, value: Any, client: Any = None
     ) -> bool:
         """Synchronize IO device state based on IEC 61850 value.
 
@@ -474,29 +509,37 @@ class IOMappingManager:
         synced = False
         for device_config in device_configs:
             device_name = device_config["device_name"]
-            
+
             # Only sync to OUTPUT devices (LEDs, etc.) - not INPUT devices (buttons, potentiometers)
             device_direction = device_config.get("direction", "").lower()
             # Check both 'type' and 'device_type' fields
-            device_type = device_config.get("type", device_config.get("device_type", "")).lower()
-            
+            device_type = device_config.get(
+                "type", device_config.get("device_type", "")
+            ).lower()
+
             # Skip input devices - they should not be written to from ACSI
             if device_direction == "input":
-                logger.debug(f"Skipping sync to input device '{device_name}' (from {obj_ref}) - input devices are read-only")
+                logger.debug(
+                    f"Skipping sync to input device '{device_name}' (from {obj_ref}) - input devices are read-only"
+                )
                 continue
-            
+
             # Also skip known input device types
             if device_type in ("button", "potentiometer", "sensor"):
-                logger.debug(f"Skipping sync to input device '{device_name}' (type: {device_type}) (from {obj_ref}) - input devices are read-only")
+                logger.debug(
+                    f"Skipping sync to input device '{device_name}' (type: {device_type}) (from {obj_ref}) - input devices are read-only"
+                )
                 continue
-            
+
             # Convert value based on device type
             if device_type == "lcd":
                 # LCDs only accept string/text values
                 if isinstance(value, str):
                     device_state = value
                 else:
-                    logger.debug(f"Skipping LCD '{device_name}' - value '{value}' is not text/string")
+                    logger.debug(
+                        f"Skipping LCD '{device_name}' - value '{value}' is not text/string"
+                    )
                     continue
             elif device_type == "led":
                 # LEDs only accept boolean-like values
@@ -504,10 +547,20 @@ class IOMappingManager:
                     device_state = value
                 elif isinstance(value, (int, float)):
                     device_state = bool(value)
-                elif isinstance(value, str) and value.upper() in ("ON", "TRUE", "1", "YES", "CLOSED", "OPEN", "ACTIVE"):
+                elif isinstance(value, str) and value.upper() in (
+                    "ON",
+                    "TRUE",
+                    "1",
+                    "YES",
+                    "CLOSED",
+                    "OPEN",
+                    "ACTIVE",
+                ):
                     device_state = True
                 else:
-                    logger.debug(f"Skipping LED '{device_name}' - value '{value}' is not boolean-like")
+                    logger.debug(
+                        f"Skipping LED '{device_name}' - value '{value}' is not boolean-like"
+                    )
                     continue
             else:
                 # For other output devices: convert to boolean
@@ -518,18 +571,17 @@ class IOMappingManager:
                     # Call set_device - both sync and async clients have this method
                     # For async clients, the caller must handle awaiting
                     client.set_device(device_name, device_state)
-                    logger.info(f"Synced IO device '{device_name}' to {device_state} (from {obj_ref}={value})")
+                    logger.info(
+                        f"Synced IO device '{device_name}' to {device_state} (from {obj_ref}={value})"
+                    )
                     synced = True
                 except Exception as e:
                     logger.error(f"Failed to sync IO device '{device_name}': {e}")
-        
+
         return synced
-    
+
     async def sync_device_from_iec61850_async(
-        self,
-        obj_ref: str,
-        value: Any,
-        client: Any = None
+        self, obj_ref: str, value: Any, client: Any = None
     ) -> bool:
         """Async version of sync_device_from_iec61850 for async clients."""
         device_configs = self.get_devices_by_objref(obj_ref)
@@ -539,20 +591,26 @@ class IOMappingManager:
         synced = False
         for device_config in device_configs:
             device_name = device_config["device_name"]
-            
+
             # Only sync to OUTPUT devices (LEDs, etc.) - not INPUT devices (buttons, potentiometers)
             device_direction = device_config.get("direction", "").lower()
             # Check both 'type' and 'device_type' fields
-            device_type = device_config.get("type", device_config.get("device_type", "")).lower()
-            
+            device_type = device_config.get(
+                "type", device_config.get("device_type", "")
+            ).lower()
+
             # Skip input devices - they should not be written to from ACSI
             if device_direction == "input":
-                logger.debug(f"Skipping sync to input device '{device_name}' (from {obj_ref}) - input devices are read-only")
+                logger.debug(
+                    f"Skipping sync to input device '{device_name}' (from {obj_ref}) - input devices are read-only"
+                )
                 continue
-            
+
             # Also skip known input device types
             if device_type in ("button", "potentiometer", "sensor"):
-                logger.debug(f"Skipping sync to input device '{device_name}' (type: {device_type}) (from {obj_ref}) - input devices are read-only")
+                logger.debug(
+                    f"Skipping sync to input device '{device_name}' (type: {device_type}) (from {obj_ref}) - input devices are read-only"
+                )
                 continue
 
             # Convert value based on device type
@@ -561,7 +619,9 @@ class IOMappingManager:
                 if isinstance(value, str):
                     device_state = value
                 else:
-                    logger.debug(f"Skipping LCD '{device_name}' - value '{value}' is not text/string")
+                    logger.debug(
+                        f"Skipping LCD '{device_name}' - value '{value}' is not text/string"
+                    )
                     continue
             elif device_type == "led":
                 # LEDs only accept boolean-like values
@@ -570,11 +630,21 @@ class IOMappingManager:
                     device_state = value
                 elif isinstance(value, (int, float)):
                     device_state = bool(value)
-                elif isinstance(value, str) and value.upper() in ("ON", "TRUE", "1", "YES", "CLOSED", "OPEN", "ACTIVE"):
+                elif isinstance(value, str) and value.upper() in (
+                    "ON",
+                    "TRUE",
+                    "1",
+                    "YES",
+                    "CLOSED",
+                    "OPEN",
+                    "ACTIVE",
+                ):
                     device_state = True
                 else:
                     # Skip LEDs if value is not boolean-like (e.g., text)
-                    logger.debug(f"Skipping LED '{device_name}' - value '{value}' is not boolean-like")
+                    logger.debug(
+                        f"Skipping LED '{device_name}' - value '{value}' is not boolean-like"
+                    )
                     continue
             else:
                 # For other output devices: convert to boolean
@@ -583,11 +653,13 @@ class IOMappingManager:
             if client:
                 try:
                     await client.set_device(device_name, device_state)
-                    logger.info(f"Synced IO device '{device_name}' to {device_state} (from {obj_ref}={value})")
+                    logger.info(
+                        f"Synced IO device '{device_name}' to {device_state} (from {obj_ref}={value})"
+                    )
                     synced = True
                 except Exception as e:
                     logger.error(f"Failed to sync IO device '{device_name}': {e}")
-        
+
         return synced
 
     def _convert_to_bool(self, value: Any) -> bool:
@@ -600,7 +672,13 @@ class IOMappingManager:
 
         if isinstance(value, str):
             return value.upper() in (
-                "ON", "TRUE", "1", "YES", "CLOSED", "OPEN", "ACTIVE"
+                "ON",
+                "TRUE",
+                "1",
+                "YES",
+                "CLOSED",
+                "OPEN",
+                "ACTIVE",
             )
 
         return bool(value)
@@ -611,11 +689,11 @@ class IOMappingManager:
         self,
         device_name: str,
         gpio_pin: int,
-        obj_ref: Optional[str] = None,
+        obj_ref: str | None = None,
         description: str = "",
         initial_state: bool = False,
-        **extra_properties: Any
-    ) -> Dict[str, Any]:
+        **extra_properties: Any,
+    ) -> dict[str, Any]:
         """Configure an IO device and add it to the mapping.
 
         This is a convenience method that:
@@ -634,12 +712,12 @@ class IOMappingManager:
             dict: Configuration suitable for demo_io config_led endpoint (includes gpio_pin)
         """
         # Add to mapping (without gpio_pin - that belongs to device config, not mapping)
-        demoio_config = self.add_mapping(
+        self.add_mapping(
             device_name=device_name,
             obj_ref=obj_ref,
             description=description,
             initial_state=initial_state,
-            **extra_properties
+            **extra_properties,
         )
 
         # Return config for demo_io (includes gpio_pin for device configuration)
@@ -647,12 +725,12 @@ class IOMappingManager:
             "name": device_name,
             "gpio_pin": gpio_pin,
             "description": description or f"Mapped to {obj_ref}" if obj_ref else "",
-            "initial_state": initial_state
+            "initial_state": initial_state,
         }
 
-    def get_device_config_for_demoio(self, device_name: str) -> Optional[Dict[str, Any]]:
+    def get_device_config_for_demoio(self, device_name: str) -> dict[str, Any] | None:
         """Get IO device configuration in the format expected by demo_io.
-        
+
         Note: gpio_pin is NOT included as it's device-specific config stored in demo_io,
         not in the mapping.
 
@@ -669,12 +747,12 @@ class IOMappingManager:
         return {
             "name": device_name,
             "description": config.get("description", ""),
-            "initial_state": config.get("initial_state", False)
+            "initial_state": config.get("initial_state", False),
         }
 
-    def get_all_device_configs_for_demoio(self) -> List[Dict[str, Any]]:
+    def get_all_device_configs_for_demoio(self) -> list[dict[str, Any]]:
         """Get all IO device configurations in demo_io format.
-        
+
         Note: gpio_pin is NOT included as it's device-specific config stored in demo_io,
         not in the mapping.
 
@@ -683,14 +761,16 @@ class IOMappingManager:
         """
         configs = []
         for device_name, config in self._mappings.items():
-            configs.append({
-                "name": device_name,
-                "description": config.get("description", ""),
-                "initial_state": config.get("initial_state", False)
-            })
+            configs.append(
+                {
+                    "name": device_name,
+                    "description": config.get("description", ""),
+                    "initial_state": config.get("initial_state", False),
+                }
+            )
         return configs
 
-    def list_mapped_devices(self) -> List[str]:
+    def list_mapped_devices(self) -> list[str]:
         """List all IO device names that have mappings.
 
         Returns:
@@ -698,7 +778,7 @@ class IOMappingManager:
         """
         return list(self._mappings.keys())
 
-    def list_mapped_objrefs(self) -> List[str]:
+    def list_mapped_objrefs(self) -> list[str]:
         """List all IEC 61850 object references that have mappings.
 
         Returns:

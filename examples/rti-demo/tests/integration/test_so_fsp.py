@@ -52,14 +52,19 @@ def _establish_connection():
     requests.post(f"{FSP_URL}/stop", timeout=5)
     time.sleep(0.5)
 
-    r = requests.post(f"{SO_URL}/connect",
-                       json={"host": "0.0.0.0", "port": WS_PORT, "cp": CP}, timeout=5)
+    r = requests.post(
+        f"{SO_URL}/connect",
+        json={"host": "0.0.0.0", "port": WS_PORT, "cp": CP},
+        timeout=5,
+    )
     assert r.status_code == 200 and r.json().get("ok"), f"SO /connect failed: {r.text}"
 
     # FSP's StartRequest.port is typed str, unlike SO's ConnectRequest.port (int).
-    r = requests.post(f"{FSP_URL}/start",
-                       json={"host": "rti-so", "port": str(WS_PORT), "mode": "active", "cp": CP},
-                       timeout=5)
+    r = requests.post(
+        f"{FSP_URL}/start",
+        json={"host": "rti-so", "port": str(WS_PORT), "mode": "active", "cp": CP},
+        timeout=5,
+    )
     assert r.status_code == 200 and r.json().get("ok"), f"FSP /start failed: {r.text}"
 
     deadline = time.time() + 12
@@ -96,6 +101,7 @@ def disconnected():
 # Connected-state behavior
 # ---------------------------------------------------------------------------
 
+
 def test_connections_endpoint_after_websocket(connected):
     r = requests.post(f"{SO_URL}/connections", json={"cp": CP}, timeout=5)
     assert r.status_code == 200
@@ -118,8 +124,11 @@ def test_status_fields_when_connected(connected):
 
 
 def test_actions_logged_after_websocket_read(connected):
-    requests.post(f"{SO_URL}/readvalue",
-                  json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "cp": CP}, timeout=5)
+    requests.post(
+        f"{SO_URL}/readvalue",
+        json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "cp": CP},
+        timeout=5,
+    )
 
     r = requests.get(f"{SO_URL}/actions-logs", timeout=5)
     assert r.status_code == 200
@@ -129,8 +138,11 @@ def test_actions_logged_after_websocket_read(connected):
 
 
 def test_messages_logged_after_websocket_read(connected):
-    requests.post(f"{SO_URL}/readvalue",
-                  json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "cp": CP}, timeout=5)
+    requests.post(
+        f"{SO_URL}/readvalue",
+        json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "cp": CP},
+        timeout=5,
+    )
 
     r = requests.get(f"{SO_URL}/messages", timeout=5)
     assert r.status_code == 200
@@ -143,9 +155,13 @@ def test_messages_logged_after_websocket_read(connected):
 # Disconnected-state error handling
 # ---------------------------------------------------------------------------
 
+
 def test_readvalue_503_when_not_connected(disconnected):
-    r = requests.post(f"{SO_URL}/readvalue",
-                       json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "cp": CP}, timeout=5)
+    r = requests.post(
+        f"{SO_URL}/readvalue",
+        json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "cp": CP},
+        timeout=5,
+    )
     assert r.status_code == 503
 
 
@@ -153,16 +169,21 @@ def test_writevalue_503_when_not_connected(disconnected):
     # writevalue wraps the same "no-active-websocket-connection" failure in a
     # 500 (unlike readvalue's plain 503) - this asserts today's actual
     # behavior, not necessarily the ideal one.
-    r = requests.post(f"{SO_URL}/writevalue",
-                       json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "cp": CP, "value": "on"},
-                       timeout=5)
+    r = requests.post(
+        f"{SO_URL}/writevalue",
+        json={"objRef": "LD0/LLN0$ST$Mod", "fc": "st", "cp": CP, "value": "on"},
+        timeout=5,
+    )
     assert r.status_code == 500
     assert "no-active-websocket-connection" in r.json().get("error", "")
 
 
 def test_writevalue_missing_fc(disconnected):
-    r = requests.post(f"{SO_URL}/writevalue",
-                       json={"objRef": "LD0/LLN0$ST$Mod", "cp": CP, "value": "on"}, timeout=5)
+    r = requests.post(
+        f"{SO_URL}/writevalue",
+        json={"objRef": "LD0/LLN0$ST$Mod", "cp": CP, "value": "on"},
+        timeout=5,
+    )
     assert r.status_code == 422
 
 

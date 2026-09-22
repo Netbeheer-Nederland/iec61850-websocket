@@ -41,9 +41,9 @@ from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
-from unittest.mock import AsyncMock
 
 _tmp_connections_file = Path(tempfile.mkdtemp()) / "connections.json"
 _tmp_connections_file.write_text("[]", encoding="utf-8")
@@ -76,12 +76,18 @@ def _fresh_manager(tmp_path):
 
 # -------------------- ConnectionManager.add_connection --------------------
 
+
 def test_add_connection_stores_ws_port_for_new_connection(tmp_path):
     manager = _fresh_manager(tmp_path)
 
     conn = manager.add_connection(
-        name="so1", host="127.0.0.1", port=5002, conn_type="RTI-SO",
-        acsi="client", ws_mode="passive", ws_port=8765,
+        name="so1",
+        host="127.0.0.1",
+        port=5002,
+        conn_type="RTI-SO",
+        acsi="client",
+        ws_mode="passive",
+        ws_port=8765,
     )
 
     assert conn["port"] == 5002
@@ -92,8 +98,12 @@ def test_add_connection_defaults_ws_port_to_none_when_not_given(tmp_path):
     manager = _fresh_manager(tmp_path)
 
     conn = manager.add_connection(
-        name="so1", host="127.0.0.1", port=5002, conn_type="RTI-SO",
-        acsi="client", ws_mode="passive",
+        name="so1",
+        host="127.0.0.1",
+        port=5002,
+        conn_type="RTI-SO",
+        acsi="client",
+        ws_mode="passive",
     )
 
     assert conn["port"] == 5002
@@ -103,8 +113,13 @@ def test_add_connection_defaults_ws_port_to_none_when_not_given(tmp_path):
 def test_add_connection_updates_ws_port_on_existing_connection_by_name(tmp_path):
     manager = _fresh_manager(tmp_path)
     manager.add_connection(
-        name="so1", host="127.0.0.1", port=5002, conn_type="RTI-SO",
-        acsi="client", ws_mode="passive", ws_port=8765,
+        name="so1",
+        host="127.0.0.1",
+        port=5002,
+        conn_type="RTI-SO",
+        acsi="client",
+        ws_mode="passive",
+        ws_port=8765,
     )
 
     # add_connection() short-circuits as a no-op when name+host+port all
@@ -112,8 +127,13 @@ def test_add_connection_updates_ws_port_on_existing_connection_by_name(tmp_path)
     # change here to take the "update existing connection by name" branch
     # rather than the "already exists" early return.
     updated = manager.add_connection(
-        name="so1", host="127.0.0.1", port=5003, conn_type="RTI-SO",
-        acsi="client", ws_mode="passive", ws_port=9000,
+        name="so1",
+        host="127.0.0.1",
+        port=5003,
+        conn_type="RTI-SO",
+        acsi="client",
+        ws_mode="passive",
+        ws_port=9000,
     )
 
     assert updated["port"] == 5003
@@ -126,13 +146,22 @@ def test_add_connection_ws_port_is_independent_of_bff_port(tmp_path):
     # whatever it was even as ws_port changes, and vice versa.
     manager = _fresh_manager(tmp_path)
     manager.add_connection(
-        name="so1", host="127.0.0.1", port=5002, conn_type="RTI-SO",
-        acsi="client", ws_mode="passive", ws_port=8765,
+        name="so1",
+        host="127.0.0.1",
+        port=5002,
+        conn_type="RTI-SO",
+        acsi="client",
+        ws_mode="passive",
+        ws_port=8765,
     )
 
     updated = manager.add_connection(
-        name="so1", host="127.0.0.1", port=5555, conn_type="RTI-SO",
-        acsi="client", ws_mode="passive",
+        name="so1",
+        host="127.0.0.1",
+        port=5555,
+        conn_type="RTI-SO",
+        acsi="client",
+        ws_mode="passive",
     )
 
     assert updated["port"] == 5555
@@ -140,6 +169,7 @@ def test_add_connection_ws_port_is_independent_of_bff_port(tmp_path):
 
 
 # -------------------- HTTP layer: create/update connection --------------------
+
 
 def test_create_connection_endpoint_stores_ws_port(monkeypatch):
     from fastapi.testclient import TestClient
@@ -152,15 +182,18 @@ def test_create_connection_endpoint_stores_ws_port(monkeypatch):
     monkeypatch.setattr(bff_server.conn_manager, "check_connection", AsyncMock())
 
     client = TestClient(bff_server.app)
-    response = client.post("/api/add-connection", json={
-        "name": "so-http-1",
-        "host": "127.0.0.1",
-        "port": 5002,
-        "ws_port": 8765,
-        "type": "RTI-SO",
-        "acsi": "client",
-        "ws_mode": "passive",
-    })
+    response = client.post(
+        "/api/add-connection",
+        json={
+            "name": "so-http-1",
+            "host": "127.0.0.1",
+            "port": 5002,
+            "ws_port": 8765,
+            "type": "RTI-SO",
+            "acsi": "client",
+            "ws_mode": "passive",
+        },
+    )
 
     assert response.status_code == 201
     body = response.json()
@@ -174,15 +207,18 @@ def test_update_connection_endpoint_updates_ws_port_independently(monkeypatch):
     monkeypatch.setattr(bff_server.conn_manager, "check_connection", AsyncMock())
 
     client = TestClient(bff_server.app)
-    create_resp = client.post("/api/add-connection", json={
-        "name": "so-http-2",
-        "host": "127.0.0.1",
-        "port": 5002,
-        "ws_port": 8765,
-        "type": "RTI-SO",
-        "acsi": "client",
-        "ws_mode": "passive",
-    })
+    create_resp = client.post(
+        "/api/add-connection",
+        json={
+            "name": "so-http-2",
+            "host": "127.0.0.1",
+            "port": 5002,
+            "ws_port": 8765,
+            "type": "RTI-SO",
+            "acsi": "client",
+            "ws_mode": "passive",
+        },
+    )
     assert create_resp.status_code == 201
 
     update_resp = client.put("/api/edit-connection/so-http-2", json={"ws_port": 9000})

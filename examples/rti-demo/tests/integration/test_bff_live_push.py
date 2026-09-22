@@ -95,7 +95,9 @@ def test_live_push_delivers_fsp_connect_update():
     state change, and require the delta to arrive over the same socket.
     """
     so_connect = requests.post(
-        f"{SO_URL}/connect", json={"host": "0.0.0.0", "port": WS_PORT, "cp": CP}, timeout=5
+        f"{SO_URL}/connect",
+        json={"host": "0.0.0.0", "port": WS_PORT, "cp": CP},
+        timeout=5,
     )
     assert so_connect.status_code == 200 and so_connect.json().get("ok")
 
@@ -111,7 +113,12 @@ def test_live_push_delivers_fsp_connect_update():
                 None,
                 lambda: requests.post(
                     f"{FSP_URL}/start",
-                    json={"host": "rti-so", "port": str(WS_PORT), "mode": "active", "cp": CP},
+                    json={
+                        "host": "rti-so",
+                        "port": str(WS_PORT),
+                        "mode": "active",
+                        "cp": CP,
+                    },
                     timeout=5,
                 ),
             )
@@ -127,7 +134,9 @@ def test_live_push_delivers_fsp_connect_update():
                 msg = json.loads(raw)
                 if msg.get("type") != "connections":
                     continue
-                fsp = next((c for c in msg["data"] if c.get("host") == "rti-fsp01"), None)
+                fsp = next(
+                    (c for c in msg["data"] if c.get("host") == "rti-fsp01"), None
+                )
                 if fsp and (fsp.get("connectedClients") or 0) > 0:
                     found_connected_clients = fsp["connectedClients"]
                     break

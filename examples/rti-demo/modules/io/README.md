@@ -247,26 +247,26 @@ The demo_IO system integrates with IEC 61850 power system protocols through:
 
 The default devices defined in `io_config.json` use the following GPIO configuration:
 
-| Device Name | Device Type | GPIO | Physical Pin | Direction | Description |
-|-------------|-------------|------|--------------|-----------|-------------|
-| led1 | LED | 17 | 11 | OUTPUT | LED 1 |
-| led2 | LED | 18 | 12 | OUTPUT | LED 2 |
-| led3 | LED | 22 | 15 | OUTPUT | LED 3 |
-| button1 | Button | 10 | 19 | INPUT | Button (latching, pull-up) |
-| pot1 | Potentiometer | - | - | INPUT | ADC Channel 0 |
-| lcd1 | LCD 16x2 | Multiple | Multiple | OUTPUT | HD44780 4-bit mode |
+| Device Name | Device Type   | GPIO     | Physical Pin | Direction | Description                |
+|-------------|---------------|----------|--------------|-----------|----------------------------|
+| led1        | LED           | 17       | 11           | OUTPUT    | LED 1                      |
+| led2        | LED           | 18       | 12           | OUTPUT    | LED 2                      |
+| led3        | LED           | 22       | 15           | OUTPUT    | LED 3                      |
+| button1     | Button        | 10       | 19           | INPUT     | Button (latching, pull-up) |
+| pot1        | Potentiometer | -        | -            | INPUT     | ADC Channel 0              |
+| lcd1        | LCD 16x2      | Multiple | Multiple     | OUTPUT    | HD44780 4-bit mode         |
 
 ### LCD Pin Mapping (HD44780 4-bit mode)
 
-| LCD Pin | Pin Name | Raspberry Pi GPIO | Physical Pin | Function |
-|---------|----------|-------------------|--------------|----------|
-| 4 | RS | 26 | 37 | Register Select (0=Command, 1=Data) |
-| 5 | RW | GND | - | Read/Write (GND = Write mode) |
-| 6 | E | 19 | 35 | Enable (clock signal) |
-| 11 | D4 | 13 | 33 | Data Bit 4 (MSB) |
-| 12 | D5 | 12 | 32 | Data Bit 5 |
-| 13 | D6 | 16 | 36 | Data Bit 6 |
-| 14 | D7 | 20 | 38 | Data Bit 7 (LSB) |
+| LCD Pin | Pin Name | Raspberry Pi GPIO | Physical Pin | Function                            |
+|---------|----------|-------------------|--------------|-------------------------------------|
+| 4       | RS       | 26                | 37           | Register Select (0=Command, 1=Data) |
+| 5       | RW       | GND               | -            | Read/Write (GND = Write mode)       |
+| 6       | E        | 19                | 35           | Enable (clock signal)               |
+| 11      | D4       | 13                | 33           | Data Bit 4 (MSB)                    |
+| 12      | D5       | 12                | 32           | Data Bit 5                          |
+| 13      | D6       | 16                | 36           | Data Bit 6                          |
+| 14      | D7       | 20                | 38           | Data Bit 7 (LSB)                    |
 
 ### Wiring Connections
 
@@ -297,16 +297,16 @@ The default devices defined in `io_config.json` use the following GPIO configura
 
 ### Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| **Port already in use** | Use different port: `PORT=8081 python main.py` |
-| **gpiozero import error (Windows)** | Normal - uses mock mode. Install gpiozero for Pi. |
-| **GPIO permission denied (Linux)** | Run with sudo or add user to gpio group |
-| **ADS1115 not detected** | Check I2C wiring, enable I2C in raspi-config |
-| **LEDs not responding** | Verify wiring (resistor +, GND -), check GPIO numbering |
-| **ACSI connection failed** | Verify DEMO_IO_URL, check demo_IO is running |
+| Issue                                  | Solution                                                                  |
+|----------------------------------------|---------------------------------------------------------------------------|
+| **Port already in use**                | Use different port: `PORT=8081 python main.py`                            |
+| **gpiozero import error (Windows)**    | Normal - uses mock mode. Install gpiozero for Pi.                         |
+| **GPIO permission denied (Linux)**     | Run with sudo or add user to gpio group                                   |
+| **ADS1115 not detected**               | Check I2C wiring, enable I2C in raspi-config                              |
+| **LEDs not responding**                | Verify wiring (resistor +, GND -), check GPIO numbering                   |
+| **ACSI connection failed**             | Verify DEMO_IO_URL, check demo_IO is running                              |
 | **Docker: `/dev/spidev0.0` not found** | Enable SPI in raspi-config, or remove SPI devices from docker-compose.yml |
-| **Docker: device passthrough errors** | Verify device files exist on host, check device permissions |
+| **Docker: device passthrough errors**  | Verify device files exist on host, check device permissions               |
 
 ### Debug Commands
 
