@@ -65,25 +65,30 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   const statusIntervalRef = useRef(null);
   const doDefinitionCacheRef = useRef({});
 
-  // Fetch connections from BFF to get IDP-Server instances
-  useEffect(() => {
-    const fetchConnections = async () => {
-      try {
-        const url = `${bffBaseUrl}/api/connections`;
-        const response = await fetch(url);
-        if (response.ok) {
-          const data = await response.json();
-          setConnections(data.connections || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch connections:', error);
+  // Fetch connections from BFF to get IDP-Server instances.
+  // A useCallback at component scope, not a plain function local to the
+  // effect below - it also needs to be reachable from the TLSConfigModal
+  // onSuccess handler further down (to refresh after a save), which a
+  // useEffect-local function isn't. Matches the identical pattern already
+  // used in ACSIServer.jsx.
+  const fetchConnections = useCallback(async () => {
+    try {
+      const url = `${bffBaseUrl}/api/connections`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setConnections(data.connections || []);
       }
-    };
-    
+    } catch (error) {
+      console.error('Failed to fetch connections:', error);
+    }
+  }, [bffBaseUrl]);
+
+  useEffect(() => {
     if (bffBaseUrl) {
       fetchConnections();
     }
-  }, [bffBaseUrl]);
+  }, [bffBaseUrl, fetchConnections]);
 
   // Fetch OAuth status from the SO server on page load - only when this
   // connection is actually configured for OAuth (endpoint.OAuth.enable_oauth,

@@ -49,9 +49,24 @@ const TLS_CONFIG_API = {
   path: '/api/connections/tls-config'
 };
 
+// The FSP/SO instance's own *runtime* TLS config (GET /api/tls-config on
+// its own service, port 5001/5002) - distinct from TLS_CONFIG_API above,
+// which is the BFF's own /api/connections/tls-config for persisting to
+// connections.json. Both need to go through the BFF's /api/execute proxy
+// (see executeApiCall below) - connection.host is a Docker-internal
+// service hostname (e.g. "rti-so"), never reachable directly from the
+// browser.
+const RUNTIME_TLS_CONFIG_API = {
+  id: 'runtime-tls-config',
+  label: 'GET /api/tls-config',
+  method: 'GET',
+  path: '/api/tls-config'
+};
+
 function getApiById(id) {
   if (id === 'reconfig-connection') return RECONFIG_CONNECTION_API;
   if (id === 'tls-config') return TLS_CONFIG_API;
+  if (id === 'runtime-tls-config') return RUNTIME_TLS_CONFIG_API;
   return null;
 }
 
@@ -89,33 +104,56 @@ const TLSConfigModal = ({
   const isServerMode = wsMode === 'passive' || wsMode === 'Passive';
   const isClientMode = wsMode === 'active' || wsMode === 'Active';
 
+  // Visible inline in the modal itself (see the render below) - not just
+  // bubbled to the parent page's onError. The parent's message banner
+  // renders behind this modal's own full-screen overlay (position: fixed,
+  // zIndex: 1000) while the modal stays open on error, so it was
+  // invisible until the user closed the modal and happened to look back -
+  // matches the pattern ControlModal.jsx already uses (local result state
+  // shown inline, in addition to bubbling to onError).
+  const [localError, setLocalError] = useState(null);
+
+  // Calls go through the BFF's /api/execute proxy, never a direct fetch to
+  // connection.host:connection.port - that's a Docker-internal service
+  // hostname (e.g. "rti-so"), resolvable from other containers but never
+  // from the actual browser, so a direct fetch always fails there with a
+  // generic network error.
+  const executeApiCall = useCallback(async (api, targetValue, bodyOverride = null) => {
+    try {
+      const url = `${bffBaseUrl}/api/execute`;
+      const payload = { target: targetValue, method: api.method || 'GET', path: api.path || '/' };
+      if (bodyOverride && Object.keys(bodyOverride).length > 0) payload.body = bodyOverride;
+      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const rawText = await response.text();
+      let parsedPayload = null;
+      try { parsedPayload = JSON.parse(rawText); } catch (error) {}
+      return { ok: response.ok, status: response.status, payload: parsedPayload, rawText };
+    } catch (error) {
+      return { ok: false, status: 0, payload: null, error: error.message };
+    }
+  }, [bffBaseUrl]);
+
   // Fetch TLS config ONLY from the server's runtime endpoint
   // If it fails, fields remain empty (no fallbacks)
   useEffect(() => {
     const fetchRuntimeTlsConfig = async () => {
       if (!isOpen || !connection) return;
-      
+
       // Determine the runtime server port based on connection type
       // RTI-SO uses port 5002, RTI-FSP uses port 5001
       const host = connection.host || 'localhost';
       const port = connection.port;
-      
+
       if (!host || !port) {
         console.warn('Cannot fetch TLS config: missing host or port');
         return;
       }
-      
-      const url = `http://${host}:${port}/api/tls-config`;
-      
+
       try {
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
+        const result = await executeApiCall(RUNTIME_TLS_CONFIG_API, `${host}:${port}`);
+
+        if (result.ok) {
+          const data = result.payload || {};
           const updates = {};
           
           // Extract TLS fields from response - try both snake_case and camelCase variants
@@ -175,7 +213,14 @@ const TLSConfigModal = ({
     };
     
     fetchRuntimeTlsConfig();
-  }, [isOpen, connection, wsHost]);
+  }, [isOpen, connection, wsHost, executeApiCall]);
+
+  // Clear any previous error whenever the modal is (re)opened for a
+  // possibly-different connection, so a stale error from a prior attempt
+  // doesn't linger.
+  useEffect(() => {
+    if (isOpen) setLocalError(null);
+  }, [isOpen, connection]);
 
   const handleFileUpload = useCallback((e, fieldName) => {
     const file = e.target.files[0];
@@ -206,76 +251,80 @@ const TLSConfigModal = ({
     };
   }, [connection, enableTLS, tlsVersion, wsMode, isServerMode, isClientMode, serverKey, serverCert, caCert]);
 
-  const executeApiCall = useCallback(async (api, targetValue, bodyOverride = {}) => {
-    try {
-      const url = `${bffBaseUrl}/api/execute`;
-      const payload = { target: targetValue, method: api.method || 'GET', path: api.path || '/' };
-      if (bodyOverride && Object.keys(bodyOverride).length > 0) payload.body = bodyOverride;
-      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const rawText = await response.text();
-      let parsedPayload = null;
-      try { parsedPayload = JSON.parse(rawText); } catch (error) {}
-      return { ok: response.ok, status: response.status, payload: parsedPayload, rawText };
-    } catch (error) {
-      return { ok: false, status: 0, payload: null, error: error.message };
-    }
-  }, [bffBaseUrl]);
-
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    if (!connection) { onError?.('Please select a connection'); return; }
+    setLocalError(null);
+    if (!connection) {
+      const msg = 'Please select a connection';
+      setLocalError(msg);
+      onError?.(msg);
+      return;
+    }
     const config = buildConfig();
     if (!config) return;
 
     setSubmitting(true);
+    // Only the actual network calls below are inside this try/catch - it
+    // determines whether the save itself succeeded or failed. onSuccess/
+    // onClose are called *after*, outside this boundary, so a bug in a
+    // parent page's onSuccess handler (e.g. calling something out of
+    // scope) can't get caught here and mislabeled as "Failed to save" when
+    // the save actually went through fine - the exact kind of misleading,
+    // inconsistent error this change is meant to fix, not reproduce.
+    let outcome;
     try {
-      // Call BFF's /api/connections/tls-config endpoint directly
-      // This saves TLS config to BFF's connections.json
+      // Call BFF's /api/connections/tls-config endpoint directly - this one
+      // genuinely is a same-origin-reachable BFF endpoint, not a container
+      // hostname, so a direct fetch is fine here.
       const bffUrl = `${bffBaseUrl}/api/connections/tls-config`;
-      const bffResponse = await fetch(bffUrl, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(config) 
-      });
-      const bffRawText = await bffResponse.text();
-      let bffPayload = null;
-      try { bffPayload = JSON.parse(bffRawText); } catch (error) {}
-      
-      if (!bffResponse.ok) { 
-        onError?.(`Failed to save TLS config to BFF: ${bffPayload?.error || bffRawText || 'Unknown error'}`); 
-        return;
-      }
-      
-      // Also reconfigure the server's runtime TLS config
-      // This ensures the /api/tls-config GET endpoint returns the updated values
-      const host = connection.host || 'localhost';
-      const port = connection.port;
-      const reconfigureUrl = `http://${host}:${port}/api/reconfig-connection`;
-      
-      const reconfigureResponse = await fetch(reconfigureUrl, {
+      const bffResponse = await fetch(bffUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
       });
-      
-      const reconfigureRawText = await reconfigureResponse.text();
-      let reconfigurePayload = null;
-      try { reconfigurePayload = JSON.parse(reconfigureRawText); } catch (error) {}
-      
-      if (reconfigureResponse.ok) {
-        onSuccess?.(`TLS config saved and applied for ${connection.name}`);
-        onClose();
+      const bffRawText = await bffResponse.text();
+      let bffPayload = null;
+      try { bffPayload = JSON.parse(bffRawText); } catch (error) {}
+
+      if (!bffResponse.ok) {
+        outcome = { ok: false, message: `Failed to save TLS config to BFF: ${bffPayload?.error || bffRawText || 'Unknown error'}` };
       } else {
-        // Even if reconfigure fails, the BFF save succeeded
-        onSuccess?.(`TLS config saved for ${connection.name} (runtime update may have failed)`);
-        onClose();
+        // Also reconfigure the server's runtime TLS config, through the
+        // BFF's /api/execute proxy - connection.host is a Docker-internal
+        // service hostname (e.g. "rti-so"), not reachable directly from the
+        // browser. A raw fetch() here always failed with a generic network
+        // error, regardless of whether the BFF save above succeeded.
+        const host = connection.host || 'localhost';
+        const port = connection.port;
+        const reconfigureResult = await executeApiCall(RECONFIG_CONNECTION_API, `${host}:${port}`, config);
+
+        outcome = reconfigureResult.ok
+          ? { ok: true }
+          : {
+              ok: false,
+              partial: true,
+              message: `TLS config saved for ${connection.name}, but the runtime update failed: `
+                + `${reconfigureResult.payload?.error || reconfigureResult.error || reconfigureResult.rawText || 'Unknown error'}`,
+            };
       }
-    } catch (error) { 
-      onError?.(`Failed to save TLS config: ${error.message}`); 
+    } catch (error) {
+      outcome = { ok: false, message: `Failed to save TLS config: ${error.message}` };
     } finally {
       setSubmitting(false);
     }
-  }, [connection, enableTLS, buildConfig, bffBaseUrl, onSuccess, onError, onClose, wsHost]);
+
+    if (outcome.ok) {
+      onSuccess?.(`TLS config saved and applied for ${connection.name}`);
+      onClose();
+    } else {
+      setLocalError(outcome.message);
+      onError?.(outcome.message);
+      // Partial failure (BFF save succeeded, runtime update didn't) keeps
+      // the modal open too, same as a full failure - closing here would
+      // hide it behind the parent page's banner again, the exact
+      // visibility problem this change fixes.
+    }
+  }, [connection, enableTLS, buildConfig, bffBaseUrl, executeApiCall, onSuccess, onError, onClose, wsHost]);
 
   if (!isOpen || !connection) return null;
 
@@ -327,7 +376,15 @@ const TLSConfigModal = ({
       margin: '16px 0', padding: '12px', background: 'var(--bg-hover)',
       borderRadius: '6px', fontSize: '13px', border: '1px solid var(--border-light)'
     },
-    fileInputGroup: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }
+    fileInputGroup: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' },
+    // Not var(--danger-bg) - that token isn't actually defined anywhere in
+    // styles.css (same latent issue ActionLogPanel.jsx hit) - a real color
+    // via --danger-color at low opacity instead.
+    errorBox: {
+      margin: '16px 0', padding: '12px', borderRadius: '6px', fontSize: '13px',
+      background: 'rgba(244, 67, 54, 0.15)', color: 'var(--danger-color)',
+      border: '1px solid var(--danger-color)'
+    }
   };
 
   return (
@@ -396,6 +453,13 @@ const TLSConfigModal = ({
                 {isServerMode ? 'Configure server certificates for incoming connections' : 'Configure CA certificate to validate server'}
               </span>
             </div>
+
+            {localError && (
+              <div style={styles.errorBox}>
+                <i className="fas fa-exclamation-triangle" style={{ marginRight: '8px' }}></i>
+                {localError}
+              </div>
+            )}
 
             <div style={styles.modalFooter}>
               <button type="button" className="btn-secondary" onClick={onClose} style={styles.button} disabled={submitting}>Cancel</button>
