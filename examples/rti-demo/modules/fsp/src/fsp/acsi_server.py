@@ -108,6 +108,16 @@ class ACSIServer:
         self.runtime.endpoint = ActiveEndpoint()
         self.runtime.endpoint.recv_msg_callback = self._on_recv_message
         self.runtime.endpoint.send_msg_callback = self._on_send_message
+        self.runtime.endpoint.error_callback = self._on_connect_error
+        # Throttling for _on_connect_error: the reconnect loop retries every
+        # few seconds forever while the peer is unreachable/mismatched
+        # (e.g. a TLS on/off mismatch) - logging every single attempt would
+        # flood the 200-entry action-log deque within minutes. Log once
+        # immediately, then only again if the reason changes or enough time
+        # has passed, so "still failing, same reason" stays visible without
+        # burying everything else.
+        self._last_connect_error_message: str | None = None
+        self._last_connect_error_log_time: float = 0.0
 
         self._log_action(
             f"New ACSIServer instance: model_path={model_path}, id={id(self.runtime)}",
@@ -376,6 +386,38 @@ class ACSIServer:
                     "detail": detail,
                 }
             )
+
+    def _on_connect_error(self, cp: str, message: str | None) -> None:
+        """ActiveEndpoint.error_callback: dial-out attempt failed, or succeeded.
+
+        Previously a failure only ever reached the raw ws61850.endpoint
+        logger (container stdout) - never the action log, never
+        runtime.error/get_status()'s "error" field - so a persistently
+        failing connection (e.g. TLS enabled on the peer but not here, or
+        vice versa) retried forever with zero visibility in the BFF/HMI,
+        only discoverable by reading raw container logs.
+
+        message is None when a connection was just established - if a prior
+        failure had been recorded, clear it so runtime.error doesn't keep
+        reporting a stale failure after the connection has recovered.
+        """
+        if message is None:
+            if self.runtime.error is not None:
+                self.runtime.error = None
+                self._log_action(f"Connection re-established (cp={cp})", "info")
+            self._last_connect_error_message = None
+            self._last_connect_error_log_time = 0.0
+            return
+
+        self.runtime.error = message
+
+        now = time.monotonic()
+        changed = message != self._last_connect_error_message
+        stale = now - self._last_connect_error_log_time >= 60.0
+        if changed or stale:
+            self._log_action(f"Connection attempt failed (cp={cp}): {message}", "warn")
+            self._last_connect_error_message = message
+            self._last_connect_error_log_time = now
 
     def _extract_message_meta(self, raw: str) -> dict[str, str]:
         """Extract metadata from a message (service type, category)."""

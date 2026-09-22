@@ -78,6 +78,16 @@ class ActiveEndpoint:
         self.websocket_info_list = []
         self.send_msg_callback = None
         self.recv_msg_callback = None
+        # Called as error_callback(cp, message) whenever the reconnect loop
+        # in start() hits a connection failure - the only way a consumer
+        # (e.g. fsp/acsi_server.py's action log) can learn *why* it's
+        # retrying, short of scraping this module's own logger output.
+        # Also called as error_callback(cp, None) once a connection is
+        # actually established, so a consumer can clear a previously
+        # reported error instead of it lingering forever after recovery.
+        # None by default: existing callers that never register one keep
+        # today's behavior (log-and-retry, silently to the caller).
+        self.error_callback = None
         self.server = None  # always None; property kept for EndpointProtocol compatibility
 
         self._tls_config = tls_config
@@ -317,6 +327,7 @@ class ActiveEndpoint:
                 self._reconnect_policy.reset()
             except (ConnectionRefusedError, OSError) as e:
                 logger.warning("Connection failed cp=%r: %s", cp, e)
+                self._notify_error(cp, f"Connection failed: {e}")
                 await self._on_connection_closed(cp)
                 if self._reconnect_policy.should_reconnect():
                     await self._reconnect_policy.wait()
@@ -324,8 +335,23 @@ class ActiveEndpoint:
                     logger.warning("Reconnection disabled or max retries reached for cp=%r, giving up", cp)
                     break
             except (websockets.exceptions.InvalidMessage, EOFError) as e:
+                detail = str(e).split('\n')[0]
                 logger.warning("Connection failed cp=%r: protocol mismatch or server unavailable (%s)", cp,
-                               str(e).split('\n')[0])
+                               detail)
+                # The single most common real-world cause: this side dials
+                # out with ws:// while the peer expects wss:// (TLS
+                # enabled), or vice versa - the handshake bytes are
+                # uninterpretable to the other side either way, and
+                # websockets surfaces it as this same generic
+                # InvalidMessage/EOFError regardless of which direction the
+                # mismatch is in. Worth calling out explicitly since
+                # nothing else about this error hints at TLS being the
+                # likely culprit.
+                self._notify_error(
+                    cp,
+                    f"Protocol mismatch or server unavailable ({detail}) - check whether TLS is "
+                    "enabled on one side but not the other",
+                )
                 await self._on_connection_closed(cp)
                 if self._reconnect_policy.should_reconnect():
                     await self._reconnect_policy.wait()
@@ -334,6 +360,7 @@ class ActiveEndpoint:
                     break
             except Exception as e:
                 logger.error("Unexpected error in active endpoint cp=%r: %s", cp, e, exc_info=True)
+                self._notify_error(cp, f"Unexpected error: {e}")
                 await self._on_connection_closed(cp)
                 if self._reconnect_policy.should_reconnect():
                     await self._reconnect_policy.wait()
@@ -361,6 +388,7 @@ class ActiveEndpoint:
         logger.info("Connecting to %s (protocol=%s)", uri, protocol)
         async with websockets.connect(uri, **connect_kwargs) as websocket:
             logger.info("WebSocket connection established to %s", uri)
+            self._notify_error(cp, None)
             websocket_info = None
 
             try:
@@ -495,6 +523,24 @@ class ActiveEndpoint:
     def _is_report(self, message: bytes, is_ber: bool) -> bool:
         decoded = decode_tpaa_message(message, is_ber)
         return decoded[0] == "unconfirmed"
+
+    def _notify_error(self, cp: str, message: str | None) -> None:
+        """Best-effort call to error_callback(cp, message), if one is set.
+
+        message is None to signal that a connection was just established,
+        clearing any previously reported error for this cp.
+
+        Called synchronously (matching send_msg_callback/recv_msg_callback's
+        existing convention), from inside start()'s reconnect loop - a
+        callback that raises must not take the loop down with it, so any
+        exception here is logged and swallowed rather than propagated.
+        """
+        if self.error_callback is None:
+            return
+        try:
+            self.error_callback(cp, message)
+        except Exception:
+            logger.exception("error_callback raised for cp=%r", cp)
 
     async def _on_connection_closed(self, cp: str) -> None:
         try:
