@@ -8,8 +8,8 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - PORT=5000
-      - PYTHONUNBUFFERED=1
+      # PORT/PYTHONUNBUFFERED already set (matching defaults) by the
+      # Dockerfile - only override what's actually different here.
       # Persist connection state in a dedicated /config dir (named volume below),
       # not in the root-owned WORKDIR /app or the ./modules/bff code mount. The
       # atomic save (temp file + rename in the same dir) needs a real, writable
@@ -61,8 +61,7 @@ services:
     ports:
       - "5001:5001"
     environment:
-      - PORT=5001
-      - PYTHONUNBUFFERED=1
+      # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
       - CP=cp1
       - MODELPATH=/models/model_1.py
       - IO_URL=http://rti-io:8000
@@ -94,6 +93,9 @@ services:
     networks:
       - rti-network
     environment:
+      # PORT overrides the Dockerfile's 5001 default - this is a second
+      # instance of the same image, on a different port. PYTHONUNBUFFERED
+      # already set by the Dockerfile.
       - PORT=5005
       - CP=cp2
       - MODELPATH=/models/model_2.py
@@ -122,9 +124,7 @@ services:
     ports:
       - "5002:5002"
       - "8765:8765"    # WebSocket port - MUST ADD
-    environment:
-      - PORT=5002
-      - PYTHONUNBUFFERED=1
+    # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
     networks:
       - rti-network
     healthcheck:
@@ -156,9 +156,7 @@ services:
     container_name: rti-io
     ports:
       - "8000:8000"
-    environment:
-      - PORT=8000
-      - PYTHONUNBUFFERED=1
+    # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
     user: ${PI_USER:-pi}  # User with gpio group access
     group_add:
       - "gpio"
