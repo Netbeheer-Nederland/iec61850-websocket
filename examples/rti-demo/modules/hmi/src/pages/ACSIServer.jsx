@@ -831,6 +831,20 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     return STATUS_LABELS[rawState] || rawState || 'N/A';
   })();
 
+  // Same host/port match TLSConfigModal's own `connection` prop below uses
+  // to find the live connection record - kept separate (not literally
+  // shared) since the modal's version also builds a full fallback shape
+  // (type/ws_mode/properties_info) this button doesn't need, just the
+  // live TLS.enable_tls value to reflect on the button itself.
+  const liveTlsConnection = useMemo(() =>
+    connections.find(c =>
+      (c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) ||
+      (c.host === host && String(c.port) === String(port))
+    ) || (endpoint?.TLS ? endpoint : null),
+    [connections, endpoint, host, port]
+  );
+  const tlsEnabled = Boolean(liveTlsConnection?.TLS?.enable_tls);
+
   return (
     <section className="page">
       <div className="page-header" style={{ position: 'relative' }}>
@@ -972,10 +986,15 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           className="btn-secondary"
           onClick={() => setShowTLSModal(true)}
           disabled={loading}
-          title="Configure TLS settings"
+          title={tlsEnabled ? 'TLS is enabled - click to configure' : 'Configure TLS settings'}
           id="acsi-tls-btn"
+          style={tlsEnabled ? {
+            borderColor: 'var(--success-color)',
+            color: 'var(--success-color)',
+          } : undefined}
         >
-          <i className="fas fa-shield-alt" style={{ marginRight: '8px' }}></i>TLS Config
+          <i className={`fas ${tlsEnabled ? 'fa-lock' : 'fa-shield-alt'}`} style={{ marginRight: '8px' }}></i>
+          TLS Config{tlsEnabled ? ' (On)' : ''}
         </button>
         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
           <input
