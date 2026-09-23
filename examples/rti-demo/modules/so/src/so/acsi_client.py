@@ -27,10 +27,8 @@ This module handles:
 from __future__ import annotations
 
 import asyncio
-import logging
-
-logger = logging.getLogger(__name__)
 import json
+import logging
 import threading
 import time
 from collections import deque
@@ -41,6 +39,8 @@ from typing import Any
 
 from ws61850.endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
+
+logger = logging.getLogger(__name__)
 
 
 class ModelInfo:
@@ -239,7 +239,7 @@ class ACSIClient:
         return [client.cp for client in self.runtime.client_list if client.is_connected]
 
     def _log_action(
-        self, message: str, level: str = "info", detail: dict[str, Any] | None = None
+            self, message: str, level: str = "info", detail: dict[str, Any] | None = None
     ) -> None:
         """Log an action to the runtime actions deque."""
         if detail is None:
@@ -545,7 +545,7 @@ class ACSIClient:
         }
 
     async def get_server_directory_tree(
-        self, cp: str, ws_info: Any | None = None
+            self, cp: str, ws_info: Any | None = None
     ) -> dict[str, Any]:
         """Get list of all Logical Devices on the server.
 
@@ -573,7 +573,7 @@ class ACSIClient:
         return {"logicalDevices": ld_list, "source": "live"}
 
     async def get_logical_device_tree(
-        self, ld_inst: str, cp: str, ws_info: Any | None = None
+            self, ld_inst: str, cp: str, ws_info: Any | None = None
     ) -> dict[str, Any]:
         """Get all Logical Nodes for a specific Logical Device.
 
@@ -604,7 +604,7 @@ class ACSIClient:
         return {"logicalDevice": ld_inst, "logicalNodes": ln_list, "source": "live"}
 
     async def get_logical_node_tree(
-        self, ld_inst: str, ln_inst: str, cp: str, ws_info: Any | None = None
+            self, ld_inst: str, ln_inst: str, cp: str, ws_info: Any | None = None
     ) -> dict[str, Any]:
         """Get complete tree for a specific Logical Node.
 
@@ -651,12 +651,12 @@ class ACSIClient:
         return result
 
     async def get_data_object_details(
-        self,
-        ld_inst: str,
-        ln_inst: str,
-        do_name: str,
-        cp: str,
-        ws_info: Any | None = None,
+            self,
+            ld_inst: str,
+            ln_inst: str,
+            do_name: str,
+            cp: str,
+            ws_info: Any | None = None,
     ) -> dict[str, Any]:
         """Get complete details for a specific Data Object including its data attributes.
 
@@ -729,7 +729,7 @@ class ACSIClient:
         return {"value": result}
 
     async def get_dataset_directory(
-        self, ld_inst: str, ln_inst: str, ds_inst: str, cp: str
+            self, ld_inst: str, ln_inst: str, ds_inst: str, cp: str
     ) -> dict[str, Any]:
         """Read a value from the server."""
         client = self.get_iec61850_client(cp)
@@ -923,7 +923,7 @@ class ACSIClient:
         return False, None
 
     async def write_value(
-        self, obj_ref: str, value: Any, fc: str, data_type: str, cp: str
+            self, obj_ref: str, value: Any, fc: str, data_type: str, cp: str
     ) -> dict[str, Any]:
         """Write a value to the server."""
         client = self.get_iec61850_client(cp)
@@ -980,7 +980,7 @@ class ACSIClient:
             return {"objRef": obj_ref, "value": None, "error": result}
 
     async def operate(
-        self, obj_ref, oper_val, val_type: str, cp: str
+            self, obj_ref, oper_val, val_type: str, cp: str
     ) -> dict[str, Any]:
         """Perform an operate command on the server."""
         client = self.get_iec61850_client(cp)
