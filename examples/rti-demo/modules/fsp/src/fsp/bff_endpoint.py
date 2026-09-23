@@ -345,11 +345,11 @@ io_plugin_connection_status = IOPluginConnectionStatus()
 
 # Configuration for IO server connection
 IO_SERVER_URL = os.getenv("IO_SERVER_URL", "http://localhost:8000")
-io_plugin_MAX_RETRIES = int(os.getenv("io_plugin_MAX_RETRIES", "3"))
-io_plugin_RETRY_DELAY = float(os.getenv("io_plugin_RETRY_DELAY", "1.0"))
+IO_PLUGIN_MAX_RETRIES = int(os.getenv("io_plugin_MAX_RETRIES", "3"))
+IO_PLUGIN_RETRY_DELAY = float(os.getenv("io_plugin_RETRY_DELAY", "1.0"))
 
 # Default files to fetch from IO server
-io_plugin_REQUIRED_FILES = [
+IO_PLUGIN_REQUIRED_FILES = [
     "io_router.py",
     "io_utils.py",
     "mapping_manager.py",
@@ -684,14 +684,14 @@ async def download_io_plugin_files(
 
     Args:
         server_url: URL of the IO server
-        files: List of filenames to download (defaults to io_plugin_REQUIRED_FILES)
+        files: List of filenames to download (defaults to IO_PLUGIN_REQUIRED_FILES)
         timeout: Timeout per file download in seconds
 
     Returns:
         Dictionary with results: {"success": bool, "downloaded": list, "failed": list, "errors": dict}
     """
     if files is None:
-        files = io_plugin_REQUIRED_FILES
+        files = IO_PLUGIN_REQUIRED_FILES
 
     results = {
         "success": False,
@@ -707,7 +707,7 @@ async def download_io_plugin_files(
         ensure_io_plugin_dir()
 
         for filename in files:
-            for attempt in range(io_plugin_MAX_RETRIES):
+            for attempt in range(IO_PLUGIN_MAX_RETRIES):
                 try:
                     content = await download_file_from_io_server(
                         server_url, filename, timeout
@@ -724,16 +724,16 @@ async def download_io_plugin_files(
                         logger.info(f"Saved file '{filename}' to {file_path}")
                         break
                     else:
-                        error_msg = f"Failed to download '{filename}' (attempt {attempt + 1}/{io_plugin_MAX_RETRIES})"
+                        error_msg = f"Failed to download '{filename}' (attempt {attempt + 1}/{IO_PLUGIN_MAX_RETRIES})"
                         results["errors"][filename] = error_msg
-                        if attempt < io_plugin_MAX_RETRIES - 1:
-                            await asyncio.sleep(io_plugin_RETRY_DELAY)
+                        if attempt < IO_PLUGIN_MAX_RETRIES - 1:
+                            await asyncio.sleep(IO_PLUGIN_RETRY_DELAY)
 
                 except Exception as e:
-                    error_msg = f"Error downloading '{filename}': {e} (attempt {attempt + 1}/{io_plugin_MAX_RETRIES})"
+                    error_msg = f"Error downloading '{filename}': {e} (attempt {attempt + 1}/{IO_PLUGIN_MAX_RETRIES})"
                     results["errors"][filename] = error_msg
-                    if attempt < io_plugin_MAX_RETRIES - 1:
-                        await asyncio.sleep(io_plugin_RETRY_DELAY)
+                    if attempt < IO_PLUGIN_MAX_RETRIES - 1:
+                        await asyncio.sleep(IO_PLUGIN_RETRY_DELAY)
 
             if filename not in results["downloaded"]:
                 results["failed"].append(filename)
@@ -888,8 +888,9 @@ async def fetch_and_load_io_plugin_files(server_url: str) -> dict[str, Any]:
 class WritevalueRequest(BaseModel):
     """Request body for writing a value to the ACSI server model."""
 
-    objRef: str = Field(
+    obj_ref: str = Field(
         ...,
+        alias="objRef",
         description="Object reference in ACSI format (e.g., 'LD0/LLN0$ST$Mod')",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"},
     )
@@ -903,8 +904,9 @@ class WritevalueRequest(BaseModel):
         description="Value to write as string representation",
         json_schema_extra={"example": "ON"},
     )
-    dataType: str = Field(
+    data_type: str = Field(
         default="",
+        alias="dataType",
         description="Optional data type for value coercion",
         json_schema_extra={"example": "BOOLEAN"},
     )
@@ -913,8 +915,9 @@ class WritevalueRequest(BaseModel):
 class UpdateIedmodelRequest(BaseModel):
     """Request body for updating the IED model file."""
 
-    modelPy: str = Field(
+    model_source: str = Field(
         ...,
+        alias="modelPy",
         description="Complete Python code for model.py file",
         json_schema_extra={
             "example": "from ws61850... import IedModel\nmodel = IedModel(...)"
@@ -950,8 +953,9 @@ class StartRequest(BaseModel):
 class ReadvalueRequest(BaseModel):
     """Request body for reading a value from the ACSI server model."""
 
-    objRef: str = Field(
+    obj_ref: str = Field(
         ...,
+        alias="objRef",
         description="Object reference in ACSI format",
         json_schema_extra={"example": "LD0/MMXU1$MX$volA"},
     )
@@ -1968,7 +1972,7 @@ def create_bff_router(
             }
         """
         try:
-            model_py = request.modelPy
+            model_py = request.model_source
 
             if not isinstance(model_py, str) or not model_py.strip():
                 return JSONResponse(
@@ -2839,7 +2843,7 @@ def create_bff_router(
             HTTPException 404: If instance not available or timeout
         """
         try:
-            obj_ref = request.objRef
+            obj_ref = request.obj_ref
             fc = request.fc
 
             if not obj_ref:
@@ -2962,10 +2966,10 @@ def create_bff_router(
         """
         global _use_io_plugin
         try:
-            obj_ref = request.objRef
+            obj_ref = request.obj_ref
             fc = request.fc
             value = request.value
-            data_type = request.dataType
+            data_type = request.data_type
 
             if not obj_ref:
                 rti_fsp._log_action(
@@ -3601,7 +3605,7 @@ def create_bff_router(
             if request.clear_files:
                 try:
                     ensure_io_plugin_dir()
-                    for filename in io_plugin_REQUIRED_FILES:
+                    for filename in IO_PLUGIN_REQUIRED_FILES:
                         file_path = get_io_plugin_file_path(filename)
                         if file_path.exists():
                             file_path.unlink()

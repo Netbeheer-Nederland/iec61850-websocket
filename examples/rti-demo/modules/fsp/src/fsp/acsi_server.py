@@ -166,18 +166,18 @@ class ACSIServer:
             model_ied_name=self.runtime.ied_model.name,
         )
 
-        def control_handler(obj_ref, ctlVal_value, parameter):
-            ctl_val = ctlVal_value["value"]
+        def control_handler(obj_ref, ctl_val_value, parameter):
+            ctl_val = ctl_val_value["value"]
 
-            TYPE_MAP = {
+            type_map = {
                 "boolean": bool,
                 "int32": int,
                 "float32": float,
                 "string": str,
             }
-            if ctlVal_value is not None:
-                if ctl_val[0] in TYPE_MAP:
-                    if isinstance(ctl_val[1], TYPE_MAP[ctl_val[0]]):
+            if ctl_val_value is not None:
+                if ctl_val[0] in type_map:
+                    if isinstance(ctl_val[1], type_map[ctl_val[0]]):
                         return ControlHandlerResult.OK, None
                     else:
                         return (
