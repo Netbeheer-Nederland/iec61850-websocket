@@ -347,14 +347,14 @@ io_plugin_connection_status = IOPluginConnectionStatus()
 
 # Configuration for IO server connection
 IO_SERVER_URL = os.getenv("IO_SERVER_URL", "http://localhost:8000")
-io_plugin_MAX_RETRIES = int(os.getenv("io_plugin_MAX_RETRIES", "3"))
-io_plugin_RETRY_DELAY = float(os.getenv("io_plugin_RETRY_DELAY", "1.0"))
+IO_PLUGIN_MAX_RETRIES = int(os.getenv("io_plugin_MAX_RETRIES", "3"))
+IO_PLUGIN_RETRY_DELAY = float(os.getenv("io_plugin_RETRY_DELAY", "1.0"))
 
 # Default files to fetch from IO server.
 # NOTE: async_client_io.py is required because io_router.py imports
 # AsyncDemoIOClient from it - without it, module loading fails with
 # "No module named 'async_client_io'".
-io_plugin_REQUIRED_FILES = [
+IO_PLUGIN_REQUIRED_FILES = [
     "io_router.py",
     "io_utils.py",
     "mapping_manager.py",
@@ -678,14 +678,14 @@ async def download_io_plugin_files(
 
     Args:
         server_url: URL of the IO server
-        files: List of filenames to download (defaults to io_plugin_REQUIRED_FILES)
+        files: List of filenames to download (defaults to IO_PLUGIN_REQUIRED_FILES)
         timeout: Timeout per file download in seconds
 
     Returns:
         Dictionary with results: {"success": bool, "downloaded": list, "failed": list, "errors": dict}
     """
     if files is None:
-        files = io_plugin_REQUIRED_FILES
+        files = IO_PLUGIN_REQUIRED_FILES
 
     results = {
         "success": False,
@@ -701,7 +701,7 @@ async def download_io_plugin_files(
         ensure_io_plugin_dir()
 
         for filename in files:
-            for attempt in range(io_plugin_MAX_RETRIES):
+            for attempt in range(IO_PLUGIN_MAX_RETRIES):
                 try:
                     content = await download_file_from_io_server(
                         server_url, filename, timeout
@@ -718,16 +718,16 @@ async def download_io_plugin_files(
                         logger.info(f"Saved file '{filename}' to {file_path}")
                         break
                     else:
-                        error_msg = f"Failed to download '{filename}' (attempt {attempt + 1}/{io_plugin_MAX_RETRIES})"
+                        error_msg = f"Failed to download '{filename}' (attempt {attempt + 1}/{IO_PLUGIN_MAX_RETRIES})"
                         results["errors"][filename] = error_msg
-                        if attempt < io_plugin_MAX_RETRIES - 1:
-                            await asyncio.sleep(io_plugin_RETRY_DELAY)
+                        if attempt < IO_PLUGIN_MAX_RETRIES - 1:
+                            await asyncio.sleep(IO_PLUGIN_RETRY_DELAY)
 
                 except Exception as e:
-                    error_msg = f"Error downloading '{filename}': {e} (attempt {attempt + 1}/{io_plugin_MAX_RETRIES})"
+                    error_msg = f"Error downloading '{filename}': {e} (attempt {attempt + 1}/{IO_PLUGIN_MAX_RETRIES})"
                     results["errors"][filename] = error_msg
-                    if attempt < io_plugin_MAX_RETRIES - 1:
-                        await asyncio.sleep(io_plugin_RETRY_DELAY)
+                    if attempt < IO_PLUGIN_MAX_RETRIES - 1:
+                        await asyncio.sleep(IO_PLUGIN_RETRY_DELAY)
 
             if filename not in results["downloaded"]:
                 results["failed"].append(filename)
@@ -4442,7 +4442,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             if request.clear_files:
                 try:
                     ensure_io_plugin_dir()
-                    for filename in io_plugin_REQUIRED_FILES:
+                    for filename in IO_PLUGIN_REQUIRED_FILES:
                         file_path = get_io_plugin_file_path(filename)
                         if file_path.exists():
                             file_path.unlink()

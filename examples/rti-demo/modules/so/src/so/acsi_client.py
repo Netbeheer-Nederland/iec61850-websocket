@@ -933,7 +933,7 @@ class ACSIClient:
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
 
         async with self.runtime.invoke_lock:
-            TYPE_MAP = {
+            type_map = {
                 "boolean": bool,
                 "int8": int,
                 "int16": int,
@@ -958,7 +958,7 @@ class ACSIClient:
                 "enumerated": int,
             }
 
-            converted, converted_val = self.convert_value(data_type, value, TYPE_MAP)
+            converted, converted_val = self.convert_value(data_type, value, type_map)
 
             if converted is False:
                 raise RuntimeError(
