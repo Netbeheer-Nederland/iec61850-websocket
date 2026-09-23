@@ -2,6 +2,9 @@ services:
   # BFF Server
   rti-bff:
     build:
+      # Repo root, not modules/bff/ - the Dockerfile needs the shared uv
+      # workspace lock and the ws61850 core library at src/, both of which
+      # live outside modules/bff/.
       context: ../..
       dockerfile: examples/rti-demo/modules/bff/docker/Dockerfile
     container_name: rti-bff
@@ -45,6 +48,9 @@ services:
   # RTI-FSP (Acsi-Server)
   rti-fsp01:
     build:
+      # Repo root, not modules/fsp - the Dockerfile needs the shared uv
+      # workspace lock and the ws61850 core library at src/, both of which
+      # live outside modules/fsp.
       context: ../..
       dockerfile: examples/rti-demo/modules/fsp/docker/Dockerfile
     container_name: rti-fsp01
@@ -70,6 +76,7 @@ services:
   # Second FSP instance
   rti-fsp02:
     build:
+      # Repo root - see rti-fsp01's build.context comment above.
       context: ../..
       dockerfile: examples/rti-demo/modules/fsp/docker/Dockerfile
     container_name: rti-fsp02
@@ -101,9 +108,13 @@ services:
   # RTI SO (Acsi-Client)
   rti-so:
     build:
+      # Repo root, not modules/so - the Dockerfile needs the shared uv
+      # workspace lock and the ws61850 core library at src/, both of which
+      # live outside modules/so.
       context: ../..
       dockerfile: examples/rti-demo/modules/so/docker/Dockerfile
     container_name: rti-so
+    hostname: rti-so
     ports:
       - "5002:5002"
       - "8765:8765"    # WebSocket port - MUST ADD
