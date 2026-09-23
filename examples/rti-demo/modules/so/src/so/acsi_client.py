@@ -872,8 +872,8 @@ class ACSIClient:
             result = await client.get_URCB_values(obj_ref, websocket_info, None, None)
         return {"urcbDefinition": result}
 
-    def convert_value(self, type_name, raw_str, TYPE_MAP):
-        expected_type = TYPE_MAP.get(type_name)
+    def convert_value(self, type_name, raw_str, type_map):
+        expected_type = type_map.get(type_name)
         if expected_type is None:
             logger.exception(f"Unknown type: {type_name}")
             return False, None

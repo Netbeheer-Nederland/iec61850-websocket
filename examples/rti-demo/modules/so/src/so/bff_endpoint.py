@@ -1523,9 +1523,9 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
     rti_so.install_write_callback(on_write_callback)
 
-    def on_report_callback(rptID, dataSet, data):
+    def on_report_callback(rpt_id, data_set, data):
         """Callback for received report messages."""
-        logger.info(f"[REPORT] rptID={rptID} dataSet={dataSet} dataCount={len(data)}")
+        logger.info(f"[REPORT] rptID={rpt_id} dataSet={data_set} dataCount={len(data)}")
         for item in data:
             logger.info(f"  {item.get('dataRef')} = {item.get('value')}")
 
@@ -1568,7 +1568,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         loop,
                     )
 
-                    value = f"rptID={rptID} dataSet={dataSet}"
+                    value = f"rptID={rpt_id} dataSet={data_set}"
 
                     asyncio.run_coroutine_threadsafe(
                         write_to_lcd(
