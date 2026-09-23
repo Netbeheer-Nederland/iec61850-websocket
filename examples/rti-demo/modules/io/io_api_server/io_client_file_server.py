@@ -59,13 +59,13 @@ def create_io_client_router() -> APIRouter:
     )
 
     # Configuration for io_client files storage
-    IO_CLIENT_FILES_DIR = os.getenv("IO_CLIENT_FILES_DIR", "/app/io/io_client")
-    IO_CLIENT_VERSION = os.getenv("IO_CLIENT_VERSION", "1.0.0")
+    io_client_files_dir = os.getenv("IO_CLIENT_FILES_DIR", "/app/io/io_client")
+    io_client_version = os.getenv("IO_CLIENT_VERSION", "1.0.0")
 
     def ensure_io_client_files_dir() -> bool:
         """Ensure the io_client files directory exists."""
         try:
-            os.makedirs(IO_CLIENT_FILES_DIR, exist_ok=True)
+            os.makedirs(io_client_files_dir, exist_ok=True)
             return True
         except Exception as e:
             logger.error(f"Failed to create io_client files directory: {e}")
@@ -73,7 +73,7 @@ def create_io_client_router() -> APIRouter:
 
     def get_io_client_file_path(filename: str) -> str:
         """Get the full path for an io_client file."""
-        return os.path.join(IO_CLIENT_FILES_DIR, filename)
+        return os.path.join(io_client_files_dir, filename)
 
     def list_io_client_files() -> list[dict[str, Any]]:
         """List all files in the io_client files directory."""
@@ -82,8 +82,8 @@ def create_io_client_router() -> APIRouter:
 
         try:
             files = []
-            for filename in os.listdir(IO_CLIENT_FILES_DIR):
-                filepath = os.path.join(IO_CLIENT_FILES_DIR, filename)
+            for filename in os.listdir(io_client_files_dir):
+                filepath = os.path.join(io_client_files_dir, filename)
                 if os.path.isfile(filepath):
                     stat = os.stat(filepath)
                     files.append(
@@ -120,7 +120,7 @@ def create_io_client_router() -> APIRouter:
                 "ok": True,
                 "files": files,
                 "count": len(files),
-                "directory": IO_CLIENT_FILES_DIR,
+                "directory": io_client_files_dir,
             }
         except Exception as e:
             logger.error(f"Error in api_list_io_client_files: {e}")
@@ -199,7 +199,7 @@ def create_io_client_router() -> APIRouter:
             files = list_io_client_files()
             return {
                 "ok": True,
-                "version": IO_CLIENT_VERSION,
+                "version": io_client_version,
                 "files_count": len(files),
                 "files_available": [f["name"] for f in files],
                 "api_version": "1.0.0",
@@ -227,10 +227,10 @@ def create_io_client_router() -> APIRouter:
             return {
                 "status": "healthy",
                 "service": "IO Client File Server",
-                "files_directory": IO_CLIENT_FILES_DIR,
+                "files_directory": io_client_files_dir,
                 "files_available": len(files) > 0,
                 "files_count": len(files),
-                "version": IO_CLIENT_VERSION,
+                "version": io_client_version,
             }
         except Exception as e:
             logger.error(f"Error in io_client health check: {e}")

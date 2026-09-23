@@ -33,10 +33,10 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from typing import Any
+from typing import Annotated, Any
 
 from async_client_io import AsyncDemoIOClient
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Path, Request
 from mapping_manager import IOMappingManager
 from pydantic import BaseModel, Field
 
@@ -118,8 +118,9 @@ class IOMappingRequest(BaseModel):
         description="Unique IO device identifier",
         json_schema_extra={"example": "LD0/GGIO1$ST$Ind1"},
     )
-    objRef: str | None = Field(
+    obj_ref: str | None = Field(
         default=None,
+        alias="objRef",
         description="IEC 61850 object reference (optional)",
         json_schema_extra={"example": "LD0/GGIO1$ST$Ind1"},
     )
@@ -148,8 +149,9 @@ class IOMappingRequest(BaseModel):
         description="ACSI service type: writeValue or operate (default: writeValue)",
         json_schema_extra={"example": "writeValue"},
     )
-    dataType: str | None = Field(
+    data_type: str | None = Field(
         default=None,
+        alias="dataType",
         description="Data type for ACSI values: BOOLEAN, INT8, INT16, INT32, FLOAT32, etc.",
         json_schema_extra={"example": "FLOAT32"},
     )
@@ -167,13 +169,13 @@ class IOMappingResponse(BaseModel):
     """
 
     device_name: str
-    objRef: str | list[str] | None = None
+    obj_ref: str | list[str] | None = Field(default=None, alias="objRef")
     description: str = ""
     direction: str = "output"
     device_type: str | None = None
     initial_state: bool = False
     service: str | None = None
-    dataType: str | None = None
+    data_type: str | None = Field(default=None, alias="dataType")
     fc: str | None = "st"
 
 
@@ -960,18 +962,18 @@ def create_io_router() -> APIRouter:
             manager = get_mapping_manager()
             mapping = manager.add_mapping(
                 device_name=request.device_name,
-                obj_ref=request.objRef,
+                obj_ref=request.obj_ref,
                 description=request.description,
                 initial_state=request.initial_state,
                 direction=request.direction,
                 device_type=request.device_type,
                 service=request.service,
-                dataType=request.dataType,
+                dataType=request.data_type,
                 fc=request.fc,
             )
             manager.save()
 
-            logger.info(f"Added mapping: {request.device_name} -> {request.objRef}")
+            logger.info(f"Added mapping: {request.device_name} -> {request.obj_ref}")
             return {
                 "ok": True,
                 "message": f"Mapping added for {request.device_name}",
@@ -1076,22 +1078,24 @@ def create_io_router() -> APIRouter:
         },
         tags=["IO Mapping"],
     )
-    async def api_get_mapping_by_objref(objRef: str, request: Request):
+    async def api_get_mapping_by_objref(
+        obj_ref: Annotated[str, Path(alias="objRef")], request: Request
+    ):
         """Get IO mapping by IEC 61850 object reference.
 
         Args:
-            objRef: IEC 61850 object reference
+            obj_ref: IEC 61850 object reference
 
         Returns:
             dict: Mapping configuration with device_name
         """
         try:
             manager = get_mapping_manager()
-            mapping = manager.get_device_by_objref(objRef)
+            mapping = manager.get_device_by_objref(obj_ref)
 
             if not mapping:
                 raise HTTPException(
-                    status_code=404, detail=f"No mapping found for objRef: {objRef}"
+                    status_code=404, detail=f"No mapping found for objRef: {obj_ref}"
                 )
 
             return {
@@ -1109,7 +1113,7 @@ def create_io_router() -> APIRouter:
         except HTTPException:
             raise
         except Exception as exc:
-            logger.error(f"Failed to get mapping for objRef {objRef}: {exc}")
+            logger.error(f"Failed to get mapping for objRef {obj_ref}: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
 
     @router.delete(

@@ -212,8 +212,9 @@ class LCDControlRequest(BaseModel):
 class ACSIMappingRequest(BaseModel):
     """Request body for setting ACSI mapping for a device."""
 
-    objRef: str = Field(
+    obj_ref: str = Field(
         ...,
+        alias="objRef",
         description="IEC61850 object reference to map to",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"},
     )
@@ -1141,7 +1142,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             )
 
         # Update the global device mappings
-        global_mappings[device_name] = {"objRef": request.objRef, "fc": request.fc}
+        global_mappings[device_name] = {"objRef": request.obj_ref, "fc": request.fc}
 
         # Persist mappings to file
         from io_config import get_config_path, save_full_config
@@ -1161,12 +1162,12 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         )
 
         logger.info(
-            f"Set ACSI mapping: {device_name} -> {request.objRef} (fc={request.fc})"
+            f"Set ACSI mapping: {device_name} -> {request.obj_ref} (fc={request.fc})"
         )
         return {
             "ok": True,
             "device": device_name,
-            "objRef": request.objRef,
+            "objRef": request.obj_ref,
             "fc": request.fc,
             "message": "Mapping set and saved to config file",
         }
