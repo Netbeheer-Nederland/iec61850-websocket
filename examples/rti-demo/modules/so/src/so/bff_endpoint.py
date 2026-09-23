@@ -79,7 +79,7 @@ logging.basicConfig(
 )
 
 # Apply the severity to the root logger here at import time, not only in the
-# __main__ block, so every entry point honours LOG_LEVEL: `python
+# __main__ block, so every entry point honors LOG_LEVEL: `python
 # so/bff_endpoint.py`, `uvicorn so.bff_endpoint:app`, a service wrapper, or
 # pytest importing create_fastapi_app. Child loggers (acsi_client, ws61850.*)
 # and the ACSI client's background event-loop thread inherit this level.
@@ -136,7 +136,7 @@ _use_io_client = True
 # Configurable via IO_PLUGIN_STORAGE environment variable.
 # Default: /app/io_plugin_dynamic (good for Docker volumes)
 IO_PLUGIN_STORAGE = os.getenv("IO_PLUGIN_STORAGE", "/app/io_plugin_dynamic")
-io_plugin_dynamic_DIR = Path(IO_PLUGIN_STORAGE)
+IO_PLUGIN_DYNAMIC_DIR = Path(IO_PLUGIN_STORAGE)
 
 # Global reference to loaded io_plugin modules
 _io_plugin_module = None
@@ -366,14 +366,14 @@ IO_PLUGIN_REQUIRED_FILES = [
 
 def ensure_io_plugin_dir():
     """Ensure the dynamic io_plugin directory exists."""
-    io_plugin_dynamic_DIR.mkdir(parents=True, exist_ok=True)
-    return io_plugin_dynamic_DIR
+    IO_PLUGIN_DYNAMIC_DIR.mkdir(parents=True, exist_ok=True)
+    return IO_PLUGIN_DYNAMIC_DIR
 
 
 def get_io_plugin_file_path(relative_path: str) -> Path:
     """Get the full path for a io_plugin file in the dynamic directory."""
     ensure_io_plugin_dir()
-    return io_plugin_dynamic_DIR / relative_path
+    return IO_PLUGIN_DYNAMIC_DIR / relative_path
 
 
 def check_required_io_plugin_files() -> bool:
@@ -436,8 +436,8 @@ def load_io_plugin_modules() -> bool:
 
     try:
         # Add the dynamic directory to sys.path so imports work
-        if str(io_plugin_dynamic_DIR) not in sys.path:
-            sys.path.insert(0, str(io_plugin_dynamic_DIR))
+        if str(IO_PLUGIN_DYNAMIC_DIR) not in sys.path:
+            sys.path.insert(0, str(IO_PLUGIN_DYNAMIC_DIR))
 
         # Load async_client_io module FIRST - io_router.py depends on it
         # (imports AsyncDemoIOClient from it). Registering it in sys.modules
@@ -605,8 +605,8 @@ def clear_io_plugin_modules():
     _mapping_manager_module = None
     _io_utils_module = None
     # Remove dynamic directory from sys.path
-    if str(io_plugin_dynamic_DIR) in sys.path:
-        sys.path.remove(str(io_plugin_dynamic_DIR))
+    if str(IO_PLUGIN_DYNAMIC_DIR) in sys.path:
+        sys.path.remove(str(IO_PLUGIN_DYNAMIC_DIR))
     # Remove all dynamically-registered modules from sys.modules so a
     # subsequent reload picks up freshly-downloaded copies instead of
     # stale cached modules (and stale Pydantic model classes/schemas).
@@ -3243,12 +3243,12 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                             if io_client:
                                 # Fire-and-forget: don't wait for IO sync to complete
                                 # Check health and sync in background
-                                lcdValue = f"Read - {obj_ref}"
+                                lcd_value = f"Read - {obj_ref}"
 
                                 if result is None:
-                                    lcdValue = f"Readvalue failed - {obj_ref} fail"
+                                    lcd_value = f"Readvalue failed - {obj_ref} fail"
                                 else:
-                                    lcdValue = f"{obj_ref} : {result.get('value')}"
+                                    lcd_value = f"{obj_ref} : {result.get('value')}"
 
                                 asyncio.create_task(
                                     blink_led_task(
@@ -3264,7 +3264,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                                     write_to_lcd(
                                         io_client,
                                         "read",
-                                        lcdValue,
+                                        lcd_value,
                                         mapping_manager=mapping_manager,
                                     )
                                 )
@@ -4003,13 +4003,13 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                             if io_client:
                                 # Fire-and-forget: don't wait for IO sync to complete
                                 # Check health and sync in background
-                                lcdValue = f"Write - {obj_ref} Value: {value}"
+                                lcd_value = f"Write - {obj_ref} Value: {value}"
 
                                 if result is None:
-                                    lcdValue = f"Write - {obj_ref} fail"
+                                    lcd_value = f"Write - {obj_ref} fail"
                                 else:
                                     if result.get("error") is not None:
-                                        lcdValue = f"Write - {obj_ref} fail"
+                                        lcd_value = f"Write - {obj_ref} fail"
 
                                 asyncio.create_task(
                                     blink_led_task(
@@ -4025,7 +4025,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                                     write_to_lcd(
                                         io_client,
                                         "setpoint",
-                                        lcdValue,
+                                        lcd_value,
                                         mapping_manager=mapping_manager,
                                     )
                                 )
@@ -4575,12 +4575,12 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             ensure_io_plugin_dir()
 
             all_files = []
-            for item in io_plugin_dynamic_DIR.iterdir():
+            for item in IO_PLUGIN_DYNAMIC_DIR.iterdir():
                 if item.is_file():
                     all_files.append(
                         {
                             "name": item.name,
-                            "path": str(item.relative_to(io_plugin_dynamic_DIR)),
+                            "path": str(item.relative_to(IO_PLUGIN_DYNAMIC_DIR)),
                             "size": item.stat().st_size,
                             "modified": item.stat().st_mtime,
                         }
@@ -4594,7 +4594,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 "async_client_io.py",
             ]
             present_files = [
-                f.name for f in io_plugin_dynamic_DIR.iterdir() if f.is_file()
+                f.name for f in IO_PLUGIN_DYNAMIC_DIR.iterdir() if f.is_file()
             ]
             missing_files = [f for f in required_files if f not in present_files]
 
@@ -4602,7 +4602,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 "files": all_files,
                 "required_files_present": len(missing_files) == 0,
                 "missing_files": missing_files,
-                "directory": str(io_plugin_dynamic_DIR),
+                "directory": str(IO_PLUGIN_DYNAMIC_DIR),
             }
 
         except Exception as e:

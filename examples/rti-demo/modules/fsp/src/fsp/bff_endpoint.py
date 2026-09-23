@@ -129,7 +129,7 @@ _use_io_plugin = False  # Default to False will be enabled if files exist
 # Default: /app/io_plugin_dynamic (good for Docker volumes)
 # Fallback: temp directory if not specified
 IO_PLUGIN_STORAGE = os.getenv("IO_PLUGIN_STORAGE", "/app/io_plugin_dynamic")
-io_plugin_dynamic_DIR = Path(IO_PLUGIN_STORAGE)
+IO_PLUGIN_DYNAMIC_DIR = Path(IO_PLUGIN_STORAGE)
 
 # Global reference to loaded io_plugin modules
 _io_plugin_module = None
@@ -364,14 +364,14 @@ io_plugin_REQUIRED_FILES = [
 
 def ensure_io_plugin_dir():
     """Ensure the dynamic io_plugin directory exists."""
-    io_plugin_dynamic_DIR.mkdir(parents=True, exist_ok=True)
-    return io_plugin_dynamic_DIR
+    IO_PLUGIN_DYNAMIC_DIR.mkdir(parents=True, exist_ok=True)
+    return IO_PLUGIN_DYNAMIC_DIR
 
 
 def get_io_plugin_file_path(relative_path: str) -> Path:
     """Get the full path for a io_plugin file in the dynamic directory."""
     ensure_io_plugin_dir()
-    return io_plugin_dynamic_DIR / relative_path
+    return IO_PLUGIN_DYNAMIC_DIR / relative_path
 
 
 def check_required_io_plugin_files() -> bool:
@@ -434,8 +434,8 @@ def load_io_plugin_modules() -> bool:
 
     try:
         # Add the dynamic directory to sys.path so imports work
-        if str(io_plugin_dynamic_DIR) not in sys.path:
-            sys.path.insert(0, str(io_plugin_dynamic_DIR))
+        if str(IO_PLUGIN_DYNAMIC_DIR) not in sys.path:
+            sys.path.insert(0, str(IO_PLUGIN_DYNAMIC_DIR))
 
         # Load async_client_io module (dependency of io_router) — must load first
         async_client_io_path = get_io_plugin_file_path("async_client_io.py")
@@ -611,8 +611,8 @@ def clear_io_plugin_modules():
     _mapping_manager_module = None
     _io_utils_module = None
     # Remove dynamic directory from sys.path
-    if str(io_plugin_dynamic_DIR) in sys.path:
-        sys.path.remove(str(io_plugin_dynamic_DIR))
+    if str(IO_PLUGIN_DYNAMIC_DIR) in sys.path:
+        sys.path.remove(str(IO_PLUGIN_DYNAMIC_DIR))
     # Remove all dynamically-registered modules from sys.modules so a
     # subsequent reload picks up freshly-downloaded copies instead of
     # stale cached modules (and stale Pydantic model classes/schemas).
@@ -3211,7 +3211,7 @@ def create_bff_router(
 
             return {
                 "ok": True,
-                "file_path": str(file_path.relative_to(io_plugin_dynamic_DIR)),
+                "file_path": str(file_path.relative_to(IO_PLUGIN_DYNAMIC_DIR)),
                 "full_path": str(file_path),
                 "size": len(file_content),
                 "message": f"File uploaded successfully: {file.filename}",
@@ -3244,12 +3244,12 @@ def create_bff_router(
 
             # Get all files in the directory
             all_files = []
-            for item in io_plugin_dynamic_DIR.iterdir():
+            for item in IO_PLUGIN_DYNAMIC_DIR.iterdir():
                 if item.is_file():
                     all_files.append(
                         {
                             "name": item.name,
-                            "path": str(item.relative_to(io_plugin_dynamic_DIR)),
+                            "path": str(item.relative_to(IO_PLUGIN_DYNAMIC_DIR)),
                             "size": item.stat().st_size,
                             "modified": item.stat().st_mtime,
                         }
@@ -3264,7 +3264,7 @@ def create_bff_router(
                 "async_client_io.py",
             ]
             present_files = [
-                f.name for f in io_plugin_dynamic_DIR.iterdir() if f.is_file()
+                f.name for f in IO_PLUGIN_DYNAMIC_DIR.iterdir() if f.is_file()
             ]
             missing_files = [f for f in required_files if f not in present_files]
 
@@ -3272,7 +3272,7 @@ def create_bff_router(
                 "files": all_files,
                 "required_files_present": len(missing_files) == 0,
                 "missing_files": missing_files,
-                "directory": str(io_plugin_dynamic_DIR),
+                "directory": str(IO_PLUGIN_DYNAMIC_DIR),
             }
 
         except Exception as e:
@@ -3430,7 +3430,7 @@ def create_bff_router(
                 "files_present": files_present,
                 "modules_loaded": modules_loaded,
                 "io_router_included": _io_router_included,
-                "dynamic_directory": str(io_plugin_dynamic_DIR),
+                "dynamic_directory": str(IO_PLUGIN_DYNAMIC_DIR),
                 "details": {
                     "io_router_loaded": _io_plugin_module is not None,
                     "io_utils_loaded": _io_utils_module is not None,
