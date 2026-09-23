@@ -26,6 +26,7 @@ import sys
 from datetime import datetime
 from typing import Any
 
+import httpx2 as httpx
 import requests
 from fastapi import (
     FastAPI,
@@ -797,6 +798,10 @@ async def create_oauth_connection(request: OAUTHConnectionCreateConfigRequest):
             connection["OAuth"] = {}
 
         connection["OAuth"]["enable_oauth"] = request.enable_oauth
+        if request.idp_server is not None:
+            connection["OAuth"]["idp_server"] = request.idp_server
+        if request.realm is not None:
+            connection["OAuth"]["realm"] = request.realm
 
         # Store OAuth fields based on mode
         if request.ws_mode == "passive" or request.ws_mode == "Passive":
@@ -842,6 +847,55 @@ async def create_oauth_connection(request: OAUTHConnectionCreateConfigRequest):
         }
 
     return {"ok": False, "message": "Connection not found"}
+
+
+async def _fetch_oidc_discovery(url: str) -> dict[str, Any]:
+    # verify=False: same as the IDP-Server health check - demo IDPs
+    # typically run on a self-signed certificate.
+    async with httpx.AsyncClient(timeout=5.0, verify=False) as client:
+        response = await client.get(url)
+        response.raise_for_status()
+        return response.json()
+
+
+@app.get(
+    "/api/idp/discovery",
+    summary="Discover a realm's OAuth endpoints",
+    description="Reads the realm's OIDC discovery document from an IDP-Server connection.",
+    response_description="Issuer, certificate (JWKS) endpoint and token endpoint",
+    tags=["OAuth"],
+)
+async def get_idp_discovery(idp_server: str, realm: str):
+    """Look up a realm's issuer and endpoints on a registered IDP-Server.
+
+    Fetched here rather than in the browser: the IDP's address (e.g.
+    http://keycloak:8080) is only resolvable inside the Docker network. The
+    issuer comes from the IDP itself, since it can differ from that address
+    (Keycloak's KC_HOSTNAME) and the SO rejects tokens whose issuer doesn't
+    match exactly.
+    """
+    idp = conn_manager.get_connection(idp_server)
+    if not idp or idp.get("type") != "IDP-Server":
+        return {"ok": False, "error": f"IDP server '{idp_server}' not found"}
+
+    base_url = idp.get("endpoint") or (
+        f"http://{idp['host']}:{idp['port']}" if idp.get("host") else ""
+    )
+    if not base_url:
+        return {"ok": False, "error": f"IDP server '{idp_server}' has no endpoint"}
+
+    url = f"{base_url.rstrip('/')}/realms/{realm}/.well-known/openid-configuration"
+    try:
+        discovery = await _fetch_oidc_discovery(url)
+    except Exception as e:
+        return {"ok": False, "error": f"Could not read {url}: {e}"}
+
+    return {
+        "ok": True,
+        "issuer": discovery.get("issuer"),
+        "certificate_endpoint": discovery.get("jwks_uri"),
+        "token_endpoint": discovery.get("token_endpoint"),
+    }
 
 
 @app.get(
@@ -1233,6 +1287,23 @@ async def execute_dynamic_api(request: ExecuteRequest):
                         enriched_body[field] = value
 
                 body = enriched_body
+
+    # An RTI-FSP only holds TLS in memory, so after a restart its dial-out
+    # would come back as plain WS - /start carries its stored TLS config
+    # along (FSP's /start applies it before connecting).
+    if path == "/api/start" and isinstance(body, dict):
+        host, _, port = target.rpartition(":")
+        connection = conn_manager.get_connection_by_host_port(
+            host, int(port) if port.isdigit() else port
+        )
+        stored_tls = (connection or {}).get("TLS")
+        if connection and connection.get("type") == "RTI-FSP" and stored_tls:
+            body = {
+                "enable_tls": bool(stored_tls.get("enable_tls")),
+                "tls_version": stored_tls.get("tls_version"),
+                "server_ca": stored_tls.get("server_ca"),
+                **body,
+            }
 
     try:
         # Get client from registry

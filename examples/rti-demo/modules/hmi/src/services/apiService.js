@@ -68,6 +68,7 @@ const API_DEFINITIONS = [
   { id: 'reconfig-oauth', label: 'POST /api/reconfig-oauth', method: 'POST', path: '/api/reconfig-oauth' },
   { id: 'reconfig-connection', label: 'POST /api/reconfig-connection', method: 'POST', path: '/api/reconfig-connection' },
   { id: 'oauth-status', label: 'GET /api/oauth-status', method: 'GET', path: '/api/oauth-status' },
+  { id: 'runtime-tls-config', label: 'GET /api/tls-config', method: 'GET', path: '/api/tls-config' },
   
   // Messages operations
   { id: 'messages', label: 'GET /api/messages', method: 'GET', path: '/api/messages' },

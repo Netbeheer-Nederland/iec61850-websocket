@@ -35,12 +35,26 @@ SERVER_HOSTNAMES="${SERVER_HOSTNAMES:-localhost,127.0.0.1}"
 echo "🔐 Generating CA..."
 cfssl gencert -initca ca-csr.json | cfssljson -bare ca
 
-echo "🔐 Generating server certificate..."
+echo "🔐 Generating keycloak certificate..."
+HOSTNAME='keycloak'
 cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
   -profile=server \
+  -cn="{$HOSTNAME}" \
+  -hostname="${HOSTNAME}, ${SERVER_HOSTNAMES}" \
+  server-csr.json | cfssljson -bare keycloak
+
+echo "🔐 Generating server certificate..."
+HOSTNAME='rti-so'
+cfssl gencert \
+  -ca=ca.pem \
+  -ca-key=ca-key.pem \
+  -config=ca-config.json \
+  -profile=server \
+  -cn="{$HOSTNAME}" \
+  -hostname="${HOSTNAME},${SERVER_HOSTNAMES}" \
   server-csr.json | cfssljson -bare server
 
 echo "🔐 Generating client certificate..."
@@ -52,9 +66,9 @@ cfssl gencert \
   -hostname="${SERVER_HOSTNAMES}" \
   client-csr.json | cfssljson -bare client
 
-chmod 600 *-key.pem
-chmod 611 server.pem
-chmod 611 server-key.pem
+chmod 644 *-key.pem
+chmod 644 server.pem
+chmod 644 server-key.pem
 
 echo
 echo "✅ Certificates generated:"

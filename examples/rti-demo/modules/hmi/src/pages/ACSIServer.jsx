@@ -23,7 +23,9 @@ import { executeApiCall, buildTargetValue, getApiById, getAutoRefreshIntervalMs 
 import Tree from '../components/Tree';
 import { transformModelToTree } from '../utils/modelUtils';
 
-import TLSConfigModal from '../components/TLSConfigModal';
+import TLSConfigModal, { useRuntimeTlsEnabled } from '../components/TLSConfigModal';
+import OAuthConfigModal, { useRuntimeOAuthEnabled, oauthRequestBody } from '../components/OAuthConfigModal';
+import SecurityActionMessage from '../components/SecurityActionMessage';
 import ContextMenu  from "../components/ContextMenu.jsx";
 import WriteValueModal from '../components/WriteValueModal.jsx';
 import ActionLogPanel from '../components/ActionLogPanel.jsx';
@@ -132,8 +134,15 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   }, [selectedInstanceName, selectedInstanceStorageKey]);
 
   const [showTLSModal, setShowTLSModal] = useState(false);
-  const [useOAuth, setUseOAuth] = useState(false);
+  const [showOAuthModal, setShowOAuthModal] = useState(false);
   const [message, setMessage] = useState(null);
+  const clearMessage = useCallback(() => setMessage(null), []);
+  // This FSP's live connections.json record (its saved OAuth block) - the
+  // navigation-time `endpoint` copy goes stale once settings are saved.
+  const liveConnection = useMemo(
+    () => connections.find(c => c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) || endpoint,
+    [connections, endpoint]
+  );
 
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
   const [contextMenuTarget, setContextMenuTarget] = useState(null);
@@ -319,12 +328,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     }
   }, []);
 
-  // Resolve the IDP server name associated with this connection's OAuth config
-  const resolveIdpServerName = useCallback((ep) => {
-    const oauthConfig = ep?.OAuth || ep?.oauth || {};
-    return oauthConfig.idp_server || ep?.idp_server || '';
-  }, []);
-
   // This FSP's own BFF address (e.g. "rti-fsp01:5001") - every status/
   // start/stop/model call is routed here. Deliberately no fallback to
   // host/port: those are the *target SO's* WS Host/Port form fields, an
@@ -337,6 +340,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     () => (endpoint ? buildTargetValue(endpoint.host, endpoint.port) : null),
     [endpoint]
   );
+
+  // Reflected on the TLS Config button - the FSP's live runtime state, the
+  // same thing the modal loads, not the persisted connections.json copy.
+  const [tlsEnabled, refreshTlsEnabled] = useRuntimeTlsEnabled(endpointTarget);
+  // Same for OAuth - reflected on the OAuth Config button.
+  const [oauthEnabled, refreshOAuthEnabled] = useRuntimeOAuthEnabled(endpointTarget);
 
   const stopMonitoring = useCallback(() => {
     if (monitorIntervalRef.current) {
@@ -355,6 +364,11 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
 
   const loadStatus = useCallback(async () => {
     if (!endpointTarget) return;
+    // Along with the status: TLS can change without this page doing
+    // anything to it - Connect applies the stored config, and the BFF
+    // re-applies it after a restart - so the button would otherwise go stale.
+    refreshTlsEnabled();
+    refreshOAuthEnabled();
     try {
       const result = await executeApiCall('status', endpointTarget, null);
       if (result?.ok) {
@@ -379,34 +393,21 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         }
       }
     } catch (error) { console.error('Failed to load status:', error); }
-  }, [endpointTarget, executeApiCall, parsePythonDictString]);
+  }, [endpointTarget, executeApiCall, parsePythonDictString, refreshTlsEnabled, refreshOAuthEnabled]);
 
-  // Load server status and OAuth status on page load
+  // Load server status on page load
   useEffect(() => {
     if (!endpointTarget) return;
     const fetchInitialData = async () => {
       try {
         // Load server status
         await loadStatus();
-
-        // Fetch OAuth status - only when this connection is actually
-        // configured for OAuth (endpoint.OAuth.enable_oauth, set via
-        // ConnectionModal). Connections that never use OAuth would always
-        // just get "false" back, so probing them on every load is pure
-        // noise - see the identical guard in ACSIClient.jsx.
-        if (endpoint?.OAuth?.enable_oauth) {
-          const result = await executeApiCall('oauth-status', endpointTarget, {});
-          if (result?.ok) {
-            const enableOAuth = result.payload?.result?.enable_oauth ?? result.payload?.enable_oauth ?? false;
-            setUseOAuth(enableOAuth);
-          }
-        }
       } catch (error) {
         console.error('Failed to fetch initial data:', error);
       }
     };
     fetchInitialData();
-  }, [endpointTarget, loadStatus, endpoint]);
+  }, [endpointTarget, loadStatus]);
 
   const initialSyncDoneRef = useRef(false);
 
@@ -487,6 +488,17 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     setLoading(true); setError(null);
     try {
       const result = await executeApiCall('start', endpointTarget, { host, port, mode, cp });
+      if (result?.ok && liveConnection?.OAuth?.enable_oauth) {
+        // OAuth only takes effect through /reconfig-oauth (it fetches the
+        // token and restarts the dial-out with it) - so a saved config is
+        // applied here, right after /start, rather than when it was saved.
+        const oauthResult = await executeApiCall('reconfig-oauth', endpointTarget, {
+          ...oauthRequestBody(liveConnection, liveConnection.OAuth, 'active'), host, port, cp,
+        });
+        if (!oauthResult?.ok) {
+          setError(`Connected, but applying the saved OAuth config failed: ${oauthResult?.payload?.detail || oauthResult?.payload?.error || 'Unknown error'}`);
+        }
+      }
       if (result?.ok) {
         await loadStatus();
       } else {
@@ -494,7 +506,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       }
     } catch (error) { setError(error.message); }
     finally { setLoading(false); }
-  }, [endpointTarget, host, port, mode, cp, executeApiCall, loadStatus]);
+  }, [endpointTarget, host, port, mode, cp, executeApiCall, loadStatus, liveConnection]);
 
   const handleStopServer = useCallback(async () => {
     if (!endpointTarget) { setError('No endpoint configured'); return; }
@@ -831,19 +843,12 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     return STATUS_LABELS[rawState] || rawState || 'N/A';
   })();
 
-  // Same host/port match TLSConfigModal's own `connection` prop below uses
-  // to find the live connection record - kept separate (not literally
-  // shared) since the modal's version also builds a full fallback shape
-  // (type/ws_mode/properties_info) this button doesn't need, just the
-  // live TLS.enable_tls value to reflect on the button itself.
-  const liveTlsConnection = useMemo(() =>
-    connections.find(c =>
-      (c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) ||
-      (c.host === host && String(c.port) === String(port))
-    ) || (endpoint?.TLS ? endpoint : null),
-    [connections, endpoint, host, port]
-  );
-  const tlsEnabled = Boolean(liveTlsConnection?.TLS?.enable_tls);
+  // The FSP's own last dial-out failure (runtime.error, set by its reconnect
+  // loop - e.g. a TLS on/off mismatch with the SO). The loop retries
+  // forever, so without this the failure was only visible in container logs.
+  const liveStatus = statusInfo?.result?.status;
+  const connectionError = rawState && rawState !== 'stopped' ? liveStatus?.error : null;
+
 
   return (
     <section className="page">
@@ -996,112 +1001,40 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           <i className={`fas ${tlsEnabled ? 'fa-lock' : 'fa-shield-alt'}`} style={{ marginRight: '8px' }}></i>
           TLS Config{tlsEnabled ? ' (On)' : ''}
         </button>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={useOAuth}
-            onChange={async (e) => {
-              const newValue = e.target.checked;
-
-              if (!endpointTarget || !endpoint?.name) return;
-
-              setLoading(true);
-
-              // Only gate the ENABLE path on IDP availability. Disabling proceeds unchecked.
-              if (newValue) {
-                const idpServerName = resolveIdpServerName(endpoint);
-                const latestConnections = await fetchConnections();
-                const idpServerConn = (latestConnections || connections).find(
-                  c => c.type === 'IDP-Server' && c.name === idpServerName
-                );
-
-                if (!idpServerConn || idpServerConn.status !== 'connected') {
-                  setMessage({ type: 'error', text: 'IDP server unavailable' });
-                  setLoading(false);
-                  return;
-                }
-              }
-
-              setUseOAuth(newValue);
-              // Call reconfig-oauth immediately when checkbox is toggled
-              try {
-                  // Build OAuth config from endpoint
-                  const oauthConfig = endpoint?.OAuth || {};
-
-                  // For active mode (FSP), use the client's port for WebSocket connection
-                  let connectionPort = endpoint?.port || port;
-                  if (endpoint?.ws_mode === 'active' || endpoint?.ws_mode === 'Active') {
-                      // Find corresponding client connection (SO) by replacing Server with Client in endpoint name
-                      const clientName = endpoint.name.replace('Server', 'Client');
-                      const clientConnection = connections.find(c =>
-                          (c.type === 'RTI-SO' || c.acsi === 'client') &&
-                          c.name === clientName
-                      );
-                      if (clientConnection) {
-                          connectionPort = clientConnection.port;
-                      }
-                  }
-
-                  // Use the connection's own host/port for the target endpoint
-                  const targetHost = endpoint?.host || host;
-                  const targetPort = endpoint?.port || port;
-                  const connectionTarget = buildTargetValue(targetHost, targetPort);
-
-                  const requestBody = {
-                    connection_name: endpoint?.name,
-                    enable_oauth: newValue,
-                    ws_mode: endpoint?.ws_mode || 'active',
-                    host: host || "127.0.0.1",
-                    port: String(port) || "8675",
-                    cp: cp,
-                    // Always send OAuth config fields (null when disabling)
-                    token_endpoint_url: newValue ? (oauthConfig.token_endpoint || '') : null,
-                    client_id: newValue ? (oauthConfig.client_id || '') : null,
-                    client_secret: newValue ? (oauthConfig.client_secret || '') : null,
-                    ca_certificate: newValue ? (oauthConfig.auth_server_ca || '') : null,
-                    enable_token_refresh: newValue ? (oauthConfig.enable_token_refresh || false) : false
-                  };
-
-                  // Save to SO/FSP server
-                  const soResult = await executeApiCall('reconfig-oauth', connectionTarget, requestBody);
-
-                  // Also save to BFF's connections.json
-                  const bffOauthConfig = {
-                    connection_name: endpoint?.name || host,
-                    enable_oauth: newValue,
-                    ws_mode: endpoint?.ws_mode || 'Active',
-                    // Always send OAuth config fields (null when disabling)
-                    token_endpoint_url: newValue ? (oauthConfig.token_endpoint || '') : null,
-                    client_id: newValue ? (oauthConfig.client_id || '') : null,
-                    client_secret: newValue ? (oauthConfig.client_secret || '') : null,
-                    ca_certificate: newValue ? (oauthConfig.auth_server_ca || '') : null,
-                    enable_token_refresh: newValue ? (oauthConfig.enable_token_refresh || false) : false
-                  };
-                  const bffResult = await fetch(`${bffBaseUrl}/api/connections/oauth-config`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(bffOauthConfig)
-                  });
-
-                  if (soResult?.ok && bffResult.ok) {
-                    setMessage({ type: 'success', text: `OAuth ${newValue ? 'enabled' : 'disabled'} successfully` });
-                  } else {
-                    setMessage({ type: 'error', text: soResult?.payload?.error || bffResult.statusText || 'Failed to update OAuth' });
-                    setUseOAuth(!newValue); // Revert on failure
-                  }
-                } catch (error) {
-                  setMessage({ type: 'error', text: error.message });
-                  setUseOAuth(!newValue); // Revert on failure
-                } finally {
-                  setLoading(false);
-                }
-            }}
-            disabled={loading}
-            id="acsi-oauth-checkbox"
-          />
-          <span style={{ color: 'var(--text-primary)' }}>Enable OAuth</span>
-        </label>
+        <button
+          className="btn-secondary"
+          onClick={() => setShowOAuthModal(true)}
+          disabled={loading}
+          title={oauthEnabled ? 'OAuth is enabled - click to configure' : 'Configure OAuth settings'}
+          id="acsi-oauth-btn"
+          style={oauthEnabled ? {
+            borderColor: 'var(--success-color)',
+            color: 'var(--success-color)',
+          } : undefined}
+        >
+          <i className="fas fa-key" style={{ marginRight: '8px' }}></i>
+          OAuth Config{oauthEnabled ? ' (On)' : ''}
+        </button>
       </div>
+      <SecurityActionMessage id="acsi-security-message" message={message} onDismiss={clearMessage} />
+      {connectionError && (
+        <div id="acsi-connection-error" className="alert" role="alert" style={{
+          marginTop: '-12px',
+          marginBottom: '24px',
+          padding: '12px',
+          // Same tint + border as SecurityActionMessage - --danger-bg isn't
+          // defined in styles.css.
+          background: 'rgba(244, 67, 54, 0.15)',
+          border: '1px solid var(--danger-color)',
+          color: 'var(--danger-color)',
+          borderRadius: '4px',
+          display: 'flex',
+          alignItems: 'center'
+        }}>
+          <i className="fas fa-exclamation-triangle" style={{ marginRight: '8px' }}></i>
+          Cannot connect to {liveStatus.host}:{liveStatus.port} (still retrying): {connectionError}
+        </div>
+      )}
 
         <div className="page-header" style={{ position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -1115,20 +1048,6 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </button>
       </div>*/}
 
-      {message && (
-      <div className="alert" style={{
-        marginBottom: '16px',
-        padding: '12px',
-        background: message.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
-        color: message.type === 'success' ? 'var(--success-color)' : 'var(--danger-color)',
-        borderRadius: '4px',
-        display: 'flex',
-        alignItems: 'center'
-      }}>
-        <i className={`fas fa-${message.type === 'success' ? 'check-circle' : 'exclamation-circle'}`} style={{ marginRight: '8px' }}></i>
-        {message.text}
-      </div>
-    )}
 
       {error && <div className="alert alert-error" style={{ marginBottom: '16px', padding: '12px', background: 'var(--danger-bg)', color: 'var(--danger-color)', borderRadius: '4px' }}>
         <i className="fas fa-exclamation-triangle" style={{ marginRight: '8px' }}></i>{error}
@@ -1227,11 +1146,29 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         onClear={clearMessages}
       />
 
+      <OAuthConfigModal
+        isOpen={showOAuthModal}
+        onClose={() => setShowOAuthModal(false)}
+        connection={liveConnection}
+        wsMode="active"
+        connections={connections}
+        target={endpointTarget}
+        // Disconnected: the FSP turns OAuth off right away but keeps "on"
+        // for Connect to apply (see handleStartServer).
+        runtimeBody={{ host, port, cp }}
+        bffBaseUrl={bffBaseUrl}
+        onSuccess={(msg) => {
+          setMessage({ type: 'success', text: msg });
+          fetchConnections();
+          refreshOAuthEnabled();
+        }}
+        onError={(msg) => setMessage({ type: 'error', text: msg })}
+      />
+
       <TLSConfigModal
         isOpen={showTLSModal}
         onClose={() => {
           setShowTLSModal(false);
-          setTimeout(() => setMessage(null), 3000);
         }}
         connection={(
           () => {
@@ -1282,6 +1219,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           setMessage({ type: 'success', text: msg });
           // Refetch connections to get updated TLS config
           fetchConnections();
+          refreshTlsEnabled();
         }}
         onError={(msg) => setMessage({ type: 'error', text: msg })}
       />

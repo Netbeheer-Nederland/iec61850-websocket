@@ -203,6 +203,16 @@ class OAUTHConnectionCreateConfigRequest(BaseModel):
         description="Enable token refresh",
         json_schema_extra={"example": False},
     )
+    idp_server: str | None = Field(
+        default=None,
+        description="Name of the IDP-Server connection the endpoints came from",
+        json_schema_extra={"example": "IDP"},
+    )
+    realm: str | None = Field(
+        default=None,
+        description="Realm on that IDP server",
+        json_schema_extra={"example": "iec61850-test"},
+    )
 
 
 class ConnectionUpdateRequest(BaseModel):

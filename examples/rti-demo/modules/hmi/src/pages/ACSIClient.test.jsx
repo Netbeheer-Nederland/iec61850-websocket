@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { render, screen, within, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ACSIClient from './ACSIClient';
@@ -203,5 +203,98 @@ describe('ACSIClient ACSI Clients accordion', () => {
     expect(
       screen.getByText('Click "Fetch Model" to load the ACSI model tree for cp2')
     ).toBeInTheDocument();
+  });
+});
+
+describe('ACSIClient TLS Config button', () => {
+  // connections.json claims TLS is on - the state persisted by an earlier
+  // save, which the SO doesn't re-apply after a restart.
+  const staleTlsConnections = () => {
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).endsWith('/api/connections')) {
+        return {
+          ok: true,
+          json: async () => ({ connections: [{ ...endpoint, TLS: { enable_tls: true } }] }),
+        };
+      }
+      return { ok: false, json: async () => ({}) };
+    });
+  };
+
+  const runtimeTls = (enableTls) => {
+    executeApiCall.mockImplementation(async (apiId, target) => {
+      if (apiId === 'runtime-tls-config') {
+        expect(target).toBe('10.0.0.2:5002');
+        return { ok: true, payload: { ok: true, result: { ok: true, enable_tls: enableTls } } };
+      }
+      return { ok: false };
+    });
+  };
+
+  it('reflects the runtime TLS state, not the stale persisted one', async () => {
+    staleTlsConnections();
+    runtimeTls(false);
+    renderPage();
+
+    await waitFor(() => {
+      expect(executeApiCall).toHaveBeenCalledWith('runtime-tls-config', '10.0.0.2:5002');
+    });
+    expect(document.getElementById('acsi-client-tls-btn')).toHaveTextContent(/^TLS Config$/);
+  });
+
+  it('shows (On) when the runtime endpoint actually has TLS enabled', async () => {
+    runtimeTls(true);
+    renderPage();
+
+    await waitFor(() => {
+      expect(document.getElementById('acsi-client-tls-btn')).toHaveTextContent('TLS Config (On)');
+    });
+  });
+});
+
+describe('ACSIClient security action message', () => {
+  it('shows TLS/OAuth results right under the security buttons, then clears them', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderPage();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      // Enabling OAuth without its endpoints is refused by the OAuth modal.
+      await user.click(document.getElementById('acsi-client-oauth-btn'));
+      await user.click(document.getElementById('oauth-enable'));
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+
+      const alert = await waitFor(() => {
+        const el = document.getElementById('acsi-client-security-message');
+        expect(el).not.toBeNull();
+        return el;
+      });
+      expect(alert).toHaveTextContent('Certificate endpoint and token issuer are required');
+      const securityRow = document.getElementById('acsi-client-tls-btn').parentElement;
+      expect(securityRow.nextElementSibling).toBe(alert);
+
+      await act(async () => { vi.advanceTimersByTime(5000); });
+      expect(document.getElementById('acsi-client-security-message')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('ACSIClient OAuth Config button', () => {
+  it('reflects the SO\'s runtime OAuth state', async () => {
+    executeApiCall.mockImplementation(async (apiId, target) => {
+      if (apiId === 'oauth-status') {
+        expect(target).toBe('10.0.0.2:5002');
+        return { ok: true, payload: { result: { ok: true, enable_oauth: true } } };
+      }
+      return { ok: false };
+    });
+    renderPage();
+
+    await waitFor(() => {
+      expect(document.getElementById('acsi-client-oauth-btn')).toHaveTextContent('OAuth Config (On)');
+    });
+    expect(document.getElementById('acsi-client-oauth-checkbox')).toBeNull();
   });
 });

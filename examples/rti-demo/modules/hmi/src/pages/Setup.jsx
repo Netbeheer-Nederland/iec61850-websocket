@@ -45,15 +45,6 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
     acsi: 'client',
     ws_mode: 'passive',
     endpoint: '',
-    certificate_endpoint: '',
-    auth_server_ca: '',
-    token_issuer_url: '',
-    realm: '',
-    token_endpoint: '',
-    client_id: '',
-    client_secret: '',
-    enable_token_refresh: false,
-    idp_server: '',
     cp: ''
   });
   const [bffError, setBffError] = useState(null);
@@ -130,75 +121,16 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
   // Add connection
   const handleAddConnection = () => {
     setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, ws_port: 8765, type: 'RTI-SO', acsi: 'client', ws_mode: 'passive', endpoint: '', certificate_endpoint: '', auth_server_ca: '', token_issuer_url: '', realm: '', token_endpoint: '', client_id: '', client_secret: '', enable_token_refresh: false, idp_server: '', cp: '' });
+    setFormData({ name: '', host: '', port: 5000, ws_port: 8765, type: 'RTI-SO', acsi: 'client', ws_mode: 'passive', endpoint: '', cp: '' });
     setShowModal(true);
   };
 
   // Edit connection
   const handleEditConnection = (conn) => {
     setCurrentConnection(conn);
-    
-    const oauthConfig = conn.OAuth || conn.oauth || conn.oauth_config || conn.OAuthConfig || conn.oauthConfig || {};
-    
-    const propertiesOauth = (conn.properties_info || {}).properties || {};
-    const oauthFromProps = propertiesOauth.OAuth || propertiesOauth.oauth || {};
-
-    let certificateEndpoint = oauthConfig.certificate_endpoint || 
-                                  oauthConfig.certificate_endpoint_url || 
-                                  oauthFromProps.certificate_endpoint || 
-                                  oauthFromProps.certificate_endpoint_url || 
-                                  oauthConfig.cert_endpoint || 
-                                  oauthConfig.cert_endpoint_url || 
-                                  conn.certificate_endpoint || 
-                                  conn.certificate_endpoint_url || 
-                                  conn.cert_endpoint || 
-                                  conn.cert_endpoint_url || 
-                                  '';
-    
-    const authServerCa = oauthConfig.auth_server_ca || 
-                         oauthFromProps.auth_server_ca || 
-                         oauthConfig.ca_certificate || 
-                         oauthFromProps.ca_certificate || 
-                         conn.auth_server_ca || '';
-    
-    const tokenIssuerUrl = oauthConfig.token_issuer || 
-                           oauthFromProps.token_issuer || 
-                           oauthConfig.token_issuer_url || 
-                           oauthFromProps.token_issuer_url || 
-                           conn.token_issuer_url || '';
-    
-    const realm = oauthConfig.realm || oauthFromProps.realm || conn.realm || '';
-    const tokenEndpoint = oauthConfig.token_endpoint || 
-                          oauthFromProps.token_endpoint || 
-                          oauthConfig.token_endpoint_url || 
-                          oauthFromProps.token_endpoint_url || 
-                          conn.token_endpoint || '';
-    const clientId = oauthConfig.client_id || oauthFromProps.client_id || conn.client_id || '';
-    const clientSecret = oauthConfig.client_secret || oauthFromProps.client_secret || conn.client_secret || '';
-    const enableTokenRefresh = oauthConfig.enable_token_refresh || oauthFromProps.enable_token_refresh || conn.enable_token_refresh || false;
-
-    let idpServer = oauthConfig.idp_server || 
-                   oauthFromProps.idp_server || 
-                   conn.idp_server || 
-                   oauthConfig.idpServer || 
-                   oauthFromProps.idpServer || 
-                   conn.idpServer || 
-                   (conn.OAuth || {}).idp_server_name ||
-                   (conn.oauth || {}).idp_server_name || 
-                   conn.idp_server_name || 
-                   '';
-    
-    if (!certificateEndpoint && idpServer) {
-      const idpServers = connections.filter(c => c.type === 'IDP-Server');
-      const matchingIdp = idpServers.find(server => server.name === idpServer);
-      if (matchingIdp && matchingIdp.endpoint) {
-        certificateEndpoint = matchingIdp.endpoint;
-        if (!idpServer) {
-          idpServer = matchingIdp.name;
-        }
-      }
-    }
-    
+    // OAuth settings aren't edited here any more (see OAuthConfigModal on
+    // the instance's own page) - and since edit-connection leaves omitted
+    // fields untouched, saving this form keeps them as they are.
     setFormData({
       name: conn.name || '',
       host: conn.host || '',
@@ -212,16 +144,7 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
       type: conn.type || 'RTI-SO',
       acsi: conn.acsi || 'server',
       ws_mode: conn.ws_mode || '',
-      endpoint: conn.endpoint || '',
-      certificate_endpoint: certificateEndpoint,
-      auth_server_ca: authServerCa,
-      token_issuer_url: tokenIssuerUrl,
-      realm: realm,
-      token_endpoint: tokenEndpoint,
-      client_id: clientId,
-      client_secret: clientSecret,
-      enable_token_refresh: enableTokenRefresh,
-      idp_server: idpServer
+      endpoint: conn.endpoint || ''
     });
     setShowModal(true);
   };
@@ -423,12 +346,10 @@ function Setup({ settings, connections = [], loading = false, onReload }) {
 
       {/* Connection Modal */}
       <ConnectionModal
-        settings={settings}
         showModal={showModal}
         onClose={() => setShowModal(false)}
         currentConnection={currentConnection}
         formData={formData}
-        connections={connections}
         onFormChange={setFormData}
         onSave={handleSaveConnection}
       />

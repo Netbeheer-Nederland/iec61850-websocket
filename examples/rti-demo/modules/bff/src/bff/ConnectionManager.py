@@ -37,6 +37,7 @@ import asyncio
 import json
 import os
 import tempfile
+import time
 from datetime import datetime
 
 import httpx2 as httpx
@@ -62,6 +63,15 @@ class ConnectionManager:
         logger: Logger instance for connection-related messages
     """
 
+    # A failed TLS/OAuth re-apply (e.g. a bad stored cert) is retried at most
+    # this often - each attempt restarts the SO's WebSocket listener, so
+    # retrying on every status poll would keep knocking it over.
+    SECURITY_SYNC_RETRY_SECONDS = 60
+    # The SO's /reconfig-connection and /reconfig-oauth stop and restart its
+    # listener (incl. a 3 s port-release wait), far longer than the 2 s
+    # health-check timeout.
+    SECURITY_SYNC_TIMEOUT_SECONDS = 40
+
     def __init__(self, bff_clients, connections_file, logger) -> None:
         self.connections_file = connections_file
         self._bff_clients = bff_clients
@@ -71,6 +81,10 @@ class ConnectionManager:
         self.status_task = None
         # Reusable HTTP client (connection pooling + keep-alive) for health checks.
         self._client: httpx.AsyncClient | None = None
+        # (connection name, "tls" | "oauth") -> time.monotonic() of its last
+        # failed re-apply - separate per kind, so a failing TLS re-apply
+        # doesn't also hold back OAuth.
+        self._sync_failures: dict[tuple[str, str], float] = {}
         # Give every connection an initial status so the UI can render instantly.
         for con in self.connections:
             con.setdefault("status", "checking")
@@ -109,9 +123,169 @@ class ConnectionManager:
         # Run an immediate check so cards populate on startup instead of
         # waiting for the first interval to elapse.
         await self.get_all_connections_with_status()
+        await self.sync_all_runtime_security()
         while True:
             await asyncio.sleep(interval)
             await self.get_all_connections_with_status()
+            await self.sync_all_runtime_security()
+
+    async def sync_all_runtime_security(self) -> None:
+        """Re-apply stored TLS, then OAuth, to every connected RTI-SO.
+
+        The SO keeps both only in memory, so after a container restart it
+        comes back as plain, unauthenticated WS while connections.json still
+        says otherwise. Per SO, TLS and OAuth run one after the other - each
+        restarts the SO's listener - while different SOs run concurrently.
+        RTI-FSP isn't handled here: its dial-out only starts on Connect,
+        which applies the stored TLS (/api/execute's /start enrichment) and
+        OAuth (the HMI's reconfig-oauth after /start) itself.
+        """
+        client = self.get_client()
+
+        async def sync_one(con):
+            await self.sync_runtime_tls(con, client)
+            await self.sync_runtime_oauth(con, client)
+
+        await asyncio.gather(*(sync_one(con) for con in self.connections))
+
+    def _resync_base_url(self, con, block: str, kind: str) -> str | None:
+        """The SO's base URL if `con` is due a `kind` re-apply check, else None."""
+        if (
+            con.get("type") != "RTI-SO"
+            or not con.get(block)
+            or con.get("status") != "connected"
+        ):
+            return None
+        last_failure = self._sync_failures.get((con.get("name"), kind))
+        if (
+            last_failure is not None
+            and time.monotonic() - last_failure < self.SECURITY_SYNC_RETRY_SECONDS
+        ):
+            return None
+        return f"http://{con['host']}:{con['port']}"
+
+    async def _get_runtime(self, client, url: str, name: str) -> dict | None:
+        try:
+            response = await client.get(url)
+            runtime = response.json()
+        except (httpx.RequestError, ValueError) as e:
+            self.logger.debug(f"Runtime check {url} failed for {name}: {e}")
+            return None
+        if not isinstance(runtime, dict) or not runtime.get("ok"):
+            return None
+        return runtime
+
+    async def _reapply(self, client, name: str, kind: str, url: str, body) -> None:
+        try:
+            response = await client.post(
+                url, json=body, timeout=self.SECURITY_SYNC_TIMEOUT_SECONDS
+            )
+            payload = response.json()
+            error = (
+                None
+                if response.status_code < 400 and payload.get("ok")
+                else payload.get("error") or f"HTTP {response.status_code}"
+            )
+        except (httpx.RequestError, ValueError) as e:
+            error = str(e)
+
+        if error is None:
+            self._sync_failures.pop((name, kind), None)
+            self.logger.info(f"Stored {kind.upper()} config re-applied to {name}")
+        else:
+            self._sync_failures[(name, kind)] = time.monotonic()
+            self.logger.warning(
+                f"Re-applying stored {kind.upper()} config to {name} failed: {error}"
+            )
+
+    @staticmethod
+    def _normalize_tls_version(version) -> str:
+        # Same "1.2"/"TLSv1_2" vs. everything-else-is-1.3 rule the SO's own
+        # /reconfig-connection applies, so both sides compare alike.
+        version = str(version or "").lower()
+        return "1.2" if "1.2" in version or "1_2" in version else "1.3"
+
+    async def sync_runtime_tls(self, con, client) -> None:
+        """Re-apply a connected RTI-SO's stored TLS config if its runtime differs."""
+        base_url = self._resync_base_url(con, "TLS", "tls")
+        if base_url is None:
+            return
+        name = con.get("name")
+        stored = con["TLS"]
+        runtime = await self._get_runtime(client, f"{base_url}/api/tls-config", name)
+        if runtime is None:
+            return
+
+        want_tls = bool(stored.get("enable_tls"))
+        in_sync = bool(runtime.get("enable_tls")) == want_tls and (
+            not want_tls
+            or (
+                self._normalize_tls_version(runtime.get("tls_version"))
+                == self._normalize_tls_version(stored.get("tls_version"))
+                and runtime.get("server_cert") == stored.get("server_cert")
+            )
+        )
+        if in_sync:
+            self._sync_failures.pop((name, "tls"), None)
+            return
+
+        self.logger.info(
+            f"Re-applying stored TLS config to {name} "
+            f"(enable_tls={want_tls}, tls_version={stored.get('tls_version')})"
+        )
+        await self._reapply(
+            client,
+            name,
+            "tls",
+            f"{base_url}/api/reconfig-connection",
+            {
+                "connection_name": name,
+                "enable_tls": want_tls,
+                "tls_version": stored.get("tls_version"),
+                "server_key": stored.get("server_key"),
+                "server_cert": stored.get("server_cert"),
+                "server_ca": stored.get("server_ca"),
+                "ws_mode": con.get("ws_mode") or "passive",
+            },
+        )
+
+    async def sync_runtime_oauth(self, con, client) -> None:
+        """Re-apply a connected RTI-SO's stored OAuth config if its runtime differs.
+
+        The SO's /oauth-status only reports on/off, so that's what's compared;
+        changed endpoints are applied by the OAuth Config dialog itself.
+        """
+        base_url = self._resync_base_url(con, "OAuth", "oauth")
+        if base_url is None:
+            return
+        name = con.get("name")
+        stored = con["OAuth"]
+        runtime = await self._get_runtime(client, f"{base_url}/api/oauth-status", name)
+        if runtime is None:
+            return
+
+        want_oauth = bool(stored.get("enable_oauth"))
+        if bool(runtime.get("enable_oauth")) == want_oauth:
+            self._sync_failures.pop((name, "oauth"), None)
+            return
+
+        self.logger.info(
+            f"Re-applying stored OAuth config to {name} (enable_oauth={want_oauth})"
+        )
+        await self._reapply(
+            client,
+            name,
+            "oauth",
+            f"{base_url}/api/reconfig-oauth",
+            {
+                "connection_name": name,
+                "enable_oauth": want_oauth,
+                "ws_mode": con.get("ws_mode") or "passive",
+                "certificate_endpoint_url": stored.get("certificate_endpoint"),
+                "token_issuer_url": stored.get("token_issuer"),
+                "ca_certificate": stored.get("auth_server_ca"),
+            },
+        )
 
     def load_connections(self) -> list[dict]:
         """Load connections from file."""

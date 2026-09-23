@@ -12,6 +12,10 @@
 * Run the following command to start Keycloak in the scripts/keycloak directory:
 
 ```shell
+docker network create rti-network 2>/dev/null || true
+```
+
+```shell
 docker compose up
 ```
 

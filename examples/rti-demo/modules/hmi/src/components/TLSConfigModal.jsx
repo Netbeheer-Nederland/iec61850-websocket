@@ -19,6 +19,7 @@
 
 // TLSConfigModal.jsx
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRuntimeFlag } from '../hooks/useRuntimeFlag';
 
 function parsePythonDictString(pythonStr) {
   if (!pythonStr || typeof pythonStr !== 'string') return pythonStr;
@@ -63,11 +64,27 @@ const RUNTIME_TLS_CONFIG_API = {
   path: '/api/tls-config'
 };
 
+// "1.2"/"1.3" (runtime) or "TLSv1_2"/"TLSv1_3" (connections.json) -> the
+// select's "1.2"/"1.3"; null when there's nothing usable.
+function normalizeTlsVersion(version) {
+  const v = String(version ?? '');
+  if (/1[._]3/.test(v)) return '1.3';
+  if (/1[._]2/.test(v)) return '1.2';
+  return null;
+}
+
 function getApiById(id) {
   if (id === 'reconfig-connection') return RECONFIG_CONNECTION_API;
   if (id === 'tls-config') return TLS_CONFIG_API;
   if (id === 'runtime-tls-config') return RUNTIME_TLS_CONFIG_API;
   return null;
+}
+
+// Whether the instance at `target` (e.g. "rti-so:5002") actually has TLS
+// enabled right now - the same runtime source this modal's form loads from,
+// not the TLS block persisted in connections.json (see useRuntimeFlag).
+function useRuntimeTlsEnabled(target) {
+  return useRuntimeFlag('runtime-tls-config', 'enable_tls', target);
 }
 
 const TLSConfigModal = ({
@@ -133,17 +150,29 @@ const TLSConfigModal = ({
     }
   }, [bffBaseUrl]);
 
-  // Fetch TLS config ONLY from the server's runtime endpoint
-  // If it fails, fields remain empty (no fallbacks)
+  // Load the form: the saved settings (connection.TLS, from the BFF's
+  // connections.json) first, then the instance's runtime GET /api/tls-config
+  // on top. The runtime decides whether TLS is actually on right now; while
+  // it's off it only reports defaults (e.g. tls_version "1.2"), so the saved
+  // version/certificates are kept rather than lost.
   useEffect(() => {
-    const fetchRuntimeTlsConfig = async () => {
+    const loadTlsConfig = async () => {
       if (!isOpen || !connection) return;
 
-      // Determine the runtime server port based on connection type
-      // RTI-SO uses port 5002, RTI-FSP uses port 5001
+      const applyFields = (src) => {
+        const version = normalizeTlsVersion(src.tls_version);
+        if (version) setTlsVersion(version);
+        if (src.server_key) setServerKey(src.server_key);
+        if (src.server_cert) setServerCert(src.server_cert);
+        if (src.server_ca) setCaCert(src.server_ca);
+      };
+
+      const stored = connection.TLS || {};
+      setEnableTLS(Boolean(stored.enable_tls));
+      applyFields(stored);
+
       const host = connection.host || 'localhost';
       const port = connection.port;
-
       if (!host || !port) {
         console.warn('Cannot fetch TLS config: missing host or port');
         return;
@@ -151,68 +180,18 @@ const TLSConfigModal = ({
 
       try {
         const result = await executeApiCall(RUNTIME_TLS_CONFIG_API, `${host}:${port}`);
-
-        if (result.ok) {
-          const data = result.payload || {};
-          const updates = {};
-          
-          // Extract TLS fields from response - try both snake_case and camelCase variants
-          const extractFields = (obj) => {
-            const getField = (snake, camel, formField) => {
-              const value = obj[snake] || obj[camel];
-              if (value !== undefined && value !== null && value !== '') {
-                updates[formField] = value;
-              }
-            };
-            
-            getField('enable_tls', 'enableTLS', 'enableTLS');
-            getField('tls_version', 'tlsVersion', 'tlsVersion');
-            getField('server_key', 'serverKey', 'serverKey');
-            getField('server_cert', 'serverCert', 'serverCert');
-            getField('server_ca', 'serverCa', 'caCert');
-            getField('ws_mode', 'wsMode', 'wsMode');
-          };
-          
-          // Try to extract from root level
-          extractFields(data);
-          
-          // Also check nested config
-          if (data.config) {
-            extractFields(data.config);
-          }
-          
-          // Only update if we have values
-          if (Object.keys(updates).length > 0) {
-            if (updates.enableTLS !== undefined) setEnableTLS(updates.enableTLS);
-            if (updates.tlsVersion !== undefined) {
-              // Parse tls_version - handle both '1.2'/'1.3' and 'TLSv1_2'/'TLSv1_3' formats
-              let version = '1.2';
-              if (updates.tlsVersion) {
-                const versionStr = String(updates.tlsVersion).toLowerCase();
-                if (versionStr.includes('1.3') || versionStr.includes('tls1_3')) {
-                  version = '1.3';
-                } else if (versionStr.includes('1.2') || versionStr.includes('tls1_2')) {
-                  version = '1.2';
-                } else {
-                  version = versionStr;
-                }
-              }
-              setTlsVersion(version);
-            }
-            if (updates.serverKey !== undefined) setServerKey(updates.serverKey);
-            if (updates.serverCert !== undefined) setServerCert(updates.serverCert);
-            if (updates.caCert !== undefined) setCaCert(updates.caCert);
-            if (updates.wsMode !== undefined) setWsMode(updates.wsMode);
-          }
-        }
-        // If response is not ok or any error occurs, fields remain empty - no fallback
+        if (!result.ok) return;
+        // /api/execute wraps the instance's own response under `result`.
+        const data = result.payload?.result ?? result.payload ?? {};
+        if (data.enable_tls !== undefined) setEnableTLS(Boolean(data.enable_tls));
+        if (data.enable_tls) applyFields(data);
+        if (data.ws_mode) setWsMode(data.ws_mode);
       } catch (error) {
         console.warn('Failed to fetch TLS config from server endpoint:', error);
-        // Fields remain empty - user can configure from scratch
       }
     };
-    
-    fetchRuntimeTlsConfig();
+
+    loadTlsConfig();
   }, [isOpen, connection, wsHost, executeApiCall]);
 
   // Clear any previous error whenever the modal is (re)opened for a
@@ -298,8 +277,10 @@ const TLSConfigModal = ({
         const port = connection.port;
         const reconfigureResult = await executeApiCall(RECONFIG_CONNECTION_API, `${host}:${port}`, config);
 
+        // A disconnected FSP only stores the setting ("saved") - it takes
+        // effect on the next Connect rather than dialing out right away.
         outcome = reconfigureResult.ok
-          ? { ok: true }
+          ? { ok: true, deferred: reconfigureResult.payload?.result?.status === 'saved' }
           : {
               ok: false,
               partial: true,
@@ -314,7 +295,9 @@ const TLSConfigModal = ({
     }
 
     if (outcome.ok) {
-      onSuccess?.(`TLS config saved and applied for ${connection.name}`);
+      onSuccess?.(outcome.deferred
+        ? `TLS config saved for ${connection.name} - applies on next Connect`
+        : `TLS config saved and applied for ${connection.name}`);
       onClose();
     } else {
       setLocalError(outcome.message);
@@ -475,4 +458,4 @@ const TLSConfigModal = ({
 };
 
 export default TLSConfigModal;
-export { parsePythonDictString, getApiById, RECONFIG_CONNECTION_API };
+export { parsePythonDictString, getApiById, RECONFIG_CONNECTION_API, useRuntimeTlsEnabled };

@@ -45,6 +45,7 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8000 \
+    GPIO_CHIP=/dev/gpiochip0 \
     PATH="/app/.venv/bin:$PATH"
 
 # Runtime GPIO tooling + curl for the health check

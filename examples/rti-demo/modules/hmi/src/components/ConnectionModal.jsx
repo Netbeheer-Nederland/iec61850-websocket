@@ -17,23 +17,17 @@
  * limitations under the License.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 
-function ConnectionModal({ 
-  settings, 
-  showModal, 
-  onClose, 
-  currentConnection, 
-  formData, 
-  connections = [],
+function ConnectionModal({
+  showModal,
+  onClose,
+  currentConnection,
+  formData,
   onFormChange,
-  onSave 
+  onSave
 }) {
-  const [selectedIdpServer, setSelectedIdpServer] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  // Get IDP-Server connections
-  const idpServers = connections.filter(conn => conn.type === 'IDP-Server');
 
   const handleInputChange = (e) => {
     const { id, value, type } = e.target;
@@ -41,20 +35,6 @@ function ConnectionModal({
       ...prev,
       [id]: type === 'number' ? parseInt(value) : value
     }));
-  };
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target.result;
-      onFormChange(prev => ({
-        ...prev,
-        auth_server_ca: content
-      }));
-    };
-    reader.readAsText(file);
   };
 
   // Sync ACSI and ws_mode when type changes or modal opens
@@ -81,230 +61,6 @@ function ConnectionModal({
       syncAcsiAndWsMode(formData.type, formData.acsi, formData.ws_mode);
     }
   }, [formData.type, formData.acsi, formData.ws_mode]);
-
-  // Fetch OAuth config from BFF for the connection being edited
-  useEffect(() => {
-    const fetchBffOAuthConfig = async () => {
-      if (!showModal || !currentConnection) return;
-      
-      // Only for connections that might have OAuth config
-      const connType = currentConnection.type || formData.type || '';
-      if (connType !== 'RTI-SO' && connType !== 'RTI-FSP' && connType !== 'Custom') return;
-      
-      const connName = currentConnection.name || formData.name;
-      if (!connName) return;
-      
-      try {
-        const bffHost = localStorage.getItem('bffHost') || settings?.bffHost || 'localhost';
-        const bffPort = localStorage.getItem('bffPort') || settings?.bffPort || '5000';
-        const url = `http://${bffHost}:${bffPort}/api/connections/oauth-config?connection_name=${encodeURIComponent(connName)}`;
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          const updates = {};
-
-          const extractFields = (obj) => {
-            const getField = (snake, camel, formField) => {
-              const value = obj[snake] || obj[camel];
-              if (value !== undefined && value !== null && value !== '') {
-                updates[formField] = value;
-              }
-            };
-            
-            getField('certificate_endpoint', 'certificateEndpoint', 'certificate_endpoint');
-            getField('certificate_endpoint_url', 'certificateEndpointUrl', 'certificate_endpoint');
-            getField('token_issuer', 'tokenIssuer', 'token_issuer_url');
-            getField('token_issuer_url', 'tokenIssuerUrl', 'token_issuer_url');
-            getField('auth_server_ca', 'authServerCa', 'auth_server_ca');
-            getField('ca_certificate', 'caCertificate', 'auth_server_ca');
-            getField('realm', 'realm', 'realm');
-            getField('token_endpoint', 'tokenEndpoint', 'token_endpoint');
-            getField('token_endpoint_url', 'tokenEndpointUrl', 'token_endpoint');
-            getField('client_id', 'clientId', 'client_id');
-            getField('client_secret', 'clientSecret', 'client_secret');
-            getField('idp_server', 'idpServer', 'idp_server');
-            
-            if (obj.enable_token_refresh !== undefined) {
-              updates.enable_token_refresh = obj.enable_token_refresh;
-            }
-            if (obj.enable_oauth !== undefined) {
-              updates.enable_oauth = obj.enable_oauth;
-            }
-          };
-          
-          extractFields(data);
-          
-          if (data.config) {
-            extractFields(data.config);
-          }
-          
-          if (data.connection) {
-            extractFields(data.connection);
-          }
-          
-          if (Object.keys(updates).length > 0) {
-            onFormChange(prev => ({ ...prev, ...updates }));
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to fetch OAuth config from BFF:', error);
-      }
-    };
-    
-    fetchBffOAuthConfig();
-  }, [showModal, currentConnection, formData.name, formData.type, onFormChange, settings]);
-
-
-  useEffect(() => {
-    if (showModal && currentConnection) {
-      const idpServerName = formData.idp_server ||
-                           currentConnection.idp_server || 
-                           (currentConnection.OAuth || {}).idp_server ||
-                           (currentConnection.oauth || {}).idp_server ||
-                           '';
-      
-      if (idpServerName) {
-        const matchingByName = idpServers.find(server => server.name === idpServerName);
-        if (matchingByName) {
-          setSelectedIdpServer(matchingByName.name);
-          if (!formData.idp_server) {
-            onFormChange(prev => ({ ...prev, idp_server: matchingByName.name }));
-          }
-          if (matchingByName.endpoint && !formData.certificate_endpoint) {
-            onFormChange(prev => ({
-              ...prev,
-              certificate_endpoint: matchingByName.endpoint
-            }));
-          }
-          return;
-        }
-      }
-      
-      const certEndpoint = formData.certificate_endpoint || '';
-      if (certEndpoint) {
-        const matchingIdp = idpServers.find(server => {
-          const serverEndpoint = server.endpoint || '';
-          return serverEndpoint === certEndpoint ||
-                 (serverEndpoint.includes(certEndpoint) && certEndpoint.length > 0) ||
-                 (certEndpoint.includes(serverEndpoint) && serverEndpoint.length > 0);
-        });
-        if (matchingIdp && !selectedIdpServer) {
-          setSelectedIdpServer(matchingIdp.name);
-          // Also set formData.idp_server when matching by certificate endpoint
-          if (!formData.idp_server) {
-            onFormChange(prev => ({ ...prev, idp_server: matchingIdp.name }));
-          }
-        }
-      }
-    }
-  }, [showModal, currentConnection, formData.idp_server, formData.certificate_endpoint, idpServers, selectedIdpServer, onFormChange]);
-
-  useEffect(() => {
-    if (selectedIdpServer && formData.realm && formData.ws_mode === 'active') {
-      const selected = idpServers.find(server => server.name === selectedIdpServer);
-      if (selected?.endpoint) {
-        try {
-          const url = new URL(selected.endpoint);
-          const baseUrl = `${url.protocol}//${url.host}`;
-          const newTokenEndpoint = `${baseUrl}/realms/${formData.realm}/protocol/openid-connect/token`;
-          
-          // Only update if not already set or value has changed
-          if (!formData.token_endpoint || formData.token_endpoint !== newTokenEndpoint) {
-            onFormChange(prev => ({
-              ...prev,
-              token_endpoint: newTokenEndpoint
-            }));
-          }
-        } catch (e) {
-          console.warn('Could not construct token endpoint from IDP server:', e);
-        }
-      }
-    }
-  }, [selectedIdpServer, formData.realm, formData.ws_mode, formData.token_endpoint, idpServers, onFormChange]);
-
-  useEffect(() => {
-    if (selectedIdpServer && formData.realm && formData.ws_mode === "active") {
-      const selected = idpServers.find(server => server.name === selectedIdpServer);
-      if (selected?.endpoint) {
-        try {
-          const url = new URL(selected.endpoint);
-          const baseUrl = `${url.protocol}//${url.host}`;
-          const newCertEndpoint = `${baseUrl}/realms/${formData.realm}/protocol/openid-connect/certs`;
-          const newTokenIssuer = `${baseUrl}/realms/${formData.realm}`;
-          
-          // Only update fields that are not set or have changed
-          const updates = {};
-          if (!formData.certificate_endpoint || formData.certificate_endpoint !== newCertEndpoint) {
-            updates.certificate_endpoint = newCertEndpoint;
-          }
-          if (!formData.token_issuer_url || formData.token_issuer_url !== newTokenIssuer) {
-            updates.token_issuer_url = newTokenIssuer;
-          }
-          
-          if (Object.keys(updates).length > 0) {
-            onFormChange(prev => ({ ...prev, ...updates }));
-          }
-        } catch (e) {
-          console.warn('Could not construct endpoints from IDP server:', e);
-        }
-      }
-    }
-  }, [selectedIdpServer, formData.realm, formData.ws_mode, formData.certificate_endpoint, formData.token_issuer_url, idpServers, onFormChange]);
-
-  useEffect(() => {
-    if (selectedIdpServer && formData.realm && formData.ws_mode === "passive") {
-      const selected = idpServers.find(server => server.name === selectedIdpServer);
-      if (selected?.endpoint) {
-        try {
-          const url = new URL(selected.endpoint);
-          const baseUrl = `${url.protocol}//${url.host}`;
-
-          // Construct token issuer URL (OIDC discovery endpoint)
-          const newTokenIssuer = `${baseUrl}/realms/${formData.realm}`;
-          const newCertEndpoint = `${baseUrl}/realms/${formData.realm}/protocol/openid-connect/certs`;
-          
-          // Only update fields that are not set or have changed
-          const updates = {};
-          if (!formData.token_issuer_url || formData.token_issuer_url !== newTokenIssuer) {
-            updates.token_issuer_url = newTokenIssuer;
-          }
-          if (!formData.certificate_endpoint || formData.certificate_endpoint !== newCertEndpoint) {
-            updates.certificate_endpoint = newCertEndpoint;
-          }
-          
-          if (Object.keys(updates).length > 0) {
-            onFormChange(prev => ({ ...prev, ...updates }));
-          }
-        } catch (e) {
-          console.warn('Could not construct token issuer URL from IDP server:', e);
-        }
-      }
-    }
-  }, [selectedIdpServer, formData.realm, formData.ws_mode, formData.token_issuer_url, formData.certificate_endpoint, idpServers, onFormChange]);
-
-  const handleIdpServerChange = (e) => {
-    const serverName = e.target.value;
-    setSelectedIdpServer(serverName);
-    
-    const updates = { idp_server: serverName };
-    
-    if (serverName) {
-      const selected = idpServers.find(server => server.name === serverName);
-      if (selected?.endpoint) {
-        // Only update certificate_endpoint if not already set to this value
-        if (!formData.certificate_endpoint || formData.certificate_endpoint !== selected.endpoint) {
-          updates.certificate_endpoint = selected.endpoint;
-        }
-      }
-    }
-    
-    onFormChange(prev => ({ ...prev, ...updates }));
-  };
 
   const handleTypeChange = (e) => {
     const { value } = e.target;
@@ -509,156 +265,12 @@ function ConnectionModal({
                 </>
               )}
               
-              {/* IDP Server fields for SO and FSP types (and Custom) */}
-              {(formData.type === 'RTI-SO' || formData.type === 'RTI-FSP' || formData.type === 'Custom') && (
-                <>
-                  <div className="form-group">
-                    <label htmlFor="idp_server">IDP Server</label>
-                    <select
-                      id="idp_server"
-                      value={selectedIdpServer}
-                      onChange={handleIdpServerChange}
-                    >
-                      <option value="">Select an IDP Server...</option>
-                      {idpServers.map(server => (
-                        <option key={server.name} value={server.name}>{server.name}</option>
-                      ))}
-                    </select>
-                    <small style={{ color: 'var(--text-muted)' }}>
-                      Identity provider this instance authenticates against for OAuth.
-                    </small>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="realm">Realm</label>
-                    <input
-                      type="text"
-                      id="realm"
-                      value={formData.realm || ''}
-                      onChange={handleInputChange}
-                      placeholder="e.g., master"
-                    />
-                    <small style={{ color: 'var(--text-muted)' }}>
-                      OAuth realm on the selected IDP Server.
-                    </small>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="certificate_endpoint">Certificate Endpoint</label>
-                    <input
-                      type="text"
-                      id="certificate_endpoint"
-                      value={formData.certificate_endpoint || ''}
-                      onChange={handleInputChange}
-                      placeholder="Auto-constructed from IDP server and realm"
-                      readOnly
-                    />
-                    <small style={{ color: 'var(--text-muted)' }}>
-                      Used to verify the IDP server's signing certificate during OAuth
-                      token validation.
-                    </small>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="auth_server_ca">Auth Server CA</label>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
-                      <input
-                        type="file"
-                        id="auth_server_ca_file"
-                        accept=".pem,.crt,.cer"
-                        onChange={handleFileUpload}
-                      />
-                    </div>
-                    <textarea
-                      id="auth_server_ca"
-                      value={formData.auth_server_ca || ''}
-                      onChange={handleInputChange}
-                      placeholder="-----BEGIN CERTIFICATE-----..."
-                      style={{ minHeight: '80px', fontFamily: 'monospace' }}
-                    />
-                    <small style={{ color: 'var(--text-muted)' }}>
-                      CA certificate used to trust the IDP server's TLS connection -
-                      upload a file or paste it directly.
-                    </small>
-                  </div>
-                </>
-              )}
-              
-              {/* SO-specific OAuth fields (only Token Issuer URL) */}
-              {formData.type === 'RTI-SO' && (
-                <div className="form-group">
-                  <label htmlFor="token_issuer_url">Token Issuer URL</label>
-                  <input
-                    type="text"
-                    id="token_issuer_url"
-                    value={formData.token_issuer_url || ''}
-                    onChange={handleInputChange}
-                    placeholder="Auto-constructed from IDP server and realm"
-                    readOnly
-                  />
-                  <small style={{ color: 'var(--text-muted)' }}>
-                    OIDC issuer URL this instance's OAuth tokens are validated against.
-                  </small>
-                </div>
-              )}
-              
-              {/* FSP-specific fields */}
-              {formData.type === 'RTI-FSP' && (
-                <>
-                  <div className="form-group">
-                    <label htmlFor="token_endpoint">Token Endpoint</label>
-                    <input
-                      type="text"
-                      id="token_endpoint"
-                      value={formData.token_endpoint || ''}
-                      onChange={handleInputChange}
-                      placeholder="Auto-constructed from certificate endpoint and realm"
-                      readOnly
-                    />
-                    <small style={{ color: 'var(--text-muted)' }}>
-                      URL this FSP requests OAuth access tokens from.
-                    </small>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="client_id">Client ID</label>
-                    <input
-                      type="text"
-                      id="client_id"
-                      value={formData.client_id || ''}
-                      onChange={handleInputChange}
-                      placeholder="e.g., rti-fsp-client"
-                    />
-                    <small style={{ color: 'var(--text-muted)' }}>
-                      OAuth client ID this FSP authenticates as when requesting tokens.
-                    </small>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="client_secret">Client Secret</label>
-                    <input
-                      type="password"
-                      id="client_secret"
-                      value={formData.client_secret || ''}
-                      onChange={handleInputChange}
-                      placeholder="Client secret"
-                    />
-                    <small style={{ color: 'var(--text-muted)' }}>
-                      OAuth client secret paired with the Client ID above.
-                    </small>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="enable_token_refresh">Enable Token Refresh</label>
-                    <input
-                      type="checkbox"
-                      id="enable_token_refresh"
-                      checked={formData.enable_token_refresh || false}
-                      onChange={(e) => onFormChange(prev => ({
-                        ...prev,
-                        enable_token_refresh: e.target.checked
-                      }))}
-                    />
-                    <small style={{ color: 'var(--text-muted)' }}>
-                      Automatically renew the OAuth access token before it expires.
-                    </small>
-                  </div>
-                </>
+              {(isSO || isFSP || isCustom) && (
+                <p className="form-note" style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                  <i className="fas fa-info-circle" style={{ marginRight: '6px' }}></i>
+                  OAuth and TLS are configured on the instance's own page, with its
+                  OAuth Config and TLS Config buttons.
+                </p>
               )}
               {isIDP && (
                 <div className="form-group">
@@ -668,10 +280,11 @@ function ConnectionModal({
                     id="endpoint"
                     value={formData.endpoint || ''}
                     onChange={handleInputChange}
-                    placeholder="e.g., /idp"
+                    placeholder="e.g., http://keycloak:8080"
                   />
                   <small style={{ color: 'var(--text-muted)' }}>
-                    Base URL of this identity provider's OAuth/OIDC endpoint.
+                    Base URL of this identity provider, as reached from the BFF
+                    (e.g. http://keycloak:8080) - realms live under /realms/&lt;name&gt;.
                   </small>
                 </div>
               )}

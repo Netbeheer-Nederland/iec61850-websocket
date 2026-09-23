@@ -75,12 +75,24 @@ def test_status_returns_server_status(client_and_server):
     response = client.get("/api/status")
 
     assert response.status_code == 200
-    # The route wraps get_status()'s dict as a str() repr in the "status"
-    # field - see fsp/acsi_server.py get_status()/api_status().
     body = response.json()
     assert body["ok"] is True
-    assert "'status': 'stopped'" in body["status"]
-    assert "'port': 8765" in body["status"]
+    assert body["status"]["status"] == "stopped"
+    assert body["status"]["port"] == 8765
+
+
+def test_status_error_with_quotes_survives_as_json(client_and_server):
+    # Returned as a JSON object, not str(dict): a Python repr of an error
+    # containing quotes (e.g. "Connect call failed ('::1', 8765)") mixes
+    # quote styles, which the HMI's repr-to-JSON conversion couldn't parse -
+    # so the dial-out error never reached the page.
+    client, server = client_and_server
+    error = "Connection failed: Connect call failed ('::1', 8765, 0, 0)"
+    server.get_status = lambda: {"status": "listening", "error": error}
+
+    body = client.get("/api/status").json()
+
+    assert body["status"]["error"] == error
 
 
 def test_start_rejects_unsupported_mode(client_and_server):
@@ -127,6 +139,70 @@ def test_start_calls_server_and_updates_cp(client_and_server):
     assert response.json()["ok"] is True
     assert called == {"host": "127.0.0.1", "port": 9000}
     assert server.runtime.cp == "cp2"
+
+
+def test_start_applies_stored_tls_before_connecting(client_and_server):
+    # The BFF adds the connection's stored TLS config to /start, so an FSP
+    # restarted since TLS was last configured still dials out over WSS.
+    import ssl
+
+    client, server = client_and_server
+    seen = {}
+    server.start_server = lambda host, port: seen.update(
+        tls=server.runtime.endpoint._tls_config
+    )
+
+    response = client.post(
+        "/api/start",
+        json={
+            "mode": "active",
+            "host": "rti-so",
+            "port": "8765",
+            "cp": "cp1",
+            "enable_tls": True,
+            "tls_version": "TLSv1_3",
+            "server_ca": "CA-PEM",
+        },
+    )
+
+    assert response.status_code == 200
+    tls = seen["tls"]
+    assert tls.mode == "client"
+    assert tls.cafile == "CA-PEM"
+    assert tls.min_version == tls.max_version == ssl.TLSVersion.TLSv1_3
+
+
+def test_start_with_tls_disabled_clears_previous_tls(client_and_server):
+    client, server = client_and_server
+    server.runtime.endpoint._tls_config = object()
+    server.start_server = lambda host, port: None
+
+    client.post(
+        "/api/start",
+        json={
+            "mode": "active",
+            "host": "rti-so",
+            "port": "8765",
+            "cp": "cp1",
+            "enable_tls": False,
+        },
+    )
+
+    assert server.runtime.endpoint._tls_config is None
+
+
+def test_start_without_tls_fields_leaves_tls_untouched(client_and_server):
+    client, server = client_and_server
+    existing = object()
+    server.runtime.endpoint._tls_config = existing
+    server.start_server = lambda host, port: None
+
+    client.post(
+        "/api/start",
+        json={"mode": "active", "host": "rti-so", "port": "8765", "cp": "cp1"},
+    )
+
+    assert server.runtime.endpoint._tls_config is existing
 
 
 def test_stop_returns_stopped_when_already_stopped(client_and_server):
@@ -366,3 +442,78 @@ def test_fsp_properties(client_and_server):
     assert body["ok"] is True
     assert body["acsi_role"] == "ACSI-Server"
     assert body["ws_mode"] == "Active"
+
+
+def test_reconfig_while_stopped_saves_tls_without_connecting(client_and_server):
+    # After a Disconnect, saving TLS settings must not dial out on its own -
+    # they apply on the next Connect instead.
+    client, server = client_and_server
+    started = []
+    server.start_server = lambda host, port: started.append((host, port))
+
+    response = client.post(
+        "/api/reconfig-connection",
+        json={
+            "host": "rti-so",
+            "port": "8765",
+            "connection_name": "FSP01",
+            "enable_tls": True,
+            "tls_version": "TLSv1_3",
+            "server_ca": "CA-PEM",
+            "ws_mode": "active",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "saved"
+    assert started == []
+    assert server.runtime.endpoint._tls_config.cafile == "CA-PEM"
+
+
+def _oauth_body(enable_oauth):
+    return {
+        "connection_name": "FSP01",
+        "enable_oauth": enable_oauth,
+        "host": "rti-so",
+        "port": "8765",
+        "cp": "cp1",
+        "ws_mode": "active",
+        "token_endpoint_url": "http://keycloak:8080/realms/r/protocol/openid-connect/token",
+        "client_id": "ws-client",
+        "client_secret": "s3cret",
+    }
+
+
+def test_reconfig_oauth_off_while_stopped_clears_oauth_without_connecting(
+    client_and_server,
+):
+    # Turning OAuth off after a Disconnect must actually turn it off (it used
+    # to only be saved in the BFF, so /oauth-status kept reporting it on) -
+    # without dialing out.
+    client, server = client_and_server
+    started = []
+    server.start_server = lambda host, port: started.append((host, port))
+    endpoint = server.runtime.endpoint
+    endpoint._oauth_enable = True
+    endpoint._access_token = "stale-token"
+    endpoint._assoc_handler._token_endpoint = "http://keycloak:8080/token"
+
+    response = client.post("/api/reconfig-oauth", json=_oauth_body(False))
+
+    assert response.json()["status"] == "saved"
+    assert started == []
+    assert endpoint._oauth_enable is False
+    assert endpoint._access_token is None
+    assert endpoint._assoc_handler._token_endpoint is None
+    assert client.get("/api/oauth-status").json()["enable_oauth"] is False
+
+
+def test_reconfig_oauth_on_while_stopped_waits_for_connect(client_and_server):
+    client, server = client_and_server
+    started = []
+    server.start_server = lambda host, port: started.append((host, port))
+
+    response = client.post("/api/reconfig-oauth", json=_oauth_body(True))
+
+    assert response.json()["status"] == "saved"
+    assert started == []

@@ -200,3 +200,41 @@ describe('Setup page - saving connections', () => {
     expect(lastSaveBody().ws_port).toBe(9001);
   });
 });
+
+describe('Setup page - OAuth settings moved to the OAuth Config dialog', () => {
+  const OAUTH_FIELDS = ['IDP Server', 'Realm', 'Certificate Endpoint', 'Auth Server CA', 'Token Issuer URL',
+    'Token Endpoint', 'Client ID', 'Client Secret', 'Enable Token Refresh'];
+
+  it.each(['RTI-SO', 'RTI-FSP'])('shows no OAuth fields for %s', async (type) => {
+    renderSetup();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.selectOptions(screen.getByLabelText('Type'), type);
+
+    for (const label of OAUTH_FIELDS) {
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    }
+  });
+
+  it('leaves a connection\'s saved OAuth settings alone when editing it', async () => {
+    renderSetup([
+      {
+        name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765, type: 'RTI-SO', acsi: 'client', ws_mode: 'passive',
+        status: 'connected', OAuth: { enable_oauth: true, realm: 'iec61850-test', token_issuer: 'http://localhost:8080/realms/iec61850-test' },
+      },
+    ]);
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: 'Edit' }));
+    await u.click(screen.getByRole('button', { name: /save instance/i }));
+
+    const call = global.fetch.mock.calls.find(([url]) => String(url).includes('/api/edit-connection/so1'));
+    const body = JSON.parse(call[1].body);
+    // Omitted fields are left untouched by the BFF's edit-connection.
+    for (const field of ['realm', 'certificate_endpoint', 'token_issuer_url', 'auth_server_ca', 'token_endpoint',
+      'client_id', 'client_secret', 'enable_token_refresh', 'idp_server']) {
+      expect(body).not.toHaveProperty(field);
+    }
+  });
+});

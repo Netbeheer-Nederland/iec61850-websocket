@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ACSIServer from './ACSIServer';
@@ -407,5 +407,160 @@ describe('ACSIServer monitoring - action log ordering', () => {
     });
     const ids = screen.getAllByText(/^#\d+ -/).map((el) => el.textContent.match(/^#(\d+)/)[1]);
     expect(ids).toEqual(['3', '2', '1']);
+  });
+});
+
+describe('ACSIServer security action message', () => {
+  it('shows TLS/OAuth results right under the security buttons, then clears them', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderPage();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      // Enabling OAuth without a token endpoint is refused by the OAuth modal.
+      await user.click(document.getElementById('acsi-oauth-btn'));
+      await user.click(document.getElementById('oauth-enable'));
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+
+      const alert = await waitFor(() => {
+        const el = document.getElementById('acsi-security-message');
+        expect(el).not.toBeNull();
+        return el;
+      });
+      expect(alert).toHaveTextContent('Token endpoint and client ID are required');
+      const securityRow = document.getElementById('acsi-tls-btn').parentElement;
+      expect(securityRow.nextElementSibling).toBe(alert);
+
+      await act(async () => { vi.advanceTimersByTime(5000); });
+      expect(document.getElementById('acsi-security-message')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('ACSIServer OAuth on Connect', () => {
+  it('re-applies the FSP\'s saved OAuth config when connecting', async () => {
+    mockConnections([
+      { name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765, type: 'RTI-SO', status: 'connected' },
+      {
+        ...DEFAULT_ENDPOINT, ws_mode: 'active', status: 'connected',
+        OAuth: {
+          enable_oauth: true, token_endpoint: 'http://keycloak:8080/realms/r/protocol/openid-connect/token',
+          client_id: 'ws-client', client_secret: 's3cret',
+        },
+      },
+    ]);
+    executeApiCall.mockImplementation(async (apiId) => (
+      apiId === 'start' || apiId === 'reconfig-oauth' ? { ok: true, payload: { result: { ok: true } } } : { ok: false }
+    ));
+    renderPage();
+    const user = userEvent.setup({ delay: null });
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.click(document.getElementById('acsi-start-btn'));
+
+    await waitFor(() => expect(executeApiCall).toHaveBeenCalledWith(
+      'reconfig-oauth', 'rti-fsp01:5001', expect.objectContaining({
+        connection_name: 'FSP01', enable_oauth: true, ws_mode: 'active',
+        token_endpoint_url: 'http://keycloak:8080/realms/r/protocol/openid-connect/token',
+        client_id: 'ws-client', client_secret: 's3cret', cp: 'cp1',
+      })
+    ));
+  });
+});
+
+describe('ACSIServer TLS Config button', () => {
+  it('turns (On) once Connect brings the FSP up with its stored TLS config', async () => {
+    let started = false;
+    executeApiCall.mockImplementation(async (apiId) => {
+      if (apiId === 'start') {
+        started = true;
+        return { ok: true, payload: { result: { ok: true } } };
+      }
+      if (apiId === 'runtime-tls-config') {
+        return { ok: true, payload: { result: { ok: true, enable_tls: started } } };
+      }
+      return { ok: false };
+    });
+    renderPage();
+    const user = userEvent.setup({ delay: null });
+
+    const button = document.getElementById('acsi-tls-btn');
+    await waitFor(() => {
+      expect(executeApiCall).toHaveBeenCalledWith('runtime-tls-config', 'rti-fsp01:5001');
+    });
+    expect(button).toHaveTextContent(/^TLS Config$/);
+
+    await user.click(document.getElementById('acsi-start-btn'));
+
+    await waitFor(() => expect(button).toHaveTextContent('TLS Config (On)'));
+  });
+});
+
+describe('ACSIServer dial-out failure alert', () => {
+  const statusWith = (status, error) => async (apiId) => {
+    if (apiId === 'status') {
+      return {
+        ok: true,
+        payload: { result: { status: { status, host: 'rti-so', port: 8765, error, accessPoints: ['cp1'] } } },
+      };
+    }
+    return { ok: false };
+  };
+
+  it('shows the FSP\'s reported connection error while it keeps retrying', async () => {
+    executeApiCall.mockImplementation(statusWith('listening', 'Protocol mismatch - check whether TLS is enabled on one side'));
+    renderPage();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Cannot connect to rti-so:8765');
+    expect(alert).toHaveTextContent('Protocol mismatch - check whether TLS is enabled on one side');
+  });
+
+  it('shows nothing once the FSP is stopped', async () => {
+    executeApiCall.mockImplementation(statusWith('stopped', 'Protocol mismatch'));
+    renderPage();
+
+    await waitFor(() => expect(executeApiCall).toHaveBeenCalledWith('status', 'rti-fsp01:5001', null));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('ACSIServer OAuth off while disconnected', () => {
+  it('tells the disconnected FSP to turn OAuth off, not just the BFF', async () => {
+    mockConnections([
+      {
+        ...DEFAULT_ENDPOINT, ws_mode: 'active', status: 'connected',
+        OAuth: { enable_oauth: true, token_endpoint: 'http://keycloak:8080/t', client_id: 'ws-client' },
+      },
+    ]);
+    let runtimeOn = true;
+    executeApiCall.mockImplementation(async (apiId, target, body) => {
+      if (apiId === 'oauth-status') return { ok: true, payload: { result: { ok: true, enable_oauth: runtimeOn } } };
+      if (apiId === 'reconfig-oauth') {
+        runtimeOn = body.enable_oauth;
+        return { ok: true, payload: { result: { ok: true, status: 'saved' } } };
+      }
+      return { ok: false };
+    });
+    const baseFetch = global.fetch;
+    global.fetch = vi.fn(async (url, init) => (
+      String(url).endsWith('/api/connections/oauth-config')
+        ? { ok: true, json: async () => ({ ok: true }) }
+        : baseFetch(url, init)
+    ));
+    renderPage();
+    const user = userEvent.setup({ delay: null });
+
+    const button = document.getElementById('acsi-oauth-btn');
+    await waitFor(() => expect(button).toHaveTextContent('OAuth Config (On)'));
+    await user.click(button);
+    await waitFor(() => expect(document.getElementById('oauth-enable')).toBeChecked());
+    await user.click(document.getElementById('oauth-enable'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(button).toHaveTextContent(/^OAuth Config$/));
+    expect(runtimeOn).toBe(false);
   });
 });

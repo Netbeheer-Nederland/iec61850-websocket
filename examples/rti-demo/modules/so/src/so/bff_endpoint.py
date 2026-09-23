@@ -104,6 +104,8 @@ class HealthCheckAccessFilter(logging.Filter):
         "/api/messages",
         "/api/properties",
         "/api/actions-logs",
+        "/api/tls-config",
+        "/api/oauth-status"
     )
 
     def filter(self, record: logging.LogRecord) -> bool:

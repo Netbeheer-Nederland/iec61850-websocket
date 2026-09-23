@@ -98,7 +98,14 @@ class HealthCheckAccessFilter(logging.Filter):
     ``uvicorn.access`` logger is actually at DEBUG.
     """
 
-    QUIET_PATHS = ("/api/status", "/api/health", "/api/messages","/api/actions-logs")
+    QUIET_PATHS = (
+        "/api/status",
+        "/api/health",
+        "/api/messages",
+        "/api/actions-logs",
+        "/api/tls-config",
+        "/api/oauth-status"
+    )
 
     def filter(self, record: logging.LogRecord) -> bool:
         args = record.args
@@ -175,7 +182,7 @@ def _try_include_io_router() -> bool:
 
 
 async def _bootstrap_io_client_after_connect(
-    demo_io_server_url: str, acsi_url: str
+        demo_io_server_url: str, acsi_url: str
 ) -> dict[str, Any]:
     """Chain the demo_IO device-proxy bootstrap sequence right after a
     successful /api/io-plugin/connect (files downloaded, modules loaded,
@@ -413,9 +420,9 @@ def _rebuild_pydantic_models(module) -> None:
     for name, obj in vars(module).items():
         try:
             if (
-                isinstance(obj, type)
-                and issubclass(obj, BaseModel)
-                and obj is not BaseModel
+                    isinstance(obj, type)
+                    and issubclass(obj, BaseModel)
+                    and obj is not BaseModel
             ):
                 obj.model_rebuild(force=True, _types_namespace=vars(module))
         except Exception as e:
@@ -625,7 +632,7 @@ def clear_io_plugin_modules():
 
 
 async def download_file_from_io_server(
-    server_url: str, filename: str, timeout: float = 10.0
+        server_url: str, filename: str, timeout: float = 10.0
 ) -> str | None:
     """Download a single file from the IO server.
 
@@ -678,7 +685,7 @@ async def download_file_from_io_server(
 
 
 async def download_io_plugin_files(
-    server_url: str, files: list[str] = None, timeout: float = 10.0
+        server_url: str, files: list[str] = None, timeout: float = 10.0
 ) -> dict[str, Any]:
     """Download multiple io_plugin files from the IO server with retry logic.
 
@@ -751,7 +758,7 @@ async def download_io_plugin_files(
 
 
 async def check_io_server_health(
-    server_url: str, timeout: float = 5.0
+        server_url: str, timeout: float = 5.0
 ) -> dict[str, Any]:
     """Check if the IO server is healthy and available.
 
@@ -947,6 +954,47 @@ class StartRequest(BaseModel):
         default="cp1",
         description="Communication point identifier",
         json_schema_extra={"example": "cp1"},
+    )
+    # Optional stored TLS config - added by the BFF's /api/execute from
+    # connections.json, since TLS is otherwise lost when this FSP restarts.
+    # Omitted entirely, the endpoint's current TLS config is left as-is.
+    enable_tls: bool | None = Field(
+        default=None,
+        description="Dial out over WSS (omit to keep the current TLS setting)",
+        json_schema_extra={"example": True},
+    )
+    tls_version: str | None = Field(
+        default=None,
+        description="TLS version",
+        json_schema_extra={"example": "TLSv1_3"},
+    )
+    server_ca: str | None = Field(
+        default=None,
+        description="CA certificate (PEM) to validate the SO against",
+        json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
+    )
+
+
+def _client_tls_config(tls_version: str | None, server_ca: str | None) -> TLSConfig:
+    """Client-mode TLSConfig for the FSP's active dial-out."""
+    # Normalize tls_version to handle "1.2", "1.3", "TLSv1_2", "TLSv1_3" formats
+    tls_version_str = (tls_version or "1.3").lower()
+    if "1.2" in tls_version_str or "1_2" in tls_version_str:
+        version = ssl.TLSVersion.TLSv1_2
+    else:
+        version = ssl.TLSVersion.TLSv1_3
+    keylog_file = tempfile.NamedTemporaryFile(
+        mode="w",
+        prefix="tlskeys",
+        suffix=".log",
+        delete=True,
+    )
+    return TLSConfig(
+        mode="client",
+        cafile=server_ca,
+        min_version=version,
+        max_version=version,
+        keylog_file=keylog_file.name,
     )
 
 
@@ -1185,8 +1233,8 @@ class IOPluginConnectionStatusResponse(BaseModel):
 
 
 def create_bff_router(
-    factory_dir,
-    scl_default_path: Path | None = None,
+        factory_dir,
+        scl_default_path: Path | None = None,
 ) -> tuple[APIRouter, ACSIServer]:
     """Create a FastAPI router for the ACSI server BFF API.
 
@@ -1226,10 +1274,10 @@ def create_bff_router(
                 write_to_lcd = get_write_to_lcd_dynamic()
 
                 if (
-                    io_plugin is None
-                    or mapping_manager is None
-                    or sync_to_io_device is None
-                    or write_to_lcd is None
+                        io_plugin is None
+                        or mapping_manager is None
+                        or sync_to_io_device is None
+                        or write_to_lcd is None
                 ):
                     logger.warning(
                         "Dynamic io_plugin loading failed, falling back to disabled state"
@@ -1312,9 +1360,9 @@ def create_bff_router(
                 blink_led_task = get_blink_led_task_dynamic()
 
                 if (
-                    io_plugin is None
-                    or mapping_manager is None
-                    or blink_led_task is None
+                        io_plugin is None
+                        or mapping_manager is None
+                        or blink_led_task is None
                 ):
                     logger.warning(
                         "Dynamic io_plugin loading failed, falling back to disabled state"
@@ -1471,51 +1519,51 @@ def create_bff_router(
                             "type": "LogicalNode",
                             "name": ln.name,
                             "children": (
-                                [
-                                    {
-                                        "kind": "Group",
-                                        "type": "Group",
-                                        "name": "DataSets",
-                                        "children": [
-                                            {
-                                                "kind": "DataSet",
-                                                "type": "DataSet",
-                                                "name": ds.name,
-                                                "ref": f"{ld.name}/{ln.name}.{ds.name}",
-                                            }
-                                            for ds in (ln.data_sets or [])
+                                            [
+                                                {
+                                                    "kind": "Group",
+                                                    "type": "Group",
+                                                    "name": "DataSets",
+                                                    "children": [
+                                                        {
+                                                            "kind": "DataSet",
+                                                            "type": "DataSet",
+                                                            "name": ds.name,
+                                                            "ref": f"{ld.name}/{ln.name}.{ds.name}",
+                                                        }
+                                                        for ds in (ln.data_sets or [])
+                                                    ],
+                                                }
+                                            ]
+                                            if (ln.data_sets or [])
+                                            else []
+                                        )
+                                        + (
+                                            [
+                                                {
+                                                    "kind": "Group",
+                                                    "type": "Group",
+                                                    "name": "ReportControls",
+                                                    "children": [
+                                                        {
+                                                            "kind": "BRCB"
+                                                            if rcb.buffered
+                                                            else "URCB",
+                                                            "type": "ReportControl",
+                                                            "name": rcb.name,
+                                                            "ref": f"{ld.name}/{ln.name}.{rcb.name}",
+                                                        }
+                                                        for rcb in (ln.rcbs or [])
+                                                    ],
+                                                }
+                                            ]
+                                            if (ln.rcbs or [])
+                                            else []
+                                        )
+                                        + [
+                                            serialize_data_object(do)
+                                            for do in (ln.data_objects or [])
                                         ],
-                                    }
-                                ]
-                                if (ln.data_sets or [])
-                                else []
-                            )
-                            + (
-                                [
-                                    {
-                                        "kind": "Group",
-                                        "type": "Group",
-                                        "name": "ReportControls",
-                                        "children": [
-                                            {
-                                                "kind": "BRCB"
-                                                if rcb.buffered
-                                                else "URCB",
-                                                "type": "ReportControl",
-                                                "name": rcb.name,
-                                                "ref": f"{ld.name}/{ln.name}.{rcb.name}",
-                                            }
-                                            for rcb in (ln.rcbs or [])
-                                        ],
-                                    }
-                                ]
-                                if (ln.rcbs or [])
-                                else []
-                            )
-                            + [
-                                serialize_data_object(do)
-                                for do in (ln.data_objects or [])
-                            ],
                         }
                         for ln in (ld.logical_nodes or [])
                     ],
@@ -1539,7 +1587,7 @@ def create_bff_router(
         return results
 
     def collect_da_paths_from_da(
-        data_attribute: DataAttribute, prefix: str
+            data_attribute: DataAttribute, prefix: str
     ) -> list[tuple]:
         """Collect flattened (path, fc_name) tuples for nested DA paths."""
         results: list[tuple] = []
@@ -1551,7 +1599,7 @@ def create_bff_router(
         return results
 
     def build_logical_node_details(
-        ied_model: IedModel | None,
+            ied_model: IedModel | None,
     ) -> dict[str, dict[str, Any]]:
         """Build UI-friendly logical node details."""
         details: dict[str, dict[str, Any]] = {}
@@ -1580,7 +1628,7 @@ def create_bff_router(
 
                     data_objects.append(obj_info)
                     for da_path, fc_name in collect_da_paths_from_do(
-                        data_object, data_object.name
+                            data_object, data_object.name
                     ):
                         data_attributes.append(da_path)
                         if fc_name:
@@ -1632,7 +1680,7 @@ def create_bff_router(
             if hasattr(websocket_info, "tpa"):
                 info["tpa"] = str(websocket_info.tpa)
             elif hasattr(websocket_info, "request") and hasattr(
-                websocket_info.request, "headers"
+                    websocket_info.request, "headers"
             ):
                 headers = websocket_info.request.headers
                 if "X-TPA" in headers:
@@ -1736,7 +1784,9 @@ def create_bff_router(
         """
         try:
             return JSONResponse(
-                content={"ok": True, "status": str(rti_fsp.get_status())},
+                # A JSON object, not str(dict) - see
+                # test_status_error_with_quotes_survives_as_json.
+                content={"ok": True, "status": rti_fsp.get_status()},
                 status_code=200,
             )
         except Exception as exc:
@@ -2189,6 +2239,17 @@ def create_bff_router(
                         status_code=400,
                     )
 
+            if request.enable_tls is not None:
+                rti_fsp.runtime.endpoint._tls_config = (
+                    _client_tls_config(request.tls_version, request.server_ca)
+                    if request.enable_tls
+                    else None
+                )
+                rti_fsp._log_action(
+                    f"Applied TLS config on start: enable_tls={request.enable_tls}",
+                    "debug",
+                )
+
             try:
                 rti_fsp.start_server(host, port)
             except Exception as exc:
@@ -2247,10 +2308,10 @@ def create_bff_router(
                         write_to_lcd = get_write_to_lcd_dynamic()
 
                         if (
-                            io_plugin is None
-                            or mapping_manager is None
-                            or sync_to_io_device is None
-                            or write_to_lcd is None
+                                io_plugin is None
+                                or mapping_manager is None
+                                or sync_to_io_device is None
+                                or write_to_lcd is None
                         ):
                             logger.warning(
                                 "Dynamic io_plugin loading failed, falling back to disabled state"
@@ -2327,20 +2388,6 @@ def create_bff_router(
                 status_code=500,
             )
 
-    async def _wait_for_runtime_loop(
-        rti_fsp, timeout: float = 5.0
-    ) -> asyncio.AbstractEventLoop:
-        """Poll until the server's background event loop is created and running,
-        or raise if it doesn't show up within `timeout` seconds."""
-        deadline = asyncio.get_event_loop().time() + timeout
-        while True:
-            loop = rti_fsp.runtime.loop
-            if loop is not None and loop.is_running():
-                return loop
-            if asyncio.get_event_loop().time() >= deadline:
-                raise RuntimeError("server-failed-to-start")
-            await asyncio.sleep(0.05)
-
     @router.post(
         "/reconfig-connection",
         summary="Get Connection Info",
@@ -2378,36 +2425,37 @@ def create_bff_router(
                 # Only create TLSConfig if TLS is enabled
                 tls_config = None
                 if request.enable_tls:
-                    keylog_file = tempfile.NamedTemporaryFile(
-                        mode="w",
-                        prefix="tlskeys",
-                        suffix=".log",
-                        delete=True,
-                    )
-                    tls_config = TLSConfig(
-                        mode="client",
-                        cafile=request.server_ca,
-                        min_version=tls_version,
-                        max_version=tls_version,
-                        keylog_file=keylog_file.name,
+                    tls_config = _client_tls_config(
+                        request.tls_version, request.server_ca
                     )
                 cp = os.getenv("CP", "cp1")
-
-                loop = rti_fsp.runtime.loop
-                if loop is None or not loop.is_running():
-                    rti_fsp._log_action(
-                        "Server not running, starting server instance", "debug"
-                    )
-                    logger.info("server not running, starting server instance")
-                    rti_fsp.start_server(host, int(request_port))
-                    loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
-                    rti_fsp._log_action("Server instance started", "debug")
 
                 endpoint = rti_fsp.runtime.endpoint
                 if endpoint is None:
                     return JSONResponse(
                         content={"ok": False, "error": "Endpoint not initialized"},
                         status_code=500,
+                    )
+
+                # Disconnected: just keep the setting for the next Connect.
+                # Starting the dial-out from here used to reconnect an FSP the
+                # user had deliberately disconnected.
+                loop = rti_fsp.runtime.loop
+                if loop is None or not loop.is_running():
+                    endpoint._tls_config = tls_config
+                    rti_fsp._log_action(
+                        f"TLS config saved (enable_tls={request.enable_tls}), "
+                        "applies on next Connect",
+                        "info",
+                    )
+                    return JSONResponse(
+                        content={
+                            "ok": True,
+                            "status": "saved",
+                            "ws_mode": request.ws_mode,
+                            "enable_tls": request.enable_tls,
+                        },
+                        status_code=200,
                     )
 
                 # Call reconfigure_connection on the endpoint's event loop
@@ -2593,17 +2641,33 @@ def create_bff_router(
                 f"OAuth enable: {request.enable_oauth}, token_endpoint: {token_endpoint}"
             )
 
+            # Disconnected: don't dial out from here (that used to reconnect an
+            # FSP the user had deliberately disconnected). Turning OAuth off
+            # takes effect now - clearing the in-memory state, so
+            # /oauth-status stops reporting it on - while turning it on is
+            # applied by the HMI's Connect, which fetches the token then.
             loop = rti_fsp.runtime.loop
             if loop is None or not loop.is_running():
+                endpoint = rti_fsp.runtime.endpoint
+                if not request.enable_oauth and endpoint is not None:
+                    endpoint._oauth_enable = False
+                    endpoint._access_token = None
+                    endpoint._credentials_provider = None
+                    endpoint._assoc_handler._token_endpoint = None
+                    endpoint._assoc_handler._kc_cert = None
                 rti_fsp._log_action(
-                    "Server not running, starting server instance for OAuth reconfig",
-                    "debug",
+                    f"OAuth config saved (enable_oauth={request.enable_oauth}), "
+                    "applies on next Connect",
+                    "info",
                 )
-                logger.info("server not running, starting server instance")
-                rti_fsp.start_server(host, int(oauth_port))
-                loop = await _wait_for_runtime_loop(rti_fsp, timeout=5.0)
-                rti_fsp._log_action(
-                    "Server instance started for OAuth reconfig", "debug"
+                return JSONResponse(
+                    content={
+                        "ok": True,
+                        "status": "saved",
+                        "ws_mode": "active",
+                        "enable_oauth": request.enable_oauth,
+                    },
+                    status_code=200,
                 )
 
             # When disabling OAuth, stop the endpoint first to avoid issues with ClientCredentialsProvider
@@ -2614,8 +2678,8 @@ def create_bff_router(
                 logger.info("Disabling OAuth - stopping endpoint first")
                 # Stop the current connection if it exists
                 if (
-                    hasattr(rti_fsp.runtime.endpoint, "_connect_task")
-                    and rti_fsp.runtime.endpoint._connect_task is not None
+                        hasattr(rti_fsp.runtime.endpoint, "_connect_task")
+                        and rti_fsp.runtime.endpoint._connect_task is not None
                 ):
                     stop_fut = asyncio.run_coroutine_threadsafe(
                         rti_fsp.runtime.endpoint._cancel_task(
@@ -2691,7 +2755,7 @@ def create_bff_router(
         try:
             # Check the runtime endpoint's OAuth enable status
             if hasattr(rti_fsp.runtime, "endpoint") and hasattr(
-                rti_fsp.runtime.endpoint, "_oauth_enable"
+                    rti_fsp.runtime.endpoint, "_oauth_enable"
             ):
                 enable_oauth = rti_fsp.runtime.endpoint._oauth_enable
                 return {"ok": True, "enable_oauth": enable_oauth}
@@ -3013,10 +3077,10 @@ def create_bff_router(
                         write_to_lcd = get_write_to_lcd_dynamic()
 
                         if (
-                            io_plugin is None
-                            or mapping_manager is None
-                            or sync_to_io_device is None
-                            or write_to_lcd is None
+                                io_plugin is None
+                                or mapping_manager is None
+                                or sync_to_io_device is None
+                                or write_to_lcd is None
                         ):
                             logger.warning(
                                 "Dynamic io_plugin loading failed, falling back to disabled state"
@@ -3166,7 +3230,7 @@ def create_bff_router(
         tags=["IO Plugin"],
     )
     async def api_upload_io_plugin_file(
-        file: UploadFile = File(...), request: IoPluginFileUploadRequest = None
+            file: UploadFile = File(...), request: IoPluginFileUploadRequest = None
     ):
         """Upload a file to the dynamic io_plugin directory.
 
@@ -3424,9 +3488,9 @@ def create_bff_router(
         try:
             files_present = check_required_io_plugin_files()
             modules_loaded = (
-                _io_plugin_module is not None
-                and _mapping_manager_module is not None
-                and _io_utils_module is not None
+                    _io_plugin_module is not None
+                    and _mapping_manager_module is not None
+                    and _io_utils_module is not None
             )
 
             return {
@@ -3507,7 +3571,7 @@ def create_bff_router(
             io_plugin_connection_status.record_fetch(
                 success=result.get("connection_success", False),
                 error=result.get("errors", {}).get("general")
-                or ", ".join(result.get("errors", {}).values()),
+                      or ", ".join(result.get("errors", {}).values()),
                 files_fetched=len(result.get("files_downloaded", [])),
             )
 
@@ -3722,8 +3786,8 @@ def create_fastapi_app(factory_dir: Path | None = None) -> FastAPI:
     app = FastAPI(
         title="ACSI Server WS Active",
         description="Backend for Frontend (BFF) endpoint providing REST API for ACSI Server control. "
-        "This service manages ACSI Server WebSocket Active lifecycle, IED models, data access, "
-        "and provides comprehensive monitoring capabilities.",
+                    "This service manages ACSI Server WebSocket Active lifecycle, IED models, data access, "
+                    "and provides comprehensive monitoring capabilities.",
         version="1.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
@@ -3768,7 +3832,7 @@ def create_fastapi_app(factory_dir: Path | None = None) -> FastAPI:
     _fastapi_app_ref = app
 
     resolved_factory_dir = (
-        os.getenv("MODELPATH") or factory_dir or Path(__file__).parent
+            os.getenv("MODELPATH") or factory_dir or Path(__file__).parent
     )
     router, _server = create_bff_router(resolved_factory_dir)
     app.include_router(router)

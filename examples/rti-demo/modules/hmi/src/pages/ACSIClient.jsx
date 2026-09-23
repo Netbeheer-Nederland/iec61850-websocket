@@ -25,7 +25,9 @@ import ContextMenu from '../components/ContextMenu';
 import ControlModal from '../components/ControlModal';
 import WriteValueModal from '../components/WriteValueModal';
 import BrcbConfigModal from '../components/BrcbConfigModal';
-import TLSConfigModal from '../components/TLSConfigModal';
+import TLSConfigModal, { useRuntimeTlsEnabled } from '../components/TLSConfigModal';
+import OAuthConfigModal, { useRuntimeOAuthEnabled } from '../components/OAuthConfigModal';
+import SecurityActionMessage from '../components/SecurityActionMessage';
 import ActionLogPanel from '../components/ActionLogPanel.jsx';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
 import { subscribe as subscribeLive } from '../services/liveSocket';
@@ -64,6 +66,11 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   const [expandedClients, setExpandedClients] = useState({});
   const statusIntervalRef = useRef(null);
   const doDefinitionCacheRef = useRef({});
+  // Reflected on the TLS Config button - the SO's live runtime state, the
+  // same thing the modal loads, not the persisted connections.json copy.
+  const [tlsEnabled, refreshTlsEnabled] = useRuntimeTlsEnabled(apiTarget);
+  // Same for OAuth - reflected on the OAuth Config button.
+  const [oauthEnabled, refreshOAuthEnabled] = useRuntimeOAuthEnabled(apiTarget);
 
   // Fetch connections from BFF to get IDP-Server instances.
   // A useCallback at component scope, not a plain function local to the
@@ -89,27 +96,6 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
       fetchConnections();
     }
   }, [bffBaseUrl, fetchConnections]);
-
-  // Fetch OAuth status from the SO server on page load - only when this
-  // connection is actually configured for OAuth (endpoint.OAuth.enable_oauth,
-  // set via ConnectionModal). Connections that never use OAuth would always
-  // just get "false" back, so probing them on every load is pure noise -
-  // see the identical guard in ACSIServer.jsx.
-  useEffect(() => {
-    const fetchOAuthStatus = async () => {
-      if (!apiTarget || !endpoint?.OAuth?.enable_oauth) return;
-      try {
-        const result = await executeApiCall('oauth-status', apiTarget, {});
-        if (result?.ok) {
-          const enableOAuth = result.payload?.result?.enable_oauth ?? result.payload?.enable_oauth ?? false;
-          setUseOAuth(enableOAuth);
-        }
-      } catch (error) {
-        console.error('Failed to fetch OAuth status:', error);
-      }
-    };
-    fetchOAuthStatus();
-  }, [apiTarget, endpoint]);
 
   // Fetch properties (includes acsi_client_list) once on mount for first
   // paint, then rely on the BFF's live push for updates instead of polling
@@ -145,8 +131,15 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
 
   const [showBrcbConfigModal, setShowBrcbConfigModal] = useState(false);
   const [showTLSModal, setShowTLSModal] = useState(false);
-  const [useOAuth, setUseOAuth] = useState(false);
+  const [showOAuthModal, setShowOAuthModal] = useState(false);
   const [message, setMessage] = useState(null);
+  const clearMessage = useCallback(() => setMessage(null), []);
+  // This SO's live connections.json record (its saved OAuth block) - the
+  // navigation-time `endpoint` copy goes stale once settings are saved.
+  const liveConnection = useMemo(
+    () => connections.find(c => c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) || endpoint,
+    [connections, endpoint]
+  );
   const monitorIntervalRef = useRef(null);
 
   useEffect(() => {
@@ -219,13 +212,17 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
   // Load status
   const loadStatus = useCallback(async () => {
     if (!apiTarget) return;
+    // Along with the status: the BFF re-applies the stored TLS config after
+    // an SO restart, so the TLS button would otherwise go stale.
+    refreshTlsEnabled();
+    refreshOAuthEnabled();
     try {
       const result = await executeApiCall('status', apiTarget, null);
       if (result?.ok) setStatusInfo(result.payload);
     } catch (error) {
       console.error('Failed to load status:', error);
     }
-  }, [apiTarget]);
+  }, [apiTarget, refreshTlsEnabled, refreshOAuthEnabled]);
 
     // Auto-poll SO status when endpoint is available — same pattern as
     // ACSIServer.jsx, so the connection status and host/port stay fresh
@@ -936,19 +933,6 @@ const getContextMenuItems = () => {
     };
   }, [stopMonitoring]);
 
-  // Same host/port match TLSConfigModal's own `connection` prop below uses
-  // to find the live connection record - kept separate (not literally
-  // shared) since the modal's version also builds a full fallback shape
-  // (type/ws_mode/properties_info) this button doesn't need, just the
-  // live TLS.enable_tls value to reflect on the button itself.
-  const liveTlsConnection = useMemo(() =>
-    connections.find(c =>
-      (c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) ||
-      (c.host === wsHost && String(c.port) === String(wsPort))
-    ) || (endpoint?.TLS ? endpoint : null),
-    [connections, endpoint, wsHost, wsPort]
-  );
-  const tlsEnabled = Boolean(liveTlsConnection?.TLS?.enable_tls);
 
    return (
     <section className="page">
@@ -1013,91 +997,22 @@ const getContextMenuItems = () => {
           <i className={`fas ${tlsEnabled ? 'fa-lock' : 'fa-shield-alt'}`} style={{ marginRight: '8px' }}></i>
           TLS Config{tlsEnabled ? ' (On)' : ''}
         </button>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={useOAuth}
-            onChange={async (e) => {
-              const newValue = e.target.checked;
-              setUseOAuth(newValue);
-              // Call reconfig-oauth immediately when checkbox is toggled
-              if (apiTarget && endpoint?.name) {
-                setLoading(true);
-                try {
-                  // Build OAuth config from endpoint
-                  const oauthConfig = endpoint?.OAuth || {};
-
-                  // For active mode connections, use the client's port for WebSocket connection
-                  let connectionPort = endpoint?.port || wsPort;
-                  if (endpoint?.ws_mode === 'active' || endpoint?.ws_mode === 'Active') {
-                      // Find corresponding client connection (SO) by replacing Server with Client in endpoint name
-                      const clientName = endpoint.name.replace('Server', 'Client');
-                      const clientConnection = propConnections.find(c =>
-                          (c.type === 'RTI-SO' || c.acsi === 'client') &&
-                          c.name === clientName
-                      );
-                      if (clientConnection) {
-                          connectionPort = clientConnection.port;
-                      }
-                  }
-
-                  // Use the connection's own host/port for the target endpoint
-                  const targetHost = endpoint?.host || wsHost;
-                  const targetPort = endpoint?.port || wsPort;
-                  const connectionTarget = buildTargetValue(targetHost, targetPort);
-
-                  const requestBody = {
-                    connection_name: endpoint?.name,
-                    enable_oauth: newValue,
-                    ws_mode: endpoint?.ws_mode || 'passive',
-                    host: endpoint?.host || wsHost,
-                    port: String(connectionPort),
-                    cp: wsCp,
-                    // Always send OAuth config fields (null when disabling)
-                    certificate_endpoint_url: newValue ? (oauthConfig.certificate_endpoint || '') : null,
-                    token_issuer_url: newValue ? (oauthConfig.token_issuer || oauthConfig.token_endpoint || '') : null,
-                    ca_certificate: newValue ? (oauthConfig.auth_server_ca || '').trim() : null
-                  };
-
-                  // Save to SO server
-                  const soResult = await executeApiCall('reconfig-oauth', connectionTarget, requestBody);
-
-                  // Also save to BFF's connections.json
-                  const bffOauthConfig = {
-                    connection_name: endpoint?.name || wsHost,
-                    enable_oauth: newValue,
-                    ws_mode: endpoint?.ws_mode || 'passive',
-                    // Always send OAuth config fields (null when disabling)
-                    certificate_endpoint_url: newValue ? (oauthConfig.certificate_endpoint || '') : null,
-                    token_issuer_url: newValue ? (oauthConfig.token_issuer || oauthConfig.token_endpoint || '') : null,
-                    ca_certificate: newValue ? (oauthConfig.auth_server_ca || '').trim() : null
-                  };
-                  const bffResult = await fetch(`${bffBaseUrl}/api/connections/oauth-config`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(bffOauthConfig)
-                  });
-
-                  if (soResult?.ok && bffResult.ok) {
-                    setMessage({ type: 'success', text: `OAuth ${newValue ? 'enabled' : 'disabled'} successfully` });
-                  } else {
-                    setMessage({ type: 'error', text: soResult?.payload?.error || bffResult.statusText || 'Failed to update OAuth' });
-                    setUseOAuth(!newValue); // Revert on failure
-                  }
-                } catch (error) {
-                  setMessage({ type: 'error', text: error.message });
-                  setUseOAuth(!newValue); // Revert on failure
-                } finally {
-                  setLoading(false);
-                }
-              }
-            }}
-            disabled={loading}
-            id="acsi-client-oauth-checkbox"
-          />
-          <span style={{ color: 'var(--text-primary)' }}>Enable OAuth</span>
-        </label>
+        <button
+          className="btn-secondary"
+          onClick={() => setShowOAuthModal(true)}
+          disabled={loading}
+          title={oauthEnabled ? 'OAuth is enabled - click to configure' : 'Configure OAuth settings'}
+          id="acsi-client-oauth-btn"
+          style={oauthEnabled ? {
+            borderColor: 'var(--success-color)',
+            color: 'var(--success-color)',
+          } : undefined}
+        >
+          <i className="fas fa-key" style={{ marginRight: '8px' }}></i>
+          OAuth Config{oauthEnabled ? ' (On)' : ''}
+        </button>
       </div>
+      <SecurityActionMessage id="acsi-client-security-message" message={message} onDismiss={clearMessage} />
 
       <div className="page-header" style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -1187,20 +1102,6 @@ const getContextMenuItems = () => {
         </div>
       )}
 
-      {message && (
-        <div className="alert" style={{
-          marginBottom: '16px',
-          padding: '12px',
-          background: message.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
-          color: message.type === 'success' ? 'var(--success-color)' : 'var(--danger-color)',
-          borderRadius: '4px',
-          display: 'flex',
-          alignItems: 'center'
-        }}>
-          <i className={`fas fa-${message.type === 'success' ? 'check-circle' : 'exclamation-circle'}`} style={{ marginRight: '8px' }}></i>
-          {message.text}
-        </div>
-      )}
 
       {/* Error Display */}
       {error && (
@@ -1323,11 +1224,26 @@ const getContextMenuItems = () => {
         />
       )}
 
+      <OAuthConfigModal
+        isOpen={showOAuthModal}
+        onClose={() => setShowOAuthModal(false)}
+        connection={liveConnection}
+        wsMode="passive"
+        connections={connections}
+        target={apiTarget}
+        bffBaseUrl={bffBaseUrl}
+        onSuccess={(msg) => {
+          setMessage({ type: 'success', text: msg });
+          fetchConnections();
+          refreshOAuthEnabled();
+        }}
+        onError={(msg) => setMessage({ type: 'error', text: msg })}
+      />
+
       <TLSConfigModal
         isOpen={showTLSModal}
         onClose={() => {
           setShowTLSModal(false);
-          setTimeout(() => setMessage(null), 3000);
         }}
         connection={(
           () => {
@@ -1378,6 +1294,7 @@ const getContextMenuItems = () => {
           setMessage({ type: 'success', text: msg });
           // Refetch connections to get updated TLS config
           fetchConnections();
+          refreshTlsEnabled();
         }}
         onError={(msg) => setMessage({ type: 'error', text: msg })}
       />

@@ -14,6 +14,11 @@ services:
       KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/server-key.pem
     volumes:
       - ./data:/opt/keycloak/data/import
-      - ../../testing/certs/server.pem:/opt/keycloak/conf/server.pem
-      - ../../testing/certs/server-key.pem:/opt/keycloak/conf/server-key.pem
+      - ../../testing/certs/keycloak.pem:/opt/keycloak/conf/server.pem
+      - ../../testing/certs/keycloak-key.pem:/opt/keycloak/conf/server-key.pem
+    networks:
+      - rti-network
 
+networks:
+  rti-network:
+    external: true

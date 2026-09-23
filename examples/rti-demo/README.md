@@ -17,12 +17,13 @@ python launch.py frontend
 
 ## Services
 
-| Service | Port | Description |
-|---------|------|-------------|
-| `bff` | 5000 | Backend for Frontend - REST API gateway |
-| `fsp` | 5001 | RTI-FSP - IEC 61850 server |
-| `so` | 5002 | RTI-SO - IEC 61850 client |
-| `frontend` | 8080 | Web-based HMI |
+| Service                  | Port        | Description                                                           |
+|--------------------------|-------------|-----------------------------------------------------------------------|
+| `bff`                    | 5000        | Backend for Frontend - REST API gateway                               |
+| `fsp`                    | 5001        | RTI-FSP - IEC 61850 server                                            |
+| `so`                     | 5002        | RTI-SO - IEC 61850 client                                             |
+| `frontend`               | 8080        | Web-based HMI                                                         |
+| `keycloak` (Docker only) | 8080 / 8443 | IDP-Server for OAuth - see [Keycloak](#keycloak-idp-server-for-oauth) |
 
 ## Access URLs
 
@@ -61,7 +62,8 @@ python launch.py --docker
 
 ## Verbose Mode & Logs
 
-By default, verbose logging is enabled and the console is kept alive (foreground mode). All service logs are prefixed with the service name:
+By default, verbose logging is enabled and the console is kept alive (foreground mode). All service logs are prefixed
+with the service name:
 
 ```
 [BFF Server] INFO: Starting RTI Demo BFF Server (FastAPI)...
@@ -77,12 +79,14 @@ To run in background: `python launch.py --background`
 ## Troubleshooting
 
 ### Port already in use
+
 ```bash
 # Find and kill process on port 8080
 sudo kill -9 $(sudo lsof -t -i :8080) 2>/dev/null
 ```
 
 ### Module not found
+
 ```bash
 # Install dependencies
 pip install -e .
@@ -90,6 +94,7 @@ pip install uvicorn fastapi requests
 ```
 
 ### connections.json error
+
 ```bash
 # Remove directory and create file
 rmdir /S /Q connections.json 2>/dev/null
@@ -98,21 +103,55 @@ echo [] > connections.json
 
 ## Docker
 
-```bash
+```shell
+docker network create rti-network 2>/dev/null || true
+```
+
+```shell
 # Build images (each module's Dockerfile builds from the repo root, since
 # fsp/so need the ws61850 core library at src/)
 cd ../..   # repo root
 docker build -f examples/rti-demo/modules/bff/docker/Dockerfile -t rti-demo-bff .
 docker build -f examples/rti-demo/modules/fsp/docker/Dockerfile -t rti-demo-fsp .
 docker build -f examples/rti-demo/modules/so/docker/Dockerfile -t rti-demo-so .
+```
 
 # Launch with Docker (all services by default)
+
+```shell
 python launch.py --docker
+```
 
 # Docker Compose
+
+```shell
 cd examples/rti-demo
 docker compose up -d
 ```
+
+### Keycloak (IDP-Server) for OAuth
+
+From the directory scripts/keycloak `docker compose up -d` with `iec61850-test` realm (client `ws-client`) imported from
+`scripts/keycloak/data`, on `rti-network`.
+
+- Admin console: http://localhost:8080 (admin / admin)
+- From the other containers: `http://keycloak:8080`
+
+Token issuer is always `http://localhost:8080/realms/iec61850-test`,
+whichever address a token was requested on (`KC_HOSTNAME`), so the SO's
+issuer check sees a single value. Settings to enter in the HMI (Setup):
+
+| Where                  | Field                | Value                                                                     |
+|------------------------|----------------------|---------------------------------------------------------------------------|
+| IDP-Server connection  | Endpoint             | `http://keycloak:8080`                                                    |
+| RTI-FSP / RTI-SO OAuth | Token endpoint       | `http://keycloak:8080/realms/iec61850-test/protocol/openid-connect/token` |
+|                        | Certificate endpoint | `http://keycloak:8080/realms/iec61850-test/protocol/openid-connect/certs` |
+|                        | Token issuer         | `http://localhost:8080/realms/iec61850-test`                              |
+|                        | Client ID / secret   | `ws-client` / see `scripts/keycloak/README.md`                            |
+
+HTTPS (8443) uses `testing/certs/server.pem`, whose certificate only covers
+`rti-so`/`localhost` - so from the containers use plain HTTP on 8080, or
+reissue the certificate with a `keycloak` SAN.
 
 ### BFF connection persistence in Docker
 
@@ -132,18 +171,22 @@ location (e.g. a host bind mount).
 
 ## IO API Server
 
-The IO API Server provides REST API endpoints for controlling physical IO devices (LEDs, buttons, LCDs, etc.) on a Raspberry Pi.
+The IO API Server provides REST API endpoints for controlling physical IO devices (LEDs, buttons, LCDs, etc.) on a
+Raspberry Pi.
 
 ### Raspberry Pi Setup
 
 #### Enable I2C Interface (Required for LCD I2C)
+
 For LCD displays using I2C interface (SDA/SCL), you must enable I2C on the Raspberry Pi:
 
 ```bash
 sudo raspi-config
 ```
+
 - Navigate to: **Interface Options → I2C → Enable**
 - Exit and reboot:
+
 ```bash
 sudo reboot
 ```
@@ -176,28 +219,29 @@ Most I2C LCD backpacks (PCF8574) use address **0x27** or **0x3F**. Update `io_co
 {
   "name": "lcd_i2c",
   "device_type": "lcd_i2c",
-  "i2c_address": 40,  // 0x27 in decimal
+  "i2c_address": 40,
+  // 0x27 in decimal
   "i2c_bus": 1
 }
 ```
 
 #### Troubleshooting I2C LCD
 
-| Issue | Solution |
-|-------|----------|
-| `i2cdetect` shows no devices | Check wiring, verify I2C is enabled |
-| Address shows `UU` | Device conflict, try power cycling |
-| Wrong address (0x27 vs 0x3F) | Try both addresses in config |
+| Issue                             | Solution                                                        |
+|-----------------------------------|-----------------------------------------------------------------|
+| `i2cdetect` shows no devices      | Check wiring, verify I2C is enabled                             |
+| Address shows `UU`                | Device conflict, try power cycling                              |
+| Wrong address (0x27 vs 0x3F)      | Try both addresses in config                                    |
 | Permission denied on `/dev/i2c-1` | Add user to i2c group: `sudo usermod -aG i2c $USER` then reboot |
 
 #### Wiring Reference (PCF8574 I2C LCD Backpack)
 
-| LCD Backpack | Raspberry Pi |
-|--------------|--------------|
-| GND | Pin 6 (GND) |
-| VCC | Pin 2 (5V) or Pin 1 (3.3V) * |
-| SDA | Pin 3 (GPIO 2, SDA) |
-| SCL | Pin 5 (GPIO 3, SCL) |
+| LCD Backpack | Raspberry Pi                 |
+|--------------|------------------------------|
+| GND          | Pin 6 (GND)                  |
+| VCC          | Pin 2 (5V) or Pin 1 (3.3V) * |
+| SDA          | Pin 3 (GPIO 2, SDA)          |
+| SCL          | Pin 5 (GPIO 3, SCL)          |
 
 *Check your LCD backpack documentation for voltage requirements (3.3V vs 5V)*
 
@@ -284,12 +328,15 @@ repository root (alongside the `ws61850` core library at `src/`) - see
 `TESTING.md` for how to install/run them. `demo_io` and `hmi` build and
 run independently (Pi hardware deps / npm toolchain respectively).
 
-## UV 
-UV is already implemented to manage the dependencies inside the dockers. To add a dependency to the project, you can use the following command:
+## UV
+
+UV is already implemented to manage the dependencies inside the dockers. To add a dependency to the project, you can use
+the following command:
 
 ```bash
 uv add <package_name>
 ```
+
 This should be followed by rebuilding the dockers to make sure the new dependency is included in the images.
 
 ```bash
@@ -300,11 +347,13 @@ After adding the dependency, you can run the following command to make sure the 
 uv lock
 ```
 
-To run the python codes without the dockers, you can use the following command to install the dependencies in your local environment:
+To run the python codes without the dockers, you can use the following command to install the dependencies in your local
+environment:
 
 ```bash
 uv sync
 ```
+
 and the python codes can be run using the following command:
 
 ```bash

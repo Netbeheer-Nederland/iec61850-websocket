@@ -178,10 +178,10 @@ services:
     volumes:
       - ./modules/io:/app/io
 
-networks:
-  rti-network:
-    driver: bridge
-
 volumes:
   # Persistent BFF runtime state (connections.json), mounted at /config.
   bff-config:
+
+networks:
+  rti-network:
+    external: true
