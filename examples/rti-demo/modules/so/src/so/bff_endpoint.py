@@ -1006,8 +1006,9 @@ class ReadvalueRequest(BaseModel):
     Used by: POST /api/readvalue
     """
 
-    objRef: str = Field(
+    obj_ref: str = Field(
         ...,
+        alias="objRef",
         description="Object reference in IEC61850 format (e.g., 'LD0/LLN0$ST$Mod')",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"},
     )
@@ -1030,8 +1031,9 @@ class ReadRCBValueRequest(BaseModel):
     Used by: POST /api/readvalue
     """
 
-    objRef: str = Field(
+    obj_ref: str = Field(
         ...,
+        alias="objRef",
         description="Object reference in IEC61850 format (e.g., 'LD0/LLN0$ST$Mod')",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"},
     )
@@ -1049,8 +1051,9 @@ class WriteRCBValueRequest(BaseModel):
     Used by: POST /api/readvalue
     """
 
-    objRef: str = Field(
+    obj_ref: str = Field(
         ...,
+        alias="objRef",
         description="Object reference in IEC61850 format (e.g., 'LD0/LLN0$ST$Mod')",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"},
     )
@@ -1123,8 +1126,9 @@ class OperateRequest(BaseModel):
     Used by: POST /api/operate
     """
 
-    objRef: str = Field(
+    obj_ref: str = Field(
         ...,
+        alias="objRef",
         description="Controllable DO Object reference in IEC61850 format",
         json_schema_extra={"example": "LD0/MMXU.WMaxSpt"},
     )
@@ -1247,8 +1251,9 @@ class WriteValueRequest(BaseModel):
     Used by: POST /api/writevalue
     """
 
-    objRef: str = Field(
+    obj_ref: str = Field(
         ...,
+        alias="objRef",
         description="Object reference in IEC61850 format",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"},
     )
@@ -1262,8 +1267,9 @@ class WriteValueRequest(BaseModel):
         description="Value to write (will be converted to appropriate type)",
         json_schema_extra={"example": "ON"},
     )
-    dataType: str | None = Field(
+    data_type: str | None = Field(
         default=None,
+        alias="dataType",
         description="Optional value type hint for coercion",
         json_schema_extra={"example": "BOOLEAN"},
     )
@@ -3190,7 +3196,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             # Check WebSocket connection before attempting to read
             _check_websocket_connection()
 
-            obj_ref = request.objRef
+            obj_ref = request.obj_ref
             fc = request.fc
 
             cp = request.cp
@@ -3445,7 +3451,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             # Check WebSocket connection before attempting to read BRCB
             _check_websocket_connection()
 
-            obj_ref = request.objRef
+            obj_ref = request.obj_ref
 
             cp = request.cp
             acsi_client = rti_so.get_iec61850_client(cp)
@@ -3518,7 +3524,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             # Check WebSocket connection before attempting to write BRCB
             _check_websocket_connection()
 
-            obj_ref = request.objRef
+            obj_ref = request.obj_ref
 
             cp = request.cp
             data = request.data
@@ -3590,7 +3596,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             # Check WebSocket connection before attempting to read URCB
             _check_websocket_connection()
 
-            obj_ref = request.objRef
+            obj_ref = request.obj_ref
 
             cp = request.cp
             acsi_client = rti_so.get_iec61850_client(cp)
@@ -3663,7 +3669,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             # Check WebSocket connection before attempting to write URCB
             _check_websocket_connection()
 
-            obj_ref = request.objRef
+            obj_ref = request.obj_ref
 
             cp = request.cp
             data = request.data
@@ -3917,10 +3923,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             # Check WebSocket connection before attempting to write value
             _check_websocket_connection()
 
-            obj_ref = request.objRef
+            obj_ref = request.obj_ref
             fc = request.fc
             value = request.value
-            value_type = request.dataType
+            value_type = request.data_type
 
             cp = request.cp
             acsi_client = rti_so.get_iec61850_client(cp)
@@ -4115,7 +4121,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             # Check WebSocket connection before attempting to operate
             _check_websocket_connection()
 
-            obj_ref = request.objRef
+            obj_ref = request.obj_ref
             value = request.value
             value_type = request.value_type
 
