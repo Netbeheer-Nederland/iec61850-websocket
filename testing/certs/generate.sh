@@ -41,7 +41,6 @@ cfssl gencert \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
   -profile=server \
-  -hostname="${SERVER_HOSTNAMES}" \
   server-csr.json | cfssljson -bare server
 
 echo "🔐 Generating client certificate..."
