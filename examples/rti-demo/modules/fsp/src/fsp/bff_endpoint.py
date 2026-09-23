@@ -98,7 +98,7 @@ class HealthCheckAccessFilter(logging.Filter):
     ``uvicorn.access`` logger is actually at DEBUG.
     """
 
-    QUIET_PATHS = ("/api/status", "/api/health", "/api/messages")
+    QUIET_PATHS = ("/api/status", "/api/health", "/api/messages","/api/actions-logs")
 
     def filter(self, record: logging.LogRecord) -> bool:
         args = record.args
