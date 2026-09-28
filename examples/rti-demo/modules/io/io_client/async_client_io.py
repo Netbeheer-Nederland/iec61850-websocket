@@ -326,7 +326,7 @@ class AsyncIOClient:
                                 match = re.search(r"'([^']+)' not found", error_msg)
                                 if match:
                                     raise DeviceNotFoundError(match.group(1))
-                        except:
+                        except Exception:
                             pass
                         raise APIError("Not found", response.status_code, endpoint)
                     return None
@@ -351,7 +351,7 @@ class AsyncIOClient:
                                 error_msg = error_data.get(
                                     "detail", ""
                                 ) or error_data.get("message", "")
-                            except:
+                            except Exception:
                                 error_msg = response.text
                             raise APIError(error_msg, response.status_code, endpoint)
                         return None
@@ -1101,7 +1101,7 @@ class AsyncDemoIOClient:
                                 match = re.search(r"'([^']+)' not found", error_msg)
                                 if match:
                                     raise DeviceNotFoundError(match.group(1))
-                        except:
+                        except Exception:
                             pass
                         raise APIError("Not found", response.status_code, endpoint)
                     return None
@@ -1126,7 +1126,7 @@ class AsyncDemoIOClient:
                                 error_msg = error_data.get(
                                     "detail", ""
                                 ) or error_data.get("message", "")
-                            except:
+                            except Exception:
                                 error_msg = response.text
                             raise APIError(error_msg, response.status_code, endpoint)
                         return None
@@ -1975,5 +1975,5 @@ class DemoIOClient:
         """Destructor - ensure session is closed."""
         try:
             self.close()
-        except:
+        except Exception:
             pass

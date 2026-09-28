@@ -543,7 +543,7 @@ def create_io_router() -> APIRouter:
                                 ip_address = ip
                                 acsi_base_url = f"http://{ip_address}:5001"
                                 break
-                except:
+                except Exception:
                     pass
 
             if not acsi_base_url:

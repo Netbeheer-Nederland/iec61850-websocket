@@ -434,7 +434,7 @@ class RTILauncher:
                 for line in process.stdout:
                     if line.strip():
                         print(f"[{service_name}] {line.strip()}", flush=True)
-            except:
+            except Exception:
                 pass
 
         reader_thread = threading.Thread(target=log_reader, daemon=True)
@@ -539,7 +539,7 @@ class RTILauncher:
                 for line in process.stdout:
                     if line.strip():
                         print(f"[{service_name}] {line.strip()}", flush=True)
-            except:
+            except Exception:
                 pass
 
         reader_thread = threading.Thread(target=log_reader, daemon=True)
@@ -623,7 +623,7 @@ class RTILauncher:
                         process.kill()
                     try:
                         process.wait(timeout=5)
-                    except:
+                    except Exception:
                         pass
 
             del self.running_services[svc_type]
