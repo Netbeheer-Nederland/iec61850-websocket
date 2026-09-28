@@ -45,7 +45,9 @@ from ws61850.security.oauth2.client_credentials import ClientCredentialsProvider
 import tempfile
 import os
 
-import base64, json, time as _time
+import base64
+import json
+import time as _time
 
 logger = logging.getLogger(__name__)
 
