@@ -215,7 +215,7 @@ class IEC61850Client:
             service_name = retrieve_service_name(response)
             if service_name[0] != "serviceError":
                 success = retrieve_success(response)
-                if success == True:
+                if success:
                     logger.debug("operate success cp=%r ref=%s", self.cp, data)
                     if callback is not None:
                         callback(success, parameter)

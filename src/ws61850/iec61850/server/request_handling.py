@@ -150,13 +150,13 @@ def get_list_of_items_ln(ln_ref, asci_service, ied: IedModel):
                 return_list = [
                     rcb.name
                     for rcb in foundLN.rcbs
-                    if rcb.get_objRef().startswith(f"{ld_name}/{ln_name}.") and rcb.buffered == False
+                    if rcb.get_objRef().startswith(f"{ld_name}/{ln_name}.") and not rcb.buffered
                 ]
             elif asci_service == "brcb":
                 return_list = [
                     rcb.name
                     for rcb in foundLN.rcbs
-                    if rcb.get_objRef().startswith(f"{ld_name}/{ln_name}.") and rcb.buffered == True
+                    if rcb.get_objRef().startswith(f"{ld_name}/{ln_name}.") and rcb.buffered
                 ]
             return return_list
     return None
