@@ -51,7 +51,7 @@ class IedModel:
         self.logical_devices.append(logical_device)
 
     # Legacy name kept so existing server code compiles without change
-    def add_logicalDevice(self, logical_device: "LogicalDevice") -> None:
+    def add_logicalDevice(self, logical_device: "LogicalDevice") -> None:  # noqa: N802
         self.add_logical_device(logical_device)
 
 
@@ -98,20 +98,20 @@ class LogicalNode(ModelNode):
         self.data_sets.append(data_set)
 
     # Legacy names so existing server/test code compiles without change
-    def add_dataObject(self, data_object: "DataObject") -> None:
+    def add_dataObject(self, data_object: "DataObject") -> None:  # noqa: N802
         self.add_data_object(data_object)
 
-    def add_reportControl(self, rcb: "ReportControl") -> None:
+    def add_reportControl(self, rcb: "ReportControl") -> None:  # noqa: N802
         self.add_report_control(rcb)
 
-    def add_dataSet(self, data_set: "DataSet") -> None:
+    def add_dataSet(self, data_set: "DataSet") -> None:  # noqa: N802
         self.add_data_set(data_set)
 
     def get_obj_ref(self) -> str:
         ld = self.parent
         return f"{ld.name}/{self.name}"
 
-    def get_objRef(self) -> str:
+    def get_objRef(self) -> str:  # noqa: N802 - legacy alias for get_obj_ref(), read externally
         return self.get_obj_ref()
 
 
@@ -152,7 +152,7 @@ class DataObject(ModelNode):
         ld = ln.parent
         return f"{ld.name}/{ln.name}." + ".".join(reversed(parts))
 
-    def get_objRef(self) -> str:
+    def get_objRef(self) -> str:  # noqa: N802 - legacy alias for get_obj_ref(), read externally
         return self.get_obj_ref()
 
 
@@ -204,7 +204,7 @@ class DataAttribute(ModelNode):
         self.data_attributes.append(data_attribute)
 
     # Legacy name
-    def addDataAttribute(self, data_attribute: "DataAttribute") -> None:
+    def addDataAttribute(self, data_attribute: "DataAttribute") -> None:  # noqa: N802
         self.add_data_attribute(data_attribute)
 
     def get_obj_ref(self) -> str:
@@ -217,7 +217,7 @@ class DataAttribute(ModelNode):
         ld = ln.parent
         return f"{ld.name}/{ln.name}." + ".".join(reversed(parts))
 
-    def get_objRef(self) -> str:
+    def get_objRef(self) -> str:  # noqa: N802 - legacy alias for get_obj_ref(), read externally
         return self.get_obj_ref()
 
     # ------------------------------------------------------------------
@@ -234,11 +234,11 @@ class DataAttribute(ModelNode):
         self.attr_type = value
 
     @property
-    def mmsValue(self):
+    def mmsValue(self):  # noqa: N802 - legacy alias, see comment above
         return self.mms_value
 
     @mmsValue.setter
-    def mmsValue(self, value):
+    def mmsValue(self, value):  # noqa: N802 - legacy alias, see comment above
         self.mms_value = value
 
 
@@ -255,14 +255,14 @@ class DataSet:
         self.fcdas.append(entry)
 
     # Legacy name
-    def dataSet_addEntry(self, entry: "DataSetEntry") -> None:
+    def dataSet_addEntry(self, entry: "DataSetEntry") -> None:  # noqa: N802
         self.add_entry(entry)
 
     def get_obj_ref(self) -> str:
         ln = self.parent
         return f"{self.logical_device_name}/{ln.name}.{self.name}"
 
-    def get_objRef(self) -> str:
+    def get_objRef(self) -> str:  # noqa: N802 - legacy alias for get_obj_ref(), read externally
         return self.get_obj_ref()
 
 
@@ -337,5 +337,5 @@ class ReportControl:
         ld = self.ln.parent
         return f"{ld.name}/{self.ln.name}.{self.name}"
 
-    def get_objRef(self) -> str:
+    def get_objRef(self) -> str:  # noqa: N802 - legacy alias for get_obj_ref(), read externally
         return self.get_obj_ref()

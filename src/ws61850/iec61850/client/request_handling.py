@@ -93,7 +93,7 @@ def create_tpaa_abort_request(invoke_id, associate_id):
     )
 
 
-def create_tpaa_request_getServerDirectory(invoke_id, associate_id, service_data):
+def create_tpaa_request_get_server_directory(invoke_id, associate_id, service_data):
     """
     Creates a Two-Party Application Association request to retrieve information about the server's directory structure.
     """
@@ -112,7 +112,7 @@ def create_tpaa_request_getServerDirectory(invoke_id, associate_id, service_data
     )
 
 
-def create_tpaa_request_getLDDirectory(invoke_id, associate_id, service_data):
+def create_tpaa_request_get_ld_directory(invoke_id, associate_id, service_data):
     """
     Creates a Two-Party Application Association request to retrieve the list of logical nodes contained within a specific logical device.
     """
@@ -131,7 +131,7 @@ def create_tpaa_request_getLDDirectory(invoke_id, associate_id, service_data):
     )
 
 
-def create_tpaa_request_getDataSetDirectoryRequest(invoke_id, associate_id, service_data):
+def create_tpaa_request_get_data_set_directory_request(invoke_id, associate_id, service_data):
     """
     Creates a Two-Party Application Association request to retrieve the list of data attributes contained within a specific data set.
     """
@@ -150,7 +150,7 @@ def create_tpaa_request_getDataSetDirectoryRequest(invoke_id, associate_id, serv
     )
 
 
-def create_tpaa_request_getLogicalNodeDirectory(
+def create_tpaa_request_get_logical_node_directory(
     invoke_id, associate_id, service_data, aCSIClass  # noqa: N803 - matches the ASN.1 grammar's own field name
 ):
     """
@@ -172,7 +172,7 @@ def create_tpaa_request_getLogicalNodeDirectory(
     )
 
 
-def create_tpaa_request_getDataDirectory(invoke_id, associate_id, service_data):
+def create_tpaa_request_get_data_directory(invoke_id, associate_id, service_data):
     """
     Creates a Two-Party Application Association request to retrieve the list of components within an object.
     """
@@ -191,7 +191,7 @@ def create_tpaa_request_getDataDirectory(invoke_id, associate_id, service_data):
     )
 
 
-def create_tpaa_request_getBRCBValuesRequest(invoke_id, associate_id, service_data):
+def create_tpaa_request_get_brcb_values_request(invoke_id, associate_id, service_data):
     """
     Creates a Two-Party Application Association request to retrieve the current values of a Buffered Report Control Block (BRCB).
     """
@@ -210,7 +210,7 @@ def create_tpaa_request_getBRCBValuesRequest(invoke_id, associate_id, service_da
     )
 
 
-def create_tpaa_request_getURCBValuesRequest(invoke_id, associate_id, service_data):
+def create_tpaa_request_get_urcb_values_request(invoke_id, associate_id, service_data):
     """
     Creates a Two-Party Application Association request to retrieve the current values of an Unbuffered Report Control Block (URCB).
     """
@@ -229,7 +229,7 @@ def create_tpaa_request_getURCBValuesRequest(invoke_id, associate_id, service_da
     )
 
 
-def create_tpaa_request_setBRCBValuesRequest(invoke_id, associate_id, client_report_control):
+def create_tpaa_request_set_brcb_values_request(invoke_id, associate_id, client_report_control):
     """
     Creates a Two-Party Application Association request to retrieve the current values of a Buffered Report Control Block (BRCB).
     """
@@ -272,7 +272,7 @@ def create_tpaa_request_setBRCBValuesRequest(invoke_id, associate_id, client_rep
     )
 
 
-def create_tpaa_request_setURCBValuesRequest(invoke_id, associate_id, client_report_control):
+def create_tpaa_request_set_urcb_values_request(invoke_id, associate_id, client_report_control):
     """
     Creates a Two-Party Application Association request to retrieve the current values of a Unbuffered Report Control Block (URCB).
     """
@@ -313,7 +313,7 @@ def create_tpaa_request_setURCBValuesRequest(invoke_id, associate_id, client_rep
     )
 
 
-def create_tpaa_request_getDataDefinition(invoke_id, associate_id, service_data):
+def create_tpaa_request_get_data_definition(invoke_id, associate_id, service_data):
     """
     Creates a Two-Party Application Association request to retrieve the data type definition of a specific object.
     """
@@ -332,7 +332,7 @@ def create_tpaa_request_getDataDefinition(invoke_id, associate_id, service_data)
     )
 
 
-def create_tpaa_request_getDataValues(
+def create_tpaa_request_get_data_values(
     invoke_id, associate_id, service_data, includeElementName  # noqa: N803 - matches the ASN.1 grammar's own field name
 ):
     """
@@ -354,7 +354,7 @@ def create_tpaa_request_getDataValues(
     )
 
 
-def create_tpaa_request_setDataValues(invoke_id, associate_id, ref, values):
+def create_tpaa_request_set_data_values(invoke_id, associate_id, ref, values):
     """
     Creates a Two-Party Application Association request  to set or update the values of a specific data attribute.
     """
@@ -374,7 +374,7 @@ def create_tpaa_request_setDataValues(invoke_id, associate_id, ref, values):
     )
 
 
-def create_tpaa_request_getDataSetValues(invoke_id, associate_id, service_data):
+def create_tpaa_request_get_data_set_values(invoke_id, associate_id, service_data):
     """
     Create a Two-Party Application Association request to retrieve the current values of a specific data set.
     """

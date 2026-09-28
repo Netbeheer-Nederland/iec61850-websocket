@@ -160,7 +160,7 @@ class IEC61850Server:
         value["validity"] = "good"
         await self.update_value(quality_item.get_objRef(), value)
 
-    def get_ctlVal_value(self, obj_ref):
+    def get_ctl_val_value(self, obj_ref):
         """
         Function used for getting ctlVal from a control object
         """
@@ -170,7 +170,7 @@ class IEC61850Server:
             return {"type": da.type.name, "value": da.mmsValue}
         return None
 
-    def set_ctlVal_value(self, tree_item, value, type):
+    def set_ctl_val_value(self, tree_item, value, type):
         """
         Function used for setting values to ctlVal in a control object
         """

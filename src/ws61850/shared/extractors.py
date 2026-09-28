@@ -127,7 +127,7 @@ def extract_ln_ref(tpaa_tuple):
         raise ValueError("Invalid TPAA structure for lnRef") from e
 
 
-def extract_acsiType(tpaa_tuple):
+def extract_acsi_type(tpaa_tuple):
     """Extracts aCSIClass from a getLogicalNodeDirectory request tuple."""
     try:
         return tpaa_tuple[1]["service"][1]["aCSIClass"]
@@ -159,7 +159,7 @@ def extract_ref(tpaa_tuple):
         raise ValueError("Invalid TPAA structure for ref") from e
 
 
-def extract_dataAttrVal(tpaa_tuple):
+def extract_data_attr_val(tpaa_tuple):
     """Extracts dataAttrVal from a setDataValues request tuple."""
     try:
         return tpaa_tuple[1]["service"][1]["dataAttrVal"]
@@ -167,7 +167,7 @@ def extract_dataAttrVal(tpaa_tuple):
         raise ValueError("Invalid TPAA structure for dataAttrVal") from e
 
 
-def extract_includeElementName(tpaa_tuple):
+def extract_include_element_name(tpaa_tuple):
     """Extracts includeElementName from a getDataValues request tuple."""
     try:
         return tpaa_tuple[1]["service"][1]["includeElementName"]

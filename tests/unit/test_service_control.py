@@ -72,7 +72,7 @@ def _select_msg(ref="LD0/CSWI1.Pos.Oper"):
 
 
 def _operate_msg(ref="LD0/CSWI1.Pos.Oper", ctl_val=True):
-    # ctlVal must match the format extract_ctlVal_from_operate_request returns
+    # ctlVal must match the format extract_ctl_val_from_operate_request returns
     # and that assign_da_item expects: ("boolean", value)
     return _svc_tuple("operate", ref=ref, ctlVal=("boolean", ctl_val))
 

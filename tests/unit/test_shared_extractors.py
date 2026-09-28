@@ -5,13 +5,13 @@ import json
 import pytest
 
 from ws61850.shared.extractors import (
-    extract_acsiType,
+    extract_acsi_type,
     extract_associate_request_type,
     extract_brcb_ref,
     extract_data_ref,
-    extract_dataAttrVal,
+    extract_data_attr_val,
     extract_ds_ref,
-    extract_includeElementName,
+    extract_include_element_name,
     extract_invoke_id,
     extract_ln_ref,
     extract_ld_name,
@@ -141,7 +141,7 @@ def test_extract_ln_ref():
 
 def test_extract_acsiType():
     tpaa = _svc_tuple("getLogicalNodeDirectory", lnRef="LD0/LLN0", aCSIClass="dataObject")
-    assert extract_acsiType(tpaa) == "dataObject"
+    assert extract_acsi_type(tpaa) == "dataObject"
 
 
 def test_extract_ds_ref():
@@ -161,12 +161,12 @@ def test_extract_ref():
 
 def test_extract_dataAttrVal():
     tpaa = _svc_tuple("setDataValues", dataAttrVal=[{"data": True}])
-    assert extract_dataAttrVal(tpaa) == [{"data": True}]
+    assert extract_data_attr_val(tpaa) == [{"data": True}]
 
 
 def test_extract_includeElementName():
     tpaa = _svc_tuple("getDataValues", includeElementName=True)
-    assert extract_includeElementName(tpaa) is True
+    assert extract_include_element_name(tpaa) is True
 
 
 def test_extract_brcb_ref():
@@ -186,12 +186,12 @@ def test_extract_urcb_ref():
 @pytest.mark.parametrize("fn,tpaa", [
     (extract_ld_name, _svc_tuple("x")),
     (extract_ln_ref, _svc_tuple("x")),
-    (extract_acsiType, _svc_tuple("x")),
+    (extract_acsi_type, _svc_tuple("x")),
     (extract_ds_ref, _svc_tuple("x")),
     (extract_data_ref, _svc_tuple("x")),
     (extract_ref, _svc_tuple("x")),
-    (extract_dataAttrVal, _svc_tuple("x")),
-    (extract_includeElementName, _svc_tuple("x")),
+    (extract_data_attr_val, _svc_tuple("x")),
+    (extract_include_element_name, _svc_tuple("x")),
     (extract_brcb_ref, _svc_tuple("x")),
     (extract_urcb_ref, _svc_tuple("x")),
 ])

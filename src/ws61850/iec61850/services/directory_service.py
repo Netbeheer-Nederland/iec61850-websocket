@@ -18,22 +18,22 @@
 import re
 
 from ws61850.iec61850.server.request_handling import (
-    create_DataAttributeDefinition_list,
-    create_subDataDefinition_list,
+    create_data_attribute_definition_list,
+    create_sub_data_definition_list,
     find_do_with_ref,
     get_list_of_items_ln,
 )
 from ws61850.iec61850.server.response_handling import (
-    create_tpaa_response_getDataDefinition,
-    create_tpaa_response_getDataDirectory,
-    create_tpaa_response_getDataSetDirectoryRequest,
-    create_tpaa_response_getLDDirectory,
-    create_tpaa_response_getLogicalNodeDirectory,
-    create_tpaa_response_getServerDirectory,
+    create_tpaa_response_get_data_definition,
+    create_tpaa_response_get_data_directory,
+    create_tpaa_response_get_data_set_directory_request,
+    create_tpaa_response_get_ld_directory,
+    create_tpaa_response_get_logical_node_directory,
+    create_tpaa_response_get_server_directory,
     create_tpaa_service_error_response,
 )
 from ws61850.shared.extractors import (
-    extract_acsiType,
+    extract_acsi_type,
     extract_data_ref,
     extract_ds_ref,
     extract_ld_name,
@@ -61,7 +61,7 @@ class DirectoryService:
 
     def get_server_directory(self, invoke_id, associate_id):
         ld_refs = [ld.name for ld in self._ied.logical_devices]
-        return create_tpaa_response_getServerDirectory(invoke_id, associate_id, ld_refs)
+        return create_tpaa_response_get_server_directory(invoke_id, associate_id, ld_refs)
 
     def get_logical_device_directory(self, invoke_id, associate_id, decoded_message):
         ied = self._ied
@@ -69,16 +69,16 @@ class DirectoryService:
         foundLD = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
         if foundLD:
             ln_names = [ln.name for ln in foundLD.logical_nodes]
-            return create_tpaa_response_getLDDirectory(invoke_id, associate_id, ln_names)
+            return create_tpaa_response_get_ld_directory(invoke_id, associate_id, ln_names)
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
 
     def get_logical_node_directory(self, invoke_id, associate_id, decoded_message):
         ied = self._ied
         ln_ref = extract_ln_ref(decoded_message)
-        acsi_service = extract_acsiType(decoded_message)
+        acsi_service = extract_acsi_type(decoded_message)
         refs = get_list_of_items_ln(ln_ref, acsi_service, ied)
         if refs is not None:
-            return create_tpaa_response_getLogicalNodeDirectory(invoke_id, associate_id, refs)
+            return create_tpaa_response_get_logical_node_directory(invoke_id, associate_id, refs)
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
 
     def get_data_set_directory(self, invoke_id, associate_id, decoded_message):
@@ -98,7 +98,7 @@ class DirectoryService:
             None,
         )
         if foundDS:
-            return create_tpaa_response_getDataSetDirectoryRequest(invoke_id, associate_id, foundDS.fcdas)
+            return create_tpaa_response_get_data_set_directory_request(invoke_id, associate_id, foundDS.fcdas)
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
 
     def get_data_directory(self, invoke_id, associate_id, decoded_message):
@@ -108,7 +108,7 @@ class DirectoryService:
         if dataObject is not None:
             sdo_list = [sdo.name for sdo in dataObject.get_do_from_do_or_da_list()]
             da_list = [da.name for da in dataObject.get_da_from_do_or_da_list()]
-            return create_tpaa_response_getDataDirectory(invoke_id, associate_id, sdo_list, da_list)
+            return create_tpaa_response_get_data_directory(invoke_id, associate_id, sdo_list, da_list)
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
 
     def get_data_definition(self, invoke_id, associate_id, decoded_message):
@@ -116,7 +116,7 @@ class DirectoryService:
         data_ref = extract_data_ref(decoded_message)
         dataObject, _ = find_do_with_ref(data_ref, ied)
         if dataObject is not None:
-            sdo_list, _ = create_subDataDefinition_list(dataObject.get_do_from_do_or_da_list())
-            da_list = create_DataAttributeDefinition_list(dataObject.get_da_from_do_or_da_list())
-            return create_tpaa_response_getDataDefinition(invoke_id, associate_id, sdo_list, da_list, dataObject)
+            sdo_list, _ = create_sub_data_definition_list(dataObject.get_do_from_do_or_da_list())
+            da_list = create_data_attribute_definition_list(dataObject.get_da_from_do_or_da_list())
+            return create_tpaa_response_get_data_definition(invoke_id, associate_id, sdo_list, da_list, dataObject)
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")

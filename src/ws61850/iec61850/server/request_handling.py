@@ -247,7 +247,7 @@ def extract_operate_or_select_ref(tpaa_tuple):
         raise ValueError("Invalid TPAA structure for dataRef") from e
 
 
-def extract_ctlVal_from_operate_request(tpaa_tuple):
+def extract_ctl_val_from_operate_request(tpaa_tuple):
     """
     Extracts the ctlVal from a TPAA request tuple.
     Assumes structure:
@@ -260,7 +260,7 @@ def extract_ctlVal_from_operate_request(tpaa_tuple):
         raise ValueError("Invalid TPAA structure for dataRef") from e
 
 
-def create_subDataDefinition_list(sub_do_list):
+def create_sub_data_definition_list(sub_do_list):
     """
     Create the list of sub data definition to use inside getDataDefinition Response
     """
@@ -271,15 +271,15 @@ def create_subDataDefinition_list(sub_do_list):
             "name": sdo_item.name,
             "cdc": sdo_item.cdc,
             "count": sdo_item.elementCount,
-            "dataAttributeDefinition": create_DataAttributeDefinition_list(sdo_item.get_da_from_do_or_da_list()),
+            "dataAttributeDefinition": create_data_attribute_definition_list(sdo_item.get_da_from_do_or_da_list()),
         }
         primary_da.extend(sdo_item.get_da_from_do_or_da_list())
         return_list.append(input_data)
-        # return_list.append(create_DataAttributeDefinition_list(da_list))
+        # return_list.append(create_data_attribute_definition_list(da_list))
     return return_list, primary_da
 
 
-def create_DataAttributeDefinition_list(da_list):
+def create_data_attribute_definition_list(da_list):
     """
     Create the list of data attribute definition to use inside getDataDefinition Response
     """
@@ -301,7 +301,7 @@ def create_DataAttributeDefinition_list(da_list):
     return return_list
 
 
-def get_octetString_size(mms_value):
+def get_octet_string_size(mms_value):
     """
     Get the size of an Octet String
     """
@@ -322,7 +322,7 @@ def get_structure_value_def(da_item: DataAttribute):
             if da_interal.attr_type.name != "structure" and da_interal.attr_type.name != "octetString":
                 value = None
             elif da_interal.attr_type.name != "structure" and da_interal.attr_type.name == "octetString":
-                value = get_octetString_size(da_interal.mms_value)
+                value = get_octet_string_size(da_interal.mms_value)
             else:
                 value = get_structure_value_def(da_interal)
             input_data.append({"cmpName": da_interal.name, "cmpType": (da_interal.attr_type.name, value)})

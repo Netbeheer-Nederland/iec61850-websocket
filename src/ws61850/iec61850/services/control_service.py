@@ -22,7 +22,7 @@ from ws61850.iec61850.server.control_handling import (
 )
 from ws61850.iec61850.server.request_handling import (
     assign_da_item,
-    extract_ctlVal_from_operate_request,
+    extract_ctl_val_from_operate_request,
     extract_operate_or_select_ref,
     find_object_in_tree,
 )
@@ -121,7 +121,7 @@ class ControlService:
                 invoke_id, associate_id, False, None, ServiceStatusKind.failedDueToServerConstraint.name
             ), None
 
-        ctlVal_request = extract_ctlVal_from_operate_request(decoded_message)
+        ctlVal_request = extract_ctl_val_from_operate_request(decoded_message)
 
         handler_fn, handler_param = control_handler
         ctl_val = {"type": control_da.type.name, "value": ctlVal_request}

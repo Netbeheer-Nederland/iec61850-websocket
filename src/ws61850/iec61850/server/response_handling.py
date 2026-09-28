@@ -44,7 +44,7 @@ def create_tpaa_associate_response(max_message_size, associate_id, service_error
     return return_item
 
 
-def create_tpaa_response_getServerDirectory(invoke_id, associate_id, ld_refs):
+def create_tpaa_response_get_server_directory(invoke_id, associate_id, ld_refs):
     """
     Creates a Two-Party Application Association response to retrieve information about the server's directory structure.
     """
@@ -63,7 +63,7 @@ def create_tpaa_response_getServerDirectory(invoke_id, associate_id, ld_refs):
     )
 
 
-def create_tpaa_response_getLDDirectory(invoke_id, associate_id, ln_refs):
+def create_tpaa_response_get_ld_directory(invoke_id, associate_id, ln_refs):
     """
     Creates a Two-Party Application Association response to retrieve the list of logical nodes contained within a specific logical device.
     """
@@ -95,7 +95,7 @@ def build_ds_refs_from_dataset(ds_list):
     return ds_refs
 
 
-def create_tpaa_response_getDataSetDirectoryRequest(invoke_id, associate_id, ds_refs):
+def create_tpaa_response_get_data_set_directory_request(invoke_id, associate_id, ds_refs):
     """
     Creates a Two-Party Application Association response to retrieve the list of data attributes contained within a specific data set.
     """
@@ -115,7 +115,7 @@ def create_tpaa_response_getDataSetDirectoryRequest(invoke_id, associate_id, ds_
     )
 
 
-def create_tpaa_response_getLogicalNodeDirectory(invoke_id, associate_id, ref_list):
+def create_tpaa_response_get_logical_node_directory(invoke_id, associate_id, ref_list):
     """
     Creates a Two-Party Application Association response to retrieve the list of objects within a specific logical node.
     """
@@ -134,7 +134,7 @@ def create_tpaa_response_getLogicalNodeDirectory(invoke_id, associate_id, ref_li
     )
 
 
-def create_tpaa_response_getDataDirectory(invoke_id, associate_id, sdo_list, da_list):
+def create_tpaa_response_get_data_directory(invoke_id, associate_id, sdo_list, da_list):
     """
     Creates a Two-Party Application Association response to retrieve the list of components within an object.
     """
@@ -154,7 +154,7 @@ def create_tpaa_response_getDataDirectory(invoke_id, associate_id, sdo_list, da_
     )
 
 
-def create_tpaa_response_getBRCBValues(invoke_id, associate_id, server_brcb: ServerReportControl):
+def create_tpaa_response_get_brcb_values(invoke_id, associate_id, server_brcb: ServerReportControl):
     """
     Response Function for getBRCBValues
     """
@@ -192,7 +192,7 @@ def create_tpaa_response_getBRCBValues(invoke_id, associate_id, server_brcb: Ser
     )
 
 
-def create_tpaa_response_getURCBValues(invoke_id, associate_id, server_urcb: ServerReportControl):
+def create_tpaa_response_get_urcb_values(invoke_id, associate_id, server_urcb: ServerReportControl):
     """
     Response Function for getURCBValues
     """
@@ -229,7 +229,7 @@ def create_tpaa_response_getURCBValues(invoke_id, associate_id, server_urcb: Ser
     )
 
 
-def create_tpaa_response_setBRCBValues(invoke_id, associate_id, service_data):
+def create_tpaa_response_set_brcb_values(invoke_id, associate_id, service_data):
     """
     Response function for setBRCBValues
     """
@@ -248,7 +248,7 @@ def create_tpaa_response_setBRCBValues(invoke_id, associate_id, service_data):
     )
 
 
-def create_tpaa_response_setURCBValues(invoke_id, associate_id, service_data):
+def create_tpaa_response_set_urcb_values(invoke_id, associate_id, service_data):
     """
     Response function for setURCBValues
     """
@@ -267,7 +267,7 @@ def create_tpaa_response_setURCBValues(invoke_id, associate_id, service_data):
     )
 
 
-def create_tpaa_response_getDataDefinition(invoke_id, associate_id, sdo_list, da_list, data_object):
+def create_tpaa_response_get_data_definition(invoke_id, associate_id, sdo_list, da_list, data_object):
     """
     Creates a Two-Party Application Association response to retrieve the data type definition of a specific object.
     """
@@ -289,7 +289,7 @@ def create_tpaa_response_getDataDefinition(invoke_id, associate_id, sdo_list, da
     )
 
 
-def create_tpaa_response_getDataValues(invoke_id, associate_id, service_data):
+def create_tpaa_response_get_data_values(invoke_id, associate_id, service_data):
     """
     Creates a Two-Party Application Association response to retrieve the current values of a specific object.
     """
@@ -308,7 +308,7 @@ def create_tpaa_response_getDataValues(invoke_id, associate_id, service_data):
     )
 
 
-def create_tpaa_response_setDataValues(invoke_id, associate_id, service_data):
+def create_tpaa_response_set_data_values(invoke_id, associate_id, service_data):
     """
     Creates a Two-Party Application Association response to set or update the values of a specific data attribute.
     """
@@ -344,7 +344,7 @@ def create_tpaa_service_error_response(invoke_id, associate_id, service_data):
     )
 
 
-def create_tpaa_response_getDataSetValues(invoke_id, associate_id, service_data):
+def create_tpaa_response_get_data_set_values(invoke_id, associate_id, service_data):
     """
     Create a Two-Party Application Association response to retrieve the current values of a specific data set.
     """

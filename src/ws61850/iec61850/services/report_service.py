@@ -22,10 +22,10 @@ from ws61850.iec61850.server.request_handling import (
     assign_urcb_value,
 )
 from ws61850.iec61850.server.response_handling import (
-    create_tpaa_response_getBRCBValues,
-    create_tpaa_response_getURCBValues,
-    create_tpaa_response_setBRCBValues,
-    create_tpaa_response_setURCBValues,
+    create_tpaa_response_get_brcb_values,
+    create_tpaa_response_get_urcb_values,
+    create_tpaa_response_set_brcb_values,
+    create_tpaa_response_set_urcb_values,
     create_tpaa_service_error_response,
 )
 from ws61850.shared.extractors import extract_brcb_ref, extract_urcb_ref
@@ -53,7 +53,7 @@ class ReportService:
             None,
         )
         if brcb is not None and brcb.rcb.buffered is True:
-            return create_tpaa_response_getBRCBValues(invoke_id, associate_id, brcb), None
+            return create_tpaa_response_get_brcb_values(invoke_id, associate_id, brcb), None
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable"), None
 
     async def reset_report_task(self, brcb_ref, iec61850_server):
@@ -93,7 +93,7 @@ class ReportService:
             if result == "ok":
                 await self.reset_report_task(brcb_ref, iec61850_server)
 
-            response = create_tpaa_response_setBRCBValues(invoke_id, associate_id, result)
+            response = create_tpaa_response_set_brcb_values(invoke_id, associate_id, result)
             return response, brcb if (brcb.rptEna and brcb.rcb.trg_ops.get("gi") and brcb.rcb.gi) else None
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable"), None
 
@@ -104,7 +104,7 @@ class ReportService:
             None,
         )
         if urcb is not None and urcb.rcb.buffered is False:
-            return create_tpaa_response_getURCBValues(invoke_id, associate_id, urcb), None
+            return create_tpaa_response_get_urcb_values(invoke_id, associate_id, urcb), None
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable"), None
 
     async def set_urcb_values(self, invoke_id, associate_id, decoded_message, websocket_info, iec61850_server):
@@ -120,6 +120,6 @@ class ReportService:
                 await self.reset_report_task(urcb_ref, iec61850_server)
 
             urcb.rcb.client_connection = websocket_info
-            response = create_tpaa_response_setURCBValues(invoke_id, associate_id, result)
+            response = create_tpaa_response_set_urcb_values(invoke_id, associate_id, result)
             return response, urcb if (urcb.rptEna and urcb.rcb.trg_ops.get("gi") and urcb.rcb.gi) else None
         return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable"), None

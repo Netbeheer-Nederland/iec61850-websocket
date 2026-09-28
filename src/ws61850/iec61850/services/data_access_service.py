@@ -30,15 +30,15 @@ from ws61850.iec61850.server.request_handling import (
     flatten_nested_data_attributes_with_fc,
 )
 from ws61850.iec61850.server.response_handling import (
-    create_tpaa_response_getDataSetValues,
-    create_tpaa_response_getDataValues,
-    create_tpaa_response_setDataValues,
+    create_tpaa_response_get_data_set_values,
+    create_tpaa_response_get_data_values,
+    create_tpaa_response_set_data_values,
     create_tpaa_service_error_response,
 )
 from ws61850.shared.extractors import (
-    extract_dataAttrVal,
+    extract_data_attr_val,
     extract_ds_ref,
-    extract_includeElementName,
+    extract_include_element_name,
     extract_ref,
 )
 
@@ -59,7 +59,7 @@ class DataAccessService:
     def get_data_values(self, invoke_id, associate_id, decoded_message):
         ied = self._ied
         data_ref = extract_ref(decoded_message)
-        include_element_name = extract_includeElementName(decoded_message)
+        include_element_name = extract_include_element_name(decoded_message)
         item = find_object_in_tree(data_ref["ref"], ied)
         if item is None:
             return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
@@ -68,12 +68,12 @@ class DataAccessService:
             da_fc = [build_data_value(da, da.attr_type.name, da.mms_value, include_element_name) for da in da_list]
         else:
             da_fc = [build_data_value(item, item.attr_type.name, item.mms_value, include_element_name)]
-        return create_tpaa_response_getDataValues(invoke_id, associate_id, da_fc)
+        return create_tpaa_response_get_data_values(invoke_id, associate_id, da_fc)
 
     def set_data_values(self, invoke_id, associate_id, decoded_message):
         ied = self._ied
         data_ref = extract_ref(decoded_message)
-        dataAttr_val = extract_dataAttrVal(decoded_message)
+        dataAttr_val = extract_data_attr_val(decoded_message)
         item = find_object_in_tree(data_ref["ref"], ied)
         if item is None:
             return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
@@ -90,13 +90,13 @@ class DataAccessService:
                         assign_da_item(item.do_or_da[da_do_index], value["data"], fc)
                     else:
                         assign_do_item(item.do_or_da[da_do_index], value["data"], fc)
-            return create_tpaa_response_setDataValues(invoke_id, associate_id, "ok")
+            return create_tpaa_response_set_data_values(invoke_id, associate_id, "ok")
         else:
             if fc == item.fc.wire_name:
                 result = assign_da_item(item, dataAttr_val[0]["data"], fc)
                 if result is False:
                     return create_tpaa_service_error_response(invoke_id, associate_id, "typeConflict")
-                return create_tpaa_response_setDataValues(invoke_id, associate_id, "ok")
+                return create_tpaa_response_set_data_values(invoke_id, associate_id, "ok")
             return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
 
     def get_dataset_values(self, invoke_id, associate_id, decoded_message, find_ds_in_tree):
@@ -128,4 +128,4 @@ class DataAccessService:
                         value_list.append(build_data_value(da, da.attr_type.name, da.mms_value, True))
                 else:
                     value_list.append(build_data_value(item, item.attr_type.name, item.mms_value, True))
-        return create_tpaa_response_getDataSetValues(invoke_id, associate_id, value_list)
+        return create_tpaa_response_get_data_set_values(invoke_id, associate_id, value_list)
