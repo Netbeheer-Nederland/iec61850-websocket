@@ -28,7 +28,7 @@ Usage::
     do = factory("TotW", parent_ln)
 """
 
-from typing import Callable
+from collections.abc import Callable
 
 from ws61850.iec61850.data_model import helper
 from ws61850.iec61850.data_model.ied_model import DataObject
