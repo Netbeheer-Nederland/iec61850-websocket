@@ -123,7 +123,7 @@ class ActiveEndpoint:
         # enabled, and disabling OAuth had no way to hand a "no credentials"
         # restart back to reconfigure_connection's code path.
         self._access_token: str | None = None
-        self._credentials_provider: "ClientCredentialsProvider | None" = None
+        self._credentials_provider: ClientCredentialsProvider | None = None
 
         # Serializes reconfigure_connection() and reconfigure_oauth() so a
         # TLS toggle and an OAuth toggle firing close together can't both

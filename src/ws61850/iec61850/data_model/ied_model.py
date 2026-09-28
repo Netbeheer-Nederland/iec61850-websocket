@@ -66,7 +66,7 @@ class LogicalDevice(ModelNode):
     def __init__(self, name: str, ldName: str, parent=None):
         super().__init__(name=name, parent=parent)
         self.ldName = ldName
-        self.logical_nodes: list["LogicalNode"] = []
+        self.logical_nodes: list[LogicalNode] = []
 
     def add_logical_node(self, ln: "LogicalNode") -> None:
         ln.parent = self
@@ -78,9 +78,9 @@ class LogicalNode(ModelNode):
 
     def __init__(self, name: str, parent=None):
         super().__init__(name=name, parent=parent)
-        self.data_objects: list["DataObject"] = []
-        self.data_sets: list["DataSet"] = []
-        self.rcbs: list["ReportControl"] = []
+        self.data_objects: list[DataObject] = []
+        self.data_sets: list[DataSet] = []
+        self.rcbs: list[ReportControl] = []
 
     def add_data_object(self, data_object: "DataObject") -> None:
         data_object.parent = self
@@ -194,7 +194,7 @@ class DataAttribute(ModelNode):
         self.attr_type = attr_type
         self.fc = fc
         self.mms_value = mms_value
-        self.data_attributes: list["DataAttribute"] = []
+        self.data_attributes: list[DataAttribute] = []
 
     def add_data_attribute(self, data_attribute: "DataAttribute") -> None:
         data_attribute.parent = self
@@ -246,7 +246,7 @@ class DataSet:
         self.parent = parent
         self.logical_device_name = logical_device_name
         self.name = name
-        self.fcdas: list["DataSetEntry"] = fcdas if fcdas is not None else []
+        self.fcdas: list[DataSetEntry] = fcdas if fcdas is not None else []
 
     def add_entry(self, entry: "DataSetEntry") -> None:
         self.fcdas.append(entry)
