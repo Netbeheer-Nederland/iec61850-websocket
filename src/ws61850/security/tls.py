@@ -38,9 +38,6 @@ class TLSConfig:
     alpn_protocols: tuple[str, ...] = field(default_factory=tuple)
     keylog_file: str | None = None
 
-import tempfile
-import ssl
-import os
 
 def build_tls_context_from_strings(tls_config: TLSConfig) -> ssl.SSLContext:
     """Build SSLContext from string contents."""
