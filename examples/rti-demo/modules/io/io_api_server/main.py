@@ -44,6 +44,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 from api_endpoint import create_fastapi_app
 from devices import ButtonConfig, LEDConfig, PotentiometerConfig
@@ -75,7 +76,7 @@ def load_acsi_config(config_path: Path) -> ACSIConfig | None:
     return None
 
 
-def load_device_mappings(config_path: Path) -> Dict[str, Dict[str, Any]] | None:
+def load_device_mappings(config_path: Path) -> dict[str, dict[str, Any]] | None:
     """Load device mappings from JSON config file."""
     if not config_path.exists():
         return None

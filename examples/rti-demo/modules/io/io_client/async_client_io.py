@@ -481,14 +481,6 @@ class AsyncIOClient:
             return {"name": name, "state": bool(result["value"])}
         return {"name": name, "state": False}
 
-    async def set_device(self, name: str, state: bool) -> dict[str, Any]:
-        """Set a specific device to ON or OFF state.
-
-        This is a convenience method that uses the device API internally.
-        """
-        data = {"state": state}
-        return await self._request("POST", f"/devices/{name}/set", json=data)
-
     async def toggle_led(self, name: str) -> dict[str, Any]:
         """Toggle the state of a specific LED.
 
@@ -1261,14 +1253,6 @@ class AsyncDemoIOClient:
         if result and "value" in result:
             return {"name": name, "state": bool(result["value"])}
         return {"name": name, "state": False}
-
-    async def set_device(self, name: str, state: bool) -> dict[str, Any]:
-        """Set a specific device to ON or OFF state.
-
-        This is a convenience method that uses the device API internally.
-        """
-        data = {"state": state}
-        return await self._request("POST", f"/devices/{name}/set", json=data)
 
     async def toggle_led(self, name: str) -> dict[str, Any]:
         """Toggle the state of a specific LED.

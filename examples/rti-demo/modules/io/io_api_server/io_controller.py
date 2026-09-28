@@ -497,33 +497,6 @@ class IOController:
     # ==================== Utility Methods ====================
 
     def get_output_devices(self) -> list[str]:
-        """
-        Get the current status of the IO controller (backward compatibility).
-
-        Returns:
-            Dictionary containing:
-            - initialized: Whether IO is initialized
-            - device_count: Number of configured devices
-            - devices: Information about all devices
-        """
-        device_info = {}
-        for name, config in self.configs.items():
-            device_info[name] = {
-                "type": config.device_type.value,
-                "description": config.description,
-                "direction": config.direction.value,
-            }
-
-        return {
-            "initialized": self._initialized,
-            "device_count": len(self.devices),
-            "device_config": device_info,
-            "states": self.get_all_states(),
-        }
-
-    # ==================== Utility Methods ====================
-
-    def get_output_devices(self) -> list[str]:
         """Get list of output device names."""
         return [
             name
