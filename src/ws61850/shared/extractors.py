@@ -20,7 +20,6 @@ import re
 
 from ws61850.iec61850.data_model.ied_model import IedModel, LogicalDevice, LogicalNode
 
-
 # ---------------------------------------------------------------------------
 # Association-level extractors (work on raw JSON strings)
 # ---------------------------------------------------------------------------

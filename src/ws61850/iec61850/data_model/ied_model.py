@@ -33,7 +33,10 @@ Protocol-level enumerations (DataAttributeType, FunctionalConstraint, …) live 
 ``ws61850.protocol.types`` — import from there, not from this module.
 """
 
-from ws61850.protocol.types import DataAttributeType, FunctionalConstraint  # noqa: F401 — re-exported for callers
+from ws61850.protocol.types import (  # noqa: F401 — re-exported for callers
+    DataAttributeType,
+    FunctionalConstraint,
+)
 
 
 class IedModel:

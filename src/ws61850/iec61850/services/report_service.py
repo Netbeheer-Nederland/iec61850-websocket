@@ -15,7 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ws61850.iec61850.server.request_handling import assign_brcb_value, assign_urcb_value
+import asyncio
+
+from ws61850.iec61850.server.request_handling import (
+    assign_brcb_value,
+    assign_urcb_value,
+)
 from ws61850.iec61850.server.response_handling import (
     create_tpaa_response_getBRCBValues,
     create_tpaa_response_getURCBValues,
@@ -24,7 +29,6 @@ from ws61850.iec61850.server.response_handling import (
     create_tpaa_service_error_response,
 )
 from ws61850.shared.extractors import extract_brcb_ref, extract_urcb_ref
-import asyncio
 
 
 class ReportService:

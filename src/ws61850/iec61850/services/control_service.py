@@ -16,7 +16,10 @@
 # limitations under the License.
 
 from ws61850.iec61850.data_model.ied_model import DataAttribute, FunctionalConstraint
-from ws61850.iec61850.server.control_handling import ControlHandlerResult, ControlServiceStatusKind
+from ws61850.iec61850.server.control_handling import (
+    ControlHandlerResult,
+    ControlServiceStatusKind,
+)
 from ws61850.iec61850.server.request_handling import (
     assign_da_item,
     extract_ctlVal_from_operate_request,

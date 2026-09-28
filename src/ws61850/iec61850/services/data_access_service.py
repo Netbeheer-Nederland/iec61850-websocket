@@ -17,7 +17,11 @@
 
 import re
 
-from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, FunctionalConstraint
+from ws61850.iec61850.data_model.ied_model import (
+    DataAttribute,
+    DataObject,
+    FunctionalConstraint,
+)
 from ws61850.iec61850.server.request_handling import (
     assign_da_item,
     assign_do_item,
@@ -31,7 +35,12 @@ from ws61850.iec61850.server.response_handling import (
     create_tpaa_response_setDataValues,
     create_tpaa_service_error_response,
 )
-from ws61850.shared.extractors import extract_dataAttrVal, extract_ds_ref, extract_includeElementName, extract_ref
+from ws61850.shared.extractors import (
+    extract_dataAttrVal,
+    extract_ds_ref,
+    extract_includeElementName,
+    extract_ref,
+)
 
 
 class DataAccessService:

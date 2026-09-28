@@ -69,6 +69,7 @@ class PrivateKeyJWTProvider:
         cafile: str | None = None,
     ):
         import ssl
+
         import aiohttp as _aiohttp
         self._aiohttp = _aiohttp
         self._token_url = token_url
