@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import importlib.util
 import json
 import logging
 import os
@@ -121,14 +122,10 @@ class HealthCheckAccessFilter(logging.Filter):
         return logging.getLogger("uvicorn.access").isEnabledFor(logging.DEBUG)
 
 
-# Try to import docker for auto-discovery
-DOCKER_AVAILABLE = False
-try:
-    import docker
-    from docker import DockerClient
-
-    DOCKER_AVAILABLE = True
-except ImportError:
+# Check whether the docker Python SDK is available for auto-discovery, without
+# actually importing it here since nothing in this module uses it directly.
+DOCKER_AVAILABLE = importlib.util.find_spec("docker") is not None
+if not DOCKER_AVAILABLE:
     logger.warning(
         "Docker Python SDK not available. Container auto-discovery disabled."
     )
