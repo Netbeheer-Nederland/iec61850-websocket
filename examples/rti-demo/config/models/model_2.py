@@ -83,20 +83,20 @@ FC_TO_ENUM_NAME = {
 }
 
 
-def _create_da_Vector(name, fc, parent):
+def _create_da_vector(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
-    _bda_mag_1 = _create_da_AnalogueValue("mag", fc, da)
+    _bda_mag_1 = _create_da_analoguevalue("mag", fc, da)
     da.add_data_attribute(_bda_mag_1)
-    _bda_ang_2 = _create_da_AnalogueValue("ang", fc, da)
+    _bda_ang_2 = _create_da_analoguevalue("ang", fc, da)
     da.add_data_attribute(_bda_ang_2)
     return da
 
 
-def _create_da_SPCOperate_1(name, fc, parent):
+def _create_da_spcoperate_1(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
     _bda_ctlval_1 = DataAttribute("ctlVal", DataAttributeType.boolean, fc, False, da)
     da.add_data_attribute(_bda_ctlval_1)
-    _bda_origin_2 = _create_da_Originator_1("origin", fc, da)
+    _bda_origin_2 = _create_da_originator_1("origin", fc, da)
     da.add_data_attribute(_bda_origin_2)
     _bda_ctlnum_3 = DataAttribute("ctlNum", DataAttributeType.int8u, fc, 0, da)
     da.add_data_attribute(_bda_ctlnum_3)
@@ -130,7 +130,7 @@ def _create_da_SPCOperate_1(name, fc, parent):
     return da
 
 
-def _create_da_Originator_1(name, fc, parent):
+def _create_da_originator_1(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
     _bda_orcat_1 = DataAttribute("orCat", DataAttributeType.enumerated, fc, 0, da)
     da.add_data_attribute(_bda_orcat_1)
@@ -141,7 +141,7 @@ def _create_da_Originator_1(name, fc, parent):
     return da
 
 
-def _create_da_SPCOperate_5(name, fc, parent):
+def _create_da_spcoperate_5(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
     _bda_ctlval_1 = DataAttribute("ctlVal", DataAttributeType.boolean, fc, False, da)
     da.add_data_attribute(_bda_ctlval_1)
@@ -162,7 +162,7 @@ def _create_da_SPCOperate_5(name, fc, parent):
         da,
     )
     da.add_data_attribute(_bda_opertm_2)
-    _bda_origin_3 = _create_da_Originator_1("origin", fc, da)
+    _bda_origin_3 = _create_da_originator_1("origin", fc, da)
     da.add_data_attribute(_bda_origin_3)
     _bda_ctlnum_4 = DataAttribute("ctlNum", DataAttributeType.int8u, fc, 0, da)
     da.add_data_attribute(_bda_ctlnum_4)
@@ -196,11 +196,11 @@ def _create_da_SPCOperate_5(name, fc, parent):
     return da
 
 
-def _create_da_SPCCancel_1(name, fc, parent):
+def _create_da_spccancel_1(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
     _bda_ctlval_1 = DataAttribute("ctlVal", DataAttributeType.boolean, fc, False, da)
     da.add_data_attribute(_bda_ctlval_1)
-    _bda_origin_2 = _create_da_Originator_1("origin", fc, da)
+    _bda_origin_2 = _create_da_originator_1("origin", fc, da)
     da.add_data_attribute(_bda_origin_2)
     _bda_ctlnum_3 = DataAttribute("ctlNum", DataAttributeType.int8u, fc, 0, da)
     da.add_data_attribute(_bda_ctlnum_3)
@@ -226,7 +226,7 @@ def _create_da_SPCCancel_1(name, fc, parent):
     return da
 
 
-def _create_da_SPCCancel_5(name, fc, parent):
+def _create_da_spccancel_5(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
     _bda_ctlval_1 = DataAttribute("ctlVal", DataAttributeType.boolean, fc, False, da)
     da.add_data_attribute(_bda_ctlval_1)
@@ -247,7 +247,7 @@ def _create_da_SPCCancel_5(name, fc, parent):
         da,
     )
     da.add_data_attribute(_bda_opertm_2)
-    _bda_origin_3 = _create_da_Originator_1("origin", fc, da)
+    _bda_origin_3 = _create_da_originator_1("origin", fc, da)
     da.add_data_attribute(_bda_origin_3)
     _bda_ctlnum_4 = DataAttribute("ctlNum", DataAttributeType.int8u, fc, 0, da)
     da.add_data_attribute(_bda_ctlnum_4)
@@ -273,14 +273,14 @@ def _create_da_SPCCancel_5(name, fc, parent):
     return da
 
 
-def _create_da_AnalogueValue(name, fc, parent):
+def _create_da_analoguevalue(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
     _bda_f_1 = DataAttribute("f", DataAttributeType.float32, fc, 0.0, da)
     da.add_data_attribute(_bda_f_1)
     return da
 
 
-def _create_do_SPG_1(name, parent):
+def _create_do_spg_1(name, parent):
     do = DataObject(name, "spg", parent=parent)
     _da_setval_1 = DataAttribute(
         "setVal", DataAttributeType.boolean, FunctionalConstraint.sp, False, do
@@ -289,14 +289,14 @@ def _create_do_SPG_1(name, parent):
     return do
 
 
-def _create_do_ASG(name, parent):
+def _create_do_asg(name, parent):
     do = DataObject(name, "asg", parent=parent)
-    _da_setmag_1 = _create_da_AnalogueValue("setMag", FunctionalConstraint.sp, do)
+    _da_setmag_1 = _create_da_analoguevalue("setMag", FunctionalConstraint.sp, do)
     do.add_do_or_da(_da_setmag_1)
     return do
 
 
-def _create_do_ISP(name, parent):
+def _create_do_isp(name, parent):
     do = DataObject(name, "ins", parent=parent)
     _da_setval_1 = DataAttribute(
         "setVal", DataAttributeType.int32, FunctionalConstraint.sp, 0, do
@@ -305,7 +305,7 @@ def _create_do_ISP(name, parent):
     return do
 
 
-def _create_do_HWYE_1_HA(name, parent):
+def _create_do_hwye_1_ha(name, parent):
     do = DataObject(name, "hwye", parent=parent)
     _da_numhar_1 = DataAttribute(
         "numHar", DataAttributeType.int16u, FunctionalConstraint.cf, "16", do
@@ -328,7 +328,7 @@ def _create_do_HWYE_1_HA(name, parent):
     return do
 
 
-def _create_do_SCA_1_SchdAbsTm(name, parent):
+def _create_do_sca_1_schdabstm(name, parent):
     do = DataObject(name, "sca", parent=parent)
     _da_val_1 = DataAttribute(
         "val", DataAttributeType.float32, FunctionalConstraint.sp, 0.0, do
@@ -337,9 +337,9 @@ def _create_do_SCA_1_SchdAbsTm(name, parent):
     return do
 
 
-def _create_do_CMV_1_phsAHar(name, parent):
+def _create_do_cmv_1_phsahar(name, parent):
     do = DataObject(name, "cmv", parent=parent)
-    _da_cval_1 = _create_da_Vector("cVal", FunctionalConstraint.mx, do)
+    _da_cval_1 = _create_da_vector("cVal", FunctionalConstraint.mx, do)
     do.add_do_or_da(_da_cval_1)
     _da_q_2 = DataAttribute(
         "q",
@@ -374,7 +374,7 @@ def _create_do_CMV_1_phsAHar(name, parent):
     return do
 
 
-def _create_do_INC_1_Mod(name, parent):
+def _create_do_inc_1_mod(name, parent):
     do = DataObject(name, "inc", parent=parent)
     _da_q_1 = DataAttribute(
         "q",
@@ -417,7 +417,7 @@ def _create_do_INC_1_Mod(name, parent):
     return do
 
 
-def _create_do_INS_1_Beh(name, parent):
+def _create_do_ins_1_beh(name, parent):
     do = DataObject(name, "ins", parent=parent)
     _da_stval_1 = DataAttribute(
         "stVal", DataAttributeType.int32, FunctionalConstraint.st, 0, do
@@ -456,7 +456,7 @@ def _create_do_INS_1_Beh(name, parent):
     return do
 
 
-def _create_do_INS_64(name, parent):
+def _create_do_ins_64(name, parent):
     do = DataObject(name, "ins", parent=parent)
     _da_stval_1 = DataAttribute(
         "stVal", DataAttributeType.int64, FunctionalConstraint.st, 0, do
@@ -495,7 +495,7 @@ def _create_do_INS_64(name, parent):
     return do
 
 
-def _create_do_LPL_1_NamPlt(name, parent):
+def _create_do_lpl_1_namplt(name, parent):
     do = DataObject(name, "lpl", parent=parent)
     _da_vendor_1 = DataAttribute(
         "vendor", DataAttributeType.visString255, FunctionalConstraint.dc, "", do
@@ -520,7 +520,7 @@ def _create_do_LPL_1_NamPlt(name, parent):
     return do
 
 
-def _create_do_DPL_1_PhyNam(name, parent):
+def _create_do_dpl_1_phynam(name, parent):
     do = DataObject(name, "dpl", parent=parent)
     _da_vendor_1 = DataAttribute(
         "vendor", DataAttributeType.visString255, FunctionalConstraint.dc, "", do
@@ -529,7 +529,7 @@ def _create_do_DPL_1_PhyNam(name, parent):
     return do
 
 
-def _create_do_SPS_1_Proxy(name, parent):
+def _create_do_sps_1_proxy(name, parent):
     do = DataObject(name, "sps", parent=parent)
     _da_stval_1 = DataAttribute(
         "stVal", DataAttributeType.boolean, FunctionalConstraint.st, False, do
@@ -568,15 +568,15 @@ def _create_do_SPS_1_Proxy(name, parent):
     return do
 
 
-def _create_do_SPC_1_SPCSO8(name, parent):
+def _create_do_spc_1_spcso8(name, parent):
     do = DataObject(name, "spc", parent=parent)
-    _da_sbow_1 = _create_da_SPCOperate_5("SBOw", FunctionalConstraint.co, do)
+    _da_sbow_1 = _create_da_spcoperate_5("SBOw", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_sbow_1)
-    _da_oper_2 = _create_da_SPCOperate_5("Oper", FunctionalConstraint.co, do)
+    _da_oper_2 = _create_da_spcoperate_5("Oper", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_oper_2)
-    _da_cancel_3 = _create_da_SPCCancel_5("Cancel", FunctionalConstraint.co, do)
+    _da_cancel_3 = _create_da_spccancel_5("Cancel", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_cancel_3)
-    _da_origin_4 = _create_da_Originator_1("origin", FunctionalConstraint.st, do)
+    _da_origin_4 = _create_da_originator_1("origin", FunctionalConstraint.st, do)
     do.add_do_or_da(_da_origin_4)
     _da_ctlnum_5 = DataAttribute(
         "ctlNum", DataAttributeType.int8u, FunctionalConstraint.st, 0, do
@@ -627,11 +627,11 @@ def _create_do_SPC_1_SPCSO8(name, parent):
     return do
 
 
-def _create_do_SPC_1_SPCSO7(name, parent):
+def _create_do_spc_1_spcso7(name, parent):
     do = DataObject(name, "spc", parent=parent)
-    _da_oper_1 = _create_da_SPCOperate_5("Oper", FunctionalConstraint.co, do)
+    _da_oper_1 = _create_da_spcoperate_5("Oper", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_oper_1)
-    _da_cancel_2 = _create_da_SPCCancel_5("Cancel", FunctionalConstraint.co, do)
+    _da_cancel_2 = _create_da_spccancel_5("Cancel", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_cancel_2)
     _da_stval_3 = DataAttribute(
         "stVal", DataAttributeType.boolean, FunctionalConstraint.st, False, do
@@ -678,11 +678,11 @@ def _create_do_SPC_1_SPCSO7(name, parent):
     return do
 
 
-def _create_do_SPC_1_SPCSO3(name, parent):
+def _create_do_spc_1_spcso3(name, parent):
     do = DataObject(name, "spc", parent=parent)
-    _da_oper_1 = _create_da_SPCOperate_1("Oper", FunctionalConstraint.co, do)
+    _da_oper_1 = _create_da_spcoperate_1("Oper", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_oper_1)
-    _da_cancel_2 = _create_da_SPCCancel_1("Cancel", FunctionalConstraint.co, do)
+    _da_cancel_2 = _create_da_spccancel_1("Cancel", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_cancel_2)
     _da_stval_3 = DataAttribute(
         "stVal", DataAttributeType.boolean, FunctionalConstraint.st, False, do
@@ -729,7 +729,7 @@ def _create_do_SPC_1_SPCSO3(name, parent):
     return do
 
 
-def _create_do_MV_1_AnIn1(name, parent):
+def _create_do_mv_1_anin1(name, parent):
     do = DataObject(name, "mv", parent=parent)
     _da_mag_1 = DataAttribute(
         "mag", DataAttributeType.structure, FunctionalConstraint.mx, [], do
@@ -768,15 +768,15 @@ def _create_do_MV_1_AnIn1(name, parent):
     return do
 
 
-def _create_do_SPC_1_SPCSO6(name, parent):
+def _create_do_spc_1_spcso6(name, parent):
     do = DataObject(name, "spc", parent=parent)
     _da_sbo_1 = DataAttribute(
         "SBO", DataAttributeType.visString64, FunctionalConstraint.co, "", do
     )
     do.add_do_or_da(_da_sbo_1)
-    _da_oper_2 = _create_da_SPCOperate_5("Oper", FunctionalConstraint.co, do)
+    _da_oper_2 = _create_da_spcoperate_5("Oper", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_oper_2)
-    _da_cancel_3 = _create_da_SPCCancel_5("Cancel", FunctionalConstraint.co, do)
+    _da_cancel_3 = _create_da_spccancel_5("Cancel", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_cancel_3)
     _da_stval_4 = DataAttribute(
         "stVal", DataAttributeType.boolean, FunctionalConstraint.st, False, do
@@ -823,9 +823,9 @@ def _create_do_SPC_1_SPCSO6(name, parent):
     return do
 
 
-def _create_do_SPC_1_SPCSO5(name, parent):
+def _create_do_spc_1_spcso5(name, parent):
     do = DataObject(name, "spc", parent=parent)
-    _da_oper_1 = _create_da_SPCOperate_5("Oper", FunctionalConstraint.co, do)
+    _da_oper_1 = _create_da_spcoperate_5("Oper", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_oper_1)
     _da_stval_2 = DataAttribute(
         "stVal", DataAttributeType.boolean, FunctionalConstraint.st, False, do
@@ -869,18 +869,18 @@ def _create_do_SPC_1_SPCSO5(name, parent):
         do,
     )
     do.add_do_or_da(_da_ctlmodel_5)
-    _da_cancel_6 = _create_da_SPCCancel_1("Cancel", FunctionalConstraint.co, do)
+    _da_cancel_6 = _create_da_spccancel_1("Cancel", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_cancel_6)
     return do
 
 
-def _create_do_SPC_1_SPCSO4(name, parent):
+def _create_do_spc_1_spcso4(name, parent):
     do = DataObject(name, "spc", parent=parent)
-    _da_sbow_1 = _create_da_SPCOperate_1("SBOw", FunctionalConstraint.co, do)
+    _da_sbow_1 = _create_da_spcoperate_1("SBOw", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_sbow_1)
-    _da_oper_2 = _create_da_SPCOperate_1("Oper", FunctionalConstraint.co, do)
+    _da_oper_2 = _create_da_spcoperate_1("Oper", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_oper_2)
-    _da_cancel_3 = _create_da_SPCCancel_1("Cancel", FunctionalConstraint.co, do)
+    _da_cancel_3 = _create_da_spccancel_1("Cancel", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_cancel_3)
     _da_stval_4 = DataAttribute(
         "stVal", DataAttributeType.boolean, FunctionalConstraint.st, False, do
@@ -927,7 +927,7 @@ def _create_do_SPC_1_SPCSO4(name, parent):
     return do
 
 
-def _create_do_LPL_2_NamPlt(name, parent):
+def _create_do_lpl_2_namplt(name, parent):
     do = DataObject(name, "lpl", parent=parent)
     _da_vendor_1 = DataAttribute(
         "vendor", DataAttributeType.visString255, FunctionalConstraint.dc, "", do
@@ -948,15 +948,15 @@ def _create_do_LPL_2_NamPlt(name, parent):
     return do
 
 
-def _create_do_SPC_1_SPCSO2(name, parent):
+def _create_do_spc_1_spcso2(name, parent):
     do = DataObject(name, "spc", parent=parent)
     _da_sbo_1 = DataAttribute(
         "SBO", DataAttributeType.visString64, FunctionalConstraint.co, "", do
     )
     do.add_do_or_da(_da_sbo_1)
-    _da_oper_2 = _create_da_SPCOperate_1("Oper", FunctionalConstraint.co, do)
+    _da_oper_2 = _create_da_spcoperate_1("Oper", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_oper_2)
-    _da_cancel_3 = _create_da_SPCCancel_1("Cancel", FunctionalConstraint.co, do)
+    _da_cancel_3 = _create_da_spccancel_1("Cancel", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_cancel_3)
     _da_stval_4 = DataAttribute(
         "stVal", DataAttributeType.boolean, FunctionalConstraint.st, False, do
@@ -1007,9 +1007,9 @@ def _create_do_SPC_1_SPCSO2(name, parent):
     return do
 
 
-def _create_do_SPC_1_SPCSO1(name, parent):
+def _create_do_spc_1_spcso1(name, parent):
     do = DataObject(name, "spc", parent=parent)
-    _da_oper_1 = _create_da_SPCOperate_1("Oper", FunctionalConstraint.co, do)
+    _da_oper_1 = _create_da_spcoperate_1("Oper", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_oper_1)
     _da_stval_2 = DataAttribute(
         "stVal", DataAttributeType.boolean, FunctionalConstraint.st, False, do
@@ -1063,28 +1063,28 @@ def _create_do_by_cdc(name: str, cdc: str | None, parent):
 
 def _create_do_by_typeref(name: str, type_ref, cdc, parent):
     _dispatcher = {
-        "SPG_1": _create_do_SPG_1,
-        "ASG": _create_do_ASG,
-        "ISP": _create_do_ISP,
-        "HWYE_1_HA": _create_do_HWYE_1_HA,
-        "SCA_1_SchdAbsTm": _create_do_SCA_1_SchdAbsTm,
-        "CMV_1_phsAHar": _create_do_CMV_1_phsAHar,
-        "INC_1_Mod": _create_do_INC_1_Mod,
-        "INS_1_Beh": _create_do_INS_1_Beh,
-        "INS_64": _create_do_INS_64,
-        "LPL_1_NamPlt": _create_do_LPL_1_NamPlt,
-        "DPL_1_PhyNam": _create_do_DPL_1_PhyNam,
-        "SPS_1_Proxy": _create_do_SPS_1_Proxy,
-        "SPC_1_SPCSO8": _create_do_SPC_1_SPCSO8,
-        "SPC_1_SPCSO7": _create_do_SPC_1_SPCSO7,
-        "SPC_1_SPCSO3": _create_do_SPC_1_SPCSO3,
-        "MV_1_AnIn1": _create_do_MV_1_AnIn1,
-        "SPC_1_SPCSO6": _create_do_SPC_1_SPCSO6,
-        "SPC_1_SPCSO5": _create_do_SPC_1_SPCSO5,
-        "SPC_1_SPCSO4": _create_do_SPC_1_SPCSO4,
-        "LPL_2_NamPlt": _create_do_LPL_2_NamPlt,
-        "SPC_1_SPCSO2": _create_do_SPC_1_SPCSO2,
-        "SPC_1_SPCSO1": _create_do_SPC_1_SPCSO1,
+        "SPG_1": _create_do_spg_1,
+        "ASG": _create_do_asg,
+        "ISP": _create_do_isp,
+        "HWYE_1_HA": _create_do_hwye_1_ha,
+        "SCA_1_SchdAbsTm": _create_do_sca_1_schdabstm,
+        "CMV_1_phsAHar": _create_do_cmv_1_phsahar,
+        "INC_1_Mod": _create_do_inc_1_mod,
+        "INS_1_Beh": _create_do_ins_1_beh,
+        "INS_64": _create_do_ins_64,
+        "LPL_1_NamPlt": _create_do_lpl_1_namplt,
+        "DPL_1_PhyNam": _create_do_dpl_1_phynam,
+        "SPS_1_Proxy": _create_do_sps_1_proxy,
+        "SPC_1_SPCSO8": _create_do_spc_1_spcso8,
+        "SPC_1_SPCSO7": _create_do_spc_1_spcso7,
+        "SPC_1_SPCSO3": _create_do_spc_1_spcso3,
+        "MV_1_AnIn1": _create_do_mv_1_anin1,
+        "SPC_1_SPCSO6": _create_do_spc_1_spcso6,
+        "SPC_1_SPCSO5": _create_do_spc_1_spcso5,
+        "SPC_1_SPCSO4": _create_do_spc_1_spcso4,
+        "LPL_2_NamPlt": _create_do_lpl_2_namplt,
+        "SPC_1_SPCSO2": _create_do_spc_1_spcso2,
+        "SPC_1_SPCSO1": _create_do_spc_1_spcso1,
     }
     fn = _dispatcher.get(type_ref)
     if fn:

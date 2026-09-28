@@ -803,7 +803,7 @@ function defaultValueLiteralForType(daType, indent = 4) {
 
 function emitDaTypeFunctions(lines, templates, iedOverrides, parentPath = []) {
   Object.entries(templates.daTypes).forEach(([daTypeId, daTypeDef]) => {
-    const fnSuffix = safeIdentifier(normalizeTypeRef(daTypeId));
+    const fnSuffix = safeIdentifier(normalizeTypeRef(daTypeId)).toLowerCase();
     const fnName = `_create_da_${fnSuffix}`;
 
     lines.push(`def ${fnName}(name, fc, parent):`);
@@ -816,7 +816,7 @@ function emitDaTypeFunctions(lines, templates, iedOverrides, parentPath = []) {
       const resolvedVal = resolveDaValue(bdaPath, iedOverrides, bda.val);
 
       if (isStructRef) {
-        const childFnSuffix = safeIdentifier(normalizeTypeRef(bda.typeRef));
+        const childFnSuffix = safeIdentifier(normalizeTypeRef(bda.typeRef)).toLowerCase();
         lines.push(`    ${bdaVar} = _create_da_${childFnSuffix}(${toPythonLiteral(bda.name || 'BDA')}, fc, da)`);
       } else {
         const bdaType = bda.dataAttributeType || 'structure';
@@ -838,7 +838,7 @@ function emitDoTypeFunctions(lines, templates, iedOverrides) {
 
   Object.entries(templates.doTypes).forEach(([doTypeId, doTypeDef]) => {
     const normalizedTypeRef = normalizeTypeRef(doTypeId);
-    const fnSuffix = safeIdentifier(normalizedTypeRef);
+    const fnSuffix = safeIdentifier(normalizedTypeRef).toLowerCase();
     const fnName = `_create_do_${fnSuffix}`;
     dispatcherEntries.push({ typeRef: normalizedTypeRef, fnName });
 
@@ -853,7 +853,7 @@ function emitDoTypeFunctions(lines, templates, iedOverrides) {
       const resolvedVal = resolveDaValue(daPath, iedOverrides, da.val);
 
       if (isStructRef) {
-        const childFnSuffix = safeIdentifier(normalizeTypeRef(da.typeRef));
+        const childFnSuffix = safeIdentifier(normalizeTypeRef(da.typeRef)).toLowerCase();
         lines.push(`    ${daVar} = _create_da_${childFnSuffix}(${toPythonLiteral(da.name || 'DA')}, ${fcExpr}, do)`);
       } else {
         const daType = da.dataAttributeType || 'structure';

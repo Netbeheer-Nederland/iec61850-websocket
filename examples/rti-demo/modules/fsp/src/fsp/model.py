@@ -83,7 +83,7 @@ FC_TO_ENUM_NAME = {
 }
 
 
-def _create_da_Originator(name, fc, parent):
+def _create_da_originator(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
     _bda_orcat_1 = DataAttribute("orCat", DataAttributeType.enumerated, fc, 0, da)
     da.add_data_attribute(_bda_orcat_1)
@@ -94,11 +94,11 @@ def _create_da_Originator(name, fc, parent):
     return da
 
 
-def _create_da_OperINT32(name, fc, parent):
+def _create_da_operint32(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
     _bda_ctlval_1 = DataAttribute("ctlVal", DataAttributeType.int32, fc, 0, da)
     da.add_data_attribute(_bda_ctlval_1)
-    _bda_origin_2 = _create_da_Originator("origin", fc, da)
+    _bda_origin_2 = _create_da_originator("origin", fc, da)
     da.add_data_attribute(_bda_origin_2)
     _bda_ctlnum_3 = DataAttribute("ctlNum", DataAttributeType.int8u, fc, 0, da)
     da.add_data_attribute(_bda_ctlnum_3)
@@ -132,7 +132,7 @@ def _create_da_OperINT32(name, fc, parent):
     return da
 
 
-def _create_da_Unit(name, fc, parent):
+def _create_da_unit(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
     _bda_siunit_1 = DataAttribute("SIUnit", DataAttributeType.enumerated, fc, 0, da)
     da.add_data_attribute(_bda_siunit_1)
@@ -143,11 +143,11 @@ def _create_da_Unit(name, fc, parent):
     return da
 
 
-def _create_da_OperAnalog(name, fc, parent):
+def _create_da_operanalog(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
-    _bda_ctlval_1 = _create_da_AnalogueValue("ctlVal", fc, da)
+    _bda_ctlval_1 = _create_da_analoguevalue("ctlVal", fc, da)
     da.add_data_attribute(_bda_ctlval_1)
-    _bda_origin_2 = _create_da_Originator("origin", fc, da)
+    _bda_origin_2 = _create_da_originator("origin", fc, da)
     da.add_data_attribute(_bda_origin_2)
     _bda_ctlnum_3 = DataAttribute("ctlNum", DataAttributeType.int8u, fc, 0, da)
     da.add_data_attribute(_bda_ctlnum_3)
@@ -181,27 +181,27 @@ def _create_da_OperAnalog(name, fc, parent):
     return da
 
 
-def _create_da_AnalogueValue(name, fc, parent):
+def _create_da_analoguevalue(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
     _bda_f_1 = DataAttribute("f", DataAttributeType.float32, fc, 0.0, da)
     da.add_data_attribute(_bda_f_1)
     return da
 
 
-def _create_da_Vector(name, fc, parent):
+def _create_da_vector(name, fc, parent):
     da = DataAttribute(name, DataAttributeType.structure, fc, [], parent)
-    _bda_mag_1 = _create_da_AnalogueValue("mag", fc, da)
+    _bda_mag_1 = _create_da_analoguevalue("mag", fc, da)
     da.add_data_attribute(_bda_mag_1)
     return da
 
 
-def _create_do_ING(name, parent):
+def _create_do_ing(name, parent):
     do = DataObject(name, "ing", parent=parent)
     _da_setval_1 = DataAttribute(
         "setVal", DataAttributeType.int32, FunctionalConstraint.sp, 0, do
     )
     do.add_do_or_da(_da_setval_1)
-    _da_units_2 = _create_da_Unit("units", FunctionalConstraint.cf, do)
+    _da_units_2 = _create_da_unit("units", FunctionalConstraint.cf, do)
     do.add_do_or_da(_da_units_2)
     _da_datans_3 = DataAttribute(
         "dataNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do
@@ -210,11 +210,11 @@ def _create_do_ING(name, parent):
     return do
 
 
-def _create_do_ASG(name, parent):
+def _create_do_asg(name, parent):
     do = DataObject(name, "asg", parent=parent)
-    _da_setmag_1 = _create_da_AnalogueValue("setMag", FunctionalConstraint.sp, do)
+    _da_setmag_1 = _create_da_analoguevalue("setMag", FunctionalConstraint.sp, do)
     do.add_do_or_da(_da_setmag_1)
-    _da_units_2 = _create_da_Unit("units", FunctionalConstraint.cf, do)
+    _da_units_2 = _create_da_unit("units", FunctionalConstraint.cf, do)
     do.add_do_or_da(_da_units_2)
     _da_datans_3 = DataAttribute(
         "dataNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do
@@ -223,7 +223,7 @@ def _create_do_ASG(name, parent):
     return do
 
 
-def _create_do_DERStateKind_ENS(name, parent):
+def _create_do_derstatekind_ens(name, parent):
     do = DataObject(name, "ens", parent=parent)
     _da_stval_1 = DataAttribute(
         "stVal", DataAttributeType.enumerated, FunctionalConstraint.st, 0, do
@@ -262,7 +262,7 @@ def _create_do_DERStateKind_ENS(name, parent):
     return do
 
 
-def _create_do_ens_HealthKind(name, parent):
+def _create_do_ens_healthkind(name, parent):
     do = DataObject(name, "ens", parent=parent)
     _da_stval_1 = DataAttribute(
         "stVal", DataAttributeType.enumerated, FunctionalConstraint.st, 0, do
@@ -301,7 +301,7 @@ def _create_do_ens_HealthKind(name, parent):
     return do
 
 
-def _create_do_DPL(name, parent):
+def _create_do_dpl(name, parent):
     do = DataObject(name, "dpl", parent=parent)
     _da_vendor_1 = DataAttribute(
         "vendor", DataAttributeType.visString255, FunctionalConstraint.dc, "", do
@@ -330,7 +330,7 @@ def _create_do_DPL(name, parent):
     return do
 
 
-def _create_do_SPS(name, parent):
+def _create_do_sps(name, parent):
     do = DataObject(name, "sps", parent=parent)
     _da_stval_1 = DataAttribute(
         "stVal", DataAttributeType.boolean, FunctionalConstraint.st, False, do
@@ -369,7 +369,7 @@ def _create_do_SPS(name, parent):
     return do
 
 
-def _create_do_ens_BehaviourModeKind(name, parent):
+def _create_do_ens_behaviourmodekind(name, parent):
     do = DataObject(name, "ens", parent=parent)
     _da_stval_1 = DataAttribute(
         "stVal", DataAttributeType.enumerated, FunctionalConstraint.st, 0, do
@@ -408,7 +408,7 @@ def _create_do_ens_BehaviourModeKind(name, parent):
     return do
 
 
-def _create_do_enc_BehaviourModeKind(name, parent):
+def _create_do_enc_behaviourmodekind(name, parent):
     do = DataObject(name, "enc", parent=parent)
     _da_stval_1 = DataAttribute(
         "stVal", DataAttributeType.enumerated, FunctionalConstraint.st, 0, do
@@ -455,7 +455,7 @@ def _create_do_enc_BehaviourModeKind(name, parent):
     return do
 
 
-def _create_do_LPL(name, parent):
+def _create_do_lpl(name, parent):
     do = DataObject(name, "lpl", parent=parent)
     _da_vendor_1 = DataAttribute(
         "vendor", DataAttributeType.visString255, FunctionalConstraint.dc, "", do
@@ -488,7 +488,7 @@ def _create_do_LPL(name, parent):
     return do
 
 
-def _create_do_LPL_420(name, parent):
+def _create_do_lpl_420(name, parent):
     do = DataObject(name, "lpl", parent=parent)
     _da_vendor_1 = DataAttribute(
         "vendor", DataAttributeType.visString255, FunctionalConstraint.dc, "", do
@@ -513,9 +513,9 @@ def _create_do_LPL_420(name, parent):
     return do
 
 
-def _create_do_MV(name, parent):
+def _create_do_mv(name, parent):
     do = DataObject(name, "mv", parent=parent)
-    _da_mag_1 = _create_da_AnalogueValue("mag", FunctionalConstraint.mx, do)
+    _da_mag_1 = _create_da_analoguevalue("mag", FunctionalConstraint.mx, do)
     do.add_do_or_da(_da_mag_1)
     _da_q_2 = DataAttribute(
         "q",
@@ -547,14 +547,14 @@ def _create_do_MV(name, parent):
         do,
     )
     do.add_do_or_da(_da_t_3)
-    _da_units_4 = _create_da_Unit("units", FunctionalConstraint.cf, do)
+    _da_units_4 = _create_da_unit("units", FunctionalConstraint.cf, do)
     do.add_do_or_da(_da_units_4)
     return do
 
 
-def _create_do_CMV(name, parent):
+def _create_do_cmv(name, parent):
     do = DataObject(name, "cmv", parent=parent)
-    _da_cval_1 = _create_da_Vector("cVal", FunctionalConstraint.mx, do)
+    _da_cval_1 = _create_da_vector("cVal", FunctionalConstraint.mx, do)
     do.add_do_or_da(_da_cval_1)
     _da_q_2 = DataAttribute(
         "q",
@@ -586,12 +586,12 @@ def _create_do_CMV(name, parent):
         do,
     )
     do.add_do_or_da(_da_t_3)
-    _da_units_4 = _create_da_Unit("units", FunctionalConstraint.cf, do)
+    _da_units_4 = _create_da_unit("units", FunctionalConstraint.cf, do)
     do.add_do_or_da(_da_units_4)
     return do
 
 
-def _create_do_WYE(name, parent):
+def _create_do_wye(name, parent):
     do = DataObject(name, "wye", parent=parent)
     _sdo_phsa_1 = _create_do_by_typeref("phsA", "CMV", "CMV", do)
     do.add_do_or_da(_sdo_phsa_1)
@@ -602,7 +602,7 @@ def _create_do_WYE(name, parent):
     return do
 
 
-def _create_do_DEL(name, parent):
+def _create_do_del(name, parent):
     do = DataObject(name, "del", parent=parent)
     _sdo_phsab_1 = _create_do_by_typeref("phsAB", "CMV", "CMV", do)
     do.add_do_or_da(_sdo_phsab_1)
@@ -613,11 +613,11 @@ def _create_do_DEL(name, parent):
     return do
 
 
-def _create_do_APC(name, parent):
+def _create_do_apc(name, parent):
     do = DataObject(name, "apc", parent=parent)
-    _da_oper_1 = _create_da_OperAnalog("Oper", FunctionalConstraint.co, do)
+    _da_oper_1 = _create_da_operanalog("Oper", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_oper_1)
-    _da_mxval_2 = _create_da_AnalogueValue("mxVal", FunctionalConstraint.mx, do)
+    _da_mxval_2 = _create_da_analoguevalue("mxVal", FunctionalConstraint.mx, do)
     do.add_do_or_da(_da_mxval_2)
     _da_q_3 = DataAttribute(
         "q",
@@ -649,7 +649,7 @@ def _create_do_APC(name, parent):
         do,
     )
     do.add_do_or_da(_da_t_4)
-    _da_units_5 = _create_da_Unit("units", FunctionalConstraint.cf, do)
+    _da_units_5 = _create_da_unit("units", FunctionalConstraint.cf, do)
     do.add_do_or_da(_da_units_5)
     _da_ctlmodel_6 = DataAttribute(
         "ctlModel",
@@ -662,9 +662,9 @@ def _create_do_APC(name, parent):
     return do
 
 
-def _create_do_INC(name, parent):
+def _create_do_inc(name, parent):
     do = DataObject(name, "inc", parent=parent)
-    _da_oper_1 = _create_da_OperINT32("Oper", FunctionalConstraint.co, do)
+    _da_oper_1 = _create_da_operint32("Oper", FunctionalConstraint.co, do)
     do.add_do_or_da(_da_oper_1)
     _da_stval_2 = DataAttribute(
         "stVal", DataAttributeType.int32, FunctionalConstraint.st, 0, do
@@ -726,22 +726,22 @@ def _create_do_by_cdc(name: str, cdc: str | None, parent):
 
 def _create_do_by_typeref(name: str, type_ref, cdc, parent):
     _dispatcher = {
-        "ING": _create_do_ING,
-        "ASG": _create_do_ASG,
-        "DERStateKind_ENS": _create_do_DERStateKind_ENS,
-        "ens_HealthKind": _create_do_ens_HealthKind,
-        "DPL": _create_do_DPL,
-        "SPS": _create_do_SPS,
-        "ens_BehaviourModeKind": _create_do_ens_BehaviourModeKind,
-        "enc_BehaviourModeKind": _create_do_enc_BehaviourModeKind,
-        "LPL": _create_do_LPL,
-        "LPL_420": _create_do_LPL_420,
-        "MV": _create_do_MV,
-        "CMV": _create_do_CMV,
-        "WYE": _create_do_WYE,
-        "DEL": _create_do_DEL,
-        "APC": _create_do_APC,
-        "INC": _create_do_INC,
+        "ING": _create_do_ing,
+        "ASG": _create_do_asg,
+        "DERStateKind_ENS": _create_do_derstatekind_ens,
+        "ens_HealthKind": _create_do_ens_healthkind,
+        "DPL": _create_do_dpl,
+        "SPS": _create_do_sps,
+        "ens_BehaviourModeKind": _create_do_ens_behaviourmodekind,
+        "enc_BehaviourModeKind": _create_do_enc_behaviourmodekind,
+        "LPL": _create_do_lpl,
+        "LPL_420": _create_do_lpl_420,
+        "MV": _create_do_mv,
+        "CMV": _create_do_cmv,
+        "WYE": _create_do_wye,
+        "DEL": _create_do_del,
+        "APC": _create_do_apc,
+        "INC": _create_do_inc,
     }
     fn = _dispatcher.get(type_ref)
     if fn:
