@@ -41,7 +41,13 @@ from fastapi.responses import JSONResponse
 
 from bff.bffClient import BffClient
 from bff.ConnectionManager import ConnectionManager
-from bff.pydantic_models import *
+from bff.pydantic_models import (
+    ConnectionCreateRequest,
+    ConnectionUpdateRequest,
+    ExecuteRequest,
+    OAUTHConnectionCreateConfigRequest,
+    TLSConnectionCreateConfigRequest,
+)
 
 # Global state
 _bff_clients: dict[str, BffClient] = {}
