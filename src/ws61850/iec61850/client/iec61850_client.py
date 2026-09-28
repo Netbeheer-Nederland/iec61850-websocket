@@ -525,7 +525,7 @@ class IEC61850Client:
                         extracted_data_type = data_tuple[0]
                         extracted_value = data_tuple[1]
                     callback(obj_ref, extracted_value, fc, extracted_data_type, result)
-                 
+
                 websocket_info.invoke_id += 1
                 return result
             else:

@@ -114,7 +114,7 @@ class PassiveEndpoint:
         # Define close_on_expiry as a bound method that can be passed safely
         # We'll set it up after the object is fully initialized
         self._close_on_expiry_bound = lambda ws, exp: self._close_on_expiry_impl(ws, exp)
-        
+
         self._assoc_handler = AssociationHandler(
             kc_cert=kc_cert,
             own_cert=own_cert,
