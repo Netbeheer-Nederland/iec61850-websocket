@@ -145,7 +145,7 @@ def create_apc_do(name: str, parent):
     da_origin = DataAttribute("origin", DataAttributeType.structure, FunctionalConstraint.co, [], da_oper)
 
     da_orCat = DataAttribute("orCat", DataAttributeType.enumerated, FunctionalConstraint.co, 0, da_origin)
-    da_orIdent = DataAttribute("orIdent", DataAttributeType.octetString, FunctionalConstraint.co, bytes(), da_origin)
+    da_orIdent = DataAttribute("orIdent", DataAttributeType.octetString, FunctionalConstraint.co, b"", da_origin)
 
     da_origin.add_data_attribute(da_orCat)
     da_origin.add_data_attribute(da_orIdent)
@@ -223,7 +223,7 @@ def create_inc_do(name: str, parent):
     da_origin = DataAttribute("origin", DataAttributeType.structure, FunctionalConstraint.co, [], da_oper)
 
     da_orCat = DataAttribute("orCat", DataAttributeType.enumerated, FunctionalConstraint.co, 0, da_origin)
-    da_orIdent = DataAttribute("orIdent", DataAttributeType.octetString, FunctionalConstraint.co, bytes(), da_origin)
+    da_orIdent = DataAttribute("orIdent", DataAttributeType.octetString, FunctionalConstraint.co, b"", da_origin)
 
     da_origin.add_data_attribute(da_orCat)
     da_origin.add_data_attribute(da_orIdent)
