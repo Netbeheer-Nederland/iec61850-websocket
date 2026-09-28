@@ -109,11 +109,6 @@ class ControlService:
                 invoke_id, associate_id, False, ControlServiceStatusKind.inconsistentParameters.name, None
             ), None
 
-        server_control_obj = next(
-            (co for co in self._control_objects
-             if co.data_object.get_objRef() == control_do.get_objRef()),
-            None,
-        )
         control_da = next((da for da in operate_item.data_attributes if da.name == "ctlVal"), None)
         if control_da is None:
             return create_tpaa_response_operate(

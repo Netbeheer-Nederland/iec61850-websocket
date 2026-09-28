@@ -326,7 +326,6 @@ class IEC61850Server:
         Function checks if a report needs to be sent following a value change
         """
         try:
-            ied = self.ied_model
             for server_report_control in self.server_report_controls:
                 if server_report_control.rptEna:
                     try:
@@ -436,7 +435,6 @@ class IEC61850Server:
         Function used for analyzing the request and sending the correct response accordingly
         """
         websocket = websocket_info.websocket
-        ied = self.ied_model
         maxMessageSize_client = 65000
         decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
         associate_id = cp
