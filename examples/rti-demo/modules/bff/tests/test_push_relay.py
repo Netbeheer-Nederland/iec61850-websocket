@@ -49,7 +49,7 @@ pytestmark = pytest.mark.unit
 
 
 class FakeBffClient:
-    """Stand-in for bffClient.BffClient: records calls, returns canned data."""
+    """Stand-in for bff_client.BffClient: records calls, returns canned data."""
 
     def __init__(self, responses=None, raises=None):
         self.responses = responses or {}

@@ -37,7 +37,7 @@ _tmp_connections_file.write_text("[]", encoding="utf-8")
 os.environ.setdefault("BFF_CONNECTIONS_FILE", str(_tmp_connections_file))
 
 from bff import bff_server  # noqa: E402 - must follow the env var default above
-from bff.ConnectionManager import ConnectionManager  # noqa: E402
+from bff.connection_manager import ConnectionManager  # noqa: E402
 
 pytestmark = pytest.mark.unit
 

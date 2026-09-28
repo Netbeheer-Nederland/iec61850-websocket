@@ -42,7 +42,7 @@ from datetime import datetime
 
 import httpx2 as httpx
 
-from bff.bffClient import BffClient
+from bff.bff_client import BffClient
 
 
 class ConnectionManager:

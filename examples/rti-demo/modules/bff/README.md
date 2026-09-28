@@ -100,8 +100,8 @@ Note: The FSP and SO services use WebSocket internally for ACSI communication, b
 bff/
 +-- __pycache__/              # Python cache files (generated)
 +-- bff_server.py            # Main FastAPI application (1256 lines)
-+-- ConnectionManager.py      # Manages connections to RTI endpoints (388 lines)
-+-- bffClient.py             # HTTP client for BFF-to-backend communication (24 lines)
++-- connection_manager.py      # Manages connections to RTI endpoints (388 lines)
++-- bff_client.py             # HTTP client for BFF-to-backend communication (24 lines)
 +-- pydantic_models.py       # Request/Response data models (93 lines)
 +-- connections.json         # Persistent connection configurations
 +-- README.md                # This file
@@ -178,7 +178,7 @@ When HMI calls /api/reconfig-oauth, BFF automatically enriches request with OAut
 - Port: 5000 (default)
 - Route groups: Health, Endpoints, Connections, Data, Operate, Execute, Reports, Stats
 
-### 2. ConnectionManager.py
+### 2. connection_manager.py
 - Manages all connections to RTI endpoints
 - Connection types: RTI-FSP, RTI-SO, IDP-Server
 - Features: Load/save connections, add/update/delete, health monitoring, auto-discovery
@@ -187,7 +187,7 @@ When HMI calls /api/reconfig-oauth, BFF automatically enriches request with OAut
 - Executes data operations against connected endpoints
 - Methods: call_remote_service, read_data, write_data, operate
 
-### 4. bffClient.py
+### 4. bff_client.py
 - HTTP client wrapper for BFF-to-backend communication
 - Connection pooling, error handling, JSON parsing
 

@@ -41,8 +41,8 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from bff.bffClient import BffClient
-from bff.ConnectionManager import ConnectionManager
+from bff.bff_client import BffClient
+from bff.connection_manager import ConnectionManager
 from bff.pydantic_models import (
     ConnectionCreateRequest,
     ConnectionUpdateRequest,
