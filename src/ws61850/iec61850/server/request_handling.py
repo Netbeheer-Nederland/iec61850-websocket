@@ -169,11 +169,11 @@ def find_do_with_ref(data_ref, ied):
     return return_do, seg_ref
 
 
-def look_in_da_or_do_list(seg_ref, foundDO):
+def look_in_da_or_do_list(seg_ref, found_do):
     """
     Find an item in a Data Object do_or_da_list
     """
-    found_obj = foundDO
+    found_obj = found_do
     for ref_index, ref_item in enumerate(seg_ref):
         if isinstance(found_obj, DataObject):
             found_item = next(
@@ -260,13 +260,13 @@ def extract_ctlVal_from_operate_request(tpaa_tuple):
         raise ValueError("Invalid TPAA structure for dataRef") from e
 
 
-def create_subDataDefinition_list(subDo_list):
+def create_subDataDefinition_list(sub_do_list):
     """
     Create the list of sub data definition to use inside getDataDefinition Response
     """
     return_list = []
     primary_da = []
-    for sdo_item in subDo_list:
+    for sdo_item in sub_do_list:
         input_data = {
             "name": sdo_item.name,
             "cdc": sdo_item.cdc,
@@ -301,14 +301,14 @@ def create_DataAttributeDefinition_list(da_list):
     return return_list
 
 
-def get_octetString_size(mmsValue):
+def get_octetString_size(mms_value):
     """
     Get the size of an Octet String
     """
-    if mmsValue is None:
+    if mms_value is None:
         return 0
     else:
-        return len(mmsValue)
+        return len(mms_value)
 
 
 def get_structure_value_def(da_item: DataAttribute):
@@ -387,8 +387,8 @@ def set_check_val(item, value):
     for da_index, da_item in enumerate(item.data_attributes):
         da_item.mmsValue = value[1][da_item.name]
 
-def convert_value(type_name, raw_str, TYPE_MAP):
-    expected_type = TYPE_MAP.get(type_name)
+def convert_value(type_name, raw_str, type_map):
+    expected_type = type_map.get(type_name)
     if expected_type is None:
         print(f"Unknown type: {type_name}")
         return False, None

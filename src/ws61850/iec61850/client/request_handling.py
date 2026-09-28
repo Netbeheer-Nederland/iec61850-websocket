@@ -150,7 +150,9 @@ def create_tpaa_request_getDataSetDirectoryRequest(invoke_id, associate_id, serv
     )
 
 
-def create_tpaa_request_getLogicalNodeDirectory(invoke_id, associate_id, service_data, aCSIClass):
+def create_tpaa_request_getLogicalNodeDirectory(
+    invoke_id, associate_id, service_data, aCSIClass  # noqa: N803 - matches the ASN.1 grammar's own field name
+):
     """
     Creates a Two-Party Application Association request to retrieve the list of objects within a specific logical node.
     """
@@ -330,7 +332,9 @@ def create_tpaa_request_getDataDefinition(invoke_id, associate_id, service_data)
     )
 
 
-def create_tpaa_request_getDataValues(invoke_id, associate_id, service_data, includeElementName):
+def create_tpaa_request_getDataValues(
+    invoke_id, associate_id, service_data, includeElementName  # noqa: N803 - matches the ASN.1 grammar's own field name
+):
     """
     Creates a Two-Party Application Association request to retrieve the current values of a specific object.
     """

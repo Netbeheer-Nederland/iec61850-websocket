@@ -180,11 +180,11 @@ class IEC61850Server:
             return True
         return False
 
-    def look_in_da_or_do_list(self, seg_ref, foundDO):
+    def look_in_da_or_do_list(self, seg_ref, found_do):
         """
         Find an item in a Data Object do_or_da_list
         """
-        found_obj = foundDO
+        found_obj = found_do
         for ref_index, ref_item in enumerate(seg_ref):
             if isinstance(found_obj, DataObject):
                 found_item = next(

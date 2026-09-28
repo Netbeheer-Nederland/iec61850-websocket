@@ -706,9 +706,9 @@ class IEC61850Client:
             return None
 
     class ClientReportControlBlock:
-        def __init__(self, objectReference, isBuffered):
-            self.objectReference = objectReference
-            self.isBuffered = isBuffered
+        def __init__(self, object_reference, is_buffered):
+            self.objectReference = object_reference
+            self.isBuffered = is_buffered
             self.rptId = None
             self.rptEna = None
             self.resv = None

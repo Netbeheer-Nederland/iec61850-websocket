@@ -66,7 +66,7 @@ class ModelNode:
 class LogicalDevice(ModelNode):
     """Represents a Logical Device (LD)."""
 
-    def __init__(self, name: str, ldName: str, parent=None):
+    def __init__(self, name: str, ldName: str, parent=None):  # noqa: N803 - IEC 61850 LDevice's ldName attribute
         super().__init__(name=name, parent=parent)
         self.ldName = ldName
         self.logical_nodes: list[LogicalNode] = []
