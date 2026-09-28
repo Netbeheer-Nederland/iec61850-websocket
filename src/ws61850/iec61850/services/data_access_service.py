@@ -17,7 +17,7 @@
 
 import re
 
-from ws61850.iec61850.data_model.ied_model import DataAttribute, DataAttributeType, DataObject, FunctionalConstraint
+from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, FunctionalConstraint
 from ws61850.iec61850.server.request_handling import (
     assign_da_item,
     assign_do_item,

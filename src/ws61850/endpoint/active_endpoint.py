@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import jwt as pyjwt  # avoid name clash if 'jwt' variable exists nearby
 
 import asyncio
 import datetime
@@ -23,7 +22,6 @@ import logging
 import websockets
 import websockets.exceptions
 
-from ws61850.security.oauth import get_access_token
 from ws61850.asn1.encode_decode import decode_tpaa_message, encode_tpaa_message
 from ws61850.endpoint.association_handler import (
     ACTION_ABORT,
@@ -38,16 +36,13 @@ from ws61850.shared.extractors import (
     retrieve_associate_id_from_decoded_msg,
     retrieve_max_outstanding_calls_from_decoded_msg,
 )
-from ws61850.security.tls import build_tls_context, build_tls_context_from_strings
+from ws61850.security.tls import build_tls_context_from_strings
 from ws61850.transport.reconnect import ReconnectPolicy
 from ws61850.security.oauth2.client_credentials import ClientCredentialsProvider
 
 import tempfile
 import os
 
-import base64
-import json
-import time as _time
 
 logger = logging.getLogger(__name__)
 

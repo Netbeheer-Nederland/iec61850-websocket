@@ -38,7 +38,7 @@ from ws61850.endpoint.connection_router import ConnectionRouter
 from ws61850.iec61850.client.request_handling import create_tpaa_associate_request
 from ws61850.security.oauth2.jwks import JwksCache
 from ws61850.security.oauth2.validator import JwtValidator
-from ws61850.security.tls import build_tls_context, build_tls_context_from_strings
+from ws61850.security.tls import build_tls_context_from_strings
 from ws61850.shared.extractors import (
     extract_associate_request_type,
     retrieve_associate_id_from_decoded_msg,
@@ -46,7 +46,6 @@ from ws61850.shared.extractors import (
 )
 
 import tempfile
-import os
 
 logger = logging.getLogger(__name__)
 

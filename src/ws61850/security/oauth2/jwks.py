@@ -16,7 +16,6 @@
 # limitations under the License.
 
 import logging
-import ssl
 
 import requests
 from jwt import algorithms

@@ -26,7 +26,6 @@ from ws61850.iec61850.server.request_handling import (
 from ws61850.iec61850.server.response_handling import (
     create_tpaa_response_operate,
     create_tpaa_response_select,
-    create_tpaa_service_error_response,
 )
 from ws61850.iec61850.server.service_error import ServiceStatusKind
 
@@ -127,7 +126,6 @@ class ControlService:
         ctlVal_request = extract_ctlVal_from_operate_request(decoded_message)
 
         handler_fn, handler_param = control_handler
-        from ws61850.iec61850.server.iec61850_server import IEC61850Server
         ctl_val = {"type": control_da.type.name, "value": ctlVal_request}
         result, error = handler_fn(control_da.get_objRef(), ctl_val, handler_param)
 

@@ -21,12 +21,11 @@ import sys
 from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.server.request_handling import (
-    print_direct_da,
-    print_node,
     retrieve_attributes_sdo,
     retrieve_das,
     retrieve_sdos,
 )
+from ws61850.shared.tree_render import print_direct_da, print_node
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
