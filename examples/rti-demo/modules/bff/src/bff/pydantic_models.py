@@ -294,7 +294,7 @@ class ExecuteRequest(BaseModel):
 class DataReadRequest(BaseModel):
     """Request body for reading data from an endpoint."""
 
-    objRef: str = Field(
+    obj_ref: str = Field(
         ...,
         description="Object reference in IEC61850 format",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"},
@@ -304,7 +304,7 @@ class DataReadRequest(BaseModel):
 class DataWriteRequest(BaseModel):
     """Request body for writing data to an endpoint."""
 
-    objRef: str = Field(
+    obj_ref: str = Field(
         ...,
         description="Object reference in IEC61850 format",
         json_schema_extra={"example": "LD0/LLN0$ST$Mod"},
@@ -323,12 +323,12 @@ class DiscoveryRequest(BaseModel):
         json_schema_extra={"example": "localhost"},
     )
     ports: list[int] | None = Field(default=None, description="List of ports to scan")
-    startPort: int | None = Field(
+    start_port: int | None = Field(
         default=None,
         description="Start port for range scan",
         json_schema_extra={"example": 5000},
     )
-    endPort: int | None = Field(
+    end_port: int | None = Field(
         default=None,
         description="End port for range scan",
         json_schema_extra={"example": 5010},
