@@ -24,6 +24,7 @@ import json
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
@@ -416,9 +417,6 @@ async def push_relay_loop(interval: float = 2.0) -> None:
 
 
 # ==================== FastAPI Application Setup ====================
-from contextlib import asynccontextmanager
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Installed here (not before uvicorn.run) so it survives uvicorn's own

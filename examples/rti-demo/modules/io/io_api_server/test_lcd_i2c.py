@@ -32,14 +32,14 @@ from pathlib import Path
 script_dir = Path(__file__).parent
 sys.path.insert(0, str(script_dir))
 
-from devices import (
+from devices import (  # noqa: E402
     DeviceFactory,
     DeviceType,
     LCDI2CConfig,
     LCDI2CDevice,
     validate_device_config,
 )
-from io_config import load_config
+from io_config import load_config  # noqa: E402
 
 
 def test_1_device_type_enum():
