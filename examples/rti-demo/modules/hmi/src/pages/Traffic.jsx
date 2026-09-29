@@ -183,7 +183,12 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
               width: '100%'
             }}>
               {connections
-                .filter(conn => conn.status === 'connected' && conn.type === 'RTI-FSP')
+                // connectedClients (fsp/acsi_server.py's get_status -
+                // len(endpoint.websocket_info_list)) is this FSP's own live
+                // WebSocket connection count - only list FSPs that actually
+                // have one open, same threshold InstanceVisualization
+                // already uses to light up its FSP circle/connection line.
+                .filter(conn => conn.status === 'connected' && conn.type === 'RTI-FSP' && (conn.connectedClients ?? 0) > 0)
                 .map((endpoint) => (
                   <MessageMonitor
                     key={`server-monitor-${endpoint.host}-${endpoint.port}`}
