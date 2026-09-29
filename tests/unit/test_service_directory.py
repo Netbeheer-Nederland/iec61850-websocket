@@ -115,7 +115,6 @@ def test_get_data_definition_unknown_returns_error(simple_ied):
 # ---------------------------------------------------------------------------
 
 def test_get_ds_directory_ok(simple_ied):
-    from ws61850.iec61850.data_model.ied_model import DataSet, DataSetEntry
 
     lln0 = simple_ied.logical_devices[0].logical_nodes[0]
     ds = DataSet(parent=lln0, logical_device_name="LD0", name="DS1")
