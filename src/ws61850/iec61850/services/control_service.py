@@ -121,23 +121,23 @@ class ControlService:
                 invoke_id, associate_id, False, None, ServiceStatusKind.failedDueToServerConstraint.name
             ), None
 
-        ctlVal_request = extract_ctl_val_from_operate_request(decoded_message)
+        ctl_val_request = extract_ctl_val_from_operate_request(decoded_message)
 
         handler_fn, handler_param = control_handler
-        ctl_val = {"type": control_da.type.name, "value": ctlVal_request}
+        ctl_val = {"type": control_da.type.name, "value": ctl_val_request}
         result, error = handler_fn(control_da.get_objRef(), ctl_val, handler_param)
 
         ctl_num = next((da for da in operate_item.data_attributes if da.name == "ctlNum"), None)
 
         if result == ControlHandlerResult.OK:
-            assign_result = assign_da_item(control_da, ctlVal_request, control_da.fc.name)
+            assign_result = assign_da_item(control_da, ctl_val_request, control_da.fc.name)
             if not assign_result:
                 return create_tpaa_response_operate(
                     invoke_id, associate_id, False, None, ServiceStatusKind.typeConflict.name
                 ), None
             if ctl_num:
                 ctl_num.mmsValue += 1
-            return create_tpaa_response_operate(invoke_id, associate_id, True, None, None), \
+            return create_tpaa_response_operate(invoke_id, associate_id, True, None, None),\
                 control_do
 
         if isinstance(error, ControlServiceStatusKind):

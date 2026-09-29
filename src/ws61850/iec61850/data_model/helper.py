@@ -57,9 +57,9 @@ def create_mv_do(name: str, parent):
     da_time_stamp = DataAttribute("t", DataAttributeType.timeStamp, FunctionalConstraint.mx, default_timestamp, do)
 
     da_units = DataAttribute("units", DataAttributeType.structure, FunctionalConstraint.cf, [], do)
-    da_siUnit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
+    da_si_unit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
     da_multiplier = DataAttribute("multiplier", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
-    da_units.add_data_attribute(da_siUnit)
+    da_units.add_data_attribute(da_si_unit)
     da_units.add_data_attribute(da_multiplier)
 
     da_mag.add_data_attribute(da_f)
@@ -78,21 +78,21 @@ def create_asg_do(name: str, parent):
     """
     do = DataObject(name, cdc="asg", parent=parent)
 
-    da_setMag = DataAttribute("setMag", DataAttributeType.structure, FunctionalConstraint.sp, [], do)
-    da_f = DataAttribute("f", DataAttributeType.float32, FunctionalConstraint.sp, 0.0, da_setMag)
+    da_set_mag = DataAttribute("setMag", DataAttributeType.structure, FunctionalConstraint.sp, [], do)
+    da_f = DataAttribute("f", DataAttributeType.float32, FunctionalConstraint.sp, 0.0, da_set_mag)
 
     da_units = DataAttribute("units", DataAttributeType.structure, FunctionalConstraint.cf, [], do)
-    da_siUnit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
+    da_si_unit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
     da_multiplier = DataAttribute("multiplier", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
-    da_units.add_data_attribute(da_siUnit)
+    da_units.add_data_attribute(da_si_unit)
     da_units.add_data_attribute(da_multiplier)
 
-    da_setMag.add_data_attribute(da_f)
+    da_set_mag.add_data_attribute(da_f)
 
-    da_dataNs = DataAttribute("dataNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do)
+    da_data_ns = DataAttribute("dataNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do)
 
-    do.add_do_or_da(da_setMag)
-    do.add_do_or_da(da_dataNs)
+    do.add_do_or_da(da_set_mag)
+    do.add_do_or_da(da_data_ns)
     do.add_do_or_da(da_units)
 
     return do
@@ -104,23 +104,23 @@ def create_asg_do_custom(name: str, parent):
     """
     do = DataObject(name, cdc="asg", parent=parent)
 
-    da_setMag = DataAttribute("setMag", DataAttributeType.structure, FunctionalConstraint.sp, [], do)
-    da_f = DataAttribute("f", DataAttributeType.float32, FunctionalConstraint.sp, 0.0, da_setMag)
-    da_val = DataAttribute("val", DataAttributeType.float32, FunctionalConstraint.sp, 0.0, da_setMag)
+    da_set_mag = DataAttribute("setMag", DataAttributeType.structure, FunctionalConstraint.sp, [], do)
+    da_f = DataAttribute("f", DataAttributeType.float32, FunctionalConstraint.sp, 0.0, da_set_mag)
+    da_val = DataAttribute("val", DataAttributeType.float32, FunctionalConstraint.sp, 0.0, da_set_mag)
 
     da_units = DataAttribute("units", DataAttributeType.structure, FunctionalConstraint.cf, [], do)
-    da_siUnit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
+    da_si_unit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
     da_multiplier = DataAttribute("multiplier", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
-    da_units.add_data_attribute(da_siUnit)
+    da_units.add_data_attribute(da_si_unit)
     da_units.add_data_attribute(da_multiplier)
 
-    da_setMag.add_data_attribute(da_f)
-    da_setMag.add_data_attribute(da_val)
+    da_set_mag.add_data_attribute(da_f)
+    da_set_mag.add_data_attribute(da_val)
 
-    da_dataNs = DataAttribute("dataNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do)
+    da_data_ns = DataAttribute("dataNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do)
 
-    do.add_do_or_da(da_setMag)
-    do.add_do_or_da(da_dataNs)
+    do.add_do_or_da(da_set_mag)
+    do.add_do_or_da(da_data_ns)
     do.add_do_or_da(da_units)
 
     return do
@@ -135,26 +135,26 @@ def create_apc_do(name: str, parent):
     # oper
     da_oper = DataAttribute("Oper", DataAttributeType.structure, FunctionalConstraint.co, [], do)
 
-    da_cVal = DataAttribute("ctlVal", DataAttributeType.structure, FunctionalConstraint.co, [], da_oper)
-    da_f = DataAttribute("f", DataAttributeType.float32, FunctionalConstraint.co, 0.0, da_cVal)
+    da_c_val = DataAttribute("ctlVal", DataAttributeType.structure, FunctionalConstraint.co, [], da_oper)
+    da_f = DataAttribute("f", DataAttributeType.float32, FunctionalConstraint.co, 0.0, da_c_val)
 
-    da_cVal.add_data_attribute(da_f)
-    da_oper.add_data_attribute(da_cVal)
+    da_c_val.add_data_attribute(da_f)
+    da_oper.add_data_attribute(da_c_val)
 
     # origin
     da_origin = DataAttribute("origin", DataAttributeType.structure, FunctionalConstraint.co, [], da_oper)
 
-    da_orCat = DataAttribute("orCat", DataAttributeType.enumerated, FunctionalConstraint.co, 0, da_origin)
-    da_orIdent = DataAttribute("orIdent", DataAttributeType.octetString, FunctionalConstraint.co, b"", da_origin)
+    da_or_cat = DataAttribute("orCat", DataAttributeType.enumerated, FunctionalConstraint.co, 0, da_origin)
+    da_or_ident = DataAttribute("orIdent", DataAttributeType.octetString, FunctionalConstraint.co, b"", da_origin)
 
-    da_origin.add_data_attribute(da_orCat)
-    da_origin.add_data_attribute(da_orIdent)
+    da_origin.add_data_attribute(da_or_cat)
+    da_origin.add_data_attribute(da_or_ident)
     da_oper.add_data_attribute(da_origin)
 
-    da_ctlNum = DataAttribute("ctlNum", DataAttributeType.int8u, FunctionalConstraint.co, 0, da_oper)
-    da_T = DataAttribute("T", DataAttributeType.timeStamp, FunctionalConstraint.co, default_timestamp, da_oper)
-    da_Test = DataAttribute("Test", DataAttributeType.boolean, FunctionalConstraint.co, False, da_oper)
-    da_Check = DataAttribute(
+    da_ctl_num = DataAttribute("ctlNum", DataAttributeType.int8u, FunctionalConstraint.co, 0, da_oper)
+    da_t = DataAttribute("T", DataAttributeType.timeStamp, FunctionalConstraint.co, default_timestamp, da_oper)
+    da_test = DataAttribute("Test", DataAttributeType.boolean, FunctionalConstraint.co, False, da_oper)
+    da_check = DataAttribute(
         "Check",
         DataAttributeType.check,
         FunctionalConstraint.co,
@@ -162,23 +162,23 @@ def create_apc_do(name: str, parent):
         da_oper,
     )
 
-    da_syncroCheck = DataAttribute("synchroCheck", DataAttributeType.boolean, FunctionalConstraint.co, False, da_Check)
-    da_interlockCheck = DataAttribute(
-        "interlockCheck", DataAttributeType.boolean, FunctionalConstraint.co, False, da_Check
+    da_syncro_check = DataAttribute("synchroCheck", DataAttributeType.boolean, FunctionalConstraint.co, False, da_check)
+    da_interlock_check = DataAttribute(
+        "interlockCheck", DataAttributeType.boolean, FunctionalConstraint.co, False, da_check
     )
 
-    da_Check.add_data_attribute(da_syncroCheck)
-    da_Check.add_data_attribute(da_interlockCheck)
+    da_check.add_data_attribute(da_syncro_check)
+    da_check.add_data_attribute(da_interlock_check)
 
-    da_oper.add_data_attribute(da_ctlNum)
-    da_oper.add_data_attribute(da_T)
-    da_oper.add_data_attribute(da_Test)
-    da_oper.add_data_attribute(da_Check)
+    da_oper.add_data_attribute(da_ctl_num)
+    da_oper.add_data_attribute(da_t)
+    da_oper.add_data_attribute(da_test)
+    da_oper.add_data_attribute(da_check)
 
     # mxVal
-    da_mxVal = DataAttribute("mxVal", DataAttributeType.structure, FunctionalConstraint.mx, [], do)
-    da_f = DataAttribute("f", DataAttributeType.float32, FunctionalConstraint.mx, 0.0, da_mxVal)
-    da_mxVal.add_data_attribute(da_f)
+    da_mx_val = DataAttribute("mxVal", DataAttributeType.structure, FunctionalConstraint.mx, [], do)
+    da_f = DataAttribute("f", DataAttributeType.float32, FunctionalConstraint.mx, 0.0, da_mx_val)
+    da_mx_val.add_data_attribute(da_f)
 
     da_quality = DataAttribute("q", DataAttributeType.quality, FunctionalConstraint.mx, default_quality, do)
     da_quality.mms_value = copy.deepcopy(default_quality)
@@ -186,20 +186,20 @@ def create_apc_do(name: str, parent):
 
     # units:
     da_units = DataAttribute("units", DataAttributeType.structure, FunctionalConstraint.cf, [], do)
-    da_siUnit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
+    da_si_unit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
     da_multiplier = DataAttribute("multiplier", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
 
-    da_units.add_data_attribute(da_siUnit)
+    da_units.add_data_attribute(da_si_unit)
     da_units.add_data_attribute(da_multiplier)
 
-    da_ctlModel = DataAttribute("ctlModel", DataAttributeType.enumerated, FunctionalConstraint.cf, 1, do)
+    da_ctl_model = DataAttribute("ctlModel", DataAttributeType.enumerated, FunctionalConstraint.cf, 1, do)
 
     do.add_do_or_da(da_oper)
-    do.add_do_or_da(da_mxVal)
+    do.add_do_or_da(da_mx_val)
     do.add_do_or_da(da_quality)
     do.add_do_or_da(da_time_stamp)
     do.add_do_or_da(da_units)
-    do.add_do_or_da(da_ctlModel)
+    do.add_do_or_da(da_ctl_model)
 
     return do
 
@@ -213,26 +213,26 @@ def create_inc_do(name: str, parent):
     # oper
     da_oper = DataAttribute("Oper", DataAttributeType.structure, FunctionalConstraint.co, [], do)
 
-    da_cVal = DataAttribute("ctlVal", DataAttributeType.structure, FunctionalConstraint.co, [], da_oper)
-    da_f = DataAttribute("f", DataAttributeType.float32, FunctionalConstraint.co, 0.0, da_cVal)
+    da_c_val = DataAttribute("ctlVal", DataAttributeType.structure, FunctionalConstraint.co, [], da_oper)
+    da_f = DataAttribute("f", DataAttributeType.float32, FunctionalConstraint.co, 0.0, da_c_val)
 
-    da_cVal.add_data_attribute(da_f)
-    da_oper.add_data_attribute(da_cVal)
+    da_c_val.add_data_attribute(da_f)
+    da_oper.add_data_attribute(da_c_val)
 
     # origin
     da_origin = DataAttribute("origin", DataAttributeType.structure, FunctionalConstraint.co, [], da_oper)
 
-    da_orCat = DataAttribute("orCat", DataAttributeType.enumerated, FunctionalConstraint.co, 0, da_origin)
-    da_orIdent = DataAttribute("orIdent", DataAttributeType.octetString, FunctionalConstraint.co, b"", da_origin)
+    da_or_cat = DataAttribute("orCat", DataAttributeType.enumerated, FunctionalConstraint.co, 0, da_origin)
+    da_or_ident = DataAttribute("orIdent", DataAttributeType.octetString, FunctionalConstraint.co, b"", da_origin)
 
-    da_origin.add_data_attribute(da_orCat)
-    da_origin.add_data_attribute(da_orIdent)
+    da_origin.add_data_attribute(da_or_cat)
+    da_origin.add_data_attribute(da_or_ident)
     da_oper.add_data_attribute(da_origin)
 
-    da_ctlNum = DataAttribute("ctlNum", DataAttributeType.int8u, FunctionalConstraint.co, 0, da_oper)
-    da_T = DataAttribute("T", DataAttributeType.timeStamp, FunctionalConstraint.co, default_timestamp, da_oper)
-    da_Test = DataAttribute("Test", DataAttributeType.boolean, FunctionalConstraint.co, False, da_oper)
-    da_Check = DataAttribute(
+    da_ctl_num = DataAttribute("ctlNum", DataAttributeType.int8u, FunctionalConstraint.co, 0, da_oper)
+    da_t = DataAttribute("T", DataAttributeType.timeStamp, FunctionalConstraint.co, default_timestamp, da_oper)
+    da_test = DataAttribute("Test", DataAttributeType.boolean, FunctionalConstraint.co, False, da_oper)
+    da_check = DataAttribute(
         "Check",
         DataAttributeType.check,
         FunctionalConstraint.co,
@@ -240,32 +240,32 @@ def create_inc_do(name: str, parent):
         da_oper,
     )
 
-    da_syncroCheck = DataAttribute("synchroCheck", DataAttributeType.boolean, FunctionalConstraint.co, False, da_Check)
-    da_interlockCheck = DataAttribute(
-        "interlockCheck", DataAttributeType.boolean, FunctionalConstraint.co, False, da_Check
+    da_syncro_check = DataAttribute("synchroCheck", DataAttributeType.boolean, FunctionalConstraint.co, False, da_check)
+    da_interlock_check = DataAttribute(
+        "interlockCheck", DataAttributeType.boolean, FunctionalConstraint.co, False, da_check
     )
 
-    da_Check.add_data_attribute(da_syncroCheck)
-    da_Check.add_data_attribute(da_interlockCheck)
+    da_check.add_data_attribute(da_syncro_check)
+    da_check.add_data_attribute(da_interlock_check)
 
-    da_oper.add_data_attribute(da_ctlNum)
-    da_oper.add_data_attribute(da_T)
-    da_oper.add_data_attribute(da_Test)
-    da_oper.add_data_attribute(da_Check)
+    da_oper.add_data_attribute(da_ctl_num)
+    da_oper.add_data_attribute(da_t)
+    da_oper.add_data_attribute(da_test)
+    da_oper.add_data_attribute(da_check)
 
-    da_stVal = DataAttribute("stVal", DataAttributeType.int32, FunctionalConstraint.st, 0, do)
+    da_st_val = DataAttribute("stVal", DataAttributeType.int32, FunctionalConstraint.st, 0, do)
 
     da_quality = DataAttribute("q", DataAttributeType.quality, FunctionalConstraint.st, default_quality, do)
     da_time_stamp = DataAttribute("t", DataAttributeType.timeStamp, FunctionalConstraint.st, default_timestamp, do)
-    da_ctlModel = DataAttribute("ctlModel", DataAttributeType.enumerated, FunctionalConstraint.cf, 1, do)
-    da_dataNs = DataAttribute("dataNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do)
+    da_ctl_model = DataAttribute("ctlModel", DataAttributeType.enumerated, FunctionalConstraint.cf, 1, do)
+    da_data_ns = DataAttribute("dataNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do)
 
     do.add_do_or_da(da_oper)
-    do.add_do_or_da(da_stVal)
+    do.add_do_or_da(da_st_val)
     do.add_do_or_da(da_quality)
     do.add_do_or_da(da_time_stamp)
-    do.add_do_or_da(da_ctlModel)
-    do.add_do_or_da(da_dataNs)
+    do.add_do_or_da(da_ctl_model)
+    do.add_do_or_da(da_data_ns)
 
     return do
 
@@ -275,11 +275,11 @@ def create_ens_do(name: str, parent):
     Function used for creating a dataObject of type ENS
     """
     do = DataObject(name, cdc="ens", parent=parent)
-    da_stVal = DataAttribute("stVal", DataAttributeType.enumerated, FunctionalConstraint.st, 0, do)
+    da_st_val = DataAttribute("stVal", DataAttributeType.enumerated, FunctionalConstraint.st, 0, do)
     da_quality = DataAttribute("q", DataAttributeType.quality, FunctionalConstraint.st, default_quality, do)
     da_time_stamp = DataAttribute("t", DataAttributeType.timeStamp, FunctionalConstraint.st, default_timestamp, do)
 
-    do.add_do_or_da(da_stVal)
+    do.add_do_or_da(da_st_val)
     do.add_do_or_da(da_quality)
     do.add_do_or_da(da_time_stamp)
 
@@ -291,11 +291,11 @@ def create_sps_do(name: str, parent):
     Function used for creating a dataObject of type SPS
     """
     do = DataObject(name, cdc="sps", parent=parent)
-    da_stVal = DataAttribute("stVal", DataAttributeType.enumerated, FunctionalConstraint.st, 0, do)
+    da_st_val = DataAttribute("stVal", DataAttributeType.enumerated, FunctionalConstraint.st, 0, do)
     da_quality = DataAttribute("q", DataAttributeType.quality, FunctionalConstraint.st, default_quality, do)
     da_time_stamp = DataAttribute("t", DataAttributeType.timeStamp, FunctionalConstraint.st, default_timestamp, do)
 
-    do.add_do_or_da(da_stVal)
+    do.add_do_or_da(da_st_val)
     do.add_do_or_da(da_quality)
     do.add_do_or_da(da_time_stamp)
 
@@ -307,15 +307,15 @@ def create_enc_do(name: str, parent):
     Function used for creating a dataObject of type ENC
     """
     do = DataObject(name, cdc="enc", parent=parent)
-    da_stVal = DataAttribute("stVal", DataAttributeType.enumerated, FunctionalConstraint.st, 0, do)
+    da_st_val = DataAttribute("stVal", DataAttributeType.enumerated, FunctionalConstraint.st, 0, do)
     da_quality = DataAttribute("q", DataAttributeType.quality, FunctionalConstraint.st, default_quality, do)
     da_time_stamp = DataAttribute("t", DataAttributeType.timeStamp, FunctionalConstraint.st, default_timestamp, do)
-    da_ctlModel = DataAttribute("ctlModel", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, do)
+    da_ctl_model = DataAttribute("ctlModel", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, do)
 
-    do.add_do_or_da(da_stVal)
+    do.add_do_or_da(da_st_val)
     do.add_do_or_da(da_quality)
     do.add_do_or_da(da_time_stamp)
-    do.add_do_or_da(da_ctlModel)
+    do.add_do_or_da(da_ctl_model)
 
     return do
 
@@ -326,14 +326,14 @@ def create_lpl_do(name: str, parent):
     """
     do = DataObject(name, cdc="lpl", parent=parent)
     da_vendor = DataAttribute("vendor", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
-    da_swRev = DataAttribute("swRev", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
-    da_configRev = DataAttribute("configRev", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
-    da_lnNs = DataAttribute("lnNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do)
+    da_sw_rev = DataAttribute("swRev", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
+    da_config_rev = DataAttribute("configRev", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
+    da_ln_ns = DataAttribute("lnNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do)
 
     do.add_do_or_da(da_vendor)
-    do.add_do_or_da(da_swRev)
-    do.add_do_or_da(da_configRev)
-    do.add_do_or_da(da_lnNs)
+    do.add_do_or_da(da_sw_rev)
+    do.add_do_or_da(da_config_rev)
+    do.add_do_or_da(da_ln_ns)
 
     return do
 
@@ -344,16 +344,16 @@ def create_dpl_do(name: str, parent):
     """
     do = DataObject(name, cdc="dpl", parent=parent)
     da_vendor = DataAttribute("vendor", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
-    da_hwRev = DataAttribute("hwRev", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
-    da_swRev = DataAttribute("swRev", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
-    da_serNum = DataAttribute("serNum", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
+    da_hw_rev = DataAttribute("hwRev", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
+    da_sw_rev = DataAttribute("swRev", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
+    da_ser_num = DataAttribute("serNum", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
     da_model = DataAttribute("model", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
     da_location = DataAttribute("location", DataAttributeType.visString255, FunctionalConstraint.dc, "", do)
 
     do.add_do_or_da(da_vendor)
-    do.add_do_or_da(da_hwRev)
-    do.add_do_or_da(da_swRev)
-    do.add_do_or_da(da_serNum)
+    do.add_do_or_da(da_hw_rev)
+    do.add_do_or_da(da_sw_rev)
+    do.add_do_or_da(da_ser_num)
     do.add_do_or_da(da_model)
     do.add_do_or_da(da_location)
 
@@ -366,23 +366,23 @@ def create_cmv_do(name: str, parent):
     """
     do = DataObject(name=name, parent=parent, cdc="cmv")
 
-    da_cVal = DataAttribute("cVal", DataAttributeType.structure, FunctionalConstraint.mx, [], do)
-    da_mag = DataAttribute("mag", DataAttributeType.structure, FunctionalConstraint.mx, [], da_cVal)
+    da_c_val = DataAttribute("cVal", DataAttributeType.structure, FunctionalConstraint.mx, [], do)
+    da_mag = DataAttribute("mag", DataAttributeType.structure, FunctionalConstraint.mx, [], da_c_val)
     da_f = DataAttribute("f", DataAttributeType.float32, FunctionalConstraint.mx, 0.0, da_mag)
     da_quality = DataAttribute("q", DataAttributeType.quality, FunctionalConstraint.mx, default_quality, do)
     da_time_stamp = DataAttribute("t", DataAttributeType.timeStamp, FunctionalConstraint.mx, default_timestamp, do)
 
     da_units = DataAttribute("units", DataAttributeType.structure, FunctionalConstraint.cf, [], do)
-    da_siUnit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
+    da_si_unit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
     da_multiplier = DataAttribute("multiplier", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
 
-    da_units.add_data_attribute(da_siUnit)
+    da_units.add_data_attribute(da_si_unit)
     da_units.add_data_attribute(da_multiplier)
 
     da_mag.add_data_attribute(da_f)
-    da_cVal.add_data_attribute(da_mag)
+    da_c_val.add_data_attribute(da_mag)
 
-    do.add_do_or_da(da_cVal)
+    do.add_do_or_da(da_c_val)
     do.add_do_or_da(da_quality)
     do.add_do_or_da(da_time_stamp)
     do.add_do_or_da(da_units)
@@ -396,20 +396,20 @@ def create_ing_do(name: str, parent):
     """
     do = DataObject(name=name, parent=parent, cdc="ing")
 
-    da_setVal = DataAttribute("setVal", DataAttributeType.int32, FunctionalConstraint.sp, 0, do)
+    da_set_val = DataAttribute("setVal", DataAttributeType.int32, FunctionalConstraint.sp, 0, do)
 
     da_units = DataAttribute("units", DataAttributeType.structure, FunctionalConstraint.cf, [], do)
-    da_siUnit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
+    da_si_unit = DataAttribute("SIUnit", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
     da_multiplier = DataAttribute("multiplier", DataAttributeType.enumerated, FunctionalConstraint.cf, 0, da_units)
 
-    da_units.add_data_attribute(da_siUnit)
+    da_units.add_data_attribute(da_si_unit)
     da_units.add_data_attribute(da_multiplier)
 
-    da_dataNs = DataAttribute("dataNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do)
+    da_data_ns = DataAttribute("dataNs", DataAttributeType.visString255, FunctionalConstraint.ex, "", do)
 
-    do.add_do_or_da(da_setVal)
+    do.add_do_or_da(da_set_val)
     do.add_do_or_da(da_units)
-    do.add_do_or_da(da_dataNs)
+    do.add_do_or_da(da_data_ns)
 
     return do
 
@@ -419,14 +419,14 @@ def create_wye_do(name: str, parent):
     Function used for creating a dataObject of type WYE
     """
     do = DataObject(name, cdc="wye", parent=parent)
-    do_phsA = create_cmv_do("phsA", do)
-    do.add_do_or_da(do_phsA)
+    do_phs_a = create_cmv_do("phsA", do)
+    do.add_do_or_da(do_phs_a)
 
-    do_phsB = create_cmv_do("phsB", do)
-    do.add_do_or_da(do_phsB)
+    do_phs_b = create_cmv_do("phsB", do)
+    do.add_do_or_da(do_phs_b)
 
-    do_phsC = create_cmv_do("phsC", do)
-    do.add_do_or_da(do_phsC)
+    do_phs_c = create_cmv_do("phsC", do)
+    do.add_do_or_da(do_phs_c)
 
     return do
 
@@ -436,14 +436,14 @@ def create_del_do(name: str, parent):
     Function used for creating a dataObject of type DEL
     """
     do = DataObject(name, cdc="del", parent=parent)
-    do_phsAB = create_cmv_do("phsAB", do)
-    do.add_do_or_da(do_phsAB)
+    do_phs_ab = create_cmv_do("phsAB", do)
+    do.add_do_or_da(do_phs_ab)
 
-    do_phsBC = create_cmv_do("phsBC", do)
-    do.add_do_or_da(do_phsBC)
+    do_phs_bc = create_cmv_do("phsBC", do)
+    do.add_do_or_da(do_phs_bc)
 
-    do_phsCA = create_cmv_do("phsCA", do)
-    do.add_do_or_da(do_phsCA)
+    do_phs_ca = create_cmv_do("phsCA", do)
+    do.add_do_or_da(do_phs_ca)
 
     return do
 

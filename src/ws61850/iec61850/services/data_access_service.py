@@ -73,7 +73,7 @@ class DataAccessService:
     def set_data_values(self, invoke_id, associate_id, decoded_message):
         ied = self._ied
         data_ref = extract_ref(decoded_message)
-        dataAttr_val = extract_data_attr_val(decoded_message)
+        data_attr_val = extract_data_attr_val(decoded_message)
         item = find_object_in_tree(data_ref["ref"], ied)
         if item is None:
             return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
@@ -84,8 +84,8 @@ class DataAccessService:
 
         if isinstance(item, DataObject):
             for da_do_index, da_do_item in enumerate(item.do_or_da):
-                if da_do_index < len(dataAttr_val):
-                    value = dataAttr_val[da_do_index]
+                if da_do_index < len(data_attr_val):
+                    value = data_attr_val[da_do_index]
                     if isinstance(da_do_item, DataAttribute):
                         assign_da_item(item.do_or_da[da_do_index], value["data"], fc)
                     else:
@@ -93,7 +93,7 @@ class DataAccessService:
             return create_tpaa_response_set_data_values(invoke_id, associate_id, "ok")
         else:
             if fc == item.fc.wire_name:
-                result = assign_da_item(item, dataAttr_val[0]["data"], fc)
+                result = assign_da_item(item, data_attr_val[0]["data"], fc)
                 if result is False:
                     return create_tpaa_service_error_response(invoke_id, associate_id, "typeConflict")
                 return create_tpaa_response_set_data_values(invoke_id, associate_id, "ok")
@@ -102,24 +102,24 @@ class DataAccessService:
     def get_dataset_values(self, invoke_id, associate_id, decoded_message, find_ds_in_tree):
         ied = self._ied
         ds_ref = extract_ds_ref(decoded_message)
-        ldName, lnName, dsName = re.split(r"[/.]", ds_ref)
-        foundLN = next(
-            (ln for ld in ied.logical_devices if ld.name == ldName
-             for ln in ld.logical_nodes if ln.name == lnName),
+        ld_name, ln_name, ds_name = re.split(r"[/.]", ds_ref)
+        found_ln = next(
+            (ln for ld in ied.logical_devices if ld.name == ld_name
+             for ln in ld.logical_nodes if ln.name == ln_name),
             None,
         )
-        if foundLN is None:
+        if found_ln is None:
             return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
-        foundDS = next(
-            (ds for ds in foundLN.data_sets
-             if ds.logical_device_name == ldName and ds.parent.name == lnName and ds.name == dsName),
+        found_ds = next(
+            (ds for ds in found_ln.data_sets
+             if ds.logical_device_name == ld_name and ds.parent.name == ln_name and ds.name == ds_name),
             None,
         )
-        if not foundDS:
+        if not found_ds:
             return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
 
         value_list = []
-        for ds_entry in foundDS.fcdas:
+        for ds_entry in found_ds.fcdas:
             item = find_object_in_tree(ds_entry.variable_name, ied)
             if item is not None:
                 if isinstance(item, DataObject):

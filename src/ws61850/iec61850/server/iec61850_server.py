@@ -213,16 +213,16 @@ class IEC61850Server:
         """
         return_do = None
         ld_name, ln_name, first_do, *seg_ref = re.split(r"[/ .]", data_ref)
-        foundLD = next((ld for ld in self.ied_model.logical_devices if ld.name == ld_name), None)
-        if foundLD:
-            foundLN = next((ln for ln in foundLD.logical_nodes if ln.name == ln_name), None)
-            if foundLN:
-                foundDO = next((do for do in foundLN.data_objects if do.name == first_do), None)
+        found_ld = next((ld for ld in self.ied_model.logical_devices if ld.name == ld_name), None)
+        if found_ld:
+            found_ln = next((ln for ln in found_ld.logical_nodes if ln.name == ln_name), None)
+            if found_ln:
+                found_do = next((do for do in found_ln.data_objects if do.name == first_do), None)
                 if len(seg_ref) != 0:
-                    return_do = self.look_in_da_or_do_list(seg_ref, foundDO)
+                    return_do = self.look_in_da_or_do_list(seg_ref, found_do)
 
                 else:
-                    return_do = foundDO
+                    return_do = found_do
 
         return return_do
 
@@ -231,7 +231,7 @@ class IEC61850Server:
         Find a Dataset in the IED tree
         """
         ld_name, ln_name, ds_name = re.split(r"[/ .]", data_ref)
-        foundLN = next(
+        found_ln = next(
             (
                 ln
                 for ld in self.ied_model.logical_devices
@@ -241,11 +241,11 @@ class IEC61850Server:
             ),
             None,
         )
-        if not foundLN:
+        if not found_ln:
             return None
-        foundDS = next((ds for ds in foundLN.data_sets if ds.name == ds_name), None)
+        found_ds = next((ds for ds in found_ln.data_sets if ds.name == ds_name), None)
 
-        return foundDS
+        return found_ds
 
     async def abort_function(self, websocket_info):
         """
@@ -435,7 +435,7 @@ class IEC61850Server:
         Function used for analyzing the request and sending the correct response accordingly
         """
         websocket = websocket_info.websocket
-        maxMessageSize_client = 65000
+        max_message_size_client = 65000
         decoded_message = decode_tpaa_message(message, websocket_info.is_ber_protocol)
         associate_id = cp
         websocket_info.associate_id = associate_id
@@ -444,11 +444,11 @@ class IEC61850Server:
             associate_type = extract_associate_request_type(decoded_message)
             logger.debug("Association message cp=%r type=%r", cp, associate_type)
             if associate_type == "associateRequest":
-                maxMessageSize_server = extract_max_message_size(decoded_message)
-                maxMessageSize = min(maxMessageSize_client, maxMessageSize_server)
+                max_message_size_server = extract_max_message_size(decoded_message)
+                max_message_size = min(max_message_size_client, max_message_size_server)
                 websocket_info.associate_id = associate_id
                 tpaa_response = create_tpaa_associate_response(
-                    maxMessageSize, associate_id, max_outstanding_calls=self.max_outstanding_calls
+                    max_message_size, associate_id, max_outstanding_calls=self.max_outstanding_calls
                 )
                 response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
                 await websocket.send(response)
@@ -459,7 +459,7 @@ class IEC61850Server:
                     "Association accepted cp=%r associate_id=%r max_msg_size=%s",
                     cp,
                     associate_id,
-                    maxMessageSize,
+                    max_message_size,
                 )
 
             elif associate_type == "releaseRequest":

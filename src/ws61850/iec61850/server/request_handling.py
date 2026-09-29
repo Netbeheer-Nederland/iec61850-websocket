@@ -117,24 +117,24 @@ def get_list_of_items_ln(ln_ref, asci_service, ied: IedModel):
     """
     return_list = []
     ld_name, ln_name = re.split(r"[/]", ln_ref)
-    foundLD: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
-    if foundLD:
-        foundLN: LogicalNode = next((ln for ln in foundLD.logical_nodes if ln.name == ln_name), None)
-        if foundLN:
+    found_ld: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
+    if found_ld:
+        found_ln: LogicalNode = next((ln for ln in found_ld.logical_nodes if ln.name == ln_name), None)
+        if found_ln:
             if asci_service == "dataObject":
-                return_list = [do.name for do in foundLN.data_objects]
+                return_list = [do.name for do in found_ln.data_objects]
             elif asci_service == "dataset":
-                return_list = [ds.name for ds in foundLN.data_sets]
+                return_list = [ds.name for ds in found_ln.data_sets]
             elif asci_service == "urcb":
                 return_list = [
                     rcb.name
-                    for rcb in foundLN.rcbs
+                    for rcb in found_ln.rcbs
                     if rcb.get_objRef().startswith(f"{ld_name}/{ln_name}.") and not rcb.buffered
                 ]
             elif asci_service == "brcb":
                 return_list = [
                     rcb.name
-                    for rcb in foundLN.rcbs
+                    for rcb in found_ln.rcbs
                     if rcb.get_objRef().startswith(f"{ld_name}/{ln_name}.") and rcb.buffered
                 ]
             return return_list
@@ -149,14 +149,14 @@ def find_do_with_ref(data_ref, ied):
     """
     return_do = None
     ld_name, ln_name, first_do, *seg_ref = re.split(r"[/ .]", data_ref)
-    foundLD: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
-    if foundLD:
-        foundLN: LogicalNode = next((ln for ln in foundLD.logical_nodes if ln.name == ln_name), None)
-        if foundLN:
-            foundDO = next((do for do in foundLN.data_objects if do.name == first_do), None)
+    found_ld: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
+    if found_ld:
+        found_ln: LogicalNode = next((ln for ln in found_ld.logical_nodes if ln.name == ln_name), None)
+        if found_ln:
+            found_do = next((do for do in found_ln.data_objects if do.name == first_do), None)
             if len(seg_ref) != 0:
-                if foundDO:
-                    inner_do: DataObject = foundDO
+                if found_do:
+                    inner_do: DataObject = found_do
                     for i in range(0, len(seg_ref)):
                         inner_do = next(
                             (do for do in inner_do.get_do_from_do_or_da_list() if do.name == seg_ref[i]), None
@@ -164,7 +164,7 @@ def find_do_with_ref(data_ref, ied):
                     return_do = inner_do
 
             else:
-                return_do = foundDO
+                return_do = found_do
 
     return return_do, seg_ref
 
@@ -218,16 +218,16 @@ def find_object_in_tree(data_ref, ied):
     """
     return_do = None
     ld_name, ln_name, first_do, *seg_ref = re.split(r"[/ .]", data_ref)
-    foundLD: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
-    if foundLD:
-        foundLN: LogicalNode = next((ln for ln in foundLD.logical_nodes if ln.name == ln_name), None)
-        if foundLN:
-            foundDO = next((do for do in foundLN.data_objects if do.name == first_do), None)
+    found_ld: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
+    if found_ld:
+        found_ln: LogicalNode = next((ln for ln in found_ld.logical_nodes if ln.name == ln_name), None)
+        if found_ln:
+            found_do = next((do for do in found_ln.data_objects if do.name == first_do), None)
             if len(seg_ref) != 0:
-                return_do = look_in_da_or_do_list(seg_ref, foundDO)
+                return_do = look_in_da_or_do_list(seg_ref, found_do)
 
             else:
-                return_do = foundDO
+                return_do = found_do
 
     return return_do
 
@@ -444,7 +444,7 @@ def assign_da_item(item, value, fc):
             print("checking item_attr_type: ", item.attr_type.name, " and value: ", value[0])
             if item.attr_type.name == value[0] and item.fc.wire_name == fc:
 
-                TYPE_MAP = {
+                type_map = {
                     "boolean": bool,
                     "int8": int,
                     "int16": int,
@@ -469,7 +469,7 @@ def assign_da_item(item, value, fc):
                     "enumerated": int,
                 }
 
-                converted, converted_val = convert_value(item.attr_type.name, value[1], TYPE_MAP)
+                converted, converted_val = convert_value(item.attr_type.name, value[1], type_map)
 
                 if converted is False:
                     print(f"Type mismatch: '{value[1]}' is not valid for {item.attr_type.name}")
@@ -477,7 +477,7 @@ def assign_da_item(item, value, fc):
                 else:
                     if item.attr_type.name == value[0] and item.fc.wire_name == fc:
                         item.mms_value = converted_val
-                print("printing value type: ", type(value[1]), " and expected type: ", TYPE_MAP[value[0]])
+                print("printing value type: ", type(value[1]), " and expected type: ", type_map[value[0]])
 
             else:
                 return False

@@ -199,12 +199,12 @@ def get_list_of_items_ln(ln_ref, asci_service, ied: IedModel):
     """Returns items from the logical node for getLogicalNodeDirectory."""
     return_list = []
     ld_name, ln_name = re.split(r"[/]", ln_ref)
-    foundLD: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
-    if foundLD:
-        foundLN: LogicalNode = next((ln for ln in foundLD.logical_nodes if ln.name == ln_name), None)
-        if foundLN:
+    found_ld: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
+    if found_ld:
+        found_ln: LogicalNode = next((ln for ln in found_ld.logical_nodes if ln.name == ln_name), None)
+        if found_ln:
             if asci_service == "dataObject":
-                return_list = [do.name for do in foundLN.data_objects]
+                return_list = [do.name for do in found_ln.data_objects]
             elif asci_service == "dataset":
                 return_list = [ds.name for ds in ied.data_sets]
     return return_list
