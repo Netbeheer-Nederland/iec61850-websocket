@@ -19,7 +19,6 @@
 
 from unittest.mock import MagicMock
 
-
 from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 
 
@@ -129,6 +128,7 @@ class TestPassiveEndpointConnectionClosed:
 
     def test_removes_the_closed_cp_websocket_info(self):
         import asyncio
+
         from ws61850.endpoint.base import WebSocketInfo
 
         ep = PassiveEndpoint()
@@ -143,6 +143,7 @@ class TestPassiveEndpointConnectionClosed:
 
     def test_leaves_other_cps_websocket_info_alone(self):
         import asyncio
+
         from ws61850.endpoint.base import WebSocketInfo
 
         ep = PassiveEndpoint()

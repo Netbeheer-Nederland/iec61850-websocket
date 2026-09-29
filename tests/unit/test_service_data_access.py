@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Unit tests for DataAccessService."""
 
-from ws61850.iec61850.services.data_access_service import DataAccessService
 from ws61850.iec61850.data_model.ied_model import FunctionalConstraint
+from ws61850.iec61850.services.data_access_service import DataAccessService
 
 
 def _svc_tuple(service_name, **fields):

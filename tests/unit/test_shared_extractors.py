@@ -8,13 +8,13 @@ from ws61850.shared.extractors import (
     extract_acsi_type,
     extract_associate_request_type,
     extract_brcb_ref,
-    extract_data_ref,
     extract_data_attr_val,
+    extract_data_ref,
     extract_ds_ref,
     extract_include_element_name,
     extract_invoke_id,
-    extract_ln_ref,
     extract_ld_name,
+    extract_ln_ref,
     extract_ref,
     extract_service_name,
     extract_urcb_ref,
@@ -22,7 +22,6 @@ from ws61850.shared.extractors import (
     retrieve_associate_id_from_decoded_msg,
     retrieve_max_outstanding_calls_from_decoded_msg,
 )
-
 
 # ---------------------------------------------------------------------------
 # retrieve_associate_id (raw JSON)

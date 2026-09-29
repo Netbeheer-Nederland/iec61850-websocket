@@ -19,7 +19,6 @@ import logging
 import sys
 from pathlib import Path
 
-
 from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server

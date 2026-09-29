@@ -1,9 +1,15 @@
 # SPDX-FileCopyrightText: 2025 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-import pytest
 from unittest.mock import MagicMock
 
-from ws61850.transport.auth_strategy import AuthContext, AuthStrategy, BearerTokenStrategy, NoAuthStrategy
+import pytest
+
+from ws61850.transport.auth_strategy import (
+    AuthContext,
+    AuthStrategy,
+    BearerTokenStrategy,
+    NoAuthStrategy,
+)
 
 
 def test_auth_context_defaults():

@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: 2025 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from ws61850.transport.reconnect import ReconnectPolicy
 

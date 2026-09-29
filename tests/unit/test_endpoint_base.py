@@ -19,7 +19,6 @@
 
 from unittest.mock import MagicMock
 
-
 from ws61850.endpoint.base import EndpointProtocol, WebSocketInfo
 
 

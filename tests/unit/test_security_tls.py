@@ -1,11 +1,11 @@
 # SPDX-FileCopyrightText: 2025 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
 import ssl
-import pytest
 from dataclasses import FrozenInstanceError
 
-from ws61850.security.tls import TLSConfig, build_tls_context
+import pytest
 
+from ws61850.security.tls import TLSConfig, build_tls_context
 
 # ---------------------------------------------------------------------------
 # TLSConfig dataclass

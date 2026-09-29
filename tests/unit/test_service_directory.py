@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Unit tests for DirectoryService."""
 
+from ws61850.iec61850.data_model.ied_model import (
+    DataSet,
+    DataSetEntry,
+    FunctionalConstraint,
+)
 from ws61850.iec61850.services.directory_service import DirectoryService
-from ws61850.iec61850.data_model.ied_model import DataSet, DataSetEntry, FunctionalConstraint
-
 
 # ---------------------------------------------------------------------------
 # Helpers

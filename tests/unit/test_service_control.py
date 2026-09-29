@@ -3,19 +3,18 @@
 """Unit tests for ControlService."""
 import pytest
 
-from ws61850.iec61850.services.control_service import ControlService
-from ws61850.iec61850.server.control_handling import ControlHandlerResult
-from ws61850.iec61850.server.server_control_object import ServerControlObject
 from ws61850.iec61850.data_model.ied_model import (
     DataAttribute,
     DataAttributeType,
     DataObject,
     FunctionalConstraint,
+    IedModel,
     LogicalDevice,
     LogicalNode,
-    IedModel,
 )
-
+from ws61850.iec61850.server.control_handling import ControlHandlerResult
+from ws61850.iec61850.server.server_control_object import ServerControlObject
+from ws61850.iec61850.services.control_service import ControlService
 
 # ---------------------------------------------------------------------------
 # Fixtures

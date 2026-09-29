@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: 2025 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from ws61850.transport.session_manager import SessionManager
 

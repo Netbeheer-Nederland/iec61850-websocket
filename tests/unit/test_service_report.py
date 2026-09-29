@@ -3,9 +3,9 @@
 """Unit tests for ReportService."""
 import pytest
 
-from ws61850.iec61850.services.report_service import ReportService
 from ws61850.iec61850.data_model.ied_model import ReportControl
 from ws61850.iec61850.server.server_report_control import ServerReportControl
+from ws61850.iec61850.services.report_service import ReportService
 
 
 def _make_rcb(name, ln, buffered=True):

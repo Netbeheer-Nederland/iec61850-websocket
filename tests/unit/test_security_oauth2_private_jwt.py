@@ -1,10 +1,11 @@
 # SPDX-FileCopyrightText: 2025 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
 import time
-import pytest
+
 import jwt
-from cryptography.hazmat.primitives.asymmetric import rsa
+import pytest
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from ws61850.security.oauth2.private_jwt import PrivateKeyJWTSigner
 
