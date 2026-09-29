@@ -162,23 +162,23 @@ async def add_iec61850_client_requests(iec61850_client, endpoint):
         websocket_info = endpoint.get_websocket_info(iec61850_client)
         if websocket_info is not None:
             try:
-                server_list = await iec61850_client.get_server_directory(websocket_info, None, None)
-                ld_directory = await iec61850_client.get_logical_device_directory("LD0", websocket_info, None, None)
-                ln_directory_ds = await iec61850_client.get_logical_node_directory(
+                await iec61850_client.get_server_directory(websocket_info, None, None)
+                await iec61850_client.get_logical_device_directory("LD0", websocket_info, None, None)
+                await iec61850_client.get_logical_node_directory(
                     "LD0", "LLN0", "dataset", websocket_info, None, None
                 )
-                ln_directory_do = await iec61850_client.get_logical_node_directory(
+                await iec61850_client.get_logical_node_directory(
                     "LD0", "LLN0", "dataObject", websocket_info, None, None
                 )
-                ds_directory = await iec61850_client.get_dataset_directory(
+                await iec61850_client.get_dataset_directory(
                     "LD0", "LLN0", "DataSetMinMaxAvg", websocket_info, None, None
                 )
-                set_urcb_res = await iec61850_client.set_URCB_values(urcb, websocket_info, None, None)
-                da_def = await iec61850_client.get_data_definition("LD0/DWMX1.WMaxSptPct", websocket_info, None, None)
-                set_da_res = await iec61850_client.set_data_values(
+                await iec61850_client.set_URCB_values(urcb, websocket_info, None, None)
+                await iec61850_client.get_data_definition("LD0/DWMX1.WMaxSptPct", websocket_info, None, None)
+                await iec61850_client.set_data_values(
                     "LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value], websocket_info, None, None
                 )
-                da_val = await iec61850_client.get_data_values(
+                await iec61850_client.get_data_values(
                     "LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info, None, None
                 )
 

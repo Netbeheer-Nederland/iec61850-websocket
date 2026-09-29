@@ -129,23 +129,23 @@ async def main():
         websocket_info = endpoint.get_websocket_info(client1)
         if websocket_info is not None:
             try:
-                server_list = await client1.get_server_directory(websocket_info, callback_called, None)
-                ld_directory = await client1.get_logical_device_directory("LD0", websocket_info, callback_called, None)
-                ln_directory_do = await client1.get_logical_node_directory(
+                await client1.get_server_directory(websocket_info, callback_called, None)
+                await client1.get_logical_device_directory("LD0", websocket_info, callback_called, None)
+                await client1.get_logical_node_directory(
                     "LD0", "LLN0", "dataObject", websocket_info, callback_called, None
                 )
-                ds_directory = await client1.get_dataset_directory(
+                await client1.get_dataset_directory(
                     "LD0", "LLN0", "DataSetMinMaxAvg", websocket_info, callback_called, None
                 )
-                da_def = await client1.get_data_definition("LD0/DWMX1.WMaxSptPct", websocket_info, callback_called, None)
-                da_dir = await client1.get_data_directory("LD0/MMXU1.A", websocket_info, callback_called, None)
-                set_da_res = await client1.set_data_values(
+                await client1.get_data_definition("LD0/DWMX1.WMaxSptPct", websocket_info, callback_called, None)
+                await client1.get_data_directory("LD0/MMXU1.A", websocket_info, callback_called, None)
+                await client1.set_data_values(
                     "LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value], websocket_info, callback_called, None
                 )
                 await client1.select("LD0/DWMX1.WMaxSpt", websocket_info, callback_called, None)
                 await client1.operate(oper_val, websocket_info, callback_called, None)
                 await client1.get_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info, callback_called, None)
-                set_urcb_res = await client1.set_URCB_values(urcb, websocket_info, callback_called, None)
+                await client1.set_URCB_values(urcb, websocket_info, callback_called, None)
 
             except Exception as e:
                 logger.exception("Service call failed: %s", e)

@@ -42,7 +42,6 @@ def test_build_assertion_contains_jti(rsa_key_pair):
     private_key, _ = rsa_key_pair
     signer = PrivateKeyJWTSigner(client_id="c", private_key=private_key)
     token = signer.build_assertion("https://example.com")
-    header = jwt.get_unverified_header(token)
     payload = jwt.decode(token, options={"verify_signature": False})
     assert "jti" in payload
 

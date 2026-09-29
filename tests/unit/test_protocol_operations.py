@@ -24,7 +24,7 @@ async def test_call_encodes_and_sends():
     executor, codec, ws = _make_executor()
     msg = ("request", {"invokeId": 1})
 
-    result = await executor.call(msg, invoke_id=1)
+    await executor.call(msg, invoke_id=1)
 
     codec.encode.assert_called_once_with(msg)
     ws.send.assert_awaited_once_with(b"encoded")
