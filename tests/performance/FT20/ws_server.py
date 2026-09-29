@@ -28,7 +28,7 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 
-trgOp_urcb = {
+trg_op_urcb = {
     "dchg": False,
     "qchg": False,
     "dupd": False,
@@ -38,7 +38,7 @@ trgOp_urcb = {
 
 urcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints", False)
 urcb.rptEna = True
-urcb.trgOps = trgOp_urcb
+urcb.trgOps = trg_op_urcb
 urcb.intgPd = 1000
 
 
@@ -84,7 +84,7 @@ data_attribute_value = {
     ),
 }
 
-data_WMaxSetPct = [
+data_w_max_set_pct = [
     {
         "name": "setMag",
         "data": ("structure", {"name": "f", "data": [("float32", 19.666)]}),

@@ -42,7 +42,7 @@ optional_fields = {
     "reasonCode": False,
 }
 
-trgOp = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": False}
+trg_op = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": False}
 
 brcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbMinMaxAvg", True)
 brcb.rptEna = True
@@ -50,7 +50,7 @@ brcb.confRev = 5
 brcb.opt_flds = optional_fields
 brcb.bufTm = 1000
 brcb.sqNum = 42
-brcb.trgOps = trgOp
+brcb.trgOps = trg_op
 brcb.intgPd = 2000
 brcb.gi = True
 brcb.purgeBuf = False
@@ -64,7 +64,7 @@ urcb.confRev = 5
 urcb.opt_flds = optional_fields
 urcb.bufTm = 1000
 urcb.sqNum = 88
-urcb.trgOps = trgOp
+urcb.trgOps = trg_op
 urcb.intgPd = 5000
 urcb.gi = True
 urcb.entryId = b"\x01\x02\x03\x04\x05\x06\x07\x08"
@@ -114,7 +114,7 @@ data_attribute_value = {
     ),
 }
 
-data_WMaxSetPct = [
+data_w_max_set_pct = [
     {
         "name": "setMag",
         "data": ("structure", {"name": "f", "data": [("float32", 19.666)]}),

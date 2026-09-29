@@ -83,8 +83,8 @@ oper_val_incorrect_do = {
     "check": {"synchroCheck": False, "interlockCheck": False},
 }
 
-setMag_val = [{"name": "setMag", "data": ("structure", {"data": [("float32", 67.39)]})}]
-setMag_wrong = [{"name": "setMag", "data": ("structure", {"data": [("boolean", False)]})}]
+set_mag_val = [{"name": "setMag", "data": ("structure", {"data": [("float32", 67.39)]})}]
+set_mag_wrong = [{"name": "setMag", "data": ("structure", {"data": [("boolean", False)]})}]
 
 
 async def main():
@@ -115,12 +115,12 @@ async def main():
                 logger.info("operate with incorrect data object: %s", operate_result)
 
                 set_val_res = await client.set_data_values(
-                    "LD0/DWMX1.WMaxSet.setMag_wrong", "sp", setMag_val, websocket_info, None, None
+                    "LD0/DWMX1.WMaxSet.setMag_wrong", "sp", set_mag_val, websocket_info, None, None
                 )
                 logger.info("setDataValues for nonexistent object: %s", set_val_res)
 
                 set_val_res = await client.set_data_values(
-                    "LD0/DWMX1.WMaxSet.setMag", "sp", setMag_wrong, websocket_info, None, None
+                    "LD0/DWMX1.WMaxSet.setMag", "sp", set_mag_wrong, websocket_info, None, None
                 )
                 logger.info("setDataValues with incorrect type: %s", set_val_res)
 

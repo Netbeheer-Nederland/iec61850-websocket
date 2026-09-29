@@ -28,16 +28,16 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 
-trgOp = {"dchg": False, "qchg": True, "dupd": False, "integrity": False, "gi": True}
+trg_op = {"dchg": False, "qchg": True, "dupd": False, "integrity": False, "gi": True}
 
 urcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints", True)
-urcb.trgOps = trgOp
+urcb.trgOps = trg_op
 
 urcb_2 = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints", True)
 urcb_2.gi = True
 urcb_2.rptEna = True
 
-data_WMaxSetPct = [
+data_w_max_set_pct = [
     {
         "name": "setMag",
         "data": ("structure", {"name": "f", "data": [("float32", 19.666)]}),

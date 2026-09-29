@@ -28,10 +28,10 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 
-trgOp = {"dchg": True, "qchg": False, "dupd": False, "integrity": False, "gi": False}
+trg_op = {"dchg": True, "qchg": False, "dupd": False, "integrity": False, "gi": False}
 
 urcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints_wrong", True)
-urcb.trgOps = trgOp
+urcb.trgOps = trg_op
 
 urcb_2 = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints_wrong", True)
 urcb_2.rptEna = True

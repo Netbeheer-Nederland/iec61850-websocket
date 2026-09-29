@@ -46,7 +46,7 @@ oper_val = {
     "test": True,
     "check": {"synchroCheck": False, "interlockCheck": False},
 }
-oper_val_setMag = {
+oper_val_set_mag = {
     "ref": "DWMX1.WMaxSet.setMag",
     "ctlVal": ("structure", {"data": [("float32", 11.86)]}),
     "origin": {"orCat": "stationControl", "orIdent": b"ORIGIN_ID_333"},
@@ -65,7 +65,7 @@ oper_val_setMag = {
     "check": {"synchroCheck": False, "interlockCheck": False},
 }
 
-setMag_val = [{"name": "setMag", "data": ("structure", {"data": [("float32", 67.39)]})}]
+set_mag_val = [{"name": "setMag", "data": ("structure", {"data": [("float32", 67.39)]})}]
 
 
 async def main():
@@ -98,7 +98,7 @@ async def main():
                 logger.info("get_data_values WMaxSet: %s", da_val)
 
                 set_val_res = await client.set_data_values(
-                    "LD0/DWMX1.WMaxSet.setMag", "sp", setMag_val, websocket_info, None, None
+                    "LD0/DWMX1.WMaxSet.setMag", "sp", set_mag_val, websocket_info, None, None
                 )
                 logger.info("set_data_values setMag: %s", set_val_res)
 

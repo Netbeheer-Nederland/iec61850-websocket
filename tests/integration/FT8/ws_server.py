@@ -28,7 +28,7 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 
-optFlds = {
+opt_flds = {
     "seqNum": False,
     "timeStamp": True,
     "dataSet": True,
@@ -39,15 +39,15 @@ optFlds = {
     "reasonCode": False,
 }
 
-trgOp = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": False}
+trg_op = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": False}
 
 brcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbMinMaxAvg", True)
 brcb.rptEna = True
 brcb.confRev = 5
-brcb.optFlds = optFlds
+brcb.optFlds = opt_flds
 brcb.bufTm = 1000
 brcb.sqNum = 42
-brcb.trgOps = trgOp
+brcb.trgOps = trg_op
 brcb.intgPd = 2
 brcb.gi = True
 brcb.purgeBuf = False
@@ -58,10 +58,10 @@ brcb.resvTms = 5
 urcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints", False)
 urcb.rptEna = True
 urcb.confRev = 5
-urcb.optFlds = optFlds
+urcb.optFlds = opt_flds
 urcb.bufTm = 1000
 urcb.sqNum = 88
-urcb.trgOps = trgOp
+urcb.trgOps = trg_op
 urcb.intgPd = 5
 urcb.gi = True
 urcb.entryId = b"\x01\x02\x03\x04\x05\x06\x07\x08"
