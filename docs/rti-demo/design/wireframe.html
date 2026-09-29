@@ -178,11 +178,16 @@
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .grid-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
   .endpoint-card { display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--wf-line-soft); border-radius: 8px; padding: 12px; background: var(--wf-fill-soft); }
-  .endpoint-card .icon-tile { width: 34px; height: 34px; border-radius: 6px; border: 1.5px solid var(--wf-line); flex: none; }
+  .endpoint-card.highlighted { border-color: var(--wf-accent); background: #fff; }
+  .endpoint-card .icon-tile { width: 34px; height: 34px; border-radius: 6px; border: 1.5px solid var(--wf-line); flex: none; position: relative; }
   .endpoint-card .meta { flex: 1; min-width: 0; }
   .endpoint-card .meta .name { height: 10px; width: 70%; background: var(--wf-fill); border: 1px dashed var(--wf-line-soft); margin-bottom: 6px; }
   .endpoint-card .meta .sub { height: 8px; width: 45%; background: var(--wf-fill); border: 1px dashed var(--wf-line-soft); }
   .endpoint-card .pill { width: 40px; height: 16px; border-radius: 8px; border: 1.5px solid var(--wf-line-soft); flex: none; }
+  /* Live counter badge (e.g. RTI-SO's connected-FSP count) - filled dark so
+     it reads as "on"/highlighted even in this doc's otherwise line-only,
+     colorless language. */
+  .count-badge { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; border-radius: 50%; background: var(--wf-accent); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid #fff; }
 
   .modal-overlay { border: 2px dashed var(--wf-line); border-radius: 10px; padding: 16px; background: #fff; margin-top: 18px; position: relative; }
   .modal-overlay::before { content: "MODAL (on top of page)"; position: absolute; top: -11px; left: 14px; background: #fff; padding: 0 6px; font-size: 9px; color: var(--wf-muted); letter-spacing: .04em; }
@@ -241,8 +246,9 @@
 
           <div class="section-card" style="margin-top:16px;">
             <h3>Instance Visualization (InstanceVisualization component)</h3>
+            <p class="placeholder-text" style="margin:0 0 10px;">ⓘ The SO card (first, below) highlights and shows a live badge with its count of currently-connected FSPs (from the SO's own /api/properties → acsi_client_list) - highlighted/badge "on" as soon as one FSP is connected, cleared back to plain/0 when none are.</p>
             <div class="grid-cards">
-              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card highlighted"><div class="icon-tile"><span class="count-badge">2</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
               <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
               <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
             </div>

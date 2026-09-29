@@ -114,6 +114,37 @@ function App() {
     );
   }, [settings.bffHost, settings.bffPort, parsePythonDictString]);
 
+  // Same idea as enrichFspClientCounts above, for the other side of the
+  // link: how many FSPs are currently associated with each connected SO
+  // (so/acsi_client.py's get_cp_list, exposed as /api/properties'
+  // acsi_client_list). Only covers first paint - like connectedClients,
+  // subsequent updates arrive already-enriched via the "connections" live
+  // push (bff_server.py's _build_enriched_connections).
+  const enrichSoClientCounts = useCallback(async (connectionsList) => {
+    const bffTarget = buildTargetValue(settings.bffHost, settings.bffPort);
+    const soConns = connectionsList.filter(c => c.type === 'RTI-SO' && c.status === 'connected');
+
+    const results = await Promise.allSettled(
+      soConns.map(async (conn) => {
+        const target = buildTargetValue(conn.host, conn.port);
+        if (!target || target === bffTarget) return { name: conn.name, count: 0 };
+        const result = await executeApiCall('properties', target, null);
+        const clientList = result?.payload?.result?.acsi_client_list || result?.payload?.acsi_client_list || [];
+
+        return { name: conn.name, count: Array.isArray(clientList) ? clientList.length : 0 };
+      })
+    );
+
+    const countMap = {};
+    results.forEach(r => {
+      if (r.status === 'fulfilled') countMap[r.value.name] = r.value.count;
+    });
+
+    return connectionsList.map(c =>
+      c.type === 'RTI-SO' ? { ...c, connectedFsps: countMap[c.name] ?? 0 } : c
+    );
+  }, [settings.bffHost, settings.bffPort]);
+
   const connectionsRef = useRef([]);
   const isFetchingRef = useRef(false);
 
@@ -126,7 +157,8 @@ function App() {
       if (response.ok) {
         const data = await response.json();
         const rawConnections = data.connections || [];
-        const enriched = await enrichFspClientCounts(rawConnections);
+        const withFspCounts = await enrichFspClientCounts(rawConnections);
+        const enriched = await enrichSoClientCounts(withFspCounts);
 
         const changed = JSON.stringify(enriched) !== JSON.stringify(connectionsRef.current);
         if (changed) {
@@ -143,7 +175,7 @@ function App() {
       if (!background) setConnectionsLoading(false);
       isFetchingRef.current = false;
     }
-  }, [settings.bffHost, settings.bffPort, enrichFspClientCounts]);
+  }, [settings.bffHost, settings.bffPort, enrichFspClientCounts, enrichSoClientCounts]);
 
   // Fetch once on mount / whenever BFF settings change
   useEffect(() => {

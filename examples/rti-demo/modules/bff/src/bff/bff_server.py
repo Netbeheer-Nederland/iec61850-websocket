@@ -276,13 +276,50 @@ async def _fetch_fsp_client_count(con: dict[str, Any]) -> tuple[str, int]:
     return con.get("name"), 0
 
 
+async def _fetch_so_client_count(con: dict[str, Any]) -> tuple[str, int]:
+    """Look up an RTI-SO connection's live count of associated FSP clients.
+
+    so/acsi_client.py's get_cp_list() (exposed as /api/properties'
+    acsi_client_list) only counts cps with an established association, so
+    this is "how many FSPs are currently connected to this SO" - the same
+    list _relay_acsi_client_list() already watches for the ACSI Client page.
+    """
+    key = f"{con.get('host')}:{con.get('port')}"
+    client = _bff_clients.get(key)
+    if not client:
+        return con.get("name"), 0
+    try:
+        result = await asyncio.to_thread(client.request, "GET", "/api/properties")
+        client_list = (
+            result.get("acsi_client_list") if isinstance(result, dict) else None
+        )
+        if isinstance(client_list, list):
+            return con.get("name"), len(client_list)
+    except Exception:
+        pass
+    return con.get("name"), 0
+
+
 async def _build_enriched_connections() -> list[dict[str, Any]]:
-    """Mirror the HMI's former client-side enrichFspClientCounts, server-side."""
+    """Mirror the HMI's former client-side enrichFspClientCounts, server-side.
+
+    Also attaches each RTI-SO's live connectedFsps count, so the Setup
+    page's SO circle can turn "connected" and show a count without a
+    separate HMI-side poll.
+    """
     conns = conn_manager.connections
     fsp_conns = [
         c
         for c in conns
         if c.get("type") == "RTI-FSP"
+        and c.get("status") == "connected"
+        and c.get("host")
+        and c.get("port")
+    ]
+    so_conns = [
+        c
+        for c in conns
+        if c.get("type") == "RTI-SO"
         and c.get("status") == "connected"
         and c.get("host")
         and c.get("port")
@@ -296,11 +333,22 @@ async def _build_enriched_connections() -> list[dict[str, Any]]:
             if isinstance(r, tuple):
                 counts[r[0]] = r[1]
 
+    so_counts: dict[str, int] = {}
+    if so_conns:
+        results = await asyncio.gather(
+            *(_fetch_so_client_count(c) for c in so_conns), return_exceptions=True
+        )
+        for r in results:
+            if isinstance(r, tuple):
+                so_counts[r[0]] = r[1]
+
     enriched = []
     for con in conns:
         entry = dict(con)
         if con.get("type") == "RTI-FSP":
             entry["connectedClients"] = counts.get(con.get("name"), 0)
+        elif con.get("type") == "RTI-SO":
+            entry["connectedFsps"] = so_counts.get(con.get("name"), 0)
         enriched.append(entry)
     return enriched
 

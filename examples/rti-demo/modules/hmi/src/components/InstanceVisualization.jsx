@@ -61,9 +61,9 @@ function InstanceVisualization({
   const hasConnected = connections.filter(conn => conn.status === 'connected').length > 0;
 
   // SO side is considered "detected" if there's at least one connected SO.
-  // Used only to color the FSP circles (green when both sides detect a
-  // connection, red if the SO side has failed) — the SO circle itself is
-  // left untouched, matching the signal the connection line already uses.
+  // Used to color the FSP circles (green when both sides detect a
+  // connection, red if the SO side has failed). The SO circle itself uses
+  // a different, per-SO signal instead (its own connectedFsps count, below).
   const soDetected = soConnections.length > 0;
 
   return (
@@ -89,25 +89,63 @@ function InstanceVisualization({
         <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', minHeight: '300px' }}>
           {/* SO (Client) Side - Left - centers vertically against FSP column height */}
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minWidth: '180px' }}>
-            {soConnections.map((conn) => (
+            {soConnections.map((conn) => {
+              // connectedFsps comes from the SO's own /api/properties
+              // acsi_client_list (cps with an established association) -
+              // see App.jsx's enrichSoClientCounts and bff_server.py's
+              // _build_enriched_connections. Green as soon as one FSP is
+              // connected, same threshold the FSP side already uses.
+              const connectedFsps = conn.connectedFsps ?? 0;
+              const fspConnected = connectedFsps > 0;
+              const soCircleBg = selectedConnection?.name === conn.name
+                ? 'var(--primary-light)'
+                : fspConnected
+                  ? 'var(--success-color)'
+                  : 'var(--bg-card)';
+
+              return (
               <React.Fragment key={`so-${conn.name}`}>
-                <div
-                  style={{
-                    width: '140px',
-                    height: '140px',
-                    border: '2px solid var(--border-color)',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: '12px',
-                    background: 'var(--bg-card)',
-                    cursor: 'pointer'
-                  }}
-                  onClick={handleSoClick}
-                  title="Type: RTI-SO (Client)"
-                >
-                  <span style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600' }}>{conn.name}</span>
+                <div style={{ position: 'relative', marginBottom: '12px' }}>
+                  <div
+                    style={{
+                      width: '140px',
+                      height: '140px',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: soCircleBg,
+                      cursor: 'pointer'
+                    }}
+                    onClick={handleSoClick}
+                    title={`Type: RTI-SO (Client) - ${connectedFsps} FSP${connectedFsps === 1 ? '' : 's'} connected`}
+                  >
+                    <span style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600' }}>{conn.name}</span>
+                  </div>
+                  {/* Counter of FSPs currently connected to this SO */}
+                  <span
+                    title={`${connectedFsps} connected FSP${connectedFsps === 1 ? '' : 's'}`}
+                    style={{
+                      position: 'absolute',
+                      top: '-4px',
+                      right: '-4px',
+                      minWidth: '26px',
+                      height: '26px',
+                      padding: '0 6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '13px',
+                      background: fspConnected ? 'var(--success-color)' : 'var(--text-muted)',
+                      color: 'white',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      border: '2px solid var(--bg-card)'
+                    }}
+                  >
+                    {connectedFsps}
+                  </span>
                 </div>
                 {showLabels && (
                   <div style={{
@@ -126,7 +164,8 @@ function InstanceVisualization({
                   </div>
                 )}
               </React.Fragment>
-            ))}
+              );
+            })}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '24px' }}>
             {fspConnections.map((conn) => {
