@@ -1,6 +1,5 @@
 # SPDX-FileCopyrightText: 2025 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-import pytest
 
 from ws61850.shared.refs import build_fcd_ref
 

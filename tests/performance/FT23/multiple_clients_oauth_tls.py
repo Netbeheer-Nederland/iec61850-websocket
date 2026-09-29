@@ -20,7 +20,6 @@ import logging
 import os
 import random
 import sys
-import time
 from pathlib import Path
 
 from ws61850.endpoint.active_endpoint import ActiveEndpoint

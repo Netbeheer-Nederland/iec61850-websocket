@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2025 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
 """Unit tests for DataAccessService."""
-import pytest
 
 from ws61850.iec61850.services.data_access_service import DataAccessService
 from ws61850.iec61850.data_model.ied_model import FunctionalConstraint

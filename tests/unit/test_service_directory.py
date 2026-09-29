@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2025 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
 """Unit tests for DirectoryService."""
-import pytest
 
 from ws61850.iec61850.services.directory_service import DirectoryService
 from ws61850.iec61850.data_model.ied_model import DataSet, DataSetEntry, FunctionalConstraint
@@ -25,7 +24,6 @@ def test_get_server_directory_returns_ld_names(simple_ied):
     # result is a TPAA tuple — check it is a tuple/list
     assert result is not None
     # The LD name should appear somewhere in the nested structure
-    import json
     flat = str(result)
     assert "LD0" in flat
 

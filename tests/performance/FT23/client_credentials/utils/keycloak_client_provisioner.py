@@ -20,7 +20,6 @@ import sys
 from pathlib import Path
 
 import requests
-import urllib3
 
 # Ensure the project root is on sys.path so that `testing` is importable
 # when this script is run directly (outside of pytest).

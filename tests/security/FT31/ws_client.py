@@ -17,10 +17,8 @@
 import asyncio
 import logging
 import sys
-import time
 from pathlib import Path
 
-import jwt
 
 from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.iec61850.data_model import IedModelLoader

@@ -7,8 +7,6 @@ from ws61850.iec61850.data_model.ied_model import (
     DataAttribute,
     DataAttributeType,
     DataObject,
-    DataSet,
-    DataSetEntry,
     FunctionalConstraint,
     IedModel,
     LogicalDevice,

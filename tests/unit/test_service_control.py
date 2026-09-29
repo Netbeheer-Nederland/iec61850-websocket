@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Unit tests for ControlService."""
 import pytest
-from unittest.mock import MagicMock
 
 from ws61850.iec61850.services.control_service import ControlService
 from ws61850.iec61850.server.control_handling import ControlHandlerResult

@@ -17,9 +17,8 @@
 
 """Unit tests for PassiveEndpoint."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 

@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Unit tests for ReportService."""
 import pytest
-from unittest.mock import MagicMock
 
 from ws61850.iec61850.services.report_service import ReportService
 from ws61850.iec61850.data_model.ied_model import ReportControl

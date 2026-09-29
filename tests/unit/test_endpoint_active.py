@@ -19,7 +19,6 @@
 
 from unittest.mock import MagicMock
 
-import pytest
 
 from ws61850.endpoint.active_endpoint import ActiveEndpoint
 
