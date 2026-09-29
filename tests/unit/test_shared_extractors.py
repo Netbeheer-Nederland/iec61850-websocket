@@ -138,7 +138,7 @@ def test_extract_ln_ref():
     assert extract_ln_ref(tpaa) == "LD0/LLN0"
 
 
-def test_extract_acsiType():
+def test_extract_acsi_type():
     tpaa = _svc_tuple("getLogicalNodeDirectory", lnRef="LD0/LLN0", aCSIClass="dataObject")
     assert extract_acsi_type(tpaa) == "dataObject"
 
@@ -158,12 +158,12 @@ def test_extract_ref():
     assert extract_ref(tpaa) == {"ref": "LD0/LLN0.Health.stVal", "fc": "st"}
 
 
-def test_extract_dataAttrVal():
+def test_extract_data_attr_val():
     tpaa = _svc_tuple("setDataValues", dataAttrVal=[{"data": True}])
     assert extract_data_attr_val(tpaa) == [{"data": True}]
 
 
-def test_extract_includeElementName():
+def test_extract_include_element_name():
     tpaa = _svc_tuple("getDataValues", includeElementName=True)
     assert extract_include_element_name(tpaa) is True
 
