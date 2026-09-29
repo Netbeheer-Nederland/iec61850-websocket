@@ -115,7 +115,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * Visual instance visualization showing all SO, FSP, and their connections
 * Multiple collapsible Data Access Panels
 * Dynamic panel management (add/remove)
-* Real-time message monitoring
+* Real-time message monitoring, newest-first by default with a toggle for oldest-first (same control as the Monitoring panels' Protocol Messages list)
 * Connection health monitoring
 * Connection reload functionality
 
