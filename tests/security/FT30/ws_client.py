@@ -47,10 +47,10 @@ logging.basicConfig(
 )
 
 
-def control_handler_for_float(obj_ref, ctlVal_value, parameter):
-    if ctlVal_value is not None:
-        if ctlVal_value["type"].startswith("float"):
-            if ctlVal_value["value"] < 50:
+def control_handler_for_float(obj_ref, ctl_val_value, parameter):
+    if ctl_val_value is not None:
+        if ctl_val_value["type"].startswith("float"):
+            if ctl_val_value["value"] < 50:
                 return ControlHandlerResult.OK, None
             else:
                 return (
