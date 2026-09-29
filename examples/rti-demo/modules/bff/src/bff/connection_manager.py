@@ -755,3 +755,50 @@ class ConnectionManager:
             *(self.check_connection(con, client) for con in self.connections)
         )
         return self.connections
+
+    async def validate_idp_server_on_start(self) -> None:
+        """Validate the most recently added IDP-Server connection at startup.
+
+        Only the latest one (highest `id`) is checked - if several IDP-Server
+        connections are registered, older ones are assumed superseded. If it
+        isn't reachable, OAuth2 is disabled on every connection that
+        authenticates against it (`OAuth.idp_server` matching its name),
+        since they'd otherwise keep trying - and failing - to fetch tokens/
+        JWKS from an IDP that isn't there. Runs once at startup rather than
+        on every status_monitor() tick, so a still-down IDP doesn't keep
+        re-triggering this (and spamming the log) every interval.
+        """
+        idp_servers = [c for c in self.connections if c.get("type") == "IDP-Server"]
+        if not idp_servers:
+            return
+
+        latest = max(idp_servers, key=lambda c: c.get("id", 0))
+        await self.check_connection(latest, self.get_client())
+
+        if latest.get("status") == "connected":
+            self.logger.info(
+                f"Startup check: IDP-Server '{latest.get('name')}' is active"
+            )
+            return
+
+        self.logger.warning(
+            f"Startup check: IDP-Server '{latest.get('name')}' is not reachable - "
+            "disabling OAuth2 on connections that use it"
+        )
+        changed = False
+        for con in self.connections:
+            oauth = con.get("OAuth")
+            if (
+                oauth
+                and oauth.get("idp_server") == latest.get("name")
+                and oauth.get("enable_oauth")
+            ):
+                oauth["enable_oauth"] = False
+                changed = True
+                self.logger.warning(
+                    f"Disabled OAuth2 on '{con.get('name')}' "
+                    f"(IDP-Server '{latest.get('name')}' unreachable)"
+                )
+
+        if changed:
+            self.save_connections()

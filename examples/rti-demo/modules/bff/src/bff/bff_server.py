@@ -423,6 +423,7 @@ async def lifespan(app: FastAPI):
     # logging dictConfig, which runs before app startup.
     logging.getLogger("uvicorn.access").addFilter(HealthCheckAccessFilter())
 
+    await conn_manager.validate_idp_server_on_start()
     asyncio.create_task(conn_manager.status_monitor(interval=10))
     asyncio.create_task(push_relay_loop(interval=2))
 
