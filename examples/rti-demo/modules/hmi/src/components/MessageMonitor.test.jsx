@@ -161,3 +161,55 @@ describe('MessageMonitor live push wiring', () => {
     expect(executeApiCall).toHaveBeenCalledTimes(1); // no more polling after stop
   });
 });
+
+describe('MessageMonitor sort order', () => {
+  // Messages arrive oldest-first (each push/poll appends to the end of the
+  // underlying array, same as the id order below) - the sort toggle should
+  // default to showing the latest one first regardless, same as
+  // ActionLogPanel's Protocol Messages list does.
+  const ids = () => screen.getAllByText(/^#\d+$/).map((el) => el.textContent);
+
+  it('defaults to newest-first even though messages arrive oldest-first', async () => {
+    isConnected.mockReturnValue(true);
+    render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+    await startMonitoring();
+
+    await pushLiveMessages('10.0.0.1:5001', [
+      { id: 1, message: 'first' },
+      { id: 2, message: 'second' },
+      { id: 3, message: 'third' },
+    ]);
+
+    expect(ids()).toEqual(['#3', '#2', '#1']);
+    expect(screen.getByTitle('Showing newest first - click for oldest first')).toBeInTheDocument();
+  });
+
+  it('toggles to oldest-first on click, and back on a second click', async () => {
+    isConnected.mockReturnValue(true);
+    render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+    await startMonitoring();
+    await pushLiveMessages('10.0.0.1:5001', [
+      { id: 1, message: 'first' },
+      { id: 2, message: 'second' },
+    ]);
+
+    const user = userEvent.setup({ delay: null });
+    const sortButton = screen.getByTitle('Showing newest first - click for oldest first');
+    await user.click(sortButton);
+
+    expect(ids()).toEqual(['#1', '#2']);
+    expect(screen.getByTitle('Showing oldest first - click for newest first')).toBeInTheDocument();
+
+    await user.click(screen.getByTitle('Showing oldest first - click for newest first'));
+
+    expect(ids()).toEqual(['#2', '#1']);
+  });
+
+  it('disables the sort button while there are no messages', async () => {
+    isConnected.mockReturnValue(true);
+    render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+    await startMonitoring();
+
+    expect(screen.getByTitle('Showing newest first - click for oldest first')).toBeDisabled();
+  });
+});

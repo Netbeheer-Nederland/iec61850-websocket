@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { executeApiCall, buildTargetValue } from '../services/apiService';
 import { subscribe as subscribeLive, isConnected as isLiveConnected, onConnectionStateChange } from '../services/liveSocket';
 
@@ -48,7 +48,12 @@ function MessageMonitor({
   const [expandedMessageId, setExpandedMessageId] = useState(null);
   const [prettyPrintMessages, setPrettyPrintMessages] = useState({});
   const [status, setStatus] = useState('Monitoring stopped');
-  
+  // Same sort toggle as ActionLogPanel's Protocol Messages list - but
+  // unlike there, messages here arrive oldest-first (each fetch/push
+  // appends, never prepends), so "newest" (the default - latest message
+  // first) is the one that has to reverse; "oldest" is the pass-through.
+  const [sortOrder, setSortOrder] = useState('newest');
+
   const pollingRef = useRef(null);
   const messageIdsRef = useRef(new Set());
   const currentIntervalRef = useRef(defaultInterval);
@@ -294,6 +299,12 @@ function MessageMonitor({
   const toggleMessage = useCallback((messageId) => {
     setExpandedMessageId(prev => prev === messageId ? null : messageId);
   }, []);
+
+  // Messages for display, in sortOrder (see the state comment above for why
+  // "newest" - the default - is the one that reverses the underlying array).
+  const visibleMessages = useMemo(() => {
+    return sortOrder === 'newest' ? [...messages].reverse() : messages;
+  }, [messages, sortOrder]);
 
   // Syntax highlight JSON content with proper token detection
   const syntaxHighlightJson = (jsonString) => {
@@ -626,13 +637,22 @@ function MessageMonitor({
             <i className="fas fa-stop"></i>
           </button>
           
-          <button 
-            className="btn-icon monitor-control-btn" 
+          <button
+            className="btn-icon monitor-control-btn"
             title="Clear Messages"
             onClick={clearMessages}
             disabled={messages.length === 0}
           >
             <i className="fas fa-trash"></i>
+          </button>
+
+          <button
+            className="btn-icon monitor-control-btn"
+            onClick={() => setSortOrder((prev) => (prev === 'newest' ? 'oldest' : 'newest'))}
+            disabled={messages.length === 0}
+            title={sortOrder === 'newest' ? 'Showing newest first - click for oldest first' : 'Showing oldest first - click for newest first'}
+          >
+            <i className={`fas fa-sort-${sortOrder === 'newest' ? 'amount-down' : 'amount-up'}`}></i>
           </button>
         </div>
       </div>
@@ -648,7 +668,7 @@ function MessageMonitor({
           </p>
         ) : (
           <div className="message-list" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-            {messages.map((msg) => {
+            {visibleMessages.map((msg) => {
               const msgId = msg.id || msg.message || JSON.stringify(msg);
               const isExpanded = expandedMessageId === msgId;
               const directionColor = getDirectionColor(msg.direction);
