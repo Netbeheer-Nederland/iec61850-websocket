@@ -16,7 +16,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 [cols="1,1,1",options="header"]
 |===
 |Route |File |Purpose
-|/overview (default) |Overview.jsx |Live, read-only status overview - SO/FSP graphic + instance table
+|/overview (default) |Overview.jsx |Live, read-only status overview - SO/FSP graphic
 |/acsi-client |ACSIClient.jsx |SO interface, tree view, controls
 |/acsi-server |ACSIServer.jsx |FSP interface, tree view, data write
 |/connections |Connections.jsx |Register, edit and delete instances (CRUD)
@@ -32,14 +32,14 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 === Page Details
 
 ==== Overview (`/overview`)
-**File**: Overview.jsx (6KB)
+**File**: Overview.jsx (3KB)
 
-**Purpose**: Default landing page showing live status of all registered instances - read-only. Registering, editing and deleting instances all live on the Connections page instead.
+**Purpose**: Default landing page showing live status of all registered instances as a graphic - read-only. The instance table, and registering, editing and deleting instances, all live on the Connections page instead.
 
 **Features**:
 * Visual instance visualization (InstanceVisualization) showing SO, FSP, and their connections
 * SO circle turns green and shows a live badge counting its connected FSPs (connectedFsps > 0)
-* Sortable, read-only status table (Status, Name, Type, Host, BFF Port - no Actions column)
+* No instance table - when nothing is registered, an empty-state hint points to the Connections page
 * Auto-checks all connection health on page load
 * Default route (redirects from `/`)
 
@@ -78,7 +78,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 ==== Connections (`/connections`)
 **File**: Connections.jsx (12KB)
 
-**Purpose**: The only place to register, edit or delete an instance - Overview only ever displays connections, it never edits them.
+**Purpose**: The only place that lists instances in a table, and the only place to register, edit or delete one - Overview only shows the live graphic.
 
 **Features**:
 * List all configured connections in a sortable table format

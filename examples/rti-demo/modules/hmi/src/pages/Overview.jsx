@@ -17,61 +17,16 @@
  * limitations under the License.
  */
 
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import InstanceVisualization from '../components/InstanceVisualization';
 
-// Read-only: the graphical SO/FSP overview and a sortable status table.
-// Registering, editing and deleting instances all live on the Connections
-// page now - this page never mutates a connection, so it doesn't need
+// Read-only: just the graphical SO/FSP overview. The instance table and
+// registering, editing and deleting instances all live on the Connections
+// page - this page never lists or mutates a connection, so it doesn't need
 // ConnectionModal, useNavigate (InstanceVisualization does its own
 // navigation for the FSP/SO circle clicks), or any of the add/edit/delete
 // plumbing the old combined Setup page used to carry.
 function Overview({ settings, connections = [], loading = false, onReload }) {
-  // Sortable columns: Name, Type, Host, BFF Port ('name' | 'type' | 'host'
-  // | 'port', or null for unsorted).
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-
-  const handleSort = (key) => {
-    setSortConfig((prev) => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
-    }));
-  };
-
-  const sortedConnections = useMemo(() => {
-    if (!sortConfig.key) return connections;
-    const { key, direction } = sortConfig;
-    const sign = direction === 'asc' ? 1 : -1;
-    return [...connections].sort((a, b) => {
-      if (key === 'port') {
-        return sign * ((Number(a.port) || 0) - (Number(b.port) || 0));
-      }
-      const aVal = String(a[key] ?? '').toLowerCase();
-      const bVal = String(b[key] ?? '').toLowerCase();
-      if (aVal < bVal) return -1 * sign;
-      if (aVal > bVal) return 1 * sign;
-      return 0;
-    });
-  }, [connections, sortConfig]);
-
-  const sortIcon = (key) => {
-    if (sortConfig.key !== key) {
-      return <i className="fas fa-sort" style={{ marginLeft: '6px', fontSize: '11px', opacity: 0.4 }}></i>;
-    }
-    return (
-      <i
-        className={`fas fa-sort-${sortConfig.direction === 'asc' ? 'up' : 'down'}`}
-        style={{ marginLeft: '6px', fontSize: '11px' }}
-      ></i>
-    );
-  };
-
-  const sortableTh = (key, label) => (
-    <th onClick={() => handleSort(key)} style={{ cursor: 'pointer', userSelect: 'none' }}>
-      {label}{sortIcon(key)}
-    </th>
-  );
-
   // Check all connections health using BFF endpoint
   const checkAllConnectionsHealth = async (connectionsList) => {
     try {
@@ -100,7 +55,7 @@ function Overview({ settings, connections = [], loading = false, onReload }) {
     <section className="page">
       <div className="page-header" style={{ marginBottom: '20px' }}>
         <h2>Overview</h2>
-        <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>Live status of all registered instances and their connections</p>
+        <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>Live status of all registered instances</p>
       </div>
 
       <React.Fragment>
@@ -122,44 +77,11 @@ function Overview({ settings, connections = [], loading = false, onReload }) {
           )}
         </div>
 
-        {/* Instances Table (read-only - register/edit/delete live on Connections) */}
-        <div style={{ paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
-          {connections && connections.length > 0 ? (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Status</th>
-                  {sortableTh('name', 'Name')}
-                  {sortableTh('type', 'Type')}
-                  {sortableTh('host', 'Host')}
-                  {sortableTh('port', 'BFF Port')}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedConnections.map((conn, index) => (
-                  <tr key={conn.name || index}>
-                    <td>
-                      <span
-                        className="bff-status-dot"
-                        style={{
-                          background: conn.status === 'connected' ? 'var(--success-color)' : 'var(--danger-color)'
-                        }}
-                      ></span>
-                    </td>
-                    <td>{conn.name}</td>
-                    <td>{conn.type}</td>
-                    <td>{conn.type === 'IDP-Server' ? '-' : conn.host}</td>
-                    <td>{conn.type === 'IDP-Server' ? '-' : conn.port}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-              No instances registered. Register one from the Connections page to get started.
-            </p>
-          )}
-        </div>
+        {!loading && connections.length === 0 && (
+          <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
+            No instances registered. Register one from the Connections page to get started.
+          </p>
+        )}
       </React.Fragment>
     </section>
   );

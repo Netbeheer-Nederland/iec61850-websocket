@@ -228,22 +228,9 @@
           <div class="wf-page-header">
             <div class="wf-h1" data-label="Overview"></div>
           </div>
-          <p class="placeholder-text" style="margin:-10px 0 16px;">ⓘ Read-only - the graphic and table below just reflect live status. Register, edit or delete an instance from the Connections page instead.</p>
+          <p class="placeholder-text" style="margin:-10px 0 16px;">ⓘ Read-only - the graphic below just reflects live status. The instance table, and registering, editing or deleting an instance, live on the Connections page instead.</p>
 
-          <div class="table-wf">
-            <div class="thead">
-              <div class="cell narrow">Status</div>
-              <div class="cell">Name</div>
-              <div class="cell">Type</div>
-              <div class="cell">Host</div>
-              <div class="cell narrow">BFF Port</div>
-            </div>
-            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">FSP01</div><div class="cell placeholder-text">RTI-FSP</div><div class="cell placeholder-text">rti-fsp</div><div class="cell narrow placeholder-text">5001</div></div>
-            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">SO</div><div class="cell placeholder-text">RTI-SO</div><div class="cell placeholder-text">rti-so</div><div class="cell narrow placeholder-text">5002</div></div>
-            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">IDP</div><div class="cell placeholder-text">IDP-Server</div><div class="cell placeholder-text">—</div><div class="cell narrow placeholder-text">—</div></div>
-          </div>
-
-          <div class="section-card" style="margin-top:16px;">
+          <div class="section-card">
             <h3>Instance Visualization (InstanceVisualization component)</h3>
             <p class="placeholder-text" style="margin:0 0 10px;">ⓘ The SO card (first, below) highlights and shows a live badge with its count of currently-connected FSPs (from the SO's own /api/properties → acsi_client_list) - highlighted/badge "on" as soon as one FSP is connected, cleared back to plain/0 when none are.</p>
             <div class="grid-cards">
@@ -276,7 +263,7 @@
               <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
             </div>
           </div>
-          <p class="placeholder-text" style="margin-top:10px;">The only place to register, edit or delete an instance - Overview only ever displays connections, it never edits them.</p>
+          <p class="placeholder-text" style="margin-top:10px;">The only place that lists instances in a table, and the only place to register, edit or delete one - Overview only shows the live graphic.</p>
 
           <div class="modal-overlay">
             <div class="modal-title"><span class="t">Register / Edit Instance</span><span class="x">×</span></div>
