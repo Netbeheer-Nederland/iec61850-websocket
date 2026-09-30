@@ -29,7 +29,7 @@ import Reports from './pages/Reports';
 import Diagnostics from './pages/Diagnostics';
 import Tools from './pages/Tools';
 import Settings from './pages/Settings';
-import Setup from './pages/Setup';
+import Overview from './pages/Overview';
 import ACSIClient from './pages/ACSIClient';
 import ACSIServer from './pages/ACSIServer';
 import { executeApiCall, buildTargetValue } from './services/apiService';
@@ -294,9 +294,9 @@ function App() {
         <main className="main-content">
           <Header bffStatus={bffStatus} />
           <Routes>
-            <Route path="/" element={<Navigate to="/setup" replace />} />
-            <Route path="/setup" element={<Setup settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections}/>} />
-            <Route path="/connections" element={<Connections connections={connections} setConnections={setConnections} loading={connectionsLoading} onReload={fetchConnections} />} />
+            <Route path="/" element={<Navigate to="/overview" replace />} />
+            <Route path="/overview" element={<Overview settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections}/>} />
+            <Route path="/connections" element={<Connections settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections} />} />
             <Route path="/model" element={<Model settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections} updateModel={updateModel} getModel={getModel} />} />
             <Route path="/traffic" element={<Traffic settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections} updateModel={updateModel} getModel={getModel} />} />
             <Route path="/data" element={<Data />} />
@@ -306,7 +306,7 @@ function App() {
             <Route path="/settings" element={<Settings settings={settings} setSettings={setSettings} />} />
             <Route path="/acsi-client" element={<ACSIClient settings={settings} bffBaseUrl={bffBaseUrl} connections={connections} updateModel={updateModel} getModel={getModel} />} />
             <Route path="/acsi-server" element={<ACSIServer settings={settings} bffBaseUrl={bffBaseUrl} connections={connections} updateModel={updateModel} getModel={getModel} />} />
-            <Route path="*" element={<Navigate to="/setup" replace />} />
+            <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>
         </main>
       </div>

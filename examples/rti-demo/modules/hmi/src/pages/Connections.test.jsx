@@ -1,110 +1,120 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Connections from './Connections';
 
-const setup = (connections = []) => {
-  const setConnections = vi.fn();
-  const utils = render(
-    <Connections connections={connections} setConnections={setConnections} />
-  );
-  return { ...utils, setConnections };
-};
-
 const user = () => userEvent.setup({ delay: null });
 
-describe('Connections page - Add/Edit modal', () => {
-  it('typing in a field actually updates its value (regression: DOM id vs formData key mismatch)', async () => {
-    const { setConnections } = setup();
+const renderConnections = (connections = []) =>
+  render(
+    <Connections
+      settings={{ bffHost: 'localhost', bffPort: '5000' }}
+      connections={connections}
+      loading={false}
+      onReload={() => {}}
+    />
+  );
+
+beforeEach(() => {
+  global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+});
+
+describe('Connections page - Register/Edit Instance modal', () => {
+  it('shows WS Port (and BFF Port) for a new RTI-SO instance', async () => {
+    renderConnections();
     const u = user();
 
-    await u.click(screen.getByRole('button', { name: /add connection/i }));
-    const hostInput = screen.getByLabelText('Host');
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
 
-    await u.clear(hostInput);
-    await u.type(hostInput, '10.0.0.5');
+    expect(screen.getByLabelText('WS Port')).toBeInTheDocument();
+    expect(screen.getByLabelText('BFF Port')).toBeInTheDocument();
+  });
 
-    expect(hostInput).toHaveValue('10.0.0.5');
-
-    await u.click(screen.getByRole('button', { name: /save connection/i }));
-    expect(setConnections).toHaveBeenCalledWith([
-      expect.objectContaining({ host: '10.0.0.5' }),
+  it('leaves WS Port blank when editing an RTI-SO connection that has none set (not a fabricated 8765)', async () => {
+    renderConnections([
+      { name: 'so1', host: '10.0.0.1', port: 5002, type: 'RTI-SO', acsi: 'client', ws_mode: 'passive', status: 'connected' },
     ]);
-  });
-
-  it('shows BFF Port and WS Port as two distinct fields for RTI-SO (the default type)', async () => {
-    setup();
     const u = user();
 
-    await u.click(screen.getByRole('button', { name: /add connection/i }));
+    await u.click(screen.getByRole('button', { name: 'Edit' }));
 
-    expect(screen.getByLabelText('BFF Port')).toBeInTheDocument();
-    expect(screen.getByLabelText('WS Port')).toBeInTheDocument();
+    // Must be genuinely blank, not a fake-looking pre-filled default - an
+    // unconfigured instance should look unconfigured.
+    expect(screen.getByLabelText('WS Port')).toHaveValue(null);
   });
 
-  it('shows BFF Port and WS Port for a Custom connection too', async () => {
-    setup();
+  it('pre-fills WS Port with the real value when the connection has one', async () => {
+    renderConnections([
+      { name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 9001, type: 'RTI-SO', acsi: 'client', ws_mode: 'passive', status: 'connected' },
+    ]);
     const u = user();
 
-    await u.click(screen.getByRole('button', { name: /add connection/i }));
-    await u.selectOptions(screen.getByLabelText('Type'), 'Custom');
+    await u.click(screen.getByRole('button', { name: 'Edit' }));
 
-    expect(screen.getByLabelText('BFF Port')).toBeInTheDocument();
-    expect(screen.getByLabelText('WS Port')).toBeInTheDocument();
+    expect(screen.getByLabelText('WS Port')).toHaveValue(9001);
   });
 
   it('labels RTI-FSP\'s port "BFF Port" too, same as RTI-SO, but without a WS Port field', async () => {
-    setup();
+    renderConnections();
     const u = user();
 
-    await u.click(screen.getByRole('button', { name: /add connection/i }));
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
     await u.selectOptions(screen.getByLabelText('Type'), 'RTI-FSP');
 
     expect(screen.getByLabelText('BFF Port')).toBeInTheDocument();
     expect(screen.queryByLabelText('WS Port')).not.toBeInTheDocument();
   });
 
-  it('saves the BFF port and WS port as two independent values', async () => {
-    const { setConnections } = setup();
+  it('shows ACSI/WebSocket Mode as read-only text (not a dropdown) for RTI-SO', async () => {
+    renderConnections();
     const u = user();
 
-    await u.click(screen.getByRole('button', { name: /add connection/i }));
-    await u.type(screen.getByLabelText('Name'), 'so1');
-    await u.type(screen.getByLabelText('Host'), '10.0.0.1');
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
 
-    const bffPortInput = screen.getByLabelText('BFF Port');
-    await u.clear(bffPortInput);
-    await u.type(bffPortInput, '5002');
-
-    const wsPortInput = screen.getByLabelText('WS Port');
-    await u.clear(wsPortInput);
-    await u.type(wsPortInput, '8765');
-
-    await u.click(screen.getByRole('button', { name: /save connection/i }));
-
-    expect(setConnections).toHaveBeenCalledWith([
-      expect.objectContaining({ name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765 }),
-    ]);
+    const acsi = screen.getByLabelText('ACSI');
+    const wsMode = screen.getByLabelText('WebSocket Mode');
+    expect(acsi.tagName).toBe('INPUT');
+    expect(acsi).toHaveAttribute('readonly');
+    expect(acsi).toHaveValue('Client');
+    expect(wsMode.tagName).toBe('INPUT');
+    expect(wsMode).toHaveAttribute('readonly');
+    expect(wsMode).toHaveValue('Passive');
   });
 
-  it('pre-fills the WS Port field when editing an existing RTI-SO connection', async () => {
-    setup([
-      { name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765, type: 'RTI-SO', status: 'connected' },
-    ]);
+  it('shows ACSI/WebSocket Mode as read-only text for RTI-FSP too', async () => {
+    renderConnections();
     const u = user();
 
-    // The edit button is icon-only (no accessible name) - grab it by
-    // position: the first .btn-icon in the connections table row.
-    const editButton = document.querySelector('#connections-container .btn-icon');
-    await u.click(editButton);
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.selectOptions(screen.getByLabelText('Type'), 'RTI-FSP');
 
-    expect(screen.getByLabelText('WS Port')).toHaveValue(8765);
+    const acsi = screen.getByLabelText('ACSI');
+    const wsMode = screen.getByLabelText('WebSocket Mode');
+    expect(acsi.tagName).toBe('INPUT');
+    expect(acsi).toHaveValue('Server');
+    expect(wsMode.tagName).toBe('INPUT');
+    expect(wsMode).toHaveValue('Active');
+  });
+
+  it('keeps ACSI/WebSocket Mode as real, editable dropdowns for Custom', async () => {
+    renderConnections();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.selectOptions(screen.getByLabelText('Type'), 'Custom');
+
+    const acsi = screen.getByLabelText('ACSI');
+    const wsMode = screen.getByLabelText('WebSocket Mode');
+    expect(acsi.tagName).toBe('SELECT');
+    expect(acsi).toBeEnabled();
+    expect(wsMode.tagName).toBe('SELECT');
+    expect(wsMode).toBeEnabled();
   });
 });
 
 describe('Connections page - table', () => {
   it('shows Status, Name, Type, Host, BFF Port and Actions columns, in that order', () => {
-    setup([
+    renderConnections([
       { name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765, type: 'RTI-SO', status: 'connected' },
     ]);
 
@@ -113,7 +123,7 @@ describe('Connections page - table', () => {
   });
 
   it('shows each row\'s status, name, type, host and BFF port', () => {
-    setup([
+    renderConnections([
       { name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765, type: 'RTI-SO', status: 'connected' },
       { name: 'fsp1', host: '10.0.0.2', port: 5001, type: 'RTI-FSP', status: 'disconnected' },
     ]);
@@ -131,7 +141,7 @@ describe('Connections page - table', () => {
   });
 
   it('sorts by a clicked column, toggling direction on repeat clicks', async () => {
-    setup([
+    renderConnections([
       { name: 'so2', host: '10.0.0.2', port: 5002, type: 'RTI-SO', status: 'connected' },
       { name: 'so1', host: '10.0.0.1', port: 5001, type: 'RTI-SO', status: 'connected' },
     ]);
@@ -149,7 +159,7 @@ describe('Connections page - table', () => {
   });
 
   it('sorts BFF Port numerically, not lexicographically', async () => {
-    setup([
+    renderConnections([
       { name: 'a', host: '10.0.0.1', port: 10001, type: 'RTI-SO', status: 'connected' },
       { name: 'b', host: '10.0.0.2', port: 9000, type: 'RTI-SO', status: 'connected' },
     ]);
@@ -160,5 +170,112 @@ describe('Connections page - table', () => {
     const nameCells = screen.getAllByRole('row').slice(1).map((r) => r.cells[1].textContent);
     // Numeric: 9000 < 10001. A lexicographic sort would put "10001" first.
     expect(nameCells).toEqual(['b', 'a']);
+  });
+});
+
+describe('Connections page - saving connections', () => {
+  const lastSaveBody = () => {
+    const call = global.fetch.mock.calls.find(([url]) => String(url).includes('/api/add-connection'));
+    return JSON.parse(call[1].body);
+  };
+
+  it('omits ws_port entirely when saving an RTI-FSP (it has no such property)', async () => {
+    renderConnections();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.selectOptions(screen.getByLabelText('Type'), 'RTI-FSP');
+    await u.type(screen.getByLabelText('Name'), 'fsp1');
+    await u.type(screen.getByLabelText('Host'), '10.0.0.2');
+
+    await u.click(screen.getByRole('button', { name: /save instance/i }));
+
+    // Previously sent as "" (leftover from the shared initial formData),
+    // which the backend's Optional[int] field rejected outright:
+    // {"detail":[{"type":"int_parsing", ..., "input":""}]}.
+    expect(lastSaveBody()).not.toHaveProperty('ws_port');
+  });
+
+  it('defaults ws_port for an RTI-SO connection left blank, instead of sending ""', async () => {
+    renderConnections();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.type(screen.getByLabelText('Name'), 'so1');
+    await u.type(screen.getByLabelText('Host'), '10.0.0.1');
+    // WS Port left untouched (blank).
+
+    await u.click(screen.getByRole('button', { name: /save instance/i }));
+
+    expect(lastSaveBody().ws_port).toBe(8765);
+  });
+
+  it('keeps a real ws_port value the user entered for RTI-SO', async () => {
+    renderConnections();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.type(screen.getByLabelText('Name'), 'so1');
+    await u.type(screen.getByLabelText('Host'), '10.0.0.1');
+    const wsPortInput = screen.getByLabelText('WS Port');
+    await u.clear(wsPortInput);
+    await u.type(wsPortInput, '9001');
+
+    await u.click(screen.getByRole('button', { name: /save instance/i }));
+
+    expect(lastSaveBody().ws_port).toBe(9001);
+  });
+
+  it('deletes a connection via DELETE /api/delete-connection/:name', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConnections([
+      { name: 'so1', host: '10.0.0.1', port: 5002, type: 'RTI-SO', status: 'connected' },
+    ]);
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:5000/api/delete-connection/so1',
+      expect.objectContaining({ method: 'DELETE' })
+    );
+  });
+});
+
+describe('Connections page - OAuth settings moved to the OAuth Config dialog', () => {
+  const OAUTH_FIELDS = ['IDP Server', 'Realm', 'Certificate Endpoint', 'Auth Server CA', 'Token Issuer URL',
+    'Token Endpoint', 'Client ID', 'Client Secret', 'Enable Token Refresh'];
+
+  it.each(['RTI-SO', 'RTI-FSP'])('shows no OAuth fields for %s', async (type) => {
+    renderConnections();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.selectOptions(screen.getByLabelText('Type'), type);
+
+    for (const label of OAUTH_FIELDS) {
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    }
+  });
+
+  it('leaves a connection\'s saved OAuth settings alone when editing it', async () => {
+    renderConnections([
+      {
+        name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765, type: 'RTI-SO', acsi: 'client', ws_mode: 'passive',
+        status: 'connected', OAuth: { enable_oauth: true, realm: 'iec61850-test', token_issuer: 'http://localhost:8080/realms/iec61850-test' },
+      },
+    ]);
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: 'Edit' }));
+    await u.click(screen.getByRole('button', { name: /save instance/i }));
+
+    const call = global.fetch.mock.calls.find(([url]) => String(url).includes('/api/edit-connection/so1'));
+    const body = JSON.parse(call[1].body);
+    // Omitted fields are left untouched by the BFF's edit-connection.
+    for (const field of ['realm', 'certificate_endpoint', 'token_issuer_url', 'auth_server_ca', 'token_endpoint',
+      'client_id', 'client_secret', 'enable_token_refresh', 'idp_server']) {
+      expect(body).not.toHaveProperty(field);
+    }
   });
 });

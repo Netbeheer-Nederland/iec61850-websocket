@@ -16,10 +16,10 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 [cols="1,1,1",options="header"]
 |===
 |Route |File |Purpose
-|/setup (default) |Setup.jsx |Connection overview, health status
+|/overview (default) |Overview.jsx |Live, read-only status overview - SO/FSP graphic + instance table
 |/acsi-client |ACSIClient.jsx |SO interface, tree view, controls
 |/acsi-server |ACSIServer.jsx |FSP interface, tree view, data write
-|/connections |Connections.jsx |Connection management (CRUD)
+|/connections |Connections.jsx |Register, edit and delete instances (CRUD)
 |/model |Model.jsx |IEC 61850 model viewer, SCL upload
 |/traffic |Traffic.jsx |Traffic monitoring, data access
 |/data |Data.jsx |Simple data visualization
@@ -31,16 +31,15 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 
 === Page Details
 
-==== Setup (`/setup`)
-**File**: Setup.jsx (16KB)
+==== Overview (`/overview`)
+**File**: Overview.jsx (6KB)
 
-**Purpose**: Initial landing page providing an overview of all configured connections and their status.
+**Purpose**: Default landing page showing live status of all registered instances - read-only. Registering, editing and deleting instances all live on the Connections page instead.
 
 **Features**:
-* Visual instance visualization showing SO, FSP, and connections
-* Connection health status monitoring
-* Connection management (add, edit, delete)
-* OAuth and TLS configuration access
+* Visual instance visualization (InstanceVisualization) showing SO, FSP, and their connections
+* SO circle turns green and shows a live badge counting its connected FSPs (connectedFsps > 0)
+* Sortable, read-only status table (Status, Name, Type, Host, BFF Port - no Actions column)
 * Auto-checks all connection health on page load
 * Default route (redirects from `/`)
 
@@ -77,20 +76,19 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * Status information display
 
 ==== Connections (`/connections`)
-**File**: Connections.jsx (7KB)
+**File**: Connections.jsx (12KB)
 
-**Purpose**: Central connection management interface for configuring all RTI service endpoints.
+**Purpose**: The only place to register, edit or delete an instance - Overview only ever displays connections, it never edits them.
 
 **Features**:
-* List all configured connections in table format
-* Add new connections via modal dialog
-* Edit existing connections
-* Delete connections
-* Connection type selection (RTI-SO, RTI-FSP, IDP-Server)
-* ACSI role configuration (server/client)
-* WebSocket mode selection (active/passive)
+* List all configured connections in a sortable table format
+* Register new instances via the shared ConnectionModal dialog (same modal ACSI Client/Server's own Edit flow doesn't use - this is the only entry point)
+* Edit existing instances
+* Delete instances (with confirmation)
+* Connection type selection (RTI-SO, RTI-FSP, IDP-Server, Custom)
+* ACSI role / WebSocket mode fixed automatically by type (Custom stays editable)
 * Refresh connections list
-* Connection persistence using localStorage
+* Saves go straight to the BFF (POST /api/add-connection, PUT /api/edit-connection/:name, DELETE /api/delete-connection/:name) - not just local/localStorage state
 
 ==== Model (`/model`)
 **File**: Model.jsx (15KB)
@@ -204,9 +202,9 @@ hmi/
     |   +-- Diagnostics.jsx
     |   +-- Model.jsx
     |   +-- Monitoring.jsx
+    |   +-- Overview.jsx
     |   +-- Reports.jsx
     |   +-- Settings.jsx
-    |   +-- Setup.jsx
     |   +-- Tools.jsx
     |   +-- Traffic.jsx
     +-- utils/
@@ -270,7 +268,7 @@ npm run build
 
 === Routing Structure
 ----
-/ (default) -> /setup
+/ (default) -> /overview
 /connections
 /model
 /traffic
@@ -281,7 +279,7 @@ npm run build
 /settings
 /acsi-client
 /acsi-server
-* (404) -> /setup
+* (404) -> /overview
 ----
 
 === Integration Notes

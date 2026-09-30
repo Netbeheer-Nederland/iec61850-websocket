@@ -18,45 +18,37 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import ConnectionModal from '../components/ConnectionModal';
 
-function Connections({ connections, setConnections, loading = false, onReload }) {
+// All instance CRUD (register/edit/delete) lives here now - Overview only
+// ever reads `connections` to render its graphic/status table. Saves go
+// straight to the BFF (add-connection/edit-connection/delete-connection),
+// same as the old combined Setup page used to, then `onReload()` refetches
+// the shared `connections` list App.jsx passes to every page.
+function Connections({ settings, connections = [], loading = false, onReload }) {
   const [showModal, setShowModal] = useState(false);
   const [currentConnection, setCurrentConnection] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     host: '',
     port: 5000,
-    // Only meaningful for RTI-SO/Custom: the port its own WebSocket
-    // (Passive) endpoint listens on - distinct from `port` above (that
-    // instance's BFF server port, used for every API call to it). A real
+    // Only meaningful for RTI-SO: the port its own WebSocket (Passive)
+    // endpoint listens on, distinct from `port` above (that instance's
+    // BFF server port, used for every /api/execute call to it). A real
     // default value, same as `port`'s 5000 - not just a placeholder hint -
-    // so it's shown the same way BFF Port is on a freshly opened form.
+    // so a freshly opened "Register Instance" form shows it the same way
+    // BFF Port is shown, rather than looking prefilled while actually
+    // being empty.
     ws_port: 8765,
     type: 'RTI-SO',
-    acsi: 'server',
-    ws_mode: '',
-    endpoint: ''
+    // Matches type: 'RTI-SO' (client/passive) - ConnectionModal has a
+    // self-correcting effect for when these get out of sync with type, but
+    // starting them already-correct avoids a visible flip on first render.
+    acsi: 'client',
+    ws_mode: 'passive',
+    endpoint: '',
+    cp: ''
   });
-
-  const handleAddConnection = () => {
-    setCurrentConnection(null);
-    setFormData({ name: '', host: '', port: 5000, ws_port: 8765, type: 'RTI-SO', acsi: 'server', ws_mode: '', endpoint: '' });
-    setShowModal(true);
-  };
-
-  const handleEditConnection = (conn) => {
-    setCurrentConnection(conn);
-    // ws_port defaults to '' (not undefined) for connections that predate
-    // it, so the input stays a controlled component.
-    setFormData({ ws_port: '', ...conn });
-    setShowModal(true);
-  };
-
-  const handleDeleteConnection = (connection) => {
-    // By identity, not index - the table can be sorted, so a row's
-    // displayed position no longer matches its index in `connections`.
-    setConnections(connections.filter((c) => c !== connection));
-  };
 
   // Sortable columns: Name, Type, Host, BFF Port ('name' | 'type' | 'host'
   // | 'port', or null for unsorted).
@@ -103,56 +95,134 @@ function Connections({ connections, setConnections, loading = false, onReload })
     </th>
   );
 
-  const handleSaveConnection = () => {
-    if (currentConnection === null) {
-      // Add new connection
-      setConnections([...connections, formData]);
-    } else {
-      // Update existing connection
-      setConnections(connections.map(conn => 
-        conn === currentConnection ? formData : conn
-      ));
-    }
-    setShowModal(false);
-  };
-
-  // Maps each field's DOM id to its formData key. Without this, every field
-  // below silently never updated state at all: e.target.id (e.g.
-  // "conn-host") was used directly as the formData key, which never matched
-  // the actual field name ("host") the inputs read their value from - so
-  // typing in any of them had no visible effect.
-  const CONN_FIELD_ID_MAP = {
-    'conn-name': 'name',
-    'conn-host': 'host',
-    'conn-port': 'port',
-    'conn-ws-port': 'ws_port',
-    'conn-type': 'type',
-    'conn-endpoint': 'endpoint',
-  };
-
-  const handleInputChange = (e) => {
-    const { id, value, type } = e.target;
-    const key = CONN_FIELD_ID_MAP[id] || id;
-    setFormData(prev => ({
-      ...prev,
-      [key]: type === 'number' ? parseInt(value) : value
-    }));
-  };
-
   const handleRefresh = () => {
     onReload?.();
   };
 
-  // RTI-SO (and a "Custom" connection standing in for one) is the only
-  // type with a WebSocket endpoint of its own to configure a port for,
-  // distinct from its BFF server port.
-  const needsWsPort = formData.type === 'RTI-SO' || formData.type === 'Custom';
-  // RTI-FSP's `port` is just as much "its own BFF server's port" as
-  // RTI-SO's is - it just doesn't have a separate ws_port to configure
-  // (it dials out to whichever SO instance is selected on the ACSI Server
-  // page, rather than owning a fixed WS port itself) - so the label/
-  // explanation is shared with RTI-SO/Custom, same as ConnectionModal.jsx.
-  const isBffPortLabeled = needsWsPort || formData.type === 'RTI-FSP';
+  // Add connection
+  const handleAddConnection = () => {
+    setCurrentConnection(null);
+    setFormData({ name: '', host: '', port: 5000, ws_port: 8765, type: 'RTI-SO', acsi: 'client', ws_mode: 'passive', endpoint: '', cp: '' });
+    setShowModal(true);
+  };
+
+  // Edit connection
+  const handleEditConnection = (conn) => {
+    setCurrentConnection(conn);
+    // OAuth settings aren't edited here (see OAuthConfigModal on the
+    // instance's own page) - and since edit-connection leaves omitted
+    // fields untouched, saving this form keeps them as they are.
+    setFormData({
+      name: conn.name || '',
+      host: conn.host || '',
+      port: conn.port || 5000,
+      // Leave blank (not a fabricated 8765) when the connection genuinely
+      // has no ws_port set - defaulting to a fake-looking real port would
+      // make an unconfigured instance look configured, exactly what the WS
+      // port split was meant to stop happening.
+      ws_port: conn.ws_port || '',
+      cp: conn.cp || '',
+      type: conn.type || 'RTI-SO',
+      acsi: conn.acsi || 'server',
+      ws_mode: conn.ws_mode || '',
+      endpoint: conn.endpoint || ''
+    });
+    setShowModal(true);
+  };
+
+  // Delete connection
+  const handleDeleteConnection = async (connection) => {
+    const confirmed = window.confirm(`Permanently delete instance "${connection.name}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/delete-connection/${connection.name}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        onReload?.();
+      }
+    } catch (error) {
+      console.error('Failed to delete connection:', error);
+    }
+  };
+
+  // Save connection (add or update)
+  const handleSaveConnection = async () => {
+    try {
+      // Validate required fields based on type
+      if (!formData.name) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      // For RTI-SO and RTI-FSP, host and port are required
+      if ((formData.type === 'RTI-SO' || formData.type === 'RTI-FSP' || formData.type === 'Custom') && (!formData.host || !formData.port)) {
+        alert('Please fill in the host and port fields');
+        return;
+      }
+
+      // For IDP-Server, endpoint is required
+      if (formData.type === 'IDP-Server' && !formData.endpoint) {
+        alert('Please fill in the endpoint field');
+        return;
+      }
+
+      const saveData = { ...formData };
+
+      // ws_port only applies to RTI-SO (see ConnectionModal.jsx) - for every
+      // other type formData.ws_port is just leftover '' from the shared
+      // initial state, and the backend's ws_port field is a plain
+      // Optional[int]: sending "" for it 400s ("unable to parse string as
+      // an integer"). For RTI-SO itself, blank still shouldn't be sent as
+      // "" either - default it instead, so a freshly registered instance
+      // always has a usable ws_port rather than needing a second edit.
+      if (saveData.type === 'RTI-SO') {
+        const parsedWsPort = Number(saveData.ws_port);
+        saveData.ws_port = Number.isFinite(parsedWsPort) && parsedWsPort > 0 ? parsedWsPort : 8765;
+      } else {
+        delete saveData.ws_port;
+      }
+
+      // cp only applies to RTI-FSP (see ConnectionModal.jsx).
+      if (saveData.type !== 'RTI-FSP') {
+        delete saveData.cp;
+      }
+
+      if (currentConnection) {
+        // Update existing connection
+        const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/edit-connection/${currentConnection.name}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(saveData)
+        });
+        if (response.ok) {
+          onReload?.();
+          setShowModal(false);
+        } else {
+          const errText = await response.text().catch(() => '');
+          alert(`Failed to save connection: ${errText || response.statusText}`);
+        }
+      } else {
+        // Add new connection
+        const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/add-connection`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(saveData)
+        });
+        if (response.ok) {
+          onReload?.();
+          setShowModal(false);
+        } else {
+          const errText = await response.text().catch(() => '');
+          alert(`Failed to save connection: ${errText || response.statusText}`);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save connection:', error);
+      alert('Failed to save connection. Check console for details.');
+    }
+  };
 
   return (
     <section className="page">
@@ -160,7 +230,7 @@ function Connections({ connections, setConnections, loading = false, onReload })
         <h1>Connections</h1>
         <button className="btn-primary" id="btn-add-connection" onClick={handleAddConnection}>
           <i className="fas fa-plus"></i>
-          Add Connection
+          Register Instance
         </button>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
@@ -173,7 +243,7 @@ function Connections({ connections, setConnections, loading = false, onReload })
         <div className="connections-table" id="connections-container">
           {connections.length === 0 ? (
             <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-              No connections configured. Click "Add Connection" to get started.
+              No instances registered. Click "Register Instance" to get started.
             </p>
           ) : (
             <table className="table">
@@ -209,12 +279,14 @@ function Connections({ connections, setConnections, loading = false, onReload })
                         <button
                           className="btn-icon"
                           onClick={() => handleEditConnection(conn)}
+                          title="Edit"
                         >
                           <i className="fas fa-edit"></i>
                         </button>
                         <button
                           className="btn-icon"
                           onClick={() => handleDeleteConnection(conn)}
+                          title="Delete"
                         >
                           <i className="fas fa-trash"></i>
                         </button>
@@ -229,106 +301,14 @@ function Connections({ connections, setConnections, loading = false, onReload })
       </div>
 
       {/* Connection Modal */}
-      {showModal && (
-        <div className="modal active">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2>{currentConnection ? 'Edit Connection' : 'Add Connection'}</h2>
-              <button className="btn-close" onClick={() => setShowModal(false)}>
-                &times;
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label htmlFor="conn-name">Name</label>
-                <input 
-                  type="text" 
-                  id="conn-name" 
-                  value={formData.name} 
-                  onChange={handleInputChange}
-                />
-              </div>
-              {formData.type !== 'IDP-Server' && (
-                <>
-                  <div className="form-group">
-                    <label htmlFor="conn-host">Host</label>
-                    <input 
-                      type="text" 
-                      id="conn-host" 
-                      value={formData.host} 
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="conn-port">{isBffPortLabeled ? 'BFF Port' : 'Port'}</label>
-                    <input
-                      type="number"
-                      id="conn-port"
-                      value={formData.port}
-                      onChange={handleInputChange}
-                    />
-                    {isBffPortLabeled && (
-                      <small style={{ color: 'var(--text-muted)' }}>
-                        Port this instance's own BFF server listens on (used for all API calls to it).
-                      </small>
-                    )}
-                  </div>
-                  {needsWsPort && (
-                    <div className="form-group">
-                      <label htmlFor="conn-ws-port">WS Port</label>
-                      <input
-                        type="number"
-                        id="conn-ws-port"
-                        value={formData.ws_port}
-                        placeholder="8765"
-                        onChange={handleInputChange}
-                      />
-                      <small style={{ color: 'var(--text-muted)' }}>
-                        Port this instance's own WebSocket (Passive) endpoint
-                        listens on - distinct from the BFF port above.
-                      </small>
-                    </div>
-                  )}
-                </>
-              )}
-              <div className="form-group">
-                <label htmlFor="conn-type">Type</label>
-                <select 
-                  id="conn-type" 
-                  value={formData.type} 
-                  onChange={handleInputChange}
-                >
-                  <option value="Custom">Custom</option>
-                  <option value="RTI-SO">RTI-SO (WS Passive/ACSI Client)</option>
-                  <option value="RTI-FSP">RTI-FSP (WS Active/ACSI Server)</option>
-                  <option value="IDP-Server">IDP-Server</option>
-                </select>
-              </div>
-              {formData.type === 'IDP-Server' && (
-                <div className="form-group">
-                  <label htmlFor="conn-endpoint">Endpoint</label>
-                  <input 
-                    type="text" 
-                    id="conn-endpoint" 
-                    value={formData.endpoint || ''} 
-                    onChange={handleInputChange}
-                    placeholder="e.g., /idp"
-                  />
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowModal(false)}>
-                Close
-              </button>
-              <button className="btn-primary" onClick={handleSaveConnection}>
-                <i className="fas fa-save"></i>
-                Save Connection
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConnectionModal
+        showModal={showModal}
+        onClose={() => setShowModal(false)}
+        currentConnection={currentConnection}
+        formData={formData}
+        onFormChange={setFormData}
+        onSave={handleSaveConnection}
+      />
     </section>
   );
 }

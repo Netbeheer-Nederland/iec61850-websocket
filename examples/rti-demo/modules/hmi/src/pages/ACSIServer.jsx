@@ -43,7 +43,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   // `connections` has actually loaded) from the ?fsp=<name> URL param that
   // navigation now also seeds, so a refresh can recover the same instance
   // instead of leaving this page permanently unusable until the user
-  // navigates back in via Setup/Model/Traffic again.
+  // navigates back in via Overview/Model/Traffic again.
   const navEndpoint = location.state?.endpoint;
   const [paramEndpoint, setParamEndpoint] = useState(null);
   const endpoint = navEndpoint || paramEndpoint;
@@ -868,7 +868,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         <div className="alert alert-error" style={{ marginBottom: '16px', padding: '12px', background: 'var(--danger-bg)', color: 'var(--danger-color)', borderRadius: '4px' }}>
           <i className="fas fa-exclamation-triangle" style={{ marginRight: '8px' }}></i>
           FSP instance "{fspParam}" not found - it may have been removed or
-          renamed. Open this page again from a Setup, Model, or Traffic
+          renamed. Open this page again from an Overview, Model, or Traffic
           page instead.
         </div>
       )}
@@ -876,7 +876,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         <div className="alert alert-error" style={{ marginBottom: '16px', padding: '12px', background: 'var(--danger-bg)', color: 'var(--danger-color)', borderRadius: '4px' }}>
           <i className="fas fa-exclamation-triangle" style={{ marginRight: '8px' }}></i>
           No FSP instance selected. This page needs to know which RTI-FSP
-          it's managing - open it from a Setup, Model, or Traffic page by
+          it's managing - open it from an Overview, Model, or Traffic page by
           clicking that FSP's icon, rather than visiting this URL directly.
         </div>
       )}

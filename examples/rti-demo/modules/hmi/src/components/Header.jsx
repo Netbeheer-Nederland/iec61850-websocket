@@ -29,10 +29,8 @@ function Header({ bffStatus }) {
     const path = location.pathname;
     switch (path) {
       case '/':
-      case '/setup':
-        return 'Setup';
-      case '/connections':
-        return 'Setup';
+      case '/overview':
+        return 'Overview';
       case '/connections':
         return 'Connections';
       case '/model':
@@ -60,7 +58,7 @@ function Header({ bffStatus }) {
         return name ? `Configuration — ${name}` : 'ACSI Server';
       }
       default:
-        return 'Setup';
+        return 'Overview';
     }
   };
 

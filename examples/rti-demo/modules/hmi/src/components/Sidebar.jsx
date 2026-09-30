@@ -22,7 +22,8 @@ import { NavLink } from 'react-router-dom';
 
 function Sidebar() {
   const navItems = [
-    { path: '/setup', icon: 'fa-gear', label: 'Setup' },
+    { path: '/overview', icon: 'fa-diagram-project', label: 'Overview' },
+    { path: '/connections', icon: 'fa-gear', label: 'Connections' },
     { path: '/model', icon: 'fa-sitemap', label: 'Model' },
     { path: '/traffic', icon: 'fa-exchange-alt', label: 'Traffic' },
     { path: '/tools', icon: 'fa-tools', label: 'Tools' },

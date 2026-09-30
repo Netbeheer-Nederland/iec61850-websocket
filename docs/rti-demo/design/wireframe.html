@@ -218,17 +218,17 @@
 
   <div class="picker" id="picker"></div>
 
-  <!-- ============ SETUP ============ -->
-  <section class="screen" data-screen="setup">
+  <!-- ============ OVERVIEW ============ -->
+  <section class="screen" data-screen="overview">
     <div class="frame">
-      <div class="wf-sidebar" data-active-nav="Setup"></div>
+      <div class="wf-sidebar" data-active-nav="Overview"></div>
       <div class="wf-main">
         <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div><div class="icon"></div></div></div>
         <div class="wf-content">
           <div class="wf-page-header">
-            <div class="wf-h1" data-label="Setup"></div>
-            <div class="btn btn-solid">+ Register Instance</div>
+            <div class="wf-h1" data-label="Overview"></div>
           </div>
+          <p class="placeholder-text" style="margin:-10px 0 16px;">ⓘ Read-only - the graphic and table below just reflect live status. Register, edit or delete an instance from the Connections page instead.</p>
 
           <div class="table-wf">
             <div class="thead">
@@ -237,11 +237,10 @@
               <div class="cell">Type</div>
               <div class="cell">Host</div>
               <div class="cell narrow">BFF Port</div>
-              <div class="cell narrow">Actions</div>
             </div>
-            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">FSP01</div><div class="cell placeholder-text">RTI-FSP</div><div class="cell placeholder-text">rti-fsp</div><div class="cell narrow placeholder-text">5001</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
-            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">SO</div><div class="cell placeholder-text">RTI-SO</div><div class="cell placeholder-text">rti-so</div><div class="cell narrow placeholder-text">5002</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
-            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">IDP</div><div class="cell placeholder-text">IDP-Server</div><div class="cell placeholder-text">—</div><div class="cell narrow placeholder-text">—</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">FSP01</div><div class="cell placeholder-text">RTI-FSP</div><div class="cell placeholder-text">rti-fsp</div><div class="cell narrow placeholder-text">5001</div></div>
+            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">SO</div><div class="cell placeholder-text">RTI-SO</div><div class="cell placeholder-text">rti-so</div><div class="cell narrow placeholder-text">5002</div></div>
+            <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">IDP</div><div class="cell placeholder-text">IDP-Server</div><div class="cell placeholder-text">—</div><div class="cell narrow placeholder-text">—</div></div>
           </div>
 
           <div class="section-card" style="margin-top:16px;">
@@ -253,6 +252,31 @@
               <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CONNECTIONS ============ -->
+  <section class="screen" data-screen="connections">
+    <div class="frame">
+      <div class="wf-sidebar" data-active-nav="Connections"></div>
+      <div class="wf-main">
+        <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
+        <div class="wf-content">
+          <div class="wf-page-header">
+            <div class="wf-h1" data-label="Connections"></div>
+            <div class="btn btn-solid">+ Register Instance</div>
+          </div>
+          <div class="section-card">
+            <h3>Registered Instances</h3>
+            <div class="table-wf">
+              <div class="thead"><div class="cell narrow">Status</div><div class="cell">Name</div><div class="cell">Type</div><div class="cell">Host</div><div class="cell narrow">BFF Port</div><div class="cell narrow">Actions</div></div>
+              <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+              <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+            </div>
+          </div>
+          <p class="placeholder-text" style="margin-top:10px;">The only place to register, edit or delete an instance - Overview only ever displays connections, it never edits them.</p>
 
           <div class="modal-overlay">
             <div class="modal-title"><span class="t">Register / Edit Instance</span><span class="x">×</span></div>
@@ -276,31 +300,6 @@
             <p class="placeholder-text" style="margin:0 0 4px;">ⓘ OAuth and TLS are configured on the instance's own page (OAuth Config / TLS Config) - no OAuth fields here.</p>
             <div class="modal-footer"><div class="btn btn-outline">Cancel</div><div class="btn btn-solid">Save</div></div>
           </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ CONNECTIONS ============ -->
-  <section class="screen" data-screen="connections">
-    <div class="frame">
-      <div class="wf-sidebar" data-active-nav="none"></div>
-      <div class="wf-main">
-        <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
-        <div class="wf-content">
-          <div class="wf-page-header">
-            <div class="wf-h1" data-label="Connections"></div>
-            <div class="btn btn-solid">+ Add Connection</div>
-          </div>
-          <div class="section-card">
-            <h3>Registered Instances</h3>
-            <div class="table-wf">
-              <div class="thead"><div class="cell narrow">Status</div><div class="cell">Name</div><div class="cell">Type</div><div class="cell">Host</div><div class="cell narrow">BFF Port</div><div class="cell narrow">Actions</div></div>
-              <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
-              <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
-            </div>
-          </div>
-          <p class="placeholder-text" style="margin-top:10px;">Simpler standalone form (Name / Host / BFF Port / WS Port / Type / Endpoint) — a lighter-weight alternative entry point to the same connection registry as Setup.</p>
         </div>
       </div>
     </div>
@@ -558,7 +557,7 @@
             <div class="modal-title"><span class="t">🔑 OAuth Configuration - FSP01</span><span class="x">×</span></div>
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:12px;"><span style="width:12px;height:12px;border:1.5px solid var(--wf-line);display:inline-block;"></span>Enable OAuth 2.0</label>
             <div class="field-row">
-              <div class="field" style="min-width:200px;"><span class="label">IDP Server</span><div class="input"></div><span class="hint">IDP-Server instance registered in Setup</span></div>
+              <div class="field" style="min-width:200px;"><span class="label">IDP Server</span><div class="input"></div><span class="hint">IDP-Server instance registered in Connections</span></div>
               <div class="field" style="min-width:200px;"><span class="label">Realm</span><div class="input"></div></div>
               <div class="field" style="justify-content:flex-end;"><div class="btn btn-outline">Discover endpoints</div></div>
             </div>
@@ -660,7 +659,7 @@
             <div class="modal-title"><span class="t">🔑 OAuth Configuration - SO</span><span class="x">×</span></div>
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:12px;"><span style="width:12px;height:12px;border:1.5px solid var(--wf-line);display:inline-block;"></span>Enable OAuth 2.0</label>
             <div class="field-row">
-              <div class="field" style="min-width:200px;"><span class="label">IDP Server</span><div class="input"></div><span class="hint">IDP-Server instance registered in Setup</span></div>
+              <div class="field" style="min-width:200px;"><span class="label">IDP Server</span><div class="input"></div><span class="hint">IDP-Server instance registered in Connections</span></div>
               <div class="field" style="min-width:200px;"><span class="label">Realm</span><div class="input"></div></div>
               <div class="field" style="justify-content:flex-end;"><div class="btn btn-outline">Discover endpoints</div></div>
             </div>
@@ -692,7 +691,7 @@
   const screens = Array.from(document.querySelectorAll('.screen'));
   const picker = document.getElementById('picker');
   const labels = {
-    'setup': 'Setup',
+    'overview': 'Overview',
     'connections': 'Connections',
     'model': 'Model',
     'traffic': 'Traffic',
@@ -712,7 +711,7 @@
   });
 
   // Build sidebar nav wireframe (shared markup) into every .wf-sidebar
-  const navItems = ['Setup', 'Model', 'Traffic', 'Tools', 'Settings'];
+  const navItems = ['Overview', 'Connections', 'Model', 'Traffic', 'Tools', 'Settings'];
   document.querySelectorAll('.wf-sidebar').forEach((sidebar) => {
     const active = sidebar.dataset.activeNav;
     const logo = document.createElement('div');
@@ -733,9 +732,9 @@
     try { localStorage.setItem('rti-wireframe-screen', key); } catch (e) {}
   }
 
-  let initial = 'setup';
-  try { initial = localStorage.getItem('rti-wireframe-screen') || 'setup'; } catch (e) {}
-  if (!labels[initial]) initial = 'setup';
+  let initial = 'overview';
+  try { initial = localStorage.getItem('rti-wireframe-screen') || 'overview'; } catch (e) {}
+  if (!labels[initial]) initial = 'overview';
   show(initial);
 </script>
 </body>

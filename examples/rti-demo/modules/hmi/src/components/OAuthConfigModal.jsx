@@ -61,8 +61,8 @@ function oauthRequestBody(connection, oauth, wsMode) {
 }
 
 // OAuth settings for one RTI-SO (passive: validates incoming tokens) or
-// RTI-FSP (active: fetches a token to present) - moved out of the Setup
-// form into its own dialog, next to TLS Config. Save stores them in the
+// RTI-FSP (active: fetches a token to present) - moved out of the
+// connection form into its own dialog, next to TLS Config. Save stores them in the
 // BFF's connections.json, then always passes them to the instance: a
 // disconnected FSP turns OAuth off right away but keeps "on" for its next
 // Connect (it answers status "saved"), instead of the setting stopping at the
@@ -324,7 +324,7 @@ const OAuthConfigModal = ({
                   <option key={server.name} value={server.name}>{server.name}</option>
                 ))}
               </select>
-              <small style={styles.hint}>Identity provider registered in Setup (type IDP-Server).</small>
+              <small style={styles.hint}>Identity provider registered in Connections (type IDP-Server).</small>
             </div>
 
             <div style={styles.formGroup}>
