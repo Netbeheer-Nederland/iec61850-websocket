@@ -360,7 +360,8 @@ html {
     color: white;
 }
 
-.endpoint-card.disconnected .endpoint-card-status {
+.endpoint-card.disconnected .endpoint-card-status,
+.endpoint-card-status.disconnected {
     background: var(--danger-color);
 }
 

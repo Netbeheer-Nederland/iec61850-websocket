@@ -81,7 +81,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 **Purpose**: The only place that lists instances in a table, and the only place to register, edit or delete one - Overview only shows the live graphic.
 
 **Features**:
-* List all configured connections in a sortable table format
+* List all configured connections in a sortable table format, with a Connected/Disconnected status badge per row (green when connected, red when disconnected)
 * Register new instances via the shared ConnectionModal dialog (same modal ACSI Client/Server's own Edit flow doesn't use - this is the only entry point)
 * Edit existing instances
 * Delete instances (with confirmation)

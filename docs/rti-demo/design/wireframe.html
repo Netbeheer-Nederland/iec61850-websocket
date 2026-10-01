@@ -173,6 +173,8 @@
   .table-wf .trow { display: flex; padding: 8px 12px; border-top: 1px dashed var(--wf-line-soft); font-size: 11px; align-items: center; }
   .table-wf .cell { flex: 1; }
   .table-wf .cell.narrow { flex: 0 0 70px; }
+  .status-pill { display: inline-block; padding: 1px 8px; border-radius: 8px; border: 1.5px solid var(--wf-line); font-size: 10px; }
+  .status-pill.off { border-style: dashed; }
   .dot-status { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--wf-line); display: inline-block; margin-right: 6px; }
 
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -259,11 +261,11 @@
             <h3>Registered Instances</h3>
             <div class="table-wf">
               <div class="thead"><div class="cell narrow">Status</div><div class="cell">Name</div><div class="cell">Type</div><div class="cell">Host</div><div class="cell narrow">BFF Port</div><div class="cell narrow">Actions</div></div>
-              <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
-              <div class="trow"><div class="cell narrow"><span class="dot-status"></span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+              <div class="trow"><div class="cell narrow"><span class="status-pill">Connected</span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
+              <div class="trow"><div class="cell narrow"><span class="status-pill off">Disconnected</span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
             </div>
           </div>
-          <p class="placeholder-text" style="margin-top:10px;">The only place that lists instances in a table, and the only place to register, edit or delete one - Overview only shows the live graphic. The table updates live (no refresh button).</p>
+          <p class="placeholder-text" style="margin-top:10px;">The only place that lists instances in a table, and the only place to register, edit or delete one - Overview only shows the live graphic. The table updates live (no refresh button). The Status column is a Connected/Disconnected badge - green (<code>--success-color</code>) when connected, red (<code>--danger-color</code>, dashed here) when disconnected.</p>
 
           <div class="modal-overlay">
             <div class="modal-title"><span class="t">Register / Edit Instance</span><span class="x">×</span></div>

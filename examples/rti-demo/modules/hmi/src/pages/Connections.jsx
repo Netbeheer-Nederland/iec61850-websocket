@@ -252,7 +252,7 @@ function Connections({ settings, connections = [], loading = false, onReload }) 
                 {sortedConnections.map((conn, index) => (
                   <tr key={conn.name || index}>
                     <td>
-                      <span className="endpoint-card-status">
+                      <span className={`endpoint-card-status${conn.status === 'connected' ? '' : ' disconnected'}`}>
                         {conn.status === 'connected' ? 'Connected' : 'Disconnected'}
                       </span>
                     </td>

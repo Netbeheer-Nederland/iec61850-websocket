@@ -190,7 +190,7 @@ primary action last.
 ### Status indicators
 
 - **Dot** (`.bff-status-dot`): a `10px` circle, `--danger-color` by default, `--success-color` when `.connected`. Used next to connection names/instance selectors throughout - some pages apply the class name and set the background inline instead of relying on `.connected`, but the visual result is the same.
-- **Badge** (`.endpoint-card-status`): a pill (`padding: 4px 12px`, `12px` radius) with a solid background - `--success-color` normally, `--danger-color` with a `.disconnected` modifier on the parent.
+- **Badge** (`.endpoint-card-status`): a pill (`padding: 4px 12px`, `12px` radius) with a solid background - `--success-color` normally, `--danger-color` with a `.disconnected` modifier - either on the badge itself (e.g. the Connections table's Connected/Disconnected badge) or on a parent `.endpoint-card`.
 
 Both patterns only encode two states (ok/not-ok) via color. If a third
 state is ever needed (e.g. "connecting"), don't just invent a new color

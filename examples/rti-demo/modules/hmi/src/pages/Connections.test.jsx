@@ -148,6 +148,16 @@ describe('Connections page - table', () => {
     expect(rows[2]).toHaveTextContent('fsp1');
   });
 
+  it('marks only a disconnected row\'s status badge with the red .disconnected modifier', () => {
+    renderConnections([
+      { name: 'so1', host: '10.0.0.1', port: 5002, type: 'RTI-SO', status: 'connected' },
+      { name: 'fsp1', host: '10.0.0.2', port: 5001, type: 'RTI-FSP', status: 'disconnected' },
+    ]);
+
+    expect(screen.getByText('Connected')).not.toHaveClass('disconnected');
+    expect(screen.getByText('Disconnected')).toHaveClass('endpoint-card-status', 'disconnected');
+  });
+
   it('sorts by a clicked column, toggling direction on repeat clicks', async () => {
     renderConnections([
       { name: 'so2', host: '10.0.0.2', port: 5002, type: 'RTI-SO', status: 'connected' },
