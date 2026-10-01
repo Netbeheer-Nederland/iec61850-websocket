@@ -57,6 +57,7 @@ const modelTreeResponse = () => ({
 });
 
 beforeEach(() => {
+  localStorage.clear();
   global.fetch = vi.fn(async (url) => {
     if (String(url).endsWith('/api/connections')) {
       return { ok: true, json: async () => ({ connections: [] }) };
@@ -296,5 +297,24 @@ describe('ACSIClient OAuth Config button', () => {
       expect(document.getElementById('acsi-client-oauth-btn')).toHaveTextContent('OAuth Config (On)');
     });
     expect(document.getElementById('acsi-client-oauth-checkbox')).toBeNull();
+  });
+});
+
+describe('ACSIClient monitoring survives switching pages', () => {
+  it('resumes monitoring on remount if it was left on, and stays stopped once stopped', async () => {
+    const user = userEvent.setup({ delay: null });
+    const first = renderPage();
+    await user.click(screen.getByRole('button', { name: 'Start Monitor' }));
+    expect(await screen.findByRole('button', { name: 'Monitoring...' })).toBeInTheDocument();
+    first.unmount();
+
+    const second = renderPage();
+    expect(await screen.findByRole('button', { name: 'Monitoring...' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Stop Monitor' }));
+    second.unmount();
+
+    renderPage();
+    expect(screen.getByRole('button', { name: 'Start Monitor' })).toBeEnabled();
   });
 });

@@ -20,6 +20,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { executeApiCall, buildTargetValue } from '../services/apiService';
 import { subscribe as subscribeLive, isConnected as isLiveConnected, onConnectionStateChange } from '../services/liveSocket';
+import { usePersistentFlag } from '../hooks/usePersistentFlag';
 
 /**
  * MessageMonitor component for monitoring WebSocket messages from endpoints
@@ -159,6 +160,28 @@ function MessageMonitor({
     setIsMonitoring(false);
     setStatus('Monitoring stopped');
   }, [stopPolling]);
+
+  // Whether the user has monitoring switched on for this endpoint -
+  // persisted per host:port so it survives switching pages (Traffic
+  // unmounts every monitor). Only the Start/Stop buttons change it.
+  const [monitoringWanted, setMonitoringWanted] = usePersistentFlag(
+    selectedEndpoint ? `message-monitor-${selectedEndpoint.host}:${selectedEndpoint.port}` : null
+  );
+
+  const handleStartMonitoring = useCallback(() => {
+    setMonitoringWanted(true);
+    startMonitoring();
+  }, [setMonitoringWanted, startMonitoring]);
+
+  const handleStopMonitoring = useCallback(() => {
+    setMonitoringWanted(false);
+    stopMonitoring();
+  }, [setMonitoringWanted, stopMonitoring]);
+
+  // Resume monitoring on (re)mount if it was left on.
+  useEffect(() => {
+    if (monitoringWanted && selectedEndpoint && !isMonitoring) startMonitoring();
+  }, [monitoringWanted, selectedEndpoint, isMonitoring, startMonitoring]);
 
   // Live push: while monitoring, ingest messages the BFF relays for this
   // endpoint's target instead of waiting for the next poll.
@@ -622,7 +645,7 @@ function MessageMonitor({
           <button 
             className="btn-icon monitor-control-btn" 
             title="Start Monitoring"
-            onClick={startMonitoring}
+            onClick={handleStartMonitoring}
             disabled={!selectedEndpoint || isMonitoring}
           >
             <i className="fas fa-play"></i>
@@ -631,7 +654,7 @@ function MessageMonitor({
           <button 
             className="btn-icon monitor-control-btn" 
             title="Stop Monitoring"
-            onClick={stopMonitoring}
+            onClick={handleStopMonitoring}
             disabled={!isMonitoring}
           >
             <i className="fas fa-stop"></i>

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MessageMonitor from './MessageMonitor';
 
@@ -49,6 +49,7 @@ const flipConnectionState = async (connected) => {
 };
 
 beforeEach(() => {
+  localStorage.clear();
   executeApiCall.mockReset();
   executeApiCall.mockResolvedValue(emptyMessagesResponse);
   isConnected.mockReset();
@@ -211,5 +212,44 @@ describe('MessageMonitor sort order', () => {
     await startMonitoring();
 
     expect(screen.getByTitle('Showing newest first - click for oldest first')).toBeDisabled();
+  });
+});
+
+describe('MessageMonitor - monitoring survives switching pages', () => {
+  it('resumes monitoring on remount if it was left on', async () => {
+    isConnected.mockReturnValue(true);
+    const { unmount } = render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+    await startMonitoring();
+    unmount();
+
+    render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+
+    await waitFor(() => expect(screen.getByTitle('Stop Monitoring')).toBeEnabled());
+    expect(screen.getByTitle('Start Monitoring')).toBeDisabled();
+  });
+
+  it('stays stopped on remount once the user stopped it', async () => {
+    isConnected.mockReturnValue(true);
+    const { unmount } = render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+    await startMonitoring();
+    const user = userEvent.setup({ delay: null });
+    await user.click(screen.getByTitle('Stop Monitoring'));
+    unmount();
+
+    render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+
+    expect(screen.getByTitle('Start Monitoring')).toBeEnabled();
+    expect(screen.getByTitle('Stop Monitoring')).toBeDisabled();
+  });
+
+  it('keeps the flag per endpoint', async () => {
+    isConnected.mockReturnValue(true);
+    const { unmount } = render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+    await startMonitoring();
+    unmount();
+
+    render(<MessageMonitor endpoints={[{ host: '10.0.0.9', port: 5009, name: 'other' }]} defaultInterval={10000} />);
+
+    expect(screen.getByTitle('Start Monitoring')).toBeEnabled();
   });
 });

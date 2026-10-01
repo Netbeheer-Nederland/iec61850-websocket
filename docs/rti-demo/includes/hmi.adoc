@@ -57,7 +57,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * BRCB (Buffered Report Control Block) configuration
 * TLS configuration support
 * OAuth authentication integration
-* Protocol message monitoring
+* Protocol message monitoring - Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
 * Real-time data updates
 
 ==== ACSI Server (`/acsi-server`)
@@ -72,7 +72,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * Tree expansion state persistence
 * TLS configuration support
 * OAuth authentication integration
-* Protocol message monitoring
+* Protocol message monitoring - Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
 * Status information display
 
 ==== Connections (`/connections`)
@@ -114,6 +114,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * Multiple collapsible Data Access Panels
 * Dynamic panel management (add/remove)
 * Real-time message monitoring, newest-first by default with a toggle for oldest-first (same control as the Monitoring panels' Protocol Messages list)
+* Each message monitor's Start/Stop is remembered per instance (host:port, localStorage), so monitoring left on resumes after switching pages
 * FSP message monitors only shown for FSPs with an active connection (connectedClients > 0), same threshold used to light up the instance visualization above
 * Connection health monitoring
 * Instance visualization updates live from the BFF's connections push - no manual refresh button

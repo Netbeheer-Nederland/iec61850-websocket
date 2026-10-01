@@ -367,7 +367,7 @@
           <div class="accordion" style="margin-top:16px;margin-bottom:0;">
             <div class="accordion-head"><span>Message Monitors</span><span class="chev">▾</span></div>
             <div class="accordion-body">
-              <p class="placeholder-text" style="margin:0 0 12px;">ⓘ ⇅ toggles the message list between newest-first (default) and oldest-first - same control as the Monitoring panels' Protocol Messages list (ACSI Server / ACSI Client), added here too. Defaults to newest first even though messages are received and stored oldest-first.</p>
+              <p class="placeholder-text" style="margin:0 0 12px;">ⓘ ⇅ toggles the message list between newest-first (default) and oldest-first - same control as the Monitoring panels' Protocol Messages list (ACSI Server / ACSI Client), added here too. Defaults to newest first even though messages are received and stored oldest-first. Each monitor's Start/Stop is remembered per instance (host:port) - leaving one on and switching pages resumes it when you come back; only Stop switches it off.</p>
               <h3 style="margin:0 0 10px;font-size:11px;color:#6b7280;">ACSI Client Endpoints (RTI-SO)</h3>
               <div class="grid-2" style="margin-bottom:20px;">
                 <div class="section-card" style="margin-bottom:0;">
@@ -527,6 +527,7 @@
             <div class="btn btn-outline">Clear Logs</div>
           </div>
           <div class="section-card"><span class="placeholder-text">Protocol message log / actions log …</span></div>
+          <p class="placeholder-text" style="margin-top:6px;">ⓘ Start/Stop is remembered per instance - leaving monitoring on and switching pages resumes it when you come back. Only Stop Monitor switches it off.</p>
 
           <div class="modal-overlay">
             <div class="modal-title"><span class="t">🛡 TLS Configuration - FSP01</span><span class="x">×</span></div>
@@ -626,6 +627,7 @@
             <div class="btn btn-outline">Clear Logs</div>
           </div>
           <div class="section-card"><span class="placeholder-text">Protocol message log / actions log …</span></div>
+          <p class="placeholder-text" style="margin-top:6px;">ⓘ Start/Stop is remembered per instance - leaving monitoring on and switching pages resumes it when you come back. Only Stop Monitor switches it off.</p>
 
           <div class="section-card"><span class="placeholder-text">Context menu (right-click a tree node): Read Value · Write Value · Operate · Configure BRCB/URCB …</span></div>
 

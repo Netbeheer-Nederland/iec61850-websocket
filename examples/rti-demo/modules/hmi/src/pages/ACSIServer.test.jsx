@@ -564,3 +564,23 @@ describe('ACSIServer OAuth off while disconnected', () => {
     expect(runtimeOn).toBe(false);
   });
 });
+
+describe('ACSIServer monitoring survives switching pages', () => {
+  it('resumes monitoring on remount if it was left on, and stays stopped once stopped', async () => {
+    const user = userEvent.setup({ delay: null });
+    const first = renderPage();
+    await user.click(screen.getByRole('button', { name: 'Start Monitor' }));
+    expect(await screen.findByRole('button', { name: 'Monitoring...' })).toBeInTheDocument();
+    expect(localStorage.getItem('acsi-server-monitoring-FSP01')).toBe('true');
+    first.unmount();
+
+    const second = renderPage();
+    expect(await screen.findByRole('button', { name: 'Monitoring...' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Stop Monitor' }));
+    second.unmount();
+
+    renderPage();
+    expect(screen.getByRole('button', { name: 'Start Monitor' })).toBeEnabled();
+  });
+});

@@ -29,6 +29,7 @@ import SecurityActionMessage from '../components/SecurityActionMessage';
 import ContextMenu  from "../components/ContextMenu.jsx";
 import WriteValueModal from '../components/WriteValueModal.jsx';
 import ActionLogPanel from '../components/ActionLogPanel.jsx';
+import { usePersistentFlag } from '../hooks/usePersistentFlag';
 
 function ACSIServer({ settings, updateModel, getModel, connections: propConnections, bffBaseUrl = 'http://localhost:5000'}) {
   const location = useLocation();
@@ -556,10 +557,31 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     monitorIntervalRef.current = setInterval(fetchActionLogs, 5000);
   }, [endpointTarget, isMonitoring, fetchActionLogs, stopMonitoring]);
 
+  // Whether the user has monitoring switched on for this FSP - persisted
+  // per instance (like acsi-server-connected-*) so it survives switching
+  // pages. No key until the ?fsp= restore has settled, so the generic
+  // pre-resolution instanceId never gets one. Only the Start/Stop buttons
+  // change it; the unmount cleanup's stopMonitoring() just stops this
+  // mount's polling, it doesn't switch monitoring off.
+  const [monitoringWanted, setMonitoringWanted] = usePersistentFlag(
+    identitySettled ? `acsi-server-monitoring-${instanceId}` : null
+  );
+
+  const startMonitoringHandler = useCallback(() => {
+    setMonitoringWanted(true);
+    startMonitoring();
+  }, [setMonitoringWanted, startMonitoring]);
+
   const stopMonitoringHandler = useCallback(async () => {
+    setMonitoringWanted(false);
     if (!isMonitoring) return;
     stopMonitoring();
-  }, [isMonitoring, stopMonitoring]);
+  }, [isMonitoring, setMonitoringWanted, stopMonitoring]);
+
+  // Resume monitoring on (re)mount if it was left on.
+  useEffect(() => {
+    if (monitoringWanted && endpointTarget && !isMonitoring) startMonitoring();
+  }, [monitoringWanted, endpointTarget, isMonitoring, startMonitoring]);
 
   const clearMessages = useCallback(async () => {
     if (!endpointTarget) { setError('No endpoint configured'); return; }
@@ -1141,7 +1163,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         messages={protocolMessages}
         isMonitoring={isMonitoring}
         disabled={!endpointTarget}
-        onStart={startMonitoring}
+        onStart={startMonitoringHandler}
         onStop={stopMonitoringHandler}
         onClear={clearMessages}
       />

@@ -31,6 +31,7 @@ import SecurityActionMessage from '../components/SecurityActionMessage';
 import ActionLogPanel from '../components/ActionLogPanel.jsx';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
 import { subscribe as subscribeLive } from '../services/liveSocket';
+import { usePersistentFlag } from '../hooks/usePersistentFlag';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
@@ -279,6 +280,27 @@ const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connect
     await fetchActionLogs();
     monitorIntervalRef.current = setInterval(fetchActionLogs, 5000);
   }, [isMonitoring, apiTarget, fetchActionLogs, stopMonitoring]);
+
+  // Whether the user has monitoring switched on - persisted (same global
+  // scope as 'acsi-connected') so it survives switching pages. Only the
+  // Start/Stop buttons change it; the unmount cleanup's stopMonitoring()
+  // just stops this mount's polling, it doesn't switch monitoring off.
+  const [monitoringWanted, setMonitoringWanted] = usePersistentFlag('acsi-monitoring');
+
+  const handleStartMonitoring = useCallback(() => {
+    setMonitoringWanted(true);
+    startMonitoring();
+  }, [setMonitoringWanted, startMonitoring]);
+
+  const handleStopMonitoring = useCallback(() => {
+    setMonitoringWanted(false);
+    stopMonitoring();
+  }, [setMonitoringWanted, stopMonitoring]);
+
+  // Resume monitoring on (re)mount if it was left on.
+  useEffect(() => {
+    if (monitoringWanted && apiTarget && !isMonitoring) startMonitoring();
+  }, [monitoringWanted, apiTarget, isMonitoring, startMonitoring]);
 
   // Clear messages
   const clearMessages = useCallback(async () => {
@@ -1151,8 +1173,8 @@ const getContextMenuItems = () => {
         messages={protocolMessages}
         isMonitoring={isMonitoring}
         disabled={!apiTarget}
-        onStart={startMonitoring}
-        onStop={stopMonitoring}
+        onStart={handleStartMonitoring}
+        onStop={handleStopMonitoring}
         onClear={clearMessages}
       />
 
