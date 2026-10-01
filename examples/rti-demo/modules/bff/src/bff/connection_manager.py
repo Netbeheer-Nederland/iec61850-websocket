@@ -95,6 +95,10 @@ class ConnectionManager:
         self.events: deque = deque(maxlen=200)
         self._event_seq = 0
         self._events_lock = threading.Lock()
+        # Last status reported as an event, per connection name - not the
+        # status loaded from connections.json, which persists across BFF
+        # restarts and would otherwise hide the first check's result.
+        self._reported_status: dict[str, str] = {}
         # Give every connection an initial status so the UI can render instantly.
         for con in self.connections:
             con.setdefault("status", "checking")
@@ -796,25 +800,29 @@ class ConnectionManager:
 
     async def get_all_connections_with_status(self):
         client = self.get_client()
-        before = {id(con): con.get("status") for con in self.connections}
         await asyncio.gather(
             *(self.check_connection(con, client) for con in self.connections)
         )
         for con in self.connections:
-            self._log_status_change(con, before.get(id(con)))
+            self._log_status_change(con)
         return self.connections
 
-    def _log_status_change(self, con, previous) -> None:
-        """Record an instance coming up or dropping (not every health tick)."""
+    def _log_status_change(self, con) -> None:
+        """Record an instance's status the first time this BFF checks it, and
+        then only when it comes up or drops (not every health tick)."""
         status = con.get("status")
-        if status == previous or status not in ("connected", "disconnected"):
+        if status not in ("connected", "disconnected"):
             return
         name = con.get("name", "")
+        previous = self._reported_status.get(name)
+        if status == previous:
+            return
+        self._reported_status[name] = status
         if status == "connected":
             self.log_event(f"{name} is reachable", instance=name)
         elif previous == "connected":
             self.log_event(f"{name} stopped responding", "warn", instance=name)
-        else:  # first check after startup / registration
+        else:  # first check since this BFF started (or since registration)
             self.log_event(f"{name} is not reachable", "warn", instance=name)
 
     async def validate_idp_server_on_start(self) -> None:

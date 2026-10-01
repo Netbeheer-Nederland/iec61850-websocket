@@ -73,26 +73,34 @@ def test_log_event_records_a_system_entry(manager):
     assert event["id"] == 1
 
 
-@pytest.mark.parametrize(
-    ("previous", "status", "expected"),
-    [
-        ("checking", "connected", ("info", "SO is reachable")),
-        ("connected", "disconnected", ("warn", "SO stopped responding")),
-        ("checking", "disconnected", ("warn", "SO is not reachable")),
-        ("disconnected", "connected", ("info", "SO is reachable")),
-    ],
-)
-def test_status_changes_become_events(manager, previous, status, expected):
-    manager._log_status_change({"name": "SO", "status": status}, previous)
-
-    [event] = manager.get_events()
-    assert (event["level"], event["message"]) == expected
+def _statuses(manager, *statuses):
+    for status in statuses:
+        manager._log_status_change({"name": "SO", "status": status})
+    return [(e["level"], e["message"]) for e in manager.get_events()]
 
 
-def test_an_unchanged_status_is_not_an_event(manager):
-    manager._log_status_change({"name": "SO", "status": "connected"}, "connected")
+def test_the_first_check_is_always_an_event_even_if_status_was_persisted(manager):
+    # connections.json persists "connected" across BFF restarts; the first
+    # check still reports it.
+    assert _statuses(manager, "connected") == [("info", "SO is reachable")]
 
-    assert manager.get_events() == []
+
+def test_first_check_unreachable_is_a_warning(manager):
+    assert _statuses(manager, "disconnected") == [("warn", "SO is not reachable")]
+
+
+def test_changes_after_that_become_events(manager):
+    assert _statuses(manager, "connected", "disconnected", "connected") == [
+        ("info", "SO is reachable"),
+        ("warn", "SO stopped responding"),
+        ("info", "SO is reachable"),
+    ]
+
+
+def test_an_unchanged_status_or_checking_is_not_an_event(manager):
+    assert _statuses(manager, "connected", "connected", "checking", "connected") == [
+        ("info", "SO is reachable"),
+    ]
 
 
 # -------------------- GET /api/diagnostics --------------------
