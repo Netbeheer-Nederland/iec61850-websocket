@@ -344,3 +344,47 @@ describe('MessageMonitor - WebSocket frames and ACSI service entries', () => {
   });
 });
 
+describe('MessageMonitor - ACSI entries linked to their frames', () => {
+  const acsiRead = {
+    id: 9,
+    kind: 'acsi',
+    message: 'GetDataValues LD0/LLN0.Mod.stVal [ST] - ok',
+    cp: 'cp1',
+    correlation: { cp: 'cp1', invokeId: 3, messageSeqFrom: 11, messageSeqTo: 12 },
+  };
+
+  it('lists the frames in the entry\'s range on its cp when expanded, and counts them in the row', async () => {
+    isConnected.mockReturnValue(true);
+    const { container } = render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+    await startMonitoring();
+    await pushLiveMessages('10.0.0.1:5001', [
+      { id: 10, cp: 'cp1', direction: 'recv', category: 'response', service_type: 'getDataValues', preview: 'earlier' },
+      { id: 11, cp: 'cp1', direction: 'send', category: 'request', service_type: 'getDataValues', preview: 'req' },
+      { id: 12, cp: 'cp1', direction: 'recv', category: 'response', service_type: 'getDataValues', preview: 'resp' },
+      { id: 13, cp: 'cp2', direction: 'recv', category: 'response', service_type: 'getDataValues', preview: 'other cp' },
+    ]);
+    await pushLiveActions('10.0.0.1:5001', [acsiRead]);
+
+    const user = userEvent.setup({ delay: null });
+    await user.click(screen.getByText(acsiRead.message));
+
+    const linked = [...container.querySelectorAll('.message-linked-frame')].map((el) => el.textContent);
+    expect(linked).toHaveLength(2);
+    expect(linked[0]).toContain('#11');
+    expect(linked[1]).toContain('#12');
+    expect(container.querySelector('.message-frame-count').textContent).toBe('2');
+  });
+
+  it('says so when the linked frames are not in view', async () => {
+    isConnected.mockReturnValue(true);
+    render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+    await startMonitoring();
+    await pushLiveActions('10.0.0.1:5001', [acsiRead]);
+
+    const user = userEvent.setup({ delay: null });
+    await user.click(screen.getByText(acsiRead.message));
+
+    expect(screen.getByText(/Frames #11-#12 aren't in this view/)).toBeInTheDocument();
+  });
+});
+

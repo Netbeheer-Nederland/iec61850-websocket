@@ -57,7 +57,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * BRCB (Buffered Report Control Block) configuration
 * TLS configuration support
 * OAuth authentication integration
-* Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
+* Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; an ACSI entry made through the SO also names the WebSocket frame range it produced (shown under the call on Traffic); Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
 * Real-time data updates
 
 ==== ACSI Server (`/acsi-server`)
@@ -72,7 +72,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * Tree expansion state persistence
 * TLS configuration support
 * OAuth authentication integration
-* Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
+* Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; an ACSI entry made through the SO also names the WebSocket frame range it produced (shown under the call on Traffic); Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
 * Status information display
 
 ==== Connections (`/connections`)
@@ -115,7 +115,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * Dynamic panel management (add/remove)
 * Real-time message monitoring, newest-first by default with a toggle for oldest-first (same control as the Monitoring panels' Activity Log)
 * Each message monitor's Start/Stop is remembered per instance (host:port, localStorage), so monitoring left on resumes after switching pages
-* Each message monitor shows two kinds of entry, each with a kind badge and a kind filter (All / WebSocket / ACSI): WebSocket frames (the instance's message log) and ACSI service entries (the kind "acsi" part of its actions log, pushed live by the BFF as `actions` events). A read/write through an SO shows up as its frames on both the SO and the FSP; a read/write aimed directly at an FSP is local model access with no frames, so it shows up as an ACSI entry on that FSP's monitor. System entries stay on the ACSI Client/Server pages. Clear empties the monitor and the instance's frame log, but leaves its actions log (and so the Activity Log) alone
+* Each message monitor shows two kinds of entry, each with a kind badge and a kind filter (All / WebSocket / ACSI): WebSocket frames (the instance's message log) and ACSI service entries (the kind "acsi" part of its actions log, pushed live by the BFF as `actions` events). A read/write through an SO shows up as its frames on both the SO and the FSP; a read/write aimed directly at an FSP is local model access with no frames, so it shows up as an ACSI entry on that FSP's monitor. Each ACSI call made through the SO is one entry (e.g. `GetDataValues LD0/LLN0.Mod.stVal [ST] - ok`, level from the response: serviceError = error, none = warn) linked to the frames it produced - the row shows their count, and expanding it lists them. System entries stay on the ACSI Client/Server pages. Clear empties the monitor and the instance's frame log, but leaves its actions log (and so the Activity Log) alone
 * FSP message monitors only shown for FSPs with an active connection (connectedClients > 0), same threshold used to light up the instance visualization above
 * Connection health monitoring
 * Instance visualization updates live from the BFF's connections push - no manual refresh button

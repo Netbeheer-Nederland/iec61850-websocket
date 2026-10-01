@@ -178,6 +178,12 @@ function ActionLogPanel({ messages, isMonitoring, disabled, onStart, onStop, onC
                       </span>
                     </div>
                     <div style={{ color: 'var(--text-primary)' }}>{msg.message}</div>
+                    {msg.correlation?.messageSeqFrom != null && (
+                      <div className="action-log-frames" style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '2px' }}>
+                        <i className="fas fa-plug" style={{ fontSize: '10px', marginRight: '4px' }}></i>
+                        WebSocket frames #{msg.correlation.messageSeqFrom}-#{msg.correlation.messageSeqTo} - shown under this call on Traffic
+                      </div>
+                    )}
                   </div>
                 );
               })

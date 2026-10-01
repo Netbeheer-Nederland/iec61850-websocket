@@ -34,6 +34,19 @@ const entryKey = (msg) => `${entryKind(msg)}:${msg.id || msg.message || JSON.str
 // ACSI entry lands next to its frames instead of all actions first.
 const byTime = (a, b) => String(a.time || a.timestamp || '').localeCompare(String(b.time || b.timestamp || ''));
 
+// The frames an ACSI entry produced: its correlation (set by the SO's
+// ACSIClient._invoke_acsi) is the range of frame ids logged while the call
+// ran, on its cp - reports excluded. An FSP's local read/write has none.
+const linkedFrames = (entry, all) => {
+  const c = entry?.correlation;
+  if (!c || c.messageSeqFrom == null || c.messageSeqTo == null) return null;
+  return all.filter((m) => entryKind(m) === 'websocket'
+    && m.cp === c.cp
+    && m.category !== 'unconfirmed'
+    && Number(m.id) >= c.messageSeqFrom
+    && Number(m.id) <= c.messageSeqTo);
+};
+
 const unwrapList = (payload, key) => {
   if (!payload) return [];
   const list = payload[key] ?? payload.result?.[key] ?? payload.result?.payload?.[key];
@@ -761,6 +774,7 @@ function MessageMonitor({
             {visibleMessages.map((msg) => {
               const msgId = entryKey(msg);
               const isAcsi = entryKind(msg) === 'acsi';
+              const frames = isAcsi ? linkedFrames(msg, messages) : null;
               const isExpanded = expandedMessageId === msgId;
               const directionColor = getDirectionColor(msg.direction);
               const categoryColor = getCategoryColor(msg.category);
@@ -798,7 +812,14 @@ function MessageMonitor({
                         <span className="message-level" style={{ color: msg.level === 'error' ? 'var(--danger-color)' : 'var(--warning-color)', fontWeight: '600' }}>{msg.level}</span>
                       )}
                       {isAcsi ? (
-                        <span className="message-summary" style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.message}</span>
+                        <>
+                          <span className="message-summary" style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.message}</span>
+                          {frames && frames.length > 0 && (
+                            <span className="message-frame-count" style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }} title="WebSocket frames this call produced - expand to see them">
+                              <i className="fas fa-plug" style={{ fontSize: '10px', marginRight: '3px' }}></i>{frames.length}
+                            </span>
+                          )}
+                        </>
                       ) : (
                         <>
                           {msg.direction && <span className="message-direction" style={{ color: directionColor, fontWeight: '600' }}>{msg.direction}</span>}
@@ -822,9 +843,33 @@ function MessageMonitor({
                     }}
                   >
                     {isAcsi ? (
-                      <pre style={{ margin: 0, fontSize: '11px', whiteSpace: 'pre-wrap', wordWrap: 'break-word', color: 'var(--text-primary)' }}>
-                        {JSON.stringify({ message: msg.message, cp: msg.cp || undefined, service: msg.service || undefined, detail: msg.detail }, null, 2)}
-                      </pre>
+                      <>
+                        <pre style={{ margin: 0, fontSize: '11px', whiteSpace: 'pre-wrap', wordWrap: 'break-word', color: 'var(--text-primary)' }}>
+                          {JSON.stringify({ message: msg.message, cp: msg.cp || undefined, service: msg.service || undefined, detail: msg.detail }, null, 2)}
+                        </pre>
+                        {frames && (
+                          <div className="message-linked-frames" style={{ marginTop: '8px', borderTop: '1px solid var(--border-color)', paddingTop: '8px' }}>
+                            <div style={{ color: 'var(--text-muted)', marginBottom: '4px' }}>
+                              <i className="fas fa-plug" style={{ fontSize: '10px', marginRight: '4px' }}></i>
+                              WebSocket frames
+                            </div>
+                            {frames.length === 0 ? (
+                              <div style={{ color: 'var(--text-muted)' }}>
+                                Frames #{msg.correlation.messageSeqFrom}-#{msg.correlation.messageSeqTo} aren't in this view (logged before monitoring started, or cleared).
+                              </div>
+                            ) : (
+                              frames.map((f) => (
+                                <div key={entryKey(f)} className="message-linked-frame" style={{ display: 'flex', gap: '8px', fontFamily: 'Consolas, "Courier New", monospace', fontSize: '11px' }}>
+                                  <span style={{ color: 'var(--text-muted)' }}>#{f.id}</span>
+                                  <span style={{ color: getDirectionColor(f.direction), fontWeight: '600' }}>{f.direction}</span>
+                                  <span style={{ color: f.level === 'error' ? 'var(--danger-color)' : 'var(--text-secondary)' }}>{f.service_type || f.service}</span>
+                                  <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.preview || f.message}</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </>
                     ) : (
                       formatMessageContent(msg)
                     )}

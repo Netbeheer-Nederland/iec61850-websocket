@@ -3234,8 +3234,10 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400,
                 )
 
-            rti_so._log_action(f"Readvalue request: objRef={obj_ref}, fc={fc}", "info", kind="acsi")
 
+            # The call itself is logged (one kind "acsi" entry, linked to its
+            # frames) by ACSIClient._invoke_acsi - only rejections, timeouts
+            # and exceptions are logged here.
             try:
                 result = rti_so.invoke_on_runtime_loop(
                     rti_so.read_value(obj_ref, fc, cp), timeout=10
@@ -3310,14 +3312,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         status_code=404,
                     )
 
-                rti_so._log_action(
-                    "Client readvalue",
-                    detail={
-                        "objRef": obj_ref,
-                        "value": result.get("value"),
-                    },
-                    kind="acsi",
-                )
                 return {
                     "ok": True,
                     "success": True,
@@ -3999,11 +3993,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     content={"ok": False, "error": "value is required"}, status_code=400
                 )
 
-            rti_so._log_action(
-                f"Writevalue request: objRef={obj_ref}, fc={fc}, value={value}", "info",
-                kind="acsi",
-            )
-
             try:
                 result = rti_so.invoke_on_runtime_loop(
                     rti_so.write_value(obj_ref, value, fc, value_type, cp), timeout=10
@@ -4172,11 +4161,6 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 return JSONResponse(
                     content={"ok": False, "error": "value is required"}, status_code=400
                 )
-
-            rti_so._log_action(
-                f"Operate request: objRef={obj_ref}, value={value}", "info",
-                kind="acsi",
-            )
 
             try:
                 result = rti_so.invoke_on_runtime_loop(

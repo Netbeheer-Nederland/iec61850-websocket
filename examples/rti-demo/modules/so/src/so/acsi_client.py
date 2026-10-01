@@ -48,6 +48,12 @@ logger = logging.getLogger(__name__)
 ACTION_KINDS = ("system", "acsi")
 
 
+def _jsonable(value: Any) -> Any:
+    """`value` made JSON-serializable (tuples -> lists, bytes etc. -> str), so
+    a raw ACSI result can go into a log entry's detail."""
+    return json.loads(json.dumps(value, default=str))
+
+
 class ModelInfo:
     def __init__(self, cp):
         self.model_status: str = "idle"  # idle|building|ready|error
@@ -731,6 +737,72 @@ class ACSIClient:
 
         return result
 
+    async def _invoke_acsi(
+            self,
+            *,
+            service: str,
+            summary: str,
+            cp: str,
+            websocket_info: Any,
+            call: Callable[[], Any],
+            detail: dict[str, Any] | None = None,
+    ) -> Any:
+        """Run one ACSI service call under invoke_lock and log it as a single
+        kind "acsi" entry, linked to the WebSocket frames it produced.
+
+        invoke_lock serializes this instance's ACSI calls, so the frames
+        logged between the start and end of `call` - on this cp, excluding
+        reports - are exactly this call's request/response frames (an
+        operate's select included). The entry's correlation records that
+        range (messageSeqFrom..messageSeqTo) plus the first invokeId, and its
+        outcome comes from the last response frame in it: a serviceError
+        response is an error, no response at all a warning. Exceptions
+        propagate unlogged - the calling route logs those (and timeouts) as
+        before. See docs/rti-demo/design/logging-kinds.md.
+        """
+        async with self.runtime.invoke_lock:
+            with self.runtime.lock:
+                seq_from = self.runtime.message_seq + 1
+            invoke_id = getattr(websocket_info, "invoke_id", None)
+            started = time.monotonic()
+            result = await call()
+            duration_ms = round((time.monotonic() - started) * 1000)
+            with self.runtime.lock:
+                seq_to = self.runtime.message_seq
+                response = next(
+                    (
+                        m
+                        for m in reversed(self.runtime.messages)
+                        if seq_from <= m["id"] <= seq_to
+                        and m.get("cp") == cp
+                        and m.get("category") == "response"
+                    ),
+                    None,
+                )
+
+        if response is None:
+            level, outcome = "warn", "no response"
+        elif response.get("service_type") == "serviceError":
+            level, outcome = "error", f"failed: {result}"
+        else:
+            level, outcome = "info", "ok"
+
+        self._log_action(
+            f"{summary} - {outcome}",
+            level,
+            {**(detail or {}), "result": _jsonable(result), "durationMs": duration_ms},
+            kind="acsi",
+            cp=cp,
+            service=service,
+            correlation={
+                "cp": cp,
+                "invokeId": invoke_id,
+                "messageSeqFrom": seq_from,
+                "messageSeqTo": seq_to,
+            },
+        )
+        return result
+
     def get_actions(self) -> list[dict[str, Any]]:
         """Get logged actions."""
         with self.runtime.lock:
@@ -758,10 +830,16 @@ class ACSIClient:
             raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
-        async with self.runtime.invoke_lock:
-            result = await client.get_data_values(
+        result = await self._invoke_acsi(
+            service="getDataValues",
+            summary=f"GetDataValues {obj_ref} [{str(fc).upper()}]",
+            cp=cp,
+            websocket_info=websocket_info,
+            detail={"objRef": obj_ref, "fc": fc},
+            call=lambda: client.get_data_values(
                 obj_ref, fc, False, websocket_info, None, None
-            )
+            ),
+        )
         return {"value": result}
 
     async def get_dataset_directory(
@@ -773,10 +851,16 @@ class ACSIClient:
             raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
-        async with self.runtime.invoke_lock:
-            result = await client.get_dataset_directory(
+        result = await self._invoke_acsi(
+            service="getDataSetDirectory",
+            summary=f"GetDataSetDirectory {ld_inst}/{ln_inst}.{ds_inst}",
+            cp=cp,
+            websocket_info=websocket_info,
+            detail={"ldInst": ld_inst, "lnInst": ln_inst, "dsInst": ds_inst},
+            call=lambda: client.get_dataset_directory(
                 ld_inst, ln_inst, ds_inst, websocket_info, None, None
-            )
+            ),
+        )
         return {"value": result}
 
     async def get_data_definition(self, obj_ref: str, cp: str) -> dict[str, Any]:
@@ -787,10 +871,16 @@ class ACSIClient:
                 raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
             websocket_info = self.runtime.endpoint.get_websocket_info(client)
-            async with self.runtime.invoke_lock:
-                result = await client.get_data_definition(
+            result = await self._invoke_acsi(
+                service="getDataDefinition",
+                summary=f"GetDataDefinition {obj_ref}",
+                cp=cp,
+                websocket_info=websocket_info,
+                detail={"objRef": obj_ref},
+                call=lambda: client.get_data_definition(
                     obj_ref, websocket_info, None, None
-                )
+                ),
+            )
             return {"dataDefinition": result}
         except Exception as e:
             logger.exception(f"Error in get_data_definition: {e}")
@@ -804,8 +894,14 @@ class ACSIClient:
             raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
-        async with self.runtime.invoke_lock:
-            result = await client.get_BRCB_values(obj_ref, websocket_info, None, None)
+        result = await self._invoke_acsi(
+            service="getBRCBValues",
+            summary=f"GetBRCBValues {obj_ref}",
+            cp=cp,
+            websocket_info=websocket_info,
+            detail={"objRef": obj_ref},
+            call=lambda: client.get_BRCB_values(obj_ref, websocket_info, None, None),
+        )
         return {"brcbDefinition": result}
 
     def create_rcb_from_frontend_data(self, rcb_data, type: str):
@@ -878,8 +974,14 @@ class ACSIClient:
             raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
-        async with self.runtime.invoke_lock:
-            result = await client.set_BRCB_values(brcb, websocket_info, None, None)
+        result = await self._invoke_acsi(
+            service="setBRCBValues",
+            summary=f"SetBRCBValues {data.get('ref', '')}",
+            cp=cp,
+            websocket_info=websocket_info,
+            detail={"objRef": data.get("ref", "")},
+            call=lambda: client.set_BRCB_values(brcb, websocket_info, None, None),
+        )
         return {"result": result}
 
     async def set_urcb_values(self, cp: str, data: Any) -> dict[str, Any]:
@@ -892,8 +994,14 @@ class ACSIClient:
             raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
-        async with self.runtime.invoke_lock:
-            result = await client.set_URCB_values(rcb, websocket_info, None, None)
+        result = await self._invoke_acsi(
+            service="setURCBValues",
+            summary=f"SetURCBValues {data.get('ref', '')}",
+            cp=cp,
+            websocket_info=websocket_info,
+            detail={"objRef": data.get("ref", "")},
+            call=lambda: client.set_URCB_values(rcb, websocket_info, None, None),
+        )
         return {"result": result}
 
     async def get_urcb_definition(self, obj_ref: str, cp: str) -> dict[str, Any]:
@@ -904,8 +1012,14 @@ class ACSIClient:
             raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
-        async with self.runtime.invoke_lock:
-            result = await client.get_URCB_values(obj_ref, websocket_info, None, None)
+        result = await self._invoke_acsi(
+            service="getURCBValues",
+            summary=f"GetURCBValues {obj_ref}",
+            cp=cp,
+            websocket_info=websocket_info,
+            detail={"objRef": obj_ref},
+            call=lambda: client.get_URCB_values(obj_ref, websocket_info, None, None),
+        )
         return {"urcbDefinition": result}
 
     def convert_value(self, type_name, raw_str, type_map):
@@ -968,47 +1082,55 @@ class ACSIClient:
 
         websocket_info = self.runtime.endpoint.get_websocket_info(client)
 
-        async with self.runtime.invoke_lock:
-            type_map = {
-                "boolean": bool,
-                "int8": int,
-                "int16": int,
-                "int24": int,
-                "int32": int,
-                "int64": int,
-                "int8u": int,
-                "int16u": int,
-                "int24u": int,
-                "int32u": int,
-                "float32": float,
-                "octetString": bytes,
-                "visString64": str,
-                "visString129": str,
-                "visString255": str,
-                "array": list,
-                "bitstring": list,  # or int/str depending on how you represent bits
-                "generalizedtime": str,  # or datetime, depending on how you parse it
-                "binarytime": str,  # or datetime/time
-                "quality": int,  # or a custom Quality class/bitmask
-                "timeStamp": str,  # or datetime
-                "enumerated": int,
-            }
+        # The type conversion needs no lock - _invoke_acsi takes invoke_lock
+        # for the call itself.
+        type_map = {
+            "boolean": bool,
+            "int8": int,
+            "int16": int,
+            "int24": int,
+            "int32": int,
+            "int64": int,
+            "int8u": int,
+            "int16u": int,
+            "int24u": int,
+            "int32u": int,
+            "float32": float,
+            "octetString": bytes,
+            "visString64": str,
+            "visString129": str,
+            "visString255": str,
+            "array": list,
+            "bitstring": list,  # or int/str depending on how you represent bits
+            "generalizedtime": str,  # or datetime, depending on how you parse it
+            "binarytime": str,  # or datetime/time
+            "quality": int,  # or a custom Quality class/bitmask
+            "timeStamp": str,  # or datetime
+            "enumerated": int,
+        }
 
-            converted, converted_val = self.convert_value(data_type, value, type_map)
+        converted, converted_val = self.convert_value(data_type, value, type_map)
 
-            if converted is False:
-                raise RuntimeError(
-                    f"Type mismatch: '{value}' is not valid for {data_type}"
-                )
-            else:
-                result = await client.set_data_values(
+        if converted is False:
+            raise RuntimeError(
+                f"Type mismatch: '{value}' is not valid for {data_type}"
+            )
+        else:
+            result = await self._invoke_acsi(
+                service="setDataValues",
+                summary=f"SetDataValues {obj_ref} [{str(fc).upper()}] = {value!r}",
+                cp=cp,
+                websocket_info=websocket_info,
+                detail={"objRef": obj_ref, "fc": fc, "value": value, "dataType": data_type},
+                call=lambda: client.set_data_values(
                     obj_ref,
                     fc,
                     [{"data": (data_type, converted_val)}],
                     websocket_info,
                     self.runtime.write_callback,
                     None,
-                )
+                ),
+            )
 
         if result is True:
             return {"objRef": obj_ref, "value": value}
@@ -1047,6 +1169,12 @@ class ACSIClient:
             "check": {"synchroCheck": False, "interlockCheck": False},
         }
 
-        async with self.runtime.invoke_lock:
-            result = await client.operate(oper_val, websocket_info, None, None)
+        result = await self._invoke_acsi(
+            service="operate",
+            summary=f"Operate {obj_ref} = {oper_val['ctlVal'][1]!r}",
+            cp=cp,
+            websocket_info=websocket_info,
+            detail={"objRef": obj_ref, "value": oper_val["ctlVal"][1], "valType": val_type},
+            call=lambda: client.operate(oper_val, websocket_info, None, None),
+        )
         return {"objRef": obj_ref, "result": result}

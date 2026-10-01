@@ -143,6 +143,14 @@ describe('ActionLogPanel kinds', () => {
     expect(screen.queryByText(/Readvalue request/)).not.toBeInTheDocument();
   });
 
+  it('points an ACSI entry at the frames it produced', () => {
+    renderPanel({
+      messages: [{ id: 4, kind: 'acsi', level: 'info', message: 'GetDataValues x - ok', correlation: { cp: 'cp1', messageSeqFrom: 11, messageSeqTo: 12 } }],
+    });
+
+    expect(screen.getByText(/WebSocket frames #11-#12/)).toBeInTheDocument();
+  });
+
   it('titles the list Activity Log, not Protocol Messages (those are the WebSocket frames on Traffic)', () => {
     renderPanel({ messages: KINDED });
 

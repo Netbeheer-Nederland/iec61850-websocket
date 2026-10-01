@@ -1,6 +1,6 @@
 # rti-demo logging: system, WebSocket and ACSI service logs
 
-Status: **in progress** (2026-10-01) - phases 1-2 implemented; see Phasing.
+Status: **in progress** (2026-10-01) - phases 1-3 implemented; see Phasing.
 
 Goal: make the three kinds of log entry the SO/FSP produce - **system**,
 **WebSocket** and **ACSI service** - distinguishable at the source, and give
@@ -101,13 +101,23 @@ then.
 
 ### Linking a service call to its frames
 
-An acsi entry made through the SO should expand to show the request/response
-frames it produced. The natural key is `(cp, invokeId)`, which every frame
-carries. **Caveat:** in the frames captured while writing this note, the
-request and response both had `invokeId: 0` - so either the demo reuses
-invoke ids, or the key needs something else (e.g. the acsi entry recording the
-frame `id`s it sent/received). Verify before relying on it - see Open
-questions.
+An acsi entry made through the SO expands to show the request/response
+frames it produced.
+
+`invokeId` alone isn't a good enough key: it counts up per call on each
+WebSocket connection (`WebSocketInfo.invoke_id`), but restarts at 0 whenever
+the connection is re-established - the `invokeId: 0` seen while drafting this
+note was simply the first call after an SO restart. And one logical call can
+use several: an operate sends a select first.
+
+So the SO's `ACSIClient._invoke_acsi` records the **range of frame ids**
+logged while the call ran (`messageSeqFrom`..`messageSeqTo`), plus the first
+`invokeId` for reference. `invoke_lock` already serializes the SO's ACSI
+calls, so the frames in that range on the entry's `cp` - reports excluded -
+are exactly that call's. The same helper also gives the entry its outcome
+from the last response frame in the range (a `serviceError` response is an
+error, no response a warning), replacing the separate "request" and
+"success" entries the SO used to log per call.
 
 A local FSP read/write simply has no linked frames - it still gets a proper
 acsi entry, which is how it finally shows up next to SO-driven reads instead
@@ -155,7 +165,7 @@ Each phase is its own commit (or small series), verified before the next.
 2. **(done)** **acsi entries on Traffic.** Have the BFF relay actions with
    `kind: "acsi"` the same way it relays messages, and show them in Traffic's
    monitors alongside frames, with kind chips.
-3. **Correlation.** Settle the `invokeId` question, record the link, and let
+3. **(done)** **Correlation.** Settle the `invokeId` question, record the link, and let
    acsi rows on Traffic expand to their frames.
 4. **Diagnostics page.** Wire `Diagnostics.jsx` into the sidebar with system
    entries from all instances plus BFF events.
@@ -166,9 +176,9 @@ Each phase is its own commit (or small series), verified before the next.
 
 ## Open questions
 
-- **invokeId uniqueness** - captured frames showed `invokeId: 0` on both request
-  and response. Does the client increment it per call, per cp, or never? If
-  not unique, correlate by recorded frame ids instead.
+- ~~**invokeId uniqueness**~~ - resolved: unique per connection only, so
+  correlation uses the frame id range instead (see Linking a service call to
+  its frames).
 - **Debug level** - the SO logs a lot of `debug` system entries on TLS/OAuth
   reconfiguration. Hide debug by default in the panels?
 - **Retention** - both logs are in-memory and bounded. Is "since last

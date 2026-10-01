@@ -320,3 +320,91 @@ class TestInitDoesNotClobberConnectStatus:
             client = ACSIClient()
 
         assert client.runtime.status == "connected"
+
+
+class TestInvokeAcsi:
+    """ACSIClient._invoke_acsi: one kind "acsi" entry per call, linked to the
+    frames logged while it ran."""
+
+    @staticmethod
+    def _frames(client, *frames):
+        async def call():
+            for direction, raw in frames:
+                client._log_message(direction, raw, None)
+            return "the-result"
+
+        return call
+
+    @staticmethod
+    def _req(cp, invoke_id, service="getDataValues"):
+        return f'{{"request": {{"associateId": "{cp}", "invokeId": {invoke_id}, "service": {{"{service}": {{}}}}}}}}'
+
+    @staticmethod
+    def _resp(cp, invoke_id, service="getDataValues"):
+        return f'{{"response": {{"associateId": "{cp}", "invokeId": {invoke_id}, "service": {{"{service}": {{}}}}}}}}'
+
+    async def test_logs_one_linked_entry_for_an_ok_call(self, client):
+        client._log_message("recv", self._resp("cp1", 1), None)  # earlier, unrelated
+        info = type("WSInfo", (), {"invoke_id": 4})()
+
+        result = await client._invoke_acsi(
+            service="getDataValues",
+            summary="GetDataValues LD0/LLN0.Mod.stVal [ST]",
+            cp="cp1",
+            websocket_info=info,
+            detail={"objRef": "LD0/LLN0.Mod.stVal"},
+            call=self._frames(client, ("send", self._req("cp1", 4)), ("recv", self._resp("cp1", 4))),
+        )
+
+        assert result == "the-result"
+        entry = client.get_actions()[-1]
+        assert entry["kind"] == "acsi"
+        assert entry["level"] == "info"
+        assert entry["message"] == "GetDataValues LD0/LLN0.Mod.stVal [ST] - ok"
+        assert entry["service"] == "getDataValues"
+        assert entry["cp"] == "cp1"
+        assert entry["detail"]["objRef"] == "LD0/LLN0.Mod.stVal"
+        assert entry["detail"]["result"] == "the-result"
+        frame_ids = [m["id"] for m in client.get_messages()]
+        assert entry["correlation"] == {
+            "cp": "cp1",
+            "invokeId": 4,
+            "messageSeqFrom": frame_ids[1],
+            "messageSeqTo": frame_ids[2],
+        }
+
+    async def test_service_error_response_is_an_error(self, client):
+        await client._invoke_acsi(
+            service="setDataValues",
+            summary="SetDataValues x",
+            cp="cp1",
+            websocket_info=None,
+            call=self._frames(
+                client,
+                ("send", self._req("cp1", 0, "setDataValues")),
+                ("recv", self._resp("cp1", 0, "serviceError")),
+            ),
+        )
+
+        entry = client.get_actions()[-1]
+        assert entry["level"] == "error"
+        assert entry["message"].startswith("SetDataValues x - failed")
+
+    async def test_no_response_on_this_cp_is_a_warning(self, client):
+        # A response on another cp, and a report, don't count as this call's.
+        await client._invoke_acsi(
+            service="getDataValues",
+            summary="GetDataValues x",
+            cp="cp1",
+            websocket_info=None,
+            call=self._frames(
+                client,
+                ("send", self._req("cp1", 0)),
+                ("recv", self._resp("cp2", 0)),
+                ("recv", '{"unconfirmed": {"associateId": "cp1", "service": {"report": {}}}}'),
+            ),
+        )
+
+        entry = client.get_actions()[-1]
+        assert entry["level"] == "warn"
+        assert entry["message"] == "GetDataValues x - no response"
