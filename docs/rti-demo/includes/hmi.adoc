@@ -25,7 +25,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 |/data |Data.jsx |Simple data visualization
 |/tools |Tools.jsx |SCL Model Factory, XML parsing
 |/reports |Reports.jsx |Reports and logging
-|/diagnostics |Diagnostics.jsx |System diagnostics
+|/diagnostics |Diagnostics.jsx |System log across the BFF and all instances
 |/settings |Settings.jsx |BFF configuration
 |===
 
@@ -155,13 +155,17 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * Placeholder for reporting functionality
 
 ==== Diagnostics (`/diagnostics`)
-**File**: Diagnostics.jsx (1.6KB)
+**File**: Diagnostics.jsx (7KB)
 
-**Purpose**: System diagnostics and health monitoring page.
+**Purpose**: "Is the system healthy?" - the system log across the whole demo, reachable from the sidebar.
 
 **Features**:
-* Simple diagnostics interface
-* Placeholder for diagnostic tools
+* Reads the BFF's `GET /api/diagnostics`: the BFF's own events (an instance coming up or dropping, TLS/OAuth re-apply results, the startup IDP check) merged with every reachable RTI-SO/RTI-FSP's System entries
+* Errors and warnings first, then newest first; header counts errors/warnings
+* Source filter (BFF or an instance) and severity filter - debug hidden by default ("All but debug"), "Errors & warnings", "All levels"
+* BFF events name the instance they concern
+* Re-read every 5s while the page is open - no refresh button
+* ACSI service and WebSocket entries are on Traffic, not here
 
 ==== Settings (`/settings`)
 **File**: Settings.jsx (6KB)

@@ -26,6 +26,7 @@ function Sidebar() {
     { path: '/connections', icon: 'fa-gear', label: 'Connections' },
     { path: '/model', icon: 'fa-sitemap', label: 'Model' },
     { path: '/traffic', icon: 'fa-exchange-alt', label: 'Traffic' },
+    { path: '/diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' },
     { path: '/tools', icon: 'fa-tools', label: 'Tools' },
     { path: '/settings', icon: 'fa-cog', label: 'Settings' },
   ];

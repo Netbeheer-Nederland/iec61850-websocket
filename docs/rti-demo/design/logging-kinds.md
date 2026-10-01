@@ -1,6 +1,6 @@
 # rti-demo logging: system, WebSocket and ACSI service logs
 
-Status: **in progress** (2026-10-01) - phases 1-3 implemented; see Phasing.
+Status: **implemented** (2026-10-01) - all phases done; retention is still an open question.
 
 Goal: make the three kinds of log entry the SO/FSP produce - **system**,
 **WebSocket** and **ACSI service** - distinguishable at the source, and give
@@ -131,7 +131,7 @@ Each page answers one question:
 
 | Page | Question | Shows |
 |---|---|---|
-| **Traffic** (all instances) | What's happening between SO and FSPs? | **websocket + acsi**, per-instance cards as today, with kind filter chips. acsi entries expand to their linked frames. This is where reads/writes belong. |
+| **Traffic** (all instances) | What's happening between SO and FSPs? | **websocket + acsi**, per-instance cards as today, with a kind filter. acsi entries expand to their linked frames. This is where reads/writes belong. |
 | **ACSI Client / ACSI Server** (one instance) | What is this instance doing, and why did it fail? | **system + acsi** for that instance - the existing Monitoring panel, with a kind filter next to the existing level filter. |
 | **Diagnostics** (new nav entry) | Is the system healthy? | **system** across all instances, plus the BFF's own events (health checks, TLS/OAuth re-sync failures from `connection_manager.status_monitor`). Warnings/errors first. |
 
@@ -144,7 +144,7 @@ developers, via `docker logs`.
 ### Visual differentiation
 
 - **Kind** gets an icon + text label on each row (e.g. `fa-gear` System,
-  `fa-plug` WebSocket, `fa-cubes` ACSI) and as filter chips.
+  `fa-plug` WebSocket, `fa-cubes` ACSI) and in a kind filter.
 - **Level** keeps its existing color coding.
 - Don't encode kind with color: color already means level, and the style
   guide reserves status color for ok / not-ok (`style-guide.md`, Status
@@ -164,12 +164,12 @@ Each phase is its own commit (or small series), verified before the next.
    separate system from service activity.
 2. **(done)** **acsi entries on Traffic.** Have the BFF relay actions with
    `kind: "acsi"` the same way it relays messages, and show them in Traffic's
-   monitors alongside frames, with kind chips.
+   monitors alongside frames, with a kind filter.
 3. **(done)** **Correlation.** Settle the `invokeId` question, record the link, and let
    acsi rows on Traffic expand to their frames.
-4. **Diagnostics page.** Wire `Diagnostics.jsx` into the sidebar with system
+4. **(done)** **Diagnostics page.** Wire `Diagnostics.jsx` into the sidebar with system
    entries from all instances plus BFF events.
-5. Update `hmi.adoc` and `wireframe.html` alongside each phase that changes
+5. **(done)** Update `hmi.adoc` and `wireframe.html` alongside each phase that changes
    what a page shows.
 
 ---
@@ -179,10 +179,13 @@ Each phase is its own commit (or small series), verified before the next.
 - ~~**invokeId uniqueness**~~ - resolved: unique per connection only, so
   correlation uses the frame id range instead (see Linking a service call to
   its frames).
-- **Debug level** - the SO logs a lot of `debug` system entries on TLS/OAuth
-  reconfiguration. Hide debug by default in the panels?
+- **Debug level** - Diagnostics hides debug by default ("All but debug"); the
+  ACSI Client/Server Activity Log still shows all levels by default, since
+  it's the place to look at one instance's details.
 - **Retention** - both logs are in-memory and bounded. Is "since last
   restart, last N entries" enough for a demo, or should system/acsi entries be
   persisted (e.g. for the Diagnostics page)?
-- **BFF events** - does the BFF need its own small actions log for the
-  Diagnostics page, or should it only aggregate the instances' system entries?
+- ~~**BFF events**~~ - resolved: the BFF keeps its own small events log
+  (`ConnectionManager.log_event`, same shape as an actions-log entry plus the
+  `instance` it concerns), and `GET /api/diagnostics` merges it with the
+  instances' system entries.

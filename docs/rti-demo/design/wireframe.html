@@ -416,6 +416,30 @@
     </div>
   </section>
 
+  <!-- ============ DIAGNOSTICS ============ -->
+  <section class="screen" data-screen="diagnostics">
+    <div class="frame">
+      <div class="wf-sidebar" data-active-nav="Diagnostics"></div>
+      <div class="wf-main">
+        <div class="wf-header"><div class="crumb"></div><div class="actions"><div class="icon"></div></div></div>
+        <div class="wf-content">
+          <div class="wf-page-header"><div class="wf-h1" data-label="Diagnostics" style="width:150px;"></div></div>
+          <p class="placeholder-text" style="margin:-10px 0 16px;">ⓘ "Is the system healthy?" - the BFF's own events (an instance coming up / dropping, TLS/OAuth re-apply results, the startup IDP check) merged with every reachable SO/FSP's System entries. Errors and warnings first, then newest first. Re-read every 5s while open - no refresh button. ACSI service and WebSocket entries live on Traffic instead.</p>
+          <div class="btn-row" style="justify-content:space-between;">
+            <span class="placeholder-text">12 entries · 1 error · 2 warnings</span>
+            <span class="placeholder-text">[All sources ▾] [All but debug ▾]</span>
+          </div>
+          <div class="section-card">
+            <div class="trow"><div class="cell placeholder-text"><b>SO</b> - 10:00:03</div><div class="cell placeholder-text">Endpoint failed to start</div><div class="cell narrow placeholder-text">⚙ System · error</div></div>
+            <div class="trow"><div class="cell placeholder-text"><b>BFF</b> · FSP01 - 10:00:02</div><div class="cell placeholder-text">FSP01 stopped responding</div><div class="cell narrow placeholder-text">⚙ System · warn</div></div>
+            <div class="trow"><div class="cell placeholder-text"><b>SO</b> - 10:00:01</div><div class="cell placeholder-text">Connected to server</div><div class="cell narrow placeholder-text">⚙ System · info</div></div>
+          </div>
+          <p class="placeholder-text" style="margin-top:6px;">ⓘ Debug entries (e.g. the SO's TLS/OAuth reconfiguration steps) are hidden by default; "All levels" shows them, "Errors &amp; warnings" narrows further.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ TOOLS ============ -->
   <section class="screen" data-screen="tools">
     <div class="frame">
@@ -686,6 +710,7 @@
     'connections': 'Connections',
     'model': 'Model',
     'traffic': 'Traffic',
+    'diagnostics': 'Diagnostics',
     'tools': 'Tools',
     'settings': 'Settings',
     'acsi-server': 'ACSI Server (FSP)',
@@ -702,7 +727,7 @@
   });
 
   // Build sidebar nav wireframe (shared markup) into every .wf-sidebar
-  const navItems = ['Overview', 'Connections', 'Model', 'Traffic', 'Tools', 'Settings'];
+  const navItems = ['Overview', 'Connections', 'Model', 'Traffic', 'Diagnostics', 'Tools', 'Settings'];
   document.querySelectorAll('.wf-sidebar').forEach((sidebar) => {
     const active = sidebar.dataset.activeNav;
     const logo = document.createElement('div');

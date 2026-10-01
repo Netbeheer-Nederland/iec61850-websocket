@@ -1438,6 +1438,71 @@ async def execute_dynamic_api(request: ExecuteRequest):
         )
 
 
+# -------------------- Diagnostics --------------------
+
+
+_DIAGNOSTICS_LEVEL_ORDER = {"error": 0, "warn": 1, "info": 2, "debug": 3}
+
+
+async def _instance_system_entries(con: dict) -> list[dict[str, Any]]:
+    """One instance's kind "system" actions-log entries, tagged with its name.
+
+    Unreachable or not-yet-registered instances contribute nothing - their
+    being down is already a BFF event ("... stopped responding").
+    """
+    client = _bff_clients.get(f"{con.get('host')}:{con.get('port')}")
+    if client is None:
+        return []
+    try:
+        result = await asyncio.to_thread(client.request, "GET", "/api/actions-logs")
+    except Exception:
+        return []
+    actions = result.get("actions") if isinstance(result, dict) else None
+    if not isinstance(actions, list):
+        return []
+    name = con.get("name", "")
+    return [
+        {**a, "instance": name, "source": name}
+        for a in actions
+        if isinstance(a, dict) and a.get("kind") == "system"
+    ]
+
+
+@app.get(
+    "/api/diagnostics",
+    summary="System log across all instances",
+    description=(
+        "The BFF's own system events plus every reachable RTI-SO/RTI-FSP's "
+        "kind \"system\" actions-log entries, errors and warnings first, then "
+        "newest first. See docs/rti-demo/design/logging-kinds.md."
+    ),
+    response_description="Merged system entries",
+    tags=["Diagnostics"],
+)
+async def get_diagnostics():
+    targets = [
+        con
+        for con in conn_manager.connections
+        if con.get("type") in ("RTI-SO", "RTI-FSP")
+        and con.get("status") == "connected"
+        and con.get("host")
+        and con.get("port")
+    ]
+    per_instance = await asyncio.gather(*(_instance_system_entries(c) for c in targets))
+    entries = [{**e, "source": "BFF"} for e in conn_manager.get_events()]
+    for chunk in per_instance:
+        entries.extend(chunk)
+
+    # Errors/warnings first, then newest first within a level. Times are
+    # each source's own "HH:MM:SS" - fine for ordering within a session.
+    entries.sort(key=lambda e: str(e.get("time", "")), reverse=True)
+    entries.sort(key=lambda e: _DIAGNOSTICS_LEVEL_ORDER.get(e.get("level"), 2))
+    return {
+        "entries": entries,
+        "sources": ["BFF", *(c.get("name", "") for c in targets)],
+    }
+
+
 # -------------------- Reports --------------------
 
 

@@ -37,7 +37,9 @@ import asyncio
 import json
 import os
 import tempfile
+import threading
 import time
+from collections import deque
 from datetime import datetime
 
 import httpx2 as httpx
@@ -85,11 +87,50 @@ class ConnectionManager:
         # failed re-apply - separate per kind, so a failing TLS re-apply
         # doesn't also hold back OAuth.
         self._sync_failures: dict[tuple[str, str], float] = {}
+        # The BFF's own system events (an instance coming up / dropping, a
+        # TLS/OAuth re-apply succeeding or failing, the startup IDP check),
+        # for the HMI's Diagnostics page next to each instance's own system
+        # entries - see docs/rti-demo/design/logging-kinds.md. Same shape as
+        # an instance's actions-log entry, plus the instance it concerns.
+        self.events: deque = deque(maxlen=200)
+        self._event_seq = 0
+        self._events_lock = threading.Lock()
         # Give every connection an initial status so the UI can render instantly.
         for con in self.connections:
             con.setdefault("status", "checking")
 
         self._register_connections_as_clients()
+
+    def log_event(
+        self,
+        message: str,
+        level: str = "info",
+        *,
+        instance: str = "",
+        detail: dict | None = None,
+    ) -> None:
+        """Record a BFF system event (kind "system") and log it as usual."""
+        log = {"error": self.logger.error, "warn": self.logger.warning}.get(
+            level, self.logger.info
+        )
+        log(message)
+        with self._events_lock:
+            self._event_seq += 1
+            self.events.append(
+                {
+                    "id": self._event_seq,
+                    "time": time.strftime("%H:%M:%S"),
+                    "kind": "system",
+                    "level": level,
+                    "message": message,
+                    "detail": detail or {},
+                    "instance": instance,
+                }
+            )
+
+    def get_events(self) -> list[dict]:
+        with self._events_lock:
+            return list(self.events)
 
     def _register_connections_as_clients(self) -> None:
         """Register BFF clients for all current connections."""
@@ -191,11 +232,15 @@ class ConnectionManager:
 
         if error is None:
             self._sync_failures.pop((name, kind), None)
-            self.logger.info(f"Stored {kind.upper()} config re-applied to {name}")
+            self.log_event(
+                f"Stored {kind.upper()} config re-applied to {name}", instance=name
+            )
         else:
             self._sync_failures[(name, kind)] = time.monotonic()
-            self.logger.warning(
-                f"Re-applying stored {kind.upper()} config to {name} failed: {error}"
+            self.log_event(
+                f"Re-applying stored {kind.upper()} config to {name} failed: {error}",
+                "warn",
+                instance=name,
             )
 
     @staticmethod
@@ -751,10 +796,26 @@ class ConnectionManager:
 
     async def get_all_connections_with_status(self):
         client = self.get_client()
+        before = {id(con): con.get("status") for con in self.connections}
         await asyncio.gather(
             *(self.check_connection(con, client) for con in self.connections)
         )
+        for con in self.connections:
+            self._log_status_change(con, before.get(id(con)))
         return self.connections
+
+    def _log_status_change(self, con, previous) -> None:
+        """Record an instance coming up or dropping (not every health tick)."""
+        status = con.get("status")
+        if status == previous or status not in ("connected", "disconnected"):
+            return
+        name = con.get("name", "")
+        if status == "connected":
+            self.log_event(f"{name} is reachable", instance=name)
+        elif previous == "connected":
+            self.log_event(f"{name} stopped responding", "warn", instance=name)
+        else:  # first check after startup / registration
+            self.log_event(f"{name} is not reachable", "warn", instance=name)
 
     async def validate_idp_server_on_start(self) -> None:
         """Validate the most recently added IDP-Server connection at startup.
@@ -776,14 +837,17 @@ class ConnectionManager:
         await self.check_connection(latest, self.get_client())
 
         if latest.get("status") == "connected":
-            self.logger.info(
-                f"Startup check: IDP-Server '{latest.get('name')}' is active"
+            self.log_event(
+                f"Startup check: IDP-Server '{latest.get('name')}' is active",
+                instance=latest.get("name", ""),
             )
             return
 
-        self.logger.warning(
+        self.log_event(
             f"Startup check: IDP-Server '{latest.get('name')}' is not reachable - "
-            "disabling OAuth2 on connections that use it"
+            "disabling OAuth2 on connections that use it",
+            "warn",
+            instance=latest.get("name", ""),
         )
         changed = False
         for con in self.connections:
@@ -795,9 +859,11 @@ class ConnectionManager:
             ):
                 oauth["enable_oauth"] = False
                 changed = True
-                self.logger.warning(
+                self.log_event(
                     f"Disabled OAuth2 on '{con.get('name')}' "
-                    f"(IDP-Server '{latest.get('name')}' unreachable)"
+                    f"(IDP-Server '{latest.get('name')}' unreachable)",
+                    "warn",
+                    instance=con.get("name", ""),
                 )
 
         if changed:

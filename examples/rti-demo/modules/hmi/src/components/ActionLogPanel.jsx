@@ -42,7 +42,7 @@ import LogKindBadge, { LOG_KINDS, kindOf } from './LogKindBadge';
 // "warning". The inline implementations this replaced checked for
 // "warning", which never matched a real "warn" entry - those silently fell
 // through to the default/info styling.
-const SEVERITY_LEVELS = ['error', 'warn', 'info', 'debug'];
+export const SEVERITY_LEVELS = ['error', 'warn', 'info', 'debug'];
 
 // --danger-bg/--warning-bg/--info-bg (used by the inline implementations
 // this replaced) aren't actually defined anywhere in styles.css - badges
@@ -55,7 +55,7 @@ const SEVERITY_STYLE = {
   debug: { label: 'debug', bg: 'rgba(148, 163, 184, 0.15)', color: 'var(--text-muted)' },
 };
 
-const styleFor = (level) => SEVERITY_STYLE[level] || SEVERITY_STYLE.info;
+export const styleFor = (level) => SEVERITY_STYLE[level] || SEVERITY_STYLE.info;
 
 function ActionLogPanel({ messages, isMonitoring, disabled, onStart, onStop, onClear }) {
   const [severityFilter, setSeverityFilter] = useState('all');
