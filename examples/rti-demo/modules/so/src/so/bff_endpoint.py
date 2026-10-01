@@ -2065,14 +2065,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             return "error"
 
         try:
-            rti_so._log_action("Scheduling model build", "debug")
+            rti_so._log_action("Scheduling model build", "debug", kind="system")
             fut = asyncio.run_coroutine_threadsafe(_abuild_full_model(cp), loop)
-            rti_so._log_action("Model build scheduled", "debug")
+            rti_so._log_action("Model build scheduled", "debug", kind="system")
         except Exception as e:
             with rti_so.runtime.lock:
                 model_info.model_status = "error"
                 model_info.model_error = str(e)
-            rti_so._log_action(f"Failed to schedule model build: {e}", "error")
+            rti_so._log_action(f"Failed to schedule model build: {e}", "error", kind="system")
             return "error"
 
         with rti_so.runtime.lock:
@@ -2217,7 +2217,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
             return connection_info
         except Exception as exc:
-            rti_so._log_action(f"Get connections failed: {exc}", "error")
+            rti_so._log_action(f"Get connections failed: {exc}", "error", kind="system")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)}, status_code=500
             )
@@ -2239,6 +2239,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             rti_so._log_action(
                 f"Reconfig connection request: connection={request.connection_name}, enable_tls={request.enable_tls}",
                 "debug",
+                kind="system",
             )
             # Normalize tls_version to handle "1.2", "1.3", "TLSv1_2", "TLSv1_3" formats
             tls_version_str = (request.tls_version or "1.3").lower()
@@ -2249,21 +2250,24 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             rti_so._log_action(
                 f"TLS version determined: {tls_version} from request: {request.tls_version}",
                 "debug",
+                kind="system",
             )
             rti_so._log_action(
                 f"Reconfiguring connection with TLS version: {tls_version} from request: {request.tls_version}",
                 "debug",
+                kind="system",
             )
             if request.ws_mode.lower() == "passive":
-                rti_so._log_action("Reconfiguring passive endpoint with TLS", "debug")
+                rti_so._log_action("Reconfiguring passive endpoint with TLS", "debug", kind="system")
                 rti_so._log_action(
                     f"Reconfiguring passive endpoint with TLS: {request.enable_tls}",
                     "debug",
+                    kind="system",
                 )
                 # Only create TLSConfig if TLS is enabled
                 tls_config = None
                 if request.enable_tls:
-                    rti_so._log_action("Creating TLS config for server mode", "debug")
+                    rti_so._log_action("Creating TLS config for server mode", "debug", kind="system")
                     keylog_file = tempfile.NamedTemporaryFile(
                         mode="w",
                         prefix="tlskeys",
@@ -2279,21 +2283,22 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         keylog_file=keylog_file.name,
                     )
                 else:
-                    rti_so._log_action("TLS disabled, no TLS config needed", "debug")
+                    rti_so._log_action("TLS disabled, no TLS config needed", "debug", kind="system")
 
                 # Explicitly clear the endpoint's TLS config if TLS is being disabled
                 endpoint = rti_so.runtime.endpoint
                 if endpoint is not None and not request.enable_tls:
                     if hasattr(endpoint, "_tls_config"):
                         endpoint._tls_config = None
-                    rti_so._log_action("Cleared endpoint TLS config", "debug")
+                    rti_so._log_action("Cleared endpoint TLS config", "debug", kind="system")
 
                 # Cancel existing connection task before reconnecting
                 if endpoint is not None and hasattr(endpoint, "_connect_task"):
                     connect_task = endpoint._connect_task
                     if connect_task and not connect_task.done():
                         rti_so._log_action(
-                            "Cancelling existing connection task", "debug"
+                            "Cancelling existing connection task", "debug",
+                            kind="system",
                         )
                         connect_task.cancel()
 
@@ -2301,7 +2306,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 # not uvicorn's own loop — matches the pattern used by
                 # read_value/write_value/operate elsewhere in this router.
                 rti_so._log_action(
-                    "Invoking reconfigure_endpoint on runtime loop", "debug"
+                    "Invoking reconfigure_endpoint on runtime loop", "debug",
+                    kind="system",
                 )
                 rti_so.invoke_on_runtime_loop(
                     rti_so.runtime.endpoint.reconfigure_endpoint(
@@ -2313,7 +2319,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
 
                 # if request.enable_tls:
-                rti_so._log_action("Waiting for endpoint to be running", "debug")
+                rti_so._log_action("Waiting for endpoint to be running", "debug", kind="system")
                 rti_so.invoke_on_runtime_loop(
                     rti_so.runtime.endpoint._endpoint_running_event.wait(),
                     timeout=20,
@@ -2323,7 +2329,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     last_err = getattr(
                         rti_so.runtime.endpoint, "_last_start_error", None
                     )
-                    rti_so._log_action(f"Endpoint failed to start: {last_err}", "error")
+                    rti_so._log_action(f"Endpoint failed to start: {last_err}", "error", kind="system")
                     return JSONResponse(
                         content={
                             "ok": False,
@@ -2335,10 +2341,12 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 rti_so._log_action(
                     f"Endpoint status: {rti_so.runtime.endpoint._is_endpoint_running}",
                     "debug",
+                    kind="system",
                 )
 
                 rti_so._log_action(
-                    f"Connection reconfigured: enable_tls={request.enable_tls}", "info"
+                    f"Connection reconfigured: enable_tls={request.enable_tls}", "info",
+                    kind="system",
                 )
                 return JSONResponse(
                     content={
@@ -2353,6 +2361,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 rti_so._log_action(
                     "Rejected: Only passive mode is supported for TLS reconfiguration",
                     "warn",
+                    kind="system",
                 )
                 return JSONResponse(
                     content={
@@ -2362,7 +2371,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400,
                 )
         except Exception as exc:
-            rti_so._log_action(f"Reconfig connection failed: {exc}", "error")
+            rti_so._log_action(f"Reconfig connection failed: {exc}", "error", kind="system")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)}, status_code=500
             )
@@ -2458,6 +2467,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             rti_so._log_action(
                 f"Reconfig OAuth request: enable={request.enable_oauth}, connection={request.connection_name or 'unknown'}",
                 "debug",
+                kind="system",
             )
             # Get OAuth settings from request (BFF should provide these from connections.json)
             certificate_endpoint = getattr(
@@ -2477,7 +2487,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     "/protocol/openid-connect/token", ""
                 )
                 rti_so._log_action(
-                    "Extracted token_issuer from token_endpoint URL", "debug"
+                    "Extracted token_issuer from token_endpoint URL", "debug",
+                    kind="system",
                 )
             ca_certificate = getattr(request, "ca_certificate", None)
 
@@ -2487,24 +2498,25 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 not certificate_endpoint or not token_issuer_url
             ):
                 error_msg = f"certificate_endpoint and token_issuer_url are required for OAuth but were not provided in request for connection: {connection_name}"
-                rti_so._log_action(error_msg, "error")
+                rti_so._log_action(error_msg, "error", kind="system")
                 raise ValueError(error_msg)
 
             if not request.enable_oauth:
-                rti_so._log_action("Disabling OAuth for connection", "debug")
+                rti_so._log_action("Disabling OAuth for connection", "debug", kind="system")
                 certificate_endpoint = None
                 token_issuer_url = None
                 ca_certificate = None
 
             if request.ws_mode.lower() == "passive":
-                rti_so._log_action("Reconfiguring OAuth for passive mode", "debug")
+                rti_so._log_action("Reconfiguring OAuth for passive mode", "debug", kind="system")
                 loop = rti_so.runtime.loop
                 if loop is None or not loop.is_running():
-                    rti_so._log_action("Client not connected", "error")
+                    rti_so._log_action("Client not connected", "error", kind="system")
                     raise HTTPException(status_code=503, detail="client-not-connected")
 
                 rti_so._log_action(
-                    "Invoking reconfigure_oauth on runtime loop", "debug"
+                    "Invoking reconfigure_oauth on runtime loop", "debug",
+                    kind="system",
                 )
                 fut = asyncio.run_coroutine_threadsafe(
                     rti_so.runtime.endpoint.reconfigure_oauth(
@@ -2519,7 +2531,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
                 if request.enable_oauth:
                     rti_so._log_action(
-                        "Waiting for OAuth endpoint to be running", "debug"
+                        "Waiting for OAuth endpoint to be running", "debug",
+                        kind="system",
                     )
                     wait_fut = asyncio.run_coroutine_threadsafe(
                         rti_so.runtime.endpoint._endpoint_running_event.wait(), loop
@@ -2528,10 +2541,12 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     rti_so._log_action(
                         f"OAuth endpoint status: {rti_so.runtime.endpoint._is_endpoint_running}",
                         "debug",
+                        kind="system",
                     )
 
                 rti_so._log_action(
-                    f"OAuth reconfigured: enable={request.enable_oauth}", "info"
+                    f"OAuth reconfigured: enable={request.enable_oauth}", "info",
+                    kind="system",
                 )
                 return JSONResponse(
                     content={
@@ -2546,6 +2561,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 rti_so._log_action(
                     "Rejected: Only passive mode is supported for OAuth reconfiguration",
                     "warn",
+                    kind="system",
                 )
                 return JSONResponse(
                     content={
@@ -2555,7 +2571,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     status_code=400,
                 )
         except Exception as exc:
-            rti_so._log_action(f"Reconfig OAuth failed: {exc}", "error")
+            rti_so._log_action(f"Reconfig OAuth failed: {exc}", "error", kind="system")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)}, status_code=500
             )
@@ -2659,19 +2675,19 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             # The genuine "connected" event is logged by acsi_client.py's
             # own _connect_async once the connection actually completes -
             # these are just the REST-handler-layer request/dispatch trace.
-            rti_so._log_action(f"Connect request: host={host}, port={port}", "debug")
+            rti_so._log_action(f"Connect request: host={host}, port={port}", "debug", kind="system")
 
             try:
                 rti_so.connect(host, port)
-                rti_so._log_action(f"Connecting to: host={host}, port={port}", "debug")
+                rti_so._log_action(f"Connecting to: host={host}, port={port}", "debug", kind="system")
                 return {"ok": True, "status": "connecting", "host": host, "port": port}
             except (ValueError, RuntimeError) as exc:
-                rti_so._log_action(f"Connect rejected: {exc}", "warn")
+                rti_so._log_action(f"Connect rejected: {exc}", "warn", kind="system")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)}, status_code=500
                 )
         except Exception as exc:
-            rti_so._log_action(f"Connect failed: {exc}", "error")
+            rti_so._log_action(f"Connect failed: {exc}", "error", kind="system")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)}, status_code=500
             )
@@ -2693,28 +2709,28 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             # The genuine "disconnected" event is logged by acsi_client.py's
             # own _disconnect_async - these are just the REST-handler-layer
             # request/dispatch trace.
-            rti_so._log_action("Disconnect request", "debug")
+            rti_so._log_action("Disconnect request", "debug", kind="system")
             status = rti_so.runtime.status
             if status in (None, "disconnected"):
-                rti_so._log_action("Already disconnected", "debug")
+                rti_so._log_action("Already disconnected", "debug", kind="system")
                 return {"ok": True, "status": "disconnected"}
 
             try:
                 rti_so.disconnect()
-                rti_so._log_action("Disconnecting...", "debug")
+                rti_so._log_action("Disconnecting...", "debug", kind="system")
                 current = rti_so.runtime.status
                 if current in ("disconnecting", "connected"):
                     return {"ok": True, "status": "disconnecting"}
-                rti_so._log_action("Disconnected", "debug")
+                rti_so._log_action("Disconnected", "debug", kind="system")
                 return {"ok": True, "status": "disconnected"}
             except Exception as exc:
                 current = rti_so.runtime.status
                 if current in ("disconnecting", "disconnected"):
                     return {"ok": True, "status": current}
-                rti_so._log_action(f"Disconnect failed: {exc}", "error")
+                rti_so._log_action(f"Disconnect failed: {exc}", "error", kind="system")
                 raise HTTPException(status_code=500, detail=str(exc))
         except Exception as exc:
-            rti_so._log_action(f"Disconnect error: {exc}", "error")
+            rti_so._log_action(f"Disconnect error: {exc}", "error", kind="system")
             raise HTTPException(status_code=500, detail=str(exc))
 
     @router.post(
@@ -2747,7 +2763,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             loop = rti_so.runtime.loop
             if loop is None or not getattr(loop, "is_running", lambda: False)():
                 rti_so._log_action(
-                    "Client not connected, raising HTTPException", "error"
+                    "Client not connected, raising HTTPException", "error",
+                    kind="system",
                 )
                 raise HTTPException(status_code=503, detail="client-not-connected")
 
@@ -2764,7 +2781,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             if model_status == "idle":
                 start_result = _start_model_build_if_needed(cp)
                 if start_result == "error":
-                    rti_so._log_action("Model build scheduling failed", "error")
+                    rti_so._log_action("Model build scheduling failed", "error", kind="system")
                     raise HTTPException(
                         status_code=503, detail=rti_so.runtime.model_error
                     )
@@ -2783,11 +2800,12 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             return {"status": "error", "model": None}
         except HTTPException as e:
             rti_so._log_action(
-                f"HTTPException raised in api_model, re-raising: {e}", "debug"
+                f"HTTPException raised in api_model, re-raising: {e}", "debug",
+                kind="system",
             )
             raise
         except Exception as exc:
-            rti_so._log_action(f"Get model failed (outer): {exc}", "error")
+            rti_so._log_action(f"Get model failed (outer): {exc}", "error", kind="system")
             logger.exception("Unhandled outer exception in api_model")
             raise HTTPException(
                 status_code=500,
@@ -3210,13 +3228,13 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
 
             if not obj_ref:
-                rti_so._log_action("Client readvalue rejected: missing objRef", "warn")
+                rti_so._log_action("Client readvalue rejected: missing objRef", "warn", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400,
                 )
 
-            rti_so._log_action(f"Readvalue request: objRef={obj_ref}, fc={fc}", "info")
+            rti_so._log_action(f"Readvalue request: objRef={obj_ref}, fc={fc}", "info", kind="acsi")
 
             try:
                 result = rti_so.invoke_on_runtime_loop(
@@ -3285,6 +3303,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         "Client readvalue failed: instanceNotAvailable",
                         "warn",
                         detail={"objRef": obj_ref, "fc": fc},
+                        kind="acsi",
                     )
                     return JSONResponse(
                         content={"ok": False, "error": "instanceNotAvailable"},
@@ -3297,6 +3316,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         "objRef": obj_ref,
                         "value": result.get("value"),
                     },
+                    kind="acsi",
                 )
                 return {
                     "ok": True,
@@ -3310,17 +3330,18 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     "Client readvalue timeout",
                     "warn",
                     detail={"objRef": obj_ref, "fc": fc},
+                    kind="acsi",
                 )
                 return JSONResponse(
                     content={"ok": False, "error": "read timeout"}, status_code=504
                 )
             except ValueError as exc:
-                rti_so._log_action(f"Client readvalue failed: {exc}", "warn")
+                rti_so._log_action(f"Client readvalue failed: {exc}", "warn", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)}, status_code=404
                 )
             except Exception as exc:
-                rti_so._log_action(f"Client readvalue failed: {exc}", "error")
+                rti_so._log_action(f"Client readvalue failed: {exc}", "error", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)}, status_code=500
                 )
@@ -3388,7 +3409,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             )
 
             if not obj_ref:
-                rti_so._log_action("Client readvalue rejected: missing objRef", "warn")
+                rti_so._log_action("Client readvalue rejected: missing objRef", "warn", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400,
@@ -3421,13 +3442,14 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                     content={"ok": False, "error": str(exc)}, status_code=404
                 )
             except Exception as exc:
-                rti_so._log_action(f"Exception in getDataDefinition: {exc}", "error")
+                rti_so._log_action(f"Exception in getDataDefinition: {exc}", "error", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)}, status_code=500
                 )
         except Exception as exc:
             rti_so._log_action(
-                f"Unhandled exception in getDataDefinition: {exc}", "error"
+                f"Unhandled exception in getDataDefinition: {exc}", "error",
+                kind="acsi",
             )
             return JSONResponse(
                 content={"ok": False, "error": str(exc)}, status_code=500
@@ -3538,7 +3560,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
 
             if not obj_ref:
-                rti_so._log_action("Client readvalue rejected: missing objRef", "warn")
+                rti_so._log_action("Client readvalue rejected: missing objRef", "warn", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400,
@@ -3684,7 +3706,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
 
             if not obj_ref:
-                rti_so._log_action("Client readvalue rejected: missing objRef", "warn")
+                rti_so._log_action("Client readvalue rejected: missing objRef", "warn", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400,
@@ -3940,7 +3962,8 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
 
             if not obj_ref:
                 rti_so._log_action(
-                    "Writevalue request rejected: missing objRef", "warn"
+                    "Writevalue request rejected: missing objRef", "warn",
+                    kind="acsi",
                 )
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
@@ -3948,14 +3971,15 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
 
             if not fc:
-                rti_so._log_action("Writevalue request rejected: missing fc", "warn")
+                rti_so._log_action("Writevalue request rejected: missing fc", "warn", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": "fc is required"}, status_code=400
                 )
 
             if fc.lower() not in ("cf", "sp"):
                 rti_so._log_action(
-                    "Access Violation: Write only allowed to CF and SP FCs", "warn"
+                    "Access Violation: Write only allowed to CF and SP FCs", "warn",
+                    kind="acsi",
                 )
                 return JSONResponse(
                     content={
@@ -3969,13 +3993,15 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 rti_so._log_action(
                     f"Writevalue request rejected: missing value for objRef={obj_ref}",
                     "warn",
+                    kind="acsi",
                 )
                 return JSONResponse(
                     content={"ok": False, "error": "value is required"}, status_code=400
                 )
 
             rti_so._log_action(
-                f"Writevalue request: objRef={obj_ref}, fc={fc}, value={value}", "info"
+                f"Writevalue request: objRef={obj_ref}, fc={fc}, value={value}", "info",
+                kind="acsi",
             )
 
             try:
@@ -4062,22 +4088,22 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         )
 
             except FuturesTimeoutError:
-                rti_so._log_action("WriteValue timeout", "error")
+                rti_so._log_action("WriteValue timeout", "error", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": "write timeout"}, status_code=504
                 )
             except ValueError as exc:
-                rti_so._log_action(f"WriteValue value error: {exc}", "error")
+                rti_so._log_action(f"WriteValue value error: {exc}", "error", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)}, status_code=404
                 )
             except Exception as exc:
-                rti_so._log_action(f"WriteValue error: {exc}", "error")
+                rti_so._log_action(f"WriteValue error: {exc}", "error", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)}, status_code=500
                 )
         except Exception as exc:
-            rti_so._log_action(f"WriteValue error: {exc}", "error")
+            rti_so._log_action(f"WriteValue error: {exc}", "error", kind="acsi")
 
             return JSONResponse(
                 content={"ok": False, "error": str(exc)}, status_code=500
@@ -4136,19 +4162,20 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 )
 
             if not obj_ref:
-                rti_so._log_action("Operate request rejected: missing objRef", "warn")
+                rti_so._log_action("Operate request rejected: missing objRef", "warn", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400,
                 )
             if value is None:
-                rti_so._log_action("Operate request rejected: missing value", "warn")
+                rti_so._log_action("Operate request rejected: missing value", "warn", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": "value is required"}, status_code=400
                 )
 
             rti_so._log_action(
-                f"Operate request: objRef={obj_ref}, value={value}", "info"
+                f"Operate request: objRef={obj_ref}, value={value}", "info",
+                kind="acsi",
             )
 
             try:

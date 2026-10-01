@@ -42,6 +42,11 @@ from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
 logger = logging.getLogger(__name__)
 
+# Kinds an actions-log entry can have (`_log_action(kind=...)`). WebSocket
+# frames live in the separate messages log as kind "websocket". See
+# docs/rti-demo/design/logging-kinds.md.
+ACTION_KINDS = ("system", "acsi")
+
 
 class ModelInfo:
     def __init__(self, cp):
@@ -239,38 +244,62 @@ class ACSIClient:
         return [client.cp for client in self.runtime.client_list if client.is_connected]
 
     def _log_action(
-            self, message: str, level: str = "info", detail: dict[str, Any] | None = None
+            self,
+            message: str,
+            level: str = "info",
+            detail: dict[str, Any] | None = None,
+            *,
+            kind: str,
+            cp: str = "",
+            service: str = "",
+            correlation: dict[str, Any] | None = None,
     ) -> None:
-        """Log an action to the runtime actions deque."""
+        """Log an action to the runtime actions deque.
+
+        `kind` is required and must be "system" (instance lifecycle and
+        configuration) or "acsi" (one ACSI service call) - see
+        docs/rti-demo/design/logging-kinds.md. WebSocket frames go to the
+        separate messages log (`_log_message`) as kind "websocket".
+        `correlation` ({"cp", "invokeId", "messageSeqFrom"}) links an acsi
+        entry to the frames it produced.
+        """
+        if kind not in ACTION_KINDS:
+            raise ValueError(f"_log_action kind must be one of {ACTION_KINDS}, got {kind!r}")
         if detail is None:
             detail = {}
         with self.runtime.lock:
             self.runtime.action_seq += 1
-            self.runtime.actions.append(
-                {
-                    "id": self.runtime.action_seq,
-                    "time": time.strftime("%H:%M:%S"),
-                    "level": level,
-                    "message": message,
-                    "detail": detail,
-                }
-            )
+            entry = {
+                "id": self.runtime.action_seq,
+                "time": time.strftime("%H:%M:%S"),
+                "kind": kind,
+                "level": level,
+                "message": message,
+                "detail": detail,
+                "cp": cp,
+                "service": service,
+            }
+            if correlation:
+                entry["correlation"] = correlation
+            self.runtime.actions.append(entry)
 
     def _extract_message_meta(self, raw: str) -> dict[str, str]:
         """Extract metadata from a message (service type, category)."""
         service_type = "unknown"
         category = "unknown"
         cp = ""
+        invoke_id = None
         try:
             msg = json.loads(raw)
             if not isinstance(msg, dict):
-                return {"service_type": service_type, "category": category, "cp": cp}
+                return {"service_type": service_type, "category": category, "cp": cp, "invoke_id": invoke_id}
 
             if "request" in msg:
                 category = "request"
                 service = msg.get("request", {}).get("service", {})
                 request = msg["request"]
                 cp = request.get("associateId", "")
+                invoke_id = request.get("invokeId")
                 if isinstance(service, dict) and service:
                     service_type = next(iter(service.keys()))
             elif "response" in msg:
@@ -278,6 +307,7 @@ class ACSIClient:
                 service = msg.get("response", {}).get("service", {})
                 response = msg["response"]
                 cp = response.get("associateId", "")
+                invoke_id = response.get("invokeId")
                 if isinstance(service, dict) and service:
                     service_type = next(iter(service.keys()))
             elif "associate" in msg:
@@ -299,7 +329,7 @@ class ACSIClient:
             service_type = "parse-error"
             category = "parse-error"
 
-        return {"service_type": service_type, "category": category, "cp": cp}
+        return {"service_type": service_type, "category": category, "cp": cp, "invoke_id": invoke_id}
 
     def _log_message(self, direction: str, message: Any, timestamp: Any) -> None:
         """Log a message (request/response) to the runtime messages deque."""
@@ -319,13 +349,18 @@ class ACSIClient:
             self.runtime.messages.append(
                 {
                     "id": self.runtime.message_seq,
+                    "time": ts,
                     "timestamp": ts,
+                    "kind": "websocket",
+                    "level": "error" if meta["service_type"] == "serviceError" else "info",
                     "direction": direction,
+                    "service": meta["service_type"],
                     "service_type": meta["service_type"],
                     "category": meta["category"],
                     "message": text,
                     "preview": text[:220] + ("..." if len(text) > 220 else ""),
                     "cp": meta["cp"],
+                    "invokeId": meta["invoke_id"],
                 }
             )
 
@@ -382,18 +417,19 @@ class ACSIClient:
             self._log_action(
                 "Connected to server",
                 detail={"host": host, "port": port},
+                kind="system",
             )
 
         except Exception as exc:
             self._set_runtime_state(status="error", error=str(exc))
-            self._log_action(f"Connection failed: {exc}", "error")
+            self._log_action(f"Connection failed: {exc}", "error", kind="system")
             raise
 
     async def _disconnect_async(self) -> None:
         """Disconnect from the server asynchronously."""
         endpoint = self.runtime.endpoint
 
-        self._log_action("Disconnecting...")
+        self._log_action("Disconnecting...", kind="system")
         self._set_runtime_state(status="disconnecting")
 
         # Cancel the background task
@@ -404,7 +440,7 @@ class ACSIClient:
             try:
                 await endpoint.stop_passive()
             except Exception as exc:
-                self._log_action(f"stop_active error: {exc}", "warn")
+                self._log_action(f"stop_active error: {exc}", "warn", kind="system")
 
         self._set_runtime_state(
             endpoint=None,
@@ -413,7 +449,7 @@ class ACSIClient:
             error=None,
         )
 
-        self._log_action("Disconnected")
+        self._log_action("Disconnected", kind="system")
         asyncio.get_running_loop().call_soon(asyncio.get_running_loop().stop)
 
     def _event_loop_thread(self, host: str, port: int) -> None:
@@ -433,7 +469,7 @@ class ACSIClient:
                 return
             except Exception as exc:
                 self._set_runtime_state(status="error", error=str(exc))
-                self._log_action(f"Connect failed: {exc}", "error")
+                self._log_action(f"Connect failed: {exc}", "error", kind="system")
                 loop.call_soon_threadsafe(loop.stop)
 
         connect_task.add_done_callback(_on_connect_done)
@@ -441,7 +477,7 @@ class ACSIClient:
         try:
             loop.run_forever()
         except Exception as exc:
-            self._log_action(f"Event loop error: {exc}", "error")
+            self._log_action(f"Event loop error: {exc}", "error", kind="system")
         finally:
             pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
             for task in pending:
@@ -495,7 +531,7 @@ class ACSIClient:
         )
         self._set_runtime_state(thread=t)
         t.start()
-        self._log_action("Connection initiated", detail={"host": host, "port": port})
+        self._log_action("Connection initiated", detail={"host": host, "port": port}, kind="system")
 
     def disconnect(self) -> None:
         """Disconnect from the server."""
@@ -517,7 +553,7 @@ class ACSIClient:
         try:
             fut.result(timeout=10)
         except FuturesTimeoutError:
-            self._log_action("Disconnect in progress (timeout).", "warn")
+            self._log_action("Disconnect in progress (timeout).", "warn", kind="system")
         except Exception:
             current = self.runtime.status
             if current not in ("disconnecting", "disconnected"):

@@ -1,6 +1,6 @@
 # rti-demo logging: system, WebSocket and ACSI service logs
 
-Status: **proposal** (2026-10-01) - nothing below is implemented yet.
+Status: **in progress** (2026-10-01) - phase 1 implemented; see Phasing.
 
 Goal: make the three kinds of log entry the SO/FSP produce - **system**,
 **WebSocket** and **ACSI service** - distinguishable at the source, and give
@@ -147,7 +147,7 @@ developers, via `docker logs`.
 
 Each phase is its own commit (or small series), verified before the next.
 
-1. **Tag `kind` on the actions log.** Add the `kind` argument, set it at all
+1. **(done)** **Tag `kind` on the actions log.** Add the `kind` argument, set it at all
    ~150 `_log_action` call sites (SO + FSP), add `kind: "websocket"` to
    `_log_message` entries, and add a kind filter to `ActionLogPanel`. Most of
    the value for the least change - the ACSI Client/Server panels can already

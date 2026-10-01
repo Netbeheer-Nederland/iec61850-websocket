@@ -109,7 +109,45 @@ describe('ActionLogPanel filtering', () => {
 
     await user.selectOptions(screen.getByTitle('Filter by severity'), 'error');
 
-    expect(screen.getByText(/No messages match the selected severity filter/)).toBeInTheDocument();
+    expect(screen.getByText(/No messages match the selected filters/)).toBeInTheDocument();
+  });
+});
+
+describe('ActionLogPanel kinds', () => {
+  const KINDED = [
+    { id: 3, timestamp: '10:00:02', kind: 'acsi', level: 'info', message: 'Readvalue request: objRef=LD0/LLN0.Mod.stVal' },
+    { id: 2, timestamp: '10:00:01', kind: 'system', level: 'debug', message: 'Reconfiguring passive endpoint with TLS' },
+    { id: 1, timestamp: '10:00:00', level: 'info', message: 'from an instance without kinds' },
+  ];
+
+  it('labels each entry with its kind, and shows no badge for an entry without one', () => {
+    const { container } = renderPanel({ messages: KINDED });
+
+    const badges = [...container.querySelectorAll('.log-kind-badge')].map((b) => b.dataset.kind);
+    expect(badges).toEqual(['acsi', 'system']);
+  });
+
+  it('filters by kind independently of severity', async () => {
+    const user = userEvent.setup({ delay: null });
+    renderPanel({ messages: KINDED });
+
+    await user.selectOptions(screen.getByTitle('Filter by kind'), 'acsi');
+
+    expect(screen.getByText(/Readvalue request/)).toBeInTheDocument();
+    expect(screen.queryByText(/Reconfiguring passive endpoint/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/without kinds/)).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByTitle('Filter by kind'), 'system');
+
+    expect(screen.getByText(/Reconfiguring passive endpoint/)).toBeInTheDocument();
+    expect(screen.queryByText(/Readvalue request/)).not.toBeInTheDocument();
+  });
+
+  it('titles the list Activity Log, not Protocol Messages (those are the WebSocket frames on Traffic)', () => {
+    renderPanel({ messages: KINDED });
+
+    expect(screen.getByText('Activity Log')).toBeInTheDocument();
+    expect(screen.queryByText('Protocol Messages')).not.toBeInTheDocument();
   });
 });
 
@@ -156,6 +194,6 @@ describe('ActionLogPanel controls', () => {
 
   it('does not render the message list at all while not monitoring', () => {
     renderPanel({ isMonitoring: false });
-    expect(screen.queryByText('Protocol Messages')).not.toBeInTheDocument();
+    expect(screen.queryByText('Activity Log')).not.toBeInTheDocument();
   });
 });

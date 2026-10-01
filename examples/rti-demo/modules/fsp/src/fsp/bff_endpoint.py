@@ -1875,7 +1875,7 @@ def create_bff_router(
                 "connections": connections,
             }
         except Exception as exc:
-            rti_fsp._log_action(f"Get connections failed: {exc}", "error")
+            rti_fsp._log_action(f"Get connections failed: {exc}", "error", kind="system")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)}, status_code=500
             )
@@ -2048,6 +2048,7 @@ def create_bff_router(
                     "dynamic": is_running,
                     "version": rti_fsp.runtime.model_version,
                 },
+                kind="system",
             )
 
             # Check if hot-swap is in progress
@@ -2074,7 +2075,7 @@ def create_bff_router(
                 }
 
         except Exception as exc:
-            rti_fsp._log_action(f"IED model update failed: {exc}", "error")
+            rti_fsp._log_action(f"IED model update failed: {exc}", "error", kind="system")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)}, status_code=400
             )
@@ -2137,6 +2138,7 @@ def create_bff_router(
                     "version": rti_fsp.runtime.model_version,
                     "filename": file.filename,
                 },
+                kind="system",
             )
 
             # Check if hot-swap is in progress
@@ -2163,7 +2165,7 @@ def create_bff_router(
                 }
 
         except Exception as exc:
-            rti_fsp._log_action(f"IED model file update failed: {exc}", "error")
+            rti_fsp._log_action(f"IED model file update failed: {exc}", "error", kind="system")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)}, status_code=400
             )
@@ -2210,7 +2212,8 @@ def create_bff_router(
 
             if mode != "active":
                 rti_fsp._log_action(
-                    "Only 'active' mode is supported in this app", "error"
+                    "Only 'active' mode is supported in this app", "error",
+                    kind="system",
                 )
                 return JSONResponse(
                     content={
@@ -2248,6 +2251,7 @@ def create_bff_router(
                 rti_fsp._log_action(
                     f"Applied TLS config on start: enable_tls={request.enable_tls}",
                     "debug",
+                    kind="system",
                 )
 
             try:
@@ -2377,7 +2381,7 @@ def create_bff_router(
                 current = rti_fsp.runtime.status
                 if current in ("stopping", "stopped"):
                     return {"ok": True, "status": current}
-                rti_fsp._log_action(f"Stop failed: {exc}", "error")
+                rti_fsp._log_action(f"Stop failed: {exc}", "error", kind="system")
                 return JSONResponse(
                     content={"ok": False, "error": f"Unexpected error: {exc}"},
                     status_code=500,
@@ -2405,6 +2409,7 @@ def create_bff_router(
             rti_fsp._log_action(
                 f"Starting connection reconfiguration for host: {request.host}, port: {request.port}",
                 "debug",
+                kind="system",
             )
             # Normalize tls_version to handle "1.2", "1.3", "TLSv1_2", "TLSv1_3" formats
             tls_version_str = (request.tls_version or "1.3").lower()
@@ -2418,6 +2423,7 @@ def create_bff_router(
             rti_fsp._log_action(
                 f"tls_version in reconfig connection: {tls_version} from request: {request.tls_version}",
                 "debug",
+                kind="system",
             )
             host = request.host
             request_port = request.port
@@ -2447,6 +2453,7 @@ def create_bff_router(
                         f"TLS config saved (enable_tls={request.enable_tls}), "
                         "applies on next Connect",
                         "info",
+                        kind="system",
                     )
                     return JSONResponse(
                         content={
@@ -2463,6 +2470,7 @@ def create_bff_router(
                 rti_fsp._log_action(
                     f"Calling reconfigure_connection for host: {host}, port: {request_port}, TLS: {request.enable_tls}",
                     "debug",
+                    kind="system",
                 )
                 fut = asyncio.run_coroutine_threadsafe(
                     endpoint.reconfigure_connection(
@@ -2477,10 +2485,11 @@ def create_bff_router(
                 # Wait for the reconfiguration to complete
                 try:
                     await asyncio.wrap_future(fut)
-                    rti_fsp._log_action("Connection reconfigured successfully", "info")
+                    rti_fsp._log_action("Connection reconfigured successfully", "info", kind="system")
                 except Exception as e:
                     rti_fsp._log_action(
-                        f"Error during reconfigure_connection: {e}", "error"
+                        f"Error during reconfigure_connection: {e}", "error",
+                        kind="system",
                     )
                     logger.info(f"Error during reconfigure_connection: {e}")
 
@@ -2507,7 +2516,7 @@ def create_bff_router(
                     status_code=400,
                 )
         except Exception as exc:
-            rti_fsp._log_action(f"api_reconfig_connection failed: {exc}", "error")
+            rti_fsp._log_action(f"api_reconfig_connection failed: {exc}", "error", kind="system")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)}, status_code=500
             )
@@ -2603,6 +2612,7 @@ def create_bff_router(
             rti_fsp._log_action(
                 f"Starting OAuth reconfiguration for connection: {request.connection_name or 'unknown'}",
                 "debug",
+                kind="system",
             )
             cp = request.cp or os.getenv("CP", "cp1")
             host = request.host
@@ -2621,16 +2631,17 @@ def create_bff_router(
             rti_fsp._log_action(
                 f"OAuth configuration - enable: {request.enable_oauth}, connection: {connection_name}",
                 "debug",
+                kind="system",
             )
 
             # Validate that required OAuth settings are provided
             if request.enable_oauth and not token_endpoint:
                 error_msg = f"token_endpoint is required for OAuth but was not provided in request for connection: {connection_name}"
-                rti_fsp._log_action(error_msg, "error")
+                rti_fsp._log_action(error_msg, "error", kind="system")
                 raise ValueError(error_msg)
 
             if not request.enable_oauth:
-                rti_fsp._log_action("Disabling OAuth for connection", "debug")
+                rti_fsp._log_action("Disabling OAuth for connection", "debug", kind="system")
                 token_endpoint = None
                 client_id = None
                 client_secret = None
@@ -2659,6 +2670,7 @@ def create_bff_router(
                     f"OAuth config saved (enable_oauth={request.enable_oauth}), "
                     "applies on next Connect",
                     "info",
+                    kind="system",
                 )
                 return JSONResponse(
                     content={
@@ -2673,7 +2685,8 @@ def create_bff_router(
             # When disabling OAuth, stop the endpoint first to avoid issues with ClientCredentialsProvider
             if not request.enable_oauth:
                 rti_fsp._log_action(
-                    "Disabling OAuth - stopping endpoint first", "debug"
+                    "Disabling OAuth - stopping endpoint first", "debug",
+                    kind="system",
                 )
                 logger.info("Disabling OAuth - stopping endpoint first")
                 # Stop the current connection if it exists
@@ -2689,7 +2702,8 @@ def create_bff_router(
                     )
                     await asyncio.wrap_future(stop_fut)
                 rti_fsp._log_action(
-                    "Endpoint stopped, now reconfiguring with OAuth disabled", "debug"
+                    "Endpoint stopped, now reconfiguring with OAuth disabled", "debug",
+                    kind="system",
                 )
                 logger.info("Endpoint stopped, now reconfiguring with OAuth disabled")
 
@@ -2697,6 +2711,7 @@ def create_bff_router(
             rti_fsp._log_action(
                 f"Calling reconfigure_oauth for host: {host}, port: {oauth_port}, OAuth: {request.enable_oauth}",
                 "debug",
+                kind="system",
             )
             fut = asyncio.run_coroutine_threadsafe(
                 rti_fsp.runtime.endpoint.reconfigure_oauth(
@@ -2713,7 +2728,7 @@ def create_bff_router(
                 loop,
             )
             await asyncio.wrap_future(fut)
-            rti_fsp._log_action("OAuth reconfigured successfully", "info")
+            rti_fsp._log_action("OAuth reconfigured successfully", "info", kind="system")
             rti_fsp.runtime.tasks["ws"] = rti_fsp.runtime.endpoint._connect_task
 
             return JSONResponse(
@@ -2727,7 +2742,7 @@ def create_bff_router(
             )
         except Exception as exc:
             logger.info(f"Reconfig OAuth error: {exc}")
-            rti_fsp._log_action(f"api_reconfig_oauth failed: {exc}", "error")
+            rti_fsp._log_action(f"api_reconfig_oauth failed: {exc}", "error", kind="system")
             return JSONResponse(
                 content={"ok": False, "error": str(exc)}, status_code=500
             )
@@ -2911,7 +2926,7 @@ def create_bff_router(
             fc = request.fc
 
             if not obj_ref:
-                rti_fsp._log_action("Server readvalue rejected: missing objRef", "warn")
+                rti_fsp._log_action("Server readvalue rejected: missing objRef", "warn", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
                     status_code=400,
@@ -2922,6 +2937,7 @@ def create_bff_router(
                     "Server readvalue rejected: server not running",
                     "warn",
                     detail={"objRef": obj_ref, "fc": fc},
+                    kind="acsi",
                 )
                 return JSONResponse(
                     content={"ok": False, "error": "Server is not running"},
@@ -2936,6 +2952,7 @@ def create_bff_router(
                         "Server readvalue failed: instanceNotAvailable",
                         "warn",
                         detail={"objRef": obj_ref, "fc": fc},
+                        kind="acsi",
                     )
                     return JSONResponse(
                         content={"ok": False, "error": "instanceNotAvailable"},
@@ -2955,6 +2972,7 @@ def create_bff_router(
                         "type": result.get("type"),
                         "value": result.get("value"),
                     },
+                    kind="acsi",
                 )
                 return {
                     "ok": True,
@@ -2969,17 +2987,18 @@ def create_bff_router(
                     "Server readvalue timeout",
                     "warn",
                     detail={"objRef": obj_ref, "fc": fc},
+                    kind="acsi",
                 )
                 return JSONResponse(
                     content={"ok": False, "error": "read timeout"}, status_code=404
                 )
             except ValueError as exc:
-                rti_fsp._log_action(f"Server readvalue failed: {exc}", "warn")
+                rti_fsp._log_action(f"Server readvalue failed: {exc}", "warn", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)}, status_code=404
                 )
             except Exception as exc:
-                rti_fsp._log_action(f"Server readvalue failed: {exc}", "error")
+                rti_fsp._log_action(f"Server readvalue failed: {exc}", "error", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)}, status_code=500
                 )
@@ -3037,7 +3056,8 @@ def create_bff_router(
 
             if not obj_ref:
                 rti_fsp._log_action(
-                    "Server writevalue rejected: missing objRef", "warn"
+                    "Server writevalue rejected: missing objRef", "warn",
+                    kind="acsi",
                 )
                 return JSONResponse(
                     content={"ok": False, "error": "objRef is required"},
@@ -3049,6 +3069,7 @@ def create_bff_router(
                     "Server writevalue rejected: missing value",
                     "warn",
                     detail={"objRef": obj_ref, "fc": fc},
+                    kind="acsi",
                 )
                 return JSONResponse(
                     content={"ok": False, "error": "value is required"}, status_code=400
@@ -3059,6 +3080,7 @@ def create_bff_router(
                     "Server writevalue rejected: server not running",
                     "warn",
                     detail={"objRef": obj_ref, "fc": fc, "value": value},
+                    kind="acsi",
                 )
                 return JSONResponse(
                     content={"ok": False, "error": "Server is not running"},
@@ -3128,17 +3150,18 @@ def create_bff_router(
                     "Server writevalue timeout",
                     "warn",
                     detail={"objRef": obj_ref, "fc": fc},
+                    kind="acsi",
                 )
                 return JSONResponse(
                     content={"ok": False, "error": "write timeout"}, status_code=504
                 )
             except ValueError as exc:
-                rti_fsp._log_action(f"Server writevalue failed: {exc}", "warn")
+                rti_fsp._log_action(f"Server writevalue failed: {exc}", "warn", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)}, status_code=404
                 )
             except Exception as exc:
-                rti_fsp._log_action(f"Server writevalue failed: {exc}", "error")
+                rti_fsp._log_action(f"Server writevalue failed: {exc}", "error", kind="acsi")
                 return JSONResponse(
                     content={"ok": False, "error": str(exc)}, status_code=500
                 )

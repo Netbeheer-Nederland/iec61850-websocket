@@ -158,14 +158,19 @@ class TestExtractMessageMeta:
 
         meta = client._extract_message_meta(raw)
 
-        assert meta == {"service_type": "read", "category": "request", "cp": "cp1"}
+        assert meta == {"service_type": "read", "category": "request", "cp": "cp1", "invoke_id": None}
 
     def test_response_message(self, client):
         raw = '{"response": {"associateId": "cp1", "service": {"read": {}}}}'
 
         meta = client._extract_message_meta(raw)
 
-        assert meta == {"service_type": "read", "category": "response", "cp": "cp1"}
+        assert meta == {"service_type": "read", "category": "response", "cp": "cp1", "invoke_id": None}
+
+    def test_request_carries_invoke_id(self, client):
+        raw = '{"request": {"associateId": "cp1", "invokeId": 7, "service": {"getDataValues": {}}}}'
+
+        assert client._extract_message_meta(raw)["invoke_id"] == 7
 
     def test_associate_request(self, client):
         raw = '{"associate": {"service": {"associateRequest": {"calledAP": "cp1"}}}}'
@@ -176,6 +181,7 @@ class TestExtractMessageMeta:
             "service_type": "associateRequest",
             "category": "associate",
             "cp": "cp1",
+            "invoke_id": None,
         }
 
     def test_associate_response(self, client):
@@ -189,6 +195,7 @@ class TestExtractMessageMeta:
             "service_type": "associateResponse",
             "category": "associate",
             "cp": "cp1",
+            "invoke_id": None,
         }
 
     def test_unrecognized_shape_returns_unknowns(self, client):
@@ -196,7 +203,7 @@ class TestExtractMessageMeta:
 
         meta = client._extract_message_meta(raw)
 
-        assert meta == {"service_type": "unknown", "category": "unknown", "cp": ""}
+        assert meta == {"service_type": "unknown", "category": "unknown", "cp": "", "invoke_id": None}
 
     def test_invalid_json_returns_parse_error(self, client):
         meta = client._extract_message_meta("not json")
@@ -205,12 +212,13 @@ class TestExtractMessageMeta:
             "service_type": "parse-error",
             "category": "parse-error",
             "cp": "",
+            "invoke_id": None,
         }
 
     def test_non_dict_json_returns_unknowns(self, client):
         meta = client._extract_message_meta("[1, 2, 3]")
 
-        assert meta == {"service_type": "unknown", "category": "unknown", "cp": ""}
+        assert meta == {"service_type": "unknown", "category": "unknown", "cp": "", "invoke_id": None}
 
 
 class TestActionsAndMessagesLog:
@@ -221,15 +229,37 @@ class TestActionsAndMessagesLog:
         # what this call itself appended.
         before = len(client.get_actions())
 
-        client._log_action("did something", detail={"x": 1})
+        client._log_action("did something", detail={"x": 1}, kind="system")
 
         actions = client.get_actions()
         assert len(actions) == before + 1
         assert actions[-1]["message"] == "did something"
         assert actions[-1]["detail"] == {"x": 1}
+        assert actions[-1]["kind"] == "system"
+
+    def test_log_action_requires_a_known_kind(self, client):
+        with pytest.raises(TypeError):
+            client._log_action("no kind")  # kind is a required keyword
+        with pytest.raises(ValueError):
+            client._log_action("bad kind", kind="websocket")
+
+    def test_log_action_records_acsi_fields(self, client):
+        client._log_action(
+            "GetDataValues",
+            kind="acsi",
+            cp="cp1",
+            service="getDataValues",
+            correlation={"cp": "cp1", "invokeId": 3, "messageSeqFrom": 10},
+        )
+
+        entry = client.get_actions()[-1]
+        assert entry["kind"] == "acsi"
+        assert entry["cp"] == "cp1"
+        assert entry["service"] == "getDataValues"
+        assert entry["correlation"] == {"cp": "cp1", "invokeId": 3, "messageSeqFrom": 10}
 
     def test_clear_actions_empties_log(self, client):
-        client._log_action("did something")
+        client._log_action("did something", kind="system")
 
         client.clear_actions()
 
@@ -246,6 +276,20 @@ class TestActionsAndMessagesLog:
         assert messages[0]["direction"] == "recv"
         assert messages[0]["service_type"] == "read"
         assert messages[0]["cp"] == "cp1"
+        assert messages[0]["kind"] == "websocket"
+        assert messages[0]["level"] == "info"
+        assert messages[0]["service"] == "read"
+
+    def test_log_message_marks_service_error_responses_as_errors(self, client):
+        client._log_message(
+            "recv",
+            '{"response": {"associateId": "cp1", "invokeId": 4, "service": {"serviceError": "instanceNotAvailable"}}}',
+            None,
+        )
+
+        message = client.get_messages()[-1]
+        assert message["level"] == "error"
+        assert message["invokeId"] == 4
 
     def test_clear_messages_empties_log(self, client):
         client._log_message("recv", "hello", None)

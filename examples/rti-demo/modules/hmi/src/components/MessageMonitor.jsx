@@ -49,7 +49,7 @@ function MessageMonitor({
   const [expandedMessageId, setExpandedMessageId] = useState(null);
   const [prettyPrintMessages, setPrettyPrintMessages] = useState({});
   const [status, setStatus] = useState('Monitoring stopped');
-  // Same sort toggle as ActionLogPanel's Protocol Messages list - but
+  // Same sort toggle as ActionLogPanel's Activity Log list - but
   // unlike there, messages here arrive oldest-first (each fetch/push
   // appends, never prepends), so "newest" (the default - latest message
   // first) is the one that has to reverse; "oldest" is the pass-through.

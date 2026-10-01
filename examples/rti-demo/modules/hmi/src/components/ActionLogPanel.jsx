@@ -18,6 +18,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
+import LogKindBadge, { LOG_KINDS, kindOf } from './LogKindBadge';
 
 /**
  * Shared "Monitoring" block for ACSIServer.jsx / ACSIClient.jsx: Start/Stop/
@@ -28,17 +29,19 @@ import React, { useMemo, useState } from 'react';
  * /api/messages (direction/category, no severity level) - these are two
  * genuinely different logs, not a case of picking one over the other.
  *
+ * Each entry also carries a `kind` - "system" (lifecycle/configuration) or
+ * "acsi" (an ACSI service call) - shown as a LogKindBadge and filterable,
+ * independently of severity. See docs/rti-demo/design/logging-kinds.md.
+ *
  * Presentation only - fetching/interval management (and whether monitoring
  * survives navigating away) stays owned by the page, same as before.
  */
 
-// Values _log_action currently sends (fsp/acsi_server.py, so/acsi_client.py):
-// "info" (default), "warn", "error" - NOT "warning". The inline
-// implementations this replaced checked for "warning", which never matched
-// a real "warn" entry - those silently fell through to the default/info
-// styling. "debug" isn't emitted yet but is included here (recognized +
-// filterable + styled) so it isn't silently bucketed under "info" the
-// moment it is.
+// Values _log_action sends (fsp/acsi_server.py, so/acsi_client.py, and the
+// bff_endpoint.py modules): "info" (default), "warn", "error", "debug" - NOT
+// "warning". The inline implementations this replaced checked for
+// "warning", which never matched a real "warn" entry - those silently fell
+// through to the default/info styling.
 const SEVERITY_LEVELS = ['error', 'warn', 'info', 'debug'];
 
 // --danger-bg/--warning-bg/--info-bg (used by the inline implementations
@@ -56,6 +59,9 @@ const styleFor = (level) => SEVERITY_STYLE[level] || SEVERITY_STYLE.info;
 
 function ActionLogPanel({ messages, isMonitoring, disabled, onStart, onStop, onClear }) {
   const [severityFilter, setSeverityFilter] = useState('all');
+  // system | acsi (the actions log never carries websocket frames - those
+  // are Traffic's MessageMonitor).
+  const [kindFilter, setKindFilter] = useState('all');
   // Messages already arrive newest-first (each page prepends new entries) -
   // "newest" here is a no-op pass-through, "oldest" reverses for display
   // only, without touching the underlying array/ordering used elsewhere.
@@ -75,11 +81,14 @@ function ActionLogPanel({ messages, isMonitoring, disabled, onStart, onStop, onC
     if (severityFilter !== 'all') {
       list = list.filter((msg) => (SEVERITY_LEVELS.includes(msg.level) ? msg.level : 'info') === severityFilter);
     }
+    if (kindFilter !== 'all') {
+      list = list.filter((msg) => kindOf(msg) === kindFilter);
+    }
     if (sortOrder === 'oldest') {
       list = [...list].reverse();
     }
     return list;
-  }, [messages, severityFilter, sortOrder]);
+  }, [messages, severityFilter, kindFilter, sortOrder]);
 
   return (
     <>
@@ -99,7 +108,7 @@ function ActionLogPanel({ messages, isMonitoring, disabled, onStart, onStop, onC
         <div style={{ marginTop: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
             <h3 style={{ fontSize: '16px', margin: 0 }}>
-              Protocol Messages
+              Activity Log
               {messages.length > 0 && (
                 <span style={{ marginLeft: '8px', fontSize: '12px', fontWeight: 'normal', color: 'var(--text-muted)' }}>
                   {messages.length} total
@@ -109,6 +118,18 @@ function ActionLogPanel({ messages, isMonitoring, disabled, onStart, onStop, onC
               )}
             </h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <select
+                id="messages-kind-filter"
+                className="action-log-select"
+                value={kindFilter}
+                onChange={(e) => setKindFilter(e.target.value)}
+                disabled={messages.length === 0}
+                title="Filter by kind"
+              >
+                <option value="all">All kinds</option>
+                <option value="system">{LOG_KINDS.system.label} only</option>
+                <option value="acsi">{LOG_KINDS.acsi.label} service only</option>
+              </select>
               <select
                 id="messages-severity-filter"
                 className="action-log-select"
@@ -139,7 +160,7 @@ function ActionLogPanel({ messages, isMonitoring, disabled, onStart, onStop, onC
               <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
                 {messages.length === 0
                   ? 'No log messages yet. Messages will appear here when monitoring.'
-                  : 'No messages match the selected severity filter.'}
+                  : 'No messages match the selected filters.'}
               </div>
             ) : (
               visibleMessages.map((msg, index) => {
@@ -149,8 +170,11 @@ function ActionLogPanel({ messages, isMonitoring, disabled, onStart, onStop, onC
                   <div key={msg.id ?? index} style={{ padding: '8px 12px', marginBottom: '8px', borderRadius: '4px', background: 'var(--bg-hover)', fontSize: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                       <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>#{msg.id ?? index} - {msg.timestamp}</span>
-                      <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '3px', background: style.bg, color: style.color }}>
-                        {style.label}
+                      <span style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <LogKindBadge kind={kindOf(msg)} />
+                        <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '3px', background: style.bg, color: style.color }}>
+                          {style.label}
+                        </span>
                       </span>
                     </div>
                     <div style={{ color: 'var(--text-primary)' }}>{msg.message}</div>
