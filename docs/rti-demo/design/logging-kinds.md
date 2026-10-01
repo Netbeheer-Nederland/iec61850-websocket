@@ -1,6 +1,6 @@
 # rti-demo logging: system, WebSocket and ACSI service logs
 
-Status: **in progress** (2026-10-01) - phase 1 implemented; see Phasing.
+Status: **in progress** (2026-10-01) - phases 1-2 implemented; see Phasing.
 
 Goal: make the three kinds of log entry the SO/FSP produce - **system**,
 **WebSocket** and **ACSI service** - distinguishable at the source, and give
@@ -152,7 +152,7 @@ Each phase is its own commit (or small series), verified before the next.
    `_log_message` entries, and add a kind filter to `ActionLogPanel`. Most of
    the value for the least change - the ACSI Client/Server panels can already
    separate system from service activity.
-2. **acsi entries on Traffic.** Have the BFF relay actions with
+2. **(done)** **acsi entries on Traffic.** Have the BFF relay actions with
    `kind: "acsi"` the same way it relays messages, and show them in Traffic's
    monitors alongside frames, with kind chips.
 3. **Correlation.** Settle the `invokeId` question, record the link, and let

@@ -232,6 +232,10 @@ ws_hub = WSHub()
 # push_relay_loop() only broadcasts messages a browser hasn't seen yet.
 _last_relayed_message_id: dict[str, int] = {}
 
+# Same, for each target's actions log (only its kind "acsi" entries are
+# relayed - see _relay_new_actions).
+_last_relayed_action_id: dict[str, int] = {}
+
 # Tracks the last-relayed acsi_client_list snapshot per "host:port" target
 # (RTI-SO only), so push_relay_loop() only broadcasts when it actually
 # changes (an FSP associating with, or dropping, one of the SO's cps).
@@ -353,33 +357,79 @@ async def _build_enriched_connections() -> list[dict[str, Any]]:
     return enriched
 
 
-async def _relay_new_messages(target_key: str, client: BffClient) -> None:
-    """Broadcast any protocol messages logged by `target_key` since the last cycle."""
+async def _relay_new_log_entries(
+    target_key: str,
+    client: BffClient,
+    *,
+    path: str,
+    list_key: str,
+    push_type: str,
+    watermarks: dict[str, int],
+    include=None,
+) -> None:
+    """Broadcast `target_key`'s log entries (from GET `path`) logged since the
+    last cycle, as {"type": push_type, "target": target_key, "data": [...]}.
+
+    `watermarks` holds the highest entry id already seen per target; it
+    advances over every entry, but only those passing `include` (if given)
+    are broadcast.
+    """
     try:
-        result = await asyncio.to_thread(client.request, "GET", "/api/messages")
+        result = await asyncio.to_thread(client.request, "GET", path)
     except Exception:
         return
-    messages = result.get("messages") if isinstance(result, dict) else None
-    if not messages:
+    entries = result.get(list_key) if isinstance(result, dict) else None
+    if not entries:
         return
 
-    last_id = _last_relayed_message_id.get(target_key, 0)
+    last_id = watermarks.get(target_key, 0)
     current_max = max(
-        (m.get("id", 0) for m in messages if isinstance(m, dict)), default=0
+        (e.get("id", 0) for e in entries if isinstance(e, dict)), default=0
     )
     if current_max < last_id:
-        # message ids reset - the instance restarted (or logs were cleared).
+        # ids reset - the instance restarted (or its log was cleared).
         last_id = 0
 
     new_items = [
-        m for m in messages if isinstance(m, dict) and m.get("id", 0) > last_id
+        e for e in entries if isinstance(e, dict) and e.get("id", 0) > last_id
     ]
     if not new_items:
         return
 
-    _last_relayed_message_id[target_key] = current_max
-    await ws_hub.broadcast(
-        {"type": "messages", "target": target_key, "data": new_items}
+    watermarks[target_key] = current_max
+    if include is not None:
+        new_items = [e for e in new_items if include(e)]
+        if not new_items:
+            return
+    await ws_hub.broadcast({"type": push_type, "target": target_key, "data": new_items})
+
+
+async def _relay_new_messages(target_key: str, client: BffClient) -> None:
+    """Broadcast any protocol messages logged by `target_key` since the last cycle."""
+    await _relay_new_log_entries(
+        target_key,
+        client,
+        path="/api/messages",
+        list_key="messages",
+        push_type="messages",
+        watermarks=_last_relayed_message_id,
+    )
+
+
+async def _relay_new_actions(target_key: str, client: BffClient) -> None:
+    """Broadcast `target_key`'s new ACSI service entries (actions log, kind
+    "acsi") - Traffic shows these next to the WebSocket frames. System
+    entries stay on the instance's own page (and Diagnostics), so they're
+    not pushed. See docs/rti-demo/design/logging-kinds.md.
+    """
+    await _relay_new_log_entries(
+        target_key,
+        client,
+        path="/api/actions-logs",
+        list_key="actions",
+        push_type="actions",
+        watermarks=_last_relayed_action_id,
+        include=lambda e: e.get("kind") == "acsi",
     )
 
 
@@ -448,6 +498,11 @@ async def push_relay_loop(interval: float = 2.0) -> None:
                 *(
                     [
                         _relay_new_messages(key, client)
+                        for key, client in live_targets
+                        if client is not None
+                    ]
+                    + [
+                        _relay_new_actions(key, client)
                         for key, client in live_targets
                         if client is not None
                     ]

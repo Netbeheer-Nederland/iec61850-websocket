@@ -115,7 +115,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * Dynamic panel management (add/remove)
 * Real-time message monitoring, newest-first by default with a toggle for oldest-first (same control as the Monitoring panels' Activity Log)
 * Each message monitor's Start/Stop is remembered per instance (host:port, localStorage), so monitoring left on resumes after switching pages
-* Message monitors show protocol (WebSocket) traffic only: a read/write through an SO shows up as its request and response on both the SO and the FSP, but a read/write aimed directly at an FSP is local model access with no protocol traffic - it only appears in that FSP's action log (ACSI Server page's Monitoring panel)
+* Each message monitor shows two kinds of entry, each with a kind badge and a kind filter (All / WebSocket / ACSI): WebSocket frames (the instance's message log) and ACSI service entries (the kind "acsi" part of its actions log, pushed live by the BFF as `actions` events). A read/write through an SO shows up as its frames on both the SO and the FSP; a read/write aimed directly at an FSP is local model access with no frames, so it shows up as an ACSI entry on that FSP's monitor. System entries stay on the ACSI Client/Server pages. Clear empties the monitor and the instance's frame log, but leaves its actions log (and so the Activity Log) alone
 * FSP message monitors only shown for FSPs with an active connection (connectedClients > 0), same threshold used to light up the instance visualization above
 * Connection health monitoring
 * Instance visualization updates live from the BFF's connections push - no manual refresh button

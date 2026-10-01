@@ -83,9 +83,11 @@ def _isolated_relay_state(monkeypatch):
     """
     monkeypatch.setattr(bff_server.conn_manager, "connections", [])
     bff_server._last_relayed_message_id.clear()
+    bff_server._last_relayed_action_id.clear()
     bff_server._last_relayed_client_list.clear()
     yield
     bff_server._last_relayed_message_id.clear()
+    bff_server._last_relayed_action_id.clear()
     bff_server._last_relayed_client_list.clear()
 
 
@@ -508,6 +510,72 @@ async def test_relay_new_messages_swallows_request_errors(monkeypatch):
     broadcast.assert_not_awaited()
 
 
+# -------------------- _relay_new_actions --------------------
+
+
+@pytest.mark.asyncio
+async def test_relay_new_actions_broadcasts_only_acsi_entries(monkeypatch):
+    broadcasts = []
+    monkeypatch.setattr(
+        bff_server.ws_hub,
+        "broadcast",
+        AsyncMock(side_effect=lambda m: broadcasts.append(m)),
+    )
+    client = FakeBffClient(
+        responses={
+            "/api/actions-logs": {
+                "actions": [
+                    {"id": 1, "kind": "system", "message": "Connected"},
+                    {"id": 2, "kind": "acsi", "message": "Readvalue"},
+                ]
+            }
+        }
+    )
+
+    await bff_server._relay_new_actions("10.0.0.1:5002", client)
+
+    assert broadcasts == [
+        {
+            "type": "actions",
+            "target": "10.0.0.1:5002",
+            "data": [{"id": 2, "kind": "acsi", "message": "Readvalue"}],
+        }
+    ]
+    assert bff_server._last_relayed_action_id["10.0.0.1:5002"] == 2
+
+
+@pytest.mark.asyncio
+async def test_relay_new_actions_advances_watermark_past_system_only_batches(monkeypatch):
+    # A batch with nothing to push still moves the watermark, so those system
+    # entries aren't re-examined (and a later acsi entry isn't mistaken for
+    # an already-seen one) next cycle.
+    broadcast = AsyncMock()
+    monkeypatch.setattr(bff_server.ws_hub, "broadcast", broadcast)
+    client = FakeBffClient(
+        responses={"/api/actions-logs": {"actions": [{"id": 5, "kind": "system"}]}}
+    )
+
+    await bff_server._relay_new_actions("10.0.0.1:5002", client)
+
+    broadcast.assert_not_awaited()
+    assert bff_server._last_relayed_action_id["10.0.0.1:5002"] == 5
+
+
+@pytest.mark.asyncio
+async def test_relay_new_actions_keeps_its_own_watermark(monkeypatch):
+    # Actions and messages are separate id sequences on the instance.
+    bff_server._last_relayed_message_id["10.0.0.1:5002"] = 100
+    monkeypatch.setattr(bff_server.ws_hub, "broadcast", AsyncMock())
+    client = FakeBffClient(
+        responses={"/api/actions-logs": {"actions": [{"id": 1, "kind": "acsi"}]}}
+    )
+
+    await bff_server._relay_new_actions("10.0.0.1:5002", client)
+
+    assert bff_server._last_relayed_action_id["10.0.0.1:5002"] == 1
+    assert bff_server._last_relayed_message_id["10.0.0.1:5002"] == 100
+
+
 # -------------------- _relay_acsi_client_list --------------------
 
 
@@ -641,6 +709,9 @@ async def test_push_relay_loop_broadcasts_connections_and_messages(monkeypatch):
                     "status": "{'status': 'listening', 'connectedClients': 1}",
                 },
                 "/api/messages": {"messages": [{"id": 1, "message": "hello"}]},
+                "/api/actions-logs": {
+                    "actions": [{"id": 1, "kind": "acsi", "message": "Server readvalue"}]
+                },
             }
         ),
     )
@@ -660,6 +731,7 @@ async def test_push_relay_loop_broadcasts_connections_and_messages(monkeypatch):
     types = [b["type"] for b in broadcasts]
     assert types.count("connections") == 1
     assert types.count("messages") == 1
+    assert types.count("actions") == 1
 
     connections_msg = next(b for b in broadcasts if b["type"] == "connections")
     assert connections_msg["data"][0]["connectedClients"] == 1

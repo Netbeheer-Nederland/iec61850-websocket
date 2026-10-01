@@ -21,9 +21,32 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { executeApiCall, buildTargetValue } from '../services/apiService';
 import { subscribe as subscribeLive, isConnected as isLiveConnected, onConnectionStateChange } from '../services/liveSocket';
 import { usePersistentFlag } from '../hooks/usePersistentFlag';
+import LogKindBadge, { LOG_KINDS } from './LogKindBadge';
+
+// Frames (messages log) and ACSI service entries (actions log, kind "acsi")
+// are separate id sequences on the instance, so the kind has to be part of
+// the dedupe/React key.
+const entryKind = (msg) => (msg?.kind === 'acsi' ? 'acsi' : 'websocket');
+const entryKey = (msg) => `${entryKind(msg)}:${msg.id || msg.message || JSON.stringify(msg)}`;
+
+// Entries are kept in arrival order; within one catch-up batch, order by the
+// instance's own time (frames "HH:MM:SS.mmm", actions "HH:MM:SS") so an
+// ACSI entry lands next to its frames instead of all actions first.
+const byTime = (a, b) => String(a.time || a.timestamp || '').localeCompare(String(b.time || b.timestamp || ''));
+
+const unwrapList = (payload, key) => {
+  if (!payload) return [];
+  const list = payload[key] ?? payload.result?.[key] ?? payload.result?.payload?.[key];
+  return Array.isArray(list) ? list : [];
+};
 
 /**
- * MessageMonitor component for monitoring WebSocket messages from endpoints
+ * MessageMonitor component for monitoring one endpoint's traffic: its
+ * WebSocket frames (GET /api/messages) and its ACSI service entries (the
+ * kind "acsi" part of GET /api/actions-logs - e.g. a read/write an FSP
+ * serves locally, which never touches the wire). Each row carries a
+ * LogKindBadge; the kind filter narrows to one. See
+ * docs/rti-demo/design/logging-kinds.md.
  * 
  * @param {Object} props - Component props
  * @param {Object[]} props.endpoints - Array of endpoint objects with host, port, name, type
@@ -54,9 +77,15 @@ function MessageMonitor({
   // appends, never prepends), so "newest" (the default - latest message
   // first) is the one that has to reverse; "oldest" is the pass-through.
   const [sortOrder, setSortOrder] = useState('newest');
+  // 'all' | 'websocket' | 'acsi'
+  const [kindFilter, setKindFilter] = useState('all');
 
   const pollingRef = useRef(null);
   const messageIdsRef = useRef(new Set());
+  // Clear empties this view and the instance's frame log, but not its
+  // actions log (the ACSI Client/Server Activity Log shows that too) - so
+  // remember how far ACSI entries were cleared and skip those on catch-up.
+  const clearedAcsiUpToRef = useRef(0);
   const currentIntervalRef = useRef(defaultInterval);
 
   // Fetch messages through BFF execute endpoint
@@ -64,13 +93,24 @@ function MessageMonitor({
     return executeApiCall('messages', targetValue, {});
   }, []);
 
-  // Append new messages, deduping by id (shared by both the HTTP catch-up
-  // fetch below and the live WS push path).
-  const ingestMessages = useCallback((msgs) => {
+  // Append new entries, deduping by kind + id (shared by both the HTTP
+  // catch-up fetch below and the live WS push path). `kind` tags entries
+  // from an instance that predates kinds: frames are always "websocket",
+  // and only the actions log's "acsi" entries are passed in here.
+  const ingestMessages = useCallback((msgs, kind = 'websocket') => {
     if (!Array.isArray(msgs) || msgs.length === 0) return;
 
-    const uniqueMsgs = msgs.filter(msg => {
-      const msgId = msg.id || msg.message || JSON.stringify(msg);
+    let entries = msgs.map((msg) => (msg && typeof msg === 'object' && !msg.kind ? { ...msg, kind } : msg));
+    if (kind === 'acsi') {
+      const maxId = Math.max(0, ...entries.map((e) => Number(e.id) || 0));
+      // ids went backwards past the clear point: the instance restarted, so
+      // the old watermark no longer means anything.
+      if (maxId < clearedAcsiUpToRef.current) clearedAcsiUpToRef.current = 0;
+      entries = entries.filter((e) => (Number(e.id) || 0) > clearedAcsiUpToRef.current);
+    }
+
+    const uniqueMsgs = entries.filter(msg => {
+      const msgId = entryKey(msg);
       if (messageIdsRef.current.has(msgId)) {
         return false; // Duplicate
       }
@@ -92,27 +132,24 @@ function MessageMonitor({
 
     try {
       const targetValue = buildTargetValue(selectedEndpoint.host, selectedEndpoint.port);
-      const result = await getMessagesApi(targetValue);
+      const [result, actionsResult] = await Promise.all([
+        getMessagesApi(targetValue),
+        executeApiCall('actions-logs', targetValue, {}),
+      ]);
 
-      if (result?.ok && result.payload) {
-        // Handle the messages response
-        let msgs = result.payload;
-
-        // Normalize the response - handle different possible structures
-        if (msgs.messages) {
-          msgs = msgs.messages;
-        } else if (msgs.result?.messages) {
-          msgs = msgs.result.messages;
-        } else if (msgs.result?.payload?.messages) {
-          msgs = msgs.result.payload.messages;
-        }
-
-        if (Array.isArray(msgs)) {
-          ingestMessages(msgs);
-        } else if (msgs && typeof msgs === 'object') {
-          ingestMessages([msgs]);
-        }
-      }
+      const frames = result?.ok ? unwrapList(result.payload, 'messages').map((m) => ({ ...m, kind: m.kind || 'websocket' })) : [];
+      const acsi = actionsResult?.ok
+        ? unwrapList(actionsResult.payload, 'actions').filter((a) => a?.kind === 'acsi')
+        : [];
+      // One combined, time-ordered batch so a catch-up interleaves the two
+      // kinds the way they happened.
+      const maxAcsiId = Math.max(0, ...acsi.map((a) => Number(a.id) || 0));
+      if (maxAcsiId < clearedAcsiUpToRef.current) clearedAcsiUpToRef.current = 0;
+      const batch = [
+        ...frames,
+        ...acsi.filter((a) => (Number(a.id) || 0) > clearedAcsiUpToRef.current),
+      ].sort(byTime);
+      ingestMessages(batch);
     } catch (error) {
       console.error('Failed to fetch messages:', error);
       setStatus(`Error: ${error.message || 'Failed to fetch messages'}`);
@@ -188,11 +225,22 @@ function MessageMonitor({
   useEffect(() => {
     if (!isMonitoring || !selectedEndpoint) return undefined;
     const targetValue = buildTargetValue(selectedEndpoint.host, selectedEndpoint.port);
-    return subscribeLive('messages', (msg) => {
+    const unsubscribeMessages = subscribeLive('messages', (msg) => {
       if (msg.target === targetValue) {
-        ingestMessages(msg.data);
+        ingestMessages(msg.data, 'websocket');
       }
     });
+    // The BFF only relays the actions log's kind "acsi" entries
+    // (_relay_new_actions in bff_server.py).
+    const unsubscribeActions = subscribeLive('actions', (msg) => {
+      if (msg.target === targetValue) {
+        ingestMessages(msg.data, 'acsi');
+      }
+    });
+    return () => {
+      unsubscribeMessages();
+      unsubscribeActions();
+    };
   }, [isMonitoring, selectedEndpoint, ingestMessages]);
 
   // If the socket drops while monitoring, fall back to polling so messages
@@ -220,6 +268,10 @@ function MessageMonitor({
       const result = await executeApiCall('clear-messages', targetValue, {});
       
       if (result?.ok) {
+        clearedAcsiUpToRef.current = Math.max(
+          clearedAcsiUpToRef.current,
+          ...messages.filter((m) => entryKind(m) === 'acsi').map((m) => Number(m.id) || 0),
+        );
         setMessages([]);
         messageIdsRef.current.clear();
         setExpandedMessageId(null);
@@ -231,7 +283,7 @@ function MessageMonitor({
       console.error('Failed to clear messages:', error);
       setStatus(`Error: ${error.message || 'Failed to clear messages'}`);
     }
-  }, [selectedEndpoint]);
+  }, [selectedEndpoint, messages]);
 
   // Handle interval change
   const handleIntervalChange = useCallback((e) => {
@@ -326,8 +378,9 @@ function MessageMonitor({
   // Messages for display, in sortOrder (see the state comment above for why
   // "newest" - the default - is the one that reverses the underlying array).
   const visibleMessages = useMemo(() => {
-    return sortOrder === 'newest' ? [...messages].reverse() : messages;
-  }, [messages, sortOrder]);
+    const filtered = kindFilter === 'all' ? messages : messages.filter((m) => entryKind(m) === kindFilter);
+    return sortOrder === 'newest' ? [...filtered].reverse() : filtered;
+  }, [messages, sortOrder, kindFilter]);
 
   // Syntax highlight JSON content with proper token detection
   const syntaxHighlightJson = (jsonString) => {
@@ -460,7 +513,7 @@ function MessageMonitor({
     try {
       let jsonContent = null;
       let displayText = '';
-      const msgId = msg.id || msg.message || JSON.stringify(msg);
+      const msgId = entryKey(msg);
       const shouldPrettyPrint = prettyPrintMessages[msgId] || false;
       
       // Handle message.message field
@@ -669,6 +722,17 @@ function MessageMonitor({
             <i className="fas fa-trash"></i>
           </button>
 
+          <select
+            className="monitor-interval-select"
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value)}
+            title="Filter by kind"
+          >
+            <option value="all">All kinds</option>
+            <option value="websocket">{LOG_KINDS.websocket.label} only</option>
+            <option value="acsi">{LOG_KINDS.acsi.label} service only</option>
+          </select>
+
           <button
             className="btn-icon monitor-control-btn"
             onClick={() => setSortOrder((prev) => (prev === 'newest' ? 'oldest' : 'newest'))}
@@ -691,8 +755,12 @@ function MessageMonitor({
           </p>
         ) : (
           <div className="message-list" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            {visibleMessages.length === 0 && (
+              <p className="monitor-no-messages">No entries match the selected kind.</p>
+            )}
             {visibleMessages.map((msg) => {
-              const msgId = msg.id || msg.message || JSON.stringify(msg);
+              const msgId = entryKey(msg);
+              const isAcsi = entryKind(msg) === 'acsi';
               const isExpanded = expandedMessageId === msgId;
               const directionColor = getDirectionColor(msg.direction);
               const categoryColor = getCategoryColor(msg.category);
@@ -722,12 +790,22 @@ function MessageMonitor({
                     }}
                     onClick={() => toggleMessage(msgId)}
                   >
-                    <div className="message-meta" style={{ display: 'flex', gap: '12px', alignItems: 'center', fontSize: '11px' }}>
+                    <div className="message-meta" style={{ display: 'flex', gap: '12px', alignItems: 'center', fontSize: '11px', minWidth: 0 }}>
+                      <LogKindBadge kind={entryKind(msg)} />
                       {msg.id && <span className="message-id" style={{ color: 'var(--text-muted)' }}>#{msg.id}</span>}
-                      {msg.timestamp && <span className="message-timestamp" style={{ color: 'var(--text-muted)' }}>{formatTimestamp(msg.timestamp)}</span>}
-                      {msg.direction && <span className="message-direction" style={{ color: directionColor, fontWeight: '600' }}>{msg.direction}</span>}
-                      {msg.category && <span className="message-category" style={{ color: categoryColor }}>{msg.category}</span>}
-                      {msg.service_type && <span className="message-service" style={{ color: 'var(--text-secondary)' }}>{msg.service_type}</span>}
+                      {(msg.time || msg.timestamp) && <span className="message-timestamp" style={{ color: 'var(--text-muted)' }}>{formatTimestamp(msg.time || msg.timestamp)}</span>}
+                      {(msg.level === 'error' || msg.level === 'warn') && (
+                        <span className="message-level" style={{ color: msg.level === 'error' ? 'var(--danger-color)' : 'var(--warning-color)', fontWeight: '600' }}>{msg.level}</span>
+                      )}
+                      {isAcsi ? (
+                        <span className="message-summary" style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.message}</span>
+                      ) : (
+                        <>
+                          {msg.direction && <span className="message-direction" style={{ color: directionColor, fontWeight: '600' }}>{msg.direction}</span>}
+                          {msg.category && <span className="message-category" style={{ color: categoryColor }}>{msg.category}</span>}
+                          {msg.service_type && <span className="message-service" style={{ color: 'var(--text-secondary)' }}>{msg.service_type}</span>}
+                        </>
+                      )}
                     </div>
                     <i 
                       className={`fas ${isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} message-toggle-icon`}
@@ -743,7 +821,13 @@ function MessageMonitor({
                       fontSize: '11px'
                     }}
                   >
-                    {formatMessageContent(msg)}
+                    {isAcsi ? (
+                      <pre style={{ margin: 0, fontSize: '11px', whiteSpace: 'pre-wrap', wordWrap: 'break-word', color: 'var(--text-primary)' }}>
+                        {JSON.stringify({ message: msg.message, cp: msg.cp || undefined, service: msg.service || undefined, detail: msg.detail }, null, 2)}
+                      </pre>
+                    ) : (
+                      formatMessageContent(msg)
+                    )}
                   </div>
                 </div>
               );

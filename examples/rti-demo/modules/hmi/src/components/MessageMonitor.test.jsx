@@ -41,6 +41,18 @@ const pushLiveMessages = async (target, data) => {
   });
 };
 
+// Each catch-up/poll fetches both logs (frames + actions); count the frame
+// fetches - one per catch-up or poll tick.
+const messageFetches = () => executeApiCall.mock.calls.filter(([apiId]) => apiId === 'messages').length;
+
+const pushLiveActions = async (target, data) => {
+  await act(async () => {
+    liveMessageHandlers
+      .filter((h) => h.type === 'actions')
+      .forEach((h) => h.handler({ type: 'actions', target, data }));
+  });
+};
+
 const flipConnectionState = async (connected) => {
   await act(async () => {
     liveStateHandlers.forEach((handler) => handler(connected));
@@ -75,12 +87,12 @@ describe('MessageMonitor live push wiring', () => {
     render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
 
     await startMonitoring();
-    expect(executeApiCall).toHaveBeenCalledTimes(1); // immediate catch-up
+    expect(messageFetches()).toBe(1); // immediate catch-up
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60000);
     });
-    expect(executeApiCall).toHaveBeenCalledTimes(1); // still just the catch-up - no polling
+    expect(messageFetches()).toBe(1); // still just the catch-up - no polling
 
     await pushLiveMessages('10.0.0.1:5001', [{ id: 1, message: 'hello' }]);
     expect(screen.getByText('#1')).toBeInTheDocument();
@@ -100,17 +112,17 @@ describe('MessageMonitor live push wiring', () => {
     render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
 
     await startMonitoring();
-    expect(executeApiCall).toHaveBeenCalledTimes(1); // immediate fetch
+    expect(messageFetches()).toBe(1); // immediate fetch
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10000);
     });
-    expect(executeApiCall).toHaveBeenCalledTimes(2); // fallback poll fired
+    expect(messageFetches()).toBe(2); // fallback poll fired
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10000);
     });
-    expect(executeApiCall).toHaveBeenCalledTimes(3);
+    expect(messageFetches()).toBe(3);
   });
 
   it('stops fallback polling and catches up once the socket reconnects', async () => {
@@ -118,17 +130,17 @@ describe('MessageMonitor live push wiring', () => {
     render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
 
     await startMonitoring();
-    expect(executeApiCall).toHaveBeenCalledTimes(1);
+    expect(messageFetches()).toBe(1);
 
     await flipConnectionState(true);
-    expect(executeApiCall).toHaveBeenCalledTimes(2); // catch-up fetch on reconnect
+    expect(messageFetches()).toBe(2); // catch-up fetch on reconnect
 
     // Fallback polling should now be stopped - no further HTTP calls even
     // after the old interval would have fired again.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30000);
     });
-    expect(executeApiCall).toHaveBeenCalledTimes(2);
+    expect(messageFetches()).toBe(2);
   });
 
   it('starts fallback polling if the socket drops while monitoring', async () => {
@@ -136,14 +148,14 @@ describe('MessageMonitor live push wiring', () => {
     render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
 
     await startMonitoring();
-    expect(executeApiCall).toHaveBeenCalledTimes(1);
+    expect(messageFetches()).toBe(1);
 
     await flipConnectionState(false);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10000);
     });
-    expect(executeApiCall).toHaveBeenCalledTimes(2); // fallback poll kicked in
+    expect(messageFetches()).toBe(2); // fallback poll kicked in
   });
 
   it('stop monitoring clears the fallback polling interval', async () => {
@@ -151,7 +163,7 @@ describe('MessageMonitor live push wiring', () => {
     render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
 
     await startMonitoring();
-    expect(executeApiCall).toHaveBeenCalledTimes(1);
+    expect(messageFetches()).toBe(1);
 
     const user = userEvent.setup({ delay: null });
     await user.click(screen.getByTitle('Stop Monitoring'));
@@ -159,7 +171,7 @@ describe('MessageMonitor live push wiring', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30000);
     });
-    expect(executeApiCall).toHaveBeenCalledTimes(1); // no more polling after stop
+    expect(messageFetches()).toBe(1); // no more polling after stop
   });
 });
 
@@ -253,3 +265,82 @@ describe('MessageMonitor - monitoring survives switching pages', () => {
     expect(screen.getByTitle('Start Monitoring')).toBeEnabled();
   });
 });
+
+describe('MessageMonitor - WebSocket frames and ACSI service entries', () => {
+  const kinds = (container) => [...container.querySelectorAll('.message-card .log-kind-badge')].map((b) => b.dataset.kind);
+
+  it('shows pushed ACSI entries next to frames, each with its kind badge - even with the same id', async () => {
+    isConnected.mockReturnValue(true);
+    const { container } = render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+    await startMonitoring();
+
+    await pushLiveMessages('10.0.0.1:5001', [{ id: 1, direction: 'recv', service_type: 'getDataValues', message: '{}' }]);
+    await pushLiveActions('10.0.0.1:5001', [{ id: 1, kind: 'acsi', message: 'Server readvalue', detail: { objRef: 'LD0/LLN0.Mod.stVal' } }]);
+
+    expect(kinds(container).sort()).toEqual(['acsi', 'websocket']);
+    expect(screen.getByText('Server readvalue')).toBeInTheDocument();
+  });
+
+  it('catches up on the actions log too, keeping only its ACSI entries', async () => {
+    isConnected.mockReturnValue(true);
+    executeApiCall.mockImplementation(async (apiId) => {
+      if (apiId === 'actions-logs') {
+        return {
+          ok: true,
+          payload: {
+            actions: [
+              { id: 1, kind: 'system', time: '10:00:00', message: 'Server listening' },
+              { id: 2, kind: 'acsi', time: '10:00:01', message: 'Server writevalue' },
+            ],
+          },
+        };
+      }
+      return emptyMessagesResponse;
+    });
+    render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+
+    await startMonitoring();
+
+    expect(await screen.findByText('Server writevalue')).toBeInTheDocument();
+    expect(screen.queryByText('Server listening')).not.toBeInTheDocument();
+  });
+
+  it('filters to one kind', async () => {
+    isConnected.mockReturnValue(true);
+    const { container } = render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+    await startMonitoring();
+    await pushLiveMessages('10.0.0.1:5001', [{ id: 1, direction: 'recv', message: '{}' }]);
+    await pushLiveActions('10.0.0.1:5001', [{ id: 1, kind: 'acsi', message: 'Server readvalue' }]);
+
+    const user = userEvent.setup({ delay: null });
+    await user.selectOptions(screen.getByTitle('Filter by kind'), 'acsi');
+
+    expect(kinds(container)).toEqual(['acsi']);
+
+    await user.selectOptions(screen.getByTitle('Filter by kind'), 'websocket');
+
+    expect(kinds(container)).toEqual(['websocket']);
+  });
+
+  it('does not bring cleared ACSI entries back on the next catch-up', async () => {
+    isConnected.mockReturnValue(true);
+    executeApiCall.mockImplementation(async (apiId) => {
+      if (apiId === 'actions-logs') {
+        return { ok: true, payload: { actions: [{ id: 7, kind: 'acsi', message: 'Server readvalue' }] } };
+      }
+      return { ok: true, payload: { messages: [] } };
+    });
+    render(<MessageMonitor endpoints={[endpoint]} defaultInterval={10000} />);
+    await startMonitoring();
+    expect(await screen.findByText('Server readvalue')).toBeInTheDocument();
+
+    const user = userEvent.setup({ delay: null });
+    await user.click(screen.getByTitle('Clear Messages'));
+    expect(screen.queryByText('Server readvalue')).not.toBeInTheDocument();
+
+    await flipConnectionState(true); // reconnect -> catch-up fetch
+
+    expect(screen.queryByText('Server readvalue')).not.toBeInTheDocument();
+  });
+});
+

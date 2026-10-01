@@ -2966,6 +2966,7 @@ def create_bff_router(
 
                 rti_fsp._log_action(
                     "Server readvalue",
+                    service="getDataValues",
                     detail={
                         "objRef": obj_ref,
                         "fc": fc,
@@ -3089,6 +3090,19 @@ def create_bff_router(
 
             try:
                 result = rti_fsp.write_value(obj_ref, value, data_type)
+                # Success counterpart of "Server readvalue" - without it a
+                # local write only ever showed up in the log if it failed.
+                rti_fsp._log_action(
+                    "Server writevalue",
+                    detail={
+                        "objRef": obj_ref,
+                        "fc": fc,
+                        "value": result.get("value"),
+                        "dataType": result.get("dataType"),
+                    },
+                    kind="acsi",
+                    service="setDataValues",
+                )
 
                 if _use_io_plugin:
                     try:
