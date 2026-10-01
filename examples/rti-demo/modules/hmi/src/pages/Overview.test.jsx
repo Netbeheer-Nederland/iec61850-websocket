@@ -6,12 +6,7 @@ import Overview from './Overview';
 const renderOverview = (connections = []) =>
   render(
     <MemoryRouter>
-      <Overview
-        settings={{ bffHost: 'localhost', bffPort: '5000' }}
-        connections={connections}
-        loading={false}
-        onReload={() => {}}
-      />
+      <Overview connections={connections} loading={false} />
     </MemoryRouter>
   );
 

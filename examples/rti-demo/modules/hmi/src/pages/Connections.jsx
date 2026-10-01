@@ -21,7 +21,7 @@ import React, { useState, useMemo } from 'react';
 import ConnectionModal from '../components/ConnectionModal';
 
 // All instance CRUD (register/edit/delete) lives here now - Overview only
-// ever reads `connections` to render its graphic/status table. Saves go
+// ever reads `connections` to render its graphic. Saves go
 // straight to the BFF (add-connection/edit-connection/delete-connection),
 // same as the old combined Setup page used to, then `onReload()` refetches
 // the shared `connections` list App.jsx passes to every page.
@@ -94,10 +94,6 @@ function Connections({ settings, connections = [], loading = false, onReload }) 
       {label}{sortIcon(key)}
     </th>
   );
-
-  const handleRefresh = () => {
-    onReload?.();
-  };
 
   // Add connection
   const handleAddConnection = () => {
@@ -231,11 +227,6 @@ function Connections({ settings, connections = [], loading = false, onReload }) 
         <button className="btn-primary" id="btn-add-connection" onClick={handleAddConnection}>
           <i className="fas fa-plus"></i>
           Register Instance
-        </button>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
-        <button className="btn-icon" id="refresh-cons-btn" title="Refresh" onClick={handleRefresh} disabled={loading}>
-          <i className={`fas fa-sync-alt${loading ? ' fa-spin' : ''}`}></i>
         </button>
       </div>
       <div style={{ marginBottom: '24px', padding: '16px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>

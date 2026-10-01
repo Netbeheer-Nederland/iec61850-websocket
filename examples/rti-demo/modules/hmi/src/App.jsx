@@ -33,7 +33,7 @@ import Overview from './pages/Overview';
 import ACSIClient from './pages/ACSIClient';
 import ACSIServer from './pages/ACSIServer';
 import { executeApiCall, buildTargetValue } from './services/apiService';
-import { connect as connectLiveSocket, reconnect as reconnectLiveSocket, subscribe as subscribeLive } from './services/liveSocket';
+import { connect as connectLiveSocket, reconnect as reconnectLiveSocket, subscribe as subscribeLive, onConnectionStateChange as onLiveSocketStateChange } from './services/liveSocket';
 
 function App() {
   const [bffStatus, setBffStatus] = useState({
@@ -184,9 +184,9 @@ function App() {
 
   // Live updates: the BFF pushes connection changes over /ws (see
   // push_relay_loop in bff/bff_server.py) instead of every tab polling
-  // /api/connections on its own 1s timer. Falls back to nothing if the
-  // socket is down - fetchConnections() above still covers first paint, and
-  // onReload (passed to pages below) still works as a manual refresh.
+  // /api/connections on its own 1s timer. fetchConnections() above covers
+  // first paint; the BFF only pushes on change, so anything that changed
+  // while the socket was down is picked up by the refetch-on-reconnect below.
   useEffect(() => {
     connectLiveSocket();
     const unsubscribe = subscribeLive('connections', (msg) => {
@@ -200,6 +200,15 @@ function App() {
     });
     return unsubscribe;
   }, []);
+
+  // The BFF's push loop only broadcasts when the connections list changes
+  // and sends nothing to a newly (re)connected socket, so a change that
+  // happened while the socket was down (e.g. a BFF restart) would otherwise
+  // stay invisible until the next one. Refetch on every (re)connect instead -
+  // this is what makes a manual refresh button unnecessary.
+  useEffect(() => onLiveSocketStateChange((connected) => {
+    if (connected) fetchConnections({ background: true });
+  }), [fetchConnections]);
 
   // Reconnect the live socket when the BFF host/port changes (not on the
   // initial mount, which already connects above), so it points at the right
@@ -295,10 +304,10 @@ function App() {
           <Header bffStatus={bffStatus} />
           <Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
-            <Route path="/overview" element={<Overview settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections}/>} />
+            <Route path="/overview" element={<Overview connections={connections} loading={connectionsLoading} />} />
             <Route path="/connections" element={<Connections settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections} />} />
             <Route path="/model" element={<Model settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections} updateModel={updateModel} getModel={getModel} />} />
-            <Route path="/traffic" element={<Traffic settings={settings} connections={connections} loading={connectionsLoading} onReload={fetchConnections} updateModel={updateModel} getModel={getModel} />} />
+            <Route path="/traffic" element={<Traffic settings={settings} connections={connections} loading={connectionsLoading} updateModel={updateModel} getModel={getModel} />} />
             <Route path="/data" element={<Data />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/diagnostics" element={<Diagnostics />} />

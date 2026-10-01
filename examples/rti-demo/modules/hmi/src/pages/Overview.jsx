@@ -26,31 +26,7 @@ import InstanceVisualization from '../components/InstanceVisualization';
 // ConnectionModal, useNavigate (InstanceVisualization does its own
 // navigation for the FSP/SO circle clicks), or any of the add/edit/delete
 // plumbing the old combined Setup page used to carry.
-function Overview({ settings, connections = [], loading = false, onReload }) {
-  // Check all connections health using BFF endpoint
-  const checkAllConnectionsHealth = async (connectionsList) => {
-    try {
-      const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/health`);
-      const data = await response.json();
-
-      await onReload?.();
-    } catch (error) {
-      console.error('Failed to check connections:', error);
-    }
-  };
-
-  // Check all connections
-  const handleCheckAllConnections = async () => {
-    try {
-      const connList = (await onReload?.()) || [];
-      if (connList.length > 0) {
-        await checkAllConnectionsHealth(connList);
-      }
-    } catch (error) {
-      console.error('Failed to refresh connections:', error);
-    }
-  };
-
+function Overview({ connections = [], loading = false }) {
   return (
     <section className="page">
       <div className="page-header" style={{ marginBottom: '20px' }}>
@@ -70,9 +46,7 @@ function Overview({ settings, connections = [], loading = false, onReload }) {
             <InstanceVisualization
               connections={connections}
               loading={loading}
-              onReload={handleCheckAllConnections}
               onConnectionClick={null}
-              showReload={true}
             />
           )}
         </div>

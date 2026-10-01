@@ -75,3 +75,11 @@ describe('InstanceVisualization - SO circle reflects connected FSP count', () =>
     expect(screen.queryByTitle(/Type: RTI-SO/)).not.toBeInTheDocument();
   });
 });
+
+describe('InstanceVisualization - no manual refresh', () => {
+  it('has no Refresh Instances button (connections arrive via the live push)', () => {
+    renderViz([SO]);
+
+    expect(screen.queryByTitle('Refresh Instances')).not.toBeInTheDocument();
+  });
+});

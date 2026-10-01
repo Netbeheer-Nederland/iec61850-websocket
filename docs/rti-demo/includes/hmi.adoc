@@ -40,7 +40,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * Visual instance visualization (InstanceVisualization) showing SO, FSP, and their connections
 * SO circle turns green and shows a live badge counting its connected FSPs (connectedFsps > 0)
 * No instance table - when nothing is registered, an empty-state hint points to the Connections page
-* Auto-checks all connection health on page load
+* Updates live from the BFF's connections push - no manual refresh button
 * Default route (redirects from `/`)
 
 ==== ACSI Client (`/acsi-client`)
@@ -87,7 +87,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * Delete instances (with confirmation)
 * Connection type selection (RTI-SO, RTI-FSP, IDP-Server, Custom)
 * ACSI role / WebSocket mode fixed automatically by type (Custom stays editable)
-* Refresh connections list
+* List updates live from the BFF's connections push - no manual refresh button
 * Saves go straight to the BFF (POST /api/add-connection, PUT /api/edit-connection/:name, DELETE /api/delete-connection/:name) - not just local/localStorage state
 
 ==== Model (`/model`)
@@ -101,7 +101,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * SCL file upload for model generation
 * Model persistence and retrieval
 * Tree expansion state management
-* Visual instance connection graph
+* Visual instance connection graph, updated live from the BFF's connections push (no manual refresh button)
 * Model upload status tracking
 
 ==== Traffic (`/traffic`)
@@ -116,7 +116,7 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 * Real-time message monitoring, newest-first by default with a toggle for oldest-first (same control as the Monitoring panels' Protocol Messages list)
 * FSP message monitors only shown for FSPs with an active connection (connectedClients > 0), same threshold used to light up the instance visualization above
 * Connection health monitoring
-* Connection reload functionality
+* Instance visualization updates live from the BFF's connections push - no manual refresh button
 
 ==== Data (`/data`)
 **File**: Data.jsx (3KB)
@@ -288,6 +288,7 @@ npm run build
 * BFF host and port configurable via Settings page
 * All configuration persisted in browser localStorage
 * Connection management centralized and shared across all pages
+* Connections list is live: App.jsx fetches `/api/connections` once for first paint, then applies the BFF's `connections` pushes over `/ws` (sent only when the list changes, checked every 2s). It refetches whenever that socket (re)connects, so changes missed while it was down still show up - no page has a manual refresh button for connections
 * API endpoints defined in apiService.js, executed through /api/execute BFF endpoint
 
 === API Dependencies

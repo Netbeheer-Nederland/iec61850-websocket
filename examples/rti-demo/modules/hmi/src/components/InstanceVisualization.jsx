@@ -26,8 +26,6 @@ import { useNavigate } from 'react-router-dom';
  * @param {Object[]} connections - Array of connection objects
  * @param {Object|null} selectedConnection - Currently selected connection (for highlighting)
  * @param {Function|null} onConnectionClick - Click handler for connection items
- * @param {Function|null} onReload - Click handler for reload button
- * @param {boolean} showReload - Whether to show reload button
  * @param {boolean} showLabels - Whether to show type labels
  * @param {boolean} loading - Whether data is currently loading
  */
@@ -35,8 +33,6 @@ function InstanceVisualization({
   connections,
   selectedConnection = null,
   onConnectionClick = null,
-  onReload = null,
-  showReload = true,
   showLabels = true,
   loading = false
 }) {
@@ -68,18 +64,6 @@ function InstanceVisualization({
 
   return (
     <div style={{ marginBottom: '40px', position: 'relative' }}>
-      {showReload && onReload && (
-        <div style={{ position: 'absolute', top: '0', right: '0' }}>
-          <button
-            className="btn-icon"
-            onClick={onReload}
-            title="Refresh Instances"
-            disabled={loading}
-          >
-            <i className="fas fa-sync-alt"></i>
-          </button>
-        </div>
-      )}
       {loading ? (
         <div className="endpoints-loading">
           <span className="spinner"></span>

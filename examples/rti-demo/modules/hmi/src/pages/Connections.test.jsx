@@ -19,6 +19,14 @@ beforeEach(() => {
   global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
 });
 
+describe('Connections page - no manual refresh', () => {
+  it('has no Refresh button (connections arrive via the live push)', () => {
+    renderConnections();
+
+    expect(screen.queryByTitle('Refresh')).not.toBeInTheDocument();
+  });
+});
+
 describe('Connections page - Register/Edit Instance modal', () => {
   it('shows WS Port (and BFF Port) for a new RTI-SO instance', async () => {
     renderConnections();

@@ -288,10 +288,8 @@ function Model({ settings, connections = [], loading = false, onReload }) {
             connections={connections}
             selectedConnection={selectedConnection}
             loading={loading}
-            onReload={onReload}
             onConnectionClick={handleConnectionClick}
             showLabels={true}
-            showReload={true}
           />
         )}
       </div>

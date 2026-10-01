@@ -22,7 +22,7 @@ import InstanceVisualization from '../components/InstanceVisualization';
 import MessageMonitor from '../components/MessageMonitor';
 import DataAccessPanel from '../components/DataAccessPanel';
 
-function Traffic({ settings, getModel, updateModel, connections = [], loading = false, onReload }) {
+function Traffic({ settings, getModel, updateModel, connections = [], loading = false }) {
 
   const [monitorsExpanded, setMonitorsExpanded] = useState(true);
   const [panelsExpanded, setPanelsExpanded] = useState(true);
@@ -40,10 +40,8 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
           connections={connections}
           selectedConnection={null}
           loading={loading}
-          onReload={onReload}
           onConnectionClick={null}
           showLabels={true}
-          showReload={true}
         />
       </div>
       
