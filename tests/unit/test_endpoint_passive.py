@@ -74,6 +74,22 @@ class TestPassiveEndpointRegistration:
         server.install_recv_msg_callback.assert_called_once_with(ep.recv_msg_callback)
 
 
+class TestPassiveEndpointIncomingConnection:
+    async def test_process_request_client_gets_send_callback(self):
+        """A client created for an incoming connection logs what it sends."""
+        ep = PassiveEndpoint()
+        ep.send_msg_callback = MagicMock()
+        connection = MagicMock()
+        connection.request.path = "/cp1"
+        request = MagicMock()
+        request.headers = {}
+
+        assert await ep.process_request(connection, request) is None
+
+        client = next(c for c in ep.client_list if c.cp == "cp1")
+        assert client.send_msg_callback is ep.send_msg_callback
+
+
 class TestPassiveEndpointWebSocketInfoLookup:
     def test_get_websocket_info_returns_none_when_empty(self):
         ep = PassiveEndpoint()
