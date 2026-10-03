@@ -20,7 +20,8 @@
 import { executeApiCall } from '../services/apiService';
 
 // Demo actions: SO service calls pinned from a Data Access Panel (an SO
-// endpoint, one of its cps, a data object, a service) and replayed as
+// endpoint, one of its cps, a data object, a service) - or, for
+// "enable-report", from the ACSI Client page's RCB dialog - and replayed as
 // one-click buttons on Traffic's demo bar. An action belongs to the FSP
 // behind its cp; actions on different FSPs that share a label run together
 // from "All FSPs" - the FSPs' models differ, so each FSP keeps its own
@@ -30,7 +31,14 @@ import { executeApiCall } from '../services/apiService';
 // the pins are a convenience, not shared state.
 
 export const STORAGE_KEY = 'traffic-demo-actions';
-export const SERVICES = ['read', 'write', 'operate'];
+export const SERVICES = ['read', 'write', 'operate', 'enable-report'];
+
+// The optFlds / trgOp a SetBRCBValues / SetURCBValues carries - the SO
+// fills any it isn't sent with its own defaults, so all are always sent
+// (missing ones false, as BrcbConfigModal does).
+const OPT_FLDS_KEYS = ['seqNum', 'timeStamp', 'dataSet', 'reasonCode', 'dataRef', 'bufOvfl', 'entryID', 'configRef'];
+const TRG_OP_KEYS = ['dchg', 'qchg', 'dupd', 'integrity', 'gi'];
+const flags = (keys, values = {}) => Object.fromEntries(keys.map((k) => [k, Boolean(values?.[k])]));
 
 /**
  * The ctlVal and value_type the SO's /api/operate wants for a DO of `cdc`,
@@ -117,10 +125,53 @@ export function buildRequest(action) {
   throw new Error(`Unknown service ${service}`);
 }
 
+const errorOf = (result, fallback) => {
+  const payload = result?.payload;
+  const message = payload?.result?.error || payload?.error || payload?.detail || result?.rawText || fallback;
+  return typeof message === 'string' ? message : JSON.stringify(message);
+};
+
+/**
+ * Enable a report control block: read it, then write its own configuration
+ * back with rptEna set - the SO resets every field a write leaves out, so
+ * a bare { rptEna: true } would wipe its data set. An RCB that is already
+ * enabled is left alone (a server may refuse a rewrite while enabled).
+ */
+async function enableReport({ soTarget, objRef, cp, rcbType }) {
+  const urcb = String(rcbType || '').toUpperCase() === 'URCB';
+  const read = await executeApiCall(urcb ? 'urcb-read' : 'brcb-read', soTarget, { objRef, cp });
+  const current = read?.payload?.result?.value;
+  if (!read?.ok || !current || typeof current !== 'object') {
+    // A serviceError comes back as its name in place of the values.
+    const message = read?.ok && typeof current === 'string' ? current : errorOf(read, 'Could not read the report control block');
+    return { ok: false, message };
+  }
+  if (current.rptEna === true) return { ok: true, message: 'already enabled' };
+
+  const write = await executeApiCall(urcb ? 'urcb-write' : 'brcb-write', soTarget, {
+    objRef,
+    data: {
+      ref: objRef,
+      dataSet: current.dataSet || '',
+      intgPd: parseInt(current.intgPd, 10) || 0,
+      rptEna: true,
+      optFlds: flags(OPT_FLDS_KEYS, current.optFlds),
+      trgOp: flags(TRG_OP_KEYS, current.trgOp),
+    },
+    cp,
+  });
+  // The SO answers ok with the server's result as value (the BFF wraps that
+  // answer in `result`): true, or the serviceError's name.
+  const value = write?.payload?.result?.value;
+  if (write?.ok && value === true) return { ok: true, message: 'ok' };
+  return { ok: false, message: write?.ok && typeof value === 'string' ? value : errorOf(write, 'Enabling the report failed') };
+}
+
 /**
  * Run an action on its SO. Resolves to { ok, message } - never throws.
  */
 export async function runAction(action) {
+  if (action.service === 'enable-report') return enableReport(action);
   let request;
   try {
     request = buildRequest(action);

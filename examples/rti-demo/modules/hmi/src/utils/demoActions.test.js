@@ -113,3 +113,74 @@ describe('loadActions / saveActions', () => {
     expect(loadActions()).toEqual([]);
   });
 });
+
+describe('runAction - enable-report', () => {
+  const rcb = { ...base, service: 'enable-report', objRef: 'LD0/LLN0.rcbActualValues', rcbType: 'BRCB' };
+  const readResult = (value) => ({ ok: true, payload: { result: { ok: true, value } } });
+  const config = {
+    dataSet: 'LD0/LLN0.DataSetActualValues', intgPd: 1000, rptEna: false,
+    optFlds: { seqNum: true, timeStamp: true }, trgOp: { dchg: true, integrity: true },
+  };
+
+  beforeEach(() => executeApiCall.mockReset());
+
+  it("reads the RCB and writes its own configuration back with rptEna on", async () => {
+    executeApiCall
+      .mockResolvedValueOnce(readResult(config))
+      .mockResolvedValueOnce({ ok: true, payload: { result: { ok: true, success: true, value: true } } });
+
+    await expect(runAction(rcb)).resolves.toEqual({ ok: true, message: 'ok' });
+    expect(executeApiCall).toHaveBeenNthCalledWith(1, 'brcb-read', 'so:5002', { objRef: rcb.objRef, cp: 'cp1' });
+    expect(executeApiCall).toHaveBeenNthCalledWith(2, 'brcb-write', 'so:5002', {
+      objRef: rcb.objRef,
+      cp: 'cp1',
+      data: {
+        ref: rcb.objRef,
+        dataSet: 'LD0/LLN0.DataSetActualValues',
+        intgPd: 1000,
+        rptEna: true,
+        optFlds: { seqNum: true, timeStamp: true, dataSet: false, reasonCode: false, dataRef: false, bufOvfl: false, entryID: false, configRef: false },
+        trgOp: { dchg: true, qchg: false, dupd: false, integrity: true, gi: false },
+      },
+    });
+  });
+
+  it('uses the URCB services for an unbuffered RCB', async () => {
+    executeApiCall
+      .mockResolvedValueOnce(readResult(config))
+      .mockResolvedValueOnce({ ok: true, payload: { result: { value: true } } });
+
+    await runAction({ ...rcb, rcbType: 'URCB' });
+    expect(executeApiCall.mock.calls.map((c) => c[0])).toEqual(['urcb-read', 'urcb-write']);
+  });
+
+  it('leaves an RCB that is already enabled alone', async () => {
+    executeApiCall.mockResolvedValueOnce(readResult({ ...config, rptEna: true }));
+
+    await expect(runAction(rcb)).resolves.toEqual({ ok: true, message: 'already enabled' });
+    expect(executeApiCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports the server's serviceError from the read or the write", async () => {
+    executeApiCall.mockResolvedValueOnce(readResult('instance-not-available'));
+    await expect(runAction(rcb)).resolves.toEqual({ ok: false, message: 'instance-not-available' });
+
+    executeApiCall
+      .mockResolvedValueOnce(readResult(config))
+      .mockResolvedValueOnce({ ok: true, payload: { result: { value: 'parameter-value-inconsistent' } } });
+    await expect(runAction(rcb)).resolves.toEqual({ ok: false, message: 'parameter-value-inconsistent' });
+  });
+
+  it('fails without writing when the read fails', async () => {
+    executeApiCall.mockResolvedValueOnce({ ok: false, payload: { result: { error: 'Client is not connected' } } });
+
+    await expect(runAction(rcb)).resolves.toEqual({ ok: false, message: 'Client is not connected' });
+    expect(executeApiCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('is a valid stored action', () => {
+    localStorage.clear();
+    saveActions([rcb]);
+    expect(loadActions()).toEqual([rcb]);
+  });
+});

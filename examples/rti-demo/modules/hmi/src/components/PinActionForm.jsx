@@ -22,27 +22,30 @@ import { controlValue } from '../utils/demoActions';
 import { useDemoActions } from '../hooks/useDemoActions';
 import { buildTargetValue } from '../services/apiService';
 
-const SERVICE_LABELS = { read: 'Read', write: 'Write', operate: 'Operate' };
+const SERVICE_LABELS = { read: 'Read', write: 'Write', operate: 'Operate', 'enable-report': 'Enable report' };
 const shortRef = (ref) => String(ref || '').split('/').pop();
 
 /**
- * "Pin as demo action" for a Data Access Panel on an SO endpoint: saves the
- * current selection as a one-click button on Traffic's demo bar, under the
- * FSP behind `cp`. See utils/demoActions.js.
+ * "Pin as demo action" for a Data Access Panel on an SO endpoint (or the
+ * ACSI Client page's RCB dialog): saves the current selection as a
+ * one-click button on Traffic's demo bar, under the FSP behind `cp`. See
+ * utils/demoActions.js.
  *
  * @param {Object} so - the selected RTI-SO connection (with fspLinks)
  * @param {string} cp - the cp the panel is using
  * @param {Object|null} read - { objRef, fc, valueType } of a selected DA, else null
  * @param {boolean} canWrite - whether that DA's FC is writable (CF/SP)
  * @param {Object|null} operate - { objRef, cdc } of a selected controllable DO, else null
+ * @param {Object|null} report - { objRef, rcbType } of a report control block, else null
  * @param {string} defaultValue - the panel's current write value
  */
-function PinActionForm({ so, cp, read = null, canWrite = false, operate = null, defaultValue = '' }) {
+function PinActionForm({ so, cp, read = null, canWrite = false, operate = null, report = null, defaultValue = '' }) {
   const { addAction } = useDemoActions();
   const services = [
     ...(read ? ['read'] : []),
     ...(read && canWrite ? ['write'] : []),
     ...(operate ? ['operate'] : []),
+    ...(report ? ['enable-report'] : []),
   ];
   const [open, setOpen] = useState(false);
   const [service, setService] = useState(null);
@@ -55,7 +58,8 @@ function PinActionForm({ so, cp, read = null, canWrite = false, operate = null, 
 
   const fspName = (so.fspLinks || []).find((l) => l.cp === cp)?.fsp || null;
   const active = services.includes(service) ? service : services[0];
-  const target = active === 'operate' ? operate : read;
+  const target = { operate, 'enable-report': report }[active] || read;
+  const takesValue = active === 'write' || active === 'operate';
 
   const openForm = () => {
     setService(services[0]);
@@ -88,10 +92,11 @@ function PinActionForm({ so, cp, read = null, canWrite = false, operate = null, 
       cp,
       fspName,
       objRef: target.objRef,
-      fc: active === 'operate' ? undefined : read.fc,
+      fc: active === 'read' || active === 'write' ? read.fc : undefined,
       valueType: active === 'write' ? read.valueType || undefined : undefined,
       cdc: active === 'operate' ? operate.cdc : undefined,
-      value: active === 'read' ? undefined : value,
+      rcbType: active === 'enable-report' ? report.rcbType : undefined,
+      value: takesValue ? value : undefined,
     });
     setPinned(`Pinned "${name}" for ${fspName || cp}`);
     setOpen(false);
@@ -112,7 +117,7 @@ function PinActionForm({ so, cp, read = null, canWrite = false, operate = null, 
     <div className="pin-action-form" style={{ border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
       <div style={{ color: 'var(--text-secondary)' }}>
         Demo action for <strong>{fspName || `cp ${cp}`}</strong> via {so.name}
-        {!fspName && <span style={{ color: 'var(--warning-color)' }}> - no registered FSP reports {cp}</span>}
+        {!fspName && Array.isArray(so.fspLinks) && <span style={{ color: 'var(--warning-color)' }}> - no registered FSP reports {cp}</span>}
       </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -129,7 +134,7 @@ function PinActionForm({ so, cp, read = null, canWrite = false, operate = null, 
             placeholder={`${SERVICE_LABELS[active]} ${shortRef(target.objRef)}`}
           />
         </label>
-        {active !== 'read' && (
+        {takesValue && (
           <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '120px' }}>
             Value
             <input value={value} onChange={(e) => { setValue(e.target.value); setError(null); }} />
@@ -137,7 +142,10 @@ function PinActionForm({ so, cp, read = null, canWrite = false, operate = null, 
         )}
       </div>
       <div style={{ fontFamily: 'Consolas, "Courier New", monospace', color: 'var(--text-muted)' }}>
-        {target.objRef}{active !== 'operate' && read.fc ? ` [${read.fc.toUpperCase()}]` : ''}{active === 'operate' ? ` (${operate.cdc})` : ''}
+        {target.objRef}
+        {(active === 'read' || active === 'write') && read.fc ? ` [${read.fc.toUpperCase()}]` : ''}
+        {active === 'operate' ? ` (${operate.cdc})` : ''}
+        {active === 'enable-report' ? ` (${report.rcbType || 'BRCB'} - its current configuration, with reporting on)` : ''}
       </div>
       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
         Give actions on other FSPs the same label to run them together with "All FSPs".

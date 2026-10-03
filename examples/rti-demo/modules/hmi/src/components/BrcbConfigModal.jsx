@@ -20,6 +20,7 @@
 // src/components/BrcbConfigModal.jsx
 import React, { useState, useEffect } from 'react';
 import { executeApiCall } from '../services/apiService';
+import PinActionForm from './PinActionForm';
 
 // Default options for optFlds and trgOp checkboxes
 const OPT_FLDS_OPTIONS = [
@@ -48,6 +49,9 @@ const BrcbConfigModal = ({
   cp,
   onClose,
   onSuccess,
+  // The SO's live, enriched connection (its fspLinks name the FSP behind
+  // cp) for "Pin as demo action"; falls back to `endpoint`.
+  pinSo = null,
 }) => {
   const [dataSet, setDataSet] = useState('');
   const [intgPd, setIntgPd] = useState(2000);
@@ -390,6 +394,11 @@ const BrcbConfigModal = ({
           >
             {result.message}
           </div>
+        )}
+
+        {/* Pin "enable this RCB" as a one-click button on Traffic's demo bar */}
+        {!isLoading && (
+          <PinActionForm so={pinSo || endpoint} cp={cp} report={{ objRef, rcbType }} />
         )}
 
         {/* Footer */}

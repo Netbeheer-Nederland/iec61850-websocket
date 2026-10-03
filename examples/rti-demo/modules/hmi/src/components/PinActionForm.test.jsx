@@ -83,4 +83,26 @@ describe('PinActionForm', () => {
     fireEvent.click(screen.getByText('Pin as demo action'));
     expect(screen.getByText(/no registered FSP reports cp7/)).toBeInTheDocument();
   });
+
+  it('pins an Enable report for an RCB, without a value', () => {
+    render(<PinActionForm so={so} cp="cp1" report={{ objRef: 'LD0/LLN0.rcbActualValues', rcbType: 'URCB' }} />);
+    fireEvent.click(screen.getByText('Pin as demo action'));
+
+    expect(screen.queryByLabelText('Value')).not.toBeInTheDocument();
+    expect(screen.getByText(/URCB - its current configuration, with reporting on/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Pin'));
+
+    expect(loadActions()).toEqual([expect.objectContaining({
+      label: 'Enable report LLN0.rcbActualValues', service: 'enable-report', rcbType: 'URCB',
+      objRef: 'LD0/LLN0.rcbActualValues', cp: 'cp1', fspName: 'FSP_North',
+    })]);
+    expect(loadActions()[0]).not.toHaveProperty('value');
+  });
+
+  it("doesn't warn about the cp when the SO's links aren't known", () => {
+    const { fspLinks, ...bare } = so;
+    render(<PinActionForm so={bare} cp="cp1" report={{ objRef: 'LD0/LLN0.rcb', rcbType: 'BRCB' }} />);
+    fireEvent.click(screen.getByText('Pin as demo action'));
+    expect(screen.queryByText(/no registered FSP/)).not.toBeInTheDocument();
+  });
 });

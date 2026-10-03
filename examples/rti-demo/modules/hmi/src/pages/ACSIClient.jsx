@@ -1235,6 +1235,7 @@ const getContextMenuItems = () => {
           rcbType={brcbConfigTarget.rcbType}
           endpoint={brcbConfigTarget.endpoint || contextMenuTarget?.endpoint || endpoint}
           cp={brcbConfigTarget.cp || contextMenuTarget?.cp || wsCp}
+          pinSo={propConnections.find((c) => c.type === 'RTI-SO' && c.host === endpoint?.host && String(c.port) === String(endpoint?.port))}
           onClose={() => {
             setShowBrcbConfigModal(false);
             setBrcbConfigTarget({ ref: '', rcbType: '', endpoint: null, cp: null });
