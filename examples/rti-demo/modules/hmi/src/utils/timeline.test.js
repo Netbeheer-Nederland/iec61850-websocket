@@ -127,3 +127,23 @@ describe('unwrapList', () => {
     expect(unwrapList(null, 'messages')).toEqual([]);
   });
 });
+
+describe('buildTimeline - link events', () => {
+  it("adds a row per FSP link change, on the FSP's SO, by the HMI's clock", () => {
+    const at = new Date(2026, 9, 3, 12, 0, 4, 500).getTime();
+    const rows = buildTimeline({
+      sos: [so],
+      fsps: [fsp1],
+      stores: {},
+      linkEvents: [
+        { fsp: 'FSP01', from: 'up', to: 'link-down', at, downMs: null },
+        { fsp: 'FSP01', from: 'link-down', to: 'up', at: at + 42000, downMs: 42000 },
+      ],
+    });
+
+    expect(rows.map((r) => [r.type, r.so, r.fsp, r.cp, r.up, r.state, r.time, r.downMs])).toEqual([
+      ['link', 'SO', 'FSP01', 'cp1', false, 'link-down', '12:00:04.500', null],
+      ['link', 'SO', 'FSP01', 'cp1', true, 'up', '12:00:46.500', 42000],
+    ]);
+  });
+});

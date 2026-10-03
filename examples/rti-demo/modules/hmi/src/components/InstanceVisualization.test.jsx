@@ -143,3 +143,37 @@ describe('InstanceVisualization - live link activity (Traffic)', () => {
     expect(screen.getByTestId('fsp-row-FSP02').style.opacity).toBe('0.35');
   });
 });
+
+describe('InstanceVisualization - dropped FSPs (Traffic)', () => {
+  const FSP = (name, extra = {}) => ({
+    name, type: 'RTI-FSP', status: 'connected', host: `${name}-host`, port: 5001, connectedClients: 1, ...extra,
+  });
+  const presence = (byName) => ({ byName, events: [] });
+
+  it('leaves an unreachable FSP out without presence, as on Overview', () => {
+    renderViz([SO, FSP('FSP01', { status: 'disconnected' })]);
+    expect(screen.queryByText('FSP01')).not.toBeInTheDocument();
+  });
+
+  it('keeps a dropped FSP on the picture, marked down, with presence', () => {
+    render(
+      <MemoryRouter>
+        <InstanceVisualization
+          connections={[SO, FSP('FSP01', { status: 'disconnected' }), FSP('FSP02', { connectedClients: 0 }), FSP('FSP03')]}
+          activity={{}}
+          presence={presence({
+            FSP01: { state: 'unreachable', since: Date.now() - 42000, downs: 1 },
+            FSP02: { state: 'link-down', since: null, downs: 0 },
+            FSP03: { state: 'up', since: null, downs: 0 },
+          })}
+        />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('FSP01')).toBeInTheDocument();
+    expect(screen.getByTestId('link-down-label-FSP01').textContent).toMatch(/^unreachable \u00b7 4[2-3]s$/);
+    expect(screen.getByTestId('link-down-label-FSP02').textContent).toBe('link down');
+    expect(screen.getByTestId('link-down-FSP02')).toBeInTheDocument();
+    expect(screen.queryByTestId('link-down-FSP03')).not.toBeInTheDocument();
+  });
+});

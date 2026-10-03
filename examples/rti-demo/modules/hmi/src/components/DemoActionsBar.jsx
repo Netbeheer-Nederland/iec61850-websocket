@@ -21,6 +21,7 @@ import React, { useState, useCallback } from 'react';
 import { useDemoActions } from '../hooks/useDemoActions';
 import { runAction, groupByLabel } from '../utils/demoActions';
 import { buildTargetValue } from '../services/apiService';
+import DownBadge from './DownBadge';
 
 const SERVICE_ICONS = {
   read: 'fa-eye', write: 'fa-pen', operate: 'fa-bolt', 'enable-report': 'fa-flag', 'disable-report': 'fa-ban',
@@ -35,8 +36,9 @@ const SERVICE_ICONS = {
  *
  * @param {Object[]} connections - enriched connections (App.jsx)
  * @param {string|null} focusedFsp - only this FSP's row is shown
+ * @param {Object|null} presence - useFspPresence's result, to mark a dropped FSP's row
  */
-function DemoActionsBar({ connections = [], focusedFsp = null }) {
+function DemoActionsBar({ connections = [], focusedFsp = null, presence = null }) {
   const { actions, removeAction } = useDemoActions();
   // action id -> 'running' | { ok, message }
   const [results, setResults] = useState({});
@@ -131,6 +133,7 @@ function DemoActionsBar({ connections = [], focusedFsp = null }) {
           <span style={{ minWidth: '140px', fontWeight: 600 }}>
             {fsp}
             <span style={{ fontFamily: 'Consolas, "Courier New", monospace', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '6px' }}>{row.cp}</span>
+            <DownBadge state={presence?.byName[fsp]?.state} />
           </span>
           {row.actions.map((a) => {
             const live = isLive(a);

@@ -27,6 +27,8 @@
 //   report - a report an FSP sent (frame category "unconfirmed")
 //   local  - an ACSI entry an FSP served on its own (a read/write aimed
 //            straight at the FSP - no frames)
+//   link   - an FSP's link going down or coming back up (useFspPresence's
+//            events - timed by the HMI's clock, not an instance's)
 //
 // Rows are paired by those ids, never by clock: the SO and FSPs run on
 // different machines. Only their display order uses the instance's time.
@@ -39,6 +41,21 @@ export const unwrapList = (payload, key) => {
 };
 
 const frameTime = (f) => String(f?.time || f?.timestamp || '');
+
+const pad = (n, w = 2) => String(n).padStart(w, '0');
+/** The HMI's clock as "HH:MM:SS.mmm" - the instances' frame time shape. */
+export const clockTime = (ms) => {
+  const d = new Date(ms);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+};
+
+/** "42s", "3m 05s", "1h 02m". */
+export const formatDuration = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${pad(s % 60)}s`;
+  return `${Math.floor(s / 3600)}h ${pad(Math.floor((s % 3600) / 60))}m`;
+};
 
 // cp + invokeId -> the FSP frames of the most recent exchange with that
 // invokeId (from its last request on): invokeIds start over when an FSP
@@ -67,9 +84,10 @@ const fspForCp = (so, cp, fsps) => {
  * @param {Object[]} args.fsps - RTI-FSP connections (with accessPoints), each with a `target`
  * @param {Object<string, {frames: Object[], acsi: Object[]}>} args.stores - entries per target;
  *   each entry carries `_arrival`, the order the HMI received it in
+ * @param {Object[]} args.linkEvents - useFspPresence's events: { fsp, from, to, at, downMs }
  * @returns {Object[]} rows, oldest first
  */
-export function buildTimeline({ sos = [], fsps = [], stores = {} }) {
+export function buildTimeline({ sos = [], fsps = [], stores = {}, linkEvents = [] }) {
   const rows = [];
   const exchangesByFsp = {};
   fsps.forEach((f) => { exchangesByFsp[f.name] = indexFspExchanges(stores[f.target]?.frames || []); });
@@ -145,6 +163,24 @@ export function buildTimeline({ sos = [], fsps = [], stores = {} }) {
       fspFrames: [],
     }));
   });
+
+  linkEvents.forEach((e) => rows.push({
+    key: `link:${e.fsp}:${e.at}`,
+    type: 'link',
+    so: soOf(e.fsp),
+    fsp: e.fsp,
+    cp: fsps.find((f) => f.name === e.fsp)?.accessPoints?.[0] || '',
+    up: e.to === 'up',
+    state: e.to,
+    downMs: e.downMs,
+    service: '',
+    message: '',
+    level: e.to === 'up' ? 'info' : 'error',
+    time: clockTime(e.at),
+    arrival: 0,
+    soFrames: [],
+    fspFrames: [],
+  }));
 
   return rows.sort((a, b) => a.time.localeCompare(b.time) || a.arrival - b.arrival);
 }

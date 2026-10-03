@@ -18,15 +18,18 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { buildTimeline } from '../utils/timeline';
+import { buildTimeline, formatDuration } from '../utils/timeline';
+import DownBadge from './DownBadge';
 
 // Same colors as the topology's link pulses (InstanceVisualization).
 const TYPE_COLORS = {
   call: 'var(--primary-color)',
   report: 'var(--warning-color)',
   local: 'var(--text-secondary)',
+  link: 'var(--danger-color)',
 };
-const TYPE_LABELS = { call: 'Calls', report: 'Reports', local: 'Local' };
+const TYPE_LABELS = { call: 'Calls', report: 'Reports', local: 'Local', link: 'Links' };
+const DOWN_LABELS = { 'link-down': 'link down', unreachable: 'unreachable' };
 const UNKNOWN_LANE = '?';
 // Rows rendered at most (newest kept); the hook keeps more.
 const MAX_ROWS = 300;
@@ -101,13 +104,19 @@ function FrameList({ title, frames, emptyText }) {
  *   the report values table reads the same entries)
  * @param {string|null} focusedFsp - only this FSP's lane and rows are shown
  * @param {Function} onFocusFsp - called with an FSP name (or null) from a lane header
+ * @param {Object|null} presence - useFspPresence's result: a dropped FSP's lane is
+ *   marked down, and its link going down / back up are rows
  */
-function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null }) {
+function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null, presence = null }) {
   const { sos, fsps, stores, running, start, stop, clear } = timeline;
-  const [types, setTypes] = useState({ call: true, report: true, local: true });
+  const linkEvents = presence?.events;
+  const [types, setTypes] = useState({ call: true, report: true, local: true, link: true });
   const [expandedKey, setExpandedKey] = useState(null);
 
-  const allRows = useMemo(() => buildTimeline({ sos, fsps, stores }), [sos, fsps, stores]);
+  const allRows = useMemo(
+    () => buildTimeline({ sos, fsps, stores, linkEvents: linkEvents || [] }),
+    [sos, fsps, stores, linkEvents],
+  );
   const counts = useMemo(() => allRows.reduce((acc, r) => ({ ...acc, [r.type]: (acc[r.type] || 0) + 1 }), {}), [allRows]);
 
   const rows = useMemo(() => allRows
@@ -119,7 +128,12 @@ function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null }) {
   const fspLanes = focusedFsp ? fsps.filter((f) => f.name === focusedFsp) : fsps;
   const lanes = [
     ...sos.map((s) => ({ name: s.name, kind: 'so' })),
-    ...fspLanes.map((f) => ({ name: f.name, kind: 'fsp', cp: f.accessPoints?.[0] })),
+    ...fspLanes.map((f) => ({
+      name: f.name,
+      kind: 'fsp',
+      cp: f.accessPoints?.[0],
+      down: presence && presence.byName[f.name]?.state !== 'up' ? presence.byName[f.name]?.state : null,
+    })),
     ...(rows.some((r) => r.type === 'call' && !r.fsp) ? [{ name: UNKNOWN_LANE, kind: 'unknown' }] : []),
   ];
   const laneIndex = (name) => {
@@ -138,6 +152,20 @@ function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null }) {
         <div style={{ gridColumn: span(fspLane, fspLane), justifySelf: 'center', maxWidth: '100%', background: 'var(--bg-card)', position: 'relative', border: '1px dashed var(--border-color)', borderRadius: '4px', padding: '2px 6px', fontSize: '12px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }} title={row.message}>
           {row.service || 'local'} <span style={{ color }} title={title}>{mark}</span>
           <span style={{ color: 'var(--text-muted)', fontSize: '10px', marginLeft: '6px' }}>local</span>
+        </div>
+      );
+    }
+    if (row.type === 'link') {
+      const color = row.up ? 'var(--success-color)' : 'var(--danger-color)';
+      const text = row.up
+        ? `\u2713 link back up${row.downMs != null ? ` after ${formatDuration(row.downMs)}` : ''}`
+        : `\u2717 ${DOWN_LABELS[row.state] || 'down'}`;
+      return (
+        <div style={{ gridColumn: span(soLane, fspLane) }} data-testid={`timeline-link-${row.fsp}`}>
+          <div style={{ padding: '2px 0', marginLeft: `calc(100% / ${2 * (Math.abs(soLane - fspLane) + 1)})`, marginRight: `calc(100% / ${2 * (Math.abs(soLane - fspLane) + 1)})` }}>
+            <div style={{ textAlign: 'center', fontSize: '12px', fontWeight: 600, color }}>{text}</div>
+            <div style={{ height: '2px', background: row.up ? color : `repeating-linear-gradient(to right, ${color} 0, ${color} 6px, transparent 6px, transparent 12px)` }} />
+          </div>
         </div>
       );
     }
@@ -221,8 +249,9 @@ function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null }) {
             onClick={() => lane.kind === 'fsp' && onFocusFsp?.(focusedFsp === lane.name ? null : lane.name)}
             title={lane.kind === 'fsp' ? (focusedFsp === lane.name ? 'Show all FSPs' : `Only ${lane.name}`) : undefined}
           >
-            {lane.kind === 'unknown' ? 'No FSP' : lane.name}
+            <span style={{ color: lane.down ? 'var(--text-muted)' : undefined }}>{lane.kind === 'unknown' ? 'No FSP' : lane.name}</span>
             {lane.cp && <span style={{ ...MONO, fontWeight: 400, color: 'var(--text-muted)', marginLeft: '6px' }}>{lane.cp}</span>}
+            <DownBadge state={lane.down} />
           </div>
         ))}
 
@@ -257,6 +286,15 @@ function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null }) {
                   </div>
                 ) : row.type === 'report' ? (
                   <FrameList title={`${row.fsp} (FSP)`} frames={row.fspFrames} emptyText="" />
+                ) : row.type === 'link' ? (
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {row.up
+                      ? `${row.fsp}'s WebSocket to the SO is open again.`
+                      : row.state === 'unreachable'
+                        ? `The BFF can't reach ${row.fsp} any more.`
+                        : `${row.fsp} is reachable, but its WebSocket to the SO is closed.`}
+                    {' '}Seen by the BFF's connection checks, timed by this browser's clock.
+                  </div>
                 ) : (
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Served by the FSP itself - no frames.</div>
                 )}

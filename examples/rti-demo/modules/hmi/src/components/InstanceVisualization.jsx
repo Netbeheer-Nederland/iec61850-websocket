@@ -20,6 +20,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EMPTY_LINK } from '../hooks/useLinkActivity';
+import { fspStateOf, useNow } from '../hooks/useFspPresence';
+import { formatDuration } from '../utils/timeline';
+
+const DOWN_LABELS = { 'link-down': 'link down', unreachable: 'unreachable' };
 
 const PULSE_COLORS = {
   request: 'var(--primary-color)',
@@ -31,12 +35,14 @@ const PULSE_COLORS = {
  * The SO-FSP line with live activity (Traffic only): a dot travels along it
  * per frame batch - towards the FSP for a request, back for a response or
  * report - with the link's cp above and its counters / last service below.
- * Turns red while the last service failed.
+ * Turns red while the last service failed. A dropped link (`down`: the
+ * FSP's presence state and how long it has been so) is drawn red with an
+ * X, its counters kept.
  */
-function ActivityLink({ fspName, cp, link = EMPTY_LINK, detected }) {
+function ActivityLink({ fspName, cp, link = EMPTY_LINK, detected, down = null }) {
   const failed = link.last && !link.last.ok;
-  const lineColor = failed ? 'var(--danger-color)' : detected ? 'var(--success-color)' : 'var(--border-color)';
-  const pulse = link.pulse;
+  const lineColor = down || failed ? 'var(--danger-color)' : detected ? 'var(--success-color)' : 'var(--border-color)';
+  const pulse = down ? null : link.pulse;
   return (
     <div style={{ width: '200px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px' }}>
       <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'Consolas, "Courier New", monospace' }} title="Access point (cp) of this link">
@@ -55,8 +61,25 @@ function ActivityLink({ fspName, cp, link = EMPTY_LINK, detected }) {
             style={{ background: pulse.ok ? PULSE_COLORS[pulse.type] : 'var(--danger-color)' }}
           />
         )}
+        {down && (
+          <span
+            data-testid={`link-down-${fspName}`}
+            style={{
+              position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+              width: '20px', height: '20px', borderRadius: '50%', background: 'var(--danger-color)', color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700,
+            }}
+          >
+            {'\u2717'}
+          </span>
+        )}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', color: 'var(--text-secondary)' }} data-testid={`link-counters-${fspName}`}>
+      {down && (
+        <div style={{ textAlign: 'center', color: 'var(--danger-color)', fontWeight: 600 }} data-testid={`link-down-label-${fspName}`}>
+          {DOWN_LABELS[down.state]}{down.forMs != null ? ` \u00b7 ${formatDuration(down.forMs)}` : ''}
+        </div>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', color: 'var(--text-secondary)', opacity: down ? 0.5 : 1 }} data-testid={`link-counters-${fspName}`}>
         <span title="Requests (SO to FSP)" style={{ color: PULSE_COLORS.request }}>&rarr; {link.requests}</span>
         <span title="Responses (FSP to SO)" style={{ color: PULSE_COLORS.response }}>&larr; {link.responses}</span>
         <span title="Reports (FSP to SO)" style={{ color: PULSE_COLORS.report }}>&#9873; {link.reports}</span>
@@ -82,6 +105,8 @@ function ActivityLink({ fspName, cp, link = EMPTY_LINK, detected }) {
  * @param {string|null} focusedFsp - Name of the FSP whose link is focused; the others are dimmed
  * @param {Function|null} onSoSelect - Replaces the SO circle's navigation to ACSI Client
  * @param {Function|null} onFspSelect - Replaces an FSP circle's navigation to ACSI Server, called with the connection
+ * @param {Object|null} presence - useFspPresence's result; when given, FSPs that
+ *   dropped stay on the picture, marked down (Traffic)
  */
 function InstanceVisualization({
   connections,
@@ -92,7 +117,8 @@ function InstanceVisualization({
   activity = null,
   focusedFsp = null,
   onSoSelect = null,
-  onFspSelect = null
+  onFspSelect = null,
+  presence = null
 }) {
   const navigate = useNavigate();
 
@@ -111,7 +137,11 @@ function InstanceVisualization({
   };
 
   const soConnections = connections.filter(conn => conn.type === 'RTI-SO' && conn.status === 'connected');
-  const fspConnections = connections.filter(conn => conn.type === 'RTI-FSP' && conn.status === 'connected');
+  // With presence (Traffic) an FSP the BFF can't reach stays on the
+  // picture, marked down, instead of disappearing.
+  const fspConnections = connections.filter(conn => conn.type === 'RTI-FSP' && (presence || conn.status === 'connected'));
+  const stateOf = (conn) => presence?.byName[conn.name]?.state ?? fspStateOf(conn);
+  const now = useNow(Boolean(presence) && fspConnections.some((c) => stateOf(c) !== 'up'));
   const hasConnected = connections.filter(conn => conn.status === 'connected').length > 0;
 
   // SO side is considered "detected" if there's at least one connected SO.
@@ -212,6 +242,11 @@ function InstanceVisualization({
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '24px' }}>
             {fspConnections.map((conn) => {
               const fspDetected = (conn.connectedClients ?? 0) > 0;
+              const fspState = presence ? stateOf(conn) : null;
+              const since = presence?.byName[conn.name]?.since;
+              const down = fspState && fspState !== 'up'
+                ? { state: fspState, forMs: since != null ? now - since : null }
+                : null;
               const bothConnected = soDetected && fspDetected;
               const soFailed = !soDetected;
 
@@ -237,6 +272,7 @@ function InstanceVisualization({
                     <ActivityLink
                       fspName={conn.name}
                       cp={conn.accessPoints?.[0]}
+                      down={down}
                       link={activity[conn.name]}
                       detected={fspDetected}
                     />
@@ -259,13 +295,13 @@ function InstanceVisualization({
                       style={{
                         width: '120px',
                         height: '120px',
-                        border: '2px solid var(--border-color)',
+                        border: down ? '2px dashed var(--danger-color)' : '2px solid var(--border-color)',
                         borderRadius: '50%',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         margin: '6px 0',
-                        background: fspCircleBg,
+                        background: down ? 'var(--bg-card)' : fspCircleBg,
                         cursor: 'pointer',
                         outline: isFocused ? '3px solid var(--primary-color)' : 'none',
                         outlineOffset: '3px'
@@ -275,7 +311,7 @@ function InstanceVisualization({
                         ? (isFocused ? `${conn.name} - click to show all links` : `${conn.name} - click to focus this link`)
                         : `Type: ${conn.type}`}
                     >
-                      <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>
+                      <span style={{ color: down ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>
                         {conn.name}
                       </span>
                     </div>

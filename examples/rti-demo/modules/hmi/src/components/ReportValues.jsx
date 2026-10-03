@@ -19,6 +19,7 @@
 
 import React, { useMemo } from 'react';
 import { buildReportValues } from '../utils/reports';
+import DownBadge from './DownBadge';
 
 const MONO = { fontFamily: 'Consolas, "Courier New", monospace' };
 const cell = { padding: '3px 8px', borderBottom: '1px solid var(--border-color)', textAlign: 'left' };
@@ -31,8 +32,10 @@ const cell = { padding: '3px 8px', borderBottom: '1px solid var(--border-color)'
  *
  * @param {Object} timeline - useTrafficTimeline's result
  * @param {string|null} focusedFsp - only this FSP's values are shown
+ * @param {Object|null} presence - useFspPresence's result: a dropped FSP's last
+ *   values stay, dimmed and marked
  */
-function ReportValues({ timeline, focusedFsp = null }) {
+function ReportValues({ timeline, focusedFsp = null, presence = null }) {
   const { sos, fsps, stores, running } = timeline;
   const groups = useMemo(() => buildReportValues({ sos, fsps, stores }), [sos, fsps, stores]);
   const visible = focusedFsp ? groups.filter((g) => g.fsp === focusedFsp) : groups;
@@ -49,11 +52,16 @@ function ReportValues({ timeline, focusedFsp = null }) {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
-      {visible.map((group) => (
-        <div key={group.fsp} data-testid={`report-values-${group.fsp}`} style={{ minWidth: 0 }}>
+      {visible.map((group) => {
+        const state = presence?.byName[group.fsp]?.state;
+        const down = Boolean(state && state !== 'up');
+        return (
+        <div key={group.fsp} data-testid={`report-values-${group.fsp}`} style={{ minWidth: 0, opacity: down ? 0.55 : 1 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '6px', fontSize: '12px' }}>
             <strong>{group.fsp}</strong>
             {group.cp && <span style={{ ...MONO, color: 'var(--text-muted)' }}>{group.cp}</span>}
+            <DownBadge state={state} />
+            {down && <span style={{ color: 'var(--text-muted)' }}>last known values</span>}
             <span style={{ color: 'var(--text-muted)' }}>
               {group.reports} report{group.reports === 1 ? '' : 's'}{group.lastTime ? ` · last ${group.lastTime}` : ''}
             </span>
@@ -89,7 +97,8 @@ function ReportValues({ timeline, focusedFsp = null }) {
             </table>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

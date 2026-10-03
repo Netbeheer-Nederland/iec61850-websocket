@@ -47,12 +47,14 @@ export function useTrafficTimeline(connections = []) {
   const running = !paused;
   const [stores, setStores] = useState({});
 
-  const withTarget = useCallback((type) => connections
-    .filter((c) => c.type === type && c.status === 'connected' && c.host && c.port)
+  const withTarget = useCallback((type, connectedOnly) => connections
+    .filter((c) => c.type === type && c.host && c.port && (!connectedOnly || c.status === 'connected'))
     .map((c) => ({ ...c, target: buildTargetValue(c.host, c.port) })), [connections]);
-  const sos = useMemo(() => withTarget('RTI-SO'), [withTarget]);
-  const fsps = useMemo(() => withTarget('RTI-FSP'), [withTarget]);
-  const targetsKey = [...sos, ...fsps].map((c) => c.target).join(',');
+  const sos = useMemo(() => withTarget('RTI-SO', true), [withTarget]);
+  // Every FSP, reachable or not - one that dropped keeps its lane and the
+  // entries already held; only reachable ones are fetched from below.
+  const fsps = useMemo(() => withTarget('RTI-FSP', false), [withTarget]);
+  const targetsKey = [...sos, ...fsps.filter((f) => f.status === 'connected')].map((c) => c.target).join(',');
 
   // Per "target|kind": ids already held, and the id Clear hid up to.
   const seenRef = useRef({});

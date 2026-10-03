@@ -110,4 +110,10 @@ describe('DemoActionsBar', () => {
     rerender(<DemoActionsBar connections={[SO]} focusedFsp="FSP_North" />);
     expect(screen.queryByTestId('demo-row-FSP_South')).not.toBeInTheDocument();
   });
+
+  it("marks a dropped FSP's row", () => {
+    pin([action('1', 'A', 'cp1', 'FSP_North')]);
+    render(<DemoActionsBar connections={[SO]} presence={{ byName: { FSP_North: { state: 'link-down' } }, events: [] }} />);
+    expect(screen.getByTestId('demo-row-FSP_North').textContent).toContain('link down');
+  });
 });

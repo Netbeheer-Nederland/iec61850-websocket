@@ -132,4 +132,26 @@ describe('TrafficTimeline', () => {
     expect(hookState.start).toHaveBeenCalled();
     expect(screen.getByText(/Timeline stopped/)).toBeInTheDocument();
   });
+
+  it("marks a dropped FSP's lane and shows its link going down and back up", () => {
+    const at = new Date(2026, 9, 3, 12, 0, 5).getTime();
+    render(
+      <TrafficTimeline
+        timeline={hookState}
+        presence={{
+          byName: { FSP01: { state: 'up' }, FSP02: { state: 'unreachable' } },
+          events: [
+            { fsp: 'FSP02', from: 'up', to: 'unreachable', at, downMs: null },
+            { fsp: 'FSP01', from: 'link-down', to: 'up', at: at + 1000, downMs: 42000 },
+          ],
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('timeline-lane-FSP02').textContent).toContain('unreachable');
+    expect(screen.getByTestId('timeline-lane-FSP01').textContent).not.toContain('down');
+    expect(screen.getByTestId('timeline-link-FSP02').textContent).toBe('\u2717 unreachable');
+    expect(screen.getByTestId('timeline-link-FSP01').textContent).toBe('\u2713 link back up after 42s');
+    expect(screen.getByText('Links (2)')).toBeInTheDocument();
+  });
 });

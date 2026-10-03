@@ -76,9 +76,9 @@ describe('useTrafficTimeline', () => {
     await waitFor(() => expect(result.current.stores['so:5002']?.frames).toHaveLength(1));
     // Only ACSI entries are kept from the actions log.
     expect(result.current.stores['so:5002'].acsi.map((a) => a.id)).toEqual([2]);
-    // The disconnected FSP isn't fetched.
+    // The disconnected FSP isn't fetched, but keeps its lane.
     expect(executeApiCall.mock.calls.map((c) => c[1])).not.toContain('f2:5001');
-    expect(result.current.fsps.map((f) => f.name)).toEqual(['FSP01']);
+    expect(result.current.fsps.map((f) => f.name)).toEqual(['FSP01', 'FSP02']);
   });
 
   it('follows pushes, dropping duplicates and unknown targets', async () => {

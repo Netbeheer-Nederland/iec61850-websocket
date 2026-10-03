@@ -24,6 +24,7 @@ import DataAccessPanel from '../components/DataAccessPanel';
 import TrafficTimeline from '../components/TrafficTimeline';
 import ReportValues from '../components/ReportValues';
 import { useTrafficTimeline } from '../hooks/useTrafficTimeline';
+import { useFspPresence } from '../hooks/useFspPresence';
 import DemoActionsBar from '../components/DemoActionsBar';
 import { useDemoActions } from '../hooks/useDemoActions';
 import { useLinkActivity } from '../hooks/useLinkActivity';
@@ -37,6 +38,8 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
   const [reportsExpanded, setReportsExpanded] = useState(true);
   // Shared by the timeline and the report values table.
   const timeline = useTrafficTimeline(connections);
+  // Which FSPs dropped (and when), so they stay on the page marked down.
+  const presence = useFspPresence(connections);
   const { actions: demoActions } = useDemoActions();
   // Once there are demo actions to run, the Data Access Panels (where they
   // are pinned from) start collapsed - they're the advanced tool then.
@@ -82,6 +85,7 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
           focusedFsp={focusedFsp}
           onSoSelect={() => setFocusedFspName(null)}
           onFspSelect={(conn) => setFocusedFspName((prev) => (prev === conn.name ? null : conn.name))}
+          presence={presence}
         />
       </div>
       
@@ -112,7 +116,7 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
           ></i>
         </div>
         <div style={{ display: demoExpanded ? 'block' : 'none' }}>
-          <DemoActionsBar connections={connections} focusedFsp={focusedFsp} />
+          <DemoActionsBar connections={connections} focusedFsp={focusedFsp} presence={presence} />
         </div>
       </div>
 
@@ -147,6 +151,7 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
             timeline={timeline}
             focusedFsp={focusedFsp}
             onFocusFsp={setFocusedFspName}
+            presence={presence}
           />
         </div>
       </div>
@@ -178,7 +183,7 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
           ></i>
         </div>
         <div style={{ display: reportsExpanded ? 'block' : 'none' }}>
-          <ReportValues timeline={timeline} focusedFsp={focusedFsp} />
+          <ReportValues timeline={timeline} focusedFsp={focusedFsp} presence={presence} />
         </div>
       </div>
 

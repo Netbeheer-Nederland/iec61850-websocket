@@ -58,4 +58,14 @@ describe('ReportValues', () => {
     rerender(<ReportValues timeline={timeline({ stores: {}, running: false })} />);
     expect(screen.getByText(/The timeline is stopped/)).toBeInTheDocument();
   });
+
+  it("keeps a dropped FSP's last values, marked", () => {
+    render(<ReportValues timeline={timeline()} presence={{ byName: { FSP_North: { state: 'unreachable' }, FSP_South: { state: 'up' } }, events: [] }} />);
+
+    const north = screen.getByTestId('report-values-FSP_North');
+    expect(north.textContent).toContain('unreachable');
+    expect(north.textContent).toContain('last known values');
+    expect(north.textContent).toContain('42.5');
+    expect(screen.getByTestId('report-values-FSP_South').textContent).not.toContain('last known values');
+  });
 });
