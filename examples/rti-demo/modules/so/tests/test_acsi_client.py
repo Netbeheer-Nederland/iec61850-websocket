@@ -198,6 +198,13 @@ class TestExtractMessageMeta:
             "invoke_id": None,
         }
 
+    def test_report_carries_its_cp(self, client):
+        raw = '{"unconfirmed": {"associateId": "cp2", "service": {"report": {"rptID": "ActualValues"}}}}'
+
+        meta = client._extract_message_meta(raw)
+
+        assert meta == {"service_type": "report", "category": "unconfirmed", "cp": "cp2", "invoke_id": None}
+
     def test_unrecognized_shape_returns_unknowns(self, client):
         raw = '{"somethingElse": {}}'
 

@@ -331,6 +331,15 @@ class ACSIClient:
 
                 if isinstance(service, dict) and service:
                     service_type = next(iter(service.keys()))
+            elif "unconfirmed" in msg:
+                # A report the FSP pushed - its associateId is the cp it
+                # came in on (there is no invokeId).
+                category = "unconfirmed"
+                unconfirmed = msg["unconfirmed"]
+                service = unconfirmed.get("service", {})
+                cp = unconfirmed.get("associateId", "")
+                if isinstance(service, dict) and service:
+                    service_type = next(iter(service.keys()))
         except Exception:
             service_type = "parse-error"
             category = "parse-error"

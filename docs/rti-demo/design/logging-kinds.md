@@ -123,6 +123,12 @@ A local FSP read/write simply has no linked frames - it still gets a proper
 acsi entry, which is how it finally shows up next to SO-driven reads instead
 of nowhere useful.
 
+Every frame's `cp` comes from its `associateId` - a request's or response's,
+or for a report (category `unconfirmed`, no `invokeId`) the one on
+`unconfirmed`. Reports are kept out of a call's frames by that category, not
+by a missing cp. On the SO, a report's cp is what tells which FSP it came
+from (Traffic's Report Values).
+
 ---
 
 ## Where each kind is shown

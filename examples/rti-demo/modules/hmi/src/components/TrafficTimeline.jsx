@@ -18,7 +18,6 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { useTrafficTimeline } from '../hooks/useTrafficTimeline';
 import { buildTimeline } from '../utils/timeline';
 
 // Same colors as the topology's link pulses (InstanceVisualization).
@@ -98,12 +97,13 @@ function FrameList({ title, frames, emptyText }) {
  * entry as a box in its lane. Expanding a row shows the frames on both
  * ends. See utils/timeline.js for how the rows are paired.
  *
- * @param {Object[]} connections - enriched connections (App.jsx)
+ * @param {Object} timeline - useTrafficTimeline's result (Traffic owns it, so
+ *   the report values table reads the same entries)
  * @param {string|null} focusedFsp - only this FSP's lane and rows are shown
  * @param {Function} onFocusFsp - called with an FSP name (or null) from a lane header
  */
-function TrafficTimeline({ connections = [], focusedFsp = null, onFocusFsp = null }) {
-  const { sos, fsps, stores, running, start, stop, clear } = useTrafficTimeline(connections);
+function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null }) {
+  const { sos, fsps, stores, running, start, stop, clear } = timeline;
   const [types, setTypes] = useState({ call: true, report: true, local: true });
   const [expandedKey, setExpandedKey] = useState(null);
 

@@ -108,8 +108,8 @@ export function buildTimeline({ sos = [], fsps = [], stores = {} }) {
     });
   });
 
-  // A report or local entry has no cp the SO side could name, so it goes to
-  // the FSP's (first) SO - in the demo there is just the one.
+  // A report or local entry goes to the SO linked to its FSP (else the
+  // first SO) - in the demo there is just the one.
   const soOf = (fspName) => (sos.find((so) => (so.fspLinks || []).some((l) => l.fsp === fspName)) || sos[0])?.name ?? null;
 
   fsps.forEach((fsp) => {

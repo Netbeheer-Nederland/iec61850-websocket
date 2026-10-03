@@ -40,6 +40,12 @@ vi.mock('../components/InstanceVisualization', () => ({
     </div>
   ),
 }));
+vi.mock('../hooks/useTrafficTimeline', () => ({
+  useTrafficTimeline: () => ({ sos: [], fsps: [], stores: {}, running: true }),
+}));
+vi.mock('../components/ReportValues', () => ({
+  default: ({ focusedFsp }) => <div data-testid="report-values">{`reports focus: ${focusedFsp ?? 'none'}`}</div>,
+}));
 vi.mock('../components/DemoActionsBar', () => ({
   default: ({ focusedFsp }) => <div data-testid="demo-actions-bar">{`demo focus: ${focusedFsp ?? 'none'}`}</div>,
 }));
@@ -156,5 +162,15 @@ describe('Traffic - demo actions', () => {
     expect(screen.getByTestId('demo-actions-bar').textContent).toBe('demo focus: none');
     fireEvent.click(screen.getByText('focus FSP01'));
     expect(screen.getByTestId('demo-actions-bar').textContent).toBe('demo focus: FSP01');
+  });
+});
+
+describe('Traffic - report values', () => {
+  it('renders the SO report values and hands them the focused FSP', () => {
+    renderTraffic([SO, fsp('FSP01', 1)]);
+
+    expect(screen.getByTestId('report-values').textContent).toBe('reports focus: none');
+    fireEvent.click(screen.getByText('focus FSP01'));
+    expect(screen.getByTestId('report-values').textContent).toBe('reports focus: FSP01');
   });
 });

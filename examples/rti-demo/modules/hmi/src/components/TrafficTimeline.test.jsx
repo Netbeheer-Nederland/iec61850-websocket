@@ -21,9 +21,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 const hookState = {};
-vi.mock('../hooks/useTrafficTimeline', () => ({
-  useTrafficTimeline: () => hookState,
-}));
 
 import TrafficTimeline from './TrafficTimeline';
 
@@ -63,7 +60,7 @@ describe('TrafficTimeline', () => {
   beforeEach(() => setHook());
 
   it('draws a lane per SO and FSP, with the FSP cps', () => {
-    render(<TrafficTimeline />);
+    render(<TrafficTimeline timeline={hookState} />);
 
     expect(screen.getByTestId('timeline-lane-SO')).toBeInTheDocument();
     expect(screen.getByTestId('timeline-lane-FSP01').textContent).toContain('cp1');
@@ -71,7 +68,7 @@ describe('TrafficTimeline', () => {
   });
 
   it('lists calls, reports and local entries newest first, with counts', () => {
-    render(<TrafficTimeline />);
+    render(<TrafficTimeline timeline={hookState} />);
 
     expect(rowTypes()).toEqual(['local', 'report', 'call']);
     expect(screen.getByText('Calls (1)')).toBeInTheDocument();
@@ -80,7 +77,7 @@ describe('TrafficTimeline', () => {
   });
 
   it('expands a call into its SO and FSP frames', () => {
-    render(<TrafficTimeline />);
+    render(<TrafficTimeline timeline={hookState} />);
 
     fireEvent.click(screen.getByText('GetDataValues'));
     expect(screen.getByText('GetDataValues LD0/LLN0.Mod.stVal - ok')).toBeInTheDocument();
@@ -91,7 +88,7 @@ describe('TrafficTimeline', () => {
   });
 
   it('filters by type', () => {
-    render(<TrafficTimeline />);
+    render(<TrafficTimeline timeline={hookState} />);
 
     fireEvent.click(screen.getByLabelText('Reports (1)'));
     fireEvent.click(screen.getByLabelText('Local (1)'));
@@ -100,14 +97,14 @@ describe('TrafficTimeline', () => {
 
   it("shows only the focused FSP's lane and rows, and focuses from a lane header", () => {
     const onFocusFsp = vi.fn();
-    const { rerender } = render(<TrafficTimeline focusedFsp="FSP02" onFocusFsp={onFocusFsp} />);
+    const { rerender } = render(<TrafficTimeline timeline={hookState} focusedFsp="FSP02" onFocusFsp={onFocusFsp} />);
 
     expect(screen.queryByTestId('timeline-lane-FSP01')).not.toBeInTheDocument();
     expect(rowTypes()).toEqual(['local', 'report']);
     fireEvent.click(screen.getByTestId('timeline-lane-FSP02'));
     expect(onFocusFsp).toHaveBeenCalledWith(null);
 
-    rerender(<TrafficTimeline onFocusFsp={onFocusFsp} />);
+    rerender(<TrafficTimeline timeline={hookState} onFocusFsp={onFocusFsp} />);
     fireEvent.click(screen.getByTestId('timeline-lane-FSP01'));
     expect(onFocusFsp).toHaveBeenCalledWith('FSP01');
   });
@@ -116,21 +113,21 @@ describe('TrafficTimeline', () => {
     setHook({
       stores: { 'so:5002': { frames: [], acsi: [{ id: 1, kind: 'acsi', service: 'Operate', level: 'error', time: '12:00:01', cp: 'cp7' }] } },
     });
-    render(<TrafficTimeline />);
+    render(<TrafficTimeline timeline={hookState} />);
 
     expect(screen.getByTestId('timeline-lane-?').textContent).toBe('No FSP');
     expect(screen.getByText('cp7 (no FSP)')).toBeInTheDocument();
   });
 
   it('wires Start / Stop / Clear', () => {
-    render(<TrafficTimeline />);
+    render(<TrafficTimeline timeline={hookState} />);
     fireEvent.click(screen.getByTitle('Stop following traffic'));
     fireEvent.click(screen.getByTitle("Empty this timeline (the instances' logs are kept)"));
     expect(hookState.stop).toHaveBeenCalled();
     expect(hookState.clear).toHaveBeenCalled();
 
     setHook({ running: false, stores: {} });
-    render(<TrafficTimeline />);
+    render(<TrafficTimeline timeline={hookState} />);
     fireEvent.click(screen.getByTitle('Follow traffic'));
     expect(hookState.start).toHaveBeenCalled();
     expect(screen.getByText(/Timeline stopped/)).toBeInTheDocument();

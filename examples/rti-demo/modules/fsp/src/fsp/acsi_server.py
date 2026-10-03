@@ -481,8 +481,10 @@ class ACSIServer:
                 if isinstance(service, dict) and service:
                     service_type = next(iter(service.keys()))
             elif "unconfirmed" in msg:
+                # A report - its associateId is the cp it goes out on.
                 category = "unconfirmed"
                 service = msg.get("unconfirmed", {}).get("service", {})
+                cp = msg["unconfirmed"].get("associateId", "")
                 if isinstance(service, dict) and service:
                     service_type = next(iter(service.keys()))
         except Exception:

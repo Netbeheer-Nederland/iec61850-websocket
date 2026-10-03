@@ -25,8 +25,8 @@ import { buildTargetValue } from '../services/apiService';
 // FSP's own frame log (the BFF relays every live instance's new frames as
 // "messages" pushes - push_relay_loop in bff_server.py - whether or not a
 // MessageMonitor is open). The FSP side is used, not the SO's, because an
-// FSP only ever has the one link, and its report frames ("unconfirmed")
-// carry no associateId the SO side could attribute them by.
+// FSP only ever has the one link - every frame in its log is that link's,
+// with no cp to look up.
 
 export const EMPTY_LINK = Object.freeze({
   requests: 0,
