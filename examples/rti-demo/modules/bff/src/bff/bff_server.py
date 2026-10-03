@@ -260,12 +260,17 @@ def _parse_status_repr(raw: Any) -> dict[str, Any] | None:
         return None
 
 
-async def _fetch_fsp_client_count(con: dict[str, Any]) -> tuple[str, int]:
-    """Look up an RTI-FSP connection's live connected-client count."""
+async def _fetch_fsp_status(con: dict[str, Any]) -> tuple[str, int, list[str]]:
+    """Look up an RTI-FSP connection's live connected-client count and cps.
+
+    The cps are fsp/acsi_server.py's get_status accessPoints - the WebSocket
+    path the FSP dials the SO on, which is the same name the SO lists it
+    under in its acsi_client_list (see _link_so_to_fsps).
+    """
     key = f"{con.get('host')}:{con.get('port')}"
     client = _bff_clients.get(key)
     if not client:
-        return con.get("name"), 0
+        return con.get("name"), 0, []
     try:
         result = await asyncio.to_thread(client.request, "GET", "/api/status")
         parsed = (
@@ -273,43 +278,70 @@ async def _fetch_fsp_client_count(con: dict[str, Any]) -> tuple[str, int]:
             if isinstance(result, dict)
             else None
         )
-        if parsed and parsed.get("status") == "listening":
-            return con.get("name"), parsed.get("connectedClients", 0) or 0
+        if parsed:
+            cps = parsed.get("accessPoints")
+            cps = [cp for cp in cps if isinstance(cp, str)] if isinstance(cps, list) else []
+            count = (
+                parsed.get("connectedClients", 0) or 0
+                if parsed.get("status") == "listening"
+                else 0
+            )
+            return con.get("name"), count, cps
     except Exception:
         pass
-    return con.get("name"), 0
+    return con.get("name"), 0, []
 
 
-async def _fetch_so_client_count(con: dict[str, Any]) -> tuple[str, int]:
-    """Look up an RTI-SO connection's live count of associated FSP clients.
+async def _fetch_so_cp_list(con: dict[str, Any]) -> tuple[str, list[str]]:
+    """Look up the cps an RTI-SO connection currently has FSPs associated on.
 
     so/acsi_client.py's get_cp_list() (exposed as /api/properties'
-    acsi_client_list) only counts cps with an established association, so
-    this is "how many FSPs are currently connected to this SO" - the same
-    list _relay_acsi_client_list() already watches for the ACSI Client page.
+    acsi_client_list) only lists cps with an established association, so
+    its length is "how many FSPs are currently connected to this SO" - the
+    same list _relay_acsi_client_list() already watches for the ACSI Client
+    page.
     """
     key = f"{con.get('host')}:{con.get('port')}"
     client = _bff_clients.get(key)
     if not client:
-        return con.get("name"), 0
+        return con.get("name"), []
     try:
         result = await asyncio.to_thread(client.request, "GET", "/api/properties")
         client_list = (
             result.get("acsi_client_list") if isinstance(result, dict) else None
         )
         if isinstance(client_list, list):
-            return con.get("name"), len(client_list)
+            return con.get("name"), [cp for cp in client_list if isinstance(cp, str)]
     except Exception:
         pass
-    return con.get("name"), 0
+    return con.get("name"), []
+
+
+def _link_so_to_fsps(
+    so_cps: list[str], fsp_entries: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Name the FSP behind each of an SO's associated cps.
+
+    One {"cp", "fsp"} per cp; "fsp" is the FSP connection's name, or None
+    when no registered FSP reports that cp. A cp is only unique per SO, so
+    if several FSPs report it (misconfiguration, or several SOs reusing the
+    same cp names) one that has a live WebSocket connection wins.
+    """
+    links = []
+    for cp in so_cps:
+        candidates = [f for f in fsp_entries if cp in f.get("accessPoints", [])]
+        candidates.sort(key=lambda f: (f.get("connectedClients", 0) or 0) == 0)
+        links.append({"cp": cp, "fsp": candidates[0]["name"] if candidates else None})
+    return links
 
 
 async def _build_enriched_connections() -> list[dict[str, Any]]:
     """Mirror the HMI's former client-side enrichFspClientCounts, server-side.
 
-    Also attaches each RTI-SO's live connectedFsps count, so the Setup
-    page's SO circle can turn "connected" and show a count without a
-    separate HMI-side poll.
+    FSPs get connectedClients and accessPoints (their cps). SOs get
+    connectedFsps and fspLinks - which registered FSP sits behind each
+    associated cp - so the HMI can tell which SO-FSP link a cp is without
+    asking the user for it.
     """
     conns = conn_manager.connections
     fsp_conns = [
@@ -328,32 +360,39 @@ async def _build_enriched_connections() -> list[dict[str, Any]]:
         and c.get("host")
         and c.get("port")
     ]
-    counts: dict[str, int] = {}
+    fsp_status: dict[str, tuple[int, list[str]]] = {}
     if fsp_conns:
         results = await asyncio.gather(
-            *(_fetch_fsp_client_count(c) for c in fsp_conns), return_exceptions=True
+            *(_fetch_fsp_status(c) for c in fsp_conns), return_exceptions=True
         )
         for r in results:
             if isinstance(r, tuple):
-                counts[r[0]] = r[1]
+                fsp_status[r[0]] = (r[1], r[2])
 
-    so_counts: dict[str, int] = {}
+    so_cps: dict[str, list[str]] = {}
     if so_conns:
         results = await asyncio.gather(
-            *(_fetch_so_client_count(c) for c in so_conns), return_exceptions=True
+            *(_fetch_so_cp_list(c) for c in so_conns), return_exceptions=True
         )
         for r in results:
             if isinstance(r, tuple):
-                so_counts[r[0]] = r[1]
+                so_cps[r[0]] = r[1]
 
     enriched = []
     for con in conns:
         entry = dict(con)
         if con.get("type") == "RTI-FSP":
-            entry["connectedClients"] = counts.get(con.get("name"), 0)
-        elif con.get("type") == "RTI-SO":
-            entry["connectedFsps"] = so_counts.get(con.get("name"), 0)
+            count, cps = fsp_status.get(con.get("name"), (0, []))
+            entry["connectedClients"] = count
+            entry["accessPoints"] = cps
         enriched.append(entry)
+
+    fsp_entries = [e for e in enriched if e.get("type") == "RTI-FSP"]
+    for entry in enriched:
+        if entry.get("type") == "RTI-SO":
+            cps = so_cps.get(entry.get("name"), [])
+            entry["connectedFsps"] = len(cps)
+            entry["fspLinks"] = _link_so_to_fsps(cps, fsp_entries)
     return enriched
 
 

@@ -33,6 +33,7 @@ import Overview from './pages/Overview';
 import ACSIClient from './pages/ACSIClient';
 import ACSIServer from './pages/ACSIServer';
 import { executeApiCall, buildTargetValue } from './services/apiService';
+import { linkSoToFsps } from './utils/fspLinks';
 import { connect as connectLiveSocket, reconnect as reconnectLiveSocket, subscribe as subscribeLive, onConnectionStateChange as onLiveSocketStateChange } from './services/liveSocket';
 
 function App() {
@@ -93,33 +94,38 @@ function App() {
     const results = await Promise.allSettled(
       fspConns.map(async (conn) => {
         const target = buildTargetValue(conn.host, conn.port);
-        if (!target || target === bffTarget) return { name: conn.name, count: 0 };
+        if (!target || target === bffTarget) return { name: conn.name, count: 0, cps: [] };
         const result = await executeApiCall('status', target, null);
         const rawStatus = result?.payload?.result?.status;
         const parsed = typeof rawStatus === 'string' ? parsePythonDictString(rawStatus) : rawStatus;
         const isListening = parsed?.status === 'listening';
         const count = isListening ? (parsed?.connectedClients ?? 0) : 0;
+        const cps = Array.isArray(parsed?.accessPoints) ? parsed.accessPoints : [];
 
-        return { name: conn.name, count };
+        return { name: conn.name, count, cps };
       })
     );
 
-    const countMap = {};
+    const statusMap = {};
     results.forEach(r => {
-      if (r.status === 'fulfilled') countMap[r.value.name] = r.value.count;
+      if (r.status === 'fulfilled') statusMap[r.value.name] = r.value;
     });
 
     return connectionsList.map(c =>
-      c.type === 'RTI-FSP' ? { ...c, connectedClients: countMap[c.name] ?? 0 } : c
+      c.type === 'RTI-FSP'
+        ? { ...c, connectedClients: statusMap[c.name]?.count ?? 0, accessPoints: statusMap[c.name]?.cps ?? [] }
+        : c
     );
   }, [settings.bffHost, settings.bffPort, parsePythonDictString]);
 
   // Same idea as enrichFspClientCounts above, for the other side of the
   // link: how many FSPs are currently associated with each connected SO
   // (so/acsi_client.py's get_cp_list, exposed as /api/properties'
-  // acsi_client_list). Only covers first paint - like connectedClients,
+  // acsi_client_list), and which FSP sits behind each of those cps
+  // (fspLinks, matched on the FSPs' accessPoints - so this must run after
+  // enrichFspClientCounts). Only covers first paint - like connectedClients,
   // subsequent updates arrive already-enriched via the "connections" live
-  // push (bff_server.py's _build_enriched_connections).
+  // push (bff_server.py's _build_enriched_connections / _link_so_to_fsps).
   const enrichSoClientCounts = useCallback(async (connectionsList) => {
     const bffTarget = buildTargetValue(settings.bffHost, settings.bffPort);
     const soConns = connectionsList.filter(c => c.type === 'RTI-SO' && c.status === 'connected');
@@ -127,22 +133,25 @@ function App() {
     const results = await Promise.allSettled(
       soConns.map(async (conn) => {
         const target = buildTargetValue(conn.host, conn.port);
-        if (!target || target === bffTarget) return { name: conn.name, count: 0 };
+        if (!target || target === bffTarget) return { name: conn.name, cps: [] };
         const result = await executeApiCall('properties', target, null);
         const clientList = result?.payload?.result?.acsi_client_list || result?.payload?.acsi_client_list || [];
 
-        return { name: conn.name, count: Array.isArray(clientList) ? clientList.length : 0 };
+        return { name: conn.name, cps: Array.isArray(clientList) ? clientList : [] };
       })
     );
 
-    const countMap = {};
+    const cpMap = {};
     results.forEach(r => {
-      if (r.status === 'fulfilled') countMap[r.value.name] = r.value.count;
+      if (r.status === 'fulfilled') cpMap[r.value.name] = r.value.cps;
     });
 
-    return connectionsList.map(c =>
-      c.type === 'RTI-SO' ? { ...c, connectedFsps: countMap[c.name] ?? 0 } : c
-    );
+    const fsps = connectionsList.filter(c => c.type === 'RTI-FSP');
+    return connectionsList.map(c => {
+      if (c.type !== 'RTI-SO') return c;
+      const cps = cpMap[c.name] ?? [];
+      return { ...c, connectedFsps: cps.length, fspLinks: linkSoToFsps(cps, fsps) };
+    });
   }, [settings.bffHost, settings.bffPort]);
 
   const connectionsRef = useRef([]);

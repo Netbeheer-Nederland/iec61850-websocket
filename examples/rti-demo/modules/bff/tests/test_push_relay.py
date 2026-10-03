@@ -18,7 +18,7 @@
 """Unit tests for the BFF's browser push relay.
 
 Covers WSHub, push_relay_loop and its helpers (_parse_status_repr,
-_fetch_fsp_client_count, _fetch_so_client_count, _build_enriched_connections,
+_fetch_fsp_status, _fetch_so_cp_list, _link_so_to_fsps, _build_enriched_connections,
 _relay_new_messages) in bff.bff_server. These are isolated unit tests - no Docker, no real
 RTI-SO/RTI-FSP instances - matching the pattern already used by
 fsp/tests/test_bff_endpoint.py and so/tests/test_bff_endpoint.py:
@@ -172,69 +172,70 @@ async def test_wshub_broadcast_with_no_clients_is_a_noop():
     await hub.broadcast({"type": "connections", "data": []})  # must not raise
 
 
-# -------------------- _fetch_fsp_client_count --------------------
+# -------------------- _fetch_fsp_status --------------------
 
 
 @pytest.mark.asyncio
-async def test_fetch_fsp_client_count_when_listening(monkeypatch):
+async def test_fetch_fsp_status_when_listening(monkeypatch):
     client = FakeBffClient(
         responses={
             "/api/status": {
                 "ok": True,
-                "status": "{'status': 'listening', 'connectedClients': 3}",
+                "status": "{'status': 'listening', 'connectedClients': 3, 'accessPoints': ['cp2']}",
             }
         }
     )
     monkeypatch.setitem(bff_server._bff_clients, "10.0.0.1:5001", client)
 
-    name, count = await bff_server._fetch_fsp_client_count(
+    result = await bff_server._fetch_fsp_status(
         {"name": "fsp1", "host": "10.0.0.1", "port": 5001}
     )
-    assert (name, count) == ("fsp1", 3)
+    assert result == ("fsp1", 3, ["cp2"])
 
 
 @pytest.mark.asyncio
-async def test_fetch_fsp_client_count_when_not_listening(monkeypatch):
+async def test_fetch_fsp_status_when_not_listening(monkeypatch):
     client = FakeBffClient(
         responses={
             "/api/status": {
                 "ok": True,
-                "status": "{'status': 'stopped', 'connectedClients': 0}",
+                "status": "{'status': 'stopped', 'connectedClients': 0, 'accessPoints': ['cp2']}",
             }
         }
     )
     monkeypatch.setitem(bff_server._bff_clients, "10.0.0.1:5001", client)
 
-    name, count = await bff_server._fetch_fsp_client_count(
+    # Not listening: no live connection, but its cp is still known.
+    result = await bff_server._fetch_fsp_status(
         {"name": "fsp1", "host": "10.0.0.1", "port": 5001}
     )
-    assert (name, count) == ("fsp1", 0)
+    assert result == ("fsp1", 0, ["cp2"])
 
 
 @pytest.mark.asyncio
-async def test_fetch_fsp_client_count_swallows_request_errors(monkeypatch):
+async def test_fetch_fsp_status_swallows_request_errors(monkeypatch):
     client = FakeBffClient(raises=ConnectionError("refused"))
     monkeypatch.setitem(bff_server._bff_clients, "10.0.0.1:5001", client)
 
-    name, count = await bff_server._fetch_fsp_client_count(
+    result = await bff_server._fetch_fsp_status(
         {"name": "fsp1", "host": "10.0.0.1", "port": 5001}
     )
-    assert (name, count) == ("fsp1", 0)
+    assert result == ("fsp1", 0, [])
 
 
 @pytest.mark.asyncio
-async def test_fetch_fsp_client_count_defaults_to_zero_when_no_client_registered():
-    name, count = await bff_server._fetch_fsp_client_count(
+async def test_fetch_fsp_status_defaults_to_zero_when_no_client_registered():
+    result = await bff_server._fetch_fsp_status(
         {"name": "ghost", "host": "1.2.3.4", "port": 9999}
     )
-    assert (name, count) == ("ghost", 0)
+    assert result == ("ghost", 0, [])
 
 
-# -------------------- _fetch_so_client_count --------------------
+# -------------------- _fetch_so_cp_list --------------------
 
 
 @pytest.mark.asyncio
-async def test_fetch_so_client_count_when_fsps_connected(monkeypatch):
+async def test_fetch_so_cp_list_when_fsps_connected(monkeypatch):
     client = FakeBffClient(
         responses={
             "/api/properties": {
@@ -247,14 +248,14 @@ async def test_fetch_so_client_count_when_fsps_connected(monkeypatch):
     )
     monkeypatch.setitem(bff_server._bff_clients, "10.0.0.3:5002", client)
 
-    name, count = await bff_server._fetch_so_client_count(
+    result = await bff_server._fetch_so_cp_list(
         {"name": "so1", "host": "10.0.0.3", "port": 5002}
     )
-    assert (name, count) == ("so1", 2)
+    assert result == ("so1", ["cp1", "cp2"])
 
 
 @pytest.mark.asyncio
-async def test_fetch_so_client_count_when_no_fsps_connected(monkeypatch):
+async def test_fetch_so_cp_list_when_no_fsps_connected(monkeypatch):
     client = FakeBffClient(
         responses={
             "/api/properties": {
@@ -267,29 +268,29 @@ async def test_fetch_so_client_count_when_no_fsps_connected(monkeypatch):
     )
     monkeypatch.setitem(bff_server._bff_clients, "10.0.0.3:5002", client)
 
-    name, count = await bff_server._fetch_so_client_count(
+    result = await bff_server._fetch_so_cp_list(
         {"name": "so1", "host": "10.0.0.3", "port": 5002}
     )
-    assert (name, count) == ("so1", 0)
+    assert result == ("so1", [])
 
 
 @pytest.mark.asyncio
-async def test_fetch_so_client_count_swallows_request_errors(monkeypatch):
+async def test_fetch_so_cp_list_swallows_request_errors(monkeypatch):
     client = FakeBffClient(raises=ConnectionError("refused"))
     monkeypatch.setitem(bff_server._bff_clients, "10.0.0.3:5002", client)
 
-    name, count = await bff_server._fetch_so_client_count(
+    result = await bff_server._fetch_so_cp_list(
         {"name": "so1", "host": "10.0.0.3", "port": 5002}
     )
-    assert (name, count) == ("so1", 0)
+    assert result == ("so1", [])
 
 
 @pytest.mark.asyncio
-async def test_fetch_so_client_count_defaults_to_zero_when_no_client_registered():
-    name, count = await bff_server._fetch_so_client_count(
+async def test_fetch_so_cp_list_empty_when_no_client_registered():
+    result = await bff_server._fetch_so_cp_list(
         {"name": "ghost", "host": "1.2.3.4", "port": 9999}
     )
-    assert (name, count) == ("ghost", 0)
+    assert result == ("ghost", [])
 
 
 # -------------------- _build_enriched_connections --------------------
@@ -328,7 +329,7 @@ async def test_build_enriched_connections_adds_fsp_client_counts(monkeypatch):
             responses={
                 "/api/status": {
                     "ok": True,
-                    "status": "{'status': 'listening', 'connectedClients': 5}",
+                    "status": "{'status': 'listening', 'connectedClients': 5, 'accessPoints': ['cp1']}",
                 }
             }
         ),
@@ -340,7 +341,7 @@ async def test_build_enriched_connections_adds_fsp_client_counts(monkeypatch):
             responses={
                 "/api/properties": {
                     "ok": True,
-                    "acsi_client_list": ["cp1"],
+                    "acsi_client_list": ["cp1", "cp9"],
                 }
             }
         ),
@@ -352,12 +353,21 @@ async def test_build_enriched_connections_adds_fsp_client_counts(monkeypatch):
     assert by_name["fsp1"]["connectedClients"] == 5
     # Disconnected FSPs are never polled for a live count and default to 0.
     assert by_name["fsp2"]["connectedClients"] == 0
-    # The SO's own connectedFsps count comes from its acsi_client_list.
-    assert by_name["so1"]["connectedFsps"] == 1
-    # Non-RTI-SO connections are never given a connectedFsps key, and
-    # non-RTI-FSP connections are never given a connectedClients key.
+    assert by_name["fsp1"]["accessPoints"] == ["cp1"]
+    assert by_name["fsp2"]["accessPoints"] == []
+    # The SO's own connectedFsps count comes from its acsi_client_list, and
+    # each cp is linked to the FSP reporting it (None if no FSP does).
+    assert by_name["so1"]["connectedFsps"] == 2
+    assert by_name["so1"]["fspLinks"] == [
+        {"cp": "cp1", "fsp": "fsp1"},
+        {"cp": "cp9", "fsp": None},
+    ]
+    # Non-RTI-SO connections are never given SO keys, and non-RTI-FSP
+    # connections are never given FSP keys.
     assert "connectedFsps" not in by_name["fsp1"]
+    assert "fspLinks" not in by_name["fsp1"]
     assert "connectedClients" not in by_name["so1"]
+    assert "accessPoints" not in by_name["so1"]
     # The source connection dicts are not mutated in place.
     assert "connectedClients" not in connections[0]
     assert "connectedFsps" not in connections[2]
@@ -382,6 +392,29 @@ async def test_build_enriched_connections_disconnected_so_defaults_to_zero(
 
     # Disconnected SOs are never polled for a live count and default to 0.
     assert enriched[0]["connectedFsps"] == 0
+    assert enriched[0]["fspLinks"] == []
+
+
+# -------------------- _link_so_to_fsps --------------------
+
+
+def test_link_so_to_fsps_maps_each_cp_to_its_fsp():
+    fsps = [
+        {"name": "fsp1", "accessPoints": ["cp1"], "connectedClients": 1},
+        {"name": "fsp2", "accessPoints": ["cp2"], "connectedClients": 1},
+    ]
+    assert bff_server._link_so_to_fsps(["cp2", "cp1"], fsps) == [
+        {"cp": "cp2", "fsp": "fsp2"},
+        {"cp": "cp1", "fsp": "fsp1"},
+    ]
+
+
+def test_link_so_to_fsps_prefers_the_connected_fsp_on_a_shared_cp():
+    fsps = [
+        {"name": "idle", "accessPoints": ["cp1"], "connectedClients": 0},
+        {"name": "live", "accessPoints": ["cp1"], "connectedClients": 1},
+    ]
+    assert bff_server._link_so_to_fsps(["cp1"], fsps) == [{"cp": "cp1", "fsp": "live"}]
 
 
 @pytest.mark.asyncio
