@@ -40,6 +40,9 @@ vi.mock('../components/InstanceVisualization', () => ({
     </div>
   ),
 }));
+vi.mock('../components/DemoActionsBar', () => ({
+  default: ({ focusedFsp }) => <div data-testid="demo-actions-bar">{`demo focus: ${focusedFsp ?? 'none'}`}</div>,
+}));
 vi.mock('../components/TrafficTimeline', () => ({
   default: ({ focusedFsp }) => <div data-testid="traffic-timeline">{`timeline focus: ${focusedFsp ?? 'none'}`}</div>,
 }));
@@ -143,5 +146,15 @@ describe('Traffic - timeline', () => {
     expect(screen.getByTestId('traffic-timeline').textContent).toBe('timeline focus: none');
     fireEvent.click(screen.getByText('focus FSP02'));
     expect(screen.getByTestId('traffic-timeline').textContent).toBe('timeline focus: FSP02');
+  });
+});
+
+describe('Traffic - demo actions', () => {
+  it('renders the demo bar and hands it the focused FSP', () => {
+    renderTraffic([SO, fsp('FSP01', 1)]);
+
+    expect(screen.getByTestId('demo-actions-bar').textContent).toBe('demo focus: none');
+    fireEvent.click(screen.getByText('focus FSP01'));
+    expect(screen.getByTestId('demo-actions-bar').textContent).toBe('demo focus: FSP01');
   });
 });

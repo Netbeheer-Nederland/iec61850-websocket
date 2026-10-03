@@ -22,6 +22,8 @@ import InstanceVisualization from '../components/InstanceVisualization';
 import MessageMonitor from '../components/MessageMonitor';
 import DataAccessPanel from '../components/DataAccessPanel';
 import TrafficTimeline from '../components/TrafficTimeline';
+import DemoActionsBar from '../components/DemoActionsBar';
+import { useDemoActions } from '../hooks/useDemoActions';
 import { useLinkActivity } from '../hooks/useLinkActivity';
 
 function Traffic({ settings, getModel, updateModel, connections = [], loading = false }) {
@@ -30,7 +32,11 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
   // shows the same traffic merged; they stay for the raw per-instance view.
   const [monitorsExpanded, setMonitorsExpanded] = useState(false);
   const [timelineExpanded, setTimelineExpanded] = useState(true);
-  const [panelsExpanded, setPanelsExpanded] = useState(true);
+  const { actions: demoActions } = useDemoActions();
+  // Once there are demo actions to run, the Data Access Panels (where they
+  // are pinned from) start collapsed - they're the advanced tool then.
+  const [panelsExpanded, setPanelsExpanded] = useState(() => demoActions.length === 0);
+  const [demoExpanded, setDemoExpanded] = useState(true);
   const [dataAccessPanels, setDataAccessPanels] = useState([1]);
   const { activity, reset: resetActivity } = useLinkActivity(connections);
   // Clicking an FSP focuses its link: the others dim and only its monitor
@@ -74,6 +80,37 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
         />
       </div>
       
+      {/* Collapsible demo actions block */}
+      <div style={{
+        marginBottom: '20px',
+        border: '1px solid var(--border-color)',
+        borderRadius: '8px',
+        padding: '12px',
+        background: 'var(--bg-card)'
+      }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            cursor: 'pointer',
+            marginBottom: '12px',
+            padding: '4px 0'
+          }}
+          onClick={() => setDemoExpanded(!demoExpanded)}
+        >
+          <h3 style={{ margin: 0, color: 'var(--text-secondary)', flex: 1 }}>
+            Demo Actions
+          </h3>
+          <i
+            className={`fas ${demoExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`}
+            style={{ color: 'var(--text-muted)', fontSize: '14px' }}
+          ></i>
+        </div>
+        <div style={{ display: demoExpanded ? 'block' : 'none' }}>
+          <DemoActionsBar connections={connections} focusedFsp={focusedFsp} />
+        </div>
+      </div>
+
       {/* Collapsible merged timeline block */}
       <div style={{
         marginBottom: '20px',

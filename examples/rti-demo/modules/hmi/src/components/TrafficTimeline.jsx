@@ -270,7 +270,7 @@ function TrafficTimeline({ connections = [], focusedFsp = null, onFocusFsp = nul
       {rows.length === 0 && (
         <p style={{ color: 'var(--text-muted)', fontSize: '12px', textAlign: 'center', margin: '16px 0 4px' }}>
           {running
-            ? 'No traffic yet. Run a service from a Data Access Panel, or trigger a report on an FSP.'
+            ? 'No traffic yet. Run a demo action or a Data Access Panel service, or trigger a report on an FSP.'
             : 'Timeline stopped. Start to follow the traffic between the SO and its FSPs.'}
         </p>
       )}

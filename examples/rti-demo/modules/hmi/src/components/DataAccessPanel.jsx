@@ -20,6 +20,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { executeApiCall, buildTargetValue, getAutoRefreshIntervalMs } from '../services/apiService';
 import ControlModal from './ControlModal';
+import PinActionForm from './PinActionForm';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
@@ -1591,6 +1592,19 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
           <i className="fas fa-times"></i>
         </button>
       </div>
+
+      {/* Pin the selection as a one-click demo action on Traffic - SO only,
+          since a demo action is a call the SO makes to one of its FSPs. */}
+      {getAcsiRole(selectedConnection) === 'client' && (
+        <PinActionForm
+          so={selectedConnection}
+          cp={effectiveCp}
+          read={buildObjectRef() ? { objRef: buildObjectRef(), fc: (selectedFC || '').toLowerCase(), valueType: selectedNode?.bType || null } : null}
+          canWrite={canWriteFc(selectedFC)}
+          operate={showOperateButton ? { objRef: `${selectedLD}/${selectedLN}.${selectedDO}`, cdc: selectedDoCdc || '' } : null}
+          defaultValue={writeValue}
+        />
+      )}
       
       {/* Results Display */}
       {error && (

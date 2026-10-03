@@ -20,6 +20,7 @@
 // src/components/ControlModal.jsx
 import React, { useState, useEffect } from 'react';
 import { executeApiCall, getApiById } from '../services/apiService';
+import { controlValue } from '../utils/demoActions';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
@@ -131,64 +132,11 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess, 
   };
 
   const getControlParameters = () => {
-    let parsedCtlVal = ctlVal.trim();
-    let valueType = 'unknown';
-
-    switch (cdc?.toUpperCase()) {
-      case 'SPC':
-        valueType = 'boolean';
-        if (['true', '1', 'on'].includes(parsedCtlVal.toLowerCase())) parsedCtlVal = true;
-        else if (['false', '0', 'off'].includes(parsedCtlVal.toLowerCase())) parsedCtlVal = false;
-        else throw new Error('Invalid SPC value. Use true/false or on/off');
-        break;
-      case 'DPC':
-        valueType = 'enumerated';
-        const dpcMap = { on: 'on', off: 'off', intermediate: 'intermediateState' };
-        parsedCtlVal = dpcMap[parsedCtlVal.toLowerCase()];
-        if (!parsedCtlVal) throw new Error('Invalid DPC value. Use on, off, or intermediate-state');
-        break;
-      case 'APC':
-        valueType = 'float32';
-        parsedCtlVal = parseFloat(parsedCtlVal);
-        if (isNaN(parsedCtlVal)) throw new Error('Invalid APC value. Must be a number');
-        break;
-      case 'INC':
-      case 'ENC':
-        valueType = 'int32';
-        parsedCtlVal = parseInt(parsedCtlVal);
-        if (isNaN(parsedCtlVal)) throw new Error('Invalid value. Must be an integer');
-        break;
-      case 'BSC':
-        valueType = 'string';
-        const bscMap = { up: 'stepUp', down: 'stepDown' };
-        parsedCtlVal = bscMap[parsedCtlVal.toLowerCase()];
-        if (!parsedCtlVal) throw new Error('Invalid BSC value. Use step-up or step-down');
-        break;
-      case 'ING':
-        valueType = 'int32';
-        parsedCtlVal = parseInt(parsedCtlVal);
-        if (isNaN(parsedCtlVal)) throw new Error('Invalid ING value. Must be an integer');
-        break;
-      case 'ASG':
-        valueType = 'string';
-        // ASG typically uses enumerated values
-        break;
-      case 'CTE':
-        valueType = 'int32';
-        parsedCtlVal = parseInt(parsedCtlVal);
-        if (isNaN(parsedCtlVal)) throw new Error('Invalid CTE value. Must be an integer');
-        break;
-      case 'ENG':
-        valueType = 'enumerated';
-        // ENG typically uses enumerated values
-        break;
-      default:
-        throw new Error('Unsupported CDC type for control');
-    }
+    const { value, valueType } = controlValue(cdc, ctlVal);
 
     return {
       objRef,
-      value: parsedCtlVal,
+      value,
       value_type: valueType,
       ctlNum: parseInt(ctlNum),
       origin: { orCat: parseInt(originCat), orIdent: originIdent },
