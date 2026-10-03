@@ -25,6 +25,7 @@ action/message logs.
 
 from __future__ import annotations
 
+import json
 from unittest.mock import patch
 
 import pytest
@@ -415,3 +416,45 @@ class TestInvokeAcsi:
         entry = client.get_actions()[-1]
         assert entry["level"] == "warn"
         assert entry["message"] == "GetDataValues x - no response"
+
+
+class TestReportCallback:
+    """_on_recv_message hands a received report's values to the report callback."""
+
+    @staticmethod
+    def _received(client, report):
+        calls = []
+        client.install_report_callback(lambda rpt_id, data_set, data: calls.append((rpt_id, data_set, data)))
+        client._on_recv_message(
+            json.dumps({"unconfirmed": {"associateId": "cp1", "service": {"report": report}}}),
+            None,
+        )
+        return calls
+
+    def test_reads_entry_data_under_entry(self, client):
+        value = [{"data": {"float32": 42.5}}]
+        calls = self._received(client, {
+            "rptID": "ActualValues",
+            "dataSet": "LD0/LLN0.DataSetActualValues",
+            "entry": {"entryID": "1", "entryData": [{"dataRef": "LD0/MMXU1.TotW.mag.f", "value": value}]},
+        })
+
+        assert calls == [(
+            "ActualValues",
+            "LD0/LLN0.DataSetActualValues",
+            [{"dataRef": "LD0/MMXU1.TotW.mag.f", "value": value}],
+        )]
+
+    def test_still_reads_a_top_level_entry_data(self, client):
+        calls = self._received(client, {
+            "rptID": "R", "dataSet": "DS", "entryData": [{"dataRef": "LD0/A", "value": 1}],
+        })
+
+        assert calls[0][2] == [{"dataRef": "LD0/A", "value": 1}]
+
+    def test_accepts_a_single_entry(self, client):
+        calls = self._received(client, {
+            "rptID": "R", "dataSet": "DS", "entry": {"entryData": {"dataRef": "LD0/A", "value": 1}},
+        })
+
+        assert calls[0][2] == [{"dataRef": "LD0/A", "value": 1}]

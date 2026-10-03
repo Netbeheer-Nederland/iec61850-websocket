@@ -183,8 +183,18 @@ class ACSIClient:
                         "dataSet": report_data.get("dataSet"),
                         "data": [],
                     }
-                    # Extract dataRef + values from entryData
-                    entry_data = report_data.get("entryData", [])
+                    # Extract dataRef + values from entryData - the server
+                    # puts it under the report's "entry" (create_tpaa_report
+                    # in ws61850's response_handling.py); a top-level
+                    # entryData is still accepted.
+                    entry = report_data.get("entry")
+                    entry_data = (
+                        entry.get("entryData")
+                        if isinstance(entry, dict)
+                        else report_data.get("entryData")
+                    )
+                    if isinstance(entry_data, dict):
+                        entry_data = [entry_data]
                     if isinstance(entry_data, list):
                         for entry in entry_data:
                             if isinstance(entry, dict):
