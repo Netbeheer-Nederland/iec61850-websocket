@@ -40,6 +40,9 @@ vi.mock('../components/InstanceVisualization', () => ({
     </div>
   ),
 }));
+vi.mock('../components/TrafficTimeline', () => ({
+  default: ({ focusedFsp }) => <div data-testid="traffic-timeline">{`timeline focus: ${focusedFsp ?? 'none'}`}</div>,
+}));
 vi.mock('../components/DataAccessPanel', () => ({
   default: () => <div data-testid="data-access-panel" />,
 }));
@@ -130,5 +133,15 @@ describe('Traffic - focusing an FSP link', () => {
 
     fireEvent.click(screen.getByText('focus FSP01'));
     expect(monitors()).toEqual(['SO', 'FSP01']);
+  });
+});
+
+describe('Traffic - timeline', () => {
+  it('renders the merged timeline and hands it the focused FSP', () => {
+    renderTraffic([SO, fsp('FSP01', 1), fsp('FSP02', 1)]);
+
+    expect(screen.getByTestId('traffic-timeline').textContent).toBe('timeline focus: none');
+    fireEvent.click(screen.getByText('focus FSP02'));
+    expect(screen.getByTestId('traffic-timeline').textContent).toBe('timeline focus: FSP02');
   });
 });

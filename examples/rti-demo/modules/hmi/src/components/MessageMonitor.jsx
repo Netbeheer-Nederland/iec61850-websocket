@@ -22,6 +22,7 @@ import { executeApiCall, buildTargetValue } from '../services/apiService';
 import { subscribe as subscribeLive, isConnected as isLiveConnected, onConnectionStateChange } from '../services/liveSocket';
 import { usePersistentFlag } from '../hooks/usePersistentFlag';
 import LogKindBadge, { LOG_KINDS } from './LogKindBadge';
+import { unwrapList } from '../utils/timeline';
 
 // Frames (messages log) and ACSI service entries (actions log, kind "acsi")
 // are separate id sequences on the instance, so the kind has to be part of
@@ -45,12 +46,6 @@ const linkedFrames = (entry, all) => {
     && m.category !== 'unconfirmed'
     && Number(m.id) >= c.messageSeqFrom
     && Number(m.id) <= c.messageSeqTo);
-};
-
-const unwrapList = (payload, key) => {
-  if (!payload) return [];
-  const list = payload[key] ?? payload.result?.[key] ?? payload.result?.payload?.[key];
-  return Array.isArray(list) ? list : [];
 };
 
 /**

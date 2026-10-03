@@ -21,11 +21,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import InstanceVisualization from '../components/InstanceVisualization';
 import MessageMonitor from '../components/MessageMonitor';
 import DataAccessPanel from '../components/DataAccessPanel';
+import TrafficTimeline from '../components/TrafficTimeline';
 import { useLinkActivity } from '../hooks/useLinkActivity';
 
 function Traffic({ settings, getModel, updateModel, connections = [], loading = false }) {
 
-  const [monitorsExpanded, setMonitorsExpanded] = useState(true);
+  // The per-instance monitors start collapsed - the timeline above them
+  // shows the same traffic merged; they stay for the raw per-instance view.
+  const [monitorsExpanded, setMonitorsExpanded] = useState(false);
+  const [timelineExpanded, setTimelineExpanded] = useState(true);
   const [panelsExpanded, setPanelsExpanded] = useState(true);
   const [dataAccessPanels, setDataAccessPanels] = useState([1]);
   const { activity, reset: resetActivity } = useLinkActivity(connections);
@@ -48,12 +52,12 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
           {focusedFsp && (
             <span className="link-focus-chip" style={{ color: 'var(--text-secondary)' }}>
               Focused on <strong>{focusedFsp}</strong>
-              <button className="btn-icon" style={{ marginLeft: '6px', padding: '2px 8px' }} onClick={() => setFocusedFspName(null)} title="Show all links">
+              <button className="btn-secondary" style={{ marginLeft: '6px', padding: '3px 10px', fontSize: '12px' }} onClick={() => setFocusedFspName(null)} title="Show all links">
                 Show all
               </button>
             </span>
           )}
-          <button className="btn-icon" style={{ padding: '2px 8px' }} onClick={resetActivity} title="Reset the link counters">
+          <button className="btn-secondary" style={{ padding: '3px 10px', fontSize: '12px' }} onClick={resetActivity} title="Reset the link counters">
             <i className="fas fa-undo" style={{ fontSize: '11px', marginRight: '4px' }}></i>Reset counters
           </button>
         </div>
@@ -70,6 +74,41 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
         />
       </div>
       
+      {/* Collapsible merged timeline block */}
+      <div style={{
+        marginBottom: '20px',
+        border: '1px solid var(--border-color)',
+        borderRadius: '8px',
+        padding: '12px',
+        background: 'var(--bg-card)'
+      }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            cursor: 'pointer',
+            marginBottom: '12px',
+            padding: '4px 0'
+          }}
+          onClick={() => setTimelineExpanded(!timelineExpanded)}
+        >
+          <h3 style={{ margin: 0, color: 'var(--text-secondary)', flex: 1 }}>
+            Timeline
+          </h3>
+          <i
+            className={`fas ${timelineExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`}
+            style={{ color: 'var(--text-muted)', fontSize: '14px' }}
+          ></i>
+        </div>
+        <div style={{ display: timelineExpanded ? 'block' : 'none' }}>
+          <TrafficTimeline
+            connections={connections}
+            focusedFsp={focusedFsp}
+            onFocusFsp={setFocusedFspName}
+          />
+        </div>
+      </div>
+
       {/* Collapsible Data Access Panels block */}
       <div style={{ 
         marginBottom: '20px',
@@ -160,7 +199,7 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
           onClick={() => setMonitorsExpanded(!monitorsExpanded)}
         >
           <h3 style={{ margin: 0, color: 'var(--text-secondary)', flex: 1 }}>
-            Message Monitors
+            Message Monitors (per instance)
           </h3>
           <i 
             className={`fas ${monitorsExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`}
