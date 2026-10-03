@@ -19,6 +19,55 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { EMPTY_LINK } from '../hooks/useLinkActivity';
+
+const PULSE_COLORS = {
+  request: 'var(--primary-color)',
+  response: 'var(--success-color)',
+  report: 'var(--warning-color)',
+};
+
+/**
+ * The SO-FSP line with live activity (Traffic only): a dot travels along it
+ * per frame batch - towards the FSP for a request, back for a response or
+ * report - with the link's cp above and its counters / last service below.
+ * Turns red while the last service failed.
+ */
+function ActivityLink({ fspName, cp, link = EMPTY_LINK, detected }) {
+  const failed = link.last && !link.last.ok;
+  const lineColor = failed ? 'var(--danger-color)' : detected ? 'var(--success-color)' : 'var(--border-color)';
+  const pulse = link.pulse;
+  return (
+    <div style={{ width: '200px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px' }}>
+      <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'Consolas, "Courier New", monospace' }} title="Access point (cp) of this link">
+        {cp || '\u00a0'}
+      </div>
+      <div className="link-line" style={{
+        position: 'relative',
+        height: '4px',
+        background: `repeating-linear-gradient(to right, ${lineColor} 0, ${lineColor} 6px, transparent 6px, transparent 12px)`,
+      }}>
+        {pulse && (
+          <span
+            key={pulse.seq}
+            data-testid={`link-pulse-${fspName}`}
+            className={`link-pulse ${pulse.type === 'request' ? 'link-pulse--out' : 'link-pulse--in'}`}
+            style={{ background: pulse.ok ? PULSE_COLORS[pulse.type] : 'var(--danger-color)' }}
+          />
+        )}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', color: 'var(--text-secondary)' }} data-testid={`link-counters-${fspName}`}>
+        <span title="Requests (SO to FSP)" style={{ color: PULSE_COLORS.request }}>&rarr; {link.requests}</span>
+        <span title="Responses (FSP to SO)" style={{ color: PULSE_COLORS.response }}>&larr; {link.responses}</span>
+        <span title="Reports (FSP to SO)" style={{ color: PULSE_COLORS.report }}>&#9873; {link.reports}</span>
+        {link.errors > 0 && <span title="Service errors" style={{ color: 'var(--danger-color)' }}>&#10007; {link.errors}</span>}
+      </div>
+      <div style={{ textAlign: 'center', color: failed ? 'var(--danger-color)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} data-testid={`link-last-${fspName}`}>
+        {link.last ? `${link.last.service} ${link.last.ok ? '\u2713' : '\u2717'} ${link.last.time}` : 'no traffic yet'}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Reusable component for visualizing SO-FSP connections
@@ -28,13 +77,22 @@ import { useNavigate } from 'react-router-dom';
  * @param {Function|null} onConnectionClick - Click handler for connection items
  * @param {boolean} showLabels - Whether to show type labels
  * @param {boolean} loading - Whether data is currently loading
+ * @param {Object|null} activity - Per FSP name link activity (useLinkActivity);
+ *   when given, each SO-FSP line shows it live (Traffic page)
+ * @param {string|null} focusedFsp - Name of the FSP whose link is focused; the others are dimmed
+ * @param {Function|null} onSoSelect - Replaces the SO circle's navigation to ACSI Client
+ * @param {Function|null} onFspSelect - Replaces an FSP circle's navigation to ACSI Server, called with the connection
  */
 function InstanceVisualization({
   connections,
   selectedConnection = null,
   onConnectionClick = null,
   showLabels = true,
-  loading = false
+  loading = false,
+  activity = null,
+  focusedFsp = null,
+  onSoSelect = null,
+  onFspSelect = null
 }) {
   const navigate = useNavigate();
 
@@ -102,7 +160,7 @@ function InstanceVisualization({
                       background: soCircleBg,
                       cursor: 'pointer'
                     }}
-                    onClick={handleSoClick}
+                    onClick={onSoSelect ? () => onSoSelect(conn) : handleSoClick}
                     title={`Type: RTI-SO (Client) - ${connectedFsps} FSP${connectedFsps === 1 ? '' : 's'} connected`}
                   >
                     <span style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600' }}>{conn.name}</span>
@@ -165,9 +223,24 @@ function InstanceVisualization({
                     ? 'var(--danger-color)'
                     : 'var(--bg-card)';
 
+              const isFocused = focusedFsp === conn.name;
+              const dimmed = focusedFsp != null && !isFocused;
+
               return (
-                <div key={`fsp-row-${conn.name}`} style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+                <div
+                  key={`fsp-row-${conn.name}`}
+                  data-testid={`fsp-row-${conn.name}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0', opacity: dimmed ? 0.35 : 1, transition: 'opacity 0.2s' }}
+                >
                   {/* Connection line - lives next to this specific FSP */}
+                  {activity ? (
+                    <ActivityLink
+                      fspName={conn.name}
+                      cp={conn.accessPoints?.[0]}
+                      link={activity[conn.name]}
+                      detected={fspDetected}
+                    />
+                  ) : (
                   <div
                     style={{
                       height: '4px',
@@ -178,6 +251,7 @@ function InstanceVisualization({
                       flexShrink: 0
                     }}
                   ></div>
+                  )}
 
                   {/* FSP circle + label */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '180px', marginLeft: '16px' }}>
@@ -192,10 +266,14 @@ function InstanceVisualization({
                         justifyContent: 'center',
                         margin: '6px 0',
                         background: fspCircleBg,
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        outline: isFocused ? '3px solid var(--primary-color)' : 'none',
+                        outlineOffset: '3px'
                       }}
-                      onClick={() => handleFspClick(conn)}
-                      title={`Type: ${conn.type}`}
+                      onClick={() => (onFspSelect ? onFspSelect(conn) : handleFspClick(conn))}
+                      title={onFspSelect
+                        ? (isFocused ? `${conn.name} - click to show all links` : `${conn.name} - click to focus this link`)
+                        : `Type: ${conn.type}`}
                     >
                       <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>
                         {conn.name}

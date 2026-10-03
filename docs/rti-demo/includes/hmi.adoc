@@ -111,6 +111,8 @@ providing a modern web interface for monitoring and controlling RTI services (FS
 
 **Features**:
 * Visual instance visualization showing all SO, FSP, and their connections
+* Live link activity on each SO-FSP line, counted from that FSP's own frames (pushed by the BFF whether or not a monitor is running): its cp, a dot per frame batch travelling towards the FSP (request) or back (response, report), request / response / report / error counters and the last service with its result and time; the line turns red while the last service failed. Reset counters zeroes them
+* Clicking an FSP focuses its link - the other links dim and only that FSP's message monitor is listed (the SO's stays); clicking it again, the SO, or Show all shows every link again. On Traffic the circles focus instead of opening the ACSI Client/Server pages
 * Multiple collapsible Data Access Panels
 * Dynamic panel management (add/remove)
 * Real-time message monitoring, newest-first by default with a toggle for oldest-first (same control as the Monitoring panels' Activity Log)

@@ -2181,3 +2181,50 @@ h3 {
 .brcb-result-error {
     background-color: #e53e3e;
 }
+/* Traffic topology: a dot travelling along an SO-FSP link per frame batch
+   (InstanceVisualization's ActivityLink). --out runs SO -> FSP (a request),
+   --in FSP -> SO (a response or report). */
+.link-pulse {
+    position: absolute;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    margin-top: -6px;
+    border-radius: 50%;
+    box-shadow: 0 0 8px currentColor;
+    opacity: 0;
+    animation: 0.9s ease-in-out forwards;
+}
+
+.link-pulse--out {
+    animation-name: link-pulse-out;
+}
+
+.link-pulse--in {
+    animation-name: link-pulse-in;
+}
+
+@keyframes link-pulse-out {
+    from { left: 0; opacity: 1; }
+    80% { opacity: 1; }
+    to { left: calc(100% - 12px); opacity: 0; }
+}
+
+@keyframes link-pulse-in {
+    from { left: calc(100% - 12px); opacity: 1; }
+    80% { opacity: 1; }
+    to { left: 0; opacity: 0; }
+}
+
+@keyframes link-pulse-flash {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .link-pulse--out,
+    .link-pulse--in {
+        left: calc(50% - 6px);
+        animation-name: link-pulse-flash;
+    }
+}

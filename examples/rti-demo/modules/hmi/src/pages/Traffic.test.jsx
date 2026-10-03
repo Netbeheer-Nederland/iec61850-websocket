@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Traffic from './Traffic';
 
@@ -29,8 +29,16 @@ import Traffic from './Traffic';
 vi.mock('../components/MessageMonitor', () => ({
   default: ({ title }) => <div data-testid="message-monitor">{title}</div>,
 }));
+// Exposes its select callbacks as buttons, so focusing can be driven here.
 vi.mock('../components/InstanceVisualization', () => ({
-  default: () => <div data-testid="instance-visualization" />,
+  default: ({ connections = [], onFspSelect, onSoSelect }) => (
+    <div data-testid="instance-visualization">
+      {connections.filter((c) => c.type === 'RTI-FSP').map((c) => (
+        <button key={c.name} onClick={() => onFspSelect?.(c)}>{`focus ${c.name}`}</button>
+      ))}
+      <button onClick={() => onSoSelect?.()}>focus SO</button>
+    </div>
+  ),
 }));
 vi.mock('../components/DataAccessPanel', () => ({
   default: () => <div data-testid="data-access-panel" />,
@@ -86,5 +94,41 @@ describe('Traffic - Message Monitors only lists FSPs with an active connection',
     expect(screen.getByText('FSP01')).toBeInTheDocument();
     expect(screen.queryByText('FSP02')).not.toBeInTheDocument();
     expect(screen.getByText('FSP03')).toBeInTheDocument();
+  });
+});
+
+describe('Traffic - focusing an FSP link', () => {
+  const all = () => [SO, fsp('FSP01', 1), fsp('FSP02', 1)];
+  const monitors = () => screen.getAllByTestId('message-monitor').map((m) => m.textContent);
+
+  it('lists only the focused FSP monitor, and shows all again on a second click', () => {
+    renderTraffic(all());
+
+    fireEvent.click(screen.getByText('focus FSP02'));
+    expect(monitors()).toEqual(['SO', 'FSP02']);
+    expect(screen.getByText(/Focused on/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('focus FSP02'));
+    expect(monitors()).toEqual(['SO', 'FSP01', 'FSP02']);
+    expect(screen.queryByText(/Focused on/)).not.toBeInTheDocument();
+  });
+
+  it('clears the focus from the SO or the Show all button', () => {
+    renderTraffic(all());
+
+    fireEvent.click(screen.getByText('focus FSP01'));
+    fireEvent.click(screen.getByText('focus SO'));
+    expect(monitors()).toEqual(['SO', 'FSP01', 'FSP02']);
+
+    fireEvent.click(screen.getByText('focus FSP01'));
+    fireEvent.click(screen.getByTitle('Show all links'));
+    expect(monitors()).toEqual(['SO', 'FSP01', 'FSP02']);
+  });
+
+  it('keeps the SO monitor listed while an FSP is focused', () => {
+    renderTraffic(all());
+
+    fireEvent.click(screen.getByText('focus FSP01'));
+    expect(monitors()).toEqual(['SO', 'FSP01']);
   });
 });

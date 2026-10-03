@@ -21,12 +21,20 @@ import React, { useState, useEffect, useCallback } from 'react';
 import InstanceVisualization from '../components/InstanceVisualization';
 import MessageMonitor from '../components/MessageMonitor';
 import DataAccessPanel from '../components/DataAccessPanel';
+import { useLinkActivity } from '../hooks/useLinkActivity';
 
 function Traffic({ settings, getModel, updateModel, connections = [], loading = false }) {
 
   const [monitorsExpanded, setMonitorsExpanded] = useState(true);
   const [panelsExpanded, setPanelsExpanded] = useState(true);
   const [dataAccessPanels, setDataAccessPanels] = useState([1]);
+  const { activity, reset: resetActivity } = useLinkActivity(connections);
+  // Clicking an FSP focuses its link: the others dim and only its monitor
+  // is listed below. Clicking it again, or the SO, shows all links again.
+  const [focusedFspName, setFocusedFspName] = useState(null);
+  const focusedFsp = connections.some((c) => c.type === 'RTI-FSP' && c.name === focusedFspName)
+    ? focusedFspName
+    : null;
 
   return (
     <section className="page">
@@ -36,12 +44,29 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
       </div>
 
       <div style={{ marginBottom: '40px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '12px' }}>
+          {focusedFsp && (
+            <span className="link-focus-chip" style={{ color: 'var(--text-secondary)' }}>
+              Focused on <strong>{focusedFsp}</strong>
+              <button className="btn-icon" style={{ marginLeft: '6px', padding: '2px 8px' }} onClick={() => setFocusedFspName(null)} title="Show all links">
+                Show all
+              </button>
+            </span>
+          )}
+          <button className="btn-icon" style={{ padding: '2px 8px' }} onClick={resetActivity} title="Reset the link counters">
+            <i className="fas fa-undo" style={{ fontSize: '11px', marginRight: '4px' }}></i>Reset counters
+          </button>
+        </div>
         <InstanceVisualization
           connections={connections}
           selectedConnection={null}
           loading={loading}
           onConnectionClick={null}
           showLabels={true}
+          activity={activity}
+          focusedFsp={focusedFsp}
+          onSoSelect={() => setFocusedFspName(null)}
+          onFspSelect={(conn) => setFocusedFspName((prev) => (prev === conn.name ? null : conn.name))}
         />
       </div>
       
@@ -187,6 +212,7 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
                 // have one open, same threshold InstanceVisualization
                 // already uses to light up its FSP circle/connection line.
                 .filter(conn => conn.status === 'connected' && conn.type === 'RTI-FSP' && (conn.connectedClients ?? 0) > 0)
+                .filter(conn => !focusedFsp || conn.name === focusedFsp)
                 .map((endpoint) => (
                   <MessageMonitor
                     key={`server-monitor-${endpoint.host}-${endpoint.port}`}
