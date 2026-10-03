@@ -105,4 +105,17 @@ describe('PinActionForm', () => {
     fireEvent.click(screen.getByText('Pin as demo action'));
     expect(screen.queryByText(/no registered FSP/)).not.toBeInTheDocument();
   });
+
+  it('offers Disable report for an RCB too', () => {
+    render(<PinActionForm so={so} cp="cp1" report={{ objRef: 'LD0/LLN0.rcbActualValues', rcbType: 'BRCB' }} />);
+    fireEvent.click(screen.getByText('Pin as demo action'));
+
+    fireEvent.change(screen.getByLabelText('Service'), { target: { value: 'disable-report' } });
+    expect(screen.getByText(/with reporting off/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Pin'));
+
+    expect(loadActions()).toEqual([expect.objectContaining({
+      label: 'Disable report LLN0.rcbActualValues', service: 'disable-report', rcbType: 'BRCB',
+    })]);
+  });
 });

@@ -21,7 +21,8 @@ import { executeApiCall } from '../services/apiService';
 
 // Demo actions: SO service calls pinned from a Data Access Panel (an SO
 // endpoint, one of its cps, a data object, a service) - or, for
-// "enable-report", from the ACSI Client page's RCB dialog - and replayed as
+// "enable-report" / "disable-report", from the ACSI Client page's RCB
+// dialog - and replayed as
 // one-click buttons on Traffic's demo bar. An action belongs to the FSP
 // behind its cp; actions on different FSPs that share a label run together
 // from "All FSPs" - the FSPs' models differ, so each FSP keeps its own
@@ -31,7 +32,7 @@ import { executeApiCall } from '../services/apiService';
 // the pins are a convenience, not shared state.
 
 export const STORAGE_KEY = 'traffic-demo-actions';
-export const SERVICES = ['read', 'write', 'operate', 'enable-report'];
+export const SERVICES = ['read', 'write', 'operate', 'enable-report', 'disable-report'];
 
 // The optFlds / trgOp a SetBRCBValues / SetURCBValues carries - the SO
 // fills any it isn't sent with its own defaults, so all are always sent
@@ -132,12 +133,13 @@ const errorOf = (result, fallback) => {
 };
 
 /**
- * Enable a report control block: read it, then write its own configuration
- * back with rptEna set - the SO resets every field a write leaves out, so
- * a bare { rptEna: true } would wipe its data set. An RCB that is already
- * enabled is left alone (a server may refuse a rewrite while enabled).
+ * Turn a report control block's reporting on or off: read it, then write
+ * its own configuration back with rptEna set - the SO resets every field a
+ * write leaves out, so a bare { rptEna } would wipe its data set. An RCB
+ * already in the wanted state is left alone (a server may refuse a rewrite
+ * while enabled).
  */
-async function enableReport({ soTarget, objRef, cp, rcbType }) {
+async function setReporting({ soTarget, objRef, cp, rcbType }, enabled) {
   const urcb = String(rcbType || '').toUpperCase() === 'URCB';
   const read = await executeApiCall(urcb ? 'urcb-read' : 'brcb-read', soTarget, { objRef, cp });
   const current = read?.payload?.result?.value;
@@ -146,7 +148,7 @@ async function enableReport({ soTarget, objRef, cp, rcbType }) {
     const message = read?.ok && typeof current === 'string' ? current : errorOf(read, 'Could not read the report control block');
     return { ok: false, message };
   }
-  if (current.rptEna === true) return { ok: true, message: 'already enabled' };
+  if (current.rptEna === enabled) return { ok: true, message: enabled ? 'already enabled' : 'already disabled' };
 
   const write = await executeApiCall(urcb ? 'urcb-write' : 'brcb-write', soTarget, {
     objRef,
@@ -154,7 +156,7 @@ async function enableReport({ soTarget, objRef, cp, rcbType }) {
       ref: objRef,
       dataSet: current.dataSet || '',
       intgPd: parseInt(current.intgPd, 10) || 0,
-      rptEna: true,
+      rptEna: enabled,
       optFlds: flags(OPT_FLDS_KEYS, current.optFlds),
       trgOp: flags(TRG_OP_KEYS, current.trgOp),
     },
@@ -164,14 +166,16 @@ async function enableReport({ soTarget, objRef, cp, rcbType }) {
   // answer in `result`): true, or the serviceError's name.
   const value = write?.payload?.result?.value;
   if (write?.ok && value === true) return { ok: true, message: 'ok' };
-  return { ok: false, message: write?.ok && typeof value === 'string' ? value : errorOf(write, 'Enabling the report failed') };
+  const failed = enabled ? 'Enabling the report failed' : 'Disabling the report failed';
+  return { ok: false, message: write?.ok && typeof value === 'string' ? value : errorOf(write, failed) };
 }
 
 /**
  * Run an action on its SO. Resolves to { ok, message } - never throws.
  */
 export async function runAction(action) {
-  if (action.service === 'enable-report') return enableReport(action);
+  if (action.service === 'enable-report') return setReporting(action, true);
+  if (action.service === 'disable-report') return setReporting(action, false);
   let request;
   try {
     request = buildRequest(action);

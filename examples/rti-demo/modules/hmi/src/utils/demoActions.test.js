@@ -184,3 +184,37 @@ describe('runAction - enable-report', () => {
     expect(loadActions()).toEqual([rcb]);
   });
 });
+
+describe('runAction - disable-report', () => {
+  const rcb = { ...base, service: 'disable-report', objRef: 'LD0/LLN0.rcbActualValues', rcbType: 'BRCB' };
+  const readResult = (value) => ({ ok: true, payload: { result: { ok: true, value } } });
+  const config = { dataSet: 'LD0/LLN0.DataSetActualValues', intgPd: 1000, rptEna: true, optFlds: {}, trgOp: { dchg: true } };
+
+  beforeEach(() => executeApiCall.mockReset());
+
+  it('writes the configuration back with rptEna off', async () => {
+    executeApiCall
+      .mockResolvedValueOnce(readResult(config))
+      .mockResolvedValueOnce({ ok: true, payload: { result: { value: true } } });
+
+    await expect(runAction(rcb)).resolves.toEqual({ ok: true, message: 'ok' });
+    expect(executeApiCall.mock.calls[1][2].data).toMatchObject({
+      ref: rcb.objRef, dataSet: config.dataSet, intgPd: 1000, rptEna: false, trgOp: { dchg: true },
+    });
+  });
+
+  it('leaves an RCB that is already disabled alone', async () => {
+    executeApiCall.mockResolvedValueOnce(readResult({ ...config, rptEna: false }));
+
+    await expect(runAction(rcb)).resolves.toEqual({ ok: true, message: 'already disabled' });
+    expect(executeApiCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a failed write', async () => {
+    executeApiCall
+      .mockResolvedValueOnce(readResult(config))
+      .mockResolvedValueOnce({ ok: false, payload: {} });
+
+    await expect(runAction(rcb)).resolves.toEqual({ ok: false, message: 'Disabling the report failed' });
+  });
+});

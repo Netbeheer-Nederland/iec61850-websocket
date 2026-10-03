@@ -22,7 +22,9 @@ import { controlValue } from '../utils/demoActions';
 import { useDemoActions } from '../hooks/useDemoActions';
 import { buildTargetValue } from '../services/apiService';
 
-const SERVICE_LABELS = { read: 'Read', write: 'Write', operate: 'Operate', 'enable-report': 'Enable report' };
+const SERVICE_LABELS = {
+  read: 'Read', write: 'Write', operate: 'Operate', 'enable-report': 'Enable report', 'disable-report': 'Disable report',
+};
 const shortRef = (ref) => String(ref || '').split('/').pop();
 
 /**
@@ -45,7 +47,7 @@ function PinActionForm({ so, cp, read = null, canWrite = false, operate = null, 
     ...(read ? ['read'] : []),
     ...(read && canWrite ? ['write'] : []),
     ...(operate ? ['operate'] : []),
-    ...(report ? ['enable-report'] : []),
+    ...(report ? ['enable-report', 'disable-report'] : []),
   ];
   const [open, setOpen] = useState(false);
   const [service, setService] = useState(null);
@@ -58,7 +60,8 @@ function PinActionForm({ so, cp, read = null, canWrite = false, operate = null, 
 
   const fspName = (so.fspLinks || []).find((l) => l.cp === cp)?.fsp || null;
   const active = services.includes(service) ? service : services[0];
-  const target = { operate, 'enable-report': report }[active] || read;
+  const isReport = active === 'enable-report' || active === 'disable-report';
+  const target = active === 'operate' ? operate : isReport ? report : read;
   const takesValue = active === 'write' || active === 'operate';
 
   const openForm = () => {
@@ -95,7 +98,7 @@ function PinActionForm({ so, cp, read = null, canWrite = false, operate = null, 
       fc: active === 'read' || active === 'write' ? read.fc : undefined,
       valueType: active === 'write' ? read.valueType || undefined : undefined,
       cdc: active === 'operate' ? operate.cdc : undefined,
-      rcbType: active === 'enable-report' ? report.rcbType : undefined,
+      rcbType: isReport ? report.rcbType : undefined,
       value: takesValue ? value : undefined,
     });
     setPinned(`Pinned "${name}" for ${fspName || cp}`);
@@ -145,7 +148,7 @@ function PinActionForm({ so, cp, read = null, canWrite = false, operate = null, 
         {target.objRef}
         {(active === 'read' || active === 'write') && read.fc ? ` [${read.fc.toUpperCase()}]` : ''}
         {active === 'operate' ? ` (${operate.cdc})` : ''}
-        {active === 'enable-report' ? ` (${report.rcbType || 'BRCB'} - its current configuration, with reporting on)` : ''}
+        {isReport ? ` (${report.rcbType || 'BRCB'} - its current configuration, with reporting ${active === 'enable-report' ? 'on' : 'off'})` : ''}
       </div>
       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
         Give actions on other FSPs the same label to run them together with "All FSPs".

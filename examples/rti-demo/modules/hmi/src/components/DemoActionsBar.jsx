@@ -22,7 +22,9 @@ import { useDemoActions } from '../hooks/useDemoActions';
 import { runAction, groupByLabel } from '../utils/demoActions';
 import { buildTargetValue } from '../services/apiService';
 
-const SERVICE_ICONS = { read: 'fa-eye', write: 'fa-pen', operate: 'fa-bolt', 'enable-report': 'fa-flag' };
+const SERVICE_ICONS = {
+  read: 'fa-eye', write: 'fa-pen', operate: 'fa-bolt', 'enable-report': 'fa-flag', 'disable-report': 'fa-ban',
+};
 
 /**
  * Traffic's demo bar: the actions pinned from Data Access Panels
