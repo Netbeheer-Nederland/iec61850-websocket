@@ -453,3 +453,56 @@ class TestSelectAndOperateAnswers:
         response = client.post("/api/select", json={"objRef": "LD0/CSWI1.Pos"})
         assert response.status_code == 504
         assert response.json() == {"ok": False, "error": "Select timeout"}
+
+
+class TestOperateRoutePassesControlParameters:
+    """POST /api/operate hands ctlNum, origin and test to ACSIClient.operate."""
+
+    @staticmethod
+    def _connected(acsi_client, monkeypatch):
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        from types import SimpleNamespace
+
+        calls = []
+
+        async def fake_operate(obj_ref, value, value_type, cp, **kwargs):
+            calls.append((obj_ref, value, value_type, cp, kwargs))
+            return {"objRef": obj_ref, "result": True}
+
+        acsi_client.runtime.endpoint = SimpleNamespace(websocket_info_list=[object()])
+        monkeypatch.setattr(acsi_client, "get_iec61850_client", lambda cp: object())
+        monkeypatch.setattr(acsi_client, "operate", fake_operate)
+        monkeypatch.setattr(
+            acsi_client,
+            "invoke_on_runtime_loop",
+            lambda coro, timeout=10: ThreadPoolExecutor(1).submit(asyncio.run, coro).result(timeout),
+        )
+        monkeypatch.setattr(bff_endpoint, "_use_io_client", False)
+        return calls
+
+    def test_passes_ctlnum_origin_and_test(self, app_client, monkeypatch):
+        client, acsi_client = app_client
+        calls = self._connected(acsi_client, monkeypatch)
+
+        response = client.post("/api/operate", json={
+            "objRef": "GenericIO/GGIO1.SPCSO1", "value": True, "value_type": "boolean", "cp": "cp2",
+            "ctlNum": 3, "origin": {"orCat": 1, "orIdent": "0"}, "test": False,
+        })
+
+        assert response.status_code == 200
+        assert response.json() == {"ok": True, "error": ""}
+        assert calls == [("GenericIO/GGIO1.SPCSO1", True, "boolean", "cp2",
+                          {"ctl_num": 3, "origin": {"orCat": 1, "orIdent": "0"}, "test": False})]
+
+    def test_rejects_an_unknown_originator_category(self, app_client, monkeypatch):
+        client, acsi_client = app_client
+        calls = self._connected(acsi_client, monkeypatch)
+
+        response = client.post("/api/operate", json={
+            "objRef": "LD0/CSWI1.Pos", "value": "on", "value_type": "enumerated", "origin": {"orCat": 12},
+        })
+
+        assert response.status_code == 400
+        assert "orCat" in response.json()["error"]
+        assert calls == []

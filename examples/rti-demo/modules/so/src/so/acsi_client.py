@@ -39,6 +39,7 @@ from typing import Any
 
 from ws61850.endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
+from ws61850.iec61850.data_model.helper import get_now_time
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,38 @@ def _jsonable(value: Any) -> Any:
     a raw ACSI result can go into a log entry's detail."""
     return json.loads(json.dumps(value, default=str))
 
+
+
+# OriginatorCategoryKind as the protocol names it (ACSI Originator.orCat).
+OR_CATEGORIES = [
+    "notSupported", "bayControl", "stationControl", "remoteControl",
+    "automaticBay", "automaticStation", "automaticRemote", "maintenance", "process",
+]
+DEFAULT_ORIGIN = {"orCat": "stationControl", "orIdent": b"ORIGIN_ID_1234567890"}
+
+
+def originator(origin: dict[str, Any] | None) -> dict[str, Any]:
+    """An operate's Originator from the caller's {orCat, orIdent}.
+
+    orCat may be the OriginatorCategoryKind number (as the HMI sends it) or
+    its name; orIdent is sent as bytes (at most 64). Missing parts keep the
+    SO's former fixed origin.
+    """
+    if not origin:
+        return dict(DEFAULT_ORIGIN)
+    cat = origin.get("orCat", DEFAULT_ORIGIN["orCat"])
+    if isinstance(cat, str) and cat.isdigit():
+        cat = int(cat)
+    if isinstance(cat, int):
+        if not 0 <= cat < len(OR_CATEGORIES):
+            raise ValueError(f"orCat must be 0..{len(OR_CATEGORIES) - 1}, got {cat}")
+        cat = OR_CATEGORIES[cat]
+    elif cat not in OR_CATEGORIES:
+        raise ValueError(f"unknown orCat {cat!r}")
+    ident = origin.get("orIdent", DEFAULT_ORIGIN["orIdent"])
+    if not isinstance(ident, bytes):
+        ident = str(ident).encode("utf-8")
+    return {"orCat": cat, "orIdent": ident[:64]}
 
 class ModelInfo:
     def __init__(self, cp):
@@ -1178,9 +1211,22 @@ class ACSIClient:
         return {"objRef": obj_ref, "result": result}
 
     async def operate(
-            self, obj_ref, oper_val, val_type: str, cp: str
+            self,
+            obj_ref,
+            oper_val,
+            val_type: str,
+            cp: str,
+            *,
+            ctl_num: int = 0,
+            origin: dict[str, Any] | None = None,
+            test: bool = False,
     ) -> dict[str, Any]:
-        """Perform an operate command on the server."""
+        """Perform an operate command on the server.
+
+        ctlNum, origin and test are the caller's (ControlModal sends all
+        three); the operate's time is now. origin's orCat may be the
+        OriginatorCategoryKind number or name.
+        """
         client = self.get_iec61850_client(cp)
         if not client:
             raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
@@ -1193,19 +1239,10 @@ class ACSIClient:
                 val_type,
                 self._convert_operate_val_to_its_type(oper_val, val_type),
             ),
-            "origin": {"orCat": "stationControl", "orIdent": b"ORIGIN_ID_1234567890"},
-            "ctlNum": 0,
-            "t": {
-                "secondSinceEpoch": 1757588367,
-                "fractionOfSecond": 8120140,
-                "timeQuality": {
-                    "leapSecondsKown": False,
-                    "clockFailure": False,
-                    "clockNotSynchronized": False,
-                    "timeAccuracy": 3,
-                },
-            },
-            "test": True,
+            "origin": originator(origin),
+            "ctlNum": int(ctl_num or 0) % 256,
+            "t": get_now_time(),
+            "test": bool(test),
             "check": {"synchroCheck": False, "interlockCheck": False},
         }
 

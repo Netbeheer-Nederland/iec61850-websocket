@@ -42,7 +42,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from so.acsi_client import ACSIClient
+from so.acsi_client import ACSIClient, originator
 from ws61850.security.tls import TLSConfig
 
 
@@ -1188,7 +1188,26 @@ class OperateRequest(BaseModel):
         json_schema_extra={"example": "cp1"},
     )
 
+    ctl_num: int = Field(
+        default=0,
+        alias="ctlNum",
+        description="Control sequence number (0..255)",
+    )
+
+    origin: dict[str, Any] | None = Field(
+        default=None,
+        description="Originator: orCat (OriginatorCategoryKind number or name) and orIdent; "
+        "omitted, the SO's own fixed origin is used",
+        json_schema_extra={"example": {"orCat": 2, "orIdent": "HMI"}},
+    )
+
+    test: bool = Field(
+        default=False,
+        description="Operate in test mode - the server is not to act on it",
+    )
+
     model_config = ConfigDict(
+        populate_by_name=True,
         json_schema_extra={
             "example": {
                 "objRef": "LD0/MMXU.WMaxSpt",
@@ -4228,10 +4247,23 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                 return JSONResponse(
                     content={"ok": False, "error": "value is required"}, status_code=400
                 )
+            try:
+                originator(request.origin)
+            except ValueError as exc:
+                return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=400)
 
             try:
                 result = rti_so.invoke_on_runtime_loop(
-                    rti_so.operate(obj_ref, value, value_type, cp), timeout=10
+                    rti_so.operate(
+                        obj_ref,
+                        value,
+                        value_type,
+                        cp,
+                        ctl_num=request.ctl_num,
+                        origin=request.origin,
+                        test=request.test,
+                    ),
+                    timeout=10,
                 )
 
                 if result is None:

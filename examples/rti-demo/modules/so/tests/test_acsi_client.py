@@ -458,3 +458,75 @@ class TestReportCallback:
         })
 
         assert calls[0][2] == [{"dataRef": "LD0/A", "value": 1}]
+
+
+class TestOperateRequestContents:
+    """What ACSIClient.operate sends: the caller's ctlNum, origin and test,
+    timed now - not a fixed test-mode operate."""
+
+    def test_originator_maps_categories(self):
+        from so.acsi_client import originator
+
+        assert originator({"orCat": 1, "orIdent": "HMI"}) == {"orCat": "bayControl", "orIdent": b"HMI"}
+        assert originator({"orCat": "3", "orIdent": "0"}) == {"orCat": "remoteControl", "orIdent": b"0"}
+        assert originator({"orCat": "automaticBay", "orIdent": b"x"}) == {"orCat": "automaticBay", "orIdent": b"x"}
+        assert originator(None) == {"orCat": "stationControl", "orIdent": b"ORIGIN_ID_1234567890"}
+        assert len(originator({"orCat": 2, "orIdent": "x" * 80})["orIdent"]) == 64
+
+    @pytest.mark.parametrize("bad", [9, -1, "fieldControl"])
+    def test_originator_rejects_unknown_categories(self, bad):
+        from so.acsi_client import originator
+
+        with pytest.raises(ValueError):
+            originator({"orCat": bad, "orIdent": "x"})
+
+    def test_operate_sends_the_callers_values_timed_now(self, client):
+        import asyncio
+        import time as _time
+        from types import SimpleNamespace
+
+        sent = []
+
+        async def fake_operate(oper_val, websocket_info, callback, parameter):
+            sent.append(oper_val)
+            return True
+
+        async def run_call(**kwargs):
+            return await kwargs["call"]()
+
+        client.get_iec61850_client = lambda cp: SimpleNamespace(operate=fake_operate)
+        client.runtime.endpoint = SimpleNamespace(get_websocket_info=lambda c: SimpleNamespace())
+        client._invoke_acsi = run_call
+
+        result = asyncio.run(client.operate(
+            "GenericIO/GGIO1.SPCSO1", True, "boolean", "cp2",
+            ctl_num=7, origin={"orCat": 1, "orIdent": "HMI"}, test=False,
+        ))
+
+        assert result == {"objRef": "GenericIO/GGIO1.SPCSO1", "result": True}
+        oper = sent[0]
+        assert oper["ctlNum"] == 7
+        assert oper["test"] is False
+        assert oper["origin"] == {"orCat": "bayControl", "orIdent": b"HMI"}
+        assert abs(oper["t"]["secondSinceEpoch"] - _time.time()) < 5
+
+    def test_operate_defaults_to_a_real_operate(self, client):
+        import asyncio
+        from types import SimpleNamespace
+
+        sent = []
+
+        async def fake_operate(oper_val, *args):
+            sent.append(oper_val)
+            return True
+
+        async def run_call(**kwargs):
+            return await kwargs["call"]()
+
+        client.get_iec61850_client = lambda cp: SimpleNamespace(operate=fake_operate)
+        client.runtime.endpoint = SimpleNamespace(get_websocket_info=lambda c: SimpleNamespace())
+        client._invoke_acsi = run_call
+
+        asyncio.run(client.operate("LD0/DWMX1.WMaxSpt", "50", "float32", "cp1"))
+        assert sent[0]["test"] is False
+        assert sent[0]["ctlNum"] == 0
