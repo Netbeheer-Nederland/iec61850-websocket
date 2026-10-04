@@ -22,10 +22,48 @@
 // the cp it came in on (its associateId), which the SO's fspLinks name the
 // FSP for.
 
+const QUALITY_FLAGS = { test: 'test', operatorBlock: 'blocked' };
+
+/** "good", or e.g. "invalid, substituted, test, overflow". */
+function formatQuality(q) {
+  if (!q || typeof q !== 'object') return String(q ?? '');
+  const parts = [q.validity || 'unknown'];
+  if (q.source && q.source !== 'process') parts.push(q.source);
+  Object.entries(QUALITY_FLAGS).forEach(([key, label]) => { if (q[key]) parts.push(label); });
+  if (q.detailQual && typeof q.detailQual === 'object') {
+    Object.entries(q.detailQual).forEach(([key, on]) => { if (on) parts.push(key); });
+  }
+  return parts.join(', ');
+}
+
+const pad = (n, w = 2) => String(n).padStart(w, '0');
+
+/**
+ * "2026-10-04 06:37:00.123 UTC", or "not set" for 0. ws61850 writes
+ * fractionOfSecond as microseconds x 10 (100 ns units - see get_now_time in
+ * ws61850's data_model/helper.py), not IEC 61850's 24-bit fraction, so it is
+ * read that way. A clock failure / unsynchronized clock is appended.
+ */
+function formatTimeStamp(t) {
+  if (!t || typeof t !== 'object') return String(t ?? '');
+  const seconds = Number(t.secondSinceEpoch) || 0;
+  if (!seconds) return 'not set';
+  const ms = Math.floor((Number(t.fractionOfSecond) || 0) / 10000);
+  const d = new Date(seconds * 1000 + ms);
+  let text = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} `
+    + `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}.${pad(d.getUTCMilliseconds(), 3)} UTC`;
+  const tq = t.timeQuality || {};
+  if (tq.clockFailure) text += ' (clock failure)';
+  else if (tq.clockNotSynchronized) text += ' (not synchronized)';
+  return text;
+}
+
 /**
  * A report value as text: ACSI values arrive as [{ data: { <type>: v } }],
- * a structure as { structure: [...] } of the same.
- * @returns {{text: string, type: string}}
+ * a structure as { structure: { data: [...] } } of the same - one with a
+ * single member shows as that member. Quality and timeStamp get a readable
+ * form, with the raw value in `detail`.
+ * @returns {{text: string, type: string, detail?: string}}
  */
 export function formatValue(value) {
   if (Array.isArray(value)) {
@@ -37,11 +75,15 @@ export function formatValue(value) {
     const keys = Object.keys(value);
     if (keys.length === 1) {
       const [type] = keys;
+      const inner = value[type];
       if (type === 'structure') {
-        const parts = Array.isArray(value.structure) ? value.structure : [value.structure];
-        return { text: `{${parts.map((p) => formatValue(p).text).join(', ')}}`, type };
+        const members = Array.isArray(inner) ? inner : Array.isArray(inner?.data) ? inner.data : [inner];
+        if (members.length === 1) return formatValue(members[0]);
+        return { text: `{${members.map((m) => formatValue(m).text).join(', ')}}`, type };
       }
-      return { text: formatValue(value[type]).text, type };
+      if (type === 'quality') return { text: formatQuality(inner), type, detail: JSON.stringify(inner) };
+      if (type === 'timeStamp') return { text: formatTimeStamp(inner), type, detail: JSON.stringify(inner) };
+      return { text: formatValue(inner).text, type };
     }
     return { text: JSON.stringify(value), type: 'object' };
   }

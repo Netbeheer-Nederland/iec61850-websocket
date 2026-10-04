@@ -42,6 +42,36 @@ describe('formatValue', () => {
   });
 });
 
+describe('formatValue - shapes ws61850 reports use', () => {
+  // As logged by an FSP (model_1 ActualValues).
+  const quality = (q) => [{ data: { quality: { validity: 'good', source: 'process', test: false, operatorBlock: false, ...q } } }];
+  const stamp = (t) => [{ data: { timeStamp: { secondSinceEpoch: 0, fractionOfSecond: 0, timeQuality: { clockFailure: false, clockNotSynchronized: false, timeAccuracy: 0 }, ...t } } }];
+
+  it('shows a single-member structure, however deep, as its value', () => {
+    expect(formatValue([{ data: { structure: { data: [{ float32: 0.0 }] } } }])).toEqual({ text: '0', type: 'float32' });
+    expect(formatValue([{ data: { structure: { data: [{ structure: { data: [{ float32: 230.25 }] } }] } } }]))
+      .toEqual({ text: '230.25', type: 'float32' });
+    expect(formatValue([{ data: { structure: { data: [{ float32: 1.5 }, { int32: 2 }] } } }]))
+      .toEqual({ text: '{1.5, 2}', type: 'structure' });
+  });
+
+  it('shows a quality as its validity and any flags set, raw in detail', () => {
+    expect(formatValue(quality())).toMatchObject({ text: 'good', type: 'quality' });
+    expect(formatValue(quality({ validity: 'invalid', source: 'substituted', test: true, operatorBlock: true, detailQual: { overflow: true, oscillatory: false } })).text)
+      .toBe('invalid, substituted, test, blocked, overflow');
+    expect(JSON.parse(formatValue(quality()).detail).validity).toBe('good');
+  });
+
+  it('shows a timestamp in UTC, "not set" for 0, with clock trouble appended', () => {
+    expect(formatValue(stamp())).toMatchObject({ text: 'not set', type: 'timeStamp' });
+    // ws61850's fractionOfSecond is microseconds x 10: 1234560 = 123.456 ms.
+    const secs = Date.UTC(2026, 9, 4, 6, 37, 0) / 1000;
+    expect(formatValue(stamp({ secondSinceEpoch: secs, fractionOfSecond: 1234560 })).text).toBe('2026-10-04 06:37:00.123 UTC');
+    expect(formatValue(stamp({ secondSinceEpoch: secs, timeQuality: { clockNotSynchronized: true } })).text)
+      .toBe('2026-10-04 06:37:00.000 UTC (not synchronized)');
+  });
+});
+
 describe('parseReport', () => {
   it('reads rptID, data set and entries', () => {
     expect(parseReport(reportText('cp1', 'ActualValues', [entry('LD0/MMXU1.TotW.mag.f', 'float32', 42)]))).toEqual({

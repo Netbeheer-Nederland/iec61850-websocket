@@ -88,7 +88,7 @@ function ReportValues({ timeline, focusedFsp = null, presence = null }) {
                     style={{ background: v.latest ? 'var(--bg-hover)' : 'transparent' }}
                   >
                     <td style={{ ...cell, ...MONO, wordBreak: 'break-all' }}>{v.dataRef}</td>
-                    <td style={{ ...cell, ...MONO, fontWeight: v.latest ? 700 : 400, color: v.latest ? 'var(--warning-color)' : 'var(--text-primary)' }} title={v.type}>{v.text}</td>
+                    <td style={{ ...cell, ...MONO, fontWeight: v.latest ? 700 : 400, color: v.latest ? 'var(--warning-color)' : 'var(--text-primary)' }} title={v.detail ? `${v.type}: ${v.detail}` : v.type}>{v.text}</td>
                     <td style={{ ...cell, color: 'var(--text-secondary)' }}>{v.rptID}</td>
                     <td style={{ ...cell, ...MONO, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{v.time}</td>
                   </tr>
