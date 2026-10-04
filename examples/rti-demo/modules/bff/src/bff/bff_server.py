@@ -51,6 +51,16 @@ from bff.pydantic_models import (
     TLSConnectionCreateConfigRequest,
 )
 
+# uvloop (which uvicorn runs on when it's installed) resolves hostnames on
+# libuv's thread pool - 4 threads unless UV_THREADPOOL_SIZE says otherwise.
+# The status monitor checks every instance at once, and a lookup of a
+# hostname that no longer resolves (a removed FSP, an IDP that isn't
+# running) holds a thread for seconds before failing. Two of those were
+# enough to queue the SO's own lookup past its health check's 2 s timeout,
+# every round, so a live SO showed as down. libuv reads this when its pool
+# first starts, so it is set before the event loop does any work.
+os.environ.setdefault("UV_THREADPOOL_SIZE", "32")
+
 # Global state
 _bff_clients: dict[str, BffClient] = {}
 

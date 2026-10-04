@@ -880,3 +880,13 @@ def test_ws_endpoint_registers_and_unregisters_client():
         assert len(bff_server.ws_hub._clients) == 1
 
     assert len(bff_server.ws_hub._clients) == 0
+
+
+# -------------------- uvloop's resolver pool --------------------
+
+
+def test_bff_gives_uvloop_a_resolver_pool_big_enough_for_dead_hosts():
+    """With libuv's default 4 threads, two lookups of hostnames that no longer
+    resolve queued the SO's lookup past its 2 s health check - see the
+    UV_THREADPOOL_SIZE comment in bff_server."""
+    assert int(os.environ["UV_THREADPOOL_SIZE"]) >= 16
