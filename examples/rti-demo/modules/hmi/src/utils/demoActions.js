@@ -183,17 +183,29 @@ export async function runAction(action) {
     return { ok: false, message: error.message };
   }
   const result = await executeApiCall(request.apiId, action.soTarget, request.body);
-  // The SO's answer, as the BFF wraps it in `result`. Its HTTP status (and
-  // the BFF's own `ok`) only say the SO got the request: an operate the FSP
-  // refused comes back as { ok: false, error }, and a read it refused as a
-  // value that is just the serviceError's name (a real read's value is a
-  // list of data).
+  return soAnswer(result, action.service);
+}
+
+/**
+ * Whether the FSP did what an SO service call asked, from executeApiCall's
+ * result: { ok, message }. The HTTP status (and the BFF's own `ok`) only say
+ * the SO got the request. The SO's answer, which the BFF wraps in `result`,
+ * says whether the FSP did it: an operate the FSP refused comes back as
+ * { ok: false, error } (error empty without a serviceError), a read it
+ * refused as a value that is just the serviceError's name (a real read's
+ * value is a list of data). Shared with ControlModal.
+ *
+ * @param {Object|null} result - executeApiCall's result
+ * @param {string} service - 'read' | 'write' | 'operate'
+ */
+export function soAnswer(result, service) {
   const answer = result?.payload?.result;
-  const refusedRead = action.service === 'read' && typeof answer?.value === 'string';
+  const refusedRead = service === 'read' && typeof answer?.value === 'string';
   const ok = Boolean(result?.ok) && answer?.ok !== false && answer?.success !== false && !refusedRead;
   if (ok) return { ok, message: 'ok' };
-  const message = (refusedRead && answer.value) || answer?.error || errorOf(result, 'Request failed');
-  return { ok, message: typeof message === 'string' ? message : JSON.stringify(message) };
+  if (refusedRead) return { ok, message: answer.value };
+  if (result?.ok && answer?.ok === false && !answer.error) return { ok, message: 'Refused by the FSP' };
+  return { ok, message: (typeof answer?.error === 'string' && answer.error) || errorOf(result, 'Request failed') };
 }
 
 /** Distinct labels in the order first pinned, each with its actions. */

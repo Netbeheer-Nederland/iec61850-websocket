@@ -23,7 +23,7 @@ vi.mock('../services/apiService', () => ({ executeApiCall: vi.fn() }));
 
 import { executeApiCall } from '../services/apiService';
 import {
-  controlValue, buildRequest, runAction, groupByLabel, loadActions, saveActions, STORAGE_KEY,
+  controlValue, buildRequest, runAction, soAnswer, groupByLabel, loadActions, saveActions, STORAGE_KEY,
 } from './demoActions';
 
 const base = { id: 'a1', label: 'L', soTarget: 'so:5002', cp: 'cp1', objRef: 'LD0/DWMX1.WMaxSpt' };
@@ -105,6 +105,19 @@ describe('runAction', () => {
 
     executeApiCall.mockResolvedValue(null);
     await expect(runAction({ ...base, service: 'read' })).resolves.toEqual({ ok: false, message: 'Request failed' });
+  });
+});
+
+describe('soAnswer', () => {
+  const viaBff = (answer) => ({ ok: true, payload: { ok: true, result: answer } });
+
+  it('names a refusal without a reason', () => {
+    expect(soAnswer(viaBff({ ok: false, error: '' }), 'operate')).toEqual({ ok: false, message: 'Refused by the FSP' });
+  });
+
+  it('passes the SO request failing through', () => {
+    expect(soAnswer({ ok: false, payload: { error: 'Client is not connected' } }, 'operate'))
+      .toEqual({ ok: false, message: 'Client is not connected' });
   });
 });
 

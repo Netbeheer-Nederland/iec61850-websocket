@@ -20,7 +20,7 @@
 // src/components/ControlModal.jsx
 import React, { useState, useEffect } from 'react';
 import { executeApiCall, getApiById } from '../services/apiService';
-import { controlValue } from '../utils/demoActions';
+import { controlValue, soAnswer } from '../utils/demoActions';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
@@ -109,19 +109,16 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess, 
       const params = getControlParameters();
       const endpointTarget = `${endpoint.host}:${endpoint.port}`;
       const response = await executeApiCall('operate', endpointTarget, params);
-      const opSuccess = response?.ok &&
-        (response?.payload?.result?.success ?? response?.payload?.success ?? true);
+      // The SO answers a refused operate with HTTP 200 { ok: false, error } -
+      // see soAnswer.
+      const answer = soAnswer(response, 'operate');
 
-      if (opSuccess) {
+      if (answer.ok) {
         setResult({ visible: true, success: true, message: 'Operate successful' });
         onSuccess(response?.payload);
       } else {
-        const errMsg = response?.payload?.result?.error
-          || response?.payload?.error
-          || response?.rawText
-          || 'Unknown error';
-        setResult({ visible: true, success: false, message: `Operate failed: ${errMsg}` });
-        onError(errMsg);
+        setResult({ visible: true, success: false, message: `Operate failed: ${answer.message}` });
+        onError(answer.message);
       }
     } catch (error) {
       setResult({ visible: true, success: false, message: `Operate error: ${error.message}` });
