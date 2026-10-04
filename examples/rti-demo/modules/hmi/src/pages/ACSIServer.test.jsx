@@ -457,7 +457,10 @@ describe('ACSIServer OAuth on Connect', () => {
     renderPage();
     const user = userEvent.setup({ delay: null });
 
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    // Connect only re-applies OAuth from the FSP's saved record once the
+    // connections fetch has been taken in - not merely called, or under load
+    // the click can land first. The SO targets come from the same state.
+    await screen.findByRole('option', { name: 'so1 (10.0.0.1:8765)' });
     await user.click(document.getElementById('acsi-start-btn'));
 
     await waitFor(() => expect(executeApiCall).toHaveBeenCalledWith(
