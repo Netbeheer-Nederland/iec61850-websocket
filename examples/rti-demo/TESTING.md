@@ -146,6 +146,15 @@ uv run pytest tests/integration -m integration -q
 it has no `pyproject.toml` of its own anymore - uv resolves the enclosing
 workspace at the repo root automatically.)
 
+`test_playbook.py` runs the demo playbook (`playbooks/demo.yaml`) - the
+same file presented in the demo - and fails on the first step that doesn't
+do what it should. It needs the SO and FSP01 / FSP02 registered with the
+BFF, and changes the stack's state as the demo does (links both FSPs,
+switches reporting on and off, drops FSP02 for a while). Run another
+playbook with `RTI_PLAYBOOK=playbooks/other.yaml`. See
+[playbooks/README.md](playbooks/README.md); the runner's own unit tests are
+`tests/test_playbook.py`.
+
 If you don't have Docker running, skip this section entirely - the unit
 test commands above never touch it.
 

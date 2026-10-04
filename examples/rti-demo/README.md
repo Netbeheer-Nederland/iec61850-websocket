@@ -60,6 +60,19 @@ python launch.py --stop
 python launch.py --docker
 ```
 
+## Demo playbooks
+
+A demo can be scripted as a playbook - a YAML list of steps (link the
+FSPs, read, operate, enable reports, drop an FSP, ...) that runs through
+the BFF while the HMI's Traffic page shows it, checking each step:
+
+```bash
+uv run python -m playbooks.run playbooks/demo.yaml
+```
+
+The same playbook runs as an integration test. See
+[playbooks/README.md](playbooks/README.md).
+
 ## Verbose Mode & Logs
 
 By default, verbose logging is enabled and the console is kept alive (foreground mode). All service logs are prefixed

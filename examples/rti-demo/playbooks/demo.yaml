@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# One SO with two FSPs, as docker-compose.yml brings them up: FSP01 runs
+# config/models/model_1.py (cp1), FSP02 model_2.py (cp2). Open the HMI's
+# Traffic page, then:
+#
+#   cd examples/rti-demo
+#   uv run python -m playbooks.run playbooks/demo.yaml
+#
+# Step reference: playbooks/README.md.
+
+name: SO with two FSPs
+bff: http://localhost:5000
+pace: 2s            # pause between steps, for the audience (--pace 0 to skip)
+
+steps:
+  - label: FSP01 dials the SO
+    link: {fsp: FSP01}
+  - label: FSP02 dials the SO
+    link: {fsp: FSP02}
+    expect: {linked: [FSP01, FSP02]}
+
+  # Start from a known state: a run that stopped half-way may have left
+  # reporting on.
+  - label: Reporting off to start with
+    disable-report:
+      fsp: [FSP01, FSP02]
+      rcb: {FSP01: LD0/LLN0.rcbActualValues, FSP02: GenericIO/LLN0.EventsRCB}
+      type: URCB
+
+  - label: Read status on both FSPs
+    read:
+      fsp: [FSP01, FSP02]
+      ref: {FSP01: LD0/LLN0.Mod.stVal, FSP02: GenericIO/LLN0.Beh.stVal}
+      fc: st
+
+  - label: Switch FSP02's LED on
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO1, cdc: SPC, value: "on"}
+
+  - label: FSP02 starts reporting (integrity, every second)
+    enable-report: {fsp: FSP02, rcb: GenericIO/LLN0.EventsRCB, type: URCB}
+  - label: Reports come in at the SO
+    wait: 5s
+    expect: {reports: {fsp: FSP02, min: 3}}
+  - label: FSP02 stops reporting
+    disable-report: {fsp: FSP02, rcb: GenericIO/LLN0.EventsRCB, type: URCB}
+
+  - label: FSP01 starts reporting (sends its values at once)
+    enable-report: {fsp: FSP01, rcb: LD0/LLN0.rcbActualValues, type: URCB}
+  - wait: 2s
+    expect: {reports: {fsp: FSP01, min: 1}}
+  - label: FSP01 stops reporting
+    disable-report: {fsp: FSP01, rcb: LD0/LLN0.rcbActualValues, type: URCB}
+
+  - label: FSP02 drops off and comes back
+    drop: {fsp: FSP02, for: 10s}
+  - label: Both answer again
+    read:
+      fsp: [FSP01, FSP02]
+      ref: {FSP01: LD0/LLN0.Mod.stVal, FSP02: GenericIO/LLN0.Beh.stVal}
+      fc: st
