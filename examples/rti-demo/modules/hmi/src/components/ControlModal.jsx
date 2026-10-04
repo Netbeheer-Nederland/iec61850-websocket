@@ -198,7 +198,7 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess, 
             onChange={(e) => setCtlVal(e.target.value)}
             placeholder={
               cdc?.toUpperCase() === 'SPC' ? 'true or false' :
-              cdc?.toUpperCase() === 'DPC' ? 'on, off, or intermediate-state' :
+              cdc?.toUpperCase() === 'DPC' ? 'on or off' :
               cdc?.toUpperCase() === 'APC' ? 'Float value (e.g., 123.45)' :
               cdc?.toUpperCase() === 'INC' || cdc?.toUpperCase() === 'ENC' ? 'Integer value' :
               cdc?.toUpperCase() === 'BSC' ? 'step-up or step-down' :

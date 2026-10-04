@@ -31,7 +31,8 @@ const base = { id: 'a1', label: 'L', soTarget: 'so:5002', cp: 'cp1', objRef: 'LD
 describe('controlValue', () => {
   it('converts per CDC', () => {
     expect(controlValue('SPC', 'on')).toEqual({ value: true, valueType: 'boolean' });
-    expect(controlValue('dpc', 'intermediate')).toEqual({ value: 'intermediateState', valueType: 'enumerated' });
+    expect(controlValue('dpc', 'on')).toEqual({ value: true, valueType: 'boolean' });
+    expect(controlValue('DPC', 'off')).toEqual({ value: false, valueType: 'boolean' });
     expect(controlValue('APC', ' 50.5 ')).toEqual({ value: 50.5, valueType: 'float32' });
     expect(controlValue('INC', '7')).toEqual({ value: 7, valueType: 'int32' });
     expect(controlValue('BSC', 'up')).toEqual({ value: 'stepUp', valueType: 'string' });
@@ -39,6 +40,8 @@ describe('controlValue', () => {
 
   it('rejects what the CDC cannot take', () => {
     expect(() => controlValue('SPC', 'maybe')).toThrow('Invalid SPC value');
+    // A DPC reports intermediate-state, but can't be commanded to it.
+    expect(() => controlValue('DPC', 'intermediate')).toThrow('Invalid DPC value. Use on or off');
     expect(() => controlValue('APC', 'abc')).toThrow('Must be a number');
     expect(() => controlValue('XYZ', '1')).toThrow('Unsupported CDC type');
   });

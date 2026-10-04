@@ -53,11 +53,13 @@ export function controlValue(cdc, raw) {
       if (['true', '1', 'on'].includes(text.toLowerCase())) return { value: true, valueType: 'boolean' };
       if (['false', '0', 'off'].includes(text.toLowerCase())) return { value: false, valueType: 'boolean' };
       throw new Error('Invalid SPC value. Use true/false or on/off');
-    case 'DPC': {
-      const value = { on: 'on', off: 'off', intermediate: 'intermediateState' }[text.toLowerCase()];
-      if (!value) throw new Error('Invalid DPC value. Use on, off, or intermediate-state');
-      return { value, valueType: 'enumerated' };
-    }
+    case 'DPC':
+      // A DPC's Oper.ctlVal is BOOLEAN (IEC 61850-7-3): on = true, off =
+      // false. intermediate-state / bad-state are states it reports, not
+      // ones it can be commanded to.
+      if (['true', '1', 'on'].includes(text.toLowerCase())) return { value: true, valueType: 'boolean' };
+      if (['false', '0', 'off'].includes(text.toLowerCase())) return { value: false, valueType: 'boolean' };
+      throw new Error('Invalid DPC value. Use on or off');
     case 'APC': {
       const value = parseFloat(text);
       if (Number.isNaN(value)) throw new Error('Invalid APC value. Must be a number');
