@@ -375,3 +375,81 @@ def test_so_properties(app_client):
     assert body["ok"] is True
     assert body["acsi_role"] == "ACSI-Client"
     assert body["ws_mode"] == "passive"
+
+
+class TestSelectAndOperateAnswers:
+    """POST /api/select (and /api/operate's answer): ok only when the server
+    carried it out - its serviceError's name is the error, not the ok."""
+
+    @pytest.mark.parametrize(
+        ("result", "expected"),
+        [
+            (True, {"ok": True, "error": ""}),
+            ("instance-not-available", {"ok": False, "error": "instance-not-available"}),
+            (None, {"ok": False, "error": "no response"}),
+            (False, {"ok": False, "error": "refused"}),
+        ],
+    )
+    def test_control_answer(self, result, expected):
+        assert bff_endpoint.control_answer(result) == expected
+
+    @staticmethod
+    def _connected(acsi_client, monkeypatch, select_result):
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        from types import SimpleNamespace
+
+        calls = []
+
+        async def fake_select(obj_ref, cp):
+            calls.append((obj_ref, cp))
+            return {"objRef": obj_ref, "result": select_result}
+
+        acsi_client.runtime.endpoint = SimpleNamespace(websocket_info_list=[object()])
+        monkeypatch.setattr(acsi_client, "get_iec61850_client", lambda cp: object())
+        monkeypatch.setattr(acsi_client, "select", fake_select)
+        # Like the SO's runtime loop: the coroutine runs on another thread's loop.
+        monkeypatch.setattr(
+            acsi_client,
+            "invoke_on_runtime_loop",
+            lambda coro, timeout=10: ThreadPoolExecutor(1).submit(asyncio.run, coro).result(timeout),
+        )
+        return calls
+
+    @pytest.mark.parametrize(
+        ("select_result", "expected"),
+        [
+            (True, {"ok": True, "error": ""}),
+            ("object-access-denied", {"ok": False, "error": "object-access-denied"}),
+            (None, {"ok": False, "error": "no response"}),
+        ],
+    )
+    def test_select_route_reports_what_the_server_answered(self, app_client, monkeypatch, select_result, expected):
+        client, acsi_client = app_client
+        calls = self._connected(acsi_client, monkeypatch, select_result)
+
+        response = client.post("/api/select", json={"objRef": "GenericIO/GGIO1.SPCSO1", "cp": "cp2"})
+
+        assert response.status_code == 200
+        assert response.json() == expected
+        assert calls == [("GenericIO/GGIO1.SPCSO1", "cp2")]
+
+    def test_select_route_needs_an_active_websocket(self, app_client):
+        client, _ = app_client
+        response = client.post("/api/select", json={"objRef": "LD0/CSWI1.Pos"})
+        assert response.status_code == 503
+
+    def test_select_route_times_out_cleanly(self, app_client, monkeypatch):
+        from concurrent.futures import TimeoutError as FuturesTimeoutError
+
+        client, acsi_client = app_client
+        self._connected(acsi_client, monkeypatch, True)
+
+        def timeout(coro, timeout=10):
+            coro.close()
+            raise FuturesTimeoutError()
+
+        monkeypatch.setattr(acsi_client, "invoke_on_runtime_loop", timeout)
+        response = client.post("/api/select", json={"objRef": "LD0/CSWI1.Pos"})
+        assert response.status_code == 504
+        assert response.json() == {"ok": False, "error": "Select timeout"}

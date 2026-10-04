@@ -1122,6 +1122,43 @@ class GetDataSetDirectory(BaseModel):
     )
 
 
+class SelectRequest(BaseModel):
+    """Request body for selecting a controllable DO (select-before-operate).
+
+    Used by: POST /api/select
+    """
+
+    obj_ref: str = Field(
+        ...,
+        alias="objRef",
+        description="Controllable DO Object reference in IEC61850 format",
+        json_schema_extra={"example": "LD0/CSWI1.Pos"},
+    )
+
+    cp: str = Field(
+        default="cp1",
+        description="Communication point identifier",
+        json_schema_extra={"example": "cp1"},
+    )
+
+
+def control_answer(result: Any) -> dict[str, Any]:
+    """{ok, error} for a select / operate the FSP answered with `result`.
+
+    The ACSI client returns True when the server carried it out, the
+    serviceError's name when it refused, None when it didn't answer. Only
+    True is ok - the operate route used to hand the serviceError's name
+    back as `ok` (a non-empty string, so truthy) with an empty error.
+    """
+    if result is True:
+        return {"ok": True, "error": ""}
+    if result is None:
+        return {"ok": False, "error": "no response"}
+    if isinstance(result, str) and result:
+        return {"ok": False, "error": result}
+    return {"ok": False, "error": "refused"}
+
+
 class OperateRequest(BaseModel):
     """Request body for writing a value to the connected server.
 
@@ -4099,6 +4136,36 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             )
 
     @router.post(
+        "/select",
+        summary="Select",
+        description="Selects a controllable DO on the connected Acsi-Server (select-before-operate). The client must be connected before calling this endpoint.",
+        response_description="{ok, error}: ok only when the server selected it",
+        responses={
+            200: {"description": "The server answered; ok says whether it selected"},
+            400: {"description": "Missing objRef"},
+            503: {"description": "No active WebSocket connection"},
+            504: {"description": "Select timeout"},
+        },
+        tags=["Data Access"],
+    )
+    async def api_select(request: SelectRequest):
+        """Select a controllable DO - the request ControlModal's Select sends."""
+        _check_websocket_connection()
+        obj_ref = request.obj_ref
+        cp = request.cp
+        if not obj_ref:
+            return JSONResponse(content={"ok": False, "error": "objRef is required"}, status_code=400)
+        if rti_so.get_iec61850_client(cp) is None:
+            return JSONResponse(content={"ok": False, "error": "ACSI client not found!"}, status_code=500)
+        try:
+            result = rti_so.invoke_on_runtime_loop(rti_so.select(obj_ref, cp), timeout=10)
+        except FuturesTimeoutError:
+            return JSONResponse(content={"ok": False, "error": "Select timeout"}, status_code=504)
+        except Exception as exc:
+            return JSONResponse(content={"ok": False, "error": str(exc)}, status_code=500)
+        return control_answer(result.get("result") if isinstance(result, dict) else None)
+
+    @router.post(
         "/operate",
         summary="Operate",
         description="Sends an operate command to the connected Acsi-Server. The client must be connected before calling this endpoint.",
@@ -4224,12 +4291,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         except Exception as e:
                             logger.error(f"Exception in IO sync setup: {e}")
 
-                    success = result.get("result", False)
-                    error = result.get("serviceError", "")
-                    return {
-                        "ok": success,
-                        "error": error,
-                    }
+                    return control_answer(result.get("result"))
             except FuturesTimeoutError:
                 return JSONResponse(
                     content={"ok": False, "error": "Operate timeout"}, status_code=504

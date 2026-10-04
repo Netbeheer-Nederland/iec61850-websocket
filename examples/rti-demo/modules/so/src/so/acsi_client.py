@@ -1156,6 +1156,27 @@ class ACSIClient:
         else:
             return {"objRef": obj_ref, "value": None, "error": result}
 
+    async def select(self, obj_ref: str, cp: str) -> dict[str, Any]:
+        """Select a controllable DO on the server (select-before-operate).
+
+        result is the client's answer: True when the server selected it, a
+        serviceError's name when it refused, None when it didn't answer.
+        """
+        client = self.get_iec61850_client(cp)
+        if not client:
+            raise RuntimeError(f"ACSI Client for {cp} not found!", cp)
+
+        websocket_info = self.runtime.endpoint.get_websocket_info(client)
+        result = await self._invoke_acsi(
+            service="select",
+            summary=f"Select {obj_ref}",
+            cp=cp,
+            websocket_info=websocket_info,
+            detail={"objRef": obj_ref},
+            call=lambda: client.select(obj_ref, websocket_info, None, None),
+        )
+        return {"objRef": obj_ref, "result": result}
+
     async def operate(
             self, obj_ref, oper_val, val_type: str, cp: str
     ) -> dict[str, Any]:
