@@ -890,3 +890,31 @@ def test_bff_gives_uvloop_a_resolver_pool_big_enough_for_dead_hosts():
     resolve queued the SO's lookup past its 2 s health check - see the
     UV_THREADPOOL_SIZE comment in bff_server."""
     assert int(os.environ["UV_THREADPOOL_SIZE"]) >= 16
+
+
+# -------------------- /api/health --------------------
+
+
+@pytest.mark.asyncio
+async def test_health_reports_the_status_monitors_view_without_probing(monkeypatch):
+    """A down instance doesn't hold /api/health up: it reports what the status
+    monitor last saw, and makes no request of its own."""
+    connections = [
+        {"name": "so1", "type": "RTI-SO", "status": "connected", "host": "rti-so", "port": 5002},
+        {"name": "gone", "type": "RTI-FSP", "status": "disconnected", "host": "rti-fsp03", "port": 5010},
+        {"name": "idp", "type": "IDP-Server", "status": "disconnected", "host": "", "port": 5000},
+    ]
+    monkeypatch.setattr(bff_server.conn_manager, "connections", connections)
+    probes = FakeBffClient(raises=AssertionError("health must not probe instances"))
+    monkeypatch.setitem(bff_server._bff_clients, "rti-so:5002", probes)
+    monkeypatch.setitem(bff_server._bff_clients, "rti-fsp03:5010", probes)
+
+    body = await bff_server.health_check()
+
+    assert body["ok"] is True
+    assert body["targets"] == [
+        {"target": "rti-so:5002", "status": "reachable"},
+        {"target": "rti-fsp03:5010", "status": "unreachable"},
+    ]
+    assert body["count"] == 2
+    assert probes.calls == []

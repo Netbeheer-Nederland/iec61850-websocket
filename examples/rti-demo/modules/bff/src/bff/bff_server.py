@@ -657,20 +657,29 @@ async def websocket_endpoint(websocket: WebSocket):
 # -------------------- Health & Status --------------------
 
 
-async def _check_target(key: str, client: BffClient) -> dict[str, str]:
-    try:
-        await asyncio.wait_for(
-            asyncio.to_thread(client.request, "GET", "/api/health"), timeout=3.0
-        )
-        return {"target": key, "status": "reachable"}
-    except Exception:
-        return {"target": key, "status": "unreachable"}
+def _target_statuses() -> list[dict[str, str]]:
+    """Each instance's reachability as the status monitor last saw it.
+
+    Not probed again per call: health used to GET every instance's
+    /api/health on each request, so one that was down (a hostname that no
+    longer resolves, a container that's gone) held every health check up to
+    its 3 s timeout - and every open HMI tab polls it every 10 s. The status
+    monitor already checks every instance every 10 s.
+    """
+    return [
+        {
+            "target": f"{con['host']}:{con['port']}",
+            "status": "reachable" if con.get("status") == "connected" else "unreachable",
+        }
+        for con in conn_manager.connections
+        if con.get("host") and con.get("port") and f"{con['host']}:{con['port']}" in _bff_clients
+    ]
 
 
 @app.get(
     "/api/health",
     summary="Health Check",
-    description="Health check endpoint for frontend: BFF status and optional target reachability.",
+    description="Health check endpoint for frontend: BFF status, and each instance's reachability as the status monitor last checked it (every 10 s).",
     response_description="Health status information",
     responses={
         200: {"description": "Service is healthy"},
@@ -682,9 +691,7 @@ async def health_check():
     try:
         bff_status = {"status": "ok", "service": "BFF"}
 
-        targets = await asyncio.gather(
-            *(_check_target(key, client) for key, client in _bff_clients.items())
-        )
+        targets = _target_statuses()
 
         return {
             "ok": True,
