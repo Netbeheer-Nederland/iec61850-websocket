@@ -76,11 +76,26 @@ describe('runAction', () => {
     expect(executeApiCall).toHaveBeenCalledWith('read', 'so:5002', { objRef: base.objRef, fc: 'st', cp: 'cp1' });
   });
 
-  it('treats an operate the SO answered with success: false as failed', async () => {
-    executeApiCall.mockResolvedValue({ ok: true, payload: { result: { success: false, error: 'blocked' } } });
+  it('treats an operate the FSP refused as failed', async () => {
+    // The SO's /api/operate answers HTTP 200 { ok: false, error }, wrapped by the BFF.
+    executeApiCall.mockResolvedValue({ ok: true, payload: { ok: true, result: { ok: false, error: 'blocked-by-interlocking' } } });
 
     await expect(runAction({ ...base, service: 'operate', cdc: 'SPC', value: 'on' }))
-      .resolves.toEqual({ ok: false, message: 'blocked' });
+      .resolves.toEqual({ ok: false, message: 'blocked-by-interlocking' });
+  });
+
+  it('treats a read the FSP refused as failed', async () => {
+    // The SO's /api/readvalue answers a serviceError with its name as the value.
+    executeApiCall.mockResolvedValue({ ok: true, payload: { ok: true, result: { ok: true, success: true, value: 'instanceNotAvailable' } } });
+
+    await expect(runAction({ ...base, service: 'read', fc: 'st' }))
+      .resolves.toEqual({ ok: false, message: 'instanceNotAvailable' });
+  });
+
+  it('accepts a read that returned data', async () => {
+    executeApiCall.mockResolvedValue({ ok: true, payload: { ok: true, result: { ok: true, success: true, value: [{ data: ['enumerated', 0] }] } } });
+
+    await expect(runAction({ ...base, service: 'read', fc: 'st' })).resolves.toEqual({ ok: true, message: 'ok' });
   });
 
   it('fails without calling the SO when the value is invalid, and on a null result', async () => {

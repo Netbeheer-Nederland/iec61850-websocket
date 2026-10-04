@@ -183,12 +183,16 @@ export async function runAction(action) {
     return { ok: false, message: error.message };
   }
   const result = await executeApiCall(request.apiId, action.soTarget, request.body);
-  const payload = result?.payload;
-  const ok = Boolean(result?.ok)
-    && (payload?.result?.success ?? payload?.success ?? true) !== false;
-  const message = ok
-    ? 'ok'
-    : payload?.result?.error || payload?.error || payload?.detail || result?.rawText || 'Request failed';
+  // The SO's answer, as the BFF wraps it in `result`. Its HTTP status (and
+  // the BFF's own `ok`) only say the SO got the request: an operate the FSP
+  // refused comes back as { ok: false, error }, and a read it refused as a
+  // value that is just the serviceError's name (a real read's value is a
+  // list of data).
+  const answer = result?.payload?.result;
+  const refusedRead = action.service === 'read' && typeof answer?.value === 'string';
+  const ok = Boolean(result?.ok) && answer?.ok !== false && answer?.success !== false && !refusedRead;
+  if (ok) return { ok, message: 'ok' };
+  const message = (refusedRead && answer.value) || answer?.error || errorOf(result, 'Request failed');
   return { ok, message: typeof message === 'string' ? message : JSON.stringify(message) };
 }
 
