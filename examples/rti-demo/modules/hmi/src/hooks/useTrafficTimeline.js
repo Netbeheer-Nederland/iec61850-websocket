@@ -88,7 +88,9 @@ export function useTrafficTimeline(connections = []) {
       .map((e) => {
         seen.add(e.id);
         arrivalRef.current += 1;
-        return { ...e, _arrival: arrivalRef.current };
+        // _receivedAt (this browser's clock) places link up/down rows, which
+        // have no instance time, among the instances' entries.
+        return { ...e, _arrival: arrivalRef.current, _receivedAt: Date.now() };
       });
     if (fresh.length === 0) return;
     setStores((prev) => {

@@ -271,7 +271,12 @@ function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null, prese
             >
               {/* Explicit column 1, so each row's time starts a new grid row
                   instead of filling a lane the previous row left empty. */}
-              <div style={{ gridColumn: '1', ...MONO, fontSize: '11px', color: 'var(--text-muted)', cursor: 'pointer' }}>{row.time}</div>
+              <div
+                style={{ gridColumn: '1', ...MONO, fontSize: '11px', color: 'var(--text-muted)', cursor: 'pointer', fontStyle: row.type === 'link' ? 'italic' : 'normal' }}
+                title={row.type === 'link' ? "This browser's clock - the other rows show their instance's" : undefined}
+              >
+                {row.time}
+              </div>
               {renderSegment(row)}
             </div>
             {expandedKey === row.key && (

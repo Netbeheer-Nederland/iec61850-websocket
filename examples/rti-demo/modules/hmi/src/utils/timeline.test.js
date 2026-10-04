@@ -136,6 +136,31 @@ describe('unwrapList', () => {
 });
 
 describe('buildTimeline - link events', () => {
+  it("places a link row after what had been received when it happened, not by the browser's clock", () => {
+    // Instances log UTC (06:..), the browser runs two hours ahead (08:..).
+    const stores = {
+      'f1:5001': {
+        frames: [
+          frame(1, '', null, 'send', 'unconfirmed', { time: '06:00:01.000', _arrival: 1, _receivedAt: 1000 }),
+          frame(2, '', null, 'send', 'unconfirmed', { time: '06:00:05.000', _arrival: 2, _receivedAt: 3000 }),
+        ],
+        acsi: [],
+      },
+    };
+    const linkEvents = [
+      { fsp: 'FSP01', from: 'up', to: 'link-down', at: 2000, downMs: null },
+      { fsp: 'FSP01', from: 'link-down', to: 'up', at: 2500, downMs: 500 },
+    ];
+    const at = new Date(2026, 9, 3, 8, 0, 3).getTime();
+
+    const rows = buildTimeline({ sos: [so], fsps: [fsp1], stores, linkEvents });
+    expect(rows.map((r) => r.key)).toEqual([
+      'report:f1:5001:1', 'link:FSP01:2000', 'link:FSP01:2500', 'report:f1:5001:2',
+    ]);
+    // Shown with the browser's clock all the same.
+    expect(buildTimeline({ sos: [so], fsps: [fsp1], stores: {}, linkEvents: [{ ...linkEvents[0], at }] })[0].time).toBe('08:00:03.000');
+  });
+
   it("adds a row per FSP link change, on the FSP's SO, by the HMI's clock", () => {
     const at = new Date(2026, 9, 3, 12, 0, 4, 500).getTime();
     const rows = buildTimeline({

@@ -28,7 +28,8 @@
 //   local  - an ACSI entry an FSP served on its own (a read/write aimed
 //            straight at the FSP - no frames)
 //   link   - an FSP's link going down or coming back up (useFspPresence's
-//            events - timed by the HMI's clock, not an instance's)
+//            events - shown with the HMI's clock, placed by what had been
+//            received by then; see placeLinkRow)
 //
 // Rows are paired by those ids, never by clock: the SO and FSPs run on
 // different machines. Only their display order uses the instance's time.
@@ -86,7 +87,8 @@ const fspForCp = (so, cp, fsps) => {
  * @param {Object[]} args.sos - RTI-SO connections (with fspLinks), each with a `target` ("host:port")
  * @param {Object[]} args.fsps - RTI-FSP connections (with accessPoints), each with a `target`
  * @param {Object<string, {frames: Object[], acsi: Object[]}>} args.stores - entries per target;
- *   each entry carries `_arrival`, the order the HMI received it in
+ *   each entry carries `_arrival`, the order the HMI received it in, and
+ *   `_receivedAt`, when (this browser's clock)
  * @param {Object[]} args.linkEvents - useFspPresence's events: { fsp, from, to, at, downMs }
  * @returns {Object[]} rows, oldest first
  */
@@ -122,6 +124,7 @@ export function buildTimeline({ sos = [], fsps = [], stores = {}, linkEvents = [
         level: entry.level || 'info',
         time: frameTime(soFrames[0]) || frameTime(entry),
         arrival: entry._arrival ?? 0,
+        receivedAt: entry._receivedAt ?? 0,
         soFrames,
         fspFrames,
         hasCorrelation: Boolean(c),
@@ -148,6 +151,7 @@ export function buildTimeline({ sos = [], fsps = [], stores = {}, linkEvents = [
         level: f.level || 'info',
         time: frameTime(f),
         arrival: f._arrival ?? 0,
+        receivedAt: f._receivedAt ?? 0,
         soFrames: [],
         fspFrames: [f],
       }));
@@ -162,12 +166,15 @@ export function buildTimeline({ sos = [], fsps = [], stores = {}, linkEvents = [
       level: entry.level || 'info',
       time: frameTime(entry),
       arrival: entry._arrival ?? 0,
+      receivedAt: entry._receivedAt ?? 0,
       soFrames: [],
       fspFrames: [],
     }));
   });
 
-  linkEvents.forEach((e) => rows.push({
+  const entryRows = rows.slice();
+  linkEvents.forEach((e, i) => rows.push({
+    ...placeLinkRow(entryRows, e.at, i),
     key: `link:${e.fsp}:${e.at}`,
     type: 'link',
     so: soOf(e.fsp),
@@ -180,10 +187,28 @@ export function buildTimeline({ sos = [], fsps = [], stores = {}, linkEvents = [
     message: '',
     level: e.to === 'up' ? 'info' : 'error',
     time: clockTime(e.at),
-    arrival: 0,
     soFrames: [],
     fspFrames: [],
   }));
 
-  return rows.sort((a, b) => a.time.localeCompare(b.time) || a.arrival - b.arrival);
+  return rows.sort((a, b) => (a.sortTime ?? a.time).localeCompare(b.sortTime ?? b.time) || a.arrival - b.arrival);
+}
+
+/**
+ * Where a link up/down row goes: right after the latest entry the HMI had
+ * received when it happened. Its own time is this browser's clock, while
+ * the entries carry their instance's (in Docker typically UTC) - sorting
+ * by it would put link rows hours away from the traffic around them.
+ * `index` keeps several events after the same entry in order.
+ */
+function placeLinkRow(entryRows, at, index) {
+  const before = entryRows.filter((r) => r.receivedAt && r.receivedAt <= at);
+  const anchor = before.reduce(
+    (latest, r) => (!latest || r.time.localeCompare(latest.time) > 0 || (r.time === latest.time && r.arrival > latest.arrival) ? r : latest),
+    null,
+  );
+  return {
+    sortTime: anchor ? anchor.time : '',
+    arrival: (anchor ? anchor.arrival : 0) + 0.5 + index / 1000,
+  };
 }
