@@ -550,7 +550,19 @@ class ACSIClient:
     def _convert_operate_val_to_its_type(self, oper_val: Any, val_type: str) -> Any:
         """Convert the operate value to its specified type."""
         if val_type == "boolean":
+            # bool("false") is True - read a string by what it says.
+            if isinstance(oper_val, str):
+                return oper_val.strip().lower() in ("true", "1", "on")
             return bool(oper_val)
+        elif val_type == "enumerated":
+            # ACSI's enumerated is INTEGER (0..255) - ENG/ENC controls.
+            try:
+                value = int(oper_val)
+            except (TypeError, ValueError):
+                raise ValueError(f"enumerated value must be an integer, got {oper_val!r}") from None
+            if not 0 <= value <= 255:
+                raise ValueError(f"enumerated value must be 0..255, got {value}")
+            return value
         elif val_type == "int32":
             return int(oper_val)
         elif val_type == "float32":

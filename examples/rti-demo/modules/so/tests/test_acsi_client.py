@@ -138,6 +138,9 @@ class TestConvertOperateValToItsType:
     def test_boolean(self, client):
         assert client._convert_operate_val_to_its_type("true", "boolean") is True
         assert client._convert_operate_val_to_its_type("", "boolean") is False
+        assert client._convert_operate_val_to_its_type("false", "boolean") is False
+        assert client._convert_operate_val_to_its_type("off", "boolean") is False
+        assert client._convert_operate_val_to_its_type(True, "boolean") is True
 
     def test_int32(self, client):
         assert client._convert_operate_val_to_its_type("42", "int32") == 42
@@ -530,3 +533,16 @@ class TestOperateRequestContents:
         asyncio.run(client.operate("LD0/DWMX1.WMaxSpt", "50", "float32", "cp1"))
         assert sent[0]["test"] is False
         assert sent[0]["ctlNum"] == 0
+
+
+class TestEnumeratedOperateValue:
+    """ENG/ENC operates send value_type "enumerated" - ACSI INTEGER (0..255)."""
+
+    def test_converts_to_an_integer(self, client):
+        assert client._convert_operate_val_to_its_type("3", "enumerated") == 3
+        assert client._convert_operate_val_to_its_type(0, "enumerated") == 0
+
+    @pytest.mark.parametrize("bad", ["on", "", 256, -1, None])
+    def test_rejects_what_is_not_0_to_255(self, client, bad):
+        with pytest.raises(ValueError):
+            client._convert_operate_val_to_its_type(bad, "enumerated")
