@@ -22,7 +22,8 @@ from ws61850.iec61850.services.control_service import ControlService
 
 @pytest.fixture
 def control_ied():
-    """IED with a controllable DO: LD0/CSWI1.Pos (FC=co, Oper/ctlVal bool, Oper/ctlNum int)."""
+    """IED with a controllable DO: LD0/CSWI1.Pos (FC=co, Oper/ctlVal bool, Oper/ctlNum int),
+    select-before-operate (ctlModel 2, sbo-with-normal-security)."""
     ied = IedModel(name="CtrlIED")
     ld = LogicalDevice(name="LD0", ldName="LD0")
     ied.add_logicalDevice(ld)
@@ -43,9 +44,25 @@ def control_ied():
     oper.add_data_attribute(ctl_val)
     oper.add_data_attribute(ctl_num)
     pos.add_do_or_da(oper)
+    _set_ctl_model(pos, 2)
     ln.add_dataObject(pos)
 
     return ied
+
+
+def _set_ctl_model(pos, value):
+    """Give Pos a ctlModel (FC=cf) - the enum number or its name."""
+    existing = next((da for da in pos.do_or_da if da.name == "ctlModel"), None)
+    if existing is not None:
+        existing.mms_value = value
+        return
+    ctl_model = DataAttribute(name="ctlModel", attr_type=DataAttributeType.enumerated, fc=FunctionalConstraint.cf, mms_value=value)
+    ctl_model.parent = pos
+    pos.add_do_or_da(ctl_model)
+
+
+def _pos(control_ied):
+    return control_ied.logical_devices[0].logical_nodes[0].data_objects[0]
 
 
 @pytest.fixture
@@ -154,3 +171,56 @@ def test_operate_increments_ctl_num(control_ied, control_objects):
     initial = ctl_num.mmsValue
     svc.operate(1, 0, _operate_msg())
     assert ctl_num.mmsValue == initial + 1
+
+
+# ---------------------------------------------------------------------------
+# select-before-operate only for sbo-with-* controls
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("ctl_model", [1, "direct-with-normal-security", 3])
+def test_direct_control_operates_without_select(control_ied, control_objects, ctl_model):
+    _set_ctl_model(_pos(control_ied), ctl_model)
+    svc = ControlService(control_ied, control_objects, lambda: (_ok_handler, None))
+    result, quality_do = svc.operate(1, 0, _operate_msg())
+    assert "'success': True" in str(result)
+    assert quality_do is not None
+
+
+def test_sbo_ctl_model_by_name_requires_select(control_ied, control_objects):
+    _set_ctl_model(_pos(control_ied), "sbo-with-enhanced-security")
+    svc = ControlService(control_ied, control_objects, lambda: (_ok_handler, None))
+    result, _ = svc.operate(1, 0, _operate_msg())
+    assert "controlMustBeSelected" in str(result)
+
+
+def test_unselected_operate_does_not_reach_the_handler(control_ied, control_objects):
+    calls = []
+
+    def _recording_handler(ref, val, param):
+        calls.append(ref)
+        return ControlHandlerResult.OK, None
+
+    svc = ControlService(control_ied, control_objects, lambda: (_recording_handler, None))
+    svc.operate(1, 0, _operate_msg())
+    assert calls == []
+
+
+def test_operate_deselects_so_the_next_needs_a_new_select(control_ied, control_objects):
+    svc = ControlService(control_ied, control_objects, lambda: (_ok_handler, None))
+    svc.select(1, 0, _select_msg())
+    first, _ = svc.operate(1, 0, _operate_msg())
+    assert "'success': True" in str(first)
+    assert control_objects[0].is_selected is False
+
+    second, _ = svc.operate(1, 0, _operate_msg())
+    assert "controlMustBeSelected" in str(second)
+
+
+def test_failed_operate_deselects_too(control_ied, control_objects):
+    def _fail_handler(ref, val, param):
+        return ControlHandlerResult.FAILED, None
+
+    svc = ControlService(control_ied, control_objects, lambda: (_fail_handler, None))
+    svc.select(1, 0, _select_msg())
+    svc.operate(1, 0, _operate_msg())
+    assert control_objects[0].is_selected is False

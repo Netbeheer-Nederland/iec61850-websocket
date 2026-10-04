@@ -32,6 +32,25 @@ from ws61850.iec61850.server.response_handling import (
 )
 from ws61850.iec61850.server.service_error import ServiceStatusKind
 
+# ctlModel values that need a select before an operate (IEC 61850-7-2):
+# sbo-with-normal-security (2) and sbo-with-enhanced-security (4).
+_SBO_CTL_MODELS = {2, 4}
+
+
+def _is_select_before_operate(control_do):
+    """Whether control_do's ctlModel is sbo-with-*. ctlModel is held as its
+    enum number or its name, depending on how the model was built."""
+    ctl_model = next(
+        (da for da in control_do.get_da_from_do_or_da_list() if da.name == "ctlModel"),
+        None,
+    )
+    if ctl_model is None:
+        return False
+    value = ctl_model.mms_value
+    if isinstance(value, int):
+        return value in _SBO_CTL_MODELS
+    return isinstance(value, str) and value.lower().startswith("sbo")
+
 
 class ControlService:
     """
@@ -67,14 +86,17 @@ class ControlService:
                 current = getattr(current, "parent", None)
         return None
 
-    def select(self, invoke_id, associate_id, decoded_message):
-        ref = extract_operate_or_select_ref(decoded_message)
-        control_do = self._get_control_data_object(ref)
-        server_control_obj = next(
+    def _get_server_control_object(self, control_do):
+        return next(
             (co for co in self._control_objects
              if control_do is not None and co.data_object.get_objRef() == control_do.get_objRef()),
             None,
         )
+
+    def select(self, invoke_id, associate_id, decoded_message):
+        ref = extract_operate_or_select_ref(decoded_message)
+        control_do = self._get_control_data_object(ref)
+        server_control_obj = self._get_server_control_object(control_do)
         if server_control_obj is None:
             return create_tpaa_response_select(
                 invoke_id, associate_id, False, None, ServiceStatusKind.instanceNotAvailable.name
@@ -115,6 +137,24 @@ class ControlService:
                 invoke_id, associate_id, False, None, ServiceStatusKind.instanceNotAvailable.name
             ), None
 
+        # A select-before-operate control must have been selected - checked
+        # before anything is written or handed to the control handler. It is
+        # deselected again once the operate has been tried (IEC 61850-7-2).
+        server_control_obj = None
+        if _is_select_before_operate(control_do):
+            server_control_obj = self._get_server_control_object(control_do)
+            if server_control_obj is None or not server_control_obj.is_selected:
+                return create_tpaa_response_operate(
+                    invoke_id, associate_id, False, None, ServiceStatusKind.controlMustBeSelected.name
+                ), None
+        try:
+            return self._operate_selected(invoke_id, associate_id, decoded_message, operate_item, control_da, control_do)
+        finally:
+            if server_control_obj is not None:
+                server_control_obj.is_selected = False
+
+    def _operate_selected(self, invoke_id, associate_id, decoded_message, operate_item, control_da, control_do):
+        """The operate itself, once the control may be operated."""
         control_handler = self._control_handler_ref()
         if control_handler is None:
             return create_tpaa_response_operate(
