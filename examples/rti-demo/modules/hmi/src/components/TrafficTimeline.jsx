@@ -18,7 +18,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { buildTimeline, formatDuration } from '../utils/timeline';
+import { buildTimeline, collapseReports, formatDuration } from '../utils/timeline';
 import DownBadge from './DownBadge';
 
 // Same colors as the topology's link pulses (InstanceVisualization).
@@ -34,6 +34,9 @@ const UNKNOWN_LANE = '?';
 // Rows rendered at most (newest kept); the hook keeps more.
 const MAX_ROWS = 300;
 const MONO = { fontFamily: 'Consolas, "Courier New", monospace' };
+
+// "250ms", "1s", "1.5s", "12s".
+const formatInterval = (ms) => (ms < 1000 ? `${ms}ms` : `${Number((ms / 1000).toFixed(ms < 10000 ? 1 : 0))}s`);
 
 const levelMark = (level) => {
   if (level === 'error') return { mark: '✗', color: 'var(--danger-color)', title: 'Failed' };
@@ -119,9 +122,9 @@ function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null, prese
   );
   const counts = useMemo(() => allRows.reduce((acc, r) => ({ ...acc, [r.type]: (acc[r.type] || 0) + 1 }), {}), [allRows]);
 
-  const rows = useMemo(() => allRows
+  const rows = useMemo(() => collapseReports(allRows
     .filter((r) => types[r.type])
-    .filter((r) => !focusedFsp || r.fsp === focusedFsp)
+    .filter((r) => !focusedFsp || r.fsp === focusedFsp))
     .slice(-MAX_ROWS)
     .reverse(), [allRows, types, focusedFsp]);
 
@@ -182,7 +185,16 @@ function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null, prese
             lanes={Math.abs(soLane - fspLane) + 1}
             color={TYPE_COLORS.report}
             towards={soLane < fspLane ? 'left' : 'right'}
-            label={<><i className="fas fa-flag" style={{ fontSize: '10px', color: TYPE_COLORS.report }}></i><span>{row.service}</span></>}
+            label={(
+              <>
+                <i className="fas fa-flag" style={{ fontSize: '10px', color: TYPE_COLORS.report }}></i>
+                <span>{row.service}{row.rptID ? ` ${row.rptID}` : ''}</span>
+                {row.count > 1 && <span style={{ fontWeight: 600, color: TYPE_COLORS.report }}>{`\u00d7${row.count}`}</span>}
+              </>
+            )}
+            sub={row.count > 1
+              ? `${row.firstTime} \u2013 ${row.time}${row.intervalMs ? ` \u00b7 every ~${formatInterval(row.intervalMs)}` : ''}`
+              : null}
           />
         </div>
       );
@@ -296,7 +308,13 @@ function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null, prese
                     />
                   </div>
                 ) : row.type === 'report' ? (
-                  <FrameList title={`${row.fsp} (FSP)`} frames={row.fspFrames} emptyText="" />
+                  <FrameList
+                    title={row.count > 1
+                      ? `${row.fsp} (FSP) - ${row.count} reports${row.fspFrames.length < row.count ? `, newest ${row.fspFrames.length} shown` : ''}`
+                      : `${row.fsp} (FSP)`}
+                    frames={row.fspFrames}
+                    emptyText=""
+                  />
                 ) : row.type === 'link' ? (
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     {row.up

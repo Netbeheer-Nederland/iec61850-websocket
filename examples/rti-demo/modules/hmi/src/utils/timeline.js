@@ -34,6 +34,8 @@
 // Rows are paired by those ids, never by clock: the SO and FSPs run on
 // different machines. Only their display order uses the instance's time.
 
+import { parseReport } from './reports';
+
 /** The list under `key` in a /api/messages or /api/actions-logs payload. */
 export const unwrapList = (payload, key) => {
   if (!payload) return [];
@@ -147,6 +149,7 @@ export function buildTimeline({ sos = [], fsps = [], stores = {}, linkEvents = [
         fsp: fsp.name,
         cp: f.cp || fsp.accessPoints?.[0] || '',
         service: f.service_type || f.service || 'Report',
+        rptID: parseReport(f.message)?.rptID || '',
         message: f.preview || '',
         level: f.level || 'info',
         time: frameTime(f),
@@ -211,4 +214,68 @@ function placeLinkRow(entryRows, at, index) {
     sortTime: anchor ? anchor.time : '',
     arrival: (anchor ? anchor.arrival : 0) + 0.5 + index / 1000,
   };
+}
+
+// Frames kept on a collapsed run of reports, for expanding it (newest).
+export const MAX_RUN_FRAMES = 50;
+
+const timeMs = (t) => {
+  const m = /^(\d+):(\d+):(\d+)(?:\.(\d+))?/.exec(String(t || ''));
+  return m ? ((+m[1] * 60 + +m[2]) * 60 + +m[3]) * 1000 + +(m[4] || '0').padEnd(3, '0').slice(0, 3) : null;
+};
+
+/**
+ * Collapse runs of reports - report rows with nothing else between them -
+ * into one row per FSP and rptID, so a 1 s integrity report doesn't push
+ * everything else off the timeline. A collapsed row sits where its newest
+ * report did and carries count, firstTime, intervalMs (average spacing) and
+ * the run's newest frames. Its key is its first report's, so it stays the
+ * same row while the run grows. A lone report is left as it is.
+ *
+ * @param {Object[]} rows - buildTimeline's rows, oldest first
+ * @returns {Object[]} rows, oldest first
+ */
+export function collapseReports(rows) {
+  const out = [];
+  let run = [];
+  const flush = () => {
+    const groups = new Map();
+    run.forEach((r) => {
+      const id = `${r.so}|${r.fsp}|${r.rptID}`;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(r);
+    });
+    [...groups.values()]
+      .map((members) => {
+        if (members.length === 1) return members[0];
+        const first = members[0];
+        const last = members[members.length - 1];
+        const span = timeMs(last.time) - timeMs(first.time);
+        return {
+          ...first,
+          key: `reports:${first.key}`,
+          count: members.length,
+          firstTime: first.time,
+          time: last.time,
+          arrival: last.arrival,
+          receivedAt: last.receivedAt,
+          intervalMs: Number.isFinite(span) && span > 0 ? Math.round(span / (members.length - 1)) : null,
+          level: members.some((m) => m.level === 'error') ? 'error' : first.level,
+          fspFrames: members.flatMap((m) => m.fspFrames).slice(-MAX_RUN_FRAMES),
+        };
+      })
+      .sort((a, b) => a.time.localeCompare(b.time) || a.arrival - b.arrival)
+      .forEach((r) => out.push(r));
+    run = [];
+  };
+  rows.forEach((r) => {
+    if (r.type === 'report') {
+      run.push(r);
+    } else {
+      flush();
+      out.push(r);
+    }
+  });
+  flush();
+  return out;
 }

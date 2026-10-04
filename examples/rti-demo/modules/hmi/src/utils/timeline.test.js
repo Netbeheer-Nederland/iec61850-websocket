@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildTimeline, unwrapList } from './timeline';
+import { buildTimeline, collapseReports, unwrapList, MAX_RUN_FRAMES } from './timeline';
 
 const so = { name: 'SO', target: 'so:5002', fspLinks: [{ cp: 'cp1', fsp: 'FSP01' }, { cp: 'cp2', fsp: 'FSP02' }, { cp: 'cp9', fsp: null }] };
 const fsp1 = { name: 'FSP01', target: 'f1:5001', accessPoints: ['cp1'] };
@@ -177,5 +177,58 @@ describe('buildTimeline - link events', () => {
       ['link', 'SO', 'FSP01', 'cp1', false, 'link-down', '12:00:04.500', null],
       ['link', 'SO', 'FSP01', 'cp1', true, 'up', '12:00:46.500', 42000],
     ]);
+  });
+});
+
+describe('collapseReports', () => {
+  const rep = (fsp, n, time, rptID = 'Events1', extra = {}) => ({
+    key: `report:${fsp}:${n}`, type: 'report', so: 'SO', fsp, rptID, service: 'report', level: 'info',
+    time, arrival: n, receivedAt: n, fspFrames: [{ id: n }], ...extra,
+  });
+  const callRow = (n, time) => ({ key: `call:${n}`, type: 'call', so: 'SO', fsp: 'FSP01', time, arrival: n });
+
+  it('collapses a run per FSP and rptID, at its newest report, with count and spacing', () => {
+    const rows = [
+      rep('FSP02', 1, '06:00:01.000'), rep('FSP01', 2, '06:00:01.500', 'ActualValues'),
+      rep('FSP02', 3, '06:00:02.000'), rep('FSP02', 4, '06:00:03.000'),
+    ];
+
+    const out = collapseReports(rows);
+    expect(out.map((r) => [r.key, r.count ?? 1])).toEqual([['report:FSP01:2', 1], ['reports:report:FSP02:1', 3]]);
+    expect(out[1]).toMatchObject({ firstTime: '06:00:01.000', time: '06:00:03.000', intervalMs: 1000, rptID: 'Events1' });
+    expect(out[1].fspFrames.map((f) => f.id)).toEqual([1, 3, 4]);
+  });
+
+  it('starts a new run after anything that is not a report', () => {
+    const rows = [rep('FSP02', 1, '06:00:01.000'), rep('FSP02', 2, '06:00:02.000'), callRow(3, '06:00:02.500'),
+      rep('FSP02', 4, '06:00:03.000'), rep('FSP02', 5, '06:00:04.000')];
+
+    expect(collapseReports(rows).map((r) => [r.key, r.count ?? 1])).toEqual([
+      ['reports:report:FSP02:1', 2], ['call:3', 1], ['reports:report:FSP02:4', 2],
+    ]);
+  });
+
+  it('keeps the same key while a run grows, and caps the frames it keeps', () => {
+    const many = Array.from({ length: MAX_RUN_FRAMES + 10 }, (_, i) => rep('FSP02', i + 1, `06:${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}.000`));
+
+    const a = collapseReports(many.slice(0, 5))[0];
+    const b = collapseReports(many)[0];
+    expect(b.key).toBe(a.key);
+    expect(b.count).toBe(MAX_RUN_FRAMES + 10);
+    expect(b.fspFrames).toHaveLength(MAX_RUN_FRAMES);
+    expect(b.fspFrames[b.fspFrames.length - 1].id).toBe(MAX_RUN_FRAMES + 10);
+  });
+
+  it('marks a run with a failed report as failed', () => {
+    const out = collapseReports([rep('FSP02', 1, '06:00:01.000'), rep('FSP02', 2, '06:00:02.000', 'Events1', { level: 'error' })]);
+    expect(out[0].level).toBe('error');
+  });
+});
+
+describe('buildTimeline - report rptID', () => {
+  it('reads the rptID from the report frame', () => {
+    const msg = JSON.stringify({ unconfirmed: { associateId: 'cp2', service: { report: { rptID: 'Events1', entry: { entryData: [] } } } } });
+    const stores = { 'f2:5001': { frames: [frame(1, 'cp2', null, 'send', 'unconfirmed', { message: msg })], acsi: [] } };
+    expect(buildTimeline({ sos: [so], fsps: [fsp2], stores })[0].rptID).toBe('Events1');
   });
 });

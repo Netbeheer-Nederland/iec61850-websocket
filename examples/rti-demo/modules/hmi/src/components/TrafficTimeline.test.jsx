@@ -165,4 +165,20 @@ describe('TrafficTimeline', () => {
     expect(screen.getByTestId('timeline-lane-FSP02')).toBeInTheDocument();
     expect(screen.queryByTestId('timeline-lane-FSP03')).not.toBeInTheDocument();
   });
+
+  it('collapses a run of reports into one row with a count', () => {
+    const report = (id, time) => ({ id, cp: 'cp2', direction: 'send', category: 'unconfirmed', service_type: 'report', time });
+    setHook({
+      stores: { 'f2:5001': { frames: [report(1, '12:00:01.000'), report(2, '12:00:02.000'), report(3, '12:00:03.000')], acsi: [] } },
+    });
+    render(<TrafficTimeline timeline={hookState} />);
+
+    expect(rowTypes()).toEqual(['report']);
+    expect(screen.getByText('\u00d73')).toBeInTheDocument();
+    expect(screen.getByText('12:00:01.000 \u2013 12:00:03.000 \u00b7 every ~1s')).toBeInTheDocument();
+    expect(screen.getByText('Reports (3)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('\u00d73'));
+    expect(screen.getByText('FSP02 (FSP) - 3 reports')).toBeInTheDocument();
+  });
 });
