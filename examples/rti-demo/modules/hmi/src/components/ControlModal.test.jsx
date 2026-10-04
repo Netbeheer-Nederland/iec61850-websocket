@@ -87,3 +87,38 @@ describe('ControlModal - operate result', () => {
     await waitFor(() => expect(screen.getByText('Operate failed: Refused by the FSP')).toBeInTheDocument());
   });
 });
+
+describe('ControlModal - select (select-before-operate)', () => {
+  const ctlModel = (value) => async (apiId) => (apiId === 'read' ? viaBff({ ok: true, value: [{ data: { enumerated: value } }] }) : null);
+
+  beforeEach(() => executeApiCall.mockReset());
+
+  it('offers no Select for a direct control', async () => {
+    executeApiCall.mockImplementation(ctlModel('direct-with-normal-security'));
+    renderModal();
+
+    await waitFor(() => expect(screen.getByText('direct-with-normal-security')).toBeInTheDocument());
+    expect(screen.queryByText('Select')).not.toBeInTheDocument();
+  });
+
+  it('selects an SBO control through the BFF and the SO', async () => {
+    executeApiCall.mockImplementation(ctlModel('sbo-with-normal-security'));
+    renderModal();
+    await waitFor(() => expect(screen.getByText('Select')).toBeInTheDocument());
+    executeApiCall.mockImplementationOnce(async () => viaBff({ ok: true, error: '' }));
+
+    fireEvent.click(screen.getByText('Select'));
+    await waitFor(() => expect(screen.getByText('Select successful - Now you can Operate')).toBeInTheDocument());
+    expect(executeApiCall).toHaveBeenLastCalledWith('select', 'rti-so:5002', { objRef: 'GenericIO/GGIO1.SPCSO1', cp: 'cp2' });
+  });
+
+  it('reports a select the FSP refused', async () => {
+    executeApiCall.mockImplementation(ctlModel('sbo-with-enhanced-security'));
+    renderModal();
+    await waitFor(() => expect(screen.getByText('Select')).toBeInTheDocument());
+    executeApiCall.mockImplementationOnce(async () => viaBff({ ok: false, error: 'object-access-denied' }));
+
+    fireEvent.click(screen.getByText('Select'));
+    await waitFor(() => expect(screen.getByText('Select failed: object-access-denied')).toBeInTheDocument());
+  });
+});

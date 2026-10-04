@@ -84,17 +84,16 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess, 
   const handleSelect = async () => {
     setIsSelecting(true);
     try {
-      const params = getControlParameters();
-      const response = await fetch('/api/control/select', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-      });
-      const result = await response.json();
-      if (response.ok) {
+      // Through the BFF to the SO's /api/select, like Operate (this used to
+      // POST a relative /api/control/select - the HMI's own server, which
+      // has no such route). The SO answers like operate: { ok, error }.
+      const endpointTarget = `${endpoint.host}:${endpoint.port}`;
+      const response = await executeApiCall('select', endpointTarget, { objRef, cp });
+      const answer = soAnswer(response, 'select');
+      if (answer.ok) {
         setResult({ visible: true, success: true, message: 'Select successful - Now you can Operate' });
       } else {
-        setResult({ visible: true, success: false, message: `Select failed: ${result.error || 'Unknown error'}` });
+        setResult({ visible: true, success: false, message: `Select failed: ${answer.message}` });
       }
     } catch (error) {
       setResult({ visible: true, success: false, message: `Select error: ${error.message}` });
@@ -208,6 +207,13 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess, 
           />
         </div>
         <div className="modal-buttons">
+          {/* Select-before-operate controls (ctlModel sbo-with-*) need a
+              Select first; direct ones don't, so it's only offered then. */}
+          {/sbo/i.test(String(ctlModel)) && (
+            <button className="btn-secondary" onClick={handleSelect} disabled={isSelecting || isOperating}>
+              {isSelecting ? 'Selecting...' : 'Select'}
+            </button>
+          )}
           <button className="btn-primary" onClick={handleOperate} disabled={isSelecting || isOperating}>
             {isOperating ? 'Operating...' : 'Operate'}
           </button>

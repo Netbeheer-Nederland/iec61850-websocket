@@ -47,6 +47,7 @@ const API_DEFINITIONS = [
   { id: 'status', label: 'GET /api/status', method: 'GET', path: '/api/status' },
   
   // Control operations
+  { id: 'select', label: 'POST /api/select', method: 'POST', path: '/api/select' },
   { id: 'operate', label: 'POST /api/operate', method: 'POST', path: '/api/operate' },
   
   // Report Control Blocks (RCB)
