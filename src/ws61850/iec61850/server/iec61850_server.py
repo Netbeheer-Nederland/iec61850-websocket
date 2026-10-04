@@ -559,7 +559,7 @@ class IEC61850Server:
                         encoded_report = encode_tpaa_message(tpaa_report, websocket_info.is_ber_protocol)
                         await gi_brcb.rcb.client_connection.websocket.send(encoded_report)
                         if self.send_msg_callback is not None:
-                            self.send_msg_callback(response, datetime.datetime.now())
+                            self.send_msg_callback(encoded_report, datetime.datetime.now())
                         gi_brcb.rcb.gi = False
 
             elif service_name == "setURCBValues":
@@ -579,7 +579,7 @@ class IEC61850Server:
                         encoded_report = encode_tpaa_message(tpaa_report, websocket_info.is_ber_protocol)
                         await gi_urcb.rcb.client_connection.websocket.send(encoded_report)
                         if self.send_msg_callback is not None:
-                            self.send_msg_callback(response, datetime.datetime.now())
+                            self.send_msg_callback(encoded_report, datetime.datetime.now())
                         gi_urcb.rcb.gi = False
 
             elif service_name == "operate":
