@@ -72,8 +72,11 @@ const indexFspExchanges = (frames) => {
 };
 
 const fspForCp = (so, cp, fsps) => {
+  // A link can be nameless (fsp: null) while its FSP is unreachable - the SO
+  // still holds the cp, but the BFF can't ask the FSP for its cps - so fall
+  // through to the FSPs' (last known) accessPoints then.
   const link = (so.fspLinks || []).find((l) => l.cp === cp);
-  if (link) return link.fsp;
+  if (link?.fsp) return link.fsp;
   const match = fsps.find((f) => (f.accessPoints || []).includes(cp));
   return match ? match.name : null;
 };

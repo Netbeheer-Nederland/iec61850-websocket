@@ -137,4 +137,16 @@ describe('useTrafficTimeline', () => {
       vi.useRealTimers();
     }
   });
+
+  it("keeps a dropped FSP's last known cps, so its earlier calls stay matched to it", () => {
+    const up = [
+      connections[0],
+      { ...connections[1], connectedClients: 1, accessPoints: ['cp1'] },
+    ];
+    const { result, rerender } = renderHook(({ c }) => useTrafficTimeline(c), { initialProps: { c: up } });
+    expect(result.current.fsps[0].accessPoints).toEqual(['cp1']);
+
+    rerender({ c: [connections[0], { ...connections[1], status: 'disconnected', accessPoints: [] }] });
+    expect(result.current.fsps[0]).toMatchObject({ name: 'FSP01', status: 'disconnected', accessPoints: ['cp1'] });
+  });
 });

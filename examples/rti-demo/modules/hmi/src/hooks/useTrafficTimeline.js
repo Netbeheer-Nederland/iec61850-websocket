@@ -52,8 +52,19 @@ export function useTrafficTimeline(connections = []) {
     .map((c) => ({ ...c, target: buildTargetValue(c.host, c.port) })), [connections]);
   const sos = useMemo(() => withTarget('RTI-SO', true), [withTarget]);
   // Every FSP, reachable or not - one that dropped keeps its lane and the
-  // entries already held; only reachable ones are fetched from below.
-  const fsps = useMemo(() => withTarget('RTI-FSP', false), [withTarget]);
+  // entries already held; only reachable ones are fetched from below. The
+  // BFF only knows an FSP's cps (accessPoints) while it can reach it, and
+  // the SO drops the cp's link, so the last cps seen are kept: without them
+  // a dropped FSP's earlier calls would no longer be matched to it.
+  const lastCpsRef = useRef({});
+  const fsps = useMemo(() => withTarget('RTI-FSP', false).map((f) => {
+    if (f.accessPoints?.length) {
+      lastCpsRef.current[f.name] = f.accessPoints;
+      return f;
+    }
+    const known = lastCpsRef.current[f.name];
+    return known ? { ...f, accessPoints: known } : f;
+  }), [withTarget]);
   const targetsKey = [...sos, ...fsps.filter((f) => f.status === 'connected')].map((c) => c.target).join(',');
 
   // Per "target|kind": ids already held, and the id Clear hid up to.

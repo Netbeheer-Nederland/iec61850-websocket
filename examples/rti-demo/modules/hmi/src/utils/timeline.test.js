@@ -76,6 +76,13 @@ describe('buildTimeline - calls', () => {
     expect(rows.map((r) => r.fsp)).toEqual([null, 'FSP02']);
   });
 
+  it("still names the FSP when the SO's link for the cp is nameless (FSP unreachable)", () => {
+    const stores = { 'so:5002': { frames: [], acsi: [call(1, 'cp2', 1, 1)] } };
+
+    const rows = buildTimeline({ sos: [{ ...so, fspLinks: [{ cp: 'cp2', fsp: null }] }], fsps: [fsp1, fsp2], stores });
+    expect(rows[0].fsp).toBe('FSP02');
+  });
+
   it('keeps a call whose frames are no longer held, with empty frame lists', () => {
     const stores = { 'so:5002': { frames: [], acsi: [call(1, 'cp1', 40, 41)] } };
 
