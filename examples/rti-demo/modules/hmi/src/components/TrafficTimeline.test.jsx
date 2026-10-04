@@ -154,4 +154,15 @@ describe('TrafficTimeline', () => {
     expect(screen.getByTestId('timeline-link-FSP01').textContent).toBe('\u2713 link back up after 42s');
     expect(screen.getByText('Links (2)')).toBeInTheDocument();
   });
+
+  it('gives an FSP the BFF cannot reach a lane only while it has rows', () => {
+    const fsp3 = { name: 'FSP03', target: 'f3:5001', accessPoints: ['cp3'], status: 'disconnected' };
+    setHook({ fsps: [{ ...fsp1, status: 'connected' }, { ...fsp2, status: 'disconnected' }, fsp3] });
+    render(<TrafficTimeline timeline={hookState} />);
+
+    // FSP02 dropped but has rows (a report, a local entry); FSP03 never had any.
+    expect(screen.getByTestId('timeline-lane-FSP01')).toBeInTheDocument();
+    expect(screen.getByTestId('timeline-lane-FSP02')).toBeInTheDocument();
+    expect(screen.queryByTestId('timeline-lane-FSP03')).not.toBeInTheDocument();
+  });
 });

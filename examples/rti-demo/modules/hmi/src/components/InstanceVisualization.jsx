@@ -105,8 +105,8 @@ function ActivityLink({ fspName, cp, link = EMPTY_LINK, detected, down = null })
  * @param {string|null} focusedFsp - Name of the FSP whose link is focused; the others are dimmed
  * @param {Function|null} onSoSelect - Replaces the SO circle's navigation to ACSI Client
  * @param {Function|null} onFspSelect - Replaces an FSP circle's navigation to ACSI Server, called with the connection
- * @param {Object|null} presence - useFspPresence's result; when given, FSPs that
- *   dropped stay on the picture, marked down (Traffic)
+ * @param {Object|null} presence - useFspPresence's result; when given, an FSP
+ *   whose link to the SO dropped is marked "link down" (Traffic)
  */
 function InstanceVisualization({
   connections,
@@ -137,9 +137,10 @@ function InstanceVisualization({
   };
 
   const soConnections = connections.filter(conn => conn.type === 'RTI-SO' && conn.status === 'connected');
-  // With presence (Traffic) an FSP the BFF can't reach stays on the
-  // picture, marked down, instead of disappearing.
-  const fspConnections = connections.filter(conn => conn.type === 'RTI-FSP' && (presence || conn.status === 'connected'));
+  // Only instances the BFF can reach are drawn. With presence (Traffic), an
+  // FSP the BFF reaches but whose WebSocket to the SO is closed is still
+  // drawn, marked "link down".
+  const fspConnections = connections.filter(conn => conn.type === 'RTI-FSP' && conn.status === 'connected');
   const stateOf = (conn) => presence?.byName[conn.name]?.state ?? fspStateOf(conn);
   const now = useNow(Boolean(presence) && fspConnections.some((c) => stateOf(c) !== 'up'));
   const hasConnected = connections.filter(conn => conn.status === 'connected').length > 0;

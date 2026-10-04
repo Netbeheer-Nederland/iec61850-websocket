@@ -155,7 +155,7 @@ describe('InstanceVisualization - dropped FSPs (Traffic)', () => {
     expect(screen.queryByText('FSP01')).not.toBeInTheDocument();
   });
 
-  it('keeps a dropped FSP on the picture, marked down, with presence', () => {
+  it('leaves out an FSP the BFF cannot reach, and marks one whose link to the SO dropped', () => {
     render(
       <MemoryRouter>
         <InstanceVisualization
@@ -163,16 +163,15 @@ describe('InstanceVisualization - dropped FSPs (Traffic)', () => {
           activity={{}}
           presence={presence({
             FSP01: { state: 'unreachable', since: Date.now() - 42000, downs: 1 },
-            FSP02: { state: 'link-down', since: null, downs: 0 },
+            FSP02: { state: 'link-down', since: Date.now() - 42000, downs: 1 },
             FSP03: { state: 'up', since: null, downs: 0 },
           })}
         />
       </MemoryRouter>
     );
 
-    expect(screen.getByText('FSP01')).toBeInTheDocument();
-    expect(screen.getByTestId('link-down-label-FSP01').textContent).toMatch(/^unreachable \u00b7 4[2-3]s$/);
-    expect(screen.getByTestId('link-down-label-FSP02').textContent).toBe('link down');
+    expect(screen.queryByText('FSP01')).not.toBeInTheDocument();
+    expect(screen.getByTestId('link-down-label-FSP02').textContent).toMatch(/^link down \u00b7 4[2-3]s$/);
     expect(screen.getByTestId('link-down-FSP02')).toBeInTheDocument();
     expect(screen.queryByTestId('link-down-FSP03')).not.toBeInTheDocument();
   });

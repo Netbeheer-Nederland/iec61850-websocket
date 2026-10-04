@@ -125,7 +125,13 @@ function TrafficTimeline({ timeline, focusedFsp = null, onFocusFsp = null, prese
     .slice(-MAX_ROWS)
     .reverse(), [allRows, types, focusedFsp]);
 
-  const fspLanes = focusedFsp ? fsps.filter((f) => f.name === focusedFsp) : fsps;
+  // An FSP the BFF can't reach only keeps its lane while the timeline holds
+  // rows for it (one that dropped mid-demo); one that was never up here -
+  // a stale entry - gets none.
+  const fspsWithRows = new Set(allRows.map((r) => r.fsp));
+  const fspLanes = fsps
+    .filter((f) => f.status === 'connected' || fspsWithRows.has(f.name))
+    .filter((f) => !focusedFsp || f.name === focusedFsp);
   const lanes = [
     ...sos.map((s) => ({ name: s.name, kind: 'so' })),
     ...fspLanes.map((f) => ({

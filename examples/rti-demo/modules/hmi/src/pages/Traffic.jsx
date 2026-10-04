@@ -50,7 +50,8 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
   // Clicking an FSP focuses its link: the others dim and only its monitor
   // is listed below. Clicking it again, or the SO, shows all links again.
   const [focusedFspName, setFocusedFspName] = useState(null);
-  const focusedFsp = connections.some((c) => c.type === 'RTI-FSP' && c.name === focusedFspName)
+  // Only an FSP the BFF can reach can be focused - one it can't isn't drawn.
+  const focusedFsp = connections.some((c) => c.type === 'RTI-FSP' && c.status === 'connected' && c.name === focusedFspName)
     ? focusedFspName
     : null;
 
