@@ -184,3 +184,69 @@ async def test_monitor_reapplies_tls_then_oauth(tmp_path):
     await manager.sync_all_runtime_security()
 
     assert [name for name, _ in so.posts] == ["reconfig-connection", "reconfig-oauth"]
+
+
+def _execute_start(monkeypatch, fsp):
+    monkeypatch.setattr(bff_server.conn_manager, "connections", [fsp])
+    sent = {}
+
+    class _Client:
+        def request(self, method, path, json=None):
+            sent.update(json=json)
+            return {"ok": True}
+
+    monkeypatch.setitem(bff_server._bff_clients, "rti-fsp01:5001", _Client())
+    from fastapi.testclient import TestClient
+
+    response = TestClient(bff_server.app).post(
+        "/api/execute",
+        json={
+            "target": "rti-fsp01:5001",
+            "method": "POST",
+            "path": "/api/start",
+            "body": {"host": "rti-so", "port": "8765", "mode": "active", "cp": "cp1"},
+        },
+    )
+    assert response.status_code == 200
+    return sent["json"]
+
+
+def test_execute_start_adds_stored_fsp_oauth(monkeypatch):
+    # So the FSP fetches its token before it dials, for the HMI's Connect and
+    # a playbook's link alike - not a first, token-less attempt the SO refuses.
+    fsp = {
+        "name": "FSP01", "host": "rti-fsp01", "port": 5001, "type": "RTI-FSP", "ws_mode": "active",
+        "OAuth": {
+            "enable_oauth": True,
+            "token_endpoint": "https://keycloak:8443/realms/r/protocol/openid-connect/token",
+            "client_id": "ws-client",
+            "client_secret": "s3cret",
+            "auth_server_ca": "CA-PEM",
+            "enable_token_refresh": True,
+        },
+    }
+
+    assert _execute_start(monkeypatch, fsp) == {
+        "host": "rti-so", "port": "8765", "mode": "active", "cp": "cp1",
+        "enable_oauth": True,
+        "token_endpoint_url": "https://keycloak:8443/realms/r/protocol/openid-connect/token",
+        "client_id": "ws-client",
+        "client_secret": "s3cret",
+        "ca_certificate": "CA-PEM",
+        "enable_token_refresh": True,
+    }
+
+
+def test_execute_start_sends_stored_oauth_off(monkeypatch):
+    fsp = {"name": "FSP01", "host": "rti-fsp01", "port": 5001, "type": "RTI-FSP",
+           "OAuth": {"enable_oauth": False, "token_endpoint": "", "client_id": ""}}
+
+    assert _execute_start(monkeypatch, fsp) == {
+        "host": "rti-so", "port": "8765", "mode": "active", "cp": "cp1", "enable_oauth": False,
+    }
+
+
+def test_execute_start_without_stored_oauth_adds_nothing(monkeypatch):
+    fsp = {"name": "FSP01", "host": "rti-fsp01", "port": 5001, "type": "RTI-FSP"}
+
+    assert _execute_start(monkeypatch, fsp) == {"host": "rti-so", "port": "8765", "mode": "active", "cp": "cp1"}

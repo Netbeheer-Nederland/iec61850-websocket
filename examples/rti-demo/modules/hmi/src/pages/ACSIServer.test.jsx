@@ -440,7 +440,7 @@ describe('ACSIServer security action message', () => {
 });
 
 describe('ACSIServer OAuth on Connect', () => {
-  it('re-applies the FSP\'s saved OAuth config when connecting', async () => {
+  it('connects with /start alone - the BFF adds the saved OAuth config to it', async () => {
     mockConnections([
       { name: 'so1', host: '10.0.0.1', port: 5002, ws_port: 8765, type: 'RTI-SO', status: 'connected' },
       {
@@ -463,13 +463,12 @@ describe('ACSIServer OAuth on Connect', () => {
     await screen.findByRole('option', { name: 'so1 (10.0.0.1:8765)' });
     await user.click(document.getElementById('acsi-start-btn'));
 
+    // A /reconfig-oauth after /start made the FSP dial once without a token
+    // (refused by the SO) before redialing with one.
     await waitFor(() => expect(executeApiCall).toHaveBeenCalledWith(
-      'reconfig-oauth', 'rti-fsp01:5001', expect.objectContaining({
-        connection_name: 'FSP01', enable_oauth: true, ws_mode: 'active',
-        token_endpoint_url: 'http://keycloak:8080/realms/r/protocol/openid-connect/token',
-        client_id: 'ws-client', client_secret: 's3cret', cp: 'cp1',
-      })
+      'start', 'rti-fsp01:5001', expect.objectContaining({ cp: 'cp1', mode: 'active' })
     ));
+    expect(executeApiCall.mock.calls.map((c) => c[0])).not.toContain('reconfig-oauth');
   });
 });
 

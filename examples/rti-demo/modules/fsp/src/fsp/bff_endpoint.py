@@ -973,6 +973,23 @@ class StartRequest(BaseModel):
         description="CA certificate (PEM) to validate the SO against",
         json_schema_extra={"example": "-----BEGIN CERTIFICATE-----..."},
     )
+    # Optional stored OAuth config - added by the BFF's /api/execute from
+    # connections.json, so the token is fetched before dialing out instead of
+    # by a /reconfig-oauth after a first, token-less attempt the SO refuses.
+    # Omitted entirely, the current OAuth setup is left as-is.
+    enable_oauth: bool | None = Field(
+        default=None,
+        description="Present an OAuth token (omit to keep the current OAuth setting)",
+    )
+    token_endpoint_url: str | None = Field(default=None, description="IDP token endpoint")
+    client_id: str | None = Field(default=None, description="OAuth client id")
+    client_secret: str | None = Field(default=None, description="OAuth client secret")
+    ca_certificate: str | None = Field(
+        default=None, description="CA certificate (PEM) for the IDP's HTTPS"
+    )
+    enable_token_refresh: bool | None = Field(
+        default=None, description="Fetch a fresh token on every (re)connect"
+    )
 
 
 def _client_tls_config(tls_version: str | None, server_ca: str | None) -> TLSConfig:
@@ -2254,6 +2271,38 @@ def create_bff_router(
                     kind="system",
                 )
 
+            if request.enable_oauth is not None:
+                if request.enable_oauth and not request.token_endpoint_url:
+                    return JSONResponse(
+                        content={
+                            "ok": False,
+                            "error": "OAuth is enabled but no token_endpoint_url was given",
+                        },
+                        status_code=400,
+                    )
+                endpoint = rti_fsp.runtime.endpoint
+                if request.enable_oauth:
+                    rti_fsp.runtime.start_oauth = {
+                        "token_endpoint": request.token_endpoint_url,
+                        "client_id": request.client_id,
+                        "client_secret": request.client_secret,
+                        "kc_cert": request.ca_certificate,
+                        "enable_token_refresh": bool(request.enable_token_refresh),
+                    }
+                else:
+                    rti_fsp.runtime.start_oauth = None
+                    if endpoint is not None:
+                        endpoint._oauth_enable = False
+                        endpoint._access_token = None
+                        endpoint._credentials_provider = None
+                        endpoint._assoc_handler._token_endpoint = None
+                        endpoint._assoc_handler._kc_cert = None
+                rti_fsp._log_action(
+                    f"Applied OAuth config on start: enable_oauth={request.enable_oauth}",
+                    "debug",
+                    kind="system",
+                )
+
             try:
                 rti_fsp.start_server(host, port)
             except Exception as exc:
@@ -2650,6 +2699,19 @@ def create_bff_router(
             logger.info(f"Reconfiguring OAuth with connection: {connection_name}")
             logger.info(
                 f"OAuth enable: {request.enable_oauth}, token_endpoint: {token_endpoint}"
+            )
+
+            # The next /start without OAuth fields dials out the same way.
+            rti_fsp.runtime.start_oauth = (
+                {
+                    "token_endpoint": token_endpoint,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "kc_cert": ca_certificate,
+                    "enable_token_refresh": bool(enable_token_refresh),
+                }
+                if request.enable_oauth
+                else None
             )
 
             # Disconnected: don't dial out from here (that used to reconnect an

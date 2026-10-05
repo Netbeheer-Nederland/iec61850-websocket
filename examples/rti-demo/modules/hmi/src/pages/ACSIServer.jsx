@@ -24,7 +24,7 @@ import Tree from '../components/Tree';
 import { transformModelToTree } from '../utils/modelUtils';
 
 import TLSConfigModal, { useRuntimeTlsEnabled } from '../components/TLSConfigModal';
-import OAuthConfigModal, { useRuntimeOAuthEnabled, oauthRequestBody } from '../components/OAuthConfigModal';
+import OAuthConfigModal, { useRuntimeOAuthEnabled } from '../components/OAuthConfigModal';
 import SecurityActionMessage from '../components/SecurityActionMessage';
 import ContextMenu  from "../components/ContextMenu.jsx";
 import WriteValueModal from '../components/WriteValueModal.jsx';
@@ -488,18 +488,9 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     if (!endpointTarget) { setError('No endpoint configured'); return; }
     setLoading(true); setError(null);
     try {
+      // The BFF adds the FSP's saved TLS and OAuth config to /start, so the
+      // FSP fetches its token before it dials out.
       const result = await executeApiCall('start', endpointTarget, { host, port, mode, cp });
-      if (result?.ok && liveConnection?.OAuth?.enable_oauth) {
-        // OAuth only takes effect through /reconfig-oauth (it fetches the
-        // token and restarts the dial-out with it) - so a saved config is
-        // applied here, right after /start, rather than when it was saved.
-        const oauthResult = await executeApiCall('reconfig-oauth', endpointTarget, {
-          ...oauthRequestBody(liveConnection, liveConnection.OAuth, 'active'), host, port, cp,
-        });
-        if (!oauthResult?.ok) {
-          setError(`Connected, but applying the saved OAuth config failed: ${oauthResult?.payload?.detail || oauthResult?.payload?.error || 'Unknown error'}`);
-        }
-      }
       if (result?.ok) {
         await loadStatus();
       } else {
@@ -507,7 +498,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
       }
     } catch (error) { setError(error.message); }
     finally { setLoading(false); }
-  }, [endpointTarget, host, port, mode, cp, executeApiCall, loadStatus, liveConnection]);
+  }, [endpointTarget, host, port, mode, cp, executeApiCall, loadStatus]);
 
   const handleStopServer = useCallback(async () => {
     if (!endpointTarget) { setError('No endpoint configured'); return; }

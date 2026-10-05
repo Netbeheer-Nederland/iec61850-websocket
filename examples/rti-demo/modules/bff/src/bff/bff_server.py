@@ -1627,6 +1627,23 @@ async def execute_dynamic_api(request: ExecuteRequest):
                 "server_ca": stored_tls.get("server_ca"),
                 **body,
             }
+        # Likewise its OAuth config: with it, /start fetches the token before
+        # dialing out, instead of a token-less first attempt the SO refuses
+        # (the HMI's Connect used to follow /start with /reconfig-oauth).
+        stored_oauth = (connection or {}).get("OAuth")
+        if connection and connection.get("type") == "RTI-FSP" and stored_oauth:
+            if stored_oauth.get("enable_oauth"):
+                oauth_fields = {
+                    "enable_oauth": True,
+                    "token_endpoint_url": stored_oauth.get("token_endpoint"),
+                    "client_id": stored_oauth.get("client_id"),
+                    "client_secret": stored_oauth.get("client_secret"),
+                    "ca_certificate": stored_oauth.get("auth_server_ca") or None,
+                    "enable_token_refresh": bool(stored_oauth.get("enable_token_refresh")),
+                }
+            else:
+                oauth_fields = {"enable_oauth": False}
+            body = {**oauth_fields, **body}
 
     try:
         # Get client from registry

@@ -77,6 +77,10 @@ class ACSIServerRuntime:
         self.model_ied_name: str | None = None
         self.model_source: str | None = None
         self.cp: str = os.getenv("CP", "cp1")
+        # OAuth for the dial-out, from /start (the BFF adds the connection's
+        # stored config): the token is fetched before connecting. None: no
+        # OAuth, or whatever /reconfig-oauth set up.
+        self.start_oauth: dict | None = None
         self.last_status_log_signature: tuple | None = None
         self.lock: threading.Lock = threading.Lock()
         self.model_lock: threading.Lock = (
@@ -727,6 +731,19 @@ class ACSIServer:
         self._log_action("Server stopped", kind="system")
         asyncio.get_running_loop().call_soon(asyncio.get_running_loop().stop)
 
+    async def _start_dial_out(self, host: str, port: int, cp: str):
+        """Start connecting to the SO; returns the connect task.
+
+        With OAuth from /start, the token is fetched first (reconfigure_oauth
+        then connects with it) - a dial-out without a token would only be
+        refused by the SO.
+        """
+        oauth = self.runtime.start_oauth
+        if oauth:
+            await self.runtime.endpoint.reconfigure_oauth(host, str(port), cp, True, **oauth)
+            return self.runtime.endpoint._connect_task
+        return self.runtime.endpoint.run_in_background(host, port, cp)
+
     async def _start_server_async(self, host: str, port: int) -> None:
         """Start the server asynchronously."""
 
@@ -752,7 +769,7 @@ class ACSIServer:
         )
         tasks: dict[str, asyncio.Task] = {"report": report_task}
 
-        ws_task = self.runtime.endpoint.run_in_background(host, port, cp)
+        ws_task = await self._start_dial_out(host, port, cp)
         tasks["ws"] = ws_task
 
         self._set_runtime_state(
