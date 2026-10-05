@@ -1419,7 +1419,7 @@ async def list_playbooks():
 @app.get("/api/playbooks/{name}", summary="Get a playbook", tags=["Playbooks"])
 async def get_playbook(name: str):
     try:
-        playbook, builtin = playbook_store.get(name)
+        playbook, builtin = await asyncio.to_thread(playbook_store.get, name)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"no playbook {name!r}")
     except PlaybookNameError as exc:
@@ -1438,7 +1438,7 @@ async def get_playbook(name: str):
 @app.get("/api/playbooks/{name}/file", summary="Download a playbook file", tags=["Playbooks"])
 async def download_playbook(name: str):
     try:
-        text, filename = playbook_store.file(name)
+        text, filename = await asyncio.to_thread(playbook_store.file, name)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"no playbook {name!r}")
     except PlaybookNameError as exc:
@@ -1452,7 +1452,7 @@ async def download_playbook(name: str):
 
 @app.put("/api/playbooks/{name}", summary="Save a playbook", tags=["Playbooks"])
 async def save_playbook(name: str, request: PlaybookSaveRequest):
-    try:
+    def do_save():
         if request.playbook is not None:
             playbook = request.playbook
         elif request.text is not None:
@@ -1460,6 +1460,9 @@ async def save_playbook(name: str, request: PlaybookSaveRequest):
         else:
             raise HTTPException(status_code=400, detail="send 'playbook', or 'text' with its 'format'")
         playbook_store.save(name, playbook)
+
+    try:
+        await asyncio.to_thread(do_save)
     except (PlaybookNameError, PlaybookError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except BuiltinPlaybookError as exc:
@@ -1470,7 +1473,7 @@ async def save_playbook(name: str, request: PlaybookSaveRequest):
 @app.delete("/api/playbooks/{name}", summary="Delete a saved playbook", tags=["Playbooks"])
 async def delete_playbook(name: str):
     try:
-        playbook_store.delete(name)
+        await asyncio.to_thread(playbook_store.delete, name)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"no playbook {name!r}")
     except PlaybookNameError as exc:
@@ -1483,10 +1486,10 @@ async def delete_playbook(name: str):
 @app.post("/api/playbooks/{name}/run", summary="Run a playbook", tags=["Playbooks"])
 async def run_playbook(name: str, request: PlaybookRunRequest | None = None):
     request = request or PlaybookRunRequest()
+    publish = _run_publisher(asyncio.get_running_loop())
     try:
-        state = playbook_runs.start(
-            name, pace=request.pace, keep_going=request.keep_going,
-            publish=_run_publisher(asyncio.get_running_loop()),
+        state = await asyncio.to_thread(
+            playbook_runs.start, name, pace=request.pace, keep_going=request.keep_going, publish=publish,
         )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"no playbook {name!r}")
