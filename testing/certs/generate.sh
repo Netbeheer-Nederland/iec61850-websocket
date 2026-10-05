@@ -43,7 +43,7 @@ cfssl gencert \
   -config=ca-config.json \
   -profile=server \
   -cn="{$HOSTNAME}" \
-  -hostname="${HOSTNAME}, ${SERVER_HOSTNAMES}" \
+  -hostname="${HOSTNAME},${SERVER_HOSTNAMES}" \
   server-csr.json | cfssljson -bare keycloak
 
 echo "🔐 Generating server certificate..."
