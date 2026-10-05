@@ -49,6 +49,7 @@ vi.mock('../components/ReportValues', () => ({
 vi.mock('../components/DemoActionsBar', () => ({
   default: ({ focusedFsp }) => <div data-testid="demo-actions-bar">{`demo focus: ${focusedFsp ?? 'none'}`}</div>,
 }));
+vi.mock('../components/PlaybookBar', () => ({ default: () => <div data-testid="playbook-bar" /> }));
 vi.mock('../components/TrafficTimeline', () => ({
   default: ({ focusedFsp }) => <div data-testid="traffic-timeline">{`timeline focus: ${focusedFsp ?? 'none'}`}</div>,
 }));

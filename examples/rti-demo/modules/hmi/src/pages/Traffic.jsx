@@ -26,6 +26,7 @@ import ReportValues from '../components/ReportValues';
 import { useTrafficTimeline } from '../hooks/useTrafficTimeline';
 import { useFspPresence } from '../hooks/useFspPresence';
 import DemoActionsBar from '../components/DemoActionsBar';
+import PlaybookBar from '../components/PlaybookBar';
 import { useDemoActions } from '../hooks/useDemoActions';
 import { useLinkActivity } from '../hooks/useLinkActivity';
 
@@ -90,7 +91,7 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
         />
       </div>
       
-      {/* Collapsible demo actions block */}
+      {/* Collapsible playbook block: playbooks above, the pinned buttons below */}
       <div style={{
         marginBottom: '20px',
         border: '1px solid var(--border-color)',
@@ -109,7 +110,7 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
           onClick={() => setDemoExpanded(!demoExpanded)}
         >
           <h3 style={{ margin: 0, color: 'var(--text-secondary)', flex: 1 }}>
-            Demo Actions
+            Playbook
           </h3>
           <i
             className={`fas ${demoExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`}
@@ -117,6 +118,7 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
           ></i>
         </div>
         <div style={{ display: demoExpanded ? 'block' : 'none' }}>
+          <PlaybookBar />
           <DemoActionsBar connections={connections} focusedFsp={focusedFsp} presence={presence} />
         </div>
       </div>
