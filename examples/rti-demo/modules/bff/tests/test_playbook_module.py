@@ -5,11 +5,13 @@ covered by examples/rti-demo/tests/test_playbook.py)."""
 
 from __future__ import annotations
 
+import threading
+import time
 from pathlib import Path
 
 import pytest
 
-from bff.playbook import PlaybookError, dump_playbook, load_playbook, parse_playbook, step_label
+from bff.playbook import PlaybookError, Runner, dump_playbook, load_playbook, parse_playbook, step_label
 
 pytestmark = pytest.mark.unit
 
@@ -53,12 +55,6 @@ def test_step_label():
     assert step_label({"wait": "5s"}) == "wait 5s"
     assert step_label({"read": {"fsp": ["F1", "F2"], "ref": "LD0/X.st"}}) == "read F1, F2 LD0/X.st"
     assert step_label({"enable-report": {"fsp": "F1", "rcb": {"F1": "R"}}}) == "enable-report F1"
-
-
-import threading
-import time
-
-from bff.playbook import Runner
 
 
 class TinyBff:
@@ -115,6 +111,7 @@ def test_stop_interrupts_a_wait():
     results = runner.run()
     assert time.monotonic() - started < 5
     assert [r.index for r in results] == [1]
+    assert results[0].message == "stopped during wait 30s"
     assert runner.stopped is True
 
 
@@ -126,6 +123,7 @@ def test_stop_skips_the_relink_of_a_drop():
     results = runner.run()
     assert results[0].ok is False and results[0].message == "stopped"
     assert "/api/start" not in bff.calls
+    assert runner.stopped is True
 
 
 def test_injected_sleep_still_used():

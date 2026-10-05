@@ -533,7 +533,10 @@ class Runner:
         label = step_label(step)
         if action == "wait":
             self.sleep(parse_duration(spec))
-            ok, message, details = True, f"waited {spec}", []
+            if self.stop.is_set():
+                ok, message, details = True, f"stopped during wait {spec}", []
+            else:
+                ok, message, details = True, f"waited {spec}", []
         else:
             if not isinstance(spec, dict):
                 raise PlaybookError(f"step {index}: '{action}' needs a mapping")
@@ -573,6 +576,10 @@ class Runner:
             results.append(result)
             if self.on_result:
                 self.on_result(result)
+            if self.stop.is_set():
+                self.stopped = True
+                self.log("stopped")
+                break
             mark = "✓" if result.ok else "✗"
             self.log(f"[{index:>2}/{len(steps)}] {mark} {result.label} · {result.message} ({result.seconds:.1f}s)")
             if not result.ok and not keep_going:
