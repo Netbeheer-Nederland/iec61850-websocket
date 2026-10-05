@@ -59,7 +59,8 @@ function stepOf(entries, refused) {
  * FSPs button (an entry per FSP): { steps, skipped }. A refusal is kept, as
  * a step expecting one; a click that didn't get through is skipped. Clicks
  * end up in one step unless their outcome, service or a field run.py can't
- * take per FSP (fc, cdc, type) differs.
+ * take per FSP (fc, cdc, type) differs - or they'd put the same FSP twice in
+ * one step, which splits into separate steps instead (in click order).
  *
  * @param {{action: Object, fsp: string, result: {ok: boolean, message: string, refused?: boolean}}[]} entries
  */
@@ -70,10 +71,17 @@ export function clicksToSteps(entries) {
     const refused = !e.result.ok;
     const fixed = Object.fromEntries(Object.entries(specOf(e.action)).filter(([k]) => !PER_FSP.includes(k)));
     const key = JSON.stringify([refused, e.action.service, fixed]);
-    if (!groups.has(key)) groups.set(key, { refused, entries: [] });
-    groups.get(key).entries.push(e);
+    if (!groups.has(key)) groups.set(key, { refused, slots: [] });
+    const group = groups.get(key);
+    let slot = group.slots.find((entries) => !entries.some((se) => se.fsp === e.fsp));
+    if (!slot) {
+      slot = [];
+      group.slots.push(slot);
+    }
+    slot.push(e);
   });
-  return { steps: [...groups.values()].map((g) => stepOf(g.entries, g.refused)), skipped };
+  const steps = [...groups.values()].flatMap((g) => g.slots.map((slot) => stepOf(slot, g.refused)));
+  return { steps, skipped };
 }
 
 /** A playbook name for an uploaded file: its base name, made valid. */

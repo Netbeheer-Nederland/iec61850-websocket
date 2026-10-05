@@ -70,6 +70,16 @@ describe('clicksToSteps', () => {
     expect(steps.map((s) => s.read.fsp)).toEqual(['F1', 'F2']);
   });
 
+  it('splits two actions on the same FSP within one All-FSPs group into separate steps', () => {
+    const { steps } = clicksToSteps([
+      entry('F1', { objRef: 'A' }), entry('F2', { objRef: 'B' }), entry('F1', { objRef: 'C' }), entry('F2', { objRef: 'D' }),
+    ]);
+    expect(steps).toEqual([
+      { label: 'Act', read: { fsp: ['F1', 'F2'], ref: { F1: 'A', F2: 'B' }, fc: 'st' } },
+      { label: 'Act', read: { fsp: ['F1', 'F2'], ref: { F1: 'C', F2: 'D' }, fc: 'st' } },
+    ]);
+  });
+
   it('skips clicks that failed for another reason', () => {
     const failed = entry('F1', {}, { ok: false, message: 'Client is not connected' });
     expect(clicksToSteps([failed])).toEqual({ steps: [], skipped: [failed] });
