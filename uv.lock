@@ -253,6 +253,7 @@ dependencies = [
     { name = "docker" },
     { name = "fastapi" },
     { name = "httpx2" },
+    { name = "pyyaml" },
     { name = "requests" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -262,6 +263,7 @@ requires-dist = [
     { name = "docker", specifier = "==6.1.0" },
     { name = "fastapi", specifier = ">=0.139.0" },
     { name = "httpx2", specifier = ">=2.13.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "requests", specifier = "==2.32.5" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.51.0" },
 ]
