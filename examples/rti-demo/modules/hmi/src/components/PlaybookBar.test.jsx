@@ -2,10 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 
 const pushes = new Map();
+const connStateHandlers = new Set();
 vi.mock('../services/liveSocket', () => ({
   subscribe: (type, fn) => {
     pushes.set(type, fn);
     return () => pushes.delete(type);
+  },
+  onConnectionStateChange: (fn) => {
+    connStateHandlers.add(fn);
+    fn(true);
+    return () => connStateHandlers.delete(fn);
   },
 }));
 vi.mock('../utils/playbooks', async (importOriginal) => ({
@@ -50,6 +56,8 @@ describe('PlaybookBar', () => {
     vi.clearAllMocks();
     resetPlaybookRecorderStore();
     localStorage.clear();
+    pushes.clear();
+    connStateHandlers.clear();
     api.listPlaybooks.mockResolvedValue(LIST);
     api.getPlaybook.mockResolvedValue(DEMO);
     api.getPlaybookRun.mockResolvedValue(null);
@@ -131,5 +139,49 @@ describe('PlaybookBar', () => {
     await pick('rec1');
     fireEvent.click(await screen.findByTitle('Delete this playbook'));
     await waitFor(() => expect(api.deletePlaybook).toHaveBeenCalledWith('rec1'));
+  });
+
+  it('shows the run state runPlaybook() returns straight away', async () => {
+    api.runPlaybook.mockResolvedValue(runState('running', ['pending', 'pending']));
+    render(<PlaybookBar />);
+    await pick('demo');
+    await screen.findByText('FSP01 dials the SO');
+    fireEvent.click(screen.getByRole('button', { name: /Run/ }));
+    await waitFor(() => expect(screen.getByTestId('playbook-step-1')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Run/ })).toBeDisabled();
+  });
+
+  it('refetches the run on reconnect, replacing a stale running state', async () => {
+    api.getPlaybookRun.mockResolvedValue(runState('running', ['ok', 'running']));
+    render(<PlaybookBar />);
+    await screen.findByTestId('playbook-step-1');
+    await waitFor(() => expect(screen.getByRole('button', { name: /Run/ })).toBeDisabled());
+
+    // The BFF restarted: no run any more.
+    api.getPlaybookRun.mockResolvedValue(null);
+    await act(async () => { connStateHandlers.forEach((fn) => fn(true)); });
+    await waitFor(() => expect(screen.getByRole('button', { name: /Run/ })).not.toBeDisabled());
+  });
+
+  it('a stale localStorage name that no longer exists is dropped silently', async () => {
+    localStorage.setItem('traffic-playbook', 'gone');
+    api.getPlaybook.mockRejectedValue(new Error("no playbook 'gone'"));
+    render(<PlaybookBar />);
+    await waitFor(() => expect(api.getPlaybook).toHaveBeenCalledWith('gone'));
+    await waitFor(() => expect(screen.getByLabelText('Playbook')).toHaveValue(''));
+    expect(screen.queryByText(/no playbook/)).not.toBeInTheDocument();
+    expect(localStorage.getItem('traffic-playbook')).toBeNull();
+  });
+
+  it('gives duplicate recorder notes distinct keys', async () => {
+    render(<PlaybookBar />);
+    fireEvent.click(await screen.findByRole('button', { name: /Record/ }));
+    const broken = (soTarget) => ({
+      action: { label: 'Broken', service: 'read', soTarget, soName: 'SO', objRef: 'R', fc: 'st' },
+      fsp: 'F1', result: { ok: false, message: 'Client is not connected' },
+    });
+    act(() => recordClick([broken('so:1')]));
+    act(() => recordClick([broken('so:1')]));
+    expect(screen.getAllByText(/Not recorded: "Broken"/)).toHaveLength(2);
   });
 });

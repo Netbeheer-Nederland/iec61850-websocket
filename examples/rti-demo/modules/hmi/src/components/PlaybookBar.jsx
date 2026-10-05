@@ -44,6 +44,13 @@ const remember = (name) => {
     // storage unavailable - only the convenience is lost
   }
 };
+const forget = () => {
+  try {
+    localStorage.removeItem(LAST_KEY);
+  } catch {
+    // storage unavailable - nothing to forget
+  }
+};
 
 function StepMark({ status }) {
   if (status === 'running') return <i className="fas fa-spinner fa-spin" style={{ fontSize: '10px' }}></i>;
@@ -65,9 +72,11 @@ function PlaybookBar() {
   const [error, setError] = useState('');
   const [title, setTitle] = useState('');
   const [saveName, setSaveName] = useState('');
-  const run = usePlaybookRun();
+  const [run, setRun] = usePlaybookRun();
   const recorder = usePlaybookRecorder();
   const fileInput = useRef(null);
+  const playbooksRef = useRef(playbooks);
+  playbooksRef.current = playbooks;
 
   const running = run?.state === 'running';
   const unsaved = !recorder.recording && recorder.steps.length > 0;
@@ -98,7 +107,18 @@ function PlaybookBar() {
     let alive = true;
     getPlaybook(selected)
       .then((p) => { if (alive) setLoaded({ name: p.name, builtin: p.builtin, labels: p.labels }); })
-      .catch((e) => { if (alive) { setLoaded(null); setError(e.message); } });
+      .catch((e) => {
+        if (!alive) return;
+        setLoaded(null);
+        // A remembered name that's gone (deleted elsewhere, or from an older
+        // browser profile) shouldn't nag on every load - just drop it.
+        if (!playbooksRef.current.some((p) => p.name === selected)) {
+          setSelected('');
+          forget();
+        } else {
+          setError(e.message);
+        }
+      });
     return () => { alive = false; };
   }, [selected]);
 
@@ -182,11 +202,11 @@ function PlaybookBar() {
           ))}
         </select>
         <button className="btn-primary" style={buttonStyle} disabled={!loaded || running || busy}
-          onClick={() => attempt(() => runPlaybook(selected))} title="Run this playbook in the BFF">
+          onClick={() => attempt(async () => setRun(await runPlaybook(selected)))} title="Run this playbook in the BFF">
           <i className="fas fa-play" style={{ fontSize: '10px' }}></i>Run
         </button>
         {running && (
-          <button className="btn-secondary" style={buttonStyle} onClick={() => attempt(stopPlaybook)} title="Stop after the current step">
+          <button className="btn-secondary" style={buttonStyle} onClick={() => attempt(stopPlaybook)} title="Stop the run - a wait or drop in progress ends at once">
             <i className="fas fa-stop" style={{ fontSize: '10px' }}></i>Stop
           </button>
         )}
@@ -232,7 +252,7 @@ function PlaybookBar() {
       {run?.name === selected && run.state === 'error' && run.error && (
         <div style={{ color: 'var(--danger-color)' }}>Couldn't run: {run.error}</div>
       )}
-      {recorder.notes.map((note) => <div key={note} style={{ color: 'var(--text-muted)' }}>{note}</div>)}
+      {recorder.notes.map((note, i) => <div key={i} style={{ color: 'var(--text-muted)' }}>{note}</div>)}
       {recorder.recording && rows.length === 0 && (
         <div style={{ color: 'var(--text-muted)' }}>Recording - click the demo buttons below.</div>
       )}
