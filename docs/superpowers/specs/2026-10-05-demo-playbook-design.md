@@ -94,13 +94,13 @@ one-click buttons stay exactly as they are; on top of them the HMI can:
 
 ### Layout
 
-The Traffic block's title becomes **Demo Playbook**. Inside: the playbook bar
+The Traffic block's title becomes **Playbook**. Inside: the playbook bar
 and step list on top, then `DemoActionsBar` (the pinned buttons) as today.
 
 ```
-Demo Playbook                                                      ▲
+Playbook                                                      ▲
 ┌──────────────────────────────────────────────────────────────────┐
-│ [demo ▾] [▶ Run] [■ Stop]  [⬇ Download] [⬆ Upload] [🗑]  [● Record] │
+│ [playbook ▾] [▶ Run] [■ Stop]  [⬇ Download] [⬆ Upload] [🗑]  [● Record] │
 │  1 ✓ FSP01 dials the SO · already linked on cp1 (0.1s)           │
 │  2 ✓ FSP02 dials the SO · linked: FSP01, FSP02                   │
 │  3 ⟳ Reporting off to start with                                 │
