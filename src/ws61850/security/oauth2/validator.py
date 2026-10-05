@@ -19,7 +19,7 @@ import logging
 from dataclasses import dataclass
 
 import jwt
-from jwt import ExpiredSignatureError, InvalidTokenError
+from jwt import ExpiredSignatureError, InvalidIssuerError, InvalidTokenError
 
 from ws61850.security.oauth2.jwks import JwksCache
 
@@ -96,6 +96,12 @@ class JwtValidator:
 
         except ExpiredSignatureError:
             logger.warning("Token expired (kid=%r)", jwt.get_unverified_header(token).get("kid"))
+            return False, None
+        except InvalidIssuerError:
+            # Both values, so a configured issuer that doesn't match what the
+            # IDP writes into its tokens (e.g. its public hostname) shows at once.
+            received = jwt.decode(token, options={"verify_signature": False}).get("iss")
+            logger.warning("Token invalid: issuer mismatch - expected %r, got %r", self._issuer, received)
             return False, None
         except InvalidTokenError as e:
             logger.warning("Token invalid: %s", e)

@@ -77,3 +77,11 @@ def test_jwks_unreachable_still_raises(private_key):
     )
     with pytest.raises(requests.ConnectionError):
         validator.validate(make_token(private_key))
+
+
+def test_wrong_issuer_logs_expected_and_received(validator, private_key, caplog):
+    token = make_token(private_key, iss="https://localhost:8443/realms/test")
+    with caplog.at_level("WARNING", logger="ws61850.security.oauth2.validator"):
+        assert validator.validate(token) == (False, None)
+    assert f"expected {ISSUER!r}" in caplog.text
+    assert "got 'https://localhost:8443/realms/test'" in caplog.text
