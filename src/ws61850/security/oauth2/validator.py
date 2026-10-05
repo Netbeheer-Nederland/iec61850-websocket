@@ -64,9 +64,19 @@ class JwtValidator:
         """
         try:
             header = jwt.get_unverified_header(token)
-            kid = header["kid"]
+            kid = header.get("kid")
             alg = header.get("alg", "RS256")
-            signing_key = self._jwks.get_signing_key(kid)
+            if kid is None:
+                logger.warning("Token invalid: no kid in its header")
+                return False, None
+            try:
+                signing_key = self._jwks.get_signing_key(kid)
+            except KeyError:
+                # Signed by a key the issuer doesn't publish (JwksCache has
+                # already refreshed): a forged or foreign token, not a
+                # verification failure.
+                logger.warning("Token invalid: unknown kid=%r", kid)
+                return False, None
 
             decoded = jwt.decode(
                 token,
