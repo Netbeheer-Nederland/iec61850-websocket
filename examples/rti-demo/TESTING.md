@@ -110,7 +110,9 @@ examples/rti-demo/modules/
 │   ├── pyproject.toml
 │   ├── src/bff/bff_server.py, connection_manager.py, bff_client.py, ...
 │   ├── docker/Dockerfile
-│   └── tests/test_push_relay.py, test_connection_manager_ids.py, ...
+│   └── tests/test_push_relay.py, test_connection_manager_ids.py,
+│       test_playbook_module.py, test_playbook_store.py,
+│       test_playbook_runs.py, test_playbook_endpoints.py, ...
 ├── fsp/
 │   ├── pyproject.toml
 │   ├── src/fsp/bff_endpoint.py, acsi_server.py, model.py
@@ -151,7 +153,11 @@ same file presented in the demo - and fails on the first step that doesn't
 do what it should. It needs the SO and FSP01 / FSP02 registered with the
 BFF, and changes the stack's state as the demo does (links both FSPs,
 switches reporting on and off, drops FSP02 for a while). Run another
-playbook with `RTI_PLAYBOOK=playbooks/other.yaml`. See
+playbook with `RTI_PLAYBOOK=playbooks/other.yaml`. Alongside it,
+`test_demo_playbook_runs_clean_in_the_bff` runs the same playbook the way
+the HMI's Run button does - as a run started and polled through the BFF's
+`/api/playbooks` endpoints, rather than the runner calling the BFF directly
+- and is skipped if that playbook isn't one the BFF has. See
 [playbooks/README.md](playbooks/README.md); the runner's own unit tests are
 `tests/test_playbook.py`.
 

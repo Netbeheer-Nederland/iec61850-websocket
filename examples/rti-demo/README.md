@@ -70,8 +70,9 @@ the BFF while the HMI's Traffic page shows it, checking each step:
 uv run python -m playbooks.run playbooks/demo.yaml
 ```
 
-The same playbook runs as an integration test. See
-[playbooks/README.md](playbooks/README.md).
+The same playbook runs as an integration test. Playbooks can also be
+recorded from clicks on the demo buttons, and run, from Traffic's Playbook
+block in the HMI. See [playbooks/README.md](playbooks/README.md).
 
 ## Verbose Mode & Logs
 

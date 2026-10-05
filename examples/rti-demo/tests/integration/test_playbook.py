@@ -19,6 +19,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -51,3 +52,22 @@ def test_demo_playbook_runs_clean():
     failed = [r for r in results if not r.ok]
     assert not failed, "\n".join(lines)
     assert len(results) == len(playbook["steps"])
+
+
+def test_demo_playbook_runs_clean_in_the_bff():
+    """The same playbook, run by the BFF the way the HMI's Run button does."""
+    bff = run.load_playbook(PLAYBOOK).get("bff", run.DEFAULT_BFF)
+    name = PLAYBOOK.stem
+    r = requests.post(f"{bff}/api/playbooks/{name}/run", json={"pace": 0}, timeout=10)
+    if r.status_code == 404:
+        pytest.skip(f"{name} is not a playbook the BFF has (only built-in ones run here)")
+    assert r.status_code == 200, r.text
+
+    deadline = time.monotonic() + 180
+    while True:
+        state = requests.get(f"{bff}/api/playbooks/run", timeout=10).json()["run"]
+        if state["state"] != "running" or time.monotonic() > deadline:
+            break
+        time.sleep(1)
+    lines = [f"{s['index']} {s['status']} {s['label']} · {s['message']}" for s in state["steps"]]
+    assert state["state"] == "passed", "\n".join(lines + [str(state.get("error"))])

@@ -9,6 +9,19 @@ runs.
 The same file runs as an integration test, so the demo you present is the
 demo the tests run.
 
+## From the HMI
+
+Traffic → Playbook: pick a playbook and Run it, watch ✓ / ✗ come in per step,
+Stop it, or Download / Upload / Delete one. Record turns clicks on the pinned
+demo buttons into playbook steps, and Stop recording saves it. Built-in
+playbooks are this folder; saved ones live under `BFF_PLAYBOOKS_DIR`
+(`/config/playbooks` on the `bff-config` volume in `docker-compose.yml`). A
+recording is an ordinary playbook file - download it, drop it in here, and it
+runs the same from the CLI and as the test.
+
+The CLI imports the runner from the BFF package (`bff.playbook`), so run
+`uv sync --all-packages` (or `uv sync --package bff`) before using it.
+
 ## Running
 
 With the stack up (`docker compose up -d`) and the SO and FSPs registered
