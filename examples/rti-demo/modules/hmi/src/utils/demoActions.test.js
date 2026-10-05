@@ -84,7 +84,7 @@ describe('runAction', () => {
     executeApiCall.mockResolvedValue({ ok: true, payload: { ok: true, result: { ok: false, error: 'blocked-by-interlocking' } } });
 
     await expect(runAction({ ...base, service: 'operate', cdc: 'SPC', value: 'on' }))
-      .resolves.toEqual({ ok: false, message: 'blocked-by-interlocking' });
+      .resolves.toEqual({ ok: false, message: 'blocked-by-interlocking', refused: true });
   });
 
   it('treats a read the FSP refused as failed', async () => {
@@ -92,7 +92,7 @@ describe('runAction', () => {
     executeApiCall.mockResolvedValue({ ok: true, payload: { ok: true, result: { ok: true, success: true, value: 'instanceNotAvailable' } } });
 
     await expect(runAction({ ...base, service: 'read', fc: 'st' }))
-      .resolves.toEqual({ ok: false, message: 'instanceNotAvailable' });
+      .resolves.toEqual({ ok: false, message: 'instanceNotAvailable', refused: true });
   });
 
   it('accepts a read that returned data', async () => {
@@ -115,7 +115,7 @@ describe('soAnswer', () => {
   const viaBff = (answer) => ({ ok: true, payload: { ok: true, result: answer } });
 
   it('names a refusal without a reason', () => {
-    expect(soAnswer(viaBff({ ok: false, error: '' }), 'operate')).toEqual({ ok: false, message: 'Refused by the FSP' });
+    expect(soAnswer(viaBff({ ok: false, error: '' }), 'operate')).toEqual({ ok: false, message: 'Refused by the FSP', refused: true });
   });
 
   it('passes the SO request failing through', () => {
@@ -194,12 +194,12 @@ describe('runAction - enable-report', () => {
 
   it("reports the server's serviceError from the read or the write", async () => {
     executeApiCall.mockResolvedValueOnce(readResult('instance-not-available'));
-    await expect(runAction(rcb)).resolves.toEqual({ ok: false, message: 'instance-not-available' });
+    await expect(runAction(rcb)).resolves.toEqual({ ok: false, message: 'instance-not-available', refused: true });
 
     executeApiCall
       .mockResolvedValueOnce(readResult(config))
       .mockResolvedValueOnce({ ok: true, payload: { result: { value: 'parameter-value-inconsistent' } } });
-    await expect(runAction(rcb)).resolves.toEqual({ ok: false, message: 'parameter-value-inconsistent' });
+    await expect(runAction(rcb)).resolves.toEqual({ ok: false, message: 'parameter-value-inconsistent', refused: true });
   });
 
   it('fails without writing when the read fails', async () => {

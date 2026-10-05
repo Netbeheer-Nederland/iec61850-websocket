@@ -148,7 +148,7 @@ async function setReporting({ soTarget, objRef, cp, rcbType }, enabled) {
   if (!read?.ok || !current || typeof current !== 'object') {
     // A serviceError comes back as its name in place of the values.
     const message = read?.ok && typeof current === 'string' ? current : errorOf(read, 'Could not read the report control block');
-    return { ok: false, message };
+    return read?.ok && typeof current === 'string' ? { ok: false, message, refused: true } : { ok: false, message };
   }
   if (current.rptEna === enabled) return { ok: true, message: enabled ? 'already enabled' : 'already disabled' };
 
@@ -169,7 +169,8 @@ async function setReporting({ soTarget, objRef, cp, rcbType }, enabled) {
   const value = write?.payload?.result?.value;
   if (write?.ok && value === true) return { ok: true, message: 'ok' };
   const failed = enabled ? 'Enabling the report failed' : 'Disabling the report failed';
-  return { ok: false, message: write?.ok && typeof value === 'string' ? value : errorOf(write, failed) };
+  if (write?.ok && typeof value === 'string') return { ok: false, message: value, refused: true };
+  return { ok: false, message: errorOf(write, failed) };
 }
 
 /**
@@ -205,9 +206,12 @@ export function soAnswer(result, service) {
   const refusedRead = service === 'read' && typeof answer?.value === 'string';
   const ok = Boolean(result?.ok) && answer?.ok !== false && answer?.success !== false && !refusedRead;
   if (ok) return { ok, message: 'ok' };
-  if (refusedRead) return { ok, message: answer.value };
-  if (result?.ok && answer?.ok === false && !answer.error) return { ok, message: 'Refused by the FSP' };
-  return { ok, message: (typeof answer?.error === 'string' && answer.error) || errorOf(result, 'Request failed') };
+  // refused: the SO got the request and the FSP said no - as opposed to the
+  // request not getting through. A recording keeps a refusal (expect: fail).
+  if (refusedRead) return { ok, message: answer.value, refused: true };
+  if (result?.ok && answer?.ok === false && !answer.error) return { ok, message: 'Refused by the FSP', refused: true };
+  const message = (typeof answer?.error === 'string' && answer.error) || errorOf(result, 'Request failed');
+  return result?.ok && answer ? { ok, message, refused: true } : { ok, message };
 }
 
 /** Distinct labels in the order first pinned, each with its actions. */
