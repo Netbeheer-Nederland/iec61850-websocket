@@ -29,6 +29,7 @@ from __future__ import annotations
 import ast
 import json
 import re
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -264,13 +265,21 @@ class Runner:
         transport: Any = None,
         pace: float | None = None,
         log: Callable[[str], None] = print,
-        sleep: Callable[[float], None] = time.sleep,
+        sleep: Callable[[float], Any] | None = None,
+        stop: threading.Event | None = None,
+        on_step: Callable[[int, str], None] | None = None,
+        on_result: Callable[[StepResult], None] | None = None,
     ):
         self.playbook = validate_playbook(playbook)
         self.transport = transport or BffTransport(playbook.get("bff", DEFAULT_BFF))
         self.pace = parse_duration(playbook.get("pace", 0)) if pace is None else pace
         self.log = log
-        self.sleep = sleep
+        # Every pause waits on the stop event, so Stop ends a wait at once.
+        self.stop = stop or threading.Event()
+        self.sleep = sleep if sleep is not None else self.stop.wait
+        self.on_step = on_step
+        self.on_result = on_result
+        self.stopped = False
         self._instances: dict[str, dict[str, Any]] | None = None
         self._cps: dict[str, str] = {str(k): str(v) for k, v in (playbook.get("cps") or {}).items()}
         # Step number -> the SO's highest frame id when that step started.
@@ -362,6 +371,8 @@ class Runner:
     def _wait_for_link(self, cp: str, linked: bool, timeout: float) -> bool:
         deadline = time.monotonic() + timeout
         while True:
+            if self.stop.is_set():
+                return False
             if (cp in self.linked_cps()) == linked:
                 return True
             if time.monotonic() >= deadline:
@@ -402,6 +413,8 @@ class Runner:
         if not ok:
             return ok, message
         self.sleep(parse_duration(spec.get("for", 10)))
+        if self.stop.is_set():
+            return False, "stopped"
         ok, message = self.do_link(spec, fsp)
         return ok, f"dropped for {spec.get('for', 10)}, then {message}"
 
@@ -548,10 +561,18 @@ class Runner:
         for index, step in enumerate(steps, 1):
             if only is not None and index not in only:
                 continue
+            if self.stop.is_set():
+                self.stopped = True
+                self.log("stopped")
+                break
             if _expects_reports(step) or (index < len(steps) and _expects_reports(steps[index])):
                 self._marks[index] = self.frame_mark()
+            if self.on_step:
+                self.on_step(index, step_label(step))
             result = self.run_step(index, step)
             results.append(result)
+            if self.on_result:
+                self.on_result(result)
             mark = "✓" if result.ok else "✗"
             self.log(f"[{index:>2}/{len(steps)}] {mark} {result.label} · {result.message} ({result.seconds:.1f}s)")
             if not result.ok and not keep_going:
