@@ -93,6 +93,11 @@ urcb.resv = True
 def callback_called(result, param):
     logger.info("callback called: %s", result)
 
+
+# set_data_values calls its callback with what was written, not (result, param).
+def write_callback_called(obj_ref, value, fc, data_type, result):
+    logger.info("write callback called: %s [%s] = %r (%s): %s", obj_ref, fc, value, data_type, result)
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="WebSocketServer")
     default_host = os.getenv("WS_SERVER_HOST", "localhost")
@@ -155,7 +160,7 @@ async def main():
                     "LD0/DWMX1.WMaxSetPct", "sp", True, websocket_info, callback_called, None
                 )
                 set_da_res = await client.set_data_values(
-                    "LD0/DWMX1.WMaxSetPct", "sp", data_w_max_set_pct, websocket_info, callback_called, None
+                    "LD0/DWMX1.WMaxSetPct", "sp", data_w_max_set_pct, websocket_info, write_callback_called, None
                 )
                 set_brcb_res = await client.set_BRCB_values(brcb, websocket_info, callback_called, None)
 

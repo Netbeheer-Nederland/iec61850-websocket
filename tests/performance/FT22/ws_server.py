@@ -76,6 +76,11 @@ def callback_called(result, param):
     logger.info("callback called: %s", result)
 
 
+# set_data_values calls its callback with what was written, not (result, param).
+def write_callback_called(obj_ref, value, fc, data_type, result):
+    logger.info("write callback called: %s [%s] = %r (%s): %s", obj_ref, fc, value, data_type, result)
+
+
 data_attribute_value = {
     "name": "Oper",
     "data": (
@@ -199,7 +204,7 @@ async def add_iec61850_client_requests(iec61850_client, endpoint):
                     "LD0/DWMX1.WMaxSptPct", websocket_info, callback_called, None
                 )
                 set_da_res = await iec61850_client.set_data_values(
-                    "LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value], websocket_info, callback_called, None
+                    "LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value], websocket_info, write_callback_called, None
                 )
                 da_val = await iec61850_client.get_data_values(
                     "LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info, callback_called, None
