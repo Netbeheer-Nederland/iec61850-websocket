@@ -17,8 +17,9 @@
  * limitations under the License.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useDemoActions } from '../hooks/useDemoActions';
+import { recordClick } from '../hooks/usePlaybookRecorder';
 import { runAction, groupByLabel } from '../utils/demoActions';
 import { buildTargetValue } from '../services/apiService';
 import DownBadge from './DownBadge';
@@ -59,13 +60,18 @@ function DemoActionsBar({ connections = [], focusedFsp = null, presence = null }
     return Boolean(so && (so.fspLinks || []).some((l) => l.cp === action.cp));
   };
 
-  const run = useCallback(async (list) => {
+  // Runs the actions of one click; while a playbook is being recorded, the
+  // click is added to it once every action has answered.
+  const run = async (list) => {
+    const fsps = list.map(fspOf);
     setResults((prev) => ({ ...prev, ...Object.fromEntries(list.map((a) => [a.id, 'running'])) }));
-    await Promise.all(list.map(async (a) => {
+    const answers = await Promise.all(list.map(async (a) => {
       const result = await runAction(a);
       setResults((prev) => ({ ...prev, [a.id]: result }));
+      return result;
     }));
-  }, []);
+    recordClick(list.map((action, i) => ({ action, fsp: fsps[i], result: answers[i] })));
+  };
 
   if (actions.length === 0) {
     return (

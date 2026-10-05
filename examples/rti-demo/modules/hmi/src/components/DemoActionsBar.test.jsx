@@ -29,6 +29,7 @@ import DemoActionsBar from './DemoActionsBar';
 import { executeApiCall } from '../services/apiService';
 import { saveActions, loadActions } from '../utils/demoActions';
 import { resetDemoActionsStore } from '../hooks/useDemoActions';
+import { startRecording, resetPlaybookRecorderStore, recordedPlaybook } from '../hooks/usePlaybookRecorder';
 
 const SO = {
   name: 'Demo_SO', type: 'RTI-SO', status: 'connected', host: 'so', port: 5002,
@@ -47,6 +48,7 @@ describe('DemoActionsBar', () => {
   beforeEach(() => {
     localStorage.clear();
     resetDemoActionsStore();
+    resetPlaybookRecorderStore();
     executeApiCall.mockClear();
   });
 
@@ -115,5 +117,27 @@ describe('DemoActionsBar', () => {
     pin([action('1', 'A', 'cp1', 'FSP_North')]);
     render(<DemoActionsBar connections={[SO]} presence={{ byName: { FSP_North: { state: 'link-down' } }, events: [] }} />);
     expect(screen.getByTestId('demo-row-FSP_North').textContent).toContain('link down');
+  });
+
+  it('records clicks while recording, an All FSPs click as one step', async () => {
+    pin([action('1', 'Read status', 'cp1', 'FSP_North'), action('2', 'Read status', 'cp2', 'FSP_South')]);
+    render(<DemoActionsBar connections={[SO]} />);
+    startRecording();
+
+    fireEvent.click(screen.getByTitle(/Run "Read status" on/));
+    await waitFor(() => expect(recordedPlaybook('t').steps).toHaveLength(1));
+    expect(recordedPlaybook('t').steps[0]).toEqual({
+      label: 'Read status',
+      read: { fsp: ['FSP_North', 'FSP_South'], ref: { FSP_North: 'LD0/X1.stVal', FSP_South: 'LD0/X2.stVal' }, fc: 'st' },
+    });
+    expect(recordedPlaybook('t').so).toBe('Demo_SO');
+  });
+
+  it('does not record when not recording', async () => {
+    pin([action('1', 'A', 'cp1', 'FSP_North')]);
+    render(<DemoActionsBar connections={[SO]} />);
+    fireEvent.click(screen.getByText('A'));
+    await waitFor(() => expect(executeApiCall).toHaveBeenCalled());
+    expect(recordedPlaybook('t').steps).toEqual([]);
   });
 });
