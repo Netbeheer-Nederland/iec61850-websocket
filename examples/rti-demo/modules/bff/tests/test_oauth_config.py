@@ -122,6 +122,36 @@ def test_idp_discovery_returns_the_realms_real_endpoints(monkeypatch):
     }
 
 
+def test_idp_discovery_points_endpoints_at_the_idp_url(monkeypatch):
+    # An IDP with a fixed public hostname (Keycloak KC_HOSTNAME=localhost)
+    # advertises every endpoint on it - unreachable from the SO / FSP
+    # containers. The endpoints are fetched from the IDP-Server connection's
+    # URL instead; the issuer stays as the IDP reports it (tokens carry it).
+    async def fake_fetch(url):
+        return {
+            "issuer": "http://localhost:8080/realms/iec61850-test",
+            "jwks_uri": "http://localhost:8080/realms/iec61850-test/protocol/openid-connect/certs",
+            "token_endpoint": "http://localhost:8080/realms/iec61850-test/protocol/openid-connect/token",
+        }
+
+    monkeypatch.setattr(bff_server, "_fetch_oidc_discovery", fake_fetch)
+
+    body = (
+        TestClient(bff_server.app)
+        .get(
+            "/api/idp/discovery", params={"idp_server": "IDP", "realm": "iec61850-test"}
+        )
+        .json()
+    )
+
+    assert body == {
+        "ok": True,
+        "issuer": "http://localhost:8080/realms/iec61850-test",
+        "certificate_endpoint": "http://keycloak:8080/realms/iec61850-test/protocol/openid-connect/certs",
+        "token_endpoint": "http://keycloak:8080/realms/iec61850-test/protocol/openid-connect/token",
+    }
+
+
 def test_idp_discovery_reports_an_unreachable_idp(monkeypatch):
     async def failing_fetch(url):
         raise OSError("connection refused")

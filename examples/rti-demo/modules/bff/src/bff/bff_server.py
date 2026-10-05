@@ -28,6 +28,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx2 as httpx
 import requests
@@ -1017,6 +1018,25 @@ async def create_oauth_connection(request: OAUTHConnectionCreateConfigRequest):
     return {"ok": False, "message": "Connection not found"}
 
 
+def _on_idp_url(endpoint: str | None, issuer: str | None, base_url: str) -> str | None:
+    """An endpoint from the discovery document, moved onto the IDP-Server
+    connection's URL when it sits on the issuer's host.
+
+    An IDP with a fixed public hostname (Keycloak's KC_HOSTNAME, e.g.
+    localhost) advertises every endpoint on that host, which the SO and the
+    FSPs can't reach from inside the Docker network; the connection's URL is
+    the address they can. Endpoints already on another host (a separate
+    backchannel URL) are kept.
+    """
+    if not endpoint or not issuer:
+        return endpoint
+    issuer_parts, endpoint_parts = urlsplit(issuer), urlsplit(endpoint)
+    if (endpoint_parts.scheme, endpoint_parts.netloc) != (issuer_parts.scheme, issuer_parts.netloc):
+        return endpoint
+    base = urlsplit(base_url)
+    return endpoint_parts._replace(scheme=base.scheme, netloc=base.netloc).geturl()
+
+
 async def _fetch_oidc_discovery(url: str) -> dict[str, Any]:
     # verify=False: same as the IDP-Server health check - demo IDPs
     # typically run on a self-signed certificate.
@@ -1058,11 +1078,12 @@ async def get_idp_discovery(idp_server: str, realm: str):
     except Exception as e:
         return {"ok": False, "error": f"Could not read {url}: {e}"}
 
+    issuer = discovery.get("issuer")
     return {
         "ok": True,
-        "issuer": discovery.get("issuer"),
-        "certificate_endpoint": discovery.get("jwks_uri"),
-        "token_endpoint": discovery.get("token_endpoint"),
+        "issuer": issuer,
+        "certificate_endpoint": _on_idp_url(discovery.get("jwks_uri"), issuer, base_url),
+        "token_endpoint": _on_idp_url(discovery.get("token_endpoint"), issuer, base_url),
     }
 
 
