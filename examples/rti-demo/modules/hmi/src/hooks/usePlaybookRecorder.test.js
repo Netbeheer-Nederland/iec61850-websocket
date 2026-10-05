@@ -24,8 +24,8 @@ import {
 } from './usePlaybookRecorder';
 
 const OK = { ok: true, message: 'ok' };
-const entry = (soTarget, label = 'Read', result = OK) => ({
-  action: { label, service: 'read', soTarget, soName: soTarget === 'so:1' ? 'SO' : 'Other SO', objRef: 'R', fc: 'st' },
+const entry = (soTarget, label = 'Read', result = OK, extra = {}) => ({
+  action: { label, service: 'read', soTarget, soName: soTarget === 'so:1' ? 'SO' : 'Other SO', objRef: 'R', fc: 'st', ...extra },
   fsp: 'F1',
   result,
 });
@@ -68,6 +68,21 @@ describe('usePlaybookRecorder', () => {
     act(() => startRecording());
     act(() => recordClick([entry('so:1')]));
     act(() => startRecording());
-    expect(result.current).toMatchObject({ recording: true, so: null, steps: [], notes: [] });
+    expect(result.current).toMatchObject({ recording: true, so: null, steps: [], notes: [], cps: {} });
+  });
+
+  it('keeps each FSP\'s cp and emits it under cps', () => {
+    const { result } = renderHook(() => usePlaybookRecorder());
+    act(() => startRecording());
+    act(() => recordClick([entry('so:1', 'Read', OK, { cp: 'LogicalDevice1' })]));
+    expect(result.current.cps).toEqual({ F1: 'LogicalDevice1' });
+    expect(recordedPlaybook('My demo')).toMatchObject({ cps: { F1: 'LogicalDevice1' } });
+  });
+
+  it('omits cps when no recorded click carried one', () => {
+    renderHook(() => usePlaybookRecorder());
+    act(() => startRecording());
+    act(() => recordClick([entry('so:1')]));
+    expect(recordedPlaybook('My demo')).not.toHaveProperty('cps');
   });
 });

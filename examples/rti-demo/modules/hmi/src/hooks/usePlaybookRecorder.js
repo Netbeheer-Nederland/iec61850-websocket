@@ -24,7 +24,7 @@ import { clicksToSteps } from '../utils/playbooks';
 // the demo bar's pinned buttons land in the Playbook bar's recording. Not
 // persisted - a reload ends a recording.
 
-const EMPTY = { recording: false, so: null, steps: [], notes: [] };
+const EMPTY = { recording: false, so: null, steps: [], notes: [], cps: {} };
 let state = EMPTY;
 const listeners = new Set();
 
@@ -58,15 +58,22 @@ export function recordClick(entries) {
     const other = elsewhere[0].action;
     notes.push(`Not recorded: "${other.label}" is on ${other.soName || other.soTarget} - a playbook drives one SO (${so.name})`);
   }
-  const { steps, skipped } = clicksToSteps(entries.filter((e) => e.action.soTarget === so.target));
+  const onTarget = entries.filter((e) => e.action.soTarget === so.target);
+  const { steps, skipped } = clicksToSteps(onTarget);
   skipped.forEach((e) => notes.push(`Not recorded: "${e.action.label}" on ${e.fsp} failed (${e.result?.message})`));
-  set({ ...state, so: steps.length > 0 ? so : state.so, steps: [...state.steps, ...steps], notes });
+  const cps = { ...state.cps };
+  onTarget.forEach((e) => { if (e.action.cp) cps[e.fsp] = e.action.cp; });
+  set({ ...state, so: steps.length > 0 ? so : state.so, steps: [...state.steps, ...steps], notes, cps });
 }
 
 /** The recording as a playbook, titled `title`. */
-export const recordedPlaybook = (title) => ({ name: title, so: state.so?.name, pace: '2s', steps: state.steps });
+export const recordedPlaybook = (title) => ({
+  name: title, so: state.so?.name, pace: '2s',
+  ...(Object.keys(state.cps).length > 0 ? { cps: state.cps } : {}),
+  steps: state.steps,
+});
 
-/** @returns {{recording: boolean, so: ?{name: string, target: string}, steps: Object[], notes: string[]}} */
+/** @returns {{recording: boolean, so: ?{name: string, target: string}, steps: Object[], notes: string[], cps: Object<string, string>}} */
 export function usePlaybookRecorder() {
   return useSyncExternalStore(subscribe, () => state);
 }
