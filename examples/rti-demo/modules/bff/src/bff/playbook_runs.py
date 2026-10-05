@@ -78,7 +78,14 @@ class PlaybookRuns:
             self._thread = threading.Thread(
                 target=self._work, args=(playbook, pace_s, keep_going), name=f"playbook-{name}", daemon=True
             )
-            self._thread.start()
+        # Published before the worker thread starts, so the "all pending"
+        # state is always the first thing a browser sees for this run -
+        # never after a step update, or even the final state.
+        try:
+            publish(initial)
+        except Exception:
+            logger.exception("publishing the initial playbook run state failed")
+        self._thread.start()
         return initial
 
     def stop(self) -> None:

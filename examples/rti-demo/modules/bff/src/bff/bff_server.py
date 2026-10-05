@@ -1497,7 +1497,7 @@ async def run_playbook(name: str, request: PlaybookRunRequest | None = None):
         raise HTTPException(status_code=400, detail=str(exc))
     except PlaybookBusy as exc:
         raise HTTPException(status_code=409, detail=str(exc))
-    await ws_hub.broadcast({"type": "playbook-run", "data": state})
+    # PlaybookRuns.start() already published this initial state itself.
     return {"ok": True, "run": state}
 
 

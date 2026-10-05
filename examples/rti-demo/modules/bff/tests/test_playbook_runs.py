@@ -40,6 +40,11 @@ def test_a_run_publishes_each_change_and_passes(store):
     assert [s["status"] for s in final["steps"]] == ["ok", "ok"]
     assert published[-1] == final
     assert any(p["steps"][0]["status"] == "running" for p in published)
+    # The "all pending" state is published first - before any step update, and
+    # before start() even starts the worker thread (so a slow browser can't
+    # see a step update, or the final state, before it).
+    assert published[0] == initial
+    assert published[0]["steps"][0]["status"] == "pending"
 
 
 def test_one_run_at_a_time_and_stop(store):
