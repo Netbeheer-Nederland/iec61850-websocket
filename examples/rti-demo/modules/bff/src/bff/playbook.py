@@ -168,7 +168,7 @@ def control_value(cdc: str, raw: Any) -> tuple[Any, str]:
     if cdc == "ASG":
         return text, "string"
     if cdc == "ENG":
-        return int(text), "enumerated"
+        return (int(text) if re.fullmatch(r"[+-]?\d+", text) else text), "enumerated"
     raise PlaybookError(f"unsupported CDC for operate: {cdc!r}")
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from bff.playbook import PlaybookError, Runner, dump_playbook, load_playbook, parse_playbook, step_label
+from bff.playbook import PlaybookError, Runner, control_value, dump_playbook, load_playbook, parse_playbook, step_label
 
 pytestmark = pytest.mark.unit
 
@@ -53,6 +53,17 @@ def test_dump_keeps_on_off_strings():
 def test_step_label():
     assert step_label({"label": "Hi", "wait": 1}) == "Hi"
     assert step_label({"wait": "5s"}) == "wait 5s"
+
+
+def test_control_value_eng_sends_an_int_for_a_number_else_the_text_enumerated():
+    assert control_value("ENG", "3") == (3, "enumerated")
+    assert control_value("ENG", "-1") == (-1, "enumerated")
+    assert control_value("ENG", "+2") == (2, "enumerated")
+    assert control_value("ENG", "open") == ("open", "enumerated")
+
+
+def test_control_value_apc_is_unchanged():
+    assert control_value("APC", "1.5") == (1.5, "float32")
     assert step_label({"read": {"fsp": ["F1", "F2"], "ref": "LD0/X.st"}}) == "read F1, F2 LD0/X.st"
     assert step_label({"enable-report": {"fsp": "F1", "rcb": {"F1": "R"}}}) == "enable-report F1"
 
