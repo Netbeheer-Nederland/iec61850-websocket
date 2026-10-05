@@ -18,9 +18,12 @@ services:
       # atomic save (temp file + rename in the same dir) needs a real, writable
       # dir - a single-file bind mount would also break os.replace() with EBUSY.
       - BFF_CONNECTIONS_FILE=/config/connections.json
+      # Playbooks saved from the HMI (recordings, uploads), on the config volume.
+      - BFF_PLAYBOOKS_DIR=/config/playbooks
     volumes:
       - ./modules/bff/src/bff:/app/examples/rti-demo/modules/bff/src/bff
       - bff-config:/config
+      - ./playbooks:/app/examples/rti-demo/playbooks:ro
     networks:
       - rti-network
     # Healthcheck already defined in the Dockerfile (with matching timing).

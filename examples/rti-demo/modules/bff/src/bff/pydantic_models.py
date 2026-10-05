@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -333,3 +333,18 @@ class DiscoveryRequest(BaseModel):
         description="End port for range scan",
         json_schema_extra={"example": 5010},
     )
+
+
+class PlaybookSaveRequest(BaseModel):
+    """A playbook to save: a recording as JSON, or an uploaded file's text."""
+
+    playbook: dict[str, Any] | None = Field(default=None, description="The playbook (a recording from the HMI)")
+    text: str | None = Field(default=None, description="A playbook file's text (an upload)")
+    format: Literal["yaml", "json"] = Field(default="yaml", description="The text's format")
+
+
+class PlaybookRunRequest(BaseModel):
+    """Options for a playbook run."""
+
+    pace: str | float | None = Field(default=None, description="Pause between steps, e.g. 2s (default: the playbook's)")
+    keep_going: bool = Field(default=False, description="Run on after a failed step")

@@ -31,6 +31,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # second sync only needs to link bff's own files in, not reinstall deps.
 COPY examples/rti-demo/modules/bff/ ./examples/rti-demo/modules/bff/
 
+# Built-in demo playbooks, where bff_server looks for them (next to modules/).
+COPY examples/rti-demo/playbooks/*.yaml ./examples/rti-demo/playbooks/
+
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --package bff
 

@@ -26,6 +26,7 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import httpx2 as httpx
@@ -39,15 +40,20 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from bff.bff_client import BffClient
 from bff.connection_manager import ConnectionManager
+from bff.playbook import BffTransport, PlaybookError, parse_playbook, step_label
+from bff.playbook_runs import PlaybookBusy, PlaybookRuns
+from bff.playbook_store import BuiltinPlaybookError, PlaybookNameError, PlaybookStore
 from bff.pydantic_models import (
     ConnectionCreateRequest,
     ConnectionUpdateRequest,
     ExecuteRequest,
     OAUTHConnectionCreateConfigRequest,
+    PlaybookRunRequest,
+    PlaybookSaveRequest,
     TLSConnectionCreateConfigRequest,
 )
 
@@ -614,6 +620,7 @@ app = FastAPI(
             "name": "Execution",
             "description": "Execute dynamic API calls against registered targets",
         },
+        {"name": "Playbooks", "description": "Store and run demo playbooks"},
     ],
 )
 
@@ -1360,6 +1367,137 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
     return connection
 
 
+# -------------------- Playbooks --------------------
+
+# Built-in playbooks: the repo's examples/rti-demo/playbooks (the Dockerfile
+# copies them to the same place in the image). Saved ones (recordings and
+# uploads from the HMI) sit next to connections.json - in Docker, on the
+# config volume.
+playbook_store = PlaybookStore(
+    os.environ.get("BFF_PLAYBOOKS_BUILTIN_DIR") or Path(__file__).resolve().parents[4] / "playbooks",
+    os.environ.get("BFF_PLAYBOOKS_DIR") or Path(CONNECTIONS_FILE).parent / "playbooks",
+)
+# A run goes through this BFF's own /api/execute, the path an HMI click takes,
+# so Traffic shows every step.
+playbook_runs = PlaybookRuns(
+    playbook_store, lambda playbook: BffTransport(f"http://localhost:{os.getenv('PORT', '5000')}")
+)
+
+
+def _run_publisher(loop: asyncio.AbstractEventLoop):
+    """Push a run's state to every browser - called from the run's thread."""
+
+    def publish(state: dict[str, Any]) -> None:
+        coro = ws_hub.broadcast({"type": "playbook-run", "data": state})
+        try:
+            asyncio.run_coroutine_threadsafe(coro, loop)
+        except RuntimeError:
+            # The loop is closed (e.g. FastAPI's TestClient, whose per-request
+            # loop closes once the request completes) - nothing to push to.
+            coro.close()
+
+    return publish
+
+
+# /api/playbooks/run before /api/playbooks/{name}, so "run" isn't taken for a name.
+@app.get("/api/playbooks/run", summary="Current playbook run", tags=["Playbooks"])
+async def get_playbook_run():
+    return {"ok": True, "run": playbook_runs.state()}
+
+
+@app.post("/api/playbooks/run/stop", summary="Stop the playbook run", tags=["Playbooks"])
+async def stop_playbook_run():
+    playbook_runs.stop()
+    return {"ok": True, "run": playbook_runs.state()}
+
+
+@app.get("/api/playbooks", summary="List playbooks", tags=["Playbooks"])
+async def list_playbooks():
+    return {"ok": True, "playbooks": await asyncio.to_thread(playbook_store.list)}
+
+
+@app.get("/api/playbooks/{name}", summary="Get a playbook", tags=["Playbooks"])
+async def get_playbook(name: str):
+    try:
+        playbook, builtin = playbook_store.get(name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no playbook {name!r}")
+    except PlaybookNameError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except PlaybookError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {
+        "ok": True,
+        "name": name,
+        "builtin": builtin,
+        "playbook": playbook,
+        "labels": [step_label(step) for step in playbook["steps"]],
+    }
+
+
+@app.get("/api/playbooks/{name}/file", summary="Download a playbook file", tags=["Playbooks"])
+async def download_playbook(name: str):
+    try:
+        text, filename = playbook_store.file(name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no playbook {name!r}")
+    except PlaybookNameError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return Response(
+        text,
+        media_type="application/json" if filename.endswith(".json") else "application/yaml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.put("/api/playbooks/{name}", summary="Save a playbook", tags=["Playbooks"])
+async def save_playbook(name: str, request: PlaybookSaveRequest):
+    try:
+        if request.playbook is not None:
+            playbook = request.playbook
+        elif request.text is not None:
+            playbook = parse_playbook(request.text, request.format)
+        else:
+            raise HTTPException(status_code=400, detail="send 'playbook', or 'text' with its 'format'")
+        playbook_store.save(name, playbook)
+    except (PlaybookNameError, PlaybookError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except BuiltinPlaybookError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    return {"ok": True, "name": name}
+
+
+@app.delete("/api/playbooks/{name}", summary="Delete a saved playbook", tags=["Playbooks"])
+async def delete_playbook(name: str):
+    try:
+        playbook_store.delete(name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no playbook {name!r}")
+    except PlaybookNameError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except BuiltinPlaybookError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    return {"ok": True}
+
+
+@app.post("/api/playbooks/{name}/run", summary="Run a playbook", tags=["Playbooks"])
+async def run_playbook(name: str, request: PlaybookRunRequest | None = None):
+    request = request or PlaybookRunRequest()
+    try:
+        state = playbook_runs.start(
+            name, pace=request.pace, keep_going=request.keep_going,
+            publish=_run_publisher(asyncio.get_running_loop()),
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no playbook {name!r}")
+    except (PlaybookNameError, PlaybookError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except PlaybookBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    await ws_hub.broadcast({"type": "playbook-run", "data": state})
+    return {"ok": True, "run": state}
+
+
 # -------------------- Dynamic API Execution --------------------
 
 
@@ -1714,6 +1852,9 @@ if __name__ == "__main__":
         ),
     )
     args = parser.parse_args()
+
+    # The playbook runner calls this BFF on its own port.
+    os.environ["PORT"] = str(args.port)
 
     # Module scope already applied LOG_LEVEL from the environment at import.
     # Re-resolve here so an explicit --log-level on the command line wins, and

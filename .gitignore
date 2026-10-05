@@ -71,6 +71,7 @@ resources.txt
 **/data/client_credentials.json
 
 # RTI Demo - local configuration and generated files
+examples/rti-demo/modules/bff/src/bff/playbooks/
 launch_config.json
 *.local.json
 *.pid

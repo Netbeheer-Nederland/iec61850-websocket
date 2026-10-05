@@ -237,6 +237,22 @@ When HMI calls /api/reconfig-oauth, BFF automatically enriches request with OAut
 ### Statistics
 - GET /api/stats - Get system statistics
 
+### Playbooks
+- GET /api/playbooks - `{ok, playbooks: [...]}`
+- GET /api/playbooks/run - `{ok, run: state|null}`
+- POST /api/playbooks/run/stop - `{ok, run}`
+- GET /api/playbooks/{name} - `{ok, name, builtin, playbook, labels}`; 400 bad name, 404, 422 broken file
+- GET /api/playbooks/{name}/file - the file's text, as a download (`Content-Disposition: attachment; filename="<file>"`)
+- PUT /api/playbooks/{name} - body `{playbook}` (a recording) or `{text, format}` (an upload) → `{ok, name}`; 400, 409 (built-in)
+- DELETE /api/playbooks/{name} - `{ok}`; 400, 404, 409 (built-in)
+- POST /api/playbooks/{name}/run - body `{pace?, keep_going?}` (optional) → `{ok, run}`; 400, 404, 409 (already running)
+
+A run's progress also pushes over `/ws` as `{"type": "playbook-run", "data": <state>}`, once when the run starts and again after every step.
+
+Environment variables:
+- `BFF_PLAYBOOKS_DIR` - where saved playbooks (recordings, uploads) live. Default: a `playbooks/` directory next to the connections file.
+- `BFF_PLAYBOOKS_BUILTIN_DIR` - where the read-only built-in playbooks live. Default: `examples/rti-demo/playbooks`.
+
 ---
 
 ## Security Features
