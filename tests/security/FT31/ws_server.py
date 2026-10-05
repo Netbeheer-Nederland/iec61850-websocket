@@ -14,8 +14,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -91,8 +93,35 @@ urcb.resv = True
 def callback_called(result, param):
     logger.info("callback called: %s", result)
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="WebSocketServer")
+    default_host = os.getenv("WS_SERVER_HOST", "localhost")
+    port = os.getenv("WS_SERVER_PORT", "8765")
+    if port is None:
+        default_port = 8765
+    else:
+        try:
+            default_port = int(port)
+        except ValueError:
+            parser.error("WS_SERVER_PORT must be an integer")
+
+    parser.add_argument(
+        "--host",
+        type=str,
+        default=default_host,
+        help="hostname for the websocket server (default: 'localhost').",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=default_port,
+        help="port for the websocket server (default: 8765).",
+    )
+
+    return parser.parse_args()
 
 async def main():
+    args = parse_args()
     endpoint = PassiveEndpoint(
         oauth_enable=True,
         cert_endpoint="https://localhost:8443/realms/iec61850-test/protocol/openid-connect/certs",
@@ -102,8 +131,8 @@ async def main():
 
     client = IEC61850Client("cp1")
     endpoint.add_iec61850_client(client)
-
-    server_task = asyncio.create_task(endpoint.start("localhost", 8765))
+    logger.info("Starting WebSocket endpoint in passive mode on %s:%s", args.host, args.port)
+    server_task = asyncio.create_task(endpoint.start(args.host, args.port))
 
     await client.ready_event.wait()
     if client.is_connected is True:

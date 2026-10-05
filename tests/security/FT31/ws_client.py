@@ -14,8 +14,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -43,12 +45,39 @@ logging.basicConfig(
 )
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="WebSocketServer")
+    default_host = os.getenv("WS_SERVER_HOST", "localhost")
+    port = os.getenv("WS_SERVER_PORT", "8765")
+    if port is None:
+        default_port = 8765
+    else:
+        try:
+            default_port = int(port)
+        except ValueError:
+            parser.error("WS_SERVER_PORT must be an integer")
+
+    parser.add_argument(
+        "--host",
+        type=str,
+        default=default_host,
+        help="hostname for the websocket server (default: 'localhost').",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=default_port,
+        help="port for the websocket server (default: 8765).",
+    )
+
+    return parser.parse_args()
+
 BASE = "https://localhost:8443"
 TARGET_REALM = "iec61850-test"
 token_endpoint = f"{BASE}/realms/{TARGET_REALM}/protocol/openid-connect/token"
 
-
 async def main():
+    args = parse_args()
     logger.info("Start Client")
 
     client_id = "ws-client"
@@ -61,7 +90,7 @@ async def main():
     iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     endpoint.add_iec61850_server(iec61850_server)
 
-    task = asyncio.create_task(endpoint.start("localhost", 8765, "cp1", access_token=access_token))
+    task = asyncio.create_task(endpoint.start(args.host, args.port, "cp1", access_token=access_token))
     task_token = asyncio.create_task(
         refresh_token_if_needed(token_endpoint, client_id, client_secret, "cp1", access_token, endpoint, cafile)
     )
