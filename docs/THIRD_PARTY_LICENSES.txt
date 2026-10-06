@@ -9,7 +9,6 @@ MIT License:
 - PyJWT
 - pyparsing
 - urllib3
-- black
 - ruff
 
 BSD 3-Clause License:
