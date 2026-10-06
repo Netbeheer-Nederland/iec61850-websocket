@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# Canonical author identities for git log, git shortlog and git blame
+# (see `git help gitmailmap`). History itself is not rewritten.
+#
+# <canonical name> <canonical email> <email used in commits>
+Robert-Jan Peters <31131411+rjfpeters-iefbr14@users.noreply.github.com> <rjf.peters@gmail.com>
