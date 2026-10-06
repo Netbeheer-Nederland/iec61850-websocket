@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# Link check for the Markdown documentation (CI job `docs-links` in
+# .github/workflows/ci.yml). Offline: only links to files in this repository
+# and #anchors are checked, no network. Run locally with
+#   docker run --rm -v "$PWD":/input -w /input lycheeverse/lychee --config lychee.toml '**/*.md'
+
+offline = true
+include_fragments = "anchor-only"
+no_progress = true
+
+# Archived plans describe the repository as it was; generated and
+# third-party trees aren't ours to fix.
+# (regular expressions)
+exclude_path = [
+  "(^|/)docs/archive/",
+  "(^|/)docs/doxygen/html/",
+  "(^|/)node_modules/",
+  "(^|/)\\.venv/",
+]

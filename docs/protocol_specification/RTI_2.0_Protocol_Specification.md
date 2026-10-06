@@ -15,7 +15,7 @@ Version: beta-1 rev. 2026-01-30
 
 [1.4 Contents of this document [5](#contents-of-this-document)](#contents-of-this-document)
 
-[1.5 Glossary [6](#_Toc216358507)](#_Toc216358507)
+[1.5 Glossary [6](#glossary)](#glossary)
 
 [2 References [7](#references)](#references)
 

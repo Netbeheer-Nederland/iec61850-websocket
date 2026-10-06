@@ -21,7 +21,7 @@ docker compose up
 
 * Log in to the Admin Console (http://localhost:8080), with the username and password you created earlier
 
-![key-cloak start screen](./images/keycloak-start-screen.png)
+![Keycloak admin console after logging in](./images/keycloak-clients-screen.png)
 
 Or directly test a realm endpoint:
 

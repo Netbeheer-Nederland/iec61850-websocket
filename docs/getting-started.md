@@ -337,6 +337,8 @@ Both terminals print the exchanged messages: an `associateRequest`/`associateRes
 followed by directory requests and periodic reports. If they appear without errors, the installation is complete. Stop
 both sides with `Ctrl+C`.
 
+`scripts/smoke-test.sh` does the same in one go (CI runs it too); it needs port 8765 to be free.
+
 ---
 
 ## Troubleshooting

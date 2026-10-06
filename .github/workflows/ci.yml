@@ -48,6 +48,28 @@ jobs:
           name: junit-${{ matrix.python }}
           path: junit-*.xml
 
+  # Relative links and #anchors in the Markdown docs (config: lychee.toml).
+  docs-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          lycheeVersion: v0.24.2
+          args: --config lychee.toml '**/*.md'
+          fail: true
+
+  # The first-run check from docs/getting-started.md, so it can't break unnoticed.
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: scripts/smoke-test.sh
+
   build:
     runs-on: ubuntu-latest
     needs: [lint, test]

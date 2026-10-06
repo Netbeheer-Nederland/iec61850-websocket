@@ -11,7 +11,9 @@ Explain how you tested your changes.
 
 ## Documentation
 
-- [ ] I have updated the documentation (if necessary)
+- [ ] I have updated the documentation (if necessary): the README of each module I changed, and anything under
+      `docs/` that describes it
+- [ ] I removed or updated any other copy of what I changed, instead of leaving two versions
 
 ## Additional Notes
 
