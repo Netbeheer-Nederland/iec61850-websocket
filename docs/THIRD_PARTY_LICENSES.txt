@@ -1,6 +1,7 @@
 THIRD-PARTY LICENSES
 
-This project bundles the following third-party Python packages:
+This project bundles the following third-party Python packages. The full license texts are in
+docs/LICENSES/.
 
 MIT License:
 - asn1tools

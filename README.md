@@ -195,12 +195,14 @@ requests to us.
 
 ## License
 
-This project is licensed under the Apache License, version 2.0 – see LICENSE for details
+This project is licensed under the Apache License, version 2.0 - see [LICENSE](LICENSE). Every file states its
+copyright and license with an SPDX header (or an entry in [REUSE.toml](REUSE.toml)), following the
+[REUSE](https://reuse.software/) specification, and [LICENSES](LICENSES) holds the texts of the licenses those
+declare: Apache-2.0, and CC-BY-4.0 for the [Code of Conduct](CODE_OF_CONDUCT.md), which is adapted from the
+Contributor Covenant.
 
 ## Licenses third-party code
 
-This project includes third-party code, which is licensed under their own respective Open-Source licenses.
-Every file states its copyright and license with SPDX headers (or an entry in [REUSE.toml](REUSE.toml)), following the
-[REUSE](https://reuse.software/) specification; the license texts are in [LICENSES](LICENSES). The third-party
-packages the project depends on and their licenses are listed in
-[docs/THIRD_PARTY_LICENSES.txt](docs/THIRD_PARTY_LICENSES.txt) and [docs/LICENSES](docs/LICENSES).
+The third-party packages the project depends on keep their own open-source licenses. Which package uses which license
+is listed in [docs/THIRD_PARTY_LICENSES.txt](docs/THIRD_PARTY_LICENSES.txt); the full license texts are in
+[docs/LICENSES](docs/LICENSES/README.md).

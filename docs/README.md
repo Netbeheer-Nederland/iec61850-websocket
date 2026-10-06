@@ -39,8 +39,8 @@ docs/
 ├─ doxygen/
 │  └─ Doxyfile                            # Doxygen configuration for the API reference
 ├─ archive/                               # finished plans, specs and guides, kept as a record
-├─ LICENSES/                              # license texts
-└─ THIRD_PARTY_LICENSES.txt               # third-party license information
+├─ LICENSES/                              # full texts of the third-party packages' licenses
+└─ THIRD_PARTY_LICENSES.txt               # which third-party package uses which license
 ```
 
 ## Generate the API reference (Doxygen)
