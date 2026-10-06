@@ -80,7 +80,7 @@ class TestConnectionRouterNotFound:
                 ):
                     await router.send_not_found_response(ws, "cp-missing", None, None)
 
-        asyncio.get_event_loop().run_until_complete(_run())
+        asyncio.run(_run())
         ws.send.assert_awaited_once_with(b"encoded")
         ws.close.assert_awaited_once()
 
@@ -104,7 +104,7 @@ class TestConnectionRouterNotFound:
                         ws, "cp-missing", None, callback
                     )
 
-        asyncio.get_event_loop().run_until_complete(_run())
+        asyncio.run(_run())
         callback.assert_called_once()
 
     def test_send_not_found_ber_protocol(self):
@@ -129,7 +129,7 @@ class TestConnectionRouterNotFound:
                         ws, "cp", "iec61850-tpaa-ber-v1", None
                     )
 
-        asyncio.get_event_loop().run_until_complete(_run())
+        asyncio.run(_run())
         assert captured_is_ber[0] is True
 
     def test_send_not_found_non_ber_protocol(self):
@@ -152,5 +152,5 @@ class TestConnectionRouterNotFound:
                 ):
                     await router.send_not_found_response(ws, "cp", None, None)
 
-        asyncio.get_event_loop().run_until_complete(_run())
+        asyncio.run(_run())
         assert captured_is_ber[0] is False

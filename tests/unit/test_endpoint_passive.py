@@ -154,7 +154,7 @@ class TestPassiveEndpointConnectionClosed:
         info = WebSocketInfo(MagicMock(), "assoc-1", cp="cp1")
         ep.websocket_info_list.append(info)
 
-        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+        asyncio.run(ep._on_connection_closed("cp1"))
 
         assert ep.websocket_info_list == []
 
@@ -170,7 +170,7 @@ class TestPassiveEndpointConnectionClosed:
         info2 = WebSocketInfo(MagicMock(), "assoc-2", cp="cp2")
         ep.websocket_info_list.extend([info1, info2])
 
-        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+        asyncio.run(ep._on_connection_closed("cp1"))
 
         assert ep.websocket_info_list == [info2]
 
@@ -181,6 +181,6 @@ class TestPassiveEndpointConnectionClosed:
         client = _make_fake_client("cp1")
         ep.add_iec61850_client(client)
 
-        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+        asyncio.run(ep._on_connection_closed("cp1"))
 
         assert ep.client_list == []

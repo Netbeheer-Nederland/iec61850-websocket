@@ -67,7 +67,7 @@ class TestAssociationHandlerAbort:
                         "abortRequest", None, mock_websocket, websocket_info
                     )
 
-        result = asyncio.get_event_loop().run_until_complete(_run())
+        result = asyncio.run(_run())
         assert result == ACTION_ABORT
 
     def test_abort_sends_response_and_aborts_transport(
@@ -88,7 +88,7 @@ class TestAssociationHandlerAbort:
                         "abortRequest", None, mock_websocket, websocket_info
                     )
 
-        asyncio.get_event_loop().run_until_complete(_run())
+        asyncio.run(_run())
         mock_websocket.send.assert_awaited_once()
         mock_websocket.transport.abort.assert_called_once()
 
@@ -110,7 +110,7 @@ class TestAssociationHandlerRelease:
                         "releaseRequest", None, mock_websocket, websocket_info
                     )
 
-        result = asyncio.get_event_loop().run_until_complete(_run())
+        result = asyncio.run(_run())
         assert result == ACTION_RELEASE
 
     def test_release_sends_response_and_closes(self, mock_websocket, websocket_info):
@@ -129,7 +129,7 @@ class TestAssociationHandlerRelease:
                         "releaseRequest", None, mock_websocket, websocket_info
                     )
 
-        asyncio.get_event_loop().run_until_complete(_run())
+        asyncio.run(_run())
         mock_websocket.send.assert_awaited_once()
         mock_websocket.close.assert_awaited_once()
 
@@ -143,7 +143,7 @@ class TestAssociationHandlerUnknown:
                 "associateResponse", MagicMock(), mock_websocket, websocket_info
             )
 
-        result = asyncio.get_event_loop().run_until_complete(_run())
+        result = asyncio.run(_run())
         assert result == ACTION_CONTINUE
 
     def test_unknown_type_sends_nothing(self, mock_websocket, websocket_info):
@@ -154,5 +154,5 @@ class TestAssociationHandlerUnknown:
                 "associateResponse", MagicMock(), mock_websocket, websocket_info
             )
 
-        asyncio.get_event_loop().run_until_complete(_run())
+        asyncio.run(_run())
         mock_websocket.send.assert_not_awaited()

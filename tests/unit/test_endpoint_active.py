@@ -118,9 +118,7 @@ class TestActiveEndpointStopPassive:
         import asyncio
 
         ep = ActiveEndpoint()
-        asyncio.get_event_loop().run_until_complete(
-            ep.stop_passive()
-        )  # should not raise
+        asyncio.run(ep.stop_passive())  # should not raise
 
 
 class TestActiveEndpointConnectionClosed:
@@ -141,7 +139,7 @@ class TestActiveEndpointConnectionClosed:
         info = WebSocketInfo(ws, "assoc-1", cp="cp1")
         ep.websocket_info_list.append(info)
 
-        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+        asyncio.run(ep._on_connection_closed("cp1"))
 
         assert ep.websocket_info_list == []
 
@@ -157,7 +155,7 @@ class TestActiveEndpointConnectionClosed:
         info2 = WebSocketInfo(MagicMock(), "assoc-2", cp="cp2")
         ep.websocket_info_list.extend([info1, info2])
 
-        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+        asyncio.run(ep._on_connection_closed("cp1"))
 
         assert ep.websocket_info_list == [info2]
 
@@ -171,7 +169,7 @@ class TestActiveEndpointConnectionClosed:
         client.disconnect_event = MagicMock()
         ep.add_iec61850_client(client)
 
-        asyncio.get_event_loop().run_until_complete(ep._on_connection_closed("cp1"))
+        asyncio.run(ep._on_connection_closed("cp1"))
 
         assert client.is_connected is False
         client.ready_event.clear.assert_called_once()
