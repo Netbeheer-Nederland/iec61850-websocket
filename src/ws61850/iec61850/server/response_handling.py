@@ -18,29 +18,19 @@
 from ws61850.iec61850.server.server_report_control import ServerReportControl
 
 
-def create_tpaa_associate_response(max_message_size, associate_id, service_error=None, max_outstanding_calls=None):
+def create_tpaa_associate_response(
+    max_message_size, associate_id, service_error=None, max_outstanding_calls=None
+):
     """
     Creates a Two-Party Application Association response between two applications to acknowledge and establish communication.
     """
-    service_dict = {
-        "maxMessageSize": max_message_size,
-        "associateId": associate_id
-    }
+    service_dict = {"maxMessageSize": max_message_size, "associateId": associate_id}
     if max_outstanding_calls is not None:
         service_dict["maxOutstandingCalls"] = max_outstanding_calls
     if service_error is not None:
         service_dict["serviceError"] = service_error
 
-    return_item = (
-        "associate",
-        (
-            "service",
-            (
-                "associateResponse",
-                service_dict
-            )
-        )
-    )
+    return_item = ("associate", ("service", ("associateResponse", service_dict)))
     return return_item
 
 
@@ -57,9 +47,9 @@ def create_tpaa_response_get_server_directory(invoke_id, associate_id, ld_refs):
                 "getServerDirectory",
                 {
                     "result": ld_refs  # expected to be a list of strings
-                }
-            )
-        }
+                },
+            ),
+        },
     )
 
 
@@ -76,9 +66,9 @@ def create_tpaa_response_get_ld_directory(invoke_id, associate_id, ln_refs):
                 "getLogicalDeviceDirectory",
                 {
                     "lnRef": ln_refs  # expected to be a list of strings
-                }
-            )
-        }
+                },
+            ),
+        },
     )
 
 
@@ -88,14 +78,13 @@ def build_ds_refs_from_dataset(ds_list):
     """
     ds_refs = []
     for entry in ds_list:
-        ds_refs.append({
-            "ref": entry.variable_name,
-            "fc": entry.fc.wire_name
-        })
+        ds_refs.append({"ref": entry.variable_name, "fc": entry.fc.wire_name})
     return ds_refs
 
 
-def create_tpaa_response_get_data_set_directory_request(invoke_id, associate_id, ds_refs):
+def create_tpaa_response_get_data_set_directory_request(
+    invoke_id, associate_id, ds_refs
+):
     """
     Creates a Two-Party Application Association response to retrieve the list of data attributes contained within a specific data set.
     """
@@ -109,9 +98,9 @@ def create_tpaa_response_get_data_set_directory_request(invoke_id, associate_id,
                 "getDataSetDirectory",
                 {
                     "dsMemberRef": ref_list  # expected to be a list of strings
-                }
-            )
-        }
+                },
+            ),
+        },
     )
 
 
@@ -128,9 +117,9 @@ def create_tpaa_response_get_logical_node_directory(invoke_id, associate_id, ref
                 "getLogicalNodeDirectory",
                 {
                     "instanceNames": ref_list  # expected to be a list of strings
-                }
-            )
-        }
+                },
+            ),
+        },
     )
 
 
@@ -145,16 +134,15 @@ def create_tpaa_response_get_data_directory(invoke_id, associate_id, sdo_list, d
             "associateId": associate_id,
             "service": (
                 "getDataDirectory",
-                {
-                    "subDataObjectName": sdo_list,
-                    "dataAttrName": da_list
-                }
-            )
-        }
+                {"subDataObjectName": sdo_list, "dataAttrName": da_list},
+            ),
+        },
     )
 
 
-def create_tpaa_response_get_brcb_values(invoke_id, associate_id, server_brcb: ServerReportControl):
+def create_tpaa_response_get_brcb_values(
+    invoke_id, associate_id, server_brcb: ServerReportControl
+):
     """
     Response Function for getBRCBValues
     """
@@ -184,15 +172,14 @@ def create_tpaa_response_get_brcb_values(invoke_id, associate_id, server_brcb: S
         {
             "invokeId": invoke_id,
             "associateId": associate_id,
-            "service": (
-                "getBRCBValues",
-                service_data
-            )
-        }
+            "service": ("getBRCBValues", service_data),
+        },
     )
 
 
-def create_tpaa_response_get_urcb_values(invoke_id, associate_id, server_urcb: ServerReportControl):
+def create_tpaa_response_get_urcb_values(
+    invoke_id, associate_id, server_urcb: ServerReportControl
+):
     """
     Response Function for getURCBValues
     """
@@ -221,11 +208,8 @@ def create_tpaa_response_get_urcb_values(invoke_id, associate_id, server_urcb: S
         {
             "invokeId": invoke_id,
             "associateId": associate_id,
-            "service": (
-                "getURCBValues",
-                service_data
-            )
-        }
+            "service": ("getURCBValues", service_data),
+        },
     )
 
 
@@ -238,13 +222,8 @@ def create_tpaa_response_set_brcb_values(invoke_id, associate_id, service_data):
         {
             "invokeId": invoke_id,
             "associateId": associate_id,
-            "service": (
-                "setBRCBValues",
-                {
-                    "result": service_data
-                }
-            )
-        }
+            "service": ("setBRCBValues", {"result": service_data}),
+        },
     )
 
 
@@ -257,17 +236,14 @@ def create_tpaa_response_set_urcb_values(invoke_id, associate_id, service_data):
         {
             "invokeId": invoke_id,
             "associateId": associate_id,
-            "service": (
-                "setURCBValues",
-                {
-                    "result": service_data
-                }
-            )
-        }
+            "service": ("setURCBValues", {"result": service_data}),
+        },
     )
 
 
-def create_tpaa_response_get_data_definition(invoke_id, associate_id, sdo_list, da_list, data_object):
+def create_tpaa_response_get_data_definition(
+    invoke_id, associate_id, sdo_list, da_list, data_object
+):
     """
     Creates a Two-Party Application Association response to retrieve the data type definition of a specific object.
     """
@@ -282,10 +258,10 @@ def create_tpaa_response_get_data_definition(invoke_id, associate_id, sdo_list, 
                     "cdc": data_object.cdc,
                     "count": data_object.elementCount,
                     "subDataDefinition": sdo_list,
-                    "dataAttributeDefinition": da_list
-                }
-            )
-        }
+                    "dataAttributeDefinition": da_list,
+                },
+            ),
+        },
     )
 
 
@@ -302,9 +278,9 @@ def create_tpaa_response_get_data_values(invoke_id, associate_id, service_data):
                 "getDataValues",
                 {
                     "dataAttrVal": service_data,
-                }
-            )
-        }
+                },
+            ),
+        },
     )
 
 
@@ -317,13 +293,8 @@ def create_tpaa_response_set_data_values(invoke_id, associate_id, service_data):
         {
             "invokeId": invoke_id,
             "associateId": associate_id,
-            "service": (
-                "setDataValues",
-                {
-                    "result": service_data
-                }
-            )
-        }
+            "service": ("setDataValues", {"result": service_data}),
+        },
     )
 
 
@@ -336,11 +307,8 @@ def create_tpaa_service_error_response(invoke_id, associate_id, service_data):
         {
             "invokeId": invoke_id,
             "associateId": associate_id,
-            "service": (
-                ("serviceError", service_data)
-
-            )
-        }
+            "service": (("serviceError", service_data)),
+        },
     )
 
 
@@ -357,9 +325,9 @@ def create_tpaa_response_get_data_set_values(invoke_id, associate_id, service_da
                 "getDatasetValues",
                 {
                     "dsMemberValue": service_data,
-                }
-            )
-        }
+                },
+            ),
+        },
     )
 
 
@@ -373,12 +341,9 @@ def create_tpaa_release_response(invoke_id, associate_id):
             "service",  # AssociateType CHOICE
             (
                 "releaseResponse",  # AssociateServiceType CHOICE
-                {
-                    "invokeId": invoke_id,
-                    "associateId": associate_id
-                }
-            )
-        )
+                {"invokeId": invoke_id, "associateId": associate_id},
+            ),
+        ),
     )
 
 
@@ -390,18 +355,14 @@ def create_tpaa_abort_response(invoke_id, associate_id):
         "associate",  # TpaaPdu CHOICE
         (
             "service",
-            (
-                "abortResponse",
-                {
-                    "invokeId": invoke_id,
-                    "associateId": associate_id
-                }
-            )
-        )
+            ("abortResponse", {"invokeId": invoke_id, "associateId": associate_id}),
+        ),
     )
 
 
-def create_tpaa_report(server_report_control: ServerReportControl, da_entry_list, associate_id):
+def create_tpaa_report(
+    server_report_control: ServerReportControl, da_entry_list, associate_id
+):
     """
     Create a Two-Party Application Association for report
     """
@@ -416,35 +377,25 @@ def create_tpaa_report(server_report_control: ServerReportControl, da_entry_list
         "entry": {
             "timeOfEntry": server_report_control.time_of_entry,
             "entryID": server_report_control.entry_id,
-            "entryData": da_entry_list
-
-        }
+            "entryData": da_entry_list,
+        },
     }
 
     tpaa_pdu = (
         "unconfirmed",
-        {
-            "associateId": associate_id,
-            "service":
-                (
-                    "report",
-                    report_instance
-                )
-
-        }
-
+        {"associateId": associate_id, "service": ("report", report_instance)},
     )
 
     return tpaa_pdu
 
 
-def create_tpaa_response_select(invoke_id, associate_id, success, add_cause, service_error):
+def create_tpaa_response_select(
+    invoke_id, associate_id, success, add_cause, service_error
+):
     """
     Create a Two-Party Application Association response to select.
     """
-    service_dict = {
-        "success": success
-    }
+    service_dict = {"success": success}
     if add_cause is not None:
         service_dict["addCause"] = add_cause
     if service_error is not None:
@@ -455,24 +406,21 @@ def create_tpaa_response_select(invoke_id, associate_id, success, add_cause, ser
         {
             "invokeId": invoke_id,
             "associateId": associate_id,
-            "service": (
-                "select",
-                service_dict
-            )
-        }
+            "service": ("select", service_dict),
+        },
     )
 
     return return_object
 
 
-def create_tpaa_response_operate(invoke_id, associate_id, success, add_cause, service_error):
+def create_tpaa_response_operate(
+    invoke_id, associate_id, success, add_cause, service_error
+):
     """
     Create a Two-Party Application Association response to operate.
     """
 
-    service_dict = {
-        "success": success
-    }
+    service_dict = {"success": success}
     if add_cause is not None:
         service_dict["addCause"] = add_cause
     if service_error is not None:
@@ -483,11 +431,8 @@ def create_tpaa_response_operate(invoke_id, associate_id, success, add_cause, se
         {
             "invokeId": invoke_id,
             "associateId": associate_id,
-            "service": (
-                "operate",
-                service_dict
-            )
-        }
+            "service": ("operate", service_dict),
+        },
     )
 
     return return_object

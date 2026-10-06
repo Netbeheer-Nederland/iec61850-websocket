@@ -18,7 +18,9 @@ AUDIENCE = "account"
 
 @pytest.fixture(scope="module")
 def private_key():
-    return rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+    return rsa.generate_private_key(
+        public_exponent=65537, key_size=2048, backend=default_backend()
+    )
 
 
 class FakeJwks:
@@ -38,7 +40,13 @@ class FakeJwks:
 
 
 def make_token(private_key, kid="key-1", **claims):
-    payload = {"iss": ISSUER, "aud": AUDIENCE, "sub": "client", "exp": int(time.time()) + 300, **claims}
+    payload = {
+        "iss": ISSUER,
+        "aud": AUDIENCE,
+        "sub": "client",
+        "exp": int(time.time()) + 300,
+        **claims,
+    }
     headers = {"kid": kid} if kid is not None else {}
     return jwt.encode(payload, private_key, algorithm="RS256", headers=headers)
 
@@ -46,7 +54,11 @@ def make_token(private_key, kid="key-1", **claims):
 @pytest.fixture
 def validator(private_key):
     public_jwk = json.loads(algorithms.RSAAlgorithm.to_jwk(private_key.public_key()))
-    return JwtValidator(FakeJwks("key-1", algorithms.RSAAlgorithm.from_jwk(public_jwk)), ISSUER, AUDIENCE)
+    return JwtValidator(
+        FakeJwks("key-1", algorithms.RSAAlgorithm.from_jwk(public_jwk)),
+        ISSUER,
+        AUDIENCE,
+    )
 
 
 def test_valid_token_is_accepted(validator, private_key):
@@ -58,7 +70,10 @@ def test_valid_token_is_accepted(validator, private_key):
 def test_unknown_kid_is_an_invalid_token_not_an_error(validator, private_key):
     # A token signed by a key the issuer doesn't publish is forged or foreign:
     # rejected as invalid (401), not reported as verification unavailable.
-    assert validator.validate(make_token(private_key, kid="not-a-known-key")) == (False, None)
+    assert validator.validate(make_token(private_key, kid="not-a-known-key")) == (
+        False,
+        None,
+    )
 
 
 def test_missing_kid_is_an_invalid_token(validator, private_key):
@@ -66,14 +81,18 @@ def test_missing_kid_is_an_invalid_token(validator, private_key):
 
 
 def test_wrong_signature_is_an_invalid_token(validator):
-    other_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+    other_key = rsa.generate_private_key(
+        public_exponent=65537, key_size=2048, backend=default_backend()
+    )
     assert validator.validate(make_token(other_key)) == (False, None)
 
 
 def test_jwks_unreachable_still_raises(private_key):
     # Not the token's fault - the caller reports verification unavailable (503).
     validator = JwtValidator(
-        FakeJwks("key-1", None, fetch_error=requests.ConnectionError("JWKS down")), ISSUER, AUDIENCE
+        FakeJwks("key-1", None, fetch_error=requests.ConnectionError("JWKS down")),
+        ISSUER,
+        AUDIENCE,
     )
     with pytest.raises(requests.ConnectionError):
         validator.validate(make_token(private_key))

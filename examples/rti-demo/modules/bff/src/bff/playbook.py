@@ -42,13 +42,30 @@ import yaml
 DEFAULT_BFF = "http://localhost:5000"
 
 ACTIONS = (
-    "link", "unlink", "drop", "read", "write", "operate", "select",
-    "enable-report", "disable-report", "wait",
+    "link",
+    "unlink",
+    "drop",
+    "read",
+    "write",
+    "operate",
+    "select",
+    "enable-report",
+    "disable-report",
+    "wait",
 )
 
 # OptFlds / TrgOp a report control block write carries - the SO resets any
 # it isn't sent, so all are always sent (as the HMI's Enable report does).
-OPT_FLDS_KEYS = ("seqNum", "timeStamp", "dataSet", "reasonCode", "dataRef", "bufOvfl", "entryID", "configRef")
+OPT_FLDS_KEYS = (
+    "seqNum",
+    "timeStamp",
+    "dataSet",
+    "reasonCode",
+    "dataRef",
+    "bufOvfl",
+    "entryID",
+    "configRef",
+)
 TRG_OP_KEYS = ("dchg", "qchg", "dupd", "integrity", "gi")
 
 
@@ -71,11 +88,18 @@ def parse_playbook(text: str, fmt: str = "yaml") -> dict[str, Any]:
 def load_playbook(path: str | Path) -> dict[str, Any]:
     """Read and check a playbook file (.yaml / .yml / .json)."""
     path = Path(path)
-    return parse_playbook(path.read_text(encoding="utf-8"), "json" if path.suffix.lower() == ".json" else "yaml")
+    return parse_playbook(
+        path.read_text(encoding="utf-8"),
+        "json" if path.suffix.lower() == ".json" else "yaml",
+    )
 
 
 def validate_playbook(data: Any) -> dict[str, Any]:
-    if not isinstance(data, dict) or not isinstance(data.get("steps"), list) or not data["steps"]:
+    if (
+        not isinstance(data, dict)
+        or not isinstance(data.get("steps"), list)
+        or not data["steps"]
+    ):
         raise PlaybookError("a playbook needs a non-empty 'steps' list")
     for i, step in enumerate(data["steps"], 1):
         if not isinstance(step, dict):
@@ -122,7 +146,9 @@ def dump_playbook(data: dict[str, Any]) -> str:
     ordered = {k: data[k] for k in _TOP_ORDER if k in data}
     ordered.update({k: v for k, v in data.items() if k not in ordered})
     ordered["steps"] = [_ordered_step(s) for s in data["steps"]]
-    return yaml.safe_dump(ordered, sort_keys=False, allow_unicode=True, default_flow_style=None, width=120)
+    return yaml.safe_dump(
+        ordered, sort_keys=False, allow_unicode=True, default_flow_style=None, width=120
+    )
 
 
 def step_label(step: dict[str, Any]) -> str:
@@ -181,14 +207,21 @@ def so_answer(service: str, http_ok: bool, payload: Any) -> tuple[bool, str]:
     answer = payload.get("result") if isinstance(payload, dict) else None
     answer = answer if isinstance(answer, dict) else {}
     refused_read = service == "read" and isinstance(answer.get("value"), str)
-    ok = http_ok and answer.get("ok") is not False and answer.get("success") is not False and not refused_read
+    ok = (
+        http_ok
+        and answer.get("ok") is not False
+        and answer.get("success") is not False
+        and not refused_read
+    )
     if ok:
         return True, "ok"
     if refused_read:
         return False, answer["value"]
     if http_ok and answer.get("ok") is False and not answer.get("error"):
         return False, "refused by the FSP"
-    error = answer.get("error") or (payload.get("error") if isinstance(payload, dict) else None)
+    error = answer.get("error") or (
+        payload.get("error") if isinstance(payload, dict) else None
+    )
     return False, str(error or "request failed")
 
 
@@ -207,17 +240,23 @@ class BffTransport:
         r.raise_for_status()
         return r.json().get("connections", [])
 
-    def execute(self, target: str, method: str, path: str, body: Any = None) -> tuple[bool, Any]:
+    def execute(
+        self, target: str, method: str, path: str, body: Any = None
+    ) -> tuple[bool, Any]:
         """(http_ok, the BFF's response JSON) for one instance call."""
         request = {"target": target, "method": method, "path": path}
         if body is not None:
             request["body"] = body
-        r = requests.post(f"{self.base_url}/api/execute", json=request, timeout=self.timeout)
+        r = requests.post(
+            f"{self.base_url}/api/execute", json=request, timeout=self.timeout
+        )
         try:
             payload = r.json()
         except ValueError:
             payload = {"error": r.text}
-        return r.ok and (payload.get("ok", True) if isinstance(payload, dict) else True), payload
+        return r.ok and (
+            payload.get("ok", True) if isinstance(payload, dict) else True
+        ), payload
 
 
 # -------------------- running --------------------
@@ -281,7 +320,9 @@ class Runner:
         self.on_result = on_result
         self.stopped = False
         self._instances: dict[str, dict[str, Any]] | None = None
-        self._cps: dict[str, str] = {str(k): str(v) for k, v in (playbook.get("cps") or {}).items()}
+        self._cps: dict[str, str] = {
+            str(k): str(v) for k, v in (playbook.get("cps") or {}).items()
+        }
         # Step number -> the SO's highest frame id when that step started.
         self._marks: dict[int, int] = {}
 
@@ -289,7 +330,9 @@ class Runner:
 
     def instances(self) -> dict[str, dict[str, Any]]:
         if self._instances is None:
-            self._instances = {c["name"]: c for c in self.transport.connections() if c.get("name")}
+            self._instances = {
+                c["name"]: c for c in self.transport.connections() if c.get("name")
+            }
         return self._instances
 
     def so(self) -> dict[str, Any]:
@@ -299,7 +342,8 @@ class Runner:
             sos = [c for c in sos if c["name"] == wanted]
         if len(sos) != 1:
             raise PlaybookError(
-                f"SO {wanted!r} not registered with the BFF" if wanted
+                f"SO {wanted!r} not registered with the BFF"
+                if wanted
                 else f"expected one RTI-SO registered with the BFF, found {len(sos)} - name it with 'so:'"
             )
         return sos[0]
@@ -313,26 +357,48 @@ class Runner:
     def cp(self, fsp_name: str) -> str:
         """The FSP's cp: the playbook's 'cps' entry, else what the FSP reports."""
         if fsp_name not in self._cps:
-            ok, payload = self.transport.execute(_target(self.fsp(fsp_name)), "GET", "/api/status")
-            status = _status_dict((payload.get("result") or {}).get("status") if isinstance(payload, dict) else None)
+            ok, payload = self.transport.execute(
+                _target(self.fsp(fsp_name)), "GET", "/api/status"
+            )
+            status = _status_dict(
+                (payload.get("result") or {}).get("status")
+                if isinstance(payload, dict)
+                else None
+            )
             points = status.get("accessPoints") or []
             if not ok or not points:
-                raise PlaybookError(f"can't tell {fsp_name}'s cp - is it reachable? (or set it under 'cps:')")
+                raise PlaybookError(
+                    f"can't tell {fsp_name}'s cp - is it reachable? (or set it under 'cps:')"
+                )
             self._cps[fsp_name] = str(points[0])
         return self._cps[fsp_name]
 
     def linked_cps(self) -> list[str]:
-        ok, payload = self.transport.execute(_target(self.so()), "GET", "/api/properties")
-        cps = (payload.get("result") or {}).get("acsi_client_list") if ok and isinstance(payload, dict) else None
+        ok, payload = self.transport.execute(
+            _target(self.so()), "GET", "/api/properties"
+        )
+        cps = (
+            (payload.get("result") or {}).get("acsi_client_list")
+            if ok and isinstance(payload, dict)
+            else None
+        )
         return list(cps or [])
 
-    def so_call(self, service: str, path: str, body: dict[str, Any]) -> tuple[bool, str]:
-        http_ok, payload = self.transport.execute(_target(self.so()), "POST", path, body)
+    def so_call(
+        self, service: str, path: str, body: dict[str, Any]
+    ) -> tuple[bool, str]:
+        http_ok, payload = self.transport.execute(
+            _target(self.so()), "POST", path, body
+        )
         return so_answer(service, http_ok, payload)
 
     def _so_frames(self) -> list[dict[str, Any]]:
         ok, payload = self.transport.execute(_target(self.so()), "GET", "/api/messages")
-        return (payload.get("result") or {}).get("messages", []) if ok and isinstance(payload, dict) else []
+        return (
+            (payload.get("result") or {}).get("messages", [])
+            if ok and isinstance(payload, dict)
+            else []
+        )
 
     def frame_mark(self) -> int:
         """The SO's highest logged frame id - reports after it are new."""
@@ -345,9 +411,12 @@ class Runner:
         dropping off would cancel out new ones."""
         cp = self.cp(fsp_name)
         return sum(
-            1 for f in self._so_frames()
+            1
+            for f in self._so_frames()
             if int(f.get("id", 0)) > mark
-            and f.get("category") == "unconfirmed" and f.get("direction") == "recv" and f.get("cp") == cp
+            and f.get("category") == "unconfirmed"
+            and f.get("direction") == "recv"
+            and f.get("cp") == cp
         )
 
     # ----- actions -----
@@ -386,10 +455,19 @@ class Runner:
         if cp in self.linked_cps():
             return True, f"already linked on {cp}"
         if not so.get("ws_port"):
-            raise PlaybookError(f"SO {so['name']!r} has no ws_port configured in the BFF")
+            raise PlaybookError(
+                f"SO {so['name']!r} has no ws_port configured in the BFF"
+            )
         ok, payload = self.transport.execute(
-            _target(self.fsp(fsp)), "POST", "/api/start",
-            {"host": so["host"], "port": str(so["ws_port"]), "mode": "active", "cp": cp},
+            _target(self.fsp(fsp)),
+            "POST",
+            "/api/start",
+            {
+                "host": so["host"],
+                "port": str(so["ws_port"]),
+                "mode": "active",
+                "cp": cp,
+            },
         )
         if not ok:
             return False, f"start failed: {payload}"
@@ -401,7 +479,9 @@ class Runner:
         cp = self.cp(fsp)
         if cp not in self.linked_cps():
             return True, f"already unlinked ({cp})"
-        ok, payload = self.transport.execute(_target(self.fsp(fsp)), "POST", "/api/stop", {})
+        ok, payload = self.transport.execute(
+            _target(self.fsp(fsp)), "POST", "/api/stop", {}
+        )
         if not ok:
             return False, f"stop failed: {payload}"
         if not self._wait_for_link(cp, False, parse_duration(spec.get("timeout", 15))):
@@ -420,7 +500,11 @@ class Runner:
 
     def do_read(self, spec, fsp):
         ref = self._per_fsp(spec, "ref", fsp)
-        return self.so_call("read", "/api/readvalue", {"objRef": ref, "fc": spec.get("fc", "st"), "cp": self.cp(fsp)})
+        return self.so_call(
+            "read",
+            "/api/readvalue",
+            {"objRef": ref, "fc": spec.get("fc", "st"), "cp": self.cp(fsp)},
+        )
 
     def do_write(self, spec, fsp):
         body = {
@@ -434,20 +518,30 @@ class Runner:
         return self.so_call("write", "/api/writevalue", body)
 
     def do_operate(self, spec, fsp):
-        value, value_type = control_value(spec.get("cdc", ""), self._per_fsp(spec, "value", fsp))
+        value, value_type = control_value(
+            spec.get("cdc", ""), self._per_fsp(spec, "value", fsp)
+        )
         origin = spec.get("origin") or {"orCat": 2, "orIdent": "playbook"}
-        return self.so_call("operate", "/api/operate", {
-            "objRef": self._per_fsp(spec, "ref", fsp),
-            "value": value,
-            "value_type": value_type,
-            "ctlNum": int(spec.get("ctlNum", 0)),
-            "origin": origin,
-            "test": bool(spec.get("test", False)),
-            "cp": self.cp(fsp),
-        })
+        return self.so_call(
+            "operate",
+            "/api/operate",
+            {
+                "objRef": self._per_fsp(spec, "ref", fsp),
+                "value": value,
+                "value_type": value_type,
+                "ctlNum": int(spec.get("ctlNum", 0)),
+                "origin": origin,
+                "test": bool(spec.get("test", False)),
+                "cp": self.cp(fsp),
+            },
+        )
 
     def do_select(self, spec, fsp):
-        return self.so_call("select", "/api/select", {"objRef": self._per_fsp(spec, "ref", fsp), "cp": self.cp(fsp)})
+        return self.so_call(
+            "select",
+            "/api/select",
+            {"objRef": self._per_fsp(spec, "ref", fsp), "cp": self.cp(fsp)},
+        )
 
     def _set_reporting(self, spec, fsp, enabled: bool):
         rcb = self._per_fsp(spec, "rcb", fsp)
@@ -456,7 +550,11 @@ class Runner:
         http_ok, payload = self.transport.execute(
             _target(self.so()), "POST", f"/api/{kind}-read", {"objRef": rcb, "cp": cp}
         )
-        current = ((payload.get("result") or {}).get("value") if isinstance(payload, dict) else None)
+        current = (
+            (payload.get("result") or {}).get("value")
+            if isinstance(payload, dict)
+            else None
+        )
         if not http_ok or not isinstance(current, dict):
             return False, f"couldn't read {rcb}: {current or payload}"
         if current.get("rptEna") is enabled:
@@ -466,13 +564,24 @@ class Runner:
             "dataSet": current.get("dataSet") or "",
             "intgPd": int(current.get("intgPd") or 0),
             "rptEna": enabled,
-            "optFlds": {k: bool((current.get("optFlds") or {}).get(k)) for k in OPT_FLDS_KEYS},
-            "trgOp": {k: bool((current.get("trgOp") or {}).get(k)) for k in TRG_OP_KEYS},
+            "optFlds": {
+                k: bool((current.get("optFlds") or {}).get(k)) for k in OPT_FLDS_KEYS
+            },
+            "trgOp": {
+                k: bool((current.get("trgOp") or {}).get(k)) for k in TRG_OP_KEYS
+            },
         }
         http_ok, payload = self.transport.execute(
-            _target(self.so()), "POST", f"/api/{kind}-write", {"objRef": rcb, "data": data, "cp": cp}
+            _target(self.so()),
+            "POST",
+            f"/api/{kind}-write",
+            {"objRef": rcb, "data": data, "cp": cp},
         )
-        value = (payload.get("result") or {}).get("value") if isinstance(payload, dict) else None
+        value = (
+            (payload.get("result") or {}).get("value")
+            if isinstance(payload, dict)
+            else None
+        )
         if http_ok and value is True:
             return True, "ok"
         return False, str(value or payload)
@@ -485,11 +594,17 @@ class Runner:
 
     # ----- expectations -----
 
-    def _check_expect(self, expect: Any, action_ok: bool, action_msg: str, mark: int | None) -> tuple[bool, str]:
+    def _check_expect(
+        self, expect: Any, action_ok: bool, action_msg: str, mark: int | None
+    ) -> tuple[bool, str]:
         if expect in (None, "ok"):
             return action_ok, action_msg
         if expect in ("fail", "refused"):
-            return (not action_ok, f"refused as expected: {action_msg}") if not action_ok else (False, "expected a refusal, got ok")
+            return (
+                (not action_ok, f"refused as expected: {action_msg}")
+                if not action_ok
+                else (False, "expected a refusal, got ok")
+            )
         if not isinstance(expect, dict):
             raise PlaybookError(f"unknown expect: {expect!r}")
         if not action_ok:
@@ -500,14 +615,20 @@ class Runner:
                 fsp, minimum = arg["fsp"], int(arg.get("min", 1))
                 got = self.reports_since(fsp, mark or 0)
                 if got < minimum:
-                    return False, f"{got} report(s) from {fsp}, expected at least {minimum}"
+                    return (
+                        False,
+                        f"{got} report(s) from {fsp}, expected at least {minimum}",
+                    )
                 notes.append(f"{got} report(s) from {fsp}")
             elif kind in ("linked", "unlinked"):
                 names = arg if isinstance(arg, list) else [arg]
                 cps = self.linked_cps()
                 for name in names:
                     if (self.cp(name) in cps) != (kind == "linked"):
-                        return False, f"{name} is {'not ' if kind == 'linked' else ''}linked"
+                        return (
+                            False,
+                            f"{name} is {'not ' if kind == 'linked' else ''}linked",
+                        )
                 notes.append(f"{kind}: {', '.join(names)}")
             else:
                 raise PlaybookError(f"unknown expect: {kind!r}")
@@ -551,16 +672,26 @@ class Runner:
                 results.append(result)
                 details.append(f"{fsp}: {result[1]}")
             ok = all(r[0] for r in results)
-            message = details[0].split(": ", 1)[1] if len(details) == 1 else "; ".join(details)
+            message = (
+                details[0].split(": ", 1)[1]
+                if len(details) == 1
+                else "; ".join(details)
+            )
 
         ok, message = self._check_expect(expect, ok, message, mark)
-        return StepResult(index, action, label, ok, message, time.monotonic() - started, details)
+        return StepResult(
+            index, action, label, ok, message, time.monotonic() - started, details
+        )
 
-    def run(self, keep_going: bool = False, only: range | None = None) -> list[StepResult]:
+    def run(
+        self, keep_going: bool = False, only: range | None = None
+    ) -> list[StepResult]:
         steps = self.playbook["steps"]
         results = []
         name = self.playbook.get("name", "playbook")
-        self.log(f"{name} - {len(steps)} steps via {getattr(self.transport, 'base_url', 'BFF')}")
+        self.log(
+            f"{name} - {len(steps)} steps via {getattr(self.transport, 'base_url', 'BFF')}"
+        )
         for index, step in enumerate(steps, 1):
             if only is not None and index not in only:
                 continue
@@ -568,7 +699,9 @@ class Runner:
                 self.stopped = True
                 self.log("stopped")
                 break
-            if _expects_reports(step) or (index < len(steps) and _expects_reports(steps[index])):
+            if _expects_reports(step) or (
+                index < len(steps) and _expects_reports(steps[index])
+            ):
                 self._marks[index] = self.frame_mark()
             if self.on_step:
                 self.on_step(index, step_label(step))
@@ -581,12 +714,17 @@ class Runner:
                 self.log("stopped")
                 break
             mark = "✓" if result.ok else "✗"
-            self.log(f"[{index:>2}/{len(steps)}] {mark} {result.label} · {result.message} ({result.seconds:.1f}s)")
+            self.log(
+                f"[{index:>2}/{len(steps)}] {mark} {result.label} · {result.message} ({result.seconds:.1f}s)"
+            )
             if not result.ok and not keep_going:
                 self.log("stopped at the first failed step (--keep-going runs on)")
                 break
             if self.pace and index < len(steps):
                 self.sleep(self.pace)
         failed = [r for r in results if not r.ok]
-        self.log(f"{len(results) - len(failed)}/{len(results)} steps ok" + (f", {len(failed)} failed" if failed else ""))
+        self.log(
+            f"{len(results) - len(failed)}/{len(results)} steps ok"
+            + (f", {len(failed)} failed" if failed else "")
+        )
         return results

@@ -20,9 +20,9 @@ import traceback
 from ws61850.endpoint import PassiveEndpoint
 from ws61850.iec61850.client.iec61850_client import IEC61850Client
 
-maxMessageSize_server = 65000
+max_message_size_server = 65000
 
-optFlds = {
+opt_flds = {
     "seqNum": False,
     "timeStamp": True,
     "dataSet": True,
@@ -33,7 +33,7 @@ optFlds = {
     "reasonCode": False,
 }
 
-trgOp = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": False}
+trg_op = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": False}
 
 # brcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbMinMaxAvg", True)
 #
@@ -42,10 +42,10 @@ trgOp = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": F
 # # rcb.resv = "ReservedValue"
 # #brcb.datSet = "Dataset1"
 # brcb.confRev = 5
-# brcb.optFlds = optFlds
+# brcb.optFlds = opt_flds
 # brcb.bufTm = 1000
 # brcb.sqNum = 42
-# brcb.trgOps = trgOp
+# brcb.trgOps = trg_op
 # brcb.intgPd = 2000
 # brcb.gi = True
 # brcb.purgeBuf = False
@@ -53,7 +53,7 @@ trgOp = {"dchg": False, "qchg": False, "dupd": False, "integrity": True, "gi": F
 # brcb.timeOfEntry = get_now_time()
 # brcb.resvTms = 5
 
-trgOp_urcb = {
+trg_op_urcb = {
     "dchg": False,
     "qchg": False,
     "dupd": False,
@@ -67,10 +67,10 @@ urcb = IEC61850Client.ClientReportControlBlock("LD0/LLN0.rcbSetpoints", False)
 urcb.rptEna = True
 # urcb.datSet = "new_Dataset"
 # urcb.confRev = 5
-# urcb.optFlds = optFlds
+# urcb.optFlds = opt_flds
 # urcb.bufTm = 1000
 # urcb.sqNum = 88
-urcb.trgOps = trgOp_urcb
+urcb.trgOps = trg_op_urcb
 urcb.intgPd = 1000
 
 
@@ -122,7 +122,7 @@ data_attribute_value = {
     ),
 }
 
-data_WMaxSetPct = [
+data_wmax_set_pct = [
     {
         "name": "setMag",
         "data": ("structure", {"name": "f", "data": [("float32", 19.666)]}),
@@ -150,56 +150,56 @@ oper_val = {
 
 
 async def main():
-    ep_wsServer = PassiveEndpoint()
+    ep_ws_server = PassiveEndpoint()
 
     iec61850_client = IEC61850Client("cp1")
-    ep_wsServer.add_iec61850_client(iec61850_client)
+    ep_ws_server.add_iec61850_client(iec61850_client)
 
     iec61850_client = IEC61850Client("cp2")
-    ep_wsServer.add_iec61850_client(iec61850_client)
+    ep_ws_server.add_iec61850_client(iec61850_client)
 
     server_task = asyncio.create_task(
-        ep_wsServer.start("localhost", 8765, protocol=["iec61850-tpaa-jer-v1"])
+        ep_ws_server.start("localhost", 8765, protocol=["iec61850-tpaa-jer-v1"])
     )
 
-    await ep_wsServer.client_list[0].ready_event.wait()
-    if ep_wsServer.client_list[0].is_connected is True:
-        websocket_info = ep_wsServer.get_websocket_info(ep_wsServer.client_list[0])
+    await ep_ws_server.client_list[0].ready_event.wait()
+    if ep_ws_server.client_list[0].is_connected is True:
+        websocket_info = ep_ws_server.get_websocket_info(ep_ws_server.client_list[0])
         if websocket_info is not None:
             try:
-                # urcb_list = await ep_wsServer.client_list[0].get_logical_node_directory("LD0", "LLN0", "urcb",
+                # urcb_list = await ep_ws_server.client_list[0].get_logical_node_directory("LD0", "LLN0", "urcb",
                 #                                                            websocket_info, callback_called, None)
-                # brcb_list = await ep_wsServer.client_list[0].get_logical_node_directory("LD0", "LLN0", "brcb",
+                # brcb_list = await ep_ws_server.client_list[0].get_logical_node_directory("LD0", "LLN0", "brcb",
                 #                                                            websocket_info, callback_called, None)
-                ###server_list = await ep_wsServer.client_list[0].get_server_directory(websocket_info, callback_called, None)
-                ###ld_directory = await ep_wsServer.client_list[0].get_logical_device_directory("LD0", websocket_info, callback_called, None)
-                # ln_directory_ds = await ep_wsServer.client_list[0].get_logical_node_directory("LD0", "LLN0", "dataset",
+                ###server_list = await ep_ws_server.client_list[0].get_server_directory(websocket_info, callback_called, None)
+                ###ld_directory = await ep_ws_server.client_list[0].get_logical_device_directory("LD0", websocket_info, callback_called, None)
+                # ln_directory_ds = await ep_ws_server.client_list[0].get_logical_node_directory("LD0", "LLN0", "dataset",
                 #                                                            websocket_info, callback_called, None)
-                ###ln_directory_do = await ep_wsServer.client_list[0].get_logical_node_directory("LD0", "LLN0", "dataObject",
+                ###ln_directory_do = await ep_ws_server.client_list[0].get_logical_node_directory("LD0", "LLN0", "dataObject",
                 ###                                                            websocket_info, callback_called, None)
-                ###ds_directory = await ep_wsServer.client_list[0].get_dataset_directory("LD0", "LLN0", "DataSetMinMaxAvg",
+                ###ds_directory = await ep_ws_server.client_list[0].get_dataset_directory("LD0", "LLN0", "DataSetMinMaxAvg",
                 ####                                                       websocket_info, callback_called, None)
-                ###da_def = await ep_wsServer.client_list[0].get_data_definition("LD0/DWMX1.WMaxSptPct", websocket_info, callback_called, None)
-                ###da_dir = await ep_wsServer.client_list[0].get_data_directory("LD0/MMXU1.A",
+                ###da_def = await ep_ws_server.client_list[0].get_data_definition("LD0/DWMX1.WMaxSptPct", websocket_info, callback_called, None)
+                ###da_dir = await ep_ws_server.client_list[0].get_data_directory("LD0/MMXU1.A",
                 ###                                                             websocket_info, callback_called, None)
-                ###set_da_res = await ep_wsServer.client_list[0].set_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value],
+                ###set_da_res = await ep_ws_server.client_list[0].set_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value],
                 ###                                               websocket_info, callback_called, None)
-                # da_val = await ep_wsServer.client_list[0].get_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info, callback_called, None)
-                # await ep_wsServer.client_list[0].get_data_values("LD0/DWMX1.WMaxSetPct", "sp", True, websocket_info, callback_called, None)
+                # da_val = await ep_ws_server.client_list[0].get_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info, callback_called, None)
+                # await ep_ws_server.client_list[0].get_data_values("LD0/DWMX1.WMaxSetPct", "sp", True, websocket_info, callback_called, None)
 
                 ####Select######
-                ###await ep_wsServer.client_list[0].select("LD0/DWMX1.WMaxSpt", websocket_info, callback_called, None)
-                # await ep_wsServer.client_list[0].select("LD0/DWMX1.WMaxSpt", websocket_info, callback_called, None)
+                ###await ep_ws_server.client_list[0].select("LD0/DWMX1.WMaxSpt", websocket_info, callback_called, None)
+                # await ep_ws_server.client_list[0].select("LD0/DWMX1.WMaxSpt", websocket_info, callback_called, None)
 
                 ####Operate#####
-                # await ep_wsServer.client_list[0].set_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value],
+                # await ep_ws_server.client_list[0].set_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value],
                 #                                               websocket_info, callback_called, None)
-                # await ep_wsServer.client_list[0].operate(oper_val, websocket_info, callback_called, None)
-                ###await ep_wsServer.client_list[0].get_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info,
+                # await ep_ws_server.client_list[0].operate(oper_val, websocket_info, callback_called, None)
+                ###await ep_ws_server.client_list[0].get_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info,
                 ###                                                callback_called, None)
 
-                # set_brcb_res = await ep_wsServer.client_list[0].set_BRCB_values(brcb, websocket_info, callback_called, None)
-                set_urcb_res = await ep_wsServer.client_list[0].set_URCB_values(
+                # set_brcb_res = await ep_ws_server.client_list[0].set_BRCB_values(brcb, websocket_info, callback_called, None)
+                set_urcb_res = await ep_ws_server.client_list[0].set_URCB_values(
                     urcb, websocket_info, callback_called, None
                 )
 
@@ -225,23 +225,23 @@ async def main():
     else:
         print("did not enter first if ")
 
-    # await ep_wsServer.client_list[1].ready_event.wait()
+    # await ep_ws_server.client_list[1].ready_event.wait()
     #
-    # if ep_wsServer.client_list[1].is_connected is True:
-    #     websocket_info = ep_wsServer.get_websocket_info(ep_wsServer.client_list[1])
+    # if ep_ws_server.client_list[1].is_connected is True:
+    #     websocket_info = ep_ws_server.get_websocket_info(ep_ws_server.client_list[1])
     #     if websocket_info is not None:
-    #         server_list = await ep_wsServer.client_list[1].get_server_directory(websocket_info, callback_called, None)
+    #         server_list = await ep_ws_server.client_list[1].get_server_directory(websocket_info, callback_called, None)
     #
-    #         ld_directory = await ep_wsServer.client_list[1].get_logical_device_directory("LD0", websocket_info,
+    #         ld_directory = await ep_ws_server.client_list[1].get_logical_device_directory("LD0", websocket_info,
     #                                                                                      callback_called, None)
     #
-    #         ln_directory_do = await ep_wsServer.client_list[1].get_logical_node_directory("LD0", "DWMX1", "dataObject",
+    #         ln_directory_do = await ep_ws_server.client_list[1].get_logical_node_directory("LD0", "DWMX1", "dataObject",
     #                                                                                       websocket_info,
     #                                                                                       callback_called, None)
     #
-    #         da_def = await ep_wsServer.client_list[1].get_data_definition("LD0/DWMX1.WMaxSetPct", websocket_info,
+    #         da_def = await ep_ws_server.client_list[1].get_data_definition("LD0/DWMX1.WMaxSetPct", websocket_info,
     #                                                                       callback_called, None)
-    #         #set_urcb_res = await ep_wsServer.client_list[1].set_URCB_values(urcb, websocket_info, callback_called, None)
+    #         #set_urcb_res = await ep_ws_server.client_list[1].set_URCB_values(urcb, websocket_info, callback_called, None)
     #
     #         print("printing the list or returned items from client 2")
     #         print("server_list:", server_list)

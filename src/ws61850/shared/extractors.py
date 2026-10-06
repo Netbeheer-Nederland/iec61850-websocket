@@ -24,6 +24,7 @@ from ws61850.iec61850.data_model.ied_model import IedModel, LogicalDevice, Logic
 # Association-level extractors (work on raw JSON strings)
 # ---------------------------------------------------------------------------
 
+
 def retrieve_associate_id(response_raw):
     """Extracts association id from an associateResponse JSON string."""
     response = json.loads(response_raw)
@@ -45,6 +46,7 @@ def retrieve_max_message_size(response_raw):
 # ---------------------------------------------------------------------------
 # Association-level extractors (work on decoded TPAA tuples)
 # ---------------------------------------------------------------------------
+
 
 def retrieve_associate_id_from_decoded_msg(decoded_msg):
     """Extracts associateId from a decoded associateResponse TPAA tuple."""
@@ -73,6 +75,7 @@ def extract_max_message_size(tpaa):
 # ---------------------------------------------------------------------------
 # TPAA PDU type extractors (work on decoded TPAA tuples)
 # ---------------------------------------------------------------------------
+
 
 def extract_associate_request_type(tpaa_tuple):
     """
@@ -110,6 +113,7 @@ def extract_invoke_id(tpaa_tuple):
 # ---------------------------------------------------------------------------
 # Service field extractors (work on decoded TPAA tuples)
 # ---------------------------------------------------------------------------
+
 
 def extract_ld_name(tpaa_tuple):
     """Extracts ldName from a getLogicalDeviceDirectory request tuple."""
@@ -195,13 +199,18 @@ def extract_urcb_ref(tpaa_tuple):
 # IED model navigation helpers (shared between client and server)
 # ---------------------------------------------------------------------------
 
+
 def get_list_of_items_ln(ln_ref, asci_service, ied: IedModel):
     """Returns items from the logical node for getLogicalNodeDirectory."""
     return_list = []
     ld_name, ln_name = re.split(r"[/]", ln_ref)
-    found_ld: LogicalDevice = next((ld for ld in ied.logical_devices if ld.name == ld_name), None)
+    found_ld: LogicalDevice = next(
+        (ld for ld in ied.logical_devices if ld.name == ld_name), None
+    )
     if found_ld:
-        found_ln: LogicalNode = next((ln for ln in found_ld.logical_nodes if ln.name == ln_name), None)
+        found_ln: LogicalNode = next(
+            (ln for ln in found_ld.logical_nodes if ln.name == ln_name), None
+        )
         if found_ln:
             if asci_service == "dataObject":
                 return_list = [do.name for do in found_ln.data_objects]

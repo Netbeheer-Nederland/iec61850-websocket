@@ -19,7 +19,9 @@ def _make_provider(**kwargs):
 
 def _mock_token_response(token="access-token", expires_in=3600):
     resp = AsyncMock()
-    resp.json = AsyncMock(return_value={"access_token": token, "expires_in": expires_in})
+    resp.json = AsyncMock(
+        return_value={"access_token": token, "expires_in": expires_in}
+    )
     resp.__aenter__ = AsyncMock(return_value=resp)
     resp.__aexit__ = AsyncMock(return_value=False)
     return resp

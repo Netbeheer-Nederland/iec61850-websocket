@@ -106,6 +106,7 @@ class TestActiveEndpointWebSocketInfoLookup:
         ws = MagicMock()
         ws.request.path = "/cp1"
         from ws61850.endpoint.base import WebSocketInfo
+
         info = WebSocketInfo(ws, "assoc-1", cp="cp1")
         ep.websocket_info_list.append(info)
         found = ep.get_websocket_info(client)
@@ -115,8 +116,11 @@ class TestActiveEndpointWebSocketInfoLookup:
 class TestActiveEndpointStopPassive:
     def test_stop_passive_is_no_op(self):
         import asyncio
+
         ep = ActiveEndpoint()
-        asyncio.get_event_loop().run_until_complete(ep.stop_passive())  # should not raise
+        asyncio.get_event_loop().run_until_complete(
+            ep.stop_passive()
+        )  # should not raise
 
 
 class TestActiveEndpointConnectionClosed:

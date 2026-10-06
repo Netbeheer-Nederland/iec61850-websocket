@@ -58,13 +58,19 @@ class PlaybookStore:
         self.saved_dir = Path(saved_dir)
 
     @staticmethod
-    def _files(directory: Path, suffixes: tuple[str, ...] = SUFFIXES) -> dict[str, Path]:
+    def _files(
+        directory: Path, suffixes: tuple[str, ...] = SUFFIXES
+    ) -> dict[str, Path]:
         if not directory.is_dir():
             return {}
         found: dict[str, Path] = {}
         for path in sorted(directory.iterdir()):
-            if (path.is_file() and path.suffix.lower() in suffixes
-                    and NAME_RE.fullmatch(path.stem) and path.stem not in RESERVED):
+            if (
+                path.is_file()
+                and path.suffix.lower() in suffixes
+                and NAME_RE.fullmatch(path.stem)
+                and path.stem not in RESERVED
+            ):
                 found.setdefault(path.stem, path)
         return found
 
@@ -80,14 +86,21 @@ class PlaybookStore:
 
     def list(self) -> list[dict[str, Any]]:
         builtin = self._files(self.builtin_dir)
-        saved = {n: p for n, p in self._files(self.saved_dir, (".yaml",)).items() if n not in builtin}
+        saved = {
+            n: p
+            for n, p in self._files(self.saved_dir, (".yaml",)).items()
+            if n not in builtin
+        }
         entries = []
         for is_builtin, files in ((True, builtin), (False, saved)):
             for name, path in files.items():
                 entry: dict[str, Any] = {"name": name, "builtin": is_builtin}
                 try:
                     playbook = load_playbook(path)
-                    entry.update(title=str(playbook.get("name") or name), steps=len(playbook["steps"]))
+                    entry.update(
+                        title=str(playbook.get("name") or name),
+                        steps=len(playbook["steps"]),
+                    )
                 except (PlaybookError, OSError, ValueError) as exc:
                     entry.update(title=name, error=str(exc))
                 entries.append(entry)
@@ -104,11 +117,15 @@ class PlaybookStore:
     def save(self, name: str, playbook: dict[str, Any]) -> None:
         check_name(name)
         if name in self._files(self.builtin_dir):
-            raise BuiltinPlaybookError(f"{name!r} is a built-in playbook - save under another name")
+            raise BuiltinPlaybookError(
+                f"{name!r} is a built-in playbook - save under another name"
+            )
         validate_playbook(playbook)
         self.saved_dir.mkdir(parents=True, exist_ok=True)
         # Temp file + rename in the same dir, as connections.json is saved.
-        fd, tmp = tempfile.mkstemp(dir=self.saved_dir, prefix=f".{name}.", suffix=".tmp")
+        fd, tmp = tempfile.mkstemp(
+            dir=self.saved_dir, prefix=f".{name}.", suffix=".tmp"
+        )
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(dump_playbook(playbook))

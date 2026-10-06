@@ -31,7 +31,9 @@ def print_node_da(index, item, last_index, go_to_next_level, is_structure):
     if is_structure:
         sdo_prefix = "               └── "
     else:
-        sdo_prefix = "               ├── " if index != last_index - 1 else "               └── "
+        sdo_prefix = (
+            "               ├── " if index != last_index - 1 else "               └── "
+        )
     if go_to_next_level > 0:
         logger.info(go_to_next_level * "     " + f"{sdo_prefix}{item}")
     else:
@@ -43,9 +45,21 @@ def print_structure(structure_list, item_index, list_len, go_to_next_level):
     for index, struct_item in enumerate(structure_list):
         cmp_type_key = next(iter(struct_item["cmpType"]))
         if cmp_type_key != "structure":
-            print_node_da(index, struct_item["cmpName"], len(structure_list), go_to_next_level, False)
+            print_node_da(
+                index,
+                struct_item["cmpName"],
+                len(structure_list),
+                go_to_next_level,
+                False,
+            )
         else:
-            print_node_da(item_index, struct_item["cmpName"], len(structure_list), go_to_next_level, True)
+            print_node_da(
+                item_index,
+                struct_item["cmpName"],
+                len(structure_list),
+                go_to_next_level,
+                True,
+            )
             struct_item = next(iter(struct_item["cmpType"].values()))
             print_structure(struct_item, index, len(struct_item), 2)
 

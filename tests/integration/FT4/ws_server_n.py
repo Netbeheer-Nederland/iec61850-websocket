@@ -83,8 +83,12 @@ oper_val_incorrect_do = {
     "check": {"synchroCheck": False, "interlockCheck": False},
 }
 
-set_mag_val = [{"name": "setMag", "data": ("structure", {"data": [("float32", 67.39)]})}]
-set_mag_wrong = [{"name": "setMag", "data": ("structure", {"data": [("boolean", False)]})}]
+set_mag_val = [
+    {"name": "setMag", "data": ("structure", {"data": [("float32", 67.39)]})}
+]
+set_mag_wrong = [
+    {"name": "setMag", "data": ("structure", {"data": [("boolean", False)]})}
+]
 
 
 async def main():
@@ -102,32 +106,54 @@ async def main():
             try:
                 logger.info("Running negative test cases:")
 
-                da_val = await client.get_data_values("LD0/DWMX1.WMaxSpt_wrong", "mx", True, websocket_info, None, None)
+                da_val = await client.get_data_values(
+                    "LD0/DWMX1.WMaxSpt_wrong", "mx", True, websocket_info, None, None
+                )
                 logger.info("getDataValues with wrong reference: %s", da_val)
 
-                select_result = await client.select("LD0/DWMX1.WMaxSetPct", websocket_info, None, None)
+                select_result = await client.select(
+                    "LD0/DWMX1.WMaxSetPct", websocket_info, None, None
+                )
                 logger.info("select result: %s", select_result)
 
-                operate_result = await client.operate(oper_val_wrong_type, websocket_info, None, None)
+                operate_result = await client.operate(
+                    oper_val_wrong_type, websocket_info, None, None
+                )
                 logger.info("operate with incorrect data type: %s", operate_result)
 
-                operate_result = await client.operate(oper_val_incorrect_do, websocket_info, None, None)
+                operate_result = await client.operate(
+                    oper_val_incorrect_do, websocket_info, None, None
+                )
                 logger.info("operate with incorrect data object: %s", operate_result)
 
                 set_val_res = await client.set_data_values(
-                    "LD0/DWMX1.WMaxSet.setMag_wrong", "sp", set_mag_val, websocket_info, None, None
+                    "LD0/DWMX1.WMaxSet.setMag_wrong",
+                    "sp",
+                    set_mag_val,
+                    websocket_info,
+                    None,
+                    None,
                 )
                 logger.info("setDataValues for nonexistent object: %s", set_val_res)
 
                 set_val_res = await client.set_data_values(
-                    "LD0/DWMX1.WMaxSet.setMag", "sp", set_mag_wrong, websocket_info, None, None
+                    "LD0/DWMX1.WMaxSet.setMag",
+                    "sp",
+                    set_mag_wrong,
+                    websocket_info,
+                    None,
+                    None,
                 )
                 logger.info("setDataValues with incorrect type: %s", set_val_res)
 
-                select_result = await client.select("LD0/DWMX1.WMaxSpt", websocket_info, None, None)
+                select_result = await client.select(
+                    "LD0/DWMX1.WMaxSpt", websocket_info, None, None
+                )
                 logger.info("select result: %s", select_result)
 
-                operate_result = await client.operate(oper_val_out_of_range, websocket_info, None, None)
+                operate_result = await client.operate(
+                    oper_val_out_of_range, websocket_info, None, None
+                )
                 logger.info("operate with out-of-range data: %s", operate_result)
 
             except Exception as e:

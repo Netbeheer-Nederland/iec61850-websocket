@@ -64,6 +64,7 @@ def parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
+
 # A forged access token: a well-formed RS256 JWT with the FT31 realm's issuer,
 # audience "account" and an expiry in 2100, but signed by no key the realm
 # knows (kid "ft31-invalid-key", bogus signature). The server must reject it.
@@ -72,6 +73,7 @@ INVALID_ACCESS_TOKEN = (
     ".eyJpc3MiOiJodHRwczovL2xvY2FsaG9zdDo4NDQzL3JlYWxtcy9pZWM2MTg1MC10ZXN0IiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImZ0MzEtbjEiLCJhenAiOiJ3cy1jbGllbnQiLCJpYXQiOjE3NjcyMjU2MDAsImV4cCI6NDEwMjQ0NDgwMH0"
     ".bm90LWEtdmFsaWQtc2lnbmF0dXJlLW5vdC1hLXZhbGlkLXNpZ25hdHVyZS1ub3QtYS12YWxpZC1zaWduYXR1cmUtbm90LWEtdmFsaWQtc2lnbmF0dXJlLQ"
 )
+
 
 async def main():
     args = parse_args()
@@ -86,7 +88,9 @@ async def main():
     iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     endpoint.add_iec61850_server(iec61850_server)
 
-    task = asyncio.create_task(endpoint.start(args.host, args.port, "cp1", access_token=access_token))
+    task = asyncio.create_task(
+        endpoint.start(args.host, args.port, "cp1", access_token=access_token)
+    )
     await asyncio.gather(task)
 
 

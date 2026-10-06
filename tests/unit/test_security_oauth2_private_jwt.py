@@ -48,7 +48,9 @@ def test_build_assertion_contains_jti(rsa_key_pair):
 
 def test_build_assertion_exp_in_future(rsa_key_pair):
     private_key, _ = rsa_key_pair
-    signer = PrivateKeyJWTSigner(client_id="c", private_key=private_key, lifetime_seconds=300)
+    signer = PrivateKeyJWTSigner(
+        client_id="c", private_key=private_key, lifetime_seconds=300
+    )
     token = signer.build_assertion("https://example.com")
     payload = jwt.decode(token, options={"verify_signature": False})
     assert payload["exp"] > time.time()

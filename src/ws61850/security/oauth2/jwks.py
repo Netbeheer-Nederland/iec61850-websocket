@@ -55,6 +55,8 @@ class JwksCache:
             self._fetch()
         jwk = self._keys.get(kid)
         if jwk is None:
-            logger.error("No JWKS key found for kid=%r (available: %s)", kid, list(self._keys))
+            logger.error(
+                "No JWKS key found for kid=%r (available: %s)", kid, list(self._keys)
+            )
             raise KeyError(f"No JWKS key found for kid={kid!r}")
         return algorithms.RSAAlgorithm.from_jwk(jwk)

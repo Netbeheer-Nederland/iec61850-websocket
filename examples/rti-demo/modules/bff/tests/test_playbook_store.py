@@ -11,7 +11,12 @@ from bff.playbook_store import BuiltinPlaybookError, PlaybookNameError, Playbook
 pytestmark = pytest.mark.unit
 
 DEMO = "name: The demo\nsteps:\n  - wait: 1s\n  - wait: 2s\n"
-REC = {"name": "My recording", "so": "SO", "pace": "2s", "steps": [{"label": "Read", "read": {"fsp": "F", "ref": "R"}}]}
+REC = {
+    "name": "My recording",
+    "so": "SO",
+    "pace": "2s",
+    "steps": [{"label": "Read", "read": {"fsp": "F", "ref": "R"}}],
+}
 
 
 @pytest.fixture
@@ -27,7 +32,12 @@ def store(tmp_path):
 def test_list_builtin_and_saved(store):
     store.save("rec1", REC)
     assert store.list() == [
-        {"name": "broken", "builtin": True, "title": "broken", "error": store.list()[0]["error"]},
+        {
+            "name": "broken",
+            "builtin": True,
+            "title": "broken",
+            "error": store.list()[0]["error"],
+        },
         {"name": "demo", "builtin": True, "title": "The demo", "steps": 2},
         {"name": "rec1", "builtin": False, "title": "My recording", "steps": 1},
     ]
@@ -59,7 +69,9 @@ def test_save_overwrites(store):
     store.save("rec1", REC)
     store.save("rec1", {**REC, "name": "Again"})
     assert store.get("rec1")[0]["name"] == "Again"
-    assert [p.name for p in store.saved_dir.iterdir()] == ["rec1.yaml"]  # no temp files left
+    assert [p.name for p in store.saved_dir.iterdir()] == [
+        "rec1.yaml"
+    ]  # no temp files left
 
 
 def test_save_refuses_builtin_name(store):
@@ -74,7 +86,9 @@ def test_delete_refuses_builtin_and_unknown(store):
         store.delete("nope")
 
 
-@pytest.mark.parametrize("name", ["", "../x", "a/b", ".hidden", "run", "x" * 65, "has space"])
+@pytest.mark.parametrize(
+    "name", ["", "../x", "a/b", ".hidden", "run", "x" * 65, "has space"]
+)
 def test_bad_names(store, name):
     with pytest.raises(PlaybookNameError):
         store.save(name, REC)

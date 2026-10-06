@@ -51,7 +51,9 @@ class ClientCredentialsProvider:
         if self._cached_token and time.monotonic() < self._expiry - self._refresh_skew:
             return self._cached_token
 
-        ssl_ctx = ssl.create_default_context(cafile=self._cafile) if self._cafile else None
+        ssl_ctx = (
+            ssl.create_default_context(cafile=self._cafile) if self._cafile else None
+        )
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         body = {
             "grant_type": "client_credentials",
@@ -60,7 +62,9 @@ class ClientCredentialsProvider:
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(self._token_url, headers=headers, data=body, ssl=ssl_ctx) as resp:
+            async with session.post(
+                self._token_url, headers=headers, data=body, ssl=ssl_ctx
+            ) as resp:
                 data = await resp.json()
 
         self._cached_token = data["access_token"]

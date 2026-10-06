@@ -25,7 +25,7 @@ from ws61850.iec61850.server.iec61850_server import IEC61850Server
 _MODEL1_PATH = pathlib.Path(__file__).parent.parent / "ied_model1.json"
 _MODEL2_PATH = pathlib.Path(__file__).parent.parent / "ied_model2.json"
 
-maxMessageSize = 65000
+max_message_size = 65000
 
 
 async def toggle_custom_value(iec61150_server, obj_ref):
@@ -46,19 +46,21 @@ def send_msg_callback(msg, timestamp):
 
 async def main():
     # websocket client
-    ep_wsServer = PassiveEndpoint(is_direct=True)
-    ep_wsServer.recv_msg_callback = received_msg_callback
-    ep_wsServer.send_msg_callback = send_msg_callback
+    ep_ws_server = PassiveEndpoint(is_direct=True)
+    ep_ws_server.recv_msg_callback = received_msg_callback
+    ep_ws_server.send_msg_callback = send_msg_callback
     iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL1_PATH), "cp1")
     report_task_1 = asyncio.create_task(iec61850_server.periodic_report_start())
-    ep_wsServer.add_iec61850_server(iec61850_server)
+    ep_ws_server.add_iec61850_server(iec61850_server)
 
     iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL2_PATH), "cp2")
-    toggle_task_2 = asyncio.create_task(toggle_custom_value(iec61850_server, "LD0/DGEN1.DEROpSt.stVal"))
+    toggle_task_2 = asyncio.create_task(
+        toggle_custom_value(iec61850_server, "LD0/DGEN1.DEROpSt.stVal")
+    )
 
-    ep_wsServer.add_iec61850_server(iec61850_server)
+    ep_ws_server.add_iec61850_server(iec61850_server)
 
-    server_task = asyncio.create_task(ep_wsServer.start("localhost", 8765))
+    server_task = asyncio.create_task(ep_ws_server.start("localhost", 8765))
 
     # await server_task
     await asyncio.gather(server_task, report_task_1, toggle_task_2)

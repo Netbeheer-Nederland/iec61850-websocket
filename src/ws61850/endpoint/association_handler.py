@@ -89,7 +89,9 @@ class AssociationHandler:
             )
             await websocket.send(encoded)
             websocket.transport.abort()
-            logger.info("Association aborted associate_id=%r", websocket_info.associate_id)
+            logger.info(
+                "Association aborted associate_id=%r", websocket_info.associate_id
+            )
             return ACTION_ABORT
 
         if associate_type == "releaseRequest":
@@ -101,7 +103,9 @@ class AssociationHandler:
             )
             await websocket.send(encoded)
             await websocket.close()
-            logger.info("Association released associate_id=%r", websocket_info.associate_id)
+            logger.info(
+                "Association released associate_id=%r", websocket_info.associate_id
+            )
             return ACTION_RELEASE
 
         if associate_type == "refreshToken":
@@ -113,7 +117,11 @@ class AssociationHandler:
                 self._cert_endpoint,
                 self._token_issuer,
             )
-            if validity and expiry is not None and websocket_info.expiry_task is not None:
+            if (
+                validity
+                and expiry is not None
+                and websocket_info.expiry_task is not None
+            ):
                 logger.debug(
                     "Token refresh accepted associate_id=%r new_expiry=%s",
                     websocket_info.associate_id,

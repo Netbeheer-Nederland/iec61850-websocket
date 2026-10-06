@@ -62,12 +62,23 @@ class DataAccessService:
         include_element_name = extract_include_element_name(decoded_message)
         item = find_object_in_tree(data_ref["ref"], ied)
         if item is None:
-            return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
+            return create_tpaa_service_error_response(
+                invoke_id, associate_id, "instanceNotAvailable"
+            )
         if isinstance(item, DataObject):
             da_list = flatten_nested_data_attributes_with_fc(item, data_ref["fc"])
-            da_fc = [build_data_value(da, da.attr_type.name, da.mms_value, include_element_name) for da in da_list]
+            da_fc = [
+                build_data_value(
+                    da, da.attr_type.name, da.mms_value, include_element_name
+                )
+                for da in da_list
+            ]
         else:
-            da_fc = [build_data_value(item, item.attr_type.name, item.mms_value, include_element_name)]
+            da_fc = [
+                build_data_value(
+                    item, item.attr_type.name, item.mms_value, include_element_name
+                )
+            ]
         return create_tpaa_response_get_data_values(invoke_id, associate_id, da_fc)
 
     def set_data_values(self, invoke_id, associate_id, decoded_message):
@@ -76,11 +87,15 @@ class DataAccessService:
         data_attr_val = extract_data_attr_val(decoded_message)
         item = find_object_in_tree(data_ref["ref"], ied)
         if item is None:
-            return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
+            return create_tpaa_service_error_response(
+                invoke_id, associate_id, "instanceNotAvailable"
+            )
 
         fc = data_ref["fc"]
         if fc == FunctionalConstraint.co.wire_name:
-            return create_tpaa_service_error_response(invoke_id, associate_id, "accessViolation")
+            return create_tpaa_service_error_response(
+                invoke_id, associate_id, "accessViolation"
+            )
 
         if isinstance(item, DataObject):
             for da_do_index, da_do_item in enumerate(item.do_or_da):
@@ -95,37 +110,69 @@ class DataAccessService:
             if fc == item.fc.wire_name:
                 result = assign_da_item(item, data_attr_val[0]["data"], fc)
                 if result is False:
-                    return create_tpaa_service_error_response(invoke_id, associate_id, "typeConflict")
-                return create_tpaa_response_set_data_values(invoke_id, associate_id, "ok")
-            return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
+                    return create_tpaa_service_error_response(
+                        invoke_id, associate_id, "typeConflict"
+                    )
+                return create_tpaa_response_set_data_values(
+                    invoke_id, associate_id, "ok"
+                )
+            return create_tpaa_service_error_response(
+                invoke_id, associate_id, "instanceNotAvailable"
+            )
 
-    def get_dataset_values(self, invoke_id, associate_id, decoded_message, find_ds_in_tree):
+    def get_dataset_values(
+        self, invoke_id, associate_id, decoded_message, find_ds_in_tree
+    ):
         ied = self._ied
         ds_ref = extract_ds_ref(decoded_message)
         ld_name, ln_name, ds_name = re.split(r"[/.]", ds_ref)
         found_ln = next(
-            (ln for ld in ied.logical_devices if ld.name == ld_name
-             for ln in ld.logical_nodes if ln.name == ln_name),
+            (
+                ln
+                for ld in ied.logical_devices
+                if ld.name == ld_name
+                for ln in ld.logical_nodes
+                if ln.name == ln_name
+            ),
             None,
         )
         if found_ln is None:
-            return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
+            return create_tpaa_service_error_response(
+                invoke_id, associate_id, "instanceNotAvailable"
+            )
         found_ds = next(
-            (ds for ds in found_ln.data_sets
-             if ds.logical_device_name == ld_name and ds.parent.name == ln_name and ds.name == ds_name),
+            (
+                ds
+                for ds in found_ln.data_sets
+                if ds.logical_device_name == ld_name
+                and ds.parent.name == ln_name
+                and ds.name == ds_name
+            ),
             None,
         )
         if not found_ds:
-            return create_tpaa_service_error_response(invoke_id, associate_id, "instanceNotAvailable")
+            return create_tpaa_service_error_response(
+                invoke_id, associate_id, "instanceNotAvailable"
+            )
 
         value_list = []
         for ds_entry in found_ds.fcdas:
             item = find_object_in_tree(ds_entry.variable_name, ied)
             if item is not None:
                 if isinstance(item, DataObject):
-                    da_list = flatten_nested_data_attributes_with_fc(item, ds_entry.fc.wire_name)
+                    da_list = flatten_nested_data_attributes_with_fc(
+                        item, ds_entry.fc.wire_name
+                    )
                     for da in da_list:
-                        value_list.append(build_data_value(da, da.attr_type.name, da.mms_value, True))
+                        value_list.append(
+                            build_data_value(da, da.attr_type.name, da.mms_value, True)
+                        )
                 else:
-                    value_list.append(build_data_value(item, item.attr_type.name, item.mms_value, True))
-        return create_tpaa_response_get_data_set_values(invoke_id, associate_id, value_list)
+                    value_list.append(
+                        build_data_value(
+                            item, item.attr_type.name, item.mms_value, True
+                        )
+                    )
+        return create_tpaa_response_get_data_set_values(
+            invoke_id, associate_id, value_list
+        )

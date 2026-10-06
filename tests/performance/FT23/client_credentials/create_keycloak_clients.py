@@ -36,7 +36,9 @@ def resolve_credentials_path(credentials_file_path: str) -> Path:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Create and authenticate Keycloak clients.")
+    parser = argparse.ArgumentParser(
+        description="Create and authenticate Keycloak clients."
+    )
     parser.add_argument(
         "--num-clients-in-batch",
         type=int,
@@ -60,10 +62,14 @@ async def run_batch(num_clients_in_batch: int):
     try:
         # Note: If clients already exist from a previous run, this will skip creation
         provision_clients(
-            num_clients_to_gen=num_clients_in_batch, start_id=CLIENT_START_ID, credentials_file_path=credentials_path
+            num_clients_to_gen=num_clients_in_batch,
+            start_id=CLIENT_START_ID,
+            credentials_file_path=credentials_path,
         )
     except ConnectionError as ex:
-        logger.error("CRITICAL ERROR in Step 1 (Client Generation): %s. Cannot proceed.", ex)
+        logger.error(
+            "CRITICAL ERROR in Step 1 (Client Generation): %s. Cannot proceed.", ex
+        )
         return
     except (OSError, ValueError, RuntimeError) as ex:
         logger.error("Unexpected error during client generation: %s", ex, exc_info=True)
@@ -73,7 +79,9 @@ async def run_batch(num_clients_in_batch: int):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
     args = parse_args()
     try:
         asyncio.run(run_batch(args.num_clients_in_batch))

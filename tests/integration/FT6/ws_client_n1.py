@@ -24,7 +24,12 @@ from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
-_MODEL_PATH = pathlib.Path(__file__).parent.parent.parent.parent / "testing" / "ieds" / "ied_model1.json"
+_MODEL_PATH = (
+    pathlib.Path(__file__).parent.parent.parent.parent
+    / "testing"
+    / "ieds"
+    / "ied_model1.json"
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -46,7 +51,9 @@ async def main():
     endpoint = ActiveEndpoint()
 
     iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
-    toggle_task = asyncio.create_task(toggle_custom_value(iec61850_server, "LD0/DGEN1.DEROpSt.stVal"))
+    toggle_task = asyncio.create_task(
+        toggle_custom_value(iec61850_server, "LD0/DGEN1.DEROpSt.stVal")
+    )
     endpoint.add_iec61850_server(iec61850_server)
 
     logger.info("Connecting to localhost:8765 cp=cp1")

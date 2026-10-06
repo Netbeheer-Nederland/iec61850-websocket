@@ -23,7 +23,12 @@ from ws61850.endpoint.passive_endpoint import PassiveEndpoint
 from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
-_MODEL_PATH = pathlib.Path(__file__).parent.parent.parent.parent / "testing" / "ieds" / "ied_model1.json"
+_MODEL_PATH = (
+    pathlib.Path(__file__).parent.parent.parent.parent
+    / "testing"
+    / "ieds"
+    / "ied_model1.json"
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -40,7 +45,9 @@ async def main():
     endpoint.add_iec61850_server(iec61850_server)
 
     logger.info("Waiting for client connections on localhost:8765 (JER + BER, direct)")
-    await endpoint.start("localhost", 8765, protocol=["iec61850-tpaa-jer-v1", "iec61850-tpaa-ber-v1"])
+    await endpoint.start(
+        "localhost", 8765, protocol=["iec61850-tpaa-jer-v1", "iec61850-tpaa-ber-v1"]
+    )
 
 
 if __name__ == "__main__":

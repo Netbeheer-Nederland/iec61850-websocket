@@ -32,7 +32,6 @@ import re
 import sys
 
 import requests
-
 from bff.playbook import (  # noqa: F401 - re-exported
     ACTIONS,
     DEFAULT_BFF,
@@ -52,7 +51,7 @@ from bff.playbook import (  # noqa: F401 - re-exported
 
 
 def _step_range(text: str) -> range:
-    """"3" or "2-5" -> a range of step numbers."""
+    """ "3" or "2-5" -> a range of step numbers."""
     m = re.fullmatch(r"(\d+)(?:-(\d+))?", text)
     if not m:
         raise argparse.ArgumentTypeError(f"not a step or range: {text!r}")
@@ -61,18 +60,32 @@ def _step_range(text: str) -> range:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run an rti-demo playbook through the BFF.")
+    parser = argparse.ArgumentParser(
+        description="Run an rti-demo playbook through the BFF."
+    )
     parser.add_argument("playbook", help="playbook file (.yaml or .json)")
-    parser.add_argument("--bff", help=f"BFF base URL (default: the playbook's 'bff', else {DEFAULT_BFF})")
-    parser.add_argument("--pace", help="pause between steps, e.g. 2s (default: the playbook's 'pace', else none)")
-    parser.add_argument("--keep-going", action="store_true", help="run on after a failed step")
-    parser.add_argument("--steps", type=_step_range, help="only these steps, e.g. 3 or 2-5")
+    parser.add_argument(
+        "--bff",
+        help=f"BFF base URL (default: the playbook's 'bff', else {DEFAULT_BFF})",
+    )
+    parser.add_argument(
+        "--pace",
+        help="pause between steps, e.g. 2s (default: the playbook's 'pace', else none)",
+    )
+    parser.add_argument(
+        "--keep-going", action="store_true", help="run on after a failed step"
+    )
+    parser.add_argument(
+        "--steps", type=_step_range, help="only these steps, e.g. 3 or 2-5"
+    )
     args = parser.parse_args(argv)
 
     try:
         playbook = load_playbook(args.playbook)
         transport = BffTransport(args.bff or playbook.get("bff", DEFAULT_BFF))
-        runner = Runner(playbook, transport, pace=parse_duration(args.pace) if args.pace else None)
+        runner = Runner(
+            playbook, transport, pace=parse_duration(args.pace) if args.pace else None
+        )
         results = runner.run(keep_going=args.keep_going, only=args.steps)
     except (PlaybookError, requests.RequestException, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)

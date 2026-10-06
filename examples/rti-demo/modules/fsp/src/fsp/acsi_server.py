@@ -153,7 +153,9 @@ class ACSIServer:
 
         if self.runtime.ied_model is None:
             try:
-                self._log_action("No model in runtime, loading from file...", "debug", kind="system")
+                self._log_action(
+                    "No model in runtime, loading from file...", "debug", kind="system"
+                )
                 self.runtime.ied_model = self.load_current_runtime_model()
             except FileNotFoundError:
                 # Precedes a raised RuntimeError below - a real failure, not
@@ -322,17 +324,24 @@ class ACSIServer:
         with self.runtime.model_lock:
             if self.runtime.status != "listening":
                 self._log_action(
-                    "Hot-swap aborted: server not in listening state", "warn",
+                    "Hot-swap aborted: server not in listening state",
+                    "warn",
                     kind="system",
                 )
                 return False
 
             if self.runtime.model_reload_in_progress:
-                self._log_action("Hot-swap aborted: reload already in progress", "warn", kind="system")
+                self._log_action(
+                    "Hot-swap aborted: reload already in progress",
+                    "warn",
+                    kind="system",
+                )
                 return False
 
             if self.runtime.pending_model is None:
-                self._log_action("Hot-swap aborted: no pending model", "warn", kind="system")
+                self._log_action(
+                    "Hot-swap aborted: no pending model", "warn", kind="system"
+                )
                 return False
 
             self.runtime.model_reload_in_progress = True
@@ -369,7 +378,9 @@ class ACSIServer:
                     )
                 else:
                     self._set_runtime_state(status="listening")
-                    self._log_action("Model hot-swap completed with warnings", "warn", kind="system")
+                    self._log_action(
+                        "Model hot-swap completed with warnings", "warn", kind="system"
+                    )
 
             return result
 
@@ -403,7 +414,9 @@ class ACSIServer:
         entry to the frames it produced.
         """
         if kind not in ACTION_KINDS:
-            raise ValueError(f"_log_action kind must be one of {ACTION_KINDS}, got {kind!r}")
+            raise ValueError(
+                f"_log_action kind must be one of {ACTION_KINDS}, got {kind!r}"
+            )
         if detail is None:
             detail = {}
         with self.runtime.lock:
@@ -439,7 +452,9 @@ class ACSIServer:
         if message is None:
             if self.runtime.error is not None:
                 self.runtime.error = None
-                self._log_action(f"Connection re-established (cp={cp})", "info", kind="system")
+                self._log_action(
+                    f"Connection re-established (cp={cp})", "info", kind="system"
+                )
             self._last_connect_error_message = None
             self._last_connect_error_log_time = 0.0
             return
@@ -450,7 +465,9 @@ class ACSIServer:
         changed = message != self._last_connect_error_message
         stale = now - self._last_connect_error_log_time >= 60.0
         if changed or stale:
-            self._log_action(f"Connection attempt failed (cp={cp}): {message}", "warn", kind="system")
+            self._log_action(
+                f"Connection attempt failed (cp={cp}): {message}", "warn", kind="system"
+            )
             self._last_connect_error_message = message
             self._last_connect_error_log_time = now
 
@@ -463,7 +480,12 @@ class ACSIServer:
         try:
             msg = json.loads(raw)
             if not isinstance(msg, dict):
-                return {"service_type": service_type, "category": category, "cp": cp, "invoke_id": invoke_id}
+                return {
+                    "service_type": service_type,
+                    "category": category,
+                    "cp": cp,
+                    "invoke_id": invoke_id,
+                }
 
             if "request" in msg:
                 category = "request"
@@ -495,7 +517,12 @@ class ACSIServer:
             service_type = "parse-error"
             category = "parse-error"
 
-        return {"service_type": service_type, "category": category, "cp": cp, "invoke_id": invoke_id}
+        return {
+            "service_type": service_type,
+            "category": category,
+            "cp": cp,
+            "invoke_id": invoke_id,
+        }
 
     def _on_send_message(self, message: Any, timestamp: Any) -> None:
         """Callback for sent WebSocket messages."""
@@ -581,7 +608,9 @@ class ACSIServer:
                     "time": ts,
                     "timestamp": ts,
                     "kind": "websocket",
-                    "level": "error" if meta["service_type"] == "serviceError" else "info",
+                    "level": "error"
+                    if meta["service_type"] == "serviceError"
+                    else "info",
                     "direction": direction,
                     "service": meta["service_type"],
                     "service_type": meta["service_type"],
@@ -611,7 +640,9 @@ class ACSIServer:
         try:
             endpoint = self.runtime.endpoint
             if endpoint is None:
-                self._log_action("Hot-swap failed: endpoint is None", "error", kind="system")
+                self._log_action(
+                    "Hot-swap failed: endpoint is None", "error", kind="system"
+                )
                 return False
 
             cp = self.runtime.cp or "cp1"
@@ -635,7 +666,8 @@ class ACSIServer:
                                 pass
                 except Exception as cancel_exc:
                     self._log_action(
-                        f"Warning: Failed to cancel old tasks: {cancel_exc}", "warn",
+                        f"Warning: Failed to cancel old tasks: {cancel_exc}",
+                        "warn",
                         kind="system",
                     )
 
@@ -659,7 +691,8 @@ class ACSIServer:
             else:
                 # No existing server, this shouldn't happen but handle it
                 self._log_action(
-                    "Hot-swap failed: no existing server to update", "error",
+                    "Hot-swap failed: no existing server to update",
+                    "error",
                     kind="system",
                 )
                 return False
@@ -667,7 +700,9 @@ class ACSIServer:
             return True
 
         except Exception as exc:
-            self._log_action(f"Hot-swap async execution failed: {exc}", "error", kind="system")
+            self._log_action(
+                f"Hot-swap async execution failed: {exc}", "error", kind="system"
+            )
             return False
 
     def _set_runtime_state(self, **kwargs: Any) -> None:
@@ -708,7 +743,9 @@ class ACSIServer:
                 # as it's been replaced in the endpoint
                 self.runtime.old_server_cp = None
             except Exception as exc:
-                self._log_action(f"Cleanup old server error: {exc}", "warn", kind="system")
+                self._log_action(
+                    f"Cleanup old server error: {exc}", "warn", kind="system"
+                )
 
         if endpoint is not None:
             try:
@@ -740,7 +777,9 @@ class ACSIServer:
         """
         oauth = self.runtime.start_oauth
         if oauth:
-            await self.runtime.endpoint.reconfigure_oauth(host, str(port), cp, True, **oauth)
+            await self.runtime.endpoint.reconfigure_oauth(
+                host, str(port), cp, True, **oauth
+            )
             return self.runtime.endpoint._connect_task
         return self.runtime.endpoint.run_in_background(host, port, cp)
 
@@ -786,7 +825,8 @@ class ACSIServer:
         if self.runtime.status != "stopping":
             self._set_runtime_state(status="listening")
             self._log_action(
-                "Server listening", detail={"host": host, "port": port, "cps": [cp]},
+                "Server listening",
+                detail={"host": host, "port": port, "cps": [cp]},
                 kind="system",
             )
 
@@ -796,7 +836,9 @@ class ACSIServer:
                 if isinstance(result, Exception) and not isinstance(
                     result, asyncio.CancelledError
                 ):
-                    self._log_action(f"Task '{name}' failed: {result}", "error", kind="system")
+                    self._log_action(
+                        f"Task '{name}' failed: {result}", "error", kind="system"
+                    )
         except asyncio.CancelledError:
             pass
         except Exception as exc:
@@ -858,7 +900,8 @@ class ACSIServer:
         self._set_runtime_state(thread=t)
         t.start()
         self._log_action(
-            "Server startup initiated", detail={"host": host, "port": port},
+            "Server startup initiated",
+            detail={"host": host, "port": port},
             kind="system",
         )
 
@@ -884,7 +927,11 @@ class ACSIServer:
             fut.result(timeout=10)
         except FuturesTimeoutError:
             # Avoid surfacing 500 to UI when shutdown is still unwinding.
-            self._log_action("Stop in progress (timeout waiting for shutdown).", "warn", kind="system")
+            self._log_action(
+                "Stop in progress (timeout waiting for shutdown).",
+                "warn",
+                kind="system",
+            )
         except Exception:
             # If stop is already in progress or completed, avoid hard failure.
             current = self.runtime.status

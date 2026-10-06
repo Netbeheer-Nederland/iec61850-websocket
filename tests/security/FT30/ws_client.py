@@ -79,6 +79,5 @@ async def main():
     await asyncio.gather(task, report_task)
 
 
-
 if __name__ == "__main__":
     asyncio.run(main())

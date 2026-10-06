@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2025 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
 """Unit tests for ControlService."""
+
 import pytest
 
 from ws61850.iec61850.data_model.ied_model import (
@@ -20,6 +21,7 @@ from ws61850.iec61850.services.control_service import ControlService
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def control_ied():
     """IED with a controllable DO: LD0/CSWI1.Pos (FC=co, Oper/ctlVal bool, Oper/ctlNum int),
@@ -34,12 +36,24 @@ def control_ied():
     pos = DataObject(name="Pos", cdc="")
     pos.parent = ln
 
-    oper = DataAttribute(name="Oper", attr_type=DataAttributeType.structure, fc=FunctionalConstraint.co)
+    oper = DataAttribute(
+        name="Oper", attr_type=DataAttributeType.structure, fc=FunctionalConstraint.co
+    )
     oper.parent = pos
 
-    ctl_val = DataAttribute(name="ctlVal", attr_type=DataAttributeType.boolean, fc=FunctionalConstraint.co, mms_value=False)
+    ctl_val = DataAttribute(
+        name="ctlVal",
+        attr_type=DataAttributeType.boolean,
+        fc=FunctionalConstraint.co,
+        mms_value=False,
+    )
     ctl_val.parent = oper
-    ctl_num = DataAttribute(name="ctlNum", attr_type=DataAttributeType.int32, fc=FunctionalConstraint.co, mms_value=0)
+    ctl_num = DataAttribute(
+        name="ctlNum",
+        attr_type=DataAttributeType.int32,
+        fc=FunctionalConstraint.co,
+        mms_value=0,
+    )
     ctl_num.parent = oper
     oper.add_data_attribute(ctl_val)
     oper.add_data_attribute(ctl_num)
@@ -56,7 +70,12 @@ def _set_ctl_model(pos, value):
     if existing is not None:
         existing.mms_value = value
         return
-    ctl_model = DataAttribute(name="ctlModel", attr_type=DataAttributeType.enumerated, fc=FunctionalConstraint.cf, mms_value=value)
+    ctl_model = DataAttribute(
+        name="ctlModel",
+        attr_type=DataAttributeType.enumerated,
+        fc=FunctionalConstraint.cf,
+        mms_value=value,
+    )
     ctl_model.parent = pos
     pos.add_do_or_da(ctl_model)
 
@@ -77,7 +96,10 @@ def _ok_handler(obj_ref, ctl_val, param):
 
 
 def _svc_tuple(service_name, **fields):
-    return ("request", {"invokeId": 1, "associateId": 0, "service": (service_name, fields)})
+    return (
+        "request",
+        {"invokeId": 1, "associateId": 0, "service": (service_name, fields)},
+    )
 
 
 def _select_msg(ref="LD0/CSWI1.Pos.Oper"):
@@ -95,6 +117,7 @@ def _operate_msg(ref="LD0/CSWI1.Pos.Oper", ctl_val=True):
 # ---------------------------------------------------------------------------
 # select
 # ---------------------------------------------------------------------------
+
 
 def test_select_ok(control_ied, control_objects):
     svc = ControlService(control_ied, control_objects, lambda: (_ok_handler, None))
@@ -122,6 +145,7 @@ def test_select_unknown_ref_returns_error(control_ied, control_objects):
 # ---------------------------------------------------------------------------
 # operate
 # ---------------------------------------------------------------------------
+
 
 def test_operate_requires_select_first(control_ied, control_objects):
     svc = ControlService(control_ied, control_objects, lambda: (_ok_handler, None))
@@ -177,8 +201,11 @@ def test_operate_increments_ctl_num(control_ied, control_objects):
 # select-before-operate only for sbo-with-* controls
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("ctl_model", [1, "direct-with-normal-security", 3])
-def test_direct_control_operates_without_select(control_ied, control_objects, ctl_model):
+def test_direct_control_operates_without_select(
+    control_ied, control_objects, ctl_model
+):
     _set_ctl_model(_pos(control_ied), ctl_model)
     svc = ControlService(control_ied, control_objects, lambda: (_ok_handler, None))
     result, quality_do = svc.operate(1, 0, _operate_msg())
@@ -200,7 +227,9 @@ def test_unselected_operate_does_not_reach_the_handler(control_ied, control_obje
         calls.append(ref)
         return ControlHandlerResult.OK, None
 
-    svc = ControlService(control_ied, control_objects, lambda: (_recording_handler, None))
+    svc = ControlService(
+        control_ied, control_objects, lambda: (_recording_handler, None)
+    )
     svc.operate(1, 0, _operate_msg())
     assert calls == []
 

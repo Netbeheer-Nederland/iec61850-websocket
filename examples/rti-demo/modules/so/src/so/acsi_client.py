@@ -55,11 +55,17 @@ def _jsonable(value: Any) -> Any:
     return json.loads(json.dumps(value, default=str))
 
 
-
 # OriginatorCategoryKind as the protocol names it (ACSI Originator.orCat).
 OR_CATEGORIES = [
-    "notSupported", "bayControl", "stationControl", "remoteControl",
-    "automaticBay", "automaticStation", "automaticRemote", "maintenance", "process",
+    "notSupported",
+    "bayControl",
+    "stationControl",
+    "remoteControl",
+    "automaticBay",
+    "automaticStation",
+    "automaticRemote",
+    "maintenance",
+    "process",
 ]
 DEFAULT_ORIGIN = {"orCat": "stationControl", "orIdent": b"ORIGIN_ID_1234567890"}
 
@@ -86,6 +92,7 @@ def originator(origin: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(ident, bytes):
         ident = str(ident).encode("utf-8")
     return {"orCat": cat, "orIdent": ident[:64]}
+
 
 class ModelInfo:
     def __init__(self, cp):
@@ -293,15 +300,15 @@ class ACSIClient:
         return [client.cp for client in self.runtime.client_list if client.is_connected]
 
     def _log_action(
-            self,
-            message: str,
-            level: str = "info",
-            detail: dict[str, Any] | None = None,
-            *,
-            kind: str,
-            cp: str = "",
-            service: str = "",
-            correlation: dict[str, Any] | None = None,
+        self,
+        message: str,
+        level: str = "info",
+        detail: dict[str, Any] | None = None,
+        *,
+        kind: str,
+        cp: str = "",
+        service: str = "",
+        correlation: dict[str, Any] | None = None,
     ) -> None:
         """Log an action to the runtime actions deque.
 
@@ -313,7 +320,9 @@ class ACSIClient:
         entry to the frames it produced.
         """
         if kind not in ACTION_KINDS:
-            raise ValueError(f"_log_action kind must be one of {ACTION_KINDS}, got {kind!r}")
+            raise ValueError(
+                f"_log_action kind must be one of {ACTION_KINDS}, got {kind!r}"
+            )
         if detail is None:
             detail = {}
         with self.runtime.lock:
@@ -341,7 +350,12 @@ class ACSIClient:
         try:
             msg = json.loads(raw)
             if not isinstance(msg, dict):
-                return {"service_type": service_type, "category": category, "cp": cp, "invoke_id": invoke_id}
+                return {
+                    "service_type": service_type,
+                    "category": category,
+                    "cp": cp,
+                    "invoke_id": invoke_id,
+                }
 
             if "request" in msg:
                 category = "request"
@@ -387,7 +401,12 @@ class ACSIClient:
             service_type = "parse-error"
             category = "parse-error"
 
-        return {"service_type": service_type, "category": category, "cp": cp, "invoke_id": invoke_id}
+        return {
+            "service_type": service_type,
+            "category": category,
+            "cp": cp,
+            "invoke_id": invoke_id,
+        }
 
     def _log_message(self, direction: str, message: Any, timestamp: Any) -> None:
         """Log a message (request/response) to the runtime messages deque."""
@@ -410,7 +429,9 @@ class ACSIClient:
                     "time": ts,
                     "timestamp": ts,
                     "kind": "websocket",
-                    "level": "error" if meta["service_type"] == "serviceError" else "info",
+                    "level": "error"
+                    if meta["service_type"] == "serviceError"
+                    else "info",
                     "direction": direction,
                     "service": meta["service_type"],
                     "service_type": meta["service_type"],
@@ -559,7 +580,9 @@ class ACSIClient:
             try:
                 value = int(oper_val)
             except (TypeError, ValueError):
-                raise ValueError(f"enumerated value must be an integer, got {oper_val!r}") from None
+                raise ValueError(
+                    f"enumerated value must be an integer, got {oper_val!r}"
+                ) from None
             if not 0 <= value <= 255:
                 raise ValueError(f"enumerated value must be 0..255, got {value}")
             return value
@@ -601,7 +624,9 @@ class ACSIClient:
         )
         self._set_runtime_state(thread=t)
         t.start()
-        self._log_action("Connection initiated", detail={"host": host, "port": port}, kind="system")
+        self._log_action(
+            "Connection initiated", detail={"host": host, "port": port}, kind="system"
+        )
 
     def disconnect(self) -> None:
         """Disconnect from the server."""
@@ -651,7 +676,7 @@ class ACSIClient:
         }
 
     async def get_server_directory_tree(
-            self, cp: str, ws_info: Any | None = None
+        self, cp: str, ws_info: Any | None = None
     ) -> dict[str, Any]:
         """Get list of all Logical Devices on the server.
 
@@ -679,7 +704,7 @@ class ACSIClient:
         return {"logicalDevices": ld_list, "source": "live"}
 
     async def get_logical_device_tree(
-            self, ld_inst: str, cp: str, ws_info: Any | None = None
+        self, ld_inst: str, cp: str, ws_info: Any | None = None
     ) -> dict[str, Any]:
         """Get all Logical Nodes for a specific Logical Device.
 
@@ -710,7 +735,7 @@ class ACSIClient:
         return {"logicalDevice": ld_inst, "logicalNodes": ln_list, "source": "live"}
 
     async def get_logical_node_tree(
-            self, ld_inst: str, ln_inst: str, cp: str, ws_info: Any | None = None
+        self, ld_inst: str, ln_inst: str, cp: str, ws_info: Any | None = None
     ) -> dict[str, Any]:
         """Get complete tree for a specific Logical Node.
 
@@ -757,12 +782,12 @@ class ACSIClient:
         return result
 
     async def get_data_object_details(
-            self,
-            ld_inst: str,
-            ln_inst: str,
-            do_name: str,
-            cp: str,
-            ws_info: Any | None = None,
+        self,
+        ld_inst: str,
+        ln_inst: str,
+        do_name: str,
+        cp: str,
+        ws_info: Any | None = None,
     ) -> dict[str, Any]:
         """Get complete details for a specific Data Object including its data attributes.
 
@@ -802,14 +827,14 @@ class ACSIClient:
         return result
 
     async def _invoke_acsi(
-            self,
-            *,
-            service: str,
-            summary: str,
-            cp: str,
-            websocket_info: Any,
-            call: Callable[[], Any],
-            detail: dict[str, Any] | None = None,
+        self,
+        *,
+        service: str,
+        summary: str,
+        cp: str,
+        websocket_info: Any,
+        call: Callable[[], Any],
+        detail: dict[str, Any] | None = None,
     ) -> Any:
         """Run one ACSI service call under invoke_lock and log it as a single
         kind "acsi" entry, linked to the WebSocket frames it produced.
@@ -907,7 +932,7 @@ class ACSIClient:
         return {"value": result}
 
     async def get_dataset_directory(
-            self, ld_inst: str, ln_inst: str, ds_inst: str, cp: str
+        self, ld_inst: str, ln_inst: str, ds_inst: str, cp: str
     ) -> dict[str, Any]:
         """Read a value from the server."""
         client = self.get_iec61850_client(cp)
@@ -1137,7 +1162,7 @@ class ACSIClient:
         return False, None
 
     async def write_value(
-            self, obj_ref: str, value: Any, fc: str, data_type: str, cp: str
+        self, obj_ref: str, value: Any, fc: str, data_type: str, cp: str
     ) -> dict[str, Any]:
         """Write a value to the server."""
         client = self.get_iec61850_client(cp)
@@ -1176,16 +1201,19 @@ class ACSIClient:
         converted, converted_val = self.convert_value(data_type, value, type_map)
 
         if converted is False:
-            raise RuntimeError(
-                f"Type mismatch: '{value}' is not valid for {data_type}"
-            )
+            raise RuntimeError(f"Type mismatch: '{value}' is not valid for {data_type}")
         else:
             result = await self._invoke_acsi(
                 service="setDataValues",
                 summary=f"SetDataValues {obj_ref} [{str(fc).upper()}] = {value!r}",
                 cp=cp,
                 websocket_info=websocket_info,
-                detail={"objRef": obj_ref, "fc": fc, "value": value, "dataType": data_type},
+                detail={
+                    "objRef": obj_ref,
+                    "fc": fc,
+                    "value": value,
+                    "dataType": data_type,
+                },
                 call=lambda: client.set_data_values(
                     obj_ref,
                     fc,
@@ -1223,15 +1251,15 @@ class ACSIClient:
         return {"objRef": obj_ref, "result": result}
 
     async def operate(
-            self,
-            obj_ref,
-            oper_val,
-            val_type: str,
-            cp: str,
-            *,
-            ctl_num: int = 0,
-            origin: dict[str, Any] | None = None,
-            test: bool = False,
+        self,
+        obj_ref,
+        oper_val,
+        val_type: str,
+        cp: str,
+        *,
+        ctl_num: int = 0,
+        origin: dict[str, Any] | None = None,
+        test: bool = False,
     ) -> dict[str, Any]:
         """Perform an operate command on the server.
 
@@ -1263,7 +1291,11 @@ class ACSIClient:
             summary=f"Operate {obj_ref} = {oper_val['ctlVal'][1]!r}",
             cp=cp,
             websocket_info=websocket_info,
-            detail={"objRef": obj_ref, "value": oper_val["ctlVal"][1], "valType": val_type},
+            detail={
+                "objRef": obj_ref,
+                "value": oper_val["ctlVal"][1],
+                "valType": val_type,
+            },
             call=lambda: client.operate(oper_val, websocket_info, None, None),
         )
         return {"objRef": obj_ref, "result": result}

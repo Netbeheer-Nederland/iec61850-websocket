@@ -36,7 +36,9 @@ async def main():
     endpoint.add_iec61850_client(client)
 
     logger.info("Waiting for client connections on localhost:8765 (JER + BER)")
-    await endpoint.start("localhost", 8765, protocol=["iec61850-tpaa-jer-v1", "iec61850-tpaa-ber-v1"])
+    await endpoint.start(
+        "localhost", 8765, protocol=["iec61850-tpaa-jer-v1", "iec61850-tpaa-ber-v1"]
+    )
 
 
 if __name__ == "__main__":

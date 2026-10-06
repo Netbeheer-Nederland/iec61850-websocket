@@ -245,7 +245,9 @@ class DataAttribute(ModelNode):
 class DataSet:
     """Represents a DataSet belonging to a LogicalNode."""
 
-    def __init__(self, parent: LogicalNode, logical_device_name: str, name: str, fcdas=None):
+    def __init__(
+        self, parent: LogicalNode, logical_device_name: str, name: str, fcdas=None
+    ):
         self.parent = parent
         self.logical_device_name = logical_device_name
         self.name = name

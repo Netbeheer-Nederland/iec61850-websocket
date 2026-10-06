@@ -78,7 +78,14 @@ def callback_called(result, param):
 
 # set_data_values calls its callback with what was written, not (result, param).
 def write_callback_called(obj_ref, value, fc, data_type, result):
-    logger.info("write callback called: %s [%s] = %r (%s): %s", obj_ref, fc, value, data_type, result)
+    logger.info(
+        "write callback called: %s [%s] = %r (%s): %s",
+        obj_ref,
+        fc,
+        value,
+        data_type,
+        result,
+    )
 
 
 data_attribute_value = {
@@ -186,7 +193,9 @@ async def add_iec61850_client_requests(iec61850_client, endpoint):
         websocket_info = endpoint.get_websocket_info(iec61850_client)
         if websocket_info is not None:
             try:
-                server_list = await iec61850_client.get_server_directory(websocket_info, callback_called, None)
+                server_list = await iec61850_client.get_server_directory(
+                    websocket_info, callback_called, None
+                )
                 ld_directory = await iec61850_client.get_logical_device_directory(
                     "LD0", websocket_info, callback_called, None
                 )
@@ -197,17 +206,34 @@ async def add_iec61850_client_requests(iec61850_client, endpoint):
                     "LD0", "LLN0", "dataObject", websocket_info, callback_called, None
                 )
                 ds_directory = await iec61850_client.get_dataset_directory(
-                    "LD0", "LLN0", "DataSetMinMaxAvg", websocket_info, callback_called, None
+                    "LD0",
+                    "LLN0",
+                    "DataSetMinMaxAvg",
+                    websocket_info,
+                    callback_called,
+                    None,
                 )
-                set_urcb_res = await iec61850_client.set_URCB_values(urcb, websocket_info, None, None)
+                set_urcb_res = await iec61850_client.set_URCB_values(
+                    urcb, websocket_info, None, None
+                )
                 da_def = await iec61850_client.get_data_definition(
                     "LD0/DWMX1.WMaxSptPct", websocket_info, callback_called, None
                 )
                 set_da_res = await iec61850_client.set_data_values(
-                    "LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value], websocket_info, write_callback_called, None
+                    "LD0/DWMX1.WMaxSpt.Oper",
+                    "co",
+                    [data_attribute_value],
+                    websocket_info,
+                    write_callback_called,
+                    None,
                 )
                 da_val = await iec61850_client.get_data_values(
-                    "LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info, callback_called, None
+                    "LD0/DWMX1.WMaxSpt.Oper",
+                    "co",
+                    True,
+                    websocket_info,
+                    callback_called,
+                    None,
                 )
 
                 logger.info("Results from client %s", iec61850_client.cp)
@@ -222,7 +248,9 @@ async def add_iec61850_client_requests(iec61850_client, endpoint):
                 logger.info("set_urcb_res: %s", set_urcb_res)
 
             except Exception as e:
-                logger.exception("Service call failed for %s: %s", iec61850_client.cp, e)
+                logger.exception(
+                    "Service call failed for %s: %s", iec61850_client.cp, e
+                )
 
 
 async def main():
@@ -237,12 +265,17 @@ async def main():
         endpoint.add_iec61850_client(client)
         clients.append(client)
 
-    logger.info("Starting WebSocket endpoint in passive mode on %s:%s", args.host, args.port)
+    logger.info(
+        "Starting WebSocket endpoint in passive mode on %s:%s", args.host, args.port
+    )
     server_task = asyncio.create_task(endpoint.start(args.host, args.port))
 
     await asyncio.sleep(2)
 
-    request_tasks = [asyncio.create_task(add_iec61850_client_requests(client, endpoint)) for client in clients]
+    request_tasks = [
+        asyncio.create_task(add_iec61850_client_requests(client, endpoint))
+        for client in clients
+    ]
     await asyncio.gather(*request_tasks)
 
     await server_task

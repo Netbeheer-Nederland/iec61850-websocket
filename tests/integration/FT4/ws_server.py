@@ -65,7 +65,9 @@ oper_val_set_mag = {
     "check": {"synchroCheck": False, "interlockCheck": False},
 }
 
-set_mag_val = [{"name": "setMag", "data": ("structure", {"data": [("float32", 67.39)]})}]
+set_mag_val = [
+    {"name": "setMag", "data": ("structure", {"data": [("float32", 67.39)]})}
+]
 
 
 async def main():
@@ -82,27 +84,44 @@ async def main():
         websocket_info = endpoint.get_websocket_info(client)
         if websocket_info is not None:
             try:
-                da_val = await client.get_data_values("LD0/DWMX1.WMaxSpt", "mx", True, websocket_info, None, None)
+                da_val = await client.get_data_values(
+                    "LD0/DWMX1.WMaxSpt", "mx", True, websocket_info, None, None
+                )
                 logger.info("get_data_values WMaxSpt: %s", da_val)
 
-                select_result = await client.select("LD0/DWMX1.WMaxSpt", websocket_info, None, None)
+                select_result = await client.select(
+                    "LD0/DWMX1.WMaxSpt", websocket_info, None, None
+                )
                 logger.info("select: %s", select_result)
 
-                operate_result = await client.operate(oper_val, websocket_info, None, None)
+                operate_result = await client.operate(
+                    oper_val, websocket_info, None, None
+                )
                 logger.info("operate: %s", operate_result)
 
-                da_val = await client.get_data_values("LD0/DWMX1.WMaxSpt", "mx", True, websocket_info, None, None)
+                da_val = await client.get_data_values(
+                    "LD0/DWMX1.WMaxSpt", "mx", True, websocket_info, None, None
+                )
                 logger.info("get_data_values WMaxSpt after operate: %s", da_val)
 
-                da_val = await client.get_data_values("LD0/DWMX1.WMaxSet", "sp", True, websocket_info, None, None)
+                da_val = await client.get_data_values(
+                    "LD0/DWMX1.WMaxSet", "sp", True, websocket_info, None, None
+                )
                 logger.info("get_data_values WMaxSet: %s", da_val)
 
                 set_val_res = await client.set_data_values(
-                    "LD0/DWMX1.WMaxSet.setMag", "sp", set_mag_val, websocket_info, None, None
+                    "LD0/DWMX1.WMaxSet.setMag",
+                    "sp",
+                    set_mag_val,
+                    websocket_info,
+                    None,
+                    None,
                 )
                 logger.info("set_data_values setMag: %s", set_val_res)
 
-                da_val = await client.get_data_values("LD0/DWMX1.WMaxSet", "sp", True, websocket_info, None, None)
+                da_val = await client.get_data_values(
+                    "LD0/DWMX1.WMaxSet", "sp", True, websocket_info, None, None
+                )
                 logger.info("get_data_values WMaxSet after set: %s", da_val)
 
             except Exception as e:

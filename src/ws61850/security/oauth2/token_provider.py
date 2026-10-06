@@ -22,5 +22,4 @@ from typing import Protocol, runtime_checkable
 class TokenProvider(Protocol):
     """Minimal interface for anything that can produce an access token."""
 
-    async def get_access_token(self) -> str:
-        ...
+    async def get_access_token(self) -> str: ...

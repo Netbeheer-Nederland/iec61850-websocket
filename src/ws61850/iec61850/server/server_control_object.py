@@ -25,8 +25,14 @@ class ServerControlObject:
 
 
 def get_control_das(data_object, list):
-    control_item = next((da for da in data_object.get_da_from_do_or_da_list() if da.fc == FunctionalConstraint.co),
-                        None)
+    control_item = next(
+        (
+            da
+            for da in data_object.get_da_from_do_or_da_list()
+            if da.fc == FunctionalConstraint.co
+        ),
+        None,
+    )
     if control_item is not None:
         list.append(ServerControlObject(data_object))
     if len(data_object.get_do_from_do_or_da_list()) > 0:

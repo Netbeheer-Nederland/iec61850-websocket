@@ -23,7 +23,12 @@ from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
-_MODEL_PATH = pathlib.Path(__file__).parent.parent.parent.parent / "testing" / "ieds" / "ied_model1.json"
+_MODEL_PATH = (
+    pathlib.Path(__file__).parent.parent.parent.parent
+    / "testing"
+    / "ieds"
+    / "ied_model1.json"
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(

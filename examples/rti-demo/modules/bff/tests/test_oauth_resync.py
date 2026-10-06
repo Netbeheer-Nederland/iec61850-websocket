@@ -215,7 +215,11 @@ def test_execute_start_adds_stored_fsp_oauth(monkeypatch):
     # So the FSP fetches its token before it dials, for the HMI's Connect and
     # a playbook's link alike - not a first, token-less attempt the SO refuses.
     fsp = {
-        "name": "FSP01", "host": "rti-fsp01", "port": 5001, "type": "RTI-FSP", "ws_mode": "active",
+        "name": "FSP01",
+        "host": "rti-fsp01",
+        "port": 5001,
+        "type": "RTI-FSP",
+        "ws_mode": "active",
         "OAuth": {
             "enable_oauth": True,
             "token_endpoint": "https://keycloak:8443/realms/r/protocol/openid-connect/token",
@@ -227,7 +231,10 @@ def test_execute_start_adds_stored_fsp_oauth(monkeypatch):
     }
 
     assert _execute_start(monkeypatch, fsp) == {
-        "host": "rti-so", "port": "8765", "mode": "active", "cp": "cp1",
+        "host": "rti-so",
+        "port": "8765",
+        "mode": "active",
+        "cp": "cp1",
         "enable_oauth": True,
         "token_endpoint_url": "https://keycloak:8443/realms/r/protocol/openid-connect/token",
         "client_id": "ws-client",
@@ -238,15 +245,29 @@ def test_execute_start_adds_stored_fsp_oauth(monkeypatch):
 
 
 def test_execute_start_sends_stored_oauth_off(monkeypatch):
-    fsp = {"name": "FSP01", "host": "rti-fsp01", "port": 5001, "type": "RTI-FSP",
-           "OAuth": {"enable_oauth": False, "token_endpoint": "", "client_id": ""}}
+    fsp = {
+        "name": "FSP01",
+        "host": "rti-fsp01",
+        "port": 5001,
+        "type": "RTI-FSP",
+        "OAuth": {"enable_oauth": False, "token_endpoint": "", "client_id": ""},
+    }
 
     assert _execute_start(monkeypatch, fsp) == {
-        "host": "rti-so", "port": "8765", "mode": "active", "cp": "cp1", "enable_oauth": False,
+        "host": "rti-so",
+        "port": "8765",
+        "mode": "active",
+        "cp": "cp1",
+        "enable_oauth": False,
     }
 
 
 def test_execute_start_without_stored_oauth_adds_nothing(monkeypatch):
     fsp = {"name": "FSP01", "host": "rti-fsp01", "port": 5001, "type": "RTI-FSP"}
 
-    assert _execute_start(monkeypatch, fsp) == {"host": "rti-so", "port": "8765", "mode": "active", "cp": "cp1"}
+    assert _execute_start(monkeypatch, fsp) == {
+        "host": "rti-so",
+        "port": "8765",
+        "mode": "active",
+        "cp": "cp1",
+    }

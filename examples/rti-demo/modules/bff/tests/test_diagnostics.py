@@ -110,8 +110,20 @@ def test_an_unchanged_status_or_checking_is_not_an_event(manager):
 def diagnostics_env(monkeypatch, manager):
     monkeypatch.setattr(bff_server, "conn_manager", manager)
     manager.connections = [
-        {"name": "SO", "type": "RTI-SO", "status": "connected", "host": "rti-so", "port": 5002},
-        {"name": "FSP01", "type": "RTI-FSP", "status": "disconnected", "host": "rti-fsp01", "port": 5001},
+        {
+            "name": "SO",
+            "type": "RTI-SO",
+            "status": "connected",
+            "host": "rti-so",
+            "port": 5002,
+        },
+        {
+            "name": "FSP01",
+            "type": "RTI-FSP",
+            "status": "disconnected",
+            "host": "rti-fsp01",
+            "port": 5001,
+        },
         {"name": "IDP", "type": "IDP-Server", "status": "connected"},
     ]
     monkeypatch.setitem(
@@ -121,9 +133,27 @@ def diagnostics_env(monkeypatch, manager):
             responses={
                 "/api/actions-logs": {
                     "actions": [
-                        {"id": 1, "time": "10:00:01", "kind": "system", "level": "info", "message": "Connected to server"},
-                        {"id": 2, "time": "10:00:02", "kind": "acsi", "level": "info", "message": "GetDataValues x - ok"},
-                        {"id": 3, "time": "10:00:03", "kind": "system", "level": "error", "message": "Endpoint failed to start"},
+                        {
+                            "id": 1,
+                            "time": "10:00:01",
+                            "kind": "system",
+                            "level": "info",
+                            "message": "Connected to server",
+                        },
+                        {
+                            "id": 2,
+                            "time": "10:00:02",
+                            "kind": "acsi",
+                            "level": "info",
+                            "message": "GetDataValues x - ok",
+                        },
+                        {
+                            "id": 3,
+                            "time": "10:00:03",
+                            "kind": "system",
+                            "level": "error",
+                            "message": "Endpoint failed to start",
+                        },
                     ]
                 }
             }
@@ -132,7 +162,9 @@ def diagnostics_env(monkeypatch, manager):
     return manager
 
 
-async def test_diagnostics_merges_bff_events_and_instance_system_entries(diagnostics_env):
+async def test_diagnostics_merges_bff_events_and_instance_system_entries(
+    diagnostics_env,
+):
     diagnostics_env.log_event("FSP01 stopped responding", "warn", instance="FSP01")
 
     body = await bff_server.get_diagnostics()
@@ -149,8 +181,14 @@ async def test_diagnostics_merges_bff_events_and_instance_system_entries(diagnos
     assert all(e["kind"] == "system" for e in body["entries"])
 
 
-async def test_diagnostics_skips_an_instance_whose_log_cannot_be_read(diagnostics_env, monkeypatch):
-    monkeypatch.setitem(bff_server._bff_clients, "rti-so:5002", FakeBffClient(raises=ConnectionError("refused")))
+async def test_diagnostics_skips_an_instance_whose_log_cannot_be_read(
+    diagnostics_env, monkeypatch
+):
+    monkeypatch.setitem(
+        bff_server._bff_clients,
+        "rti-so:5002",
+        FakeBffClient(raises=ConnectionError("refused")),
+    )
 
     body = await bff_server.get_diagnostics()
 

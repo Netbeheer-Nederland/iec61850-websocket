@@ -55,10 +55,10 @@ async def toggle_quality_value(iec61150_server, obj_ref):
         await asyncio.sleep(5)
 
 
-def control_handler_for_float(obj_ref, ctlVal_value, parameter):
-    if ctlVal_value is not None:
-        if ctlVal_value["type"].startswith("float"):
-            if ctlVal_value["value"] < 50:
+def control_handler_for_float(obj_ref, ctl_val_value, parameter):
+    if ctl_val_value is not None:
+        if ctl_val_value["type"].startswith("float"):
+            if ctl_val_value["value"] < 50:
                 return ControlHandlerResult.OK, None
             else:
                 return (
@@ -93,27 +93,29 @@ async def main():
     # release_task = asyncio.create_task(schedule_release(iec61850_server_1, ep_ws_client_1))
     ep_ws_client_1.add_iec61850_server(iec61850_server_1)
 
-    # ep_wsClient_2 = ActiveEndpoint()
+    # ep_ws_client_2 = ActiveEndpoint()
     # iec61850_server_2 = IEC61850Server(ied2, "cp2")
     # toggle_task_2 = asyncio.create_task(toggle_custom_value(iec61850_server_2, "LD0/DGEN1.DEROpSt.stVal"))
     # #toggle_task_3 = asyncio.create_task(toggle_quality_value(iec61850_server_2, "LD0/DWMX1.WMaxSptPct.q"))
-    # ep_wsClient_2.add_iec61850_server(iec61850_server_2)
+    # ep_ws_client_2.add_iec61850_server(iec61850_server_2)
     #
     task1 = asyncio.create_task(
-        ep_ws_client_1.start("localhost", 8765, "cp1", protocol=["iec61850-tpaa-jer-v1"])
+        ep_ws_client_1.start(
+            "localhost", 8765, "cp1", protocol=["iec61850-tpaa-jer-v1"]
+        )
     )
-    # task2 = asyncio.create_task(ep_wsClient_2.start("active","localhost",8765, "cp2"))
+    # task2 = asyncio.create_task(ep_ws_client_2.start("active","localhost",8765, "cp2"))
     #
     # await asyncio.gather(task1, task2, report_task_1, toggle_task_2)
     # await asyncio.gather(task1)
-    # ep_wsClient_2 = ActiveEndpoint()
+    # ep_ws_client_2 = ActiveEndpoint()
     # iec61850_server_2 = IEC61850Server(ied2, "cp2")
     # toggle_task_2 = asyncio.create_task(toggle_custom_value(iec61850_server_2, "LD0/DGEN1.DEROpSt.stVal"))
     # #toggle_task_3 = asyncio.create_task(toggle_quality_value(iec61850_server_2, "LD0/DWMX1.WMaxSptPct.q"))
-    # ep_wsClient_2.add_iec61850_server(iec61850_server_2)
+    # ep_ws_client_2.add_iec61850_server(iec61850_server_2)
 
     # task1 = asyncio.create_task(ep_ws_client_1.start("active","localhost", 8765, "cp1"))
-    # task2 = asyncio.create_task(ep_wsClient_2.start("active","localhost",8765, "cp2"))
+    # task2 = asyncio.create_task(ep_ws_client_2.start("active","localhost",8765, "cp2"))
 
     await asyncio.gather(task1, report_task_1)
     # await asyncio.sleep(10)

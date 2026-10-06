@@ -220,7 +220,9 @@ def test_start_keeps_stored_oauth_for_the_dial_out(client_and_server):
     # FSP fetches its token before it dials - not a first attempt without one.
     client, server = client_and_server
     seen = {}
-    server.start_server = lambda host, port: seen.update(oauth=server.runtime.start_oauth)
+    server.start_server = lambda host, port: seen.update(
+        oauth=server.runtime.start_oauth
+    )
 
     response = client.post(
         "/api/start",
@@ -262,7 +264,12 @@ def test_start_with_oauth_disabled_clears_previous_oauth(client_and_server):
 
     client.post(
         "/api/start",
-        json={"mode": "active", "host": "rti-so", "port": "8765", "enable_oauth": False},
+        json={
+            "mode": "active",
+            "host": "rti-so",
+            "port": "8765",
+            "enable_oauth": False,
+        },
     )
 
     assert server.runtime.start_oauth is None
@@ -281,14 +288,22 @@ def test_start_without_oauth_fields_leaves_oauth_untouched(client_and_server):
     assert server.runtime.start_oauth is kept
 
 
-def test_reconfig_oauth_off_while_stopped_also_clears_the_start_oauth(client_and_server):
+def test_reconfig_oauth_off_while_stopped_also_clears_the_start_oauth(
+    client_and_server,
+):
     # Otherwise a later bare /start would turn OAuth back on.
     client, server = client_and_server
     server.runtime.start_oauth = {"token_endpoint": "old"}
 
     response = client.post(
         "/api/reconfig-oauth",
-        json={"connection_name": "FSP01", "enable_oauth": False, "host": "rti-so", "port": "8765", "cp": "cp1"},
+        json={
+            "connection_name": "FSP01",
+            "enable_oauth": False,
+            "host": "rti-so",
+            "port": "8765",
+            "cp": "cp1",
+        },
     )
 
     assert response.status_code == 200
@@ -313,12 +328,30 @@ def test_dial_out_fetches_the_token_before_connecting(client_and_server):
             return "plain-task"
 
     server.runtime.endpoint = FakeEndpoint()
-    server.runtime.start_oauth = {"token_endpoint": "T", "client_id": "C", "client_secret": "S",
-                                  "kc_cert": None, "enable_token_refresh": False}
+    server.runtime.start_oauth = {
+        "token_endpoint": "T",
+        "client_id": "C",
+        "client_secret": "S",
+        "kc_cert": None,
+        "enable_token_refresh": False,
+    }
     assert asyncio.run(server._start_dial_out("rti-so", 8765, "cp1")) == "oauth-task"
-    assert calls == [("reconfigure_oauth", "rti-so", "8765", "cp1", True,
-                      {"token_endpoint": "T", "client_id": "C", "client_secret": "S",
-                       "kc_cert": None, "enable_token_refresh": False})]
+    assert calls == [
+        (
+            "reconfigure_oauth",
+            "rti-so",
+            "8765",
+            "cp1",
+            True,
+            {
+                "token_endpoint": "T",
+                "client_id": "C",
+                "client_secret": "S",
+                "kc_cert": None,
+                "enable_token_refresh": False,
+            },
+        )
+    ]
 
     calls.clear()
     server.runtime.start_oauth = None

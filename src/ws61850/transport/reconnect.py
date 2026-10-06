@@ -31,7 +31,12 @@ class ReconnectPolicy:
       - reconnection decision (should_reconnect)
     """
 
-    def __init__(self, enabled: bool = True, max_retries: int | None = None, delay_seconds: float = 5.0):
+    def __init__(
+        self,
+        enabled: bool = True,
+        max_retries: int | None = None,
+        delay_seconds: float = 5.0,
+    ):
         self.enabled = enabled
         self.max_retries = max_retries
         self.delay_seconds = delay_seconds
@@ -41,7 +46,11 @@ class ReconnectPolicy:
         if not self.enabled:
             return False
         if self.max_retries is not None and self._attempts >= self.max_retries:
-            logger.warning("Max retries reached (%d/%d), not reconnecting", self._attempts, self.max_retries)
+            logger.warning(
+                "Max retries reached (%d/%d), not reconnecting",
+                self._attempts,
+                self.max_retries,
+            )
             return False
         return True
 

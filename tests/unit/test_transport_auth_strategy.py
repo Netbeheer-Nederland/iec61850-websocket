@@ -54,7 +54,9 @@ async def test_bearer_client_headers():
 async def test_bearer_server_valid_header():
     request = MagicMock()
     request.headers = {"Authorization": "Bearer validtoken"}
-    ctx = await BearerTokenStrategy("validtoken").authenticate_server_connection(request)
+    ctx = await BearerTokenStrategy("validtoken").authenticate_server_connection(
+        request
+    )
     assert isinstance(ctx, AuthContext)
 
 

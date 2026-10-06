@@ -57,5 +57,3 @@ class TestEndpointProtocol:
 
         ep = ActiveEndpoint()
         assert isinstance(ep, EndpointProtocol)
-
-

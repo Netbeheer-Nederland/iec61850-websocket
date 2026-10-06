@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2025 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
 """Unit tests for ReportService."""
+
 import pytest
 
 from ws61850.iec61850.data_model.ied_model import ReportControl
@@ -31,7 +32,10 @@ def _make_server_rc(rcb):
 
 
 def _svc_tuple(service_name, **fields):
-    return ("request", {"invokeId": 1, "associateId": 0, "service": (service_name, fields)})
+    return (
+        "request",
+        {"invokeId": 1, "associateId": 0, "service": (service_name, fields)},
+    )
 
 
 @pytest.fixture
@@ -53,6 +57,7 @@ def urcb_control(simple_ied):
 # ---------------------------------------------------------------------------
 # getBRCBValues
 # ---------------------------------------------------------------------------
+
 
 def test_get_brcb_values_ok(brcb_control):
     svc = ReportService([brcb_control])
@@ -79,6 +84,7 @@ def test_get_brcb_values_rejects_unbuffered(urcb_control):
 # ---------------------------------------------------------------------------
 # getURCBValues
 # ---------------------------------------------------------------------------
+
 
 def test_get_urcb_values_ok(urcb_control):
     svc = ReportService([urcb_control])

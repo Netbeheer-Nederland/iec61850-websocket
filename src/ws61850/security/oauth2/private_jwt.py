@@ -29,7 +29,13 @@ class PrivateKeyJWTSigner:
     with client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer.
     """
 
-    def __init__(self, client_id: str, private_key, algorithm: str = "RS256", lifetime_seconds: int = 300):
+    def __init__(
+        self,
+        client_id: str,
+        private_key,
+        algorithm: str = "RS256",
+        lifetime_seconds: int = 300,
+    ):
         self._client_id = client_id
         self._private_key = private_key
         self._algorithm = algorithm
@@ -71,6 +77,7 @@ class PrivateKeyJWTProvider:
         import ssl
 
         import aiohttp as _aiohttp
+
         self._aiohttp = _aiohttp
         self._token_url = token_url
         self._signer = signer
@@ -81,6 +88,7 @@ class PrivateKeyJWTProvider:
 
     async def get_access_token(self) -> str:
         import time
+
         if self._cached_token and time.monotonic() < self._expiry - 30:
             return self._cached_token
 
@@ -94,7 +102,9 @@ class PrivateKeyJWTProvider:
             body["scope"] = self._scope
 
         async with self._aiohttp.ClientSession() as session:
-            async with session.post(self._token_url, data=body, ssl=self._ssl_ctx) as resp:
+            async with session.post(
+                self._token_url, data=body, ssl=self._ssl_ctx
+            ) as resp:
                 data = await resp.json()
 
         self._cached_token = data["access_token"]

@@ -45,4 +45,6 @@ def save_credentials(full_path: Path, credentials: list[dict[str, Any]]) -> None
         with full_path.open("w", encoding="utf-8") as file:
             json.dump(credentials, file, indent=4)
     except OSError as error:
-        raise OSError(f"Unable to write credentials file {full_path}: {error}") from error
+        raise OSError(
+            f"Unable to write credentials file {full_path}: {error}"
+        ) from error

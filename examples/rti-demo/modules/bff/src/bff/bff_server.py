@@ -46,7 +46,7 @@ from fastapi.responses import JSONResponse, Response
 from bff.bff_client import BffClient
 from bff.connection_manager import ConnectionManager
 from bff.playbook import BffTransport, PlaybookError, parse_playbook, step_label
-from bff.playbook_runs import PlaybookBusy, PlaybookRuns
+from bff.playbook_runs import PlaybookBusyError, PlaybookRuns
 from bff.playbook_store import BuiltinPlaybookError, PlaybookNameError, PlaybookStore
 from bff.pydantic_models import (
     ConnectionCreateRequest,
@@ -297,7 +297,11 @@ async def _fetch_fsp_status(con: dict[str, Any]) -> tuple[str, int, list[str]]:
         )
         if parsed:
             cps = parsed.get("accessPoints")
-            cps = [cp for cp in cps if isinstance(cp, str)] if isinstance(cps, list) else []
+            cps = (
+                [cp for cp in cps if isinstance(cp, str)]
+                if isinstance(cps, list)
+                else []
+            )
             count = (
                 parsed.get("connectedClients", 0) or 0
                 if parsed.get("status") == "listening"
@@ -446,9 +450,7 @@ async def _relay_new_log_entries(
         # ids reset - the instance restarted (or its log was cleared).
         last_id = 0
 
-    new_items = [
-        e for e in entries if isinstance(e, dict) and e.get("id", 0) > last_id
-    ]
+    new_items = [e for e in entries if isinstance(e, dict) and e.get("id", 0) > last_id]
     if not new_items:
         return
 
@@ -677,10 +679,14 @@ def _target_statuses() -> list[dict[str, str]]:
     return [
         {
             "target": f"{con['host']}:{con['port']}",
-            "status": "reachable" if con.get("status") == "connected" else "unreachable",
+            "status": "reachable"
+            if con.get("status") == "connected"
+            else "unreachable",
         }
         for con in conn_manager.connections
-        if con.get("host") and con.get("port") and f"{con['host']}:{con['port']}" in _bff_clients
+        if con.get("host")
+        and con.get("port")
+        and f"{con['host']}:{con['port']}" in _bff_clients
     ]
 
 
@@ -1031,7 +1037,10 @@ def _on_idp_url(endpoint: str | None, issuer: str | None, base_url: str) -> str 
     if not endpoint or not issuer:
         return endpoint
     issuer_parts, endpoint_parts = urlsplit(issuer), urlsplit(endpoint)
-    if (endpoint_parts.scheme, endpoint_parts.netloc) != (issuer_parts.scheme, issuer_parts.netloc):
+    if (endpoint_parts.scheme, endpoint_parts.netloc) != (
+        issuer_parts.scheme,
+        issuer_parts.netloc,
+    ):
         return endpoint
     base = urlsplit(base_url)
     return endpoint_parts._replace(scheme=base.scheme, netloc=base.netloc).geturl()
@@ -1082,8 +1091,12 @@ async def get_idp_discovery(idp_server: str, realm: str):
     return {
         "ok": True,
         "issuer": issuer,
-        "certificate_endpoint": _on_idp_url(discovery.get("jwks_uri"), issuer, base_url),
-        "token_endpoint": _on_idp_url(discovery.get("token_endpoint"), issuer, base_url),
+        "certificate_endpoint": _on_idp_url(
+            discovery.get("jwks_uri"), issuer, base_url
+        ),
+        "token_endpoint": _on_idp_url(
+            discovery.get("token_endpoint"), issuer, base_url
+        ),
     }
 
 
@@ -1395,13 +1408,15 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
 # uploads from the HMI) sit next to connections.json - in Docker, on the
 # config volume.
 playbook_store = PlaybookStore(
-    os.environ.get("BFF_PLAYBOOKS_BUILTIN_DIR") or Path(__file__).resolve().parents[4] / "playbooks",
+    os.environ.get("BFF_PLAYBOOKS_BUILTIN_DIR")
+    or Path(__file__).resolve().parents[4] / "playbooks",
     os.environ.get("BFF_PLAYBOOKS_DIR") or Path(CONNECTIONS_FILE).parent / "playbooks",
 )
 # A run goes through this BFF's own /api/execute, the path an HMI click takes,
 # so Traffic shows every step.
 playbook_runs = PlaybookRuns(
-    playbook_store, lambda playbook: BffTransport(f"http://localhost:{os.getenv('PORT', '5000')}")
+    playbook_store,
+    lambda playbook: BffTransport(f"http://localhost:{os.getenv('PORT', '5000')}"),
 )
 
 
@@ -1426,7 +1441,9 @@ async def get_playbook_run():
     return {"ok": True, "run": playbook_runs.state()}
 
 
-@app.post("/api/playbooks/run/stop", summary="Stop the playbook run", tags=["Playbooks"])
+@app.post(
+    "/api/playbooks/run/stop", summary="Stop the playbook run", tags=["Playbooks"]
+)
 async def stop_playbook_run():
     playbook_runs.stop()
     return {"ok": True, "run": playbook_runs.state()}
@@ -1456,7 +1473,9 @@ async def get_playbook(name: str):
     }
 
 
-@app.get("/api/playbooks/{name}/file", summary="Download a playbook file", tags=["Playbooks"])
+@app.get(
+    "/api/playbooks/{name}/file", summary="Download a playbook file", tags=["Playbooks"]
+)
 async def download_playbook(name: str):
     try:
         text, filename = await asyncio.to_thread(playbook_store.file, name)
@@ -1466,7 +1485,9 @@ async def download_playbook(name: str):
         raise HTTPException(status_code=400, detail=str(exc))
     return Response(
         text,
-        media_type="application/json" if filename.endswith(".json") else "application/yaml",
+        media_type="application/json"
+        if filename.endswith(".json")
+        else "application/yaml",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
@@ -1479,7 +1500,9 @@ async def save_playbook(name: str, request: PlaybookSaveRequest):
         elif request.text is not None:
             playbook = parse_playbook(request.text, request.format)
         else:
-            raise HTTPException(status_code=400, detail="send 'playbook', or 'text' with its 'format'")
+            raise HTTPException(
+                status_code=400, detail="send 'playbook', or 'text' with its 'format'"
+            )
         playbook_store.save(name, playbook)
 
     try:
@@ -1491,7 +1514,9 @@ async def save_playbook(name: str, request: PlaybookSaveRequest):
     return {"ok": True, "name": name}
 
 
-@app.delete("/api/playbooks/{name}", summary="Delete a saved playbook", tags=["Playbooks"])
+@app.delete(
+    "/api/playbooks/{name}", summary="Delete a saved playbook", tags=["Playbooks"]
+)
 async def delete_playbook(name: str):
     try:
         await asyncio.to_thread(playbook_store.delete, name)
@@ -1510,13 +1535,17 @@ async def run_playbook(name: str, request: PlaybookRunRequest | None = None):
     publish = _run_publisher(asyncio.get_running_loop())
     try:
         state = await asyncio.to_thread(
-            playbook_runs.start, name, pace=request.pace, keep_going=request.keep_going, publish=publish,
+            playbook_runs.start,
+            name,
+            pace=request.pace,
+            keep_going=request.keep_going,
+            publish=publish,
         )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"no playbook {name!r}")
     except (PlaybookNameError, PlaybookError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except PlaybookBusy as exc:
+    except PlaybookBusyError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     # PlaybookRuns.start() already published this initial state itself.
     return {"ok": True, "run": state}
@@ -1639,7 +1668,9 @@ async def execute_dynamic_api(request: ExecuteRequest):
                     "client_id": stored_oauth.get("client_id"),
                     "client_secret": stored_oauth.get("client_secret"),
                     "ca_certificate": stored_oauth.get("auth_server_ca") or None,
-                    "enable_token_refresh": bool(stored_oauth.get("enable_token_refresh")),
+                    "enable_token_refresh": bool(
+                        stored_oauth.get("enable_token_refresh")
+                    ),
                 }
             else:
                 oauth_fields = {"enable_oauth": False}
@@ -1708,7 +1739,7 @@ async def _instance_system_entries(con: dict) -> list[dict[str, Any]]:
     summary="System log across all instances",
     description=(
         "The BFF's own system events plus every reachable RTI-SO/RTI-FSP's "
-        "kind \"system\" actions-log entries, errors and warnings first, then "
+        'kind "system" actions-log entries, errors and warnings first, then '
         "newest first. See docs/rti-demo/design/logging-kinds.md."
     ),
     response_description="Merged system entries",

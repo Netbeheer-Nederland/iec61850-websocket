@@ -13,13 +13,18 @@ from ws61850.iec61850.services.directory_service import DirectoryService
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _svc_tuple(service_name, **fields):
-    return ("request", {"invokeId": 1, "associateId": 0, "service": (service_name, fields)})
+    return (
+        "request",
+        {"invokeId": 1, "associateId": 0, "service": (service_name, fields)},
+    )
 
 
 # ---------------------------------------------------------------------------
 # getServerDirectory
 # ---------------------------------------------------------------------------
+
 
 def test_get_server_directory_returns_ld_names(simple_ied):
     svc = DirectoryService(simple_ied)
@@ -34,6 +39,7 @@ def test_get_server_directory_returns_ld_names(simple_ied):
 # ---------------------------------------------------------------------------
 # getLogicalDeviceDirectory
 # ---------------------------------------------------------------------------
+
 
 def test_get_ld_directory_returns_ln_names(simple_ied):
     svc = DirectoryService(simple_ied)
@@ -56,9 +62,12 @@ def test_get_ld_directory_unknown_ld_returns_error(simple_ied):
 # getLogicalNodeDirectory
 # ---------------------------------------------------------------------------
 
+
 def test_get_ln_directory_data_objects(simple_ied):
     svc = DirectoryService(simple_ied)
-    msg = _svc_tuple("getLogicalNodeDirectory", lnRef="LD0/LLN0", aCSIClass="dataObject")
+    msg = _svc_tuple(
+        "getLogicalNodeDirectory", lnRef="LD0/LLN0", aCSIClass="dataObject"
+    )
     result = svc.get_logical_node_directory(1, 0, msg)
     flat = str(result)
     assert "Health" in flat
@@ -66,7 +75,9 @@ def test_get_ln_directory_data_objects(simple_ied):
 
 def test_get_ln_directory_unknown_ln_returns_error(simple_ied):
     svc = DirectoryService(simple_ied)
-    msg = _svc_tuple("getLogicalNodeDirectory", lnRef="LD0/MISSING", aCSIClass="dataObject")
+    msg = _svc_tuple(
+        "getLogicalNodeDirectory", lnRef="LD0/MISSING", aCSIClass="dataObject"
+    )
     result = svc.get_logical_node_directory(1, 0, msg)
     flat = str(result)
     assert "instanceNotAvailable" in flat
@@ -75,6 +86,7 @@ def test_get_ln_directory_unknown_ln_returns_error(simple_ied):
 # ---------------------------------------------------------------------------
 # getDataDirectory
 # ---------------------------------------------------------------------------
+
 
 def test_get_data_directory_returns_da_names(simple_ied):
     svc = DirectoryService(simple_ied)
@@ -96,6 +108,7 @@ def test_get_data_directory_unknown_ref_returns_error(simple_ied):
 # getDataDefinition
 # ---------------------------------------------------------------------------
 
+
 def test_get_data_definition_ok(simple_ied):
     svc = DirectoryService(simple_ied)
     msg = _svc_tuple("getDataDefinition", dataRef="LD0/LLN0.Health")
@@ -114,6 +127,7 @@ def test_get_data_definition_unknown_returns_error(simple_ied):
 # ---------------------------------------------------------------------------
 # getDataSetDirectory
 # ---------------------------------------------------------------------------
+
 
 def test_get_ds_directory_ok(simple_ied):
 

@@ -28,7 +28,9 @@ import requests
 pytestmark = pytest.mark.integration
 
 _ROOT = Path(__file__).resolve().parents[2]
-_spec = importlib.util.spec_from_file_location("rti_playbook_run", _ROOT / "playbooks" / "run.py")
+_spec = importlib.util.spec_from_file_location(
+    "rti_playbook_run", _ROOT / "playbooks" / "run.py"
+)
 run = importlib.util.module_from_spec(_spec)
 sys.modules[_spec.name] = run  # its dataclasses look their module up there
 _spec.loader.exec_module(run)
@@ -47,7 +49,9 @@ def test_demo_playbook_runs_clean():
         pytest.skip(f"BFF not reachable at {bff}: {exc}")
 
     lines = []
-    results = run.Runner(playbook, run.BffTransport(bff), pace=0, log=lines.append).run()
+    results = run.Runner(
+        playbook, run.BffTransport(bff), pace=0, log=lines.append
+    ).run()
 
     failed = [r for r in results if not r.ok]
     assert not failed, "\n".join(lines)
@@ -60,7 +64,9 @@ def test_demo_playbook_runs_clean_in_the_bff():
     name = PLAYBOOK.stem
     r = requests.post(f"{bff}/api/playbooks/{name}/run", json={"pace": 0}, timeout=10)
     if r.status_code == 404:
-        pytest.skip(f"{name} is not a playbook the BFF has (only built-in ones run here)")
+        pytest.skip(
+            f"{name} is not a playbook the BFF has (only built-in ones run here)"
+        )
     assert r.status_code == 200, r.text
 
     deadline = time.monotonic() + 180
@@ -69,5 +75,8 @@ def test_demo_playbook_runs_clean_in_the_bff():
         if state["state"] != "running" or time.monotonic() > deadline:
             break
         time.sleep(1)
-    lines = [f"{s['index']} {s['status']} {s['label']} · {s['message']}" for s in state["steps"]]
+    lines = [
+        f"{s['index']} {s['status']} {s['label']} · {s['message']}"
+        for s in state["steps"]
+    ]
     assert state["state"] == "passed", "\n".join(lines + [str(state.get("error"))])

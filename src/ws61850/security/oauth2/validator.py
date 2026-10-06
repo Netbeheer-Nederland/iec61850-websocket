@@ -91,17 +91,29 @@ class JwtValidator:
                 subject=decoded.get("sub"),
                 audience=decoded.get("aud"),
             )
-            logger.debug("Token valid kid=%r alg=%r sub=%r exp=%s", kid, alg, claims.subject, claims.expiry)
+            logger.debug(
+                "Token valid kid=%r alg=%r sub=%r exp=%s",
+                kid,
+                alg,
+                claims.subject,
+                claims.expiry,
+            )
             return True, claims
 
         except ExpiredSignatureError:
-            logger.warning("Token expired (kid=%r)", jwt.get_unverified_header(token).get("kid"))
+            logger.warning(
+                "Token expired (kid=%r)", jwt.get_unverified_header(token).get("kid")
+            )
             return False, None
         except InvalidIssuerError:
             # Both values, so a configured issuer that doesn't match what the
             # IDP writes into its tokens (e.g. its public hostname) shows at once.
             received = jwt.decode(token, options={"verify_signature": False}).get("iss")
-            logger.warning("Token invalid: issuer mismatch - expected %r, got %r", self._issuer, received)
+            logger.warning(
+                "Token invalid: issuer mismatch - expected %r, got %r",
+                self._issuer,
+                received,
+            )
             return False, None
         except InvalidTokenError as e:
             logger.warning("Token invalid: %s", e)

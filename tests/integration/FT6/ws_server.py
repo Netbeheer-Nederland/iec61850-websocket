@@ -51,10 +51,14 @@ async def main():
         websocket_info = endpoint.get_websocket_info(client)
         if websocket_info is not None:
             try:
-                set_urcb_res = await client.set_URCB_values(urcb, websocket_info, None, None)
+                set_urcb_res = await client.set_URCB_values(
+                    urcb, websocket_info, None, None
+                )
                 logger.info("set_URCB_values (trgOps dchg): %s", set_urcb_res)
 
-                set_urcb_res = await client.set_URCB_values(urcb_2, websocket_info, None, None)
+                set_urcb_res = await client.set_URCB_values(
+                    urcb_2, websocket_info, None, None
+                )
                 logger.info("set_URCB_values (rptEna): %s", set_urcb_res)
 
             except Exception as e:

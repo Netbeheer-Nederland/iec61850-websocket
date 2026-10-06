@@ -25,6 +25,7 @@ from typing import Literal
 @dataclass(frozen=True)
 class TLSConfig:
     """Immutable TLS configuration. Pass to build_tls_context() to get an ssl.SSLContext."""
+
     mode: Literal["client", "server"]
     certfile: str | None = None
     keyfile: str | None = None
@@ -45,11 +46,15 @@ def build_tls_context_from_strings(tls_config: TLSConfig) -> ssl.SSLContext:
 
     try:
         if tls_config.mode == "server":
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as cert_f:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".pem", delete=False
+            ) as cert_f:
                 cert_f.write(tls_config.certfile)
                 cert_path = cert_f.name
 
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as key_f:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".pem", delete=False
+            ) as key_f:
                 key_f.write(tls_config.keyfile)
                 key_path = key_f.name
 
@@ -57,7 +62,9 @@ def build_tls_context_from_strings(tls_config: TLSConfig) -> ssl.SSLContext:
             ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
 
             if tls_config.cafile:
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as ca_f:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".pem", delete=False
+                ) as ca_f:
                     ca_f.write(tls_config.cafile)
                     ca_path = ca_f.name
                 ctx.load_verify_locations(ca_path)
@@ -66,7 +73,9 @@ def build_tls_context_from_strings(tls_config: TLSConfig) -> ssl.SSLContext:
                 ctx.verify_mode = ssl.CERT_REQUIRED
 
         else:  # Client mode
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as ca_f:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".pem", delete=False
+            ) as ca_f:
                 ca_f.write(tls_config.cafile)
                 ca_path = ca_f.name
             ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_path)

@@ -84,7 +84,7 @@ class FunctionalConstraint(Enum):
     sg = 6
     se = 7
     sr = 8
-    or_ = 9   # ASN1 name is "or"; Python reserves "or" as a keyword
+    or_ = 9  # ASN1 name is "or"; Python reserves "or" as a keyword
     bl = 10
     ex = 11
     lg = 12
@@ -178,5 +178,14 @@ class OptFlds:
 
     @classmethod
     def from_wire(cls, d: dict) -> "OptFlds":
-        keys = ("seqNum", "timeStamp", "dataSet", "bufOvfl", "configRef", "entryID", "dataRef", "reasonCode")
+        keys = (
+            "seqNum",
+            "timeStamp",
+            "dataSet",
+            "bufOvfl",
+            "configRef",
+            "entryID",
+            "dataRef",
+            "reasonCode",
+        )
         return cls(**{k: d.get(k, False) for k in keys})

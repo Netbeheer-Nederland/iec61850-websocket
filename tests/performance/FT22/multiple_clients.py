@@ -25,7 +25,9 @@ from ws61850.endpoint.active_endpoint import ActiveEndpoint
 from ws61850.iec61850.data_model import IedModelLoader
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 
-_MODEL_PATH = Path(__file__).resolve().parents[3] / "testing" / "ieds" / "ied_model1.json"
+_MODEL_PATH = (
+    Path(__file__).resolve().parents[3] / "testing" / "ieds" / "ied_model1.json"
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -36,7 +38,9 @@ logging.basicConfig(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="WebSocketClient + IEC61850-Controller")
+    parser = argparse.ArgumentParser(
+        description="WebSocketClient + IEC61850-Controller"
+    )
     default_host = os.getenv("WS_SERVER_HOST", "localhost")
     port = os.getenv("WS_SERVER_PORT", "8765")
     if port is None:

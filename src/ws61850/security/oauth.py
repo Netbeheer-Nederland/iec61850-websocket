@@ -82,7 +82,9 @@ def introspect_token(id, secret, url, access_token, kc_cert, certs):
     if access_token != "":
         data = {"token": access_token, "client_id": id, "client_secret": secret}
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        response = requests.post(url, headers=headers, data=data, verify=kc_cert, cert=certs)
+        response = requests.post(
+            url, headers=headers, data=data, verify=kc_cert, cert=certs
+        )
         token_response = response.json()
         return token_response.get("active")
     return None

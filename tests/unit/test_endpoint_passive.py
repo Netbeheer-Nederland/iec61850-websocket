@@ -107,6 +107,7 @@ class TestPassiveEndpointWebSocketInfoLookup:
         ws = MagicMock()
         ws.request.path = "/cp1"
         from ws61850.endpoint.base import WebSocketInfo
+
         info = WebSocketInfo(ws, "assoc-1", cp="cp1")
         ep.websocket_info_list.append(info)
         found = ep.get_websocket_info(client)

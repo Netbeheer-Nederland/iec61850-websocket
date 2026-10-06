@@ -7,8 +7,7 @@ from __future__ import annotations
 import time
 
 import pytest
-
-from bff.playbook_runs import PlaybookBusy, PlaybookRuns
+from bff.playbook_runs import PlaybookBusyError, PlaybookRuns
 from bff.playbook_store import PlaybookStore
 
 from .test_playbook_module import TinyBff
@@ -36,7 +35,11 @@ def test_a_run_publishes_each_change_and_passes(store):
     assert initial["name"] == "quick" and initial["title"] == "Quick"
     assert [s["label"] for s in initial["steps"]] == ["Read", "wait 0"]
     final = runs.state()
-    assert final["state"] == "passed" and final["current"] is None and final["error"] is None
+    assert (
+        final["state"] == "passed"
+        and final["current"] is None
+        and final["error"] is None
+    )
     assert [s["status"] for s in final["steps"]] == ["ok", "ok"]
     assert published[-1] == final
     assert any(p["steps"][0]["status"] == "running" for p in published)
@@ -50,7 +53,7 @@ def test_a_run_publishes_each_change_and_passes(store):
 def test_one_run_at_a_time_and_stop(store):
     runs = PlaybookRuns(store, lambda playbook: TinyBff())
     runs.start("slow", pace=0)
-    with pytest.raises(PlaybookBusy):
+    with pytest.raises(PlaybookBusyError):
         runs.start("quick")
     time.sleep(0.1)
     runs.stop()

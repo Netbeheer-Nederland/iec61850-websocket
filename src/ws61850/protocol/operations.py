@@ -45,7 +45,9 @@ class OperationExecutor:
         self._codec = codec
         self._ws = websocket
 
-    async def call(self, message, *, invoke_id=None, expects_response=True) -> OperationResult | None:
+    async def call(
+        self, message, *, invoke_id=None, expects_response=True
+    ) -> OperationResult | None:
         encoded = self._codec.encode(message)
         await self._ws.send(encoded)
 

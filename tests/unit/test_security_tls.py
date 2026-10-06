@@ -11,6 +11,7 @@ from ws61850.security.tls import TLSConfig, build_tls_context
 # TLSConfig dataclass
 # ---------------------------------------------------------------------------
 
+
 def test_tls_config_defaults():
     cfg = TLSConfig(mode="client")
     assert cfg.certfile is None
@@ -40,6 +41,7 @@ def test_tls_config_server_mode():
 # TLSContextFactory — client context (no cert files needed for basic checks)
 # ---------------------------------------------------------------------------
 
+
 def test_build_client_context_returns_ssl_context():
     cfg = TLSConfig(mode="client", verify_peer=False)
     ctx = build_tls_context(cfg)
@@ -60,7 +62,9 @@ def test_client_verify_true_check_hostname_false():
 
 
 def test_client_min_version_applied():
-    cfg = TLSConfig(mode="client", verify_peer=False, min_version=ssl.TLSVersion.TLSv1_2)
+    cfg = TLSConfig(
+        mode="client", verify_peer=False, min_version=ssl.TLSVersion.TLSv1_2
+    )
     ctx = build_tls_context(cfg)
     assert ctx.minimum_version == ssl.TLSVersion.TLSv1_2
 

@@ -162,14 +162,24 @@ class TestExtractMessageMeta:
 
         meta = client._extract_message_meta(raw)
 
-        assert meta == {"service_type": "read", "category": "request", "cp": "cp1", "invoke_id": None}
+        assert meta == {
+            "service_type": "read",
+            "category": "request",
+            "cp": "cp1",
+            "invoke_id": None,
+        }
 
     def test_response_message(self, client):
         raw = '{"response": {"associateId": "cp1", "service": {"read": {}}}}'
 
         meta = client._extract_message_meta(raw)
 
-        assert meta == {"service_type": "read", "category": "response", "cp": "cp1", "invoke_id": None}
+        assert meta == {
+            "service_type": "read",
+            "category": "response",
+            "cp": "cp1",
+            "invoke_id": None,
+        }
 
     def test_request_carries_invoke_id(self, client):
         raw = '{"request": {"associateId": "cp1", "invokeId": 7, "service": {"getDataValues": {}}}}'
@@ -207,14 +217,24 @@ class TestExtractMessageMeta:
 
         meta = client._extract_message_meta(raw)
 
-        assert meta == {"service_type": "report", "category": "unconfirmed", "cp": "cp2", "invoke_id": None}
+        assert meta == {
+            "service_type": "report",
+            "category": "unconfirmed",
+            "cp": "cp2",
+            "invoke_id": None,
+        }
 
     def test_unrecognized_shape_returns_unknowns(self, client):
         raw = '{"somethingElse": {}}'
 
         meta = client._extract_message_meta(raw)
 
-        assert meta == {"service_type": "unknown", "category": "unknown", "cp": "", "invoke_id": None}
+        assert meta == {
+            "service_type": "unknown",
+            "category": "unknown",
+            "cp": "",
+            "invoke_id": None,
+        }
 
     def test_invalid_json_returns_parse_error(self, client):
         meta = client._extract_message_meta("not json")
@@ -229,7 +249,12 @@ class TestExtractMessageMeta:
     def test_non_dict_json_returns_unknowns(self, client):
         meta = client._extract_message_meta("[1, 2, 3]")
 
-        assert meta == {"service_type": "unknown", "category": "unknown", "cp": "", "invoke_id": None}
+        assert meta == {
+            "service_type": "unknown",
+            "category": "unknown",
+            "cp": "",
+            "invoke_id": None,
+        }
 
 
 class TestActionsAndMessagesLog:
@@ -267,7 +292,11 @@ class TestActionsAndMessagesLog:
         assert entry["kind"] == "acsi"
         assert entry["cp"] == "cp1"
         assert entry["service"] == "getDataValues"
-        assert entry["correlation"] == {"cp": "cp1", "invokeId": 3, "messageSeqFrom": 10}
+        assert entry["correlation"] == {
+            "cp": "cp1",
+            "invokeId": 3,
+            "messageSeqFrom": 10,
+        }
 
     def test_clear_actions_empties_log(self, client):
         client._log_action("did something", kind="system")
@@ -364,7 +393,9 @@ class TestInvokeAcsi:
             cp="cp1",
             websocket_info=info,
             detail={"objRef": "LD0/LLN0.Mod.stVal"},
-            call=self._frames(client, ("send", self._req("cp1", 4)), ("recv", self._resp("cp1", 4))),
+            call=self._frames(
+                client, ("send", self._req("cp1", 4)), ("recv", self._resp("cp1", 4))
+            ),
         )
 
         assert result == "the-result"
@@ -412,7 +443,10 @@ class TestInvokeAcsi:
                 client,
                 ("send", self._req("cp1", 0)),
                 ("recv", self._resp("cp2", 0)),
-                ("recv", '{"unconfirmed": {"associateId": "cp1", "service": {"report": {}}}}'),
+                (
+                    "recv",
+                    '{"unconfirmed": {"associateId": "cp1", "service": {"report": {}}}}',
+                ),
             ),
         )
 
@@ -427,38 +461,60 @@ class TestReportCallback:
     @staticmethod
     def _received(client, report):
         calls = []
-        client.install_report_callback(lambda rpt_id, data_set, data: calls.append((rpt_id, data_set, data)))
+        client.install_report_callback(
+            lambda rpt_id, data_set, data: calls.append((rpt_id, data_set, data))
+        )
         client._on_recv_message(
-            json.dumps({"unconfirmed": {"associateId": "cp1", "service": {"report": report}}}),
+            json.dumps(
+                {"unconfirmed": {"associateId": "cp1", "service": {"report": report}}}
+            ),
             None,
         )
         return calls
 
     def test_reads_entry_data_under_entry(self, client):
         value = [{"data": {"float32": 42.5}}]
-        calls = self._received(client, {
-            "rptID": "ActualValues",
-            "dataSet": "LD0/LLN0.DataSetActualValues",
-            "entry": {"entryID": "1", "entryData": [{"dataRef": "LD0/MMXU1.TotW.mag.f", "value": value}]},
-        })
+        calls = self._received(
+            client,
+            {
+                "rptID": "ActualValues",
+                "dataSet": "LD0/LLN0.DataSetActualValues",
+                "entry": {
+                    "entryID": "1",
+                    "entryData": [{"dataRef": "LD0/MMXU1.TotW.mag.f", "value": value}],
+                },
+            },
+        )
 
-        assert calls == [(
-            "ActualValues",
-            "LD0/LLN0.DataSetActualValues",
-            [{"dataRef": "LD0/MMXU1.TotW.mag.f", "value": value}],
-        )]
+        assert calls == [
+            (
+                "ActualValues",
+                "LD0/LLN0.DataSetActualValues",
+                [{"dataRef": "LD0/MMXU1.TotW.mag.f", "value": value}],
+            )
+        ]
 
     def test_still_reads_a_top_level_entry_data(self, client):
-        calls = self._received(client, {
-            "rptID": "R", "dataSet": "DS", "entryData": [{"dataRef": "LD0/A", "value": 1}],
-        })
+        calls = self._received(
+            client,
+            {
+                "rptID": "R",
+                "dataSet": "DS",
+                "entryData": [{"dataRef": "LD0/A", "value": 1}],
+            },
+        )
 
         assert calls[0][2] == [{"dataRef": "LD0/A", "value": 1}]
 
     def test_accepts_a_single_entry(self, client):
-        calls = self._received(client, {
-            "rptID": "R", "dataSet": "DS", "entry": {"entryData": {"dataRef": "LD0/A", "value": 1}},
-        })
+        calls = self._received(
+            client,
+            {
+                "rptID": "R",
+                "dataSet": "DS",
+                "entry": {"entryData": {"dataRef": "LD0/A", "value": 1}},
+            },
+        )
 
         assert calls[0][2] == [{"dataRef": "LD0/A", "value": 1}]
 
@@ -470,10 +526,22 @@ class TestOperateRequestContents:
     def test_originator_maps_categories(self):
         from so.acsi_client import originator
 
-        assert originator({"orCat": 1, "orIdent": "HMI"}) == {"orCat": "bayControl", "orIdent": b"HMI"}
-        assert originator({"orCat": "3", "orIdent": "0"}) == {"orCat": "remoteControl", "orIdent": b"0"}
-        assert originator({"orCat": "automaticBay", "orIdent": b"x"}) == {"orCat": "automaticBay", "orIdent": b"x"}
-        assert originator(None) == {"orCat": "stationControl", "orIdent": b"ORIGIN_ID_1234567890"}
+        assert originator({"orCat": 1, "orIdent": "HMI"}) == {
+            "orCat": "bayControl",
+            "orIdent": b"HMI",
+        }
+        assert originator({"orCat": "3", "orIdent": "0"}) == {
+            "orCat": "remoteControl",
+            "orIdent": b"0",
+        }
+        assert originator({"orCat": "automaticBay", "orIdent": b"x"}) == {
+            "orCat": "automaticBay",
+            "orIdent": b"x",
+        }
+        assert originator(None) == {
+            "orCat": "stationControl",
+            "orIdent": b"ORIGIN_ID_1234567890",
+        }
         assert len(originator({"orCat": 2, "orIdent": "x" * 80})["orIdent"]) == 64
 
     @pytest.mark.parametrize("bad", [9, -1, "fieldControl"])
@@ -498,13 +566,22 @@ class TestOperateRequestContents:
             return await kwargs["call"]()
 
         client.get_iec61850_client = lambda cp: SimpleNamespace(operate=fake_operate)
-        client.runtime.endpoint = SimpleNamespace(get_websocket_info=lambda c: SimpleNamespace())
+        client.runtime.endpoint = SimpleNamespace(
+            get_websocket_info=lambda c: SimpleNamespace()
+        )
         client._invoke_acsi = run_call
 
-        result = asyncio.run(client.operate(
-            "GenericIO/GGIO1.SPCSO1", True, "boolean", "cp2",
-            ctl_num=7, origin={"orCat": 1, "orIdent": "HMI"}, test=False,
-        ))
+        result = asyncio.run(
+            client.operate(
+                "GenericIO/GGIO1.SPCSO1",
+                True,
+                "boolean",
+                "cp2",
+                ctl_num=7,
+                origin={"orCat": 1, "orIdent": "HMI"},
+                test=False,
+            )
+        )
 
         assert result == {"objRef": "GenericIO/GGIO1.SPCSO1", "result": True}
         oper = sent[0]
@@ -527,7 +604,9 @@ class TestOperateRequestContents:
             return await kwargs["call"]()
 
         client.get_iec61850_client = lambda cp: SimpleNamespace(operate=fake_operate)
-        client.runtime.endpoint = SimpleNamespace(get_websocket_info=lambda c: SimpleNamespace())
+        client.runtime.endpoint = SimpleNamespace(
+            get_websocket_info=lambda c: SimpleNamespace()
+        )
         client._invoke_acsi = run_call
 
         asyncio.run(client.operate("LD0/DWMX1.WMaxSpt", "50", "float32", "cp1"))

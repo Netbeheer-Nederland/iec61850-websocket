@@ -7,12 +7,16 @@ from ws61850.iec61850.services.data_access_service import DataAccessService
 
 
 def _svc_tuple(service_name, **fields):
-    return ("request", {"invokeId": 1, "associateId": 0, "service": (service_name, fields)})
+    return (
+        "request",
+        {"invokeId": 1, "associateId": 0, "service": (service_name, fields)},
+    )
 
 
 # ---------------------------------------------------------------------------
 # getDataValues
 # ---------------------------------------------------------------------------
+
 
 def test_get_data_values_da_ok(simple_ied):
     svc = DataAccessService(simple_ied)
@@ -55,6 +59,7 @@ def test_get_data_values_missing_ref(simple_ied):
 # ---------------------------------------------------------------------------
 # setDataValues
 # ---------------------------------------------------------------------------
+
 
 def test_set_data_values_da_ok(simple_ied):
     svc = DataAccessService(simple_ied)
@@ -110,6 +115,7 @@ def test_set_data_values_wrong_fc_returns_error(simple_ied):
 # ---------------------------------------------------------------------------
 # getDatasetValues
 # ---------------------------------------------------------------------------
+
 
 def test_get_dataset_values_with_dataset(simple_ied):
     from ws61850.iec61850.data_model.ied_model import DataSet, DataSetEntry

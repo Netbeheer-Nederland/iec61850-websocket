@@ -14,6 +14,7 @@ def factory():
 # Association lifecycle
 # ---------------------------------------------------------------------------
 
+
 def test_associate_request_structure(factory):
     msg = factory.associate_request("calledAP", 65536)
     assert msg[0] == "associate"
@@ -69,6 +70,7 @@ def test_token_refresh(factory):
 # Generic request / response
 # ---------------------------------------------------------------------------
 
+
 def test_generic_request(factory):
     msg = factory.request("someService", invoke_id=1, associate_id=0, foo="bar")
     assert msg[0] == "request"
@@ -85,7 +87,9 @@ def test_generic_response(factory):
 
 
 def test_service_error(factory):
-    msg = factory.service_error(invoke_id=3, associate_id=0, error="instanceNotAvailable")
+    msg = factory.service_error(
+        invoke_id=3, associate_id=0, error="instanceNotAvailable"
+    )
     assert msg[0] == "response"
     assert msg[1]["serviceError"] == "instanceNotAvailable"
 
@@ -93,6 +97,7 @@ def test_service_error(factory):
 # ---------------------------------------------------------------------------
 # Named request builders
 # ---------------------------------------------------------------------------
+
 
 def test_get_server_directory(factory):
     msg = factory.get_server_directory(invoke_id=1, associate_id=0)

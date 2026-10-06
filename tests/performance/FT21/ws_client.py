@@ -28,7 +28,9 @@ from ws61850.iec61850.server.control_handling import (
 from ws61850.iec61850.server.iec61850_server import IEC61850Server
 from ws61850.iec61850.server.service_error import ServiceStatusKind
 
-_MODEL_PATH = Path(__file__).resolve().parents[3] / "testing" / "ieds" / "ied_model1.json"
+_MODEL_PATH = (
+    Path(__file__).resolve().parents[3] / "testing" / "ieds" / "ied_model1.json"
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(

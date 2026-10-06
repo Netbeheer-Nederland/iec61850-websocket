@@ -75,6 +75,7 @@ class ControlService:
 
     def _get_control_data_object(self, ref):
         from ws61850.iec61850.data_model.ied_model import DataObject
+
         control_item = find_object_in_tree(ref, self._ied)
         if isinstance(control_item, DataObject):
             return control_item
@@ -88,8 +89,12 @@ class ControlService:
 
     def _get_server_control_object(self, control_do):
         return next(
-            (co for co in self._control_objects
-             if control_do is not None and co.data_object.get_objRef() == control_do.get_objRef()),
+            (
+                co
+                for co in self._control_objects
+                if control_do is not None
+                and co.data_object.get_objRef() == control_do.get_objRef()
+            ),
             None,
         )
 
@@ -99,14 +104,24 @@ class ControlService:
         server_control_obj = self._get_server_control_object(control_do)
         if server_control_obj is None:
             return create_tpaa_response_select(
-                invoke_id, associate_id, False, None, ServiceStatusKind.instanceNotAvailable.name
+                invoke_id,
+                associate_id,
+                False,
+                None,
+                ServiceStatusKind.instanceNotAvailable.name,
             ), False
 
         if not server_control_obj.is_selected:
             server_control_obj.is_selected = True
-            return create_tpaa_response_select(invoke_id, associate_id, True, None, None), False
+            return create_tpaa_response_select(
+                invoke_id, associate_id, True, None, None
+            ), False
         return create_tpaa_response_select(
-            invoke_id, associate_id, False, ControlServiceStatusKind.objectAlreadySelected.name, None
+            invoke_id,
+            associate_id,
+            False,
+            ControlServiceStatusKind.objectAlreadySelected.name,
+            None,
         ), False
 
     def operate(self, invoke_id, associate_id, decoded_message):
@@ -118,23 +133,40 @@ class ControlService:
         control_do = self._get_control_data_object(ref)
         if control_do is None:
             return create_tpaa_response_operate(
-                invoke_id, associate_id, False, None, ServiceStatusKind.instanceNotAvailable.name
+                invoke_id,
+                associate_id,
+                False,
+                None,
+                ServiceStatusKind.instanceNotAvailable.name,
             ), None
 
         operate_item = next(
-            (da for da in control_do.get_da_from_do_or_da_list()
-             if da.fc == FunctionalConstraint.co and da.name == "Oper"),
+            (
+                da
+                for da in control_do.get_da_from_do_or_da_list()
+                if da.fc == FunctionalConstraint.co and da.name == "Oper"
+            ),
             None,
         )
         if operate_item is None:
             return create_tpaa_response_operate(
-                invoke_id, associate_id, False, ControlServiceStatusKind.inconsistentParameters.name, None
+                invoke_id,
+                associate_id,
+                False,
+                ControlServiceStatusKind.inconsistentParameters.name,
+                None,
             ), None
 
-        control_da = next((da for da in operate_item.data_attributes if da.name == "ctlVal"), None)
+        control_da = next(
+            (da for da in operate_item.data_attributes if da.name == "ctlVal"), None
+        )
         if control_da is None:
             return create_tpaa_response_operate(
-                invoke_id, associate_id, False, None, ServiceStatusKind.instanceNotAvailable.name
+                invoke_id,
+                associate_id,
+                False,
+                None,
+                ServiceStatusKind.instanceNotAvailable.name,
             ), None
 
         # A select-before-operate control must have been selected - checked
@@ -145,20 +177,43 @@ class ControlService:
             server_control_obj = self._get_server_control_object(control_do)
             if server_control_obj is None or not server_control_obj.is_selected:
                 return create_tpaa_response_operate(
-                    invoke_id, associate_id, False, None, ServiceStatusKind.controlMustBeSelected.name
+                    invoke_id,
+                    associate_id,
+                    False,
+                    None,
+                    ServiceStatusKind.controlMustBeSelected.name,
                 ), None
         try:
-            return self._operate_selected(invoke_id, associate_id, decoded_message, operate_item, control_da, control_do)
+            return self._operate_selected(
+                invoke_id,
+                associate_id,
+                decoded_message,
+                operate_item,
+                control_da,
+                control_do,
+            )
         finally:
             if server_control_obj is not None:
                 server_control_obj.is_selected = False
 
-    def _operate_selected(self, invoke_id, associate_id, decoded_message, operate_item, control_da, control_do):
+    def _operate_selected(
+        self,
+        invoke_id,
+        associate_id,
+        decoded_message,
+        operate_item,
+        control_da,
+        control_do,
+    ):
         """The operate itself, once the control may be operated."""
         control_handler = self._control_handler_ref()
         if control_handler is None:
             return create_tpaa_response_operate(
-                invoke_id, associate_id, False, None, ServiceStatusKind.failedDueToServerConstraint.name
+                invoke_id,
+                associate_id,
+                False,
+                None,
+                ServiceStatusKind.failedDueToServerConstraint.name,
             ), None
 
         ctl_val_request = extract_ctl_val_from_operate_request(decoded_message)
@@ -167,23 +222,38 @@ class ControlService:
         ctl_val = {"type": control_da.type.name, "value": ctl_val_request}
         result, error = handler_fn(control_da.get_objRef(), ctl_val, handler_param)
 
-        ctl_num = next((da for da in operate_item.data_attributes if da.name == "ctlNum"), None)
+        ctl_num = next(
+            (da for da in operate_item.data_attributes if da.name == "ctlNum"), None
+        )
 
         if result == ControlHandlerResult.OK:
-            assign_result = assign_da_item(control_da, ctl_val_request, control_da.fc.name)
+            assign_result = assign_da_item(
+                control_da, ctl_val_request, control_da.fc.name
+            )
             if not assign_result:
                 return create_tpaa_response_operate(
-                    invoke_id, associate_id, False, None, ServiceStatusKind.typeConflict.name
+                    invoke_id,
+                    associate_id,
+                    False,
+                    None,
+                    ServiceStatusKind.typeConflict.name,
                 ), None
             if ctl_num:
                 ctl_num.mmsValue += 1
-            return create_tpaa_response_operate(invoke_id, associate_id, True, None, None),\
-                control_do
+            return create_tpaa_response_operate(
+                invoke_id, associate_id, True, None, None
+            ), control_do
 
         if isinstance(error, ControlServiceStatusKind):
             if ctl_num:
                 ctl_num.mmsValue += 1
-            return create_tpaa_response_operate(invoke_id, associate_id, False, error.name, None), None
+            return create_tpaa_response_operate(
+                invoke_id, associate_id, False, error.name, None
+            ), None
         return create_tpaa_response_operate(
-            invoke_id, associate_id, False, None, ServiceStatusKind.failedDueToServerConstraint.name
+            invoke_id,
+            associate_id,
+            False,
+            None,
+            ServiceStatusKind.failedDueToServerConstraint.name,
         ), None

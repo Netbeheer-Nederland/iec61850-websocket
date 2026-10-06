@@ -176,8 +176,12 @@ async def main():
         websocket_info = endpoint.get_websocket_info(client)
         if websocket_info is not None:
             try:
-                server_list = await client.get_server_directory(websocket_info, None, None)
-                ld_directory = await client.get_logical_device_directory("LD0", websocket_info, None, None)
+                server_list = await client.get_server_directory(
+                    websocket_info, None, None
+                )
+                ld_directory = await client.get_logical_device_directory(
+                    "LD0", websocket_info, None, None
+                )
                 ln_directory_ds = await client.get_logical_node_directory(
                     "LD0", "LLN0", "dataset", websocket_info, None, None
                 )
@@ -187,12 +191,23 @@ async def main():
                 ds_directory = await client.get_dataset_directory(
                     "LD0", "LLN0", "DataSetMinMaxAvg", websocket_info, None, None
                 )
-                set_urcb_res = await client.set_URCB_values(urcb, websocket_info, None, None)
-                da_def = await client.get_data_definition("LD0/DWMX1.WMaxSptPct", websocket_info, None, None)
-                set_da_res = await client.set_data_values(
-                    "LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value], websocket_info, None, None
+                set_urcb_res = await client.set_URCB_values(
+                    urcb, websocket_info, None, None
                 )
-                da_val = await client.get_data_values("LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info, None, None)
+                da_def = await client.get_data_definition(
+                    "LD0/DWMX1.WMaxSptPct", websocket_info, None, None
+                )
+                set_da_res = await client.set_data_values(
+                    "LD0/DWMX1.WMaxSpt.Oper",
+                    "co",
+                    [data_attribute_value],
+                    websocket_info,
+                    None,
+                    None,
+                )
+                da_val = await client.get_data_values(
+                    "LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info, None, None
+                )
 
                 logger.info("Results from client cp1")
                 logger.info("server_list: %s", server_list)

@@ -163,7 +163,9 @@ async def add_iec61850_client_requests(iec61850_client, endpoint):
         if websocket_info is not None:
             try:
                 await iec61850_client.get_server_directory(websocket_info, None, None)
-                await iec61850_client.get_logical_device_directory("LD0", websocket_info, None, None)
+                await iec61850_client.get_logical_device_directory(
+                    "LD0", websocket_info, None, None
+                )
                 await iec61850_client.get_logical_node_directory(
                     "LD0", "LLN0", "dataset", websocket_info, None, None
                 )
@@ -174,16 +176,25 @@ async def add_iec61850_client_requests(iec61850_client, endpoint):
                     "LD0", "LLN0", "DataSetMinMaxAvg", websocket_info, None, None
                 )
                 await iec61850_client.set_URCB_values(urcb, websocket_info, None, None)
-                await iec61850_client.get_data_definition("LD0/DWMX1.WMaxSptPct", websocket_info, None, None)
+                await iec61850_client.get_data_definition(
+                    "LD0/DWMX1.WMaxSptPct", websocket_info, None, None
+                )
                 await iec61850_client.set_data_values(
-                    "LD0/DWMX1.WMaxSpt.Oper", "co", [data_attribute_value], websocket_info, None, None
+                    "LD0/DWMX1.WMaxSpt.Oper",
+                    "co",
+                    [data_attribute_value],
+                    websocket_info,
+                    None,
+                    None,
                 )
                 await iec61850_client.get_data_values(
                     "LD0/DWMX1.WMaxSpt.Oper", "co", True, websocket_info, None, None
                 )
 
             except Exception as e:
-                logger.exception("Service call failed for %s: %s", iec61850_client.cp, e)
+                logger.exception(
+                    "Service call failed for %s: %s", iec61850_client.cp, e
+                )
 
 
 CREDENTIALS_FILE = "data/client_credentials.json"
@@ -220,7 +231,10 @@ async def main():
 
     await asyncio.sleep(2)
 
-    request_tasks = [asyncio.create_task(add_iec61850_client_requests(client, endpoint)) for client in clients]
+    request_tasks = [
+        asyncio.create_task(add_iec61850_client_requests(client, endpoint))
+        for client in clients
+    ]
     await asyncio.gather(*request_tasks)
 
     await server_task

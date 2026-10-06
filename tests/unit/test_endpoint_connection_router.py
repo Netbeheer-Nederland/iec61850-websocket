@@ -70,8 +70,14 @@ class TestConnectionRouterNotFound:
         ws.close = AsyncMock()
 
         async def _run():
-            with patch("ws61850.endpoint.connection_router.encode_tpaa_message", return_value=b"encoded"):
-                with patch("ws61850.endpoint.connection_router.create_tpaa_associate_response", return_value=object()):
+            with patch(
+                "ws61850.endpoint.connection_router.encode_tpaa_message",
+                return_value=b"encoded",
+            ):
+                with patch(
+                    "ws61850.endpoint.connection_router.create_tpaa_associate_response",
+                    return_value=object(),
+                ):
                     await router.send_not_found_response(ws, "cp-missing", None, None)
 
         asyncio.get_event_loop().run_until_complete(_run())
@@ -86,9 +92,17 @@ class TestConnectionRouterNotFound:
         callback = MagicMock()
 
         async def _run():
-            with patch("ws61850.endpoint.connection_router.encode_tpaa_message", return_value=b"encoded"):
-                with patch("ws61850.endpoint.connection_router.create_tpaa_associate_response", return_value=object()):
-                    await router.send_not_found_response(ws, "cp-missing", None, callback)
+            with patch(
+                "ws61850.endpoint.connection_router.encode_tpaa_message",
+                return_value=b"encoded",
+            ):
+                with patch(
+                    "ws61850.endpoint.connection_router.create_tpaa_associate_response",
+                    return_value=object(),
+                ):
+                    await router.send_not_found_response(
+                        ws, "cp-missing", None, callback
+                    )
 
         asyncio.get_event_loop().run_until_complete(_run())
         callback.assert_called_once()
@@ -103,10 +117,17 @@ class TestConnectionRouterNotFound:
         async def _run():
             with patch(
                 "ws61850.endpoint.connection_router.encode_tpaa_message",
-                side_effect=lambda msg, is_ber: captured_is_ber.append(is_ber) or b"encoded",
+                side_effect=lambda msg, is_ber: (
+                    captured_is_ber.append(is_ber) or b"encoded"
+                ),
             ):
-                with patch("ws61850.endpoint.connection_router.create_tpaa_associate_response", return_value=object()):
-                    await router.send_not_found_response(ws, "cp", "iec61850-tpaa-ber-v1", None)
+                with patch(
+                    "ws61850.endpoint.connection_router.create_tpaa_associate_response",
+                    return_value=object(),
+                ):
+                    await router.send_not_found_response(
+                        ws, "cp", "iec61850-tpaa-ber-v1", None
+                    )
 
         asyncio.get_event_loop().run_until_complete(_run())
         assert captured_is_ber[0] is True
@@ -121,9 +142,14 @@ class TestConnectionRouterNotFound:
         async def _run():
             with patch(
                 "ws61850.endpoint.connection_router.encode_tpaa_message",
-                side_effect=lambda msg, is_ber: captured_is_ber.append(is_ber) or b"encoded",
+                side_effect=lambda msg, is_ber: (
+                    captured_is_ber.append(is_ber) or b"encoded"
+                ),
             ):
-                with patch("ws61850.endpoint.connection_router.create_tpaa_associate_response", return_value=object()):
+                with patch(
+                    "ws61850.endpoint.connection_router.create_tpaa_associate_response",
+                    return_value=object(),
+                ):
                     await router.send_not_found_response(ws, "cp", None, None)
 
         asyncio.get_event_loop().run_until_complete(_run())

@@ -96,7 +96,15 @@ def callback_called(result, param):
 
 # set_data_values calls its callback with what was written, not (result, param).
 def write_callback_called(obj_ref, value, fc, data_type, result):
-    logger.info("write callback called: %s [%s] = %r (%s): %s", obj_ref, fc, value, data_type, result)
+    logger.info(
+        "write callback called: %s [%s] = %r (%s): %s",
+        obj_ref,
+        fc,
+        value,
+        data_type,
+        result,
+    )
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="WebSocketServer")
@@ -125,6 +133,7 @@ def parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
+
 async def main():
     args = parse_args()
     endpoint = PassiveEndpoint(
@@ -136,7 +145,9 @@ async def main():
 
     client = IEC61850Client("cp1")
     endpoint.add_iec61850_client(client)
-    logger.info("Starting WebSocket endpoint in passive mode on %s:%s", args.host, args.port)
+    logger.info(
+        "Starting WebSocket endpoint in passive mode on %s:%s", args.host, args.port
+    )
     server_task = asyncio.create_task(endpoint.start(args.host, args.port))
 
     await client.ready_event.wait()
@@ -144,8 +155,12 @@ async def main():
         websocket_info = endpoint.get_websocket_info(client)
         if websocket_info is not None:
             try:
-                server_list = await client.get_server_directory(websocket_info, callback_called, None)
-                ld_directory = await client.get_logical_device_directory("LD0", websocket_info, callback_called, None)
+                server_list = await client.get_server_directory(
+                    websocket_info, callback_called, None
+                )
+                ld_directory = await client.get_logical_device_directory(
+                    "LD0", websocket_info, callback_called, None
+                )
                 ln_directory_ds = await client.get_logical_node_directory(
                     "LD0", "LLN0", "dataset", websocket_info, callback_called, None
                 )
@@ -153,16 +168,35 @@ async def main():
                     "LD0", "LLN0", "dataObject", websocket_info, callback_called, None
                 )
                 ds_directory = await client.get_dataset_directory(
-                    "LD0", "LLN0", "DataSetMinMaxAvg", websocket_info, callback_called, None
+                    "LD0",
+                    "LLN0",
+                    "DataSetMinMaxAvg",
+                    websocket_info,
+                    callback_called,
+                    None,
                 )
-                da_def = await client.get_data_definition("LD0/LLN0.Mod", websocket_info, callback_called, None)
+                da_def = await client.get_data_definition(
+                    "LD0/LLN0.Mod", websocket_info, callback_called, None
+                )
                 da_val = await client.get_data_values(
-                    "LD0/DWMX1.WMaxSetPct", "sp", True, websocket_info, callback_called, None
+                    "LD0/DWMX1.WMaxSetPct",
+                    "sp",
+                    True,
+                    websocket_info,
+                    callback_called,
+                    None,
                 )
                 set_da_res = await client.set_data_values(
-                    "LD0/DWMX1.WMaxSetPct", "sp", data_w_max_set_pct, websocket_info, write_callback_called, None
+                    "LD0/DWMX1.WMaxSetPct",
+                    "sp",
+                    data_w_max_set_pct,
+                    websocket_info,
+                    write_callback_called,
+                    None,
                 )
-                set_brcb_res = await client.set_BRCB_values(brcb, websocket_info, callback_called, None)
+                set_brcb_res = await client.set_BRCB_values(
+                    brcb, websocket_info, callback_called, None
+                )
 
                 logger.info("Results from client %s", client.cp)
                 logger.info("server_list: %s", server_list)

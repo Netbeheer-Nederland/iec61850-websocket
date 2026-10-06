@@ -22,6 +22,7 @@ from typing import Protocol, runtime_checkable
 @dataclass
 class AuthContext:
     """Opaque auth result returned after validating a server-side connection."""
+
     client_id: str | None = None
     token_expiry: float | None = None
 

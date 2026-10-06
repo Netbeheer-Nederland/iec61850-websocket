@@ -385,7 +385,10 @@ class TestSelectAndOperateAnswers:
         ("result", "expected"),
         [
             (True, {"ok": True, "error": ""}),
-            ("instance-not-available", {"ok": False, "error": "instance-not-available"}),
+            (
+                "instance-not-available",
+                {"ok": False, "error": "instance-not-available"},
+            ),
             (None, {"ok": False, "error": "no response"}),
             (False, {"ok": False, "error": "refused"}),
         ],
@@ -412,7 +415,9 @@ class TestSelectAndOperateAnswers:
         monkeypatch.setattr(
             acsi_client,
             "invoke_on_runtime_loop",
-            lambda coro, timeout=10: ThreadPoolExecutor(1).submit(asyncio.run, coro).result(timeout),
+            lambda coro, timeout=10: (
+                ThreadPoolExecutor(1).submit(asyncio.run, coro).result(timeout)
+            ),
         )
         return calls
 
@@ -424,11 +429,15 @@ class TestSelectAndOperateAnswers:
             (None, {"ok": False, "error": "no response"}),
         ],
     )
-    def test_select_route_reports_what_the_server_answered(self, app_client, monkeypatch, select_result, expected):
+    def test_select_route_reports_what_the_server_answered(
+        self, app_client, monkeypatch, select_result, expected
+    ):
         client, acsi_client = app_client
         calls = self._connected(acsi_client, monkeypatch, select_result)
 
-        response = client.post("/api/select", json={"objRef": "GenericIO/GGIO1.SPCSO1", "cp": "cp2"})
+        response = client.post(
+            "/api/select", json={"objRef": "GenericIO/GGIO1.SPCSO1", "cp": "cp2"}
+        )
 
         assert response.status_code == 200
         assert response.json() == expected
@@ -476,7 +485,9 @@ class TestOperateRoutePassesControlParameters:
         monkeypatch.setattr(
             acsi_client,
             "invoke_on_runtime_loop",
-            lambda coro, timeout=10: ThreadPoolExecutor(1).submit(asyncio.run, coro).result(timeout),
+            lambda coro, timeout=10: (
+                ThreadPoolExecutor(1).submit(asyncio.run, coro).result(timeout)
+            ),
         )
         monkeypatch.setattr(bff_endpoint, "_use_io_client", False)
         return calls
@@ -485,23 +496,44 @@ class TestOperateRoutePassesControlParameters:
         client, acsi_client = app_client
         calls = self._connected(acsi_client, monkeypatch)
 
-        response = client.post("/api/operate", json={
-            "objRef": "GenericIO/GGIO1.SPCSO1", "value": True, "value_type": "boolean", "cp": "cp2",
-            "ctlNum": 3, "origin": {"orCat": 1, "orIdent": "0"}, "test": False,
-        })
+        response = client.post(
+            "/api/operate",
+            json={
+                "objRef": "GenericIO/GGIO1.SPCSO1",
+                "value": True,
+                "value_type": "boolean",
+                "cp": "cp2",
+                "ctlNum": 3,
+                "origin": {"orCat": 1, "orIdent": "0"},
+                "test": False,
+            },
+        )
 
         assert response.status_code == 200
         assert response.json() == {"ok": True, "error": ""}
-        assert calls == [("GenericIO/GGIO1.SPCSO1", True, "boolean", "cp2",
-                          {"ctl_num": 3, "origin": {"orCat": 1, "orIdent": "0"}, "test": False})]
+        assert calls == [
+            (
+                "GenericIO/GGIO1.SPCSO1",
+                True,
+                "boolean",
+                "cp2",
+                {"ctl_num": 3, "origin": {"orCat": 1, "orIdent": "0"}, "test": False},
+            )
+        ]
 
     def test_rejects_an_unknown_originator_category(self, app_client, monkeypatch):
         client, acsi_client = app_client
         calls = self._connected(acsi_client, monkeypatch)
 
-        response = client.post("/api/operate", json={
-            "objRef": "LD0/CSWI1.Pos", "value": "on", "value_type": "enumerated", "origin": {"orCat": 12},
-        })
+        response = client.post(
+            "/api/operate",
+            json={
+                "objRef": "LD0/CSWI1.Pos",
+                "value": "on",
+                "value_type": "enumerated",
+                "origin": {"orCat": 12},
+            },
+        )
 
         assert response.status_code == 400
         assert "orCat" in response.json()["error"]

@@ -31,7 +31,7 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 
-maxMessageSize_server = 65000
+max_message_size_server = 65000
 
 
 def callback_called(result, param):
@@ -114,38 +114,42 @@ async def main():
     ctl_num = 0
 
     # websocket server
-    ep_wsServer = PassiveEndpoint()
+    ep_ws_server = PassiveEndpoint()
 
     iec61850_client = IEC61850Client("cp1")
-    ep_wsServer.add_iec61850_client(iec61850_client)
+    ep_ws_server.add_iec61850_client(iec61850_client)
 
     iec61850_client = IEC61850Client("cp2")
-    ep_wsServer.add_iec61850_client(iec61850_client)
+    ep_ws_server.add_iec61850_client(iec61850_client)
 
-    server_task = asyncio.create_task(ep_wsServer.start("localhost", 8765))
+    server_task = asyncio.create_task(ep_ws_server.start("localhost", 8765))
 
-    selected_client = ep_wsServer.client_list[0]
+    selected_client = ep_ws_server.client_list[0]
     while True:
         await selected_client.ready_event.wait()
         if not selected_client.is_connected:
             continue
 
         selected_client.disconnect_event.clear()
-        websocket_info = ep_wsServer.get_websocket_info(selected_client)
+        websocket_info = ep_ws_server.get_websocket_info(selected_client)
         if websocket_info is None:
             continue
 
         logger.info("Client connected, console input enabled")
         while selected_client.is_connected:
             try:
-                input_command = await async_input("\nPlease enter the command: ", selected_client.disconnect_event)
+                input_command = await async_input(
+                    "\nPlease enter the command: ", selected_client.disconnect_event
+                )
                 if input_command is None:
                     logger.info("Client disconnected, console input disabled")
                     break
 
                 function_name, args = extract_function_name_and_arguments(input_command)
                 if function_name == "get_server_directory":
-                    server_list = await selected_client.get_server_directory(websocket_info, None, None)
+                    server_list = await selected_client.get_server_directory(
+                        websocket_info, None, None
+                    )
                     logger.info("server directory: %s", server_list)
                 elif function_name == "get_logical_device_directory":
                     ln_refs = await selected_client.get_logical_device_directory(
@@ -153,18 +157,26 @@ async def main():
                     )
                     logger.info("LN list: %s", ln_refs)
                 elif function_name == "get_logical_node_directory":
-                    ln_directory_items = await selected_client.get_logical_node_directory(
-                        args[0], args[1], args[2], websocket_info, None, None
+                    ln_directory_items = (
+                        await selected_client.get_logical_node_directory(
+                            args[0], args[1], args[2], websocket_info, None, None
+                        )
                     )
                     logger.info("LN directory: %s", ln_directory_items)
                 elif function_name == "get_data_definition":
-                    da_def = await selected_client.get_data_definition(args[0], websocket_info, None, None)
+                    da_def = await selected_client.get_data_definition(
+                        args[0], websocket_info, None, None
+                    )
                     logger.info(da_def)
                 elif function_name == "get_data_values":
-                    data_val = await selected_client.get_data_values(args[0], args[1], args[2], websocket_info, None, None)
+                    data_val = await selected_client.get_data_values(
+                        args[0], args[1], args[2], websocket_info, None, None
+                    )
                     logger.info("data value: %s", data_val)
                 elif function_name == "select":
-                    select_result = await selected_client.select(args[0], websocket_info, None, None)
+                    select_result = await selected_client.select(
+                        args[0], websocket_info, None, None
+                    )
                     logger.info(select_result)
                 elif function_name == "operate":
                     values = {
@@ -181,7 +193,9 @@ async def main():
                         "t": get_now_time(),
                     }
                     ctl_num += 1
-                    operate_res = await selected_client.operate(values, websocket_info, None, None)
+                    operate_res = await selected_client.operate(
+                        values, websocket_info, None, None
+                    )
                     logger.info("operate result: %s", operate_res)
                 elif function_name == "set_data_values":
                     value = [{"data": (args[2], args[3])}]
@@ -195,10 +209,14 @@ async def main():
                     )
                     logger.info("dataset directory: %s", ds_directory)
                 elif function_name == "get_BRCB_values":
-                    brcb_val = await selected_client.get_BRCB_values(args[0], websocket_info, None, None)
+                    brcb_val = await selected_client.get_BRCB_values(
+                        args[0], websocket_info, None, None
+                    )
                     logger.info("brcb value: %s", brcb_val)
                 elif function_name == "get_URCB_values":
-                    urcb_val = await selected_client.get_URCB_values(args[0], websocket_info, None, None)
+                    urcb_val = await selected_client.get_URCB_values(
+                        args[0], websocket_info, None, None
+                    )
                     logger.info(urcb_val)
                 elif function_name == "get_dataset_values":
                     ds_values = await selected_client.get_dataset_values(
@@ -222,7 +240,9 @@ async def main():
                     else:
                         logger.info("Warning: No matching attribute found for %s", key)
 
-                    set_brcb_res = await selected_client.set_BRCB_values(brcb, websocket_info, None, None)
+                    set_brcb_res = await selected_client.set_BRCB_values(
+                        brcb, websocket_info, None, None
+                    )
                     logger.info("set brcb result: %s", set_brcb_res)
                 elif function_name == "set_URCB_values":
                     func, args, kwargs = parse_command(input_command)
@@ -241,7 +261,9 @@ async def main():
                     else:
                         logger.info("Warning: No matching attribute found for %s", key)
 
-                    set_urcb_res = await selected_client.set_URCB_values(urcb, websocket_info, None, None)
+                    set_urcb_res = await selected_client.set_URCB_values(
+                        urcb, websocket_info, None, None
+                    )
                     logger.info("set urcb result: %s", set_urcb_res)
                 else:
                     logger.info("Incorrect command, please try again!")

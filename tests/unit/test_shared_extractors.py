@@ -27,14 +27,11 @@ from ws61850.shared.extractors import (
 # retrieve_associate_id (raw JSON)
 # ---------------------------------------------------------------------------
 
+
 def _raw_associate_response(associate_id):
-    return json.dumps({
-        "associate": {
-            "service": {
-                "associateResponse": {"associateId": associate_id}
-            }
-        }
-    })
+    return json.dumps(
+        {"associate": {"service": {"associateResponse": {"associateId": associate_id}}}}
+    )
 
 
 def test_retrieve_associate_id_ok():
@@ -51,6 +48,7 @@ def test_retrieve_associate_id_missing_key():
 # retrieve_associate_id_from_decoded_msg
 # ---------------------------------------------------------------------------
 
+
 def _decoded_assoc_response(assoc_id):
     return ("associate", ("service", ("associateResponse", {"associateId": assoc_id})))
 
@@ -62,15 +60,24 @@ def test_retrieve_associate_id_from_decoded_msg_ok():
 
 def test_retrieve_associate_id_from_decoded_msg_missing():
     with pytest.raises(ValueError):
-        retrieve_associate_id_from_decoded_msg(("associate", ("service", ("associateResponse", {}))))
+        retrieve_associate_id_from_decoded_msg(
+            ("associate", ("service", ("associateResponse", {})))
+        )
 
 
 # ---------------------------------------------------------------------------
 # retrieve_max_outstanding_calls_from_decoded_msg
 # ---------------------------------------------------------------------------
 
+
 def test_retrieve_max_outstanding_calls_present():
-    msg = ("associate", ("service", ("associateResponse", {"associateId": 1, "maxOutstandingCalls": 10})))
+    msg = (
+        "associate",
+        (
+            "service",
+            ("associateResponse", {"associateId": 1, "maxOutstandingCalls": 10}),
+        ),
+    )
     assert retrieve_max_outstanding_calls_from_decoded_msg(msg) == 10
 
 
@@ -82,6 +89,7 @@ def test_retrieve_max_outstanding_calls_missing_returns_zero():
 # ---------------------------------------------------------------------------
 # extract_associate_request_type
 # ---------------------------------------------------------------------------
+
 
 def _assoc_tuple(request_type, payload=None):
     return ("associate", ("service", (request_type, payload or {})))
@@ -101,8 +109,16 @@ def test_extract_associate_request_type_wrong_pdu():
 # extract_service_name / extract_invoke_id
 # ---------------------------------------------------------------------------
 
+
 def _request_tuple(service_name, invoke_id=1, associate_id=0, payload=None):
-    return ("request", {"invokeId": invoke_id, "associateId": associate_id, "service": (service_name, payload or {})})
+    return (
+        "request",
+        {
+            "invokeId": invoke_id,
+            "associateId": associate_id,
+            "service": (service_name, payload or {}),
+        },
+    )
 
 
 def test_extract_service_name_ok():
@@ -124,8 +140,12 @@ def test_extract_service_name_bad_structure():
 # Field extractors
 # ---------------------------------------------------------------------------
 
+
 def _svc_tuple(service_name, **fields):
-    return ("request", {"invokeId": 1, "associateId": 0, "service": (service_name, fields)})
+    return (
+        "request",
+        {"invokeId": 1, "associateId": 0, "service": (service_name, fields)},
+    )
 
 
 def test_extract_ld_name():
@@ -139,7 +159,9 @@ def test_extract_ln_ref():
 
 
 def test_extract_acsi_type():
-    tpaa = _svc_tuple("getLogicalNodeDirectory", lnRef="LD0/LLN0", aCSIClass="dataObject")
+    tpaa = _svc_tuple(
+        "getLogicalNodeDirectory", lnRef="LD0/LLN0", aCSIClass="dataObject"
+    )
     assert extract_acsi_type(tpaa) == "dataObject"
 
 
@@ -182,18 +204,22 @@ def test_extract_urcb_ref():
 # Error paths
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("fn,tpaa", [
-    (extract_ld_name, _svc_tuple("x")),
-    (extract_ln_ref, _svc_tuple("x")),
-    (extract_acsi_type, _svc_tuple("x")),
-    (extract_ds_ref, _svc_tuple("x")),
-    (extract_data_ref, _svc_tuple("x")),
-    (extract_ref, _svc_tuple("x")),
-    (extract_data_attr_val, _svc_tuple("x")),
-    (extract_include_element_name, _svc_tuple("x")),
-    (extract_brcb_ref, _svc_tuple("x")),
-    (extract_urcb_ref, _svc_tuple("x")),
-])
+
+@pytest.mark.parametrize(
+    "fn,tpaa",
+    [
+        (extract_ld_name, _svc_tuple("x")),
+        (extract_ln_ref, _svc_tuple("x")),
+        (extract_acsi_type, _svc_tuple("x")),
+        (extract_ds_ref, _svc_tuple("x")),
+        (extract_data_ref, _svc_tuple("x")),
+        (extract_ref, _svc_tuple("x")),
+        (extract_data_attr_val, _svc_tuple("x")),
+        (extract_include_element_name, _svc_tuple("x")),
+        (extract_brcb_ref, _svc_tuple("x")),
+        (extract_urcb_ref, _svc_tuple("x")),
+    ],
+)
 def test_field_extractor_missing_raises(fn, tpaa):
     with pytest.raises(ValueError):
         fn(tpaa)

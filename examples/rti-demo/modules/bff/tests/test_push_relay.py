@@ -578,7 +578,9 @@ async def test_relay_new_actions_broadcasts_only_acsi_entries(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_relay_new_actions_advances_watermark_past_system_only_batches(monkeypatch):
+async def test_relay_new_actions_advances_watermark_past_system_only_batches(
+    monkeypatch,
+):
     # A batch with nothing to push still moves the watermark, so those system
     # entries aren't re-examined (and a later acsi entry isn't mistaken for
     # an already-seen one) next cycle.
@@ -743,7 +745,9 @@ async def test_push_relay_loop_broadcasts_connections_and_messages(monkeypatch):
                 },
                 "/api/messages": {"messages": [{"id": 1, "message": "hello"}]},
                 "/api/actions-logs": {
-                    "actions": [{"id": 1, "kind": "acsi", "message": "Server readvalue"}]
+                    "actions": [
+                        {"id": 1, "kind": "acsi", "message": "Server readvalue"}
+                    ]
                 },
             }
         ),
@@ -900,9 +904,27 @@ async def test_health_reports_the_status_monitors_view_without_probing(monkeypat
     """A down instance doesn't hold /api/health up: it reports what the status
     monitor last saw, and makes no request of its own."""
     connections = [
-        {"name": "so1", "type": "RTI-SO", "status": "connected", "host": "rti-so", "port": 5002},
-        {"name": "gone", "type": "RTI-FSP", "status": "disconnected", "host": "rti-fsp03", "port": 5010},
-        {"name": "idp", "type": "IDP-Server", "status": "disconnected", "host": "", "port": 5000},
+        {
+            "name": "so1",
+            "type": "RTI-SO",
+            "status": "connected",
+            "host": "rti-so",
+            "port": 5002,
+        },
+        {
+            "name": "gone",
+            "type": "RTI-FSP",
+            "status": "disconnected",
+            "host": "rti-fsp03",
+            "port": 5010,
+        },
+        {
+            "name": "idp",
+            "type": "IDP-Server",
+            "status": "disconnected",
+            "host": "",
+            "port": 5000,
+        },
     ]
     monkeypatch.setattr(bff_server.conn_manager, "connections", connections)
     probes = FakeBffClient(raises=AssertionError("health must not probe instances"))

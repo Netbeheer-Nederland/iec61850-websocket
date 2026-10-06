@@ -59,7 +59,9 @@ def resolve_credentials_path(credentials_file_path: str) -> Path:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="WebSocketClient + IEC61850-Controller")
+    parser = argparse.ArgumentParser(
+        description="WebSocketClient + IEC61850-Controller"
+    )
     default_host = os.getenv("WS_SERVER_HOST", "localhost")
     port = os.getenv("WS_SERVER_PORT", "8765")
     if port is None:
@@ -70,9 +72,18 @@ def parse_args() -> argparse.Namespace:
         except ValueError:
             parser.error("WS_SERVER_PORT must be an integer")
 
-    parser.add_argument("--start", type=int, default="1", help="start PoCC index (default: 1).")
-    parser.add_argument("--stop", type=int, default="50", help="stop PoCC index (default: 50).")
-    parser.add_argument("--delay", type=int, default="2", help="delay between clients in seconds (default: 2).")
+    parser.add_argument(
+        "--start", type=int, default="1", help="start PoCC index (default: 1)."
+    )
+    parser.add_argument(
+        "--stop", type=int, default="50", help="stop PoCC index (default: 50)."
+    )
+    parser.add_argument(
+        "--delay",
+        type=int,
+        default="2",
+        help="delay between clients in seconds (default: 2).",
+    )
     parser.add_argument(
         "--host",
         type=str,
@@ -85,7 +96,9 @@ def parse_args() -> argparse.Namespace:
         default=default_port,
         help="port for the websocket server (env: WS_SERVER_PORT, default: 8765).",
     )
-    parser.add_argument("--report", type=bool, default=True, help="report enabled (default: True).")
+    parser.add_argument(
+        "--report", type=bool, default=True, help="report enabled (default: True)."
+    )
     return parser.parse_args()
 
 
@@ -104,7 +117,9 @@ token_endpoint = f"{BASE}/realms/{TARGET_REALM}/protocol/openid-connect/token"
 async def start_client_process(client_config, i, args):
     client_id = client_config["client_id"]
     client_secret = client_config["client_secret"]
-    access_token = await get_access_token(token_endpoint, client_id, client_secret, cafile)
+    access_token = await get_access_token(
+        token_endpoint, client_id, client_secret, cafile
+    )
     logger.info("Access-Token: %s", access_token)
 
     tls_config = TLSConfig(mode="client", cafile=cafile)

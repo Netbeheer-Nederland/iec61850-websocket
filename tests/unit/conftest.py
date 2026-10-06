@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2025 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
 """Shared pytest fixtures for unit tests."""
+
 import pytest
 
 from ws61850.iec61850.data_model.ied_model import (
@@ -15,7 +16,9 @@ from ws61850.iec61850.data_model.ied_model import (
 
 
 def _make_da(name, fc, type_=DataAttributeType.boolean, value=False, parent=None):
-    da = DataAttribute(name=name, attr_type=type_, fc=fc, mms_value=value, parent=parent)
+    da = DataAttribute(
+        name=name, attr_type=type_, fc=fc, mms_value=value, parent=parent
+    )
     return da
 
 
@@ -44,7 +47,9 @@ def simple_ied():
     # Health DO
     health = _make_do("Health")
     health.parent = lln0
-    st_val = _make_da("stVal", FunctionalConstraint.st, DataAttributeType.boolean, False)
+    st_val = _make_da(
+        "stVal", FunctionalConstraint.st, DataAttributeType.boolean, False
+    )
     st_val.parent = health
     q = _make_da("q", FunctionalConstraint.st, DataAttributeType.quality, 0)
     q.parent = health
@@ -65,7 +70,9 @@ def simple_ied():
 
     ind1 = _make_do("Ind1")
     ind1.parent = ggio1
-    ind_st = _make_da("stVal", FunctionalConstraint.st, DataAttributeType.boolean, False)
+    ind_st = _make_da(
+        "stVal", FunctionalConstraint.st, DataAttributeType.boolean, False
+    )
     ind_st.parent = ind1
     ind1.add_do_or_da(ind_st)
     ggio1.add_dataObject(ind1)

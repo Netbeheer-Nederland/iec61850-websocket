@@ -37,7 +37,9 @@ async def main():
 
     logger.info("Connecting to localhost:8765 cp=cp1 (BER, direct)")
     try:
-        await endpoint.start("localhost", 8765, "cp1", protocol=["iec61850-tpaa-ber-v1"])
+        await endpoint.start(
+            "localhost", 8765, "cp1", protocol=["iec61850-tpaa-ber-v1"]
+        )
     except Exception as e:
         logger.info("Caught exception type: %s — %s", type(e).__name__, e)
 

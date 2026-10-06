@@ -83,7 +83,9 @@ class ActiveEndpoint:
         # None by default: existing callers that never register one keep
         # today's behavior (log-and-retry, silently to the caller).
         self.error_callback = None
-        self.server = None  # always None; property kept for EndpointProtocol compatibility
+        self.server = (
+            None  # always None; property kept for EndpointProtocol compatibility
+        )
 
         self._tls_config = tls_config
         self._is_direct = is_direct
@@ -224,9 +226,18 @@ class ActiveEndpoint:
                 credentials_provider=self._credentials_provider,
             )
 
-    async def reconfigure_oauth(self, host, port, cp, oauth_enable, token_endpoint=None,
-                                client_id=None, client_secret=None, kc_cert=None,
-                                enable_token_refresh=False):
+    async def reconfigure_oauth(
+        self,
+        host,
+        port,
+        cp,
+        oauth_enable,
+        token_endpoint=None,
+        client_id=None,
+        client_secret=None,
+        kc_cert=None,
+        enable_token_refresh=False,
+    ):
         async with self._reconfig_lock:
             self._oauth_enable = oauth_enable
             self._assoc_handler._kc_cert = kc_cert
@@ -238,15 +249,19 @@ class ActiveEndpoint:
 
             if oauth_enable:
                 if kc_cert:
-                    cert_file = tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False)
+                    cert_file = tempfile.NamedTemporaryFile(
+                        mode="w", suffix=".pem", delete=False
+                    )
                     cert_file.write(kc_cert)
                     cert_file.flush()
                     cert_file.close()
                     cafile = cert_file.name
 
                 client_con_provider = ClientCredentialsProvider(
-                    token_url=token_endpoint, client_id=client_id,
-                    client_secret=client_secret, cafile=cafile,
+                    token_url=token_endpoint,
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    cafile=cafile,
                 )
                 access_token = await client_con_provider.get_access_token()
 
@@ -254,9 +269,13 @@ class ActiveEndpoint:
                 # Persist so a later TLS-only reconfigure_connection() call
                 # can restart the loop without losing these credentials.
                 self._access_token = access_token
-                self._credentials_provider = client_con_provider if enable_token_refresh else None
+                self._credentials_provider = (
+                    client_con_provider if enable_token_refresh else None
+                )
 
-                previous_task = self._connect_task  # capture BEFORE creating the new task
+                previous_task = (
+                    self._connect_task
+                )  # capture BEFORE creating the new task
 
                 async def _run_and_cleanup():
                     try:
@@ -264,12 +283,19 @@ class ActiveEndpoint:
                         if enable_token_refresh:
                             # Provider is handed to start() — every reconnect fetches
                             # a fresh token via the provider's own expiry-aware cache.
-                            await self.start(host, int(port), cp, credentials_provider=client_con_provider)
+                            await self.start(
+                                host,
+                                int(port),
+                                cp,
+                                credentials_provider=client_con_provider,
+                            )
                         else:
                             # Static token — once it expires, every reconnect keeps
                             # presenting the same dead token and will keep failing,
                             # by design (demo mode).
-                            await self.start(host, int(port), cp, access_token=access_token)
+                            await self.start(
+                                host, int(port), cp, access_token=access_token
+                            )
                     finally:
                         if cafile is not None:
                             try:
@@ -277,7 +303,9 @@ class ActiveEndpoint:
                             except FileNotFoundError:
                                 pass
 
-                task = asyncio.create_task(_run_and_cleanup(), name=f"{cp}-active-connect-oauth")
+                task = asyncio.create_task(
+                    _run_and_cleanup(), name=f"{cp}-active-connect-oauth"
+                )
                 self._connect_task = task
             else:
                 if cafile is not None:
@@ -299,10 +327,16 @@ class ActiveEndpoint:
                 # to restart it.
                 self.run_in_background(host, int(port), cp)
 
-    async def start(self, hostname: str, port: int, cp: str, *,
-                    access_token: str | None = None,
-                    credentials_provider: "ClientCredentialsProvider | None" = None,
-                    protocol=None) -> None:
+    async def start(
+        self,
+        hostname: str,
+        port: int,
+        cp: str,
+        *,
+        access_token: str | None = None,
+        credentials_provider: "ClientCredentialsProvider | None" = None,
+        protocol=None,
+    ) -> None:
         """Connect to ws[s]://hostname:port/cp, with automatic reconnection.
 
         If credentials_provider is given, a fresh access token is fetched on
@@ -316,9 +350,15 @@ class ActiveEndpoint:
         while first or self._reconnect_policy.should_reconnect():
             first = False
             try:
-                token = await credentials_provider.get_access_token() if credentials_provider else access_token
+                token = (
+                    await credentials_provider.get_access_token()
+                    if credentials_provider
+                    else access_token
+                )
 
-                await self._connect_once(hostname, port, cp, access_token=token, protocol=protocol)
+                await self._connect_once(
+                    hostname, port, cp, access_token=token, protocol=protocol
+                )
                 self._reconnect_policy.reset()
             except (ConnectionRefusedError, OSError) as e:
                 logger.warning("Connection failed cp=%r: %s", cp, e)
@@ -327,12 +367,18 @@ class ActiveEndpoint:
                 if self._reconnect_policy.should_reconnect():
                     await self._reconnect_policy.wait()
                 else:
-                    logger.warning("Reconnection disabled or max retries reached for cp=%r, giving up", cp)
+                    logger.warning(
+                        "Reconnection disabled or max retries reached for cp=%r, giving up",
+                        cp,
+                    )
                     break
             except (websockets.exceptions.InvalidMessage, EOFError) as e:
-                detail = str(e).split('\n')[0]
-                logger.warning("Connection failed cp=%r: protocol mismatch or server unavailable (%s)", cp,
-                               detail)
+                detail = str(e).split("\n")[0]
+                logger.warning(
+                    "Connection failed cp=%r: protocol mismatch or server unavailable (%s)",
+                    cp,
+                    detail,
+                )
                 # The single most common real-world cause: this side dials
                 # out with ws:// while the peer expects wss:// (TLS
                 # enabled), or vice versa - the handshake bytes are
@@ -351,10 +397,18 @@ class ActiveEndpoint:
                 if self._reconnect_policy.should_reconnect():
                     await self._reconnect_policy.wait()
                 else:
-                    logger.warning("Reconnection disabled or max retries reached for cp=%r, giving up", cp)
+                    logger.warning(
+                        "Reconnection disabled or max retries reached for cp=%r, giving up",
+                        cp,
+                    )
                     break
             except Exception as e:
-                logger.error("Unexpected error in active endpoint cp=%r: %s", cp, e, exc_info=True)
+                logger.error(
+                    "Unexpected error in active endpoint cp=%r: %s",
+                    cp,
+                    e,
+                    exc_info=True,
+                )
                 self._notify_error(cp, f"Unexpected error: {e}")
                 await self._on_connection_closed(cp)
                 if self._reconnect_policy.should_reconnect():
@@ -369,14 +423,20 @@ class ActiveEndpoint:
     # Internal session runner
     # ------------------------------------------------------------------
 
-    async def _connect_once(self, hostname: str, port: int, cp: str, *, access_token=None, protocol=None) -> None:
+    async def _connect_once(
+        self, hostname: str, port: int, cp: str, *, access_token=None, protocol=None
+    ) -> None:
         scheme = "wss" if self._tls_config else "ws"
         uri = f"{scheme}://{hostname}:{int(port)}/{cp}"
 
         connect_kwargs = dict(
-            ssl=build_tls_context_from_strings(self._tls_config) if self._tls_config else None,
+            ssl=build_tls_context_from_strings(self._tls_config)
+            if self._tls_config
+            else None,
             subprotocols=protocol if protocol is not None else None,
-            additional_headers={"Authorization": f"Bearer {access_token}"} if access_token else None,
+            additional_headers={"Authorization": f"Bearer {access_token}"}
+            if access_token
+            else None,
             compression=None,
         )
 
@@ -390,7 +450,9 @@ class ActiveEndpoint:
                 if self._is_direct:
                     selected_client = self._router.find_client(cp)
                     if selected_client is not None:
-                        logger.debug("Dispatching to client cp=%r (direct active mode)", cp)
+                        logger.debug(
+                            "Dispatching to client cp=%r (direct active mode)", cp
+                        )
                         self.websocket_info_list = [
                             ws_info
                             for ws_info in self.websocket_info_list
@@ -402,10 +464,14 @@ class ActiveEndpoint:
                             logger.debug("BER encoding selected for cp=%r", cp)
                         self.websocket_info_list.append(websocket_info)
 
-                        tpaa_request = create_tpaa_associate_request(selected_client.cp, 65000)
+                        tpaa_request = create_tpaa_associate_request(
+                            selected_client.cp, 65000
+                        )
                         logger.debug("Sending associateRequest cp=%r", cp)
                         request = await asyncio.to_thread(
-                            encode_tpaa_message, tpaa_request, websocket_info.is_ber_protocol
+                            encode_tpaa_message,
+                            tpaa_request,
+                            websocket_info.is_ber_protocol,
                         )
                         await websocket.send(request)
                         if self.send_msg_callback is not None:
@@ -417,20 +483,36 @@ class ActiveEndpoint:
                             else:
                                 logger.info(
                                     "Received message: %s",
-                                    decode_tpaa_message(message, websocket_info.is_ber_protocol),
+                                    decode_tpaa_message(
+                                        message, websocket_info.is_ber_protocol
+                                    ),
                                 )
 
                             if not selected_client.is_connected:
-                                if not self._is_report(message, websocket_info.is_ber_protocol):
+                                if not self._is_report(
+                                    message, websocket_info.is_ber_protocol
+                                ):
                                     decoded_message = await asyncio.to_thread(
-                                        decode_tpaa_message, message, websocket_info.is_ber_protocol
+                                        decode_tpaa_message,
+                                        message,
+                                        websocket_info.is_ber_protocol,
                                     )
                                     if decoded_message[0] == "associate":
-                                        associate_type = extract_associate_request_type(decoded_message)
+                                        associate_type = extract_associate_request_type(
+                                            decoded_message
+                                        )
                                         if associate_type == "associateResponse":
-                                            asc_id = retrieve_associate_id_from_decoded_msg(decoded_message)
-                                            max_calls = retrieve_max_outstanding_calls_from_decoded_msg(decoded_message)
-                                            selected_client.max_outstanding_calls = max_calls
+                                            asc_id = (
+                                                retrieve_associate_id_from_decoded_msg(
+                                                    decoded_message
+                                                )
+                                            )
+                                            max_calls = retrieve_max_outstanding_calls_from_decoded_msg(
+                                                decoded_message
+                                            )
+                                            selected_client.max_outstanding_calls = (
+                                                max_calls
+                                            )
                                             websocket_info.associate_id = asc_id
                                             selected_client.is_connected = True
                                             selected_client.ready_event.set()
@@ -441,23 +523,42 @@ class ActiveEndpoint:
                                                 max_calls,
                                             )
                             else:
-                                if not self._is_report(message, websocket_info.is_ber_protocol):
+                                if not self._is_report(
+                                    message, websocket_info.is_ber_protocol
+                                ):
                                     decoded_message = await asyncio.to_thread(
-                                        decode_tpaa_message, message, websocket_info.is_ber_protocol
+                                        decode_tpaa_message,
+                                        message,
+                                        websocket_info.is_ber_protocol,
                                     )
                                     if decoded_message[0] == "associate":
-                                        associate_type = extract_associate_request_type(decoded_message)
-                                        logger.debug("Association control message cp=%r type=%r", cp, associate_type)
+                                        associate_type = extract_associate_request_type(
+                                            decoded_message
+                                        )
+                                        logger.debug(
+                                            "Association control message cp=%r type=%r",
+                                            cp,
+                                            associate_type,
+                                        )
                                         action = await self._assoc_handler.handle(
-                                            associate_type, decoded_message, websocket, websocket_info
+                                            associate_type,
+                                            decoded_message,
+                                            websocket,
+                                            websocket_info,
                                         )
                                         if action in (ACTION_ABORT, ACTION_RELEASE):
                                             break
 
-                                    invoke_id = selected_client.add_to_outstanding_calls(
-                                        decoded_message, websocket_info.is_ber_protocol
+                                    invoke_id = (
+                                        selected_client.add_to_outstanding_calls(
+                                            decoded_message,
+                                            websocket_info.is_ber_protocol,
+                                        )
                                     )
-                                    if invoke_id and invoke_id > websocket_info.invoke_id:
+                                    if (
+                                        invoke_id
+                                        and invoke_id > websocket_info.invoke_id
+                                    ):
                                         logger.warning(
                                             "Invoke ID out of sequence cp=%r invoke_id=%s expected<=%s, closing",
                                             cp,
@@ -473,7 +574,9 @@ class ActiveEndpoint:
                 else:
                     selected_server = self._router.find_server(cp)
                     if selected_server is not None:
-                        logger.debug("Dispatching to server cp=%r (non-direct active mode)", cp)
+                        logger.debug(
+                            "Dispatching to server cp=%r (non-direct active mode)", cp
+                        )
                         self.websocket_info_list = [
                             ws_info
                             for ws_info in self.websocket_info_list
@@ -489,7 +592,9 @@ class ActiveEndpoint:
                             if self.recv_msg_callback is not None:
                                 self.recv_msg_callback(message, datetime.datetime.now())
 
-                            await selected_server.handle_request(message, cp, websocket_info)
+                            await selected_server.handle_request(
+                                message, cp, websocket_info
+                            )
                     else:
                         await self._router.send_not_found_response(
                             websocket, cp, protocol, self.send_msg_callback
@@ -497,9 +602,15 @@ class ActiveEndpoint:
 
             except websockets.exceptions.ConnectionClosedError as e:
                 if "no close frame" in str(e):
-                    logger.info("Connection aborted without close frame (likely via transport.abort())")
+                    logger.info(
+                        "Connection aborted without close frame (likely via transport.abort())"
+                    )
                 else:
-                    logger.info("Connection closed unexpectedly: code=%s, reason=%s", e.code, e.reason)
+                    logger.info(
+                        "Connection closed unexpectedly: code=%s, reason=%s",
+                        e.code,
+                        e.reason,
+                    )
 
             except websockets.exceptions.ConnectionClosedOK:
                 logger.info("Connection closed gracefully")
@@ -556,8 +667,8 @@ class ActiveEndpoint:
                 ws_info for ws_info in self.websocket_info_list if ws_info.cp != cp
             ]
 
-            #selected_server = self._router.find_server(cp)
-            #if selected_server is not None:
-                #selected_server.set_quality_to_questionable()
+            # selected_server = self._router.find_server(cp)
+            # if selected_server is not None:
+            # selected_server.set_quality_to_questionable()
         except Exception as e:
             logger.error("Error in on_connection_closed: %s", e)

@@ -48,19 +48,25 @@ async def main():
         websocket_info = endpoint.get_websocket_info(client)
         if websocket_info is not None:
             try:
-                server_list = await client.get_server_directory(websocket_info, None, None)
+                server_list = await client.get_server_directory(
+                    websocket_info, None, None
+                )
                 for ld_index, ld_inst in enumerate(server_list):
                     is_last_ld = ld_index == len(server_list) - 1
                     ld_prefix = "└── " if is_last_ld else "├── "
                     print(f"{ld_prefix}{ld_inst}")
 
-                    ln_refs = await client.get_logical_device_directory(ld_inst, websocket_info, None, None)
+                    ln_refs = await client.get_logical_device_directory(
+                        ld_inst, websocket_info, None, None
+                    )
                     for ln_index, ln_inst in enumerate(ln_refs):
                         is_last_ln = ln_index == len(ln_refs) - 1
                         ln_prefix = (
                             "    └── "
                             if is_last_ld
-                            else "│   └── " if is_last_ln else ("    ├── " if is_last_ld else "│   ├── ")
+                            else "│   └── "
+                            if is_last_ln
+                            else ("    ├── " if is_last_ld else "│   ├── ")
                         )
                         print(f"{ln_prefix}{ln_inst}")
 
@@ -97,7 +103,10 @@ async def main():
                             print(f"{do_prefix}{do_inst}")
 
                             da_def = await client.get_data_definition(
-                                ld_inst + "/" + ln_inst + "." + do_inst, websocket_info, None, None
+                                ld_inst + "/" + ln_inst + "." + do_inst,
+                                websocket_info,
+                                None,
+                                None,
                             )
 
                             sdos = retrieve_sdos(da_def)
@@ -110,7 +119,9 @@ async def main():
                                 print_direct_da(da_list)
 
                 logger.info("Running negative test cases:")
-                ln_refs = await client.get_logical_device_directory("wrong_ld_name", websocket_info, None, None)
+                ln_refs = await client.get_logical_device_directory(
+                    "wrong_ld_name", websocket_info, None, None
+                )
                 logger.info("wrong LD result: %s", ln_refs)
 
                 ln_directory_ds = await client.get_logical_node_directory(

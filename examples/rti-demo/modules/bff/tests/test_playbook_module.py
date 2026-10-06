@@ -10,8 +10,15 @@ import time
 from pathlib import Path
 
 import pytest
-
-from bff.playbook import PlaybookError, Runner, control_value, dump_playbook, load_playbook, parse_playbook, step_label
+from bff.playbook import (
+    PlaybookError,
+    Runner,
+    control_value,
+    dump_playbook,
+    load_playbook,
+    parse_playbook,
+    step_label,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -40,13 +47,19 @@ def test_dump_round_trips_demo_and_keeps_key_order():
 
 
 def test_dump_orders_step_keys_label_action_expect():
-    text = dump_playbook({"steps": [{"expect": "fail", "read": {"fsp": "F", "ref": "R"}, "label": "L"}]})
+    text = dump_playbook(
+        {"steps": [{"expect": "fail", "read": {"fsp": "F", "ref": "R"}, "label": "L"}]}
+    )
     assert text.index("label:") < text.index("read:") < text.index("expect:")
 
 
 def test_dump_keeps_on_off_strings():
-    playbook = {"steps": [{"operate": {"fsp": "F", "ref": "R", "cdc": "SPC", "value": "on"}},
-                          {"write": {"fsp": "F", "ref": "R", "value": "off"}}]}
+    playbook = {
+        "steps": [
+            {"operate": {"fsp": "F", "ref": "R", "cdc": "SPC", "value": "on"}},
+            {"write": {"fsp": "F", "ref": "R", "value": "off"}},
+        ]
+    }
     assert parse_playbook(dump_playbook(playbook)) == playbook
 
 
@@ -64,8 +77,14 @@ def test_control_value_eng_sends_an_int_for_a_number_else_the_text_enumerated():
 
 def test_control_value_apc_is_unchanged():
     assert control_value("APC", "1.5") == (1.5, "float32")
-    assert step_label({"read": {"fsp": ["F1", "F2"], "ref": "LD0/X.st"}}) == "read F1, F2 LD0/X.st"
-    assert step_label({"enable-report": {"fsp": "F1", "rcb": {"F1": "R"}}}) == "enable-report F1"
+    assert (
+        step_label({"read": {"fsp": ["F1", "F2"], "ref": "LD0/X.st"}})
+        == "read F1, F2 LD0/X.st"
+    )
+    assert (
+        step_label({"enable-report": {"fsp": "F1", "rcb": {"F1": "R"}}})
+        == "enable-report F1"
+    )
 
 
 class TinyBff:
@@ -105,8 +124,14 @@ READ = {"read": {"fsp": "F", "ref": "LD0/X.st"}}
 
 def test_on_step_and_on_result_report_each_step():
     started, done = [], []
-    runner = Runner({"steps": [READ, {"label": "Pause", "wait": 0}]}, TinyBff(), pace=0, log=lambda _: None,
-                    on_step=lambda i, label: started.append((i, label)), on_result=done.append)
+    runner = Runner(
+        {"steps": [READ, {"label": "Pause", "wait": 0}]},
+        TinyBff(),
+        pace=0,
+        log=lambda _: None,
+        on_step=lambda i, label: started.append((i, label)),
+        on_result=done.append,
+    )
     runner.run()
     assert started == [(1, "read F LD0/X.st"), (2, "Pause")]
     assert [(r.index, r.ok) for r in done] == [(1, True), (2, True)]
@@ -115,7 +140,13 @@ def test_on_step_and_on_result_report_each_step():
 
 def test_stop_interrupts_a_wait():
     stop = threading.Event()
-    runner = Runner({"steps": [{"wait": "30s"}, READ]}, TinyBff(), pace=0, log=lambda _: None, stop=stop)
+    runner = Runner(
+        {"steps": [{"wait": "30s"}, READ]},
+        TinyBff(),
+        pace=0,
+        log=lambda _: None,
+        stop=stop,
+    )
     timer = threading.Timer(0.1, stop.set)
     timer.start()
     started = time.monotonic()
@@ -129,7 +160,13 @@ def test_stop_interrupts_a_wait():
 def test_stop_skips_the_relink_of_a_drop():
     stop = threading.Event()
     bff = TinyBff()
-    runner = Runner({"steps": [{"drop": {"fsp": "F", "for": "30s"}}]}, bff, pace=0, log=lambda _: None, stop=stop)
+    runner = Runner(
+        {"steps": [{"drop": {"fsp": "F", "for": "30s"}}]},
+        bff,
+        pace=0,
+        log=lambda _: None,
+        stop=stop,
+    )
     threading.Timer(0.1, stop.set).start()
     results = runner.run()
     assert results[0].ok is False and results[0].message == "stopped"
@@ -139,5 +176,11 @@ def test_stop_skips_the_relink_of_a_drop():
 
 def test_injected_sleep_still_used():
     slept = []
-    Runner({"steps": [{"wait": 2}]}, TinyBff(), pace=0, log=lambda _: None, sleep=slept.append).run()
+    Runner(
+        {"steps": [{"wait": 2}]},
+        TinyBff(),
+        pace=0,
+        log=lambda _: None,
+        sleep=slept.append,
+    ).run()
     assert slept == [2.0]

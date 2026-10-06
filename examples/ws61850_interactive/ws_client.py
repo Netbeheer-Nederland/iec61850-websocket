@@ -49,22 +49,22 @@ async def toggle_custom_value(iec61150_server, obj_ref):
 
 async def toggle_quality_value(iec61150_server, obj_ref):
     while True:
-        random_operate_Block = bool(randint(0, 1))
+        random_operate_block = bool(randint(0, 1))
         value = {
             "validity": "good",
             "source": "process",
             "test": False,
-            "operatorBlock": random_operate_Block,
+            "operatorBlock": random_operate_block,
         }
         await iec61150_server.update_value(obj_ref, value)
         logger.info(f"Value of {obj_ref} changed to {value}")
         await asyncio.sleep(5)
 
 
-def control_handler_for_float(obj_ref, ctlVal_value, parameter):
-    if ctlVal_value is not None:
-        if ctlVal_value["type"].startswith("float"):
-            if ctlVal_value["value"] < 50:
+def control_handler_for_float(obj_ref, ctl_val_value, parameter):
+    if ctl_val_value is not None:
+        if ctl_val_value["type"].startswith("float"):
+            if ctl_val_value["value"] < 50:
                 return ControlHandlerResult.OK, None
             else:
                 return (
@@ -77,12 +77,12 @@ def control_handler_for_float(obj_ref, ctlVal_value, parameter):
 
 
 async def main():
-    ep_wsClient_1 = ActiveEndpoint()
+    ep_ws_client_1 = ActiveEndpoint()
     iec61850_server_1 = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     iec61850_server_1.set_control_handler(control_handler_for_float, None)
-    ep_wsClient_1.add_iec61850_server(iec61850_server_1)
+    ep_ws_client_1.add_iec61850_server(iec61850_server_1)
 
-    task1 = asyncio.create_task(ep_wsClient_1.start("localhost", 9100, "cp1"))
+    task1 = asyncio.create_task(ep_ws_client_1.start("localhost", 9100, "cp1"))
 
     await asyncio.gather(task1)
 

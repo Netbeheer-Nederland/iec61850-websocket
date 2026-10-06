@@ -60,7 +60,12 @@ def _manager(tmp_path, connections):
 
 
 def _idp(id_, name="IDP", status=None):
-    con = {"id": id_, "name": name, "type": "IDP-Server", "endpoint": "http://keycloak:8080"}
+    con = {
+        "id": id_,
+        "name": name,
+        "type": "IDP-Server",
+        "endpoint": "http://keycloak:8080",
+    }
     if status is not None:
         con["status"] = status
     return con

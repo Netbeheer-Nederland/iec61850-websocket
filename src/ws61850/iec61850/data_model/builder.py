@@ -120,7 +120,9 @@ class ReportControlBuilder:
 
 
 class DataSetBuilder:
-    def __init__(self, name: str, logical_device_name: str, ln_builder: "LogicalNodeBuilder"):
+    def __init__(
+        self, name: str, logical_device_name: str, ln_builder: "LogicalNodeBuilder"
+    ):
         self._name = name
         self._ld_name = logical_device_name
         self._ln_builder = ln_builder
@@ -131,7 +133,9 @@ class DataSetBuilder:
         return self
 
     def end_data_set(self) -> "LogicalNodeBuilder":
-        self._ln_builder._pending_datasets.append((self._name, self._ld_name, self._entries))
+        self._ln_builder._pending_datasets.append(
+            (self._name, self._ld_name, self._entries)
+        )
         return self._ln_builder
 
 
@@ -151,10 +155,14 @@ class LogicalNodeBuilder:
         return DataSetBuilder(name, self._ld_builder._name, self)
 
     def brcb(self, name: str, *, dataset_name: str) -> "ReportControlBuilder":
-        return ReportControlBuilder(name, buffered=True, dataset_name=dataset_name, ln_builder=self)
+        return ReportControlBuilder(
+            name, buffered=True, dataset_name=dataset_name, ln_builder=self
+        )
 
     def urcb(self, name: str, *, dataset_name: str) -> "ReportControlBuilder":
-        return ReportControlBuilder(name, buffered=False, dataset_name=dataset_name, ln_builder=self)
+        return ReportControlBuilder(
+            name, buffered=False, dataset_name=dataset_name, ln_builder=self
+        )
 
     def end_logical_node(self) -> "LogicalDeviceBuilder":
         self._ld_builder._pending_lns.append(self)

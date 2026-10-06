@@ -72,9 +72,11 @@ def parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
+
 BASE = "https://localhost:8443"
 TARGET_REALM = "iec61850-test"
 token_endpoint = f"{BASE}/realms/{TARGET_REALM}/protocol/openid-connect/token"
+
 
 async def main():
     args = parse_args()
@@ -82,7 +84,9 @@ async def main():
 
     client_id = "ws-client"
     client_secret = "K4Nrd14seXG52J3xpnIqfMyILTJJu3VI"
-    access_token = await get_access_token(token_endpoint, client_id, client_secret, cafile)
+    access_token = await get_access_token(
+        token_endpoint, client_id, client_secret, cafile
+    )
     logger.info("Access-Token: %s", access_token)
 
     endpoint = ActiveEndpoint(oauth_enable=True)
@@ -90,9 +94,19 @@ async def main():
     iec61850_server = IEC61850Server(IedModelLoader.from_file(_MODEL_PATH), "cp1")
     endpoint.add_iec61850_server(iec61850_server)
 
-    task = asyncio.create_task(endpoint.start(args.host, args.port, "cp1", access_token=access_token))
+    task = asyncio.create_task(
+        endpoint.start(args.host, args.port, "cp1", access_token=access_token)
+    )
     task_token = asyncio.create_task(
-        refresh_token_if_needed(token_endpoint, client_id, client_secret, "cp1", access_token, endpoint, cafile)
+        refresh_token_if_needed(
+            token_endpoint,
+            client_id,
+            client_secret,
+            "cp1",
+            access_token,
+            endpoint,
+            cafile,
+        )
     )
 
     await asyncio.gather(task, task_token)

@@ -139,6 +139,7 @@ class IEC61850Server:
                 return
             value = quality_item.mmsValue
             value["validity"] = "questionable"
+
     async def read_value(self, obj_ref):
         tree_item = self.find_object_in_tree(obj_ref)
         if tree_item is None:
@@ -155,7 +156,10 @@ class IEC61850Server:
         return None
 
     async def set_quality_to_good(self, control_do):
-        quality_item = next((da for da in control_do.get_da_from_do_or_da_list() if da.name == "q"), None)
+        quality_item = next(
+            (da for da in control_do.get_da_from_do_or_da_list() if da.name == "q"),
+            None,
+        )
         value = quality_item.mmsValue.copy()
         value["validity"] = "good"
         await self.update_value(quality_item.get_objRef(), value)
@@ -190,13 +194,21 @@ class IEC61850Server:
                 found_item = next(
                     (
                         item
-                        for item in found_obj.get_do_from_do_or_da_list() + found_obj.get_da_from_do_or_da_list()
+                        for item in found_obj.get_do_from_do_or_da_list()
+                        + found_obj.get_da_from_do_or_da_list()
                         if item.name == ref_item
                     ),
                     None,
                 )
             else:
-                found_item = next((item for item in found_obj.data_attributes if item.name == ref_item), None)
+                found_item = next(
+                    (
+                        item
+                        for item in found_obj.data_attributes
+                        if item.name == ref_item
+                    ),
+                    None,
+                )
             if found_item is not None:
                 found_obj = found_item
                 if ref_index == len(seg_ref):
@@ -213,11 +225,17 @@ class IEC61850Server:
         """
         return_do = None
         ld_name, ln_name, first_do, *seg_ref = re.split(r"[/ .]", data_ref)
-        found_ld = next((ld for ld in self.ied_model.logical_devices if ld.name == ld_name), None)
+        found_ld = next(
+            (ld for ld in self.ied_model.logical_devices if ld.name == ld_name), None
+        )
         if found_ld:
-            found_ln = next((ln for ln in found_ld.logical_nodes if ln.name == ln_name), None)
+            found_ln = next(
+                (ln for ln in found_ld.logical_nodes if ln.name == ln_name), None
+            )
             if found_ln:
-                found_do = next((do for do in found_ln.data_objects if do.name == first_do), None)
+                found_do = next(
+                    (do for do in found_ln.data_objects if do.name == first_do), None
+                )
                 if len(seg_ref) != 0:
                     return_do = self.look_in_da_or_do_list(seg_ref, found_do)
 
@@ -253,7 +271,9 @@ class IEC61850Server:
         """
         await self.ready_event.wait()
         if websocket_info.websocket is not None:
-            tpaa_request = create_tpaa_abort_request(websocket_info.invoke_id, websocket_info.associate_id)
+            tpaa_request = create_tpaa_abort_request(
+                websocket_info.invoke_id, websocket_info.associate_id
+            )
             request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
 
             await websocket_info.websocket.send(request)
@@ -265,7 +285,9 @@ class IEC61850Server:
         await self.ready_event.wait()
 
         if websocket_info.websocket is not None:
-            tpaa_request = create_tpaa_release_request(websocket_info.invoke_id, websocket_info.associate_id)
+            tpaa_request = create_tpaa_release_request(
+                websocket_info.invoke_id, websocket_info.associate_id
+            )
             request = encode_tpaa_message(tpaa_request, websocket_info.is_ber_protocol)
 
             await websocket_info.websocket.send(request)
@@ -298,7 +320,14 @@ class IEC61850Server:
         """
         parent_item = self.get_do_parent(item)
         if isinstance(parent_item, DataObject) is True:
-            da_time = next((da for da in parent_item.do_or_da if da.name == "t" and da.fc.wire_name == item.fc.wire_name), None)
+            da_time = next(
+                (
+                    da
+                    for da in parent_item.do_or_da
+                    if da.name == "t" and da.fc.wire_name == item.fc.wire_name
+                ),
+                None,
+            )
             current_time = get_now_time()
             if da_time is not None:
                 da_time.mmsValue = current_time
@@ -307,7 +336,7 @@ class IEC61850Server:
         """
         Function used for updating the value of an element
         """
-        #await self.ready_event.wait()
+        # await self.ready_event.wait()
         item = self.find_object_in_tree(obj_ref)
         if item.mmsValue != value:
             item.mmsValue = value
@@ -329,14 +358,17 @@ class IEC61850Server:
             for server_report_control in self.server_report_controls:
                 if server_report_control.rptEna:
                     try:
-                        if server_report_control.rcb.trg_ops.get("dchg") is True or server_report_control.rcb.trg_ops.get("qchg"):
+                        if server_report_control.rcb.trg_ops.get(
+                            "dchg"
+                        ) is True or server_report_control.rcb.trg_ops.get("qchg"):
                             obj_ref = server_report_control.rcb.dataset_name
                             dataset = self.find_ds_in_tree(obj_ref)
                             is_in_dataset = next(
                                 (
                                     entry
                                     for entry in dataset.fcdas
-                                    if entry.variable_name in data_attribute.get_objRef()
+                                    if entry.variable_name
+                                    in data_attribute.get_objRef()
                                 ),
                                 None,
                             )
@@ -345,16 +377,21 @@ class IEC61850Server:
                                 if data_attribute.type == DataAttributeType.quality:
                                     da_list = [
                                         create_signle_entry_for_report(
-                                            data_attribute, ReasonForInclusionInLog(qualityChange=True)
+                                            data_attribute,
+                                            ReasonForInclusionInLog(qualityChange=True),
                                         )
                                     ]
                                 else:
                                     da_list = [
                                         create_signle_entry_for_report(
-                                            data_attribute, ReasonForInclusionInLog(dataChange=True)
+                                            data_attribute,
+                                            ReasonForInclusionInLog(dataChange=True),
                                         )
                                     ]
-                                if server_report_control.rcb.client_connection is not None:
+                                if (
+                                    server_report_control.rcb.client_connection
+                                    is not None
+                                ):
                                     server_report_control.time_of_entry = get_now_time()
                                     tpaa_report = create_tpaa_report(
                                         server_report_control,
@@ -362,11 +399,16 @@ class IEC61850Server:
                                         server_report_control.rcb.client_connection.associate_id,
                                     )
                                     encoded_report = encode_tpaa_message(
-                                        tpaa_report, server_report_control.rcb.client_connection.is_ber_protocol
+                                        tpaa_report,
+                                        server_report_control.rcb.client_connection.is_ber_protocol,
                                     )
-                                    await server_report_control.rcb.client_connection.websocket.send(encoded_report)
+                                    await server_report_control.rcb.client_connection.websocket.send(
+                                        encoded_report
+                                    )
                                     if self.send_msg_callback is not None:
-                                        self.send_msg_callback(encoded_report, datetime.datetime.now())
+                                        self.send_msg_callback(
+                                            encoded_report, datetime.datetime.now()
+                                        )
                                     server_report_control.seq_num += 1
                                 else:
                                     logger.info("Client connection is null!")
@@ -380,29 +422,44 @@ class IEC61850Server:
         """Send a report every `interval` second without blocking receive loop."""
         try:
             while True:
-
-                if server_report_control.rptEna and server_report_control.rcb.trg_ops.get("integrity"):
+                if (
+                    server_report_control.rptEna
+                    and server_report_control.rcb.trg_ops.get("integrity")
+                ):
                     obj_ref = server_report_control.rcb.dataset_name
                     dataset = self.find_ds_in_tree(obj_ref)
                     if dataset is not None:
                         da_list = create_data_attribute_list_from_dataset(
-                            dataset, self.ied_model, ReasonForInclusionInLog(integrity=True)
+                            dataset,
+                            self.ied_model,
+                            ReasonForInclusionInLog(integrity=True),
                         )
                         server_report_control.time_of_entry = get_now_time()
 
                         tpaa_report = create_tpaa_report(
-                            server_report_control, da_list, server_report_control.rcb.client_connection.associate_id
+                            server_report_control,
+                            da_list,
+                            server_report_control.rcb.client_connection.associate_id,
                         )
                         encoded_report = encode_tpaa_message(
-                            tpaa_report, server_report_control.rcb.client_connection.is_ber_protocol
+                            tpaa_report,
+                            server_report_control.rcb.client_connection.is_ber_protocol,
                         )
-                        await server_report_control.rcb.client_connection.websocket.send(encoded_report)
+                        await (
+                            server_report_control.rcb.client_connection.websocket.send(
+                                encoded_report
+                            )
+                        )
 
                         if self.send_msg_callback is not None:
-                            self.send_msg_callback(encoded_report, datetime.datetime.now())
+                            self.send_msg_callback(
+                                encoded_report, datetime.datetime.now()
+                            )
 
                         server_report_control.seq_num += 1
-                await asyncio.sleep(server_report_control.rcb.int_period / 1000)  # Convert milliseconds to seconds
+                await asyncio.sleep(
+                    server_report_control.rcb.int_period / 1000
+                )  # Convert milliseconds to seconds
 
         except ConnectionClosedOK:
             current_task = asyncio.current_task()
@@ -423,7 +480,8 @@ class IEC61850Server:
         for server_report_control in self.server_report_controls:
             tasks.append(
                 asyncio.create_task(
-                    self.periodic_report_task(server_report_control), name=server_report_control.rcb.get_objRef()
+                    self.periodic_report_task(server_report_control),
+                    name=server_report_control.rcb.get_objRef(),
                 )
             )
             self.periodic_report_tasks[server_report_control] = tasks[-1]
@@ -448,9 +506,13 @@ class IEC61850Server:
                 max_message_size = min(max_message_size_client, max_message_size_server)
                 websocket_info.associate_id = associate_id
                 tpaa_response = create_tpaa_associate_response(
-                    max_message_size, associate_id, max_outstanding_calls=self.max_outstanding_calls
+                    max_message_size,
+                    associate_id,
+                    max_outstanding_calls=self.max_outstanding_calls,
                 )
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
                 await websocket.send(response)
                 if self.send_msg_callback is not None:
                     self.send_msg_callback(response, datetime.datetime.now())
@@ -466,7 +528,9 @@ class IEC61850Server:
                 invoke_id = decoded_message[1][1][1]["invokeId"]
                 logger.info("Release request cp=%r associate_id=%r", cp, associate_id)
                 tpaa_response = create_tpaa_release_response(invoke_id, associate_id)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
                 await websocket.send(response)
                 if self.send_msg_callback is not None:
                     self.send_msg_callback(response, datetime.datetime.now())
@@ -475,17 +539,25 @@ class IEC61850Server:
                 invoke_id = decoded_message[1][1][1]["invokeId"]
                 logger.info("Abort request cp=%r associate_id=%r", cp, associate_id)
                 tpaa_response = create_tpaa_abort_response(invoke_id, associate_id)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
                 await websocket.send(response)
                 websocket.transport.abort()
             elif associate_type == "abortResponse":
                 logger.info("Connection aborted by client cp=%r", cp)
             else:
-                logger.warning("Unsupported association type=%r cp=%r", associate_type, cp)
+                logger.warning(
+                    "Unsupported association type=%r cp=%r", associate_type, cp
+                )
                 try:
                     invoke_id = decoded_message[1][1][1]["invokeId"]
-                    tpaa_response = create_tpaa_service_error_response(invoke_id, associate_id, "classNotSupported")
-                    response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                    tpaa_response = create_tpaa_service_error_response(
+                        invoke_id, associate_id, "classNotSupported"
+                    )
+                    response = encode_tpaa_message(
+                        tpaa_response, websocket_info.is_ber_protocol
+                    )
                     await websocket.send(response)
                 except (KeyError, TypeError, IndexError):
                     return  # nothing to do if it doesn't exist
@@ -494,106 +566,194 @@ class IEC61850Server:
             service_name = extract_service_name(decoded_message)
             invoke_id = extract_invoke_id(decoded_message)
             websocket_info.invoke_id = invoke_id + 1
-            logger.debug("Service request cp=%r service=%r invoke_id=%s", cp, service_name, invoke_id)
+            logger.debug(
+                "Service request cp=%r service=%r invoke_id=%s",
+                cp,
+                service_name,
+                invoke_id,
+            )
 
             if service_name == "getServerDirectory":
-                tpaa_response = self._directory_service.get_server_directory(invoke_id, associate_id)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response = self._directory_service.get_server_directory(
+                    invoke_id, associate_id
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "getLogicalDeviceDirectory":
-                tpaa_response = self._directory_service.get_logical_device_directory(invoke_id, associate_id, decoded_message)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response = self._directory_service.get_logical_device_directory(
+                    invoke_id, associate_id, decoded_message
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "getLogicalNodeDirectory":
-                tpaa_response = self._directory_service.get_logical_node_directory(invoke_id, associate_id, decoded_message)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response = self._directory_service.get_logical_node_directory(
+                    invoke_id, associate_id, decoded_message
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "getDataSetDirectory":
-                tpaa_response = self._directory_service.get_data_set_directory(invoke_id, associate_id, decoded_message)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response = self._directory_service.get_data_set_directory(
+                    invoke_id, associate_id, decoded_message
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "getDataDirectory":
-                tpaa_response = self._directory_service.get_data_directory(invoke_id, associate_id, decoded_message)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response = self._directory_service.get_data_directory(
+                    invoke_id, associate_id, decoded_message
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "getDataDefinition":
-                tpaa_response = self._directory_service.get_data_definition(invoke_id, associate_id, decoded_message)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response = self._directory_service.get_data_definition(
+                    invoke_id, associate_id, decoded_message
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "getDataValues":
-                tpaa_response = self._data_access_service.get_data_values(invoke_id, associate_id, decoded_message)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response = self._data_access_service.get_data_values(
+                    invoke_id, associate_id, decoded_message
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "setDataValues":
-                tpaa_response = self._data_access_service.set_data_values(invoke_id, associate_id, decoded_message)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response = self._data_access_service.set_data_values(
+                    invoke_id, associate_id, decoded_message
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "getDatasetValues":
                 tpaa_response = self._data_access_service.get_dataset_values(
                     invoke_id, associate_id, decoded_message, self.find_ds_in_tree
                 )
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "getBRCBValues":
-                tpaa_response, _ = self._report_service.get_brcb_values(invoke_id, associate_id, decoded_message)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response, _ = self._report_service.get_brcb_values(
+                    invoke_id, associate_id, decoded_message
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "getURCBValues":
-                tpaa_response, _ =  self._report_service.get_urcb_values(invoke_id, associate_id, decoded_message)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response, _ = self._report_service.get_urcb_values(
+                    invoke_id, associate_id, decoded_message
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "setBRCBValues":
                 tpaa_response, gi_brcb = await self._report_service.set_brcb_values(
                     invoke_id, associate_id, decoded_message, websocket_info, self
                 )
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
                 if gi_brcb is not None:
                     logger.info("value set, sending the one time gi")
                     dataset = self.find_ds_in_tree(gi_brcb.rcb.dataset_name)
                     if dataset is not None:
                         da_list = create_data_attribute_list_from_dataset(
-                            dataset, self.ied_model, ReasonForInclusionInLog(generalInterrogation=True)
+                            dataset,
+                            self.ied_model,
+                            ReasonForInclusionInLog(generalInterrogation=True),
                         )
                         gi_brcb.time_of_entry = get_now_time()
-                        tpaa_report = create_tpaa_report(gi_brcb, da_list, gi_brcb.rcb.client_connection.associate_id)
-                        encoded_report = encode_tpaa_message(tpaa_report, websocket_info.is_ber_protocol)
-                        await gi_brcb.rcb.client_connection.websocket.send(encoded_report)
+                        tpaa_report = create_tpaa_report(
+                            gi_brcb, da_list, gi_brcb.rcb.client_connection.associate_id
+                        )
+                        encoded_report = encode_tpaa_message(
+                            tpaa_report, websocket_info.is_ber_protocol
+                        )
+                        await gi_brcb.rcb.client_connection.websocket.send(
+                            encoded_report
+                        )
                         if self.send_msg_callback is not None:
-                            self.send_msg_callback(encoded_report, datetime.datetime.now())
+                            self.send_msg_callback(
+                                encoded_report, datetime.datetime.now()
+                            )
                         gi_brcb.rcb.gi = False
 
             elif service_name == "setURCBValues":
                 tpaa_response, gi_urcb = await self._report_service.set_urcb_values(
                     invoke_id, associate_id, decoded_message, websocket_info, self
                 )
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
                 if gi_urcb is not None:
                     logger.info("value set, sending the one time gi")
                     dataset = self.find_ds_in_tree(gi_urcb.rcb.dataset_name)
                     if dataset is not None:
                         da_list = create_data_attribute_list_from_dataset(
-                            dataset, self.ied_model, ReasonForInclusionInLog(generalInterrogation=True)
+                            dataset,
+                            self.ied_model,
+                            ReasonForInclusionInLog(generalInterrogation=True),
                         )
                         gi_urcb.time_of_entry = get_now_time()
-                        tpaa_report = create_tpaa_report(gi_urcb, da_list, gi_urcb.rcb.client_connection.associate_id)
-                        encoded_report = encode_tpaa_message(tpaa_report, websocket_info.is_ber_protocol)
-                        await gi_urcb.rcb.client_connection.websocket.send(encoded_report)
+                        tpaa_report = create_tpaa_report(
+                            gi_urcb, da_list, gi_urcb.rcb.client_connection.associate_id
+                        )
+                        encoded_report = encode_tpaa_message(
+                            tpaa_report, websocket_info.is_ber_protocol
+                        )
+                        await gi_urcb.rcb.client_connection.websocket.send(
+                            encoded_report
+                        )
                         if self.send_msg_callback is not None:
-                            self.send_msg_callback(encoded_report, datetime.datetime.now())
+                            self.send_msg_callback(
+                                encoded_report, datetime.datetime.now()
+                            )
                         gi_urcb.rcb.gi = False
 
             elif service_name == "operate":
-                tpaa_response, control_do = self._control_service.operate(invoke_id, associate_id, decoded_message)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response, control_do = self._control_service.operate(
+                    invoke_id, associate_id, decoded_message
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             elif service_name == "select":
-                tpaa_response, _ = self._control_service.select(invoke_id, associate_id, decoded_message)
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                tpaa_response, _ = self._control_service.select(
+                    invoke_id, associate_id, decoded_message
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             else:
-                logger.warning("Unsupported service cp=%r service=%r invoke_id=%s", cp, service_name, invoke_id)
-                tpaa_response = create_tpaa_service_error_response(invoke_id, associate_id, "classNotSupported")
-                response = encode_tpaa_message(tpaa_response, websocket_info.is_ber_protocol)
+                logger.warning(
+                    "Unsupported service cp=%r service=%r invoke_id=%s",
+                    cp,
+                    service_name,
+                    invoke_id,
+                )
+                tpaa_response = create_tpaa_service_error_response(
+                    invoke_id, associate_id, "classNotSupported"
+                )
+                response = encode_tpaa_message(
+                    tpaa_response, websocket_info.is_ber_protocol
+                )
 
             await websocket.send(response)
             if self.send_msg_callback is not None:
