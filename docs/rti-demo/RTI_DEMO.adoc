@@ -9,14 +9,12 @@
 :imagesdir: images
 
 *Document Version:* 1.0  
-*Last Updated:* 2026-08-28  
+*Last Updated:* 2026-10-06  
 *Primary Focus:* FSP (ACSI-Server) and SO (ACSI-Client) - System Operator
 
 == System Overview
 
 The RTI Demo implements a complete IEC 61850-based Real-Time Infrastructure with distributed components communicating via WebSocket (ACSI protocol) and HTTP/REST (management APIs).
-
-Unified entry point for launching RTI (Real-Time Infrastructure) demo services.
 
 === Components Overview
 
@@ -28,11 +26,11 @@ Unified entry point for launching RTI (Real-Time Infrastructure) demo services.
 
 |BFF |Backend |N/A |5000
 
-|FSP |Service |ACSI-Server |5001 (REST), 8765 (WebSocket)
+|FSP |Service |ACSI-Server |5001 (REST); WebSocket client of the SO
 
-|SO |Service |ACSI-Client |5002 (REST), 8765 (WebSocket)
+|SO |Service |ACSI-Client |5002 (REST), 8765 (WebSocket server)
 
-|demo_IO |Service |N/A |8000
+|IO |Service |N/A |8000
 
 |IDP Server |Service |N/A |8443 (HTTPS)
 
@@ -54,9 +52,9 @@ image::RTI_Demo_System_Architecture_Overview.png[RTI Demo System Architecture Ov
 
 |BFF |SO |HTTP/REST |5002
 
-|RTI-FSP/RTI-SO |demo_IO |HTTP/REST |8000
+|RTI-FSP/RTI-SO |IO |HTTP/REST |8000
 
-|demo_IO |Physical Devices |Direct Hardware |GPIO/ADC/I2C
+|IO |Physical Devices |Direct Hardware |GPIO, SPI (ADC), I2C (LCD)
 
 |HMI |IDP Server |OAuth 2.0 |8443 (HTTPS)
 
@@ -64,35 +62,30 @@ image::RTI_Demo_System_Architecture_Overview.png[RTI Demo System Architecture Ov
 
 |===
 
-include::includes/fsp.adoc[]
+== Components
 
-include::includes/so.adoc[]
+Each component's README is its reference: run and test commands, configuration, API and design.
 
-== BFF - Backend For Frontend
+[cols="1,2",options="header"]
+|===
+|Component |Reference
 
-include::includes/bff.adoc[]
-
-== HMI - Human Machine Interface
-
-include::includes/hmi.adoc[]
-
-== demo_IO - IO Device Control
-
-include::includes/demo_io.adoc[]
-
-== Deployment Configuration
-
-include::includes/demo_setup.adoc[]
+|RTI-FSP (ACSI server, WebSocket active) |`examples/rti-demo/modules/fsp/README.md`
+|RTI-SO (ACSI client, WebSocket passive) |`examples/rti-demo/modules/so/README.md`
+|BFF (Backend for Frontend) |`examples/rti-demo/modules/bff/README.md`
+|HMI (React frontend) |`examples/rti-demo/modules/hmi/README.md`
+|IO (Raspberry Pi devices) |`examples/rti-demo/modules/io/README.md`
+|Demo playbooks |`examples/rti-demo/playbooks/README.md`
+|===
 
 == Communication Protocols
 
 === WebSocket (ACSI)
 
 - IEC 61850 ACSI protocol
-- FSP: Active mode (initiates connections)
-- SO: Passive mode (waits for connections)
-- Port: 8765
-- Connection: FSP (Server, Port 8765) <--WebSocket--> SO (Client)
+- FSP: WebSocket active (connects out), ACSI server
+- SO: WebSocket passive (listens on port 8765), ACSI client
+- Connection: FSP (ACSI server, WebSocket client) --WebSocket--> SO (ACSI client, WebSocket server, port 8765)
 - Message Types: Read, Write, Control, Reports, Status
 
 === HTTP/REST
@@ -107,9 +100,7 @@ include::includes/demo_setup.adoc[]
 
 |BFF |SO |5002 |application/json
 
-|BFF |demo_IO |8000 |application/json
-
-|FSP/SO |demo_IO |8000 |application/json
+|FSP/SO |IO |8000 |application/json
 
 |===
 
@@ -146,8 +137,8 @@ Substation
 
 - LD0 = Logical Device 0
 - LLN0 = Logical Node Zero
-- ST = Status (Data Object type)
-- Mod = Mode (Data Object name)
+- ST = functional constraint (status information)
+- Mod = Mode (Data Object)
 
 === Data Types
 
@@ -167,154 +158,22 @@ Substation
 
 == Operational Workflows
 
-=== Data Read Flow (FSP)
+=== Read or write on the FSP itself
 
-HMI -> BFF -> FSP (REST:5001) -> FSP (WebSocket:8765) -> Model  
-HMI <- BFF <- FSP (REST:5001) <- FSP (WebSocket:8765) <- Model
+HMI -> BFF -> FSP (REST 5001) -> FSP's own model. This is local model access: no WebSocket frames. A write that is
+mapped to an IO device also updates that device (LED, LCD).
 
-=== Data Write Flow (FSP)
+=== Read, write or operate through the SO
 
-HMI -> BFF -> FSP (REST:5001) -> FSP (WebSocket:8765) -> Model -> demo_IO -> Physical Device
-
-=== Control Operation Flow (SO)
-
-HMI -> BFF -> SO (REST:5002) -> SO (WebSocket:8765) -> FSP (WebSocket:8765) -> Model
+HMI -> BFF -> SO (REST 5002) -> WebSocket (SO port 8765) -> FSP -> FSP's model, and the response back the same way.
+Reports travel FSP -> SO over the same WebSocket.
 
 === Connection Management
 
 HMI -> BFF (**POST** `/api/add-connection`) -> connections.json -> BffClient registration  
 BFF background: status_monitor checks health every 10 seconds
 
-== Quick Start Guide
+== Running the demo
 
-=== Launch All Services
-
-[source,bash]
-----
-# Launch all services (default: all services with foreground & verbose mode)
-python launch.py
-
-# Launch individual services
-python launch.py bff
-python launch.py fsp
-python launch.py so
-python launch.py frontend
-----
-
-=== Common Commands
-
-[source,bash]
-----
-# Show help
-python launch.py --help
-
-# List available services
-python launch.py list
-
-# Launch with custom port
-python launch.py bff --port 5005
-
-# Disable foreground mode (run in background)
-python launch.py --background
-
-# Disable verbose logging
-python launch.py --no-verbose
-
-# Check running services
-python launch.py --status
-
-# Stop all services
-python launch.py --stop
-
-# Docker mode
-python launch.py --docker
-----
-
-=== Access URLs
-
-[cols="1,1,1",options="header"]
-|===
-|Service |Port |Access URL
-
-|BFF |5000 |http://localhost:5000
-
-|FSP |5001 |http://localhost:5001
-
-|SO |5002 |http://localhost:5002
-
-|Frontend (HMI) |8080 |http://localhost:8080
-
-|===
-
-
-
-== Troubleshooting Guide
-
-=== Common Issues
-
-[cols="1,1,1",options="header"]
-|===
-|Service |Issue |Solution
-
-|FSP |Port 5001 in use |`PORT=5002 python bff_endpoint.py`
-
-|FSP |Port 8765 in use |Change WS port in start request
-
-|SO |Port 5002 in use |`PORT=5003 python bff_endpoint.py`
-
-|BFF |Port 5000 in use |`PORT=5005 python bff_server.py`
-
-|demo_IO |Port 8000 in use |`PORT=8001 python main.py`
-
-|All |Docker not found |Install Docker Desktop
-
-|FSP/SO |Module not found |`pip install -e .` from repo root
-
-|FSP/SO |Server not start |Check model.py exists and is valid
-
-|HMI |Cannot connect |Verify BFF host/port in Settings
-
-|===
-
-=== Debug Commands
-
-*FSP:*
-
-[source,bash]
-----
-curl http://localhost:5001/api/iec61850server/status
-curl http://localhost:5001/api/iec61850server/connections
-curl http://localhost:5001/api/iec61850server/actions
-curl http://localhost:5001/api/iec61850server/messages
-----
-
-*SO:*
-
-[source,bash]
-----
-curl http://localhost:5002/api/iec61850client/status
-curl http://localhost:5002/api/iec61850client/actions
-----
-
-*BFF:*
-
-[source,bash]
-----
-curl http://localhost:5000/api/health
-curl http://localhost:5000/api/connections
-curl http://localhost:5000/api/endpoints
-----
-
-== Documentation Sources
-
-This document was compiled from the following README files:
-
-- `examples/rti-demo/README.md` - (Main launch and services)
-- `examples/rti-demo/modules/fsp/README.md` - (FSP implementation)
-- `examples/rti-demo/modules/so/README.md` - (SO implementation)
-- `examples/rti-demo/modules/bff/README.md` - (BFF implementation)
-- `examples/rti-demo/modules/hmi/README.md` - (HMI implementation)
-- `examples/rti-demo/modules/io/README.md` - (IO control)
-
-For detailed information on specific components, refer to their respective README files in the `examples/rti-demo` directory.
-
+`examples/rti-demo/README.md` covers starting the services (`launch.py` or Docker Compose), their ports and URLs,
+Keycloak, the hardware demo, logs and troubleshooting.

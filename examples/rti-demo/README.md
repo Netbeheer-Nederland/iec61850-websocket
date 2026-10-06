@@ -212,140 +212,26 @@ Demo flow:
 3. Turn `pot1` on the FSP side: the new `TotW` value reaches the SO in the next report.
 4. Turn `pot2` on the SO side: the SO sends an operate on `WMaxSpt`, and `led2` on the FSP side shows that it arrived.
 
+FSP and SO load the IO client on request, not at startup: connect each one to its IO server with
+`POST /api/io-plugin/connect` (see *IO Client Integration* in [modules/fsp/README.md](modules/fsp/README.md)).
 Wiring, pin numbers and the I2C LCD setup are in [modules/io/README.md](modules/io/README.md).
 
 ## IO API Server
 
-The IO API Server provides REST API endpoints for controlling physical IO devices (LEDs, buttons, LCDs, etc.) on a
-Raspberry Pi.
-
-### Raspberry Pi Setup
-
-#### Enable I2C Interface (Required for LCD I2C)
-
-For LCD displays using I2C interface (SDA/SCL), you must enable I2C on the Raspberry Pi:
+The `io` service is a REST API (under `/api/io/`) for the LEDs, buttons, potentiometers and LCDs on a Raspberry Pi; it
+falls back to simulated devices elsewhere.
 
 ```bash
-sudo raspi-config
-```
-
-- Navigate to: **Interface Options → I2C → Enable**
-- Exit and reboot:
-
-```bash
-sudo reboot
-```
-
-#### Install I2C Dependencies
-
-```bash
-# Install I2C tools and Python dependencies
-sudo apt update
-sudo apt install -y i2c-tools python3-smbus
-pip install smbus2
-```
-
-#### Verify I2C is Working
-
-```bash
-# Check if I2C kernel modules are loaded
-lsmod | grep i2c
-
-# List I2C devices
-ls /dev/i2c*
-
-# Scan for I2C devices (replace 1 with your bus number if different)
-sudo i2cdetect -y 1
-```
-
-Most I2C LCD backpacks (PCF8574) use address **0x27** or **0x3F**. Update `io_config.json` with the correct address:
-
-```json
-{
-  "name": "lcd_i2c",
-  "device_type": "lcd_i2c",
-  "i2c_address": 40,
-  // 0x27 in decimal
-  "i2c_bus": 1
-}
-```
-
-#### Troubleshooting I2C LCD
-
-| Issue                             | Solution                                                        |
-|-----------------------------------|-----------------------------------------------------------------|
-| `i2cdetect` shows no devices      | Check wiring, verify I2C is enabled                             |
-| Address shows `UU`                | Device conflict, try power cycling                              |
-| Wrong address (0x27 vs 0x3F)      | Try both addresses in config                                    |
-| Permission denied on `/dev/i2c-1` | Add user to i2c group: `sudo usermod -aG i2c $USER` then reboot |
-
-#### Wiring Reference (PCF8574 I2C LCD Backpack)
-
-| LCD Backpack | Raspberry Pi                 |
-|--------------|------------------------------|
-| GND          | Pin 6 (GND)                  |
-| VCC          | Pin 2 (5V) or Pin 1 (3.3V) * |
-| SDA          | Pin 3 (GPIO 2, SDA)          |
-| SCL          | Pin 5 (GPIO 3, SCL)          |
-
-*Check your LCD backpack documentation for voltage requirements (3.3V vs 5V)*
-
-### IO API Server Usage
-
-#### Start the IO API Server
-
-```bash
-# Direct Python (listens on 8080 by default)
-cd modules/io/io_api_server
-python main.py
-
-# With custom port
-PORT=8000 python main.py
-
-# With launch.py or Docker Compose (port 8000), from examples/rti-demo
+# from examples/rti-demo, on port 8000
 python launch.py io
 docker compose up rti-io
+
+# or directly, on port 8080
+cd modules/io/io_api_server && python main.py
 ```
 
-#### API Endpoints
-
-- **Health**: `GET /api/io/health`
-- **List devices**: `GET /api/io/devices`
-- **Device state**: `GET /api/io/{device_name}`
-- **Write to device**: `POST /api/io/{device_name}`
-- **LCD write**: `POST /api/io/lcd/{device_name}/write` - Body: `{"text": ["line1", "line2"]}`
-- **LCD write line**: `POST /api/io/lcd/{device_name}/write-line` - Body: `{"line": 0, "text": "text"}`
-- **LCD clear**: `POST /api/io/lcd/{device_name}/clear`
-
-#### Device Configuration
-
-Edit `modules/io/io_api_server/io_config.json` to configure your devices. Example:
-
-```json
-{
-  "devices": [
-    {
-      "name": "led1",
-      "device_type": "led",
-      "type": "led",
-      "gpio_pin": 17,
-      "direction": "output"
-    },
-    {
-      "name": "lcd_i2c",
-      "device_type": "lcd_i2c",
-      "type": "lcd_i2c",
-      "i2c_address": 40,
-      "i2c_bus": 1,
-      "columns": 16,
-      "rows": 2,
-      "direction": "output"
-    }
-  ]
-}
-```
-
-See `modules/io/io_api_server/devices.py` for all supported device types and configurations.
+Devices, configuration (`io_config.json`), wiring, Raspberry Pi setup (GPIO, I2C, SPI) and troubleshooting are in
+[modules/io/README.md](modules/io/README.md); the endpoints are in its OpenAPI docs at http://localhost:8000/docs.
 
 ## Project Structure
 

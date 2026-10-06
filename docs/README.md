@@ -1,25 +1,43 @@
-# Overview
+# Documentation
 
-This folder contains the project documentation, including the RTIv2 protocol specification, Doxygen configuration,
-and supporting artifacts.
+Project documentation that spans more than one module. How to run or change a single example or demo service is in
+that module's own README under `examples/` (see [examples/README.md](../examples/README.md)).
 
-## Docs Overview
+## Start here
+
+| Document | What it covers |
+|---|---|
+| [getting-started.md](getting-started.md) | Install the prerequisites on Ubuntu or Fedora, set up the project, check that it works |
+
+## Contents
 
 ```
 docs/
-├─ README.md                              # This overview
-├─ THIRD_PARTY_LICENSES.txt               # License information
-├─ LICENSES                               # Directory with Licenses
+├─ README.md                              # this index
+├─ getting-started.md                     # installation and first run
+├─ architecture/                          # how the ws61850 library is built
+│  ├─ endpoint-architecture.md            #   WebSocket endpoints (passive/active), is_direct
+│  ├─ data-model-architecture.md          #   IED data model, builders, JSON loading, CDC registry
+│  └─ logging.md                          #   logger names and levels, configuring output
 ├─ protocol_specification/
 │  ├─ RTI_2.0_Protocol_Specification.md   # RTIv2 protocol specification
-│  └─ media/                              # Figures referenced by the spec
+│  ├─ example_messages/                   # example JSON messages
+│  └─ media/                              # figures referenced by the spec
+├─ rti-demo/                              # the RTI demo as a whole
+│  ├─ RTI_DEMO.adoc                       #   system overview: components, communication, data model, flows
+│  ├─ architecture/                       #   demo-setup architecture notes and whiteboard
+│  ├─ design/                             #   HMI style guide, log kinds, wireframe
+│  └─ images/                             #   architecture diagrams (also used by the module READMEs)
 ├─ scl/
 │  └─ rti_v1.0.scd                        # SCL file used for the PoC
-└─ doxygen/
-   └─ Doxyfile                            # Doxygen configuration for generating documentation
+├─ doxygen/
+│  └─ Doxyfile                            # Doxygen configuration for the API reference
+├─ archive/                               # finished plans, specs and guides, kept as a record
+├─ LICENSES/                              # license texts
+└─ THIRD_PARTY_LICENSES.txt               # third-party license information
 ```
 
-## Generate Doxygen
+## Generate the API reference (Doxygen)
 
 From the repository root, run:
 
@@ -27,10 +45,5 @@ From the repository root, run:
 doxygen docs/doxygen/Doxyfile
 ```
 
-The generated HTML output is written to:
-
-```text
-docs/doxygen/html/index.html
-```
-
-Make sure `doxygen` is installed locally before running this command.
+The HTML is written to `docs/doxygen/html/index.html` (not tracked in git). Install `doxygen` first; see
+[getting-started.md](getting-started.md#7-doxygen-optional).

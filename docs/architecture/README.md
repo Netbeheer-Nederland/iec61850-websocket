@@ -1,12 +1,12 @@
 # Development Documentation
 
-Architecture and developer guides for the `ws61850` library.
+Architecture and developer guides for the `ws61850` library. To install and set up the project, see
+[../getting-started.md](../getting-started.md).
 
 ## Contents
 
 | Document | What it covers |
 |---|---|
-| [setup.md](setup.md) | Step-by-step installation guide for Ubuntu and Fedora (all prerequisites, project setup, verification) |
 | [endpoint-architecture.md](endpoint-architecture.md) | Module layout of `ws61850.endpoint`, class responsibilities, `is_direct` semantics, reused infrastructure |
 | [logging.md](logging.md) | Logger names, log levels emitted at each layer, and how to configure log output |
 | [data-model-architecture.md](data-model-architecture.md) | Data model class design, protocol coupling to ASN1, builder/loader pattern, CDC registry, bugs fixed |

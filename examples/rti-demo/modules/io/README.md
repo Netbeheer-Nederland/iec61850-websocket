@@ -15,6 +15,8 @@ The demo_IO system enables remote control and monitoring of physical IO devices 
 
 ### Architecture
 
+![IO service architecture](../../../../docs/rti-demo/images/Demo_IO.png)
+
 ```
 +------------------+     +---------------------+     +------------------+
 |                  |     |                     |     |                  |
@@ -33,7 +35,9 @@ The demo_IO system enables remote control and monitoring of physical IO devices 
 ## Directory Structure
 
 ```
-demo_IO/
+modules/io/
+├── pyproject.toml, uv.lock               # standalone uv project (not in the root workspace)
+├── docker/Dockerfile                   # multi-stage build; context is modules/io
 ├── io_api_server/                      # IO Device REST API Service
 │   ├── main.py                         # Entry point - creates IOController + FastAPI app
 │   ├── io_controller.py                # Core IO device management (LEDs, pots, buttons, LCDs)
@@ -75,7 +79,7 @@ A **FastAPI-based web service** that provides REST API endpoints for controlling
 | Device Type | Description | Direction | Configuration |
 |-------------|-------------|-----------|---------------|
 | **LED** | Digital output - on/off control | OUTPUT | GPIO pin, initial state |
-| **Potentiometer** | Analog input via ADS1115 ADC | INPUT | ADC channel, min/max values |
+| **Potentiometer** | Analog input via an MCP3008 (SPI) or ADS1115 (I2C) ADC | INPUT | `adc_type`, ADC channel (and SPI bus/device), min/max values |
 | **Button** | Digital input with debounce | INPUT | GPIO pin, debounce time, pull-up |
 | **LCD (HD44780)** | 16x2 character display | OUTPUT | GPIO pins (RS, E, D4-D7) |
 | **LCD I2C** | LCD with I2C backpack (PCF8574) | OUTPUT | I2C address, pin mappings |
@@ -97,8 +101,10 @@ For **physical hardware operation** (not mock mode):
 
 - **Raspberry Pi** (any model with GPIO header)
 - **LEDs**: 5mm standard, 220Ω-470Ω resistors
-- **ADS1115 ADC**: For analog inputs (potentiometers)
-- **Potentiometer**: 10kΩ recommended
+- **MCP3008 ADC** (SPI) for the potentiometers, as in the default `io_config.json`; an ADS1115 (I2C) also works with
+  `"adc_type": "ads1115"`
+- **Potentiometers**: 10kΩ recommended, up to 4 (MCP3008 channels 0-3)
+- **Buttons**: momentary push buttons (latching is done in software)
 - **LCD**: HD44780-compatible 16x2 display
 - **I2C LCD Backpack**: PCF8574-based (address 0x27 or 0x3F)
 
@@ -247,14 +253,17 @@ The demo_IO system integrates with IEC 61850 power system protocols through:
 
 The default devices defined in `io_config.json` use the following GPIO configuration:
 
-| Device Name | Device Type   | GPIO     | Physical Pin | Direction | Description                |
-|-------------|---------------|----------|--------------|-----------|----------------------------|
-| led1        | LED           | 17       | 11           | OUTPUT    | LED 1                      |
-| led2        | LED           | 18       | 12           | OUTPUT    | LED 2                      |
-| led3        | LED           | 22       | 15           | OUTPUT    | LED 3                      |
-| button1     | Button        | 10       | 19           | INPUT     | Button (latching, pull-up) |
-| pot1        | Potentiometer | -        | -            | INPUT     | ADC Channel 0              |
-| lcd1        | LCD 16x2      | Multiple | Multiple     | OUTPUT    | HD44780 4-bit mode         |
+| Device Name | Device Type   | GPIO / Channel | Physical Pin | Direction | Description                        |
+|-------------|---------------|----------------|--------------|-----------|------------------------------------|
+| led1        | LED           | 17             | 11           | OUTPUT    | LED 1                              |
+| led2        | LED           | 18             | 12           | OUTPUT    | LED 2                              |
+| led3        | LED           | 22             | 15           | OUTPUT    | LED 3                              |
+| button1     | Button        | 4              | 7            | INPUT     | Button (latching, pull-up)         |
+| button2     | Button        | 23             | 16           | INPUT     | Button (latching, pull-up)         |
+| button3     | Button        | 24             | 18           | INPUT     | Button (latching, pull-up)         |
+| pot1-pot4   | Potentiometer | MCP3008 ch 0-3 | -            | INPUT     | SPI ADC, bus 0, device 0           |
+| lcd1        | LCD 16x2      | Multiple       | Multiple     | OUTPUT    | HD44780 4-bit mode                 |
+| lcd_i2c     | LCD I2C       | I2C 0x27       | 3, 5         | OUTPUT    | HD44780 with PCF8574 backpack      |
 
 ### LCD Pin Mapping (HD44780 4-bit mode)
 
@@ -275,8 +284,19 @@ The default devices defined in `io_config.json` use the following GPIO configura
 - LED2: GPIO 18 (Pin 12) -> LED anode -> Resistor (220-470Ω) -> GND
 - LED3: GPIO 22 (Pin 15) -> LED anode -> Resistor (220-470Ω) -> GND
 
-**Button**:
-- BUTTON1: GPIO 10 (Pin 19) -> Button -> GND (pull-up enabled in software)
+**Buttons** (pull-up enabled in software):
+- BUTTON1: GPIO 4 (Pin 7) -> Button -> GND
+- BUTTON2: GPIO 23 (Pin 16) -> Button -> GND
+- BUTTON3: GPIO 24 (Pin 18) -> Button -> GND
+
+**MCP3008 ADC (SPI) for the potentiometers**:
+- MOSI: GPIO 10 (Pin 19) -> MCP3008 Pin 11 (DIN)
+- MISO: GPIO 9 (Pin 21) -> MCP3008 Pin 12 (DOUT)
+- CLK: GPIO 11 (Pin 23) -> MCP3008 Pin 13 (CLK)
+- CS: GPIO 8 (Pin 24, CE0) -> MCP3008 Pin 10 (CS/SHDN)
+- VDD and VREF: +3.3V -> MCP3008 Pins 16 and 15
+- AGND and DGND: GND -> MCP3008 Pins 14 and 9
+- Potentiometers 1-4: wiper -> MCP3008 Pins 1-4 (CH0-CH3); outer legs to +3.3V and GND
 
 **LCD 16x2 (HD44780 Controller)**:
 - RS (Register Select): GPIO 26 (Pin 37) -> LCD Pin 4
@@ -302,6 +322,7 @@ The default devices defined in `io_config.json` use the following GPIO configura
 | **Port already in use**                | Use different port: `PORT=8081 python main.py`                            |
 | **gpiozero import error (Windows)**    | Normal - uses mock mode. Install gpiozero for Pi.                         |
 | **GPIO permission denied (Linux)**     | Run with sudo or add user to gpio group                                   |
+| **MCP3008 not detected**               | Check SPI wiring, enable SPI in raspi-config                              |
 | **ADS1115 not detected**               | Check I2C wiring, enable I2C in raspi-config                              |
 | **LEDs not responding**                | Verify wiring (resistor +, GND -), check GPIO numbering                   |
 | **ACSI connection failed**             | Verify IO_URL, check demo_IO is running                                   |
@@ -315,7 +336,7 @@ The default devices defined in `io_config.json` use the following GPIO configura
 curl http://localhost:8080/api/io/health
 
 # Check if ACSI IO router is connected
-curl http://localhost:5001/api/io/connection
+curl http://localhost:5001/api/io-plugin/connection-status
 
 # List all devices
 curl http://localhost:8080/api/io/devices
@@ -347,6 +368,12 @@ sudo reboot
 ```
 
 ### I2C LCD backpack (PCF8574)
+
+Install the I2C tools (`i2cdetect`) once:
+
+```bash
+sudo apt update && sudo apt install -y i2c-tools
+```
 
 Check that the I2C bus is up and the backpack answers:
 

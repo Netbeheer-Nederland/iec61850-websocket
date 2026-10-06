@@ -15,6 +15,8 @@ The FSP directory implements a complete **IEC 61850 ACSI (Abstract Communication
 
 ### Architecture
 
+![RTI-FSP ACSI server architecture](../../../../docs/rti-demo/images/RTI_FSP_ACSI_SERVER.png)
+
 ```
 +------------------+     +---------------------+     +------------------+
 |                  |     |                     |     |                  |
@@ -112,9 +114,10 @@ A **FastAPI** application that provides REST endpoints for managing the ACSI Ser
 | | POST `/api/iec61850server/actions/clear` | Clear actions |
 | | GET `/api/iec61850server/messages` | View messages |
 | | POST `/api/iec61850server/messages/clear` | Clear messages |
-| **IO Client** | POST `/api/io/connect` | Connect to demo_IO |
-| | GET `/api/io/connection` | IO connection status |
-| | POST `/api/io/disconnect` | Disconnect from demo_IO |
+| **IO Client** | POST `/api/io-plugin/connect` | Download and load the IO client from the IO server |
+| | GET `/api/io-plugin/connection-status` | IO connection status |
+| | POST `/api/io-plugin/disconnect` | Disconnect from the IO server |
+| | `/api/io/*` | IO router (LEDs, mappings), present once the IO client is loaded |
 
 ---
 
@@ -197,24 +200,31 @@ FastAPI serves at `http://localhost:5001/docs` while the service runs.
 
 ## IO Client Integration
 
-The FSP server integrates with the `demo_IO` service for controlling physical IO devices through IEC 61850 objects.
+The FSP server can drive the IO devices (LEDs, LCDs) of the `io` service and take input from its buttons and
+potentiometers. The IO code is not part of this package: on request, the service downloads the `io_client` files from
+the IO server (`/api/io-plugin/files`), loads them and adds the `/api/io/*` routes to the running app. Nothing is
+fetched at startup.
 
-### Connect to demo_IO
+### Connect to the IO service
 
 ```bash
-curl -X POST http://localhost:5001/api/io/connect \
+curl -X POST http://localhost:5001/api/io-plugin/connect \
   -H "Content-Type: application/json" \
-  -d '{"base_url": "http://demo-io:8080"}'
+  -d '{"server_url": "http://localhost:8000", "acsi_url": "http://localhost:5001"}'
 ```
+
+`server_url` defaults to `IO_SERVER_URL`. In Docker use `http://rti-io:8000`; for an IO server started directly with
+`main.py`, `http://localhost:8080`. The mapping between IO devices and IEC 61850 objects is
+`io/io_client/io_mapping.json`; see the *Hardware demo* section of `examples/rti-demo/README.md`.
 
 ### Check/Disconnect IO
 
 ```bash
 # Check connection
-curl http://localhost:5001/api/io/connection
+curl http://localhost:5001/api/io-plugin/connection-status
 
 # Disconnect
-curl -X POST http://localhost:5001/api/io/disconnect
+curl -X POST http://localhost:5001/api/io-plugin/disconnect
 ```
 
 ---
@@ -227,7 +237,9 @@ curl -X POST http://localhost:5001/api/io/disconnect
 |----------|---------|-------------|
 | `PORT` | 5001 | REST API port |
 | `CP` | cp1 | Communication point identifier |
-| `DEMO_IO_URL` | None | demo_IO service URL (for auto-connect) |
+| `IO_SERVER_URL` | `http://localhost:8000` | Default IO server for `/api/io-plugin/connect` |
+| `IO_URL` | None | Read by the loaded IO router: connects its IO client without a separate `/api/io/connect` |
+| `IO_PLUGIN_STORAGE` | `/app/io_plugin_dynamic` | Where the downloaded `io_client` files are kept |
 
 ### Server Defaults
 

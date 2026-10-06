@@ -16,6 +16,8 @@ The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication 
 
 ### Architecture
 
+![RTI-SO ACSI client architecture](../../../../docs/rti-demo/images/SO_ACSI_CLIENT.png)
+
 ```
 +------------------+     +---------------------+     +------------------+
 |                  |     |                     |     |                  |
@@ -160,24 +162,31 @@ curl http://localhost:5002/api/iec61850client/status
 
 ## IO Client Integration
 
-The SO client integrates with the `demo_IO` service for controlling physical IO devices through IEC 61850 objects.
+The SO client can drive the IO devices (LEDs, LCDs) of the `io` service and take input from its buttons and
+potentiometers. The IO code is not part of this package: on request, the service downloads the `io_client` files from
+the IO server (`/api/io-plugin/files`), loads them and adds the `/api/io/*` routes to the running app. Nothing is
+fetched at startup.
 
-### Connect to demo_IO
+### Connect to the IO service
 
 ```bash
-curl -X POST http://localhost:5002/api/io/connect \
+curl -X POST http://localhost:5002/api/io-plugin/connect \
   -H "Content-Type: application/json" \
-  -d '{"base_url": "http://demo-io:8080"}'
+  -d '{"server_url": "http://localhost:8000", "acsi_url": "http://localhost:5002"}'
 ```
+
+`server_url` defaults to `IO_SERVER_URL`. In Docker use `http://rti-io:8000`; for an IO server started directly with
+`main.py`, `http://localhost:8080`. The mapping between IO devices and IEC 61850 objects is
+`io/io_client/io_mapping.json`; see the *Hardware demo* section of `examples/rti-demo/README.md`.
 
 ### Check/Disconnect IO
 
 ```bash
 # Check connection
-curl http://localhost:5002/api/io/connection
+curl http://localhost:5002/api/io-plugin/connection-status
 
 # Disconnect
-curl -X POST http://localhost:5002/api/io/disconnect
+curl -X POST http://localhost:5002/api/io-plugin/disconnect
 ```
 
 ---
@@ -189,7 +198,9 @@ curl -X POST http://localhost:5002/api/io/disconnect
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 5002 | REST API port |
-| `DEMO_IO_URL` | None | demo_IO service URL (for auto-connect) |
+| `IO_SERVER_URL` | `http://localhost:8000` | Default IO server for `/api/io-plugin/connect` |
+| `IO_URL` | None | Read by the loaded IO router: connects its IO client without a separate `/api/io/connect` |
+| `IO_PLUGIN_STORAGE` | `/app/io_plugin_dynamic` | Where the downloaded `io_client` files are kept |
 
 ### Connection Defaults
 
@@ -201,12 +212,13 @@ curl -X POST http://localhost:5002/api/io/disconnect
 
 ## Testing
 
-Run tests from repository root:
+Run tests from the repository root:
 
 ```bash
-pip install pytest pytest-asyncio
-python -m pytest -q rti-demo/tests/unit/
+uv run --package so pytest examples/rti-demo/modules/so/tests -q
 ```
+
+See `examples/rti-demo/TESTING.md` for the other modules and the integration tests.
 
 ---
 

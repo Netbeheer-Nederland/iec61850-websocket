@@ -45,22 +45,26 @@ IEC 61850 is powerful but traditionally bound to MMS/TCP, and this PoC shows how
 
 ## High-level architecture
 
-**Flow:**
+Two parties exchange IEC 61850 ACSI services over a WebSocket. Either party can be the WebSocket server, independent of
+which one holds the data model:
 
-1. IEC 61850 source
-    - Simulated Logical Nodes *or*
-    - Real device / gateway *or*
-    - Recorded data (PCAP / JSON)
+```
+IEC61850Client  <-- ACSI services, reports -->  IEC61850Server
+      |                                                |
+  endpoint (PassiveEndpoint = WebSocket server, ActiveEndpoint = WebSocket client)
+      |                                                |
+  TPAA association, OAuth 2.0 bearer tokens, TLS
+      |                                                |
+  ASN.1 messages, JSON (JER) or BER encoded  <== WebSocket ==>
+```
 
-2. Python backend
-    - Reads / produces IEC 61850-like data
-    - Normalizes it into a simple internal model
-    - Publishes updates via WebSockets
-
-3. WebSocket clients
-    - Browser UI
-    - Monitoring tools
-    - Other backend services
+- `ws61850.endpoint` runs the WebSocket side and the TPAA association; `is_direct` says who starts it (see
+  [docs/architecture/endpoint-architecture.md](docs/architecture/endpoint-architecture.md)).
+- `ws61850.iec61850` holds the IEC 61850 client and server and the IED data model (see
+  [docs/architecture/data-model-architecture.md](docs/architecture/data-model-architecture.md)).
+- `ws61850.asn1` and `ws61850.protocol` encode and decode the messages defined by the ASN.1 schema.
+- The RTI demo in `examples/rti-demo` builds a complete system on top: RTI-FSP (IEC 61850 server), RTI-SO (IEC 61850
+  client), a BFF and a React HMI.
 
 ---
 
@@ -68,28 +72,28 @@ IEC 61850 is powerful but traditionally bound to MMS/TCP, and this PoC shows how
 
 ```
 iec61850-websocket/
-├─ pyproject.toml
-├─ README.md
-├─ src/
-│  └─ ws61850/
-│     ├─ iec61850/                 # Client/server logic and IEC 61850 data model helpers
-│     │  ├─ client/                # IEC 61850 WebSocket client implementations
-│     │  ├─ server/                # IEC 61850 WebSocket server implementations
-│     │  ├─ data_model/            # IEC 61850 data model abstractions and helpers
-│     ├─ endpoint/                 # WebSocket endpoint implementation
-│     ├─ security/
-│     │  ├─ tls.py                 # TLS configuration container and helpers
-│     │  └─ oauth.py               # OAuth utilities for client identification
-│     └─ asn1/                     # ASN.1 schema, encode/decode, formatters, and tests
-├─ tests/                          # Functional and performance-oriented test suites
-│  ├─ unit/                        # Unit-level tests (in progress)
-│  ├─ integration/                 # Integration and protocol-level tests
-│  ├─ performance/                 # Performance and load tests
-│  └─ security/                    # Security tests
-├─ examples/                       # Example clients/servers and interactive demos
-├─ docs/                           # Generated and hand-written documentation (e.g. Doxygen, specs)
-│  └─ protocol_specification/      # IEC61850 WebSocket protocol specification
-└─ scripts/                        # Helper scripts (setup, tooling, test helpers)
+├─ pyproject.toml, uv.lock         # uv workspace: ws61850 plus the rti-demo bff, fsp and so modules
+├─ src/ws61850/
+│  ├─ endpoint/                    # PassiveEndpoint / ActiveEndpoint, association handling, routing
+│  ├─ transport/                   # WebSocket transport, reconnect policy, sessions, auth strategies
+│  ├─ iec61850/
+│  │  ├─ client/                   # IEC61850Client
+│  │  ├─ server/                   # IEC61850Server, control and report handling
+│  │  ├─ services/                 # ACSI services: directory, data access, control, reports
+│  │  └─ data_model/               # IED model classes, builders, JSON loader, CDC registry
+│  ├─ protocol/                    # message types, factory and codec shared by client and server
+│  ├─ asn1/                        # ASN.1 schema and encode/decode
+│  ├─ security/                    # TLS configuration, OAuth 2.0 (tokens, JWKS, JWT validation)
+│  └─ shared/                      # errors, references, tree rendering
+├─ tests/
+│  ├─ unit/                        # unit tests (pytest), run in CI
+│  ├─ integration/                 # FT1-FT8 functional scenarios
+│  ├─ performance/                 # FT20-FT23 encoding, multiple clients, OAuth + TLS
+│  └─ security/                    # FT30-FT31 TLS and OAuth
+├─ testing/                        # test support: certificates, IED models, helpers
+├─ examples/                       # library examples and the RTI demo (see examples/README.md)
+├─ docs/                           # getting started, architecture, protocol specification (see docs/README.md)
+└─ scripts/keycloak/               # Keycloak (IDP-Server) for the OAuth scenarios
 ```
 
 ---
@@ -136,11 +140,17 @@ uv sync
 uv build
 ```
 
-or for a more detailed setup see [setup](docs/architecture/setup.md).
+or for a more detailed setup see [docs/getting-started.md](docs/getting-started.md).
 
 ---
 
 ## Running tests
+
+The unit tests run in CI and are the quickest check that everything works:
+
+```bash
+uv run pytest tests/unit -q
+```
 
 The functional and performance scenarios in `tests/` are intended to be run from the repository root with `uv`.
 Start by installing dependencies with `uv sync`, then open the markdown description for the scenario you want to run in
@@ -161,6 +171,16 @@ the corresponding test markdown files.
 Example clients, servers, and interactive demos live under the `examples/` directory in this repository. It also
 describes how to run them in the [README](examples/README.md).
 
+## Where next
+
+| You want to... | Read |
+|---|---|
+| install and verify the project | [docs/getting-started.md](docs/getting-started.md) |
+| understand or change the library | [docs/architecture/](docs/architecture/README.md) |
+| run the examples or the RTI demo | [examples/README.md](examples/README.md), [examples/rti-demo/README.md](examples/rti-demo/README.md) |
+| read the protocol | [docs/protocol_specification/](docs/protocol_specification/RTI_2.0_Protocol_Specification.md) |
+| contribute a change | [CONTRIBUTING.md](CONTRIBUTING.md) |
+
 ## Contributing
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull
@@ -173,5 +193,5 @@ This project is licensed under the Apache License, version 2.0 – see LICENSE f
 ## Licenses third-party code
 
 This project includes third-party code, which is licensed under their own respective Open-Source licenses.
-SPDX-License-Identifier headers are used to show which license is applicable. The concerning license files can be found
-in the LICENSES directory in the root of the documentation. 
+SPDX-License-Identifier headers are used to show which license is applicable. The license texts are in
+[docs/LICENSES](docs/LICENSES).

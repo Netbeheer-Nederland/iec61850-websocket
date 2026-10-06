@@ -1,9 +1,7 @@
 # ACSI IO Client - Device Control via demo_IO
 
-> **Partly outdated.** "ACSI" in this document is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` /
-> `so.bff_endpoint`), and "demo_IO" is the `io` module. Connection settings, ports and paths below are current; the
-> *Direct Client Usage* example and the *Development → Testing* commands still describe the pre-`modules/` layout and
-> are pending a rewrite. For running the whole stack, see `examples/rti-demo/README.md`.
+> In this document "ACSI" is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` / `so.bff_endpoint`) and "demo_IO"
+> is the `io` module's IO server. For running the whole stack, see `examples/rti-demo/README.md`.
 
 This directory provides the ability for ACSI to connect to and control the demo_IO service's IO device functionality.
 
@@ -38,7 +36,9 @@ A Python client library for communicating with the demo_IO service's REST API.
 **Usage (Synchronous):**
 
 ```python
-from demo_IO.io_client.async_client_io import DemoIOClient
+import sys
+sys.path.insert(0, "examples/rti-demo/modules/io/io_client")  # the modules import each other by bare name
+from async_client_io import DemoIOClient
 
 # Create client
 client = DemoIOClient(base_url="http://localhost:8080")
@@ -86,8 +86,6 @@ A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/io/connect` | Connect to demo_IO service |
-| GET | `/api/io/connection` | Get connection status |
-| POST | `/api/io/disconnect` | Disconnect from demo_IO |
 | GET | `/api/io/health` | Check demo_IO health |
 | GET | `/api/io/status` | Get IO controller status |
 | POST | `/api/io/leds/config` | Configure an LED (proxied to device API) |
@@ -106,68 +104,54 @@ A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying 
 
 ### 3. Integration with ACSI BFF
 
-The IO router is automatically included in ACSI's BFF when the `bff_endpoint.py` is imported (if the dependencies are available).
+FSP and SO don't ship these files. They download them from the IO server and load them at runtime (see below).
 
 ## Quick Start
 
-### Option 1: Using Environment Variable (Recommended)
-
-Set the `IO_URL` and `ACSI_BASE_URL` environment variables before starting ACSI. The values below are for running
-both on the host; in Docker, `docker-compose.yml` sets `IO_URL=http://rti-io:8000`.
+### Connect FSP or SO to the IO server
 
 ```bash
-# Linux/macOS
-export IO_URL=http://localhost:8080
-export ACSI_BASE_URL=http://localhost:5001
-uv run --package fsp python -m fsp.bff_endpoint
-
-# Windows
-set IO_URL=http://localhost:8080
-set ACSI_BASE_URL=http://localhost:5001
-uv run --package fsp python -m fsp.bff_endpoint
+curl -X POST http://localhost:5001/api/io-plugin/connect \
+  -H "Content-Type: application/json" \
+  -d '{"server_url": "http://localhost:8000", "acsi_url": "http://localhost:5001"}'
 ```
 
-Now ACSI will automatically connect to demo_IO on startup.
+This downloads the `io_client` files from the IO server (`GET /api/io-plugin/files`), loads them, and adds the
+`/api/io/*` routes to the running service. Use port 5002 for the SO, and `http://rti-io:8000` as `server_url` in Docker
+(`http://localhost:8080` for an IO server started directly with `main.py`). `server_url` defaults to the
+`IO_SERVER_URL` environment variable. If `IO_URL` is set, the loaded router configures its client from it; otherwise
+call `POST /api/io/connect` with `{"base_url": ...}`.
 
-### Option 2: Using API Endpoints
-
-1. Start ACSI normally
-2. Connect to demo_IO via API:
+Then use the IO routes:
 
 ```bash
-# Connect to demo_IO
-curl -X POST http://localhost:5001/api/io/connect \
-  -H "Content-Type: application/json" \
-  -d '{"base_url": "http://localhost:8080"}'   # http://rti-io:8000 when FSP runs in Docker
-
-# Check connection status
-curl http://localhost:5001/api/io/connection
+# Connection status
+curl http://localhost:5001/api/io-plugin/connection-status
 
 # Control an LED
 curl -X POST http://localhost:5001/api/io/leds/led1/set \
   -H "Content-Type: application/json" \
   -d '{"state": true}'
 
-# Get LED state
+# Get LED state, or all LEDs
 curl http://localhost:5001/api/io/leds/led1
-
-# Get all LEDs
 curl http://localhost:5001/api/io/leds
 ```
 
-### Option 3: Direct Client Usage in ACSI Code
+### Use the client directly
 
 ```python
-from acsi.demo_IO.io_client.async_client_io import DemoIOClient
+import sys
+sys.path.insert(0, "examples/rti-demo/modules/io/io_client")
+from async_client_io import DemoIOClient
 
-# In your ACSI code, create a client and use it directly
 client = DemoIOClient(base_url="http://localhost:8080")
-
-# Use the client methods
 client.turn_on("led1")
 client.toggle_led("led2")
 state = client.get_led_state("led1")
 ```
+
+The client needs `httpx2`, which the `fsp` and `so` environments have: run it with `uv run --package fsp python ...`.
 
 ## Configuration
 
@@ -194,22 +178,16 @@ PORT=8000 python examples/rti-demo/modules/io/io_api_server/main.py
 docker compose up -d rti-io
 ```
 
-### ACSI Service
+### ACSI Service (FSP / SO)
 
-ACSI runs on port 5001 by default.
-
-**Starting ACSI:**
+FSP runs on port 5001 and SO on 5002. From the repository root:
 
 ```bash
-# With IO router enabled (default in this integration)
-python examples/rti-demo/acsi/bff_endpoint.py
-
-# With custom port
-PORT=5005 python examples/rti-demo/acsi/bff_endpoint.py
-
-# With Docker
-# See Dockerfile.rti-acsi in examples/rti-demo/
+uv run --package fsp python -m fsp.bff_endpoint
+uv run --package so python -m so.bff_endpoint
 ```
+
+or from `examples/rti-demo`: `python launch.py fsp so`, or `docker compose up -d rti-fsp01 rti-so`.
 
 ## Usage Examples
 
@@ -264,7 +242,7 @@ curl http://localhost:5001/api/io/status
 curl http://localhost:5001/api/io/health
 
 # Check connection status
-curl http://localhost:5001/api/io/connection
+curl http://localhost:5001/api/io-plugin/connection-status
 ```
 
 ## Docker Deployment
@@ -284,24 +262,21 @@ docker compose up -d rti-io rti-fsp01
 
 ### Testing
 
-Run the test scripts:
+There are no automated tests for `io_client` itself; the FSP and SO tests cover how it is loaded
+(`uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -q`, and the same for `so`). On a Raspberry Pi, two
+scripts check the IO server:
 
 ```bash
-# Test async_client_io and io_router
-python examples/rti-demo/modules/io/io_client/test_client_io.py
-
-# Run standalone io_router tests
-python examples/rti-demo/acsi/test_io_router_standalone.py
-
-# Run usage examples
-python examples/rti-demo/acsi/example_usage.py
+cd examples/rti-demo/modules/io/io_api_server
+python test_imports.py     # all IO server modules import
+python test_lcd_i2c.py     # the I2C LCD works
 ```
 
 ### Adding New IO Functionality
 
 1. **Extend DemoIOClient**: Add new methods to `async_client_io.py` for additional demo_IO API calls
 2. **Add New Endpoints**: Add new routes to `io_router.py` to expose new functionality
-3. **Update BFF**: The IO router is automatically included in ACSI's BFF via `bff_endpoint.py`
+3. **Reload**: FSP and SO pick up changed files with `POST /api/io-plugin/reload` (or a new `/api/io-plugin/connect`)
 
 ## Troubleshooting
 
@@ -316,8 +291,8 @@ python examples/rti-demo/acsi/example_usage.py
 
 **Error:** `Client not configured`
 
-- Set `IO_URL` environment variable, or
-- Use POST `/api/io/connect` endpoint to configure connection
+- Load the IO client first with `POST /api/io-plugin/connect`, then
+- set the `IO_URL` environment variable, or call `POST /api/io/connect` with `{"base_url": ...}`
 
 ### Port Conflicts
 
@@ -369,17 +344,17 @@ python examples/rti-demo/acsi/example_usage.py
 ## Files
 
 - `async_client_io.py` - DemoIOClient & AsyncDemoIOClient HTTP clients
-- `io_router.py` - FastAPI IO router for ACSI BFF
-- `test_client_io.py` - Test script for client and router
-- `test_io_router_standalone.py` - Standalone router tests
-- `example_usage.py` - Usage examples
+- `io_router.py` - FastAPI IO router that FSP and SO load at runtime
+- `mapping_manager.py` - IEC 61850 object to IO device mapping (`io_mapping.json`)
+- `io_utils.py` - helpers (LED blink, LCD write) used by FSP and SO
+- `io_mapping.json` - default mapping
 - `README_IO.md` - This file
 
 ## Compatibility
 
 - Python 3.10+
 - FastAPI 0.100+
-- requests library
+- httpx2
 - demo_IO service (from examples/rti-demo/modules/io/)
 
 ## License

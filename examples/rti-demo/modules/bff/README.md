@@ -31,55 +31,7 @@ The **BFF (Backend For Frontend)** layer in the RTI Demo serves as an intermedia
 
 ## Architecture
 
-```
-+-----------------------------------------------------------------------+
-|                        RTI Demo System Architecture                     |
-+-----------------------------------------------------------------------+
-|                                                                       |
-|  +-----------------+      +-----------------+      +-------------+  |
-|  |                 |      |                 |      |             |  |
-|  |   Web Browser   |----->|   HMI (React)    |----->|    BFF      |  |
-|  |   (User)        |      |   (Port 3001)   |      | (Port 5000)|  |
-|  |                 |      |                 |      |             |  |
-|  +-----------------+      +-----------------+      +------+------+  |
-|                                                        |         |
-|                 +--------------------------------------+         |
-|                 |                                          |         |
-|                 v                                          v         |
-|  +----------------------+              +----------------------+       |
-|  |                      |              |                      |       |
-|  |   RTI-FSP (FSP-1)   |<----+-------|   RTI-FSP (FSP-2)   |       |
-|  |   (ACSI-Server)      |  HTTP/REST   |   (ACSI-Server)      |       |
-|  |   Port: 5001/5005    |              |   Port: 5005         |       |
-|  |                      |              |                      |       |
-|  +----------------------+              +----------------------+       |
-|                                                      |                 |
-|                                                      v                 |
-|                                             +----------------------+    |
-|                                             |                      |    |
-|                                             |   RTI-SO (Client)    |    |
-|                                             |   (ACSI-Client)      |    |
-|                                             |   Port: 5002         |    |
-|                                             |                      |    |
-|                                             +----------------------+    |
-|                                                                       |
-|  +-----------------+                                                  |
-|  |                 |                                                  |
-|  |  IDP Server     |<-------------------------------------------------+
-|  | (Keycloak/OAuth) |         TLS/OAuth Configuration                    |
-|  |  Port: 8443     |                                                  |
-|  |                 |                                                  |
-|  +-----------------+                                                  |
-|                                                                       |
-|  +-----------------+                                                  |
-|  |                 |                                                  |
-|  |  Demo I/O       |<-------------------------------------------------+
-|  |  (GPIO Control) |         Physical I/O Operations                     |
-|  |  Port: 8000     |                                                  |
-|  |                 |                                                  |
-|  +-----------------+                                                  |
-+-----------------------------------------------------------------------+
-```
+![BFF architecture](../../../../docs/rti-demo/images/BFF.png)
 
 ### Data Flow
 
@@ -97,14 +49,19 @@ Note: The FSP and SO services use WebSocket internally for ACSI communication, b
 ## Folder Structure
 
 ```
-bff/
-+-- __pycache__/              # Python cache files (generated)
-+-- bff_server.py            # Main FastAPI application (1256 lines)
-+-- connection_manager.py      # Manages connections to RTI endpoints (388 lines)
-+-- bff_client.py             # HTTP client for BFF-to-backend communication (24 lines)
-+-- pydantic_models.py       # Request/Response data models (93 lines)
-+-- connections.json         # Persistent connection configurations
-+-- README.md                # This file
+modules/bff/
+├── pyproject.toml
+├── docker/Dockerfile          # multi-stage build, built from the repository root
+├── src/bff/
+│   ├── bff_server.py          # FastAPI application: all routes and the /ws push channel
+│   ├── connection_manager.py  # registered RTI-FSP / RTI-SO / IDP-Server connections, health checks
+│   ├── bff_client.py          # HTTP client for BFF-to-instance calls
+│   ├── pydantic_models.py     # request/response models
+│   ├── playbook.py            # demo playbooks: parse, execute through the BFF, check each step
+│   ├── playbook_store.py      # built-in and saved playbooks
+│   ├── playbook_runs.py       # the one playbook run at a time, in a worker thread
+│   └── connections.json       # seed connections, copied to the config volume on first start
+└── tests/
 ```
 
 ---
@@ -183,17 +140,18 @@ When HMI calls /api/reconfig-oauth, BFF automatically enriches request with OAut
 - Connection types: RTI-FSP, RTI-SO, IDP-Server
 - Features: Load/save connections, add/update/delete, health monitoring, auto-discovery
 
-### 3. DataManager.py
-- Executes data operations against connected endpoints
-- Methods: call_remote_service, read_data, write_data, operate
-
-### 4. bff_client.py
+### 3. bff_client.py
 - HTTP client wrapper for BFF-to-backend communication
 - Connection pooling, error handling, JSON parsing
 
-### 5. pydantic_models.py
+### 4. pydantic_models.py
 - Data validation and OpenAPI schema generation
 - Models: Connection, TLS, OAuth, Data requests
+
+### 5. playbook.py, playbook_store.py, playbook_runs.py
+- Demo playbooks: YAML (or JSON) steps for one SO and its FSPs, executed through the BFF the same way the HMI does
+- Built-in playbooks from `examples/rti-demo/playbooks` (read-only) and saved ones on the config volume
+- One run at a time, in a worker thread; progress is pushed over `/ws` as `playbook-run` messages
 
 ---
 
@@ -201,6 +159,8 @@ When HMI calls /api/reconfig-oauth, BFF automatically enriches request with OAut
 
 ### Health & Status
 - GET /api/health - Health check with target reachability
+- GET /api/diagnostics - System log across the BFF and every reachable RTI-SO/RTI-FSP (see `docs/rti-demo/design/logging-kinds.md`)
+- WebSocket /ws - push channel for the HMI: connection list changes, actions, playbook runs
 
 ### Endpoints Management  
 - GET /api/endpoints - Get all configured and discovered endpoints
@@ -219,16 +179,15 @@ When HMI calls /api/reconfig-oauth, BFF automatically enriches request with OAut
 - POST /api/connections/oauth-config - Update OAuth for connection
 - GET /api/connections/oauth-config - Get OAuth config
 - GET /api/connections/oauth-status - Get OAuth enable status
+- GET /api/idp/discovery - Read a realm's OIDC discovery document from an IDP-Server connection (issuer, JWKS and token endpoints)
 
-### Data Operations
-- POST /api/data/read - Read data from connection
-- POST /api/data/write - Write data to connection
-
-### Control Operations
-- POST /api/operate - Perform control operation
+### Data and control operations
+Reads, writes and operates go to an SO or FSP through `POST /api/execute` (below); the BFF has no separate data routes.
 
 ### Dynamic Execution
 - POST /api/execute - Execute any API on registered target
+
+![Dynamic execution via POST /api/execute](../../../../docs/rti-demo/images/Sequence_Diagram-Dynamic_Execution_via_POST__api_execute.png)
 
 ### Reports
 - GET /api/reports - List available reports
@@ -256,6 +215,8 @@ Environment variables:
 ---
 
 ## Security Features
+
+![Security and OAuth 2.0 communication flow](../../../../docs/rti-demo/images/Security_and_OAuth_2.0_Communication_Flow.png)
 
 ### 1. TLS Encryption
 - Per-connection TLS configuration
@@ -302,7 +263,7 @@ The BFF service in docker-compose.yml:
 - Container: rti-bff
 - Port: 5000:5000
 - Network: rti-network
-- Volumes: connections.json persistence, Docker socket for discovery
+- Volumes: `bff-config` at `/config` (connections.json and saved playbooks), `./playbooks` read-only (built-in playbooks)
 - Depends on: Healthy rti-bff for HMI
 
 All services communicate through rti-network Docker network.
@@ -355,7 +316,7 @@ curl -X DELETE http://localhost:5000/api/delete-connection/my-fsp
 ## Key Design Patterns
 
 1. **Backend For Frontend Pattern** - Primary architectural pattern
-2. **Adapter Pattern** - DataManager and BffClient adapt between frontend/backend
+2. **Adapter Pattern** - BffClient and the /api/execute forwarding adapt between frontend/backend
 3. **Singleton Pattern** - Global managers instantiated once
 4. **Factory Pattern** - ConnectionManager.add_connection creates connections
 5. **Proxy Pattern** - BFF proxies requests to backend services
