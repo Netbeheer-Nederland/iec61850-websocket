@@ -82,7 +82,7 @@ async def main():
     iec61850_server_1.set_control_handler(control_handler_for_float, None)
     ep_ws_client_1.add_iec61850_server(iec61850_server_1)
 
-    task1 = asyncio.create_task(ep_ws_client_1.start("localhost", 9100, "cp1"))
+    task1 = asyncio.create_task(ep_ws_client_1.start("localhost", 8765, "cp1"))
 
     await asyncio.gather(task1)
 
