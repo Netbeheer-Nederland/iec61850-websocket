@@ -9,8 +9,8 @@ Covers **Ubuntu 24.04 LTS** and **Fedora 41**.
 
 1. [System requirements](#1-system-requirements)
 2. [Git](#2-git)
-3. [UV](#4-uv)
-4. [Python 3.12](#3-python-312)
+3. [UV](#3-uv)
+4. [Python 3.12](#4-python-312)
 5. [Docker and Docker Compose](#5-docker-and-docker-compose)
 6. [cfssl](#6-cfssl)
 7. [Doxygen (optional)](#7-doxygen-optional)
@@ -342,7 +342,7 @@ If both sides connect and exchange messages without errors, the installation is 
 | Symptom                                         | Likely cause                            | Fix                                                                                       |
 |-------------------------------------------------|-----------------------------------------|-------------------------------------------------------------------------------------------|
 | `uv: command not found`                         | Shell env not reloaded after UV install | Run `source "$HOME/.local/bin/env"` or open a new terminal                                |
-| `python3.12: command not found` on Ubuntu 22.04 | deadsnakes PPA not added                | Follow the Ubuntu 22.04 path in [section 3](#3-python-312)                                |
+| `python3.12: command not found` on Ubuntu 22.04 | deadsnakes PPA not added                | Follow the Ubuntu 22.04 path in [section 4](#4-python-312)                                |
 | `cfssl: command not found`                      | Binary not on `PATH`                    | Confirm `/usr/local/bin` is on `PATH`; re-run the `sudo mv` step                          |
 | `permission denied` running Docker              | User not in `docker` group              | Run `sudo usermod -aG docker "$USER"` then log out and back in                            |
 | `uv sync` fails on a C extension                | Python headers missing                  | Install `python3.12-dev` (Ubuntu) or `python3.12-devel` (Fedora)                          |

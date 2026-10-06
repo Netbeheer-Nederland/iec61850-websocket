@@ -116,7 +116,7 @@ iec61850-websocket/
 
 ### Setup environment
 
-If the prerequisites already installaed the environment can be setup using the following commands:
+If the prerequisites are already installed, the environment can be set up using the following commands:
 
 ```shell
 # Clone the repository
