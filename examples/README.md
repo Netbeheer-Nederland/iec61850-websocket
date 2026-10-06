@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Examples
 
 Example code for the `ws61850` library, the Python reference implementation of the WebSocket/JSON-based IEC 61850

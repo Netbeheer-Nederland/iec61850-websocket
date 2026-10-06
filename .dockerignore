@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
 # Build context for the repo-root Docker builds (examples/rti-demo/modules/
 # {so,fsp,bff}/docker/Dockerfile). These COPY only:
 #   pyproject.toml, uv.lock (the shared uv workspace lock)

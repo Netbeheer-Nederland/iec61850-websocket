@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
 # RTI Demo SO (ACSI Client / WS Passive) Docker Image - Multi-stage
 # Build context: repo root (needed for the shared uv workspace lock and
 # the ws61850 core library at src/) - see docker-compose.yml.

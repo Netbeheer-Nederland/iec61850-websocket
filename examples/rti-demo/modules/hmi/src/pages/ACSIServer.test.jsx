@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+//
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

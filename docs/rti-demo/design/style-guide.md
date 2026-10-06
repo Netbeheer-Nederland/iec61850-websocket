@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # HMI Style Guide & Design Documentation
 
 This documents the actual, current visual language of the `hmi/` React

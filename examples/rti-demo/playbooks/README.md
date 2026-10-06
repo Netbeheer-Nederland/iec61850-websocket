@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Demo playbooks
 
 A playbook is a YAML (or JSON) file listing the steps of a demo with one SO

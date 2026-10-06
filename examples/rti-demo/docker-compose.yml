@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
 # Image names follows ${RTI_IMAGE_REPO}/rti-<role>:${RTI_IMAGE_TAG}
 # defaulting to netbeheer-nederland/iec61850-websocket/rti-<role>:latest, so
 # a local `docker compose build` produces exactly the images the demo runs.

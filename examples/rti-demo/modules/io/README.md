@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # demo_IO: Raspberry Pi IO Device Control - WebSocket and ACSI Services Integration
 
 This directory contains a complete **IO Device Control System** for Raspberry Pi, consisting of two main components:

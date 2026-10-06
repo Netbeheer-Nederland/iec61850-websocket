@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # FT3: Fetch the RTI data model from the Connected Party endpoint
 
 The following negative test case variations can be considered (Optional):

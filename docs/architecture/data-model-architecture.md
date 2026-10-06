@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Data Model Architecture
 
 This document describes the IEC 61850 data model layer (`ws61850.iec61850.data_model`), its relationship to the

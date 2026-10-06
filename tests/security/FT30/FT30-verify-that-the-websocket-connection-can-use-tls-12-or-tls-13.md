@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # FT30: Verify that the WebSocket Connection Can Use TLS 1.2 or TLS 1.3
 
 ## Scope

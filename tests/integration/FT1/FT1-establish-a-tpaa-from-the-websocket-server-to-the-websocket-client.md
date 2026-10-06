@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # FT1: Establish a TPAA from the WebSocket server to the WebSocket client
 
 The following negative test case variations can be considered (Optional):

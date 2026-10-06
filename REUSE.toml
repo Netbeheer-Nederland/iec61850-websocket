@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright and license for files that can't carry a header comment (JSON,
+# lock files, images, diagrams) - see https://reuse.software/spec/.
+# Everything else carries an SPDX header in the file itself; check with
+#   uvx reuse lint
+version = 1
+
+# Images and diagrams in the documentation.
+[[annotations]]
+path = [
+  "docs/protocol_specification/media/**",
+  "docs/rti-demo/images/**",
+  "docs/rti-demo/architecture/img.png",
+  "docs/rti-demo/architecture/RTIv2- demo-setup - whiteboard.drawio",
+  "docs/rti-demo/design/wireframe.html",
+  "scripts/keycloak/images/**",
+]
+SPDX-FileCopyrightText = "2026 Netbeheer Nederland"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Data and configuration files: example messages, IED models and their
+# schema, the SCL file, demo and test configuration, certificate requests.
+[[annotations]]
+path = [
+  "docs/protocol_specification/example_messages/*.json",
+  "docs/scl/rti_v1.0.scd",
+  "src/ws61850/iec61850/data_model/schema/ied_model.schema.json",
+  "examples/ws61850_interactive/ied_model1.json",
+  "examples/ws61850_mode/ied_model1.json",
+  "examples/ws61850_mode/ied_model2.json",
+  "examples/rti-demo/config/launch_config.json.example",
+  "examples/rti-demo/modules/bff/src/bff/connections.json",
+  "examples/rti-demo/modules/hmi/package.json",
+  "examples/rti-demo/modules/io/io_api_server/io_config.json",
+  "examples/rti-demo/modules/io/io_client/io_mapping.json",
+  "scripts/keycloak/data/realm-test.json",
+  "testing/certs/*-csr.json",
+  "testing/certs/ca-config.json",
+  "testing/ieds/*.json",
+  "docs/THIRD_PARTY_LICENSES.txt",
+]
+SPDX-FileCopyrightText = "2026 Netbeheer Nederland"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Generated lock files.
+[[annotations]]
+path = [
+  "uv.lock",
+  "examples/rti-demo/modules/io/uv.lock",
+  "examples/rti-demo/modules/hmi/package-lock.json",
+]
+SPDX-FileCopyrightText = "2026 Netbeheer Nederland"
+SPDX-License-Identifier = "Apache-2.0"

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
 # RTI Demo GPIO LED Control API Docker Image - Multi-stage
 # Build context: examples/rti-demo/modules/io
 

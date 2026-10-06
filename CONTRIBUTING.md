@@ -34,8 +34,8 @@ This project follows the following [Code of Conduct](CODE_OF_CONDUCT.md).
 ## REUSE compliance and source code headers
 
 All the files in the repository need to be [REUSE compliant](https://reuse.software/).
-CI does not check this yet, and the repository is not fully compliant today (`reuse lint` reports files without a
-header). Add the header to every file you create or change, and check with:
+The `reuse` job in CI checks this on every pull request and fails if any file lacks copyright or license information.
+Check locally before you push:
 
 ```bash
 uvx reuse lint
@@ -45,15 +45,16 @@ This means that every file containing source code must include copyright and lic
 JS/CSS files that you might be serving out to browsers. (This is to help well-intentioned people avoid accidental
 copying that doesn't comply with the license.)
 
-Apache 2.0 header, as used in the source files (in the comment syntax of the file):
+Apache 2.0 header for a new file, in the comment syntax of the file (use the current year):
 
 ```text
-SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 SPDX-License-Identifier: Apache-2.0
 ```
 
-For files that can't carry a comment (images, JSON), add a `<file>.license` next to it with the same two lines, as
-`.github/pull_request_template.md.license` does.
+`uvx reuse annotate --copyright "Netbeheer Nederland" --license Apache-2.0 <file>` adds it for you. Files that can't
+carry a comment (images, JSON, lock files) are covered by a path entry in `REUSE.toml`; add new ones there. The license
+texts are in `LICENSES/`.
 
 ## Git branching
 

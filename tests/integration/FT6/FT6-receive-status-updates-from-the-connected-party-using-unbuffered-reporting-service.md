@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # FT6: Receive status updates from the Connected Party using unbuffered reporting service
 
 The following negative test case variations can be considered (Optional):

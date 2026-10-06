@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # RTI HMI - React Frontend
 
 The React-based HMI (Human Machine Interface) of the RTI demo: a web interface for monitoring and controlling the RTI

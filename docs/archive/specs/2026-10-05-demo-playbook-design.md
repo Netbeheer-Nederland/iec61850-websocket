@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Demo Playbook in the HMI - design
 
 > **Archived 2026-10-06 - historical record, not current instructions.** Implemented: see `examples/rti-demo/playbooks/README.md` for the current behaviour. Paths and steps below

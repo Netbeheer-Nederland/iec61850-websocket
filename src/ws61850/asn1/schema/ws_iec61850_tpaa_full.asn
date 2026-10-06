@@ -1,7 +1,10 @@
+-- SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+--
+-- SPDX-License-Identifier: Apache-2.0
+
 IEC61850 DEFINITIONS ::= BEGIN
 
 -- Direct mapping of IEC 61850 ACSI services
--- for questions please contact info@mz-automation.de
 
 -- TPAA (Two party application association) PDU
 TpaaPdu ::= CHOICE

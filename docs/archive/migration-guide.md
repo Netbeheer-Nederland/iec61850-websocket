@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Migration Guide: WebSocketEndpoint → PassiveEndpoint / ActiveEndpoint
 
 > **Archived 2026-10-06 - historical record, not current instructions.** The `WebSocketEndpoint` shim this guide migrates from was removed in `c710a2d`; it only helps when porting code written against it. For the current API see `docs/architecture/endpoint-architecture.md`. Paths and steps below

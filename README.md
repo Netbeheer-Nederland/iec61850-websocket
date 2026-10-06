@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # IEC 61850 WebSocket Proof-of-Concept
 
 ⚠️ **Project status:**  
@@ -193,5 +199,7 @@ This project is licensed under the Apache License, version 2.0 – see LICENSE f
 ## Licenses third-party code
 
 This project includes third-party code, which is licensed under their own respective Open-Source licenses.
-SPDX-License-Identifier headers are used to show which license is applicable. The license texts are in
-[docs/LICENSES](docs/LICENSES).
+Every file states its copyright and license with SPDX headers (or an entry in [REUSE.toml](REUSE.toml)), following the
+[REUSE](https://reuse.software/) specification; the license texts are in [LICENSES](LICENSES). The third-party
+packages the project depends on and their licenses are listed in
+[docs/THIRD_PARTY_LICENSES.txt](docs/THIRD_PARTY_LICENSES.txt) and [docs/LICENSES](docs/LICENSES).

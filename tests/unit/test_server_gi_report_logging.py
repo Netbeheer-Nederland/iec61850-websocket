@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+# SPDX-FileCopyrightText: 2025-2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
 """IEC61850Server.handle_request logs the one-time GI report it sends when an
 RCB is enabled - not the request's response a second time."""

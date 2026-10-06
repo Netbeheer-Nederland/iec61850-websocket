@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # RTI Demo Docker Build Optimization Implementation Plan
 
 > **Archived 2026-10-06 - historical record, not current instructions.** Implemented: the per-module multi-stage Dockerfiles live in `examples/rti-demo/modules/*/docker/`. The `demo_setup/` compose files this plan edits were removed later (`439ef2b`). Paths and steps below

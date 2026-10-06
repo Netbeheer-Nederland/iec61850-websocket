@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
 # RTI Demo BFF (Backend for Frontend) Docker Image - Multi-stage
 # Build context: repo root (kept consistent with fsp/so, which need it for
 # the shared uv workspace lock and the ws61850 core library at src/ - bff

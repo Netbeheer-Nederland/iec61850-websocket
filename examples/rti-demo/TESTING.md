@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Running the Test Suite
 
 This is a step-by-step guide for running rti-demo's test suites, written for

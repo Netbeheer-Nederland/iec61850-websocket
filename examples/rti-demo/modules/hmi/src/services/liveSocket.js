@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+//
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Live push channel to the BFF's /ws endpoint.
  *

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # FT4: Send setpoints to the Connected Party by using Control and SetDataValues services
 
 The following negative test case variations can be considered (Optional):

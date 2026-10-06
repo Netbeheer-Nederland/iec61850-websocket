@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Netbeheer Nederland
+# SPDX-FileCopyrightText: 2025-2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
 """Integration test: run the demo playbook (playbooks/demo.yaml) against the
 live stack - the same file and runner used to present the demo.

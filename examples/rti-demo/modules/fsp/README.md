@@ -1,6 +1,12 @@
+<!--
+SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # FSP: IEC 61850 ACSI Server Implementation
 
-This folder contains the **FSP (Functional Server Platform)** implementation - an **IEC 61850 ACSI Server** that provides WebSocket-based communication in active mode for substation automation and power system control. Developed by MZ Automation.
+This folder contains the **FSP (Functional Server Platform)** implementation - an **IEC 61850 ACSI Server** that provides WebSocket-based communication in active mode for substation automation and power system control.
 
 ## Overview
 

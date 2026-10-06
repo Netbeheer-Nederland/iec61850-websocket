@@ -48,6 +48,14 @@ jobs:
           name: junit-${{ matrix.python }}
           path: junit-*.xml
 
+  # Copyright and license information on every file (REUSE spec; REUSE.toml
+  # covers files that can't carry a header).
+  reuse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: fsfe/reuse-action@v6
+
   # Relative links and #anchors in the Markdown docs (config: lychee.toml).
   docs-links:
     runs-on: ubuntu-latest
