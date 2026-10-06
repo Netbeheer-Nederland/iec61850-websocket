@@ -3,11 +3,16 @@
 
 name: CI
 
+# Every push is checked, so long-lived branches without a pull request (such as
+# an integration branch) get CI too. Pull requests are checked only when they
+# target main; one into another branch is covered by that branch's push runs.
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
+    branches: [main]
   merge_group:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}

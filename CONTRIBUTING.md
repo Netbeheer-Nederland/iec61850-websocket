@@ -34,7 +34,7 @@ This project follows the following [Code of Conduct](CODE_OF_CONDUCT.md).
 ## REUSE compliance and source code headers
 
 All the files in the repository need to be [REUSE compliant](https://reuse.software/).
-The `reuse` job in CI checks this on every pull request and fails if any file lacks copyright or license information.
+The `reuse` job in CI checks this on every push and pull request and fails if any file lacks copyright or license information.
 Check locally before you push:
 
 ```bash
@@ -125,7 +125,7 @@ Follow this process for a code change and pull request:
 
 ## Before you push
 
-CI (`.github/workflows/ci.yml`) runs these on every pull request; run them locally first, from the repository root:
+CI (`.github/workflows/ci.yml`) runs these on every push, on any branch, and on pull requests into `main`; run them locally first, from the repository root:
 
 ```bash
 uv sync --locked
