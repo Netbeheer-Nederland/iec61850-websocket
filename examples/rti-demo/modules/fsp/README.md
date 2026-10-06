@@ -135,14 +135,14 @@ needs `src/ws61850` (the core library) and the shared uv workspace lock.
 
 ```bash
 # Build the Docker image
-docker build -t rti-demo-fsp -f examples/rti-demo/modules/fsp/docker/Dockerfile .
+docker build -t netbeheer-nederland/iec61850-websocket/rti-fsp -f examples/rti-demo/modules/fsp/docker/Dockerfile .
 
 # Run the container
-docker run --rm -p 5001:5001 rti-demo-fsp
+docker run --rm -p 5001:5001 netbeheer-nederland/iec61850-websocket/rti-fsp
 
 # With custom network (for multi-container setup)
 docker network create rti-network
-docker run --rm -p 5001:5001 --network rti-network --name rti-fsp rti-demo-fsp
+docker run --rm -p 5001:5001 --network rti-network --name rti-fsp netbeheer-nederland/iec61850-websocket/rti-fsp
 ```
 
 #### API Health Check
@@ -190,7 +190,8 @@ curl http://localhost:5001/api/iec61850server/status
 
 The FSP provides a comprehensive REST API for managing the IEC 61850 server in active mode, including server lifecycle control, model operations, data read/write, logging, and IO integration.
 
-For complete API documentation with all endpoints, parameters, and examples, see [BFF_API.md](./BFF_API.md).
+For complete API documentation with all endpoints, parameters, and examples, open the interactive OpenAPI docs that
+FastAPI serves at `http://localhost:5001/docs` while the service runs.
 
 ---
 
@@ -293,8 +294,7 @@ FSP (BFF, Port 5001) <--HTTP--> External Clients
 | `acsi_server.py` | WebSocket Server (active mode) | ACSIServerRuntime, ACSIServer |
 | `bff_endpoint.py` | REST API | FastAPI app, endpoint routes |
 | `model.py` | IED model | Generated data model |
-| `BFF_API.md` | API docs | Endpoint specifications |
-| `Dockerfile` | Container | Multi-stage build |
+| `docker/Dockerfile` | Container | Multi-stage build |
 
 ---
 

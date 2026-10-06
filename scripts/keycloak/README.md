@@ -44,7 +44,7 @@ Or with SSL:
 
 ```shell
 curl -X POST \
-  --cacert ../../../testing/certs/ca.pem \
+  --cacert ../../testing/certs/ca.pem \
   https://localhost:8443/realms/iec61850-test/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials" \

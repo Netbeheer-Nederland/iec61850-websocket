@@ -16,33 +16,27 @@ Run the setup instructions and run the examples from the project root directory:
 
 ## IEC61850 mode
 
-Examples pairing: run matching client/server scripts from `examples/ws61850_mode` depending on the mode.
+Matching client/server script pairs live in `examples/ws61850_mode/<mode>/`, where `<mode>` is the directory name:
 
-### “reversed” mode
-
-The ws_client runs the IEC61850Server, and the ws_service runs the IEC61850Client in server
-
-### “direct” mode:
-
-The ws_server runs the IEC61850Server, and the ws_client runs the IEC61850Client
+| Mode      | `ws_server.py` (WebSocket server) | `ws_client.py` (WebSocket client) |
+|-----------|-----------------------------------|-----------------------------------|
+| `direct`  | runs the `IEC61850Server`         | runs the `IEC61850Client`         |
+| `reverse` | runs the `IEC61850Client`         | runs the `IEC61850Server`         |
 
 ### Execute
 
-Run from the project root directory
-
-The websocket server and client run separately.
+Run from the project root directory. The WebSocket server and client run in separate terminals; start the server
+first.
 
 ```bash
 # start the websocket server
-python examples/ws61850_mode/<mode>/ws_server.py
+uv run python examples/ws61850_mode/<mode>/ws_server.py
 ```
 
 ```bash
 # start the websocket client
-python examples/ws61850_mode/<mode>/ws_client.py
+uv run python examples/ws61850_mode/<mode>/ws_client.py
 ```
-
-The mode is equal to the directory name.
 
 ## IEC61850 interactive
 
@@ -129,49 +123,3 @@ which is of type octet string is to be set, the value should be of form
 octetString: b"value"
 Note: Only and only one value can be set with one command, so it is important to only add one "object=value" to the
 command.
-
-## IEC61850 UI
-
-For demonstration there is also a web-based GUI client tool and this takes two steps: first, the websocket server and
-client is started,
-second, the UI is started.
-
-### Execute
-
-First, start the websocket server and client together.
-
-```bash
-python examples/ws61850_interactive/console_app.py
-```
-
-Second, start the UI.
-
-```bash
-export PORT=5000   # optional; defaults to 5000
-python examples/ws61850_interactive/app.py
-```
-
-Open `http://localhost:5000` in your browser.
-
-### Connect from UI
-
-Use the connection form:
-
-- Host: IEC 61850 WebSocket server host
-- Port: IEC 61850 WebSocket server port
-- CP: CP path (e.g., `cp`)
-
-Click "Connect" to start a client connection. The backend manages the endpoint/client lifecycle and logs recent actions
-and messages.
-
-Features:
-
-- Build and browse the IED model tree (LD/LN).
-- Monitor sent/received TPAA protocol messages.
-- Optional TLS and OAuth support when configured on the server side.
-
-Troubleshooting:
-
-- Connection issues: verify server host/port and reachability;
-- Check TLS/OAuth settings if enabled. (not yet in this example)
-- Port conflicts: set `PORT` to a free port before starting the app.

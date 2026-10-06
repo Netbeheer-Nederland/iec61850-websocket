@@ -83,12 +83,12 @@ The current FT31 scripts do not expose command-line options or environment varia
 
 ## Start Keycloak
 
-The FT31 test expects the Keycloak container defined in `scripts/keycloak/docker-compose.yaml`.
+The FT31 test expects the Keycloak container defined in `scripts/keycloak/docker-compose.yml`.
 
 From the repository root:
 
 ```bash
-docker compose -f scripts/keycloak/docker-compose.yaml up
+docker compose -f scripts/keycloak/docker-compose.yml up
 ```
 
 The docker-compose file provides:
@@ -207,7 +207,7 @@ From the repository root:
 
 ```bash
 uv sync
-docker compose -f scripts/keycloak/docker-compose.yaml up
+docker compose -f scripts/keycloak/docker-compose.yml up
 ```
 
 In another terminal:

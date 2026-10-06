@@ -1,5 +1,10 @@
 # ACSI IO Client - Device Control via demo_IO
 
+> **Partly outdated.** "ACSI" in this document is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` /
+> `so.bff_endpoint`), and "demo_IO" is the `io` module. Connection settings, ports and paths below are current; the
+> *Direct Client Usage* example and the *Development → Testing* commands still describe the pre-`modules/` layout and
+> are pending a rewrite. For running the whole stack, see `examples/rti-demo/README.md`.
+
 This directory provides the ability for ACSI to connect to and control the demo_IO service's IO device functionality.
 
 ## Overview
@@ -69,7 +74,7 @@ if client.is_healthy():
 A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying requests to demo_IO.
 
 **Features:**
-- Automatic connection via `DEMO_IO_URL` environment variable
+- Automatic connection via `IO_URL` environment variable
 - Programmatic connection management via API endpoints
 - Full LED control through REST endpoints (proxied to demo_IO device API)
 - Connection status monitoring
@@ -107,18 +112,19 @@ The IO router is automatically included in ACSI's BFF when the `bff_endpoint.py`
 
 ### Option 1: Using Environment Variable (Recommended)
 
-Set the `DEMO_IO_URL` and `ACSI_BASE_URL` environment variables before starting ACSI:
+Set the `IO_URL` and `ACSI_BASE_URL` environment variables before starting ACSI. The values below are for running
+both on the host; in Docker, `docker-compose.yml` sets `IO_URL=http://rti-io:8000`.
 
 ```bash
 # Linux/macOS
-export DEMO_IO_URL=http://demo-io:8080
+export IO_URL=http://localhost:8080
 export ACSI_BASE_URL=http://localhost:5001
-python acsi/bff_endpoint.py
+uv run --package fsp python -m fsp.bff_endpoint
 
 # Windows
-set DEMO_IO_URL=http://demo-io:8080
+set IO_URL=http://localhost:8080
 set ACSI_BASE_URL=http://localhost:5001
-python acsi/bff_endpoint.py
+uv run --package fsp python -m fsp.bff_endpoint
 ```
 
 Now ACSI will automatically connect to demo_IO on startup.
@@ -132,7 +138,7 @@ Now ACSI will automatically connect to demo_IO on startup.
 # Connect to demo_IO
 curl -X POST http://localhost:5001/api/io/connect \
   -H "Content-Type: application/json" \
-  -d '{"base_url": "http://demo-io:8080"}'
+  -d '{"base_url": "http://localhost:8080"}'   # http://rti-io:8000 when FSP runs in Docker
 
 # Check connection status
 curl http://localhost:5001/api/io/connection
@@ -155,7 +161,7 @@ curl http://localhost:5001/api/io/leds
 from acsi.demo_IO.io_client.async_client_io import DemoIOClient
 
 # In your ACSI code, create a client and use it directly
-client = DemoIOClient(base_url="http://demo-io:8080")
+client = DemoIOClient(base_url="http://localhost:8080")
 
 # Use the client methods
 client.turn_on("led1")
@@ -167,10 +173,11 @@ state = client.get_led_state("led1")
 
 ### demo_IO Service
 
-The demo_IO service is configured in `examples/rti-demo/modules/demo_io/`.
+The demo_IO service is configured in `examples/rti-demo/modules/io/`.
 
 **Default Configuration:**
-- Port: 8080
+- Port: 8080 when `io_api_server/main.py` is run directly; 8000 under `launch.py` and Docker (`rti-io:8000` on
+  `rti-network`)
 - Default LEDs: led1 (GPIO 17), led2 (GPIO 18), led3 (GPIO 22)
 - Health endpoint: `/api/io/health`
 
@@ -178,13 +185,13 @@ The demo_IO service is configured in `examples/rti-demo/modules/demo_io/`.
 
 ```bash
 # With default port
-python examples/rti-demo/modules/demo_io/io_api_server/main.py
+python examples/rti-demo/modules/io/io_api_server/main.py
 
 # With custom port
-PORT=8000 python examples/rti-demo/modules/demo_io/io_api_server/main.py
+PORT=8000 python examples/rti-demo/modules/io/io_api_server/main.py
 
-# With Docker
-# See examples/rti-demo/modules/demo_io/docker/Dockerfile
+# With Docker (from examples/rti-demo)
+docker compose up -d rti-io
 ```
 
 ### ACSI Service
@@ -264,41 +271,13 @@ curl http://localhost:5001/api/io/connection
 
 ### Docker Compose Example
 
-```yaml
-version: '3.8'
-
-services:
-  rti-acsi:
-    build:
-      context: examples/rti-demo
-      dockerfile: Dockerfile.rti-acsi
-    ports:
-      - "5001:5001"
-    environment:
-      - DEMO_IO_URL=http://demo-io:8080
-      - ACSI_BASE_URL=http://localhost:5001
-    depends_on:
-      - demo-io
-
-  demo-io:
-    build:
-      context: examples/rti-demo/modules/demo_io
-      dockerfile: docker/Dockerfile
-    ports:
-      - "8080:8080"
-```
-
-### Docker Network Configuration
-
-Make sure both services are on the same Docker network:
+`examples/rti-demo/docker-compose.yml` already wires this up: `rti-fsp01` and `rti-fsp02` get
+`IO_URL=http://rti-io:8000`, and all services share the external `rti-network`:
 
 ```bash
-# Create a network
-docker network create rti-network
-
-# Run services on the network
-docker run --network rti-network --name demo-io -p 8080:8080 rti-demo-io
-docker run --network rti-network --name rti-acsi -p 5001:5001 -e DEMO_IO_URL=http://demo-io:8080 -e ACSI_BASE_URL=http://localhost:5001 rti-demo-acsi
+docker network create rti-network 2>/dev/null || true
+cd examples/rti-demo
+docker compose up -d rti-io rti-fsp01
 ```
 
 ## Development
@@ -309,7 +288,7 @@ Run the test scripts:
 
 ```bash
 # Test async_client_io and io_router
-python examples/rti-demo/modules/demo_io/io_client/test_client_io.py
+python examples/rti-demo/modules/io/io_client/test_client_io.py
 
 # Run standalone io_router tests
 python examples/rti-demo/acsi/test_io_router_standalone.py
@@ -331,18 +310,18 @@ python examples/rti-demo/acsi/example_usage.py
 **Error:** `demo_IO service is not responding`
 
 - Check that demo_IO service is running
-- Verify the URL is correct (default: http://localhost:8080)
+- Verify the URL is correct (`http://localhost:8080` when run directly, `http://rti-io:8000` in Docker)
 - Check that the port is accessible (firewall, Docker networking)
-- Test with: `curl http://demo-io:8080/api/io/health`
+- Test with: `curl http://localhost:8080/api/io/health` (direct run) or `curl http://localhost:8000/api/io/health` (Docker, published port)
 
 **Error:** `Client not configured`
 
-- Set `DEMO_IO_URL` environment variable, or
+- Set `IO_URL` environment variable, or
 - Use POST `/api/io/connect` endpoint to configure connection
 
 ### Port Conflicts
 
-- demo_IO uses port 8080 by default
+- demo_IO uses port 8080 when run directly, 8000 under `launch.py` and Docker
 - ACSI uses port 5001 by default
 - Change ports using `PORT` environment variable
 
@@ -401,7 +380,7 @@ python examples/rti-demo/acsi/example_usage.py
 - Python 3.10+
 - FastAPI 0.100+
 - requests library
-- demo_IO service (from examples/rti-demo/modules/demo_io/)
+- demo_IO service (from examples/rti-demo/modules/io/)
 
 ## License
 

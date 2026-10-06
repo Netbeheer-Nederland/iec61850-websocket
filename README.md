@@ -151,7 +151,7 @@ Most tests follow the same pattern: start the passive side first, for example
 another terminal, for example `uv run python tests/performance/FT20/ws_client.py`.
 
 Some scenarios also require extra setup such as generated TLS certificates in `testing/certs/` or a local Keycloak
-instance started with `docker compose -f scripts/keycloak/docker-compose.yaml up`; those prerequisites are documented in
+instance started with `docker compose -f scripts/keycloak/docker-compose.yml up`; those prerequisites are documented in
 the corresponding test markdown files.
 
 ---

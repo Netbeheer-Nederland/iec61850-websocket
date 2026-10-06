@@ -14,6 +14,6 @@ Architecture and developer guides for the `ws61850` library.
 
 ## Context
 
-The endpoint layer was refactored from a single 859-line `WebSocketEndpoint` class controlled by a runtime `mode` string into two focused concrete classes (`PassiveEndpoint`, `ActiveEndpoint`) with shared infrastructure extracted into reusable helpers. The backward-compatible `WebSocketEndpoint` shim remains for existing callers.
+The endpoint layer was refactored from a single 859-line `WebSocketEndpoint` class controlled by a runtime `mode` string into two focused concrete classes (`PassiveEndpoint`, `ActiveEndpoint`) with shared infrastructure extracted into reusable helpers. The backward-compatible `WebSocketEndpoint` shim has since been removed (commit `c710a2d`).
 
 See the individual documents for details.

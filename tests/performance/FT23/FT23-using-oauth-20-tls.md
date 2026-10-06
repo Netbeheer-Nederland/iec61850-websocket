@@ -80,12 +80,12 @@ These only need to be set when you want values different from the defaults.
 
 ## Start Keycloak
 
-The FT23 test expects the Keycloak container defined in `scripts/keycloak/docker-compose.yaml`.
+The FT23 test expects the Keycloak container defined in `scripts/keycloak/docker-compose.yml`.
 
 From the repository root:
 
 ```bash
-docker compose -f scripts/keycloak/docker-compose.yaml up
+docker compose -f scripts/keycloak/docker-compose.yml up
 ```
 
 The docker-compose file provides:
@@ -226,7 +226,7 @@ From the repository root:
 
 ```bash
 uv sync
-docker compose -f scripts/keycloak/docker-compose.yaml up
+docker compose -f scripts/keycloak/docker-compose.yml up
 ```
 
 In another terminal:

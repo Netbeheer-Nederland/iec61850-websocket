@@ -84,7 +84,8 @@ The core client implementation that handles:
 
 ### 2. bff_endpoint.py - REST API (Backend for Frontend)
 
-A **FastAPI** application that provides REST endpoints for managing the ACSI client. Acts as a bridge between HTTP clients and the WebSocket-based IEC 61850 client in passive mode. For complete API documentation, see [BFF_API.md](./BFF_API.md).
+A **FastAPI** application that provides REST endpoints for managing the ACSI client. Acts as a bridge between HTTP clients and the WebSocket-based IEC 61850 client in passive mode. For complete API documentation, open the interactive OpenAPI docs that FastAPI serves at
+`http://localhost:5002/docs` while the service runs.
 
 ---
 
@@ -106,14 +107,14 @@ needs `src/ws61850` (the core library) and the shared uv workspace lock.
 
 ```bash
 # Build the Docker image
-docker build -t rti-demo-so -f examples/rti-demo/modules/so/docker/Dockerfile .
+docker build -t netbeheer-nederland/iec61850-websocket/rti-so -f examples/rti-demo/modules/so/docker/Dockerfile .
 
 # Run the container
-docker run --rm -p 5002:5002 rti-demo-so
+docker run --rm -p 5002:5002 netbeheer-nederland/iec61850-websocket/rti-so
 
 # With custom network (for multi-container setup)
 docker network create rti-network
-docker run --rm -p 5002:5002 --network rti-network --name rti-so rti-demo-so
+docker run --rm -p 5002:5002 --network rti-network --name rti-so netbeheer-nederland/iec61850-websocket/rti-so
 ```
 
 #### API Health Check
@@ -274,8 +275,7 @@ SO integrates with `demo_IO` to control physical IO devices through IEC 61850 ob
 |------|---------|---------------------|
 | `acsi_client.py` | WebSocket client (passive mode) | ModelInfo, ACSIClientRuntime, ACSIClient |
 | `bff_endpoint.py` | REST API | FastAPI app, endpoint routes |
-| `BFF_API.md` | API docs | Endpoint specifications |
-| `Dockerfile` | Container | Multi-stage build (if exists) |
+| `docker/Dockerfile` | Container | Multi-stage build |
 
 ---
 

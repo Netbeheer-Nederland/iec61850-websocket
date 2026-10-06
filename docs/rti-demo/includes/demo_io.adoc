@@ -54,7 +54,7 @@ physical IO devices connected to a Raspberry Pi or simulated devices for develop
 |Hardware Abstraction |Clean separation between hardware drivers and API logic
 |Mock Mode |Works without Raspberry Pi hardware (Windows/macOS development)
 |REST API |Complete CRUD operations for all device types
-|Swagger UI |Interactive API documentation at `/api/io/docs`
+|Swagger UI |Interactive API documentation at `/docs`
 |Thread-Safe |Safe concurrent access to IO devices
 |Plug-in Architecture |Easy to add new device types
 |===

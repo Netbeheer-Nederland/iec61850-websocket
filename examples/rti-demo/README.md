@@ -12,25 +12,31 @@ python launch.py
 python launch.py bff
 python launch.py fsp
 python launch.py so
-python launch.py frontend
+python launch.py io
 ```
+
+`launch.py` starts the Python services only. Start the HMI separately, from `modules/hmi`, with `npm install` and
+`npm run dev` (see `modules/hmi/README.md`).
 
 ## Services
 
-| Service                  | Port        | Description                                                           |
-|--------------------------|-------------|-----------------------------------------------------------------------|
-| `bff`                    | 5000        | Backend for Frontend - REST API gateway                               |
-| `fsp`                    | 5001        | RTI-FSP - IEC 61850 server                                            |
-| `so`                     | 5002        | RTI-SO - IEC 61850 client                                             |
-| `frontend`               | 8080        | Web-based HMI                                                         |
-| `keycloak` (Docker only) | 8080 / 8443 | IDP-Server for OAuth - see [Keycloak](#keycloak-idp-server-for-oauth) |
+| Service                  | Port                                 | Description                                                           |
+|--------------------------|--------------------------------------|-----------------------------------------------------------------------|
+| `bff`                    | 5000                                 | Backend for Frontend - REST API gateway                               |
+| `fsp`                    | 5001                                 | RTI-FSP - IEC 61850 server                                            |
+| `fsp2`                   | 5005                                 | RTI-FSP, second instance (`cp2`)                                      |
+| `so`                     | 5002, WebSocket 8765                 | RTI-SO - IEC 61850 client                                             |
+| `io`                     | 8000                                 | IO device control API (8080 when `main.py` is run directly)           |
+| HMI                      | 3000 (`npm run dev`) / 3001 (Docker) | Web-based HMI                                                         |
+| `keycloak` (Docker only) | 8080 / 8443                          | IDP-Server for OAuth - see [Keycloak](#keycloak-idp-server-for-oauth) |
 
 ## Access URLs
 
 - BFF: http://localhost:5000/api/health
 - FSP: http://localhost:5001/api/status
 - SO: http://localhost:5002/api/status
-- Frontend: http://localhost:8080
+- IO: http://localhost:8000/api/io/health
+- HMI: http://localhost:3000 (`npm run dev`) or http://localhost:3001 (Docker)
 
 ## Common Commands
 
@@ -170,14 +176,14 @@ HTTPS (8443) uses `testing/certs/keycloak.pem`, whose certificate only covers `k
 ### BFF connection persistence in Docker
 
 The `rti-bff` container persists `connections.json` in a dedicated `/config`
-directory backed by the `bff-config` named volume (not in `/app` or the `./bff`
-code mount). On first start it is seeded from `bff/connections.json`; after that
+directory backed by the `bff-config` named volume (not in `/app` or the module
+code). On first start it is seeded from `modules/bff/src/bff/connections.json`; after that
 the volume is authoritative. To reset it:
 
 ```bash
-docker-compose down
+docker compose down
 docker volume rm rti-demo_bff-config   # prefix matches your compose project name
-docker-compose up -d rti-bff
+docker compose up -d rti-bff
 ```
 
 The `BFF_CONNECTIONS_FILE` env var overrides the path if you need a different location (e.g. a host bind mount).
@@ -263,16 +269,16 @@ Most I2C LCD backpacks (PCF8574) use address **0x27** or **0x3F**. Update `io_co
 #### Start the IO API Server
 
 ```bash
-# Direct Python
-cd demo_IO/io_api_server
+# Direct Python (listens on 8080 by default)
+cd modules/io/io_api_server
 python main.py
 
 # With custom port
-PORT=8080 python main.py
+PORT=8000 python main.py
 
-# With Docker Compose
-cd demo_IO
-docker-compose up rti-io
+# With launch.py or Docker Compose (port 8000), from examples/rti-demo
+python launch.py io
+docker compose up rti-io
 ```
 
 #### API Endpoints
@@ -287,7 +293,7 @@ docker-compose up rti-io
 
 #### Device Configuration
 
-Edit `demo_IO/io_api_server/io_config.json` to configure your devices. Example:
+Edit `modules/io/io_api_server/io_config.json` to configure your devices. Example:
 
 ```json
 {
@@ -313,7 +319,7 @@ Edit `demo_IO/io_api_server/io_config.json` to configure your devices. Example:
 }
 ```
 
-See `demo_IO/io_api_server/devices.py` for all supported device types and configurations.
+See `modules/io/io_api_server/devices.py` for all supported device types and configurations.
 
 ## Project Structure
 

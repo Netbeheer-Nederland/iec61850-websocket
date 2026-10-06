@@ -21,7 +21,6 @@ src/ws61850/endpoint/
   connection_router.py     # cp → server/client lookup + instanceNotAvailable response
   passive_endpoint.py      # WebSocket server role  (listens for connections)
   active_endpoint.py       # WebSocket client role  (connects outward)
-  endpoint.py              # WebSocketEndpoint — backward-compatible buffering shim
 ```
 
 ## Class responsibilities
@@ -129,19 +128,13 @@ Handles the three TPAA association-control message types that appear inside ever
 | `ACTION_RELEASE` (`"release"`) | A `releaseRequest` was received; release response sent, connection closed |
 | `ACTION_CONTINUE` (`"continue"`) | A `refreshToken` or unrecognised type; loop should continue |
 
-Before this class existed, the same ~40-line block was copy-pasted three times inside `WebSocketEndpoint` (once per receive path). Both `PassiveEndpoint` and `ActiveEndpoint` call `AssociationHandler.handle()` from their respective receive loops.
+Both `PassiveEndpoint` and `ActiveEndpoint` call `AssociationHandler.handle()` from their respective receive loops.
 
 ### `ConnectionRouter` (`connection_router.py`)
 
 Resolves a control-point identifier (`cp` string) to a registered `IEC61850Server` or `IEC61850Client`, and sends the standard TPAA `instanceNotAvailable` response when no match is found.
 
-Before this class existed, the same lookup-plus-not-found block was copy-pasted four times inside `WebSocketEndpoint`. Both endpoint classes share a single `ConnectionRouter` instance.
-
-### `WebSocketEndpoint` (`endpoint.py`) — backward-compatible shim
-
-Buffers `add_iec61850_client` / `add_iec61850_server` registrations and callbacks made before `start()`. On `start(mode, hostname, port, ...)` it constructs the correct concrete class (`PassiveEndpoint` or `ActiveEndpoint`), replays the buffered state, and awaits.
-
-This shim exists so existing callers do not need to change. New code should use `PassiveEndpoint` or `ActiveEndpoint` directly.
+Both endpoint classes share a single `ConnectionRouter` instance.
 
 ## `is_direct` semantics
 
@@ -170,7 +163,6 @@ from ws61850.endpoint import (
     ActiveEndpoint,      # concrete WebSocket client role
     WebSocketInfo,       # per-connection session state
     EndpointProtocol,    # structural Protocol for type annotations
-    WebSocketEndpoint,   # deprecated shim — kept for backward compatibility
     create_endpoint,     # factory: create_endpoint('passive'/'active', **kwargs)
 )
 ```

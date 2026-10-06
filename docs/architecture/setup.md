@@ -324,16 +324,18 @@ installed.
 To do a quick smoke-test of a complete message flow, start the example server in one terminal:
 
 ```bash
-uv run python examples/server.py
+uv run python examples/ws61850_mode/direct/ws_server.py
 ```
 
 Then connect a client in a second terminal:
 
 ```bash
-uv run python examples/client.py
+uv run python examples/ws61850_mode/direct/ws_client.py
 ```
 
-If both sides connect and exchange messages without errors, the installation is complete.
+Both terminals print the exchanged messages: an `associateRequest`/`associateResponse` pair for `cp1` and `cp2`,
+followed by directory requests and periodic reports. If they appear without errors, the installation is complete. Stop
+both sides with `Ctrl+C`.
 
 ---
 

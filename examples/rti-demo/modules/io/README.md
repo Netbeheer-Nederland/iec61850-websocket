@@ -66,7 +66,7 @@ A **FastAPI-based web service** that provides REST API endpoints for controlling
 | **Hardware Abstraction** | Clean separation between hardware drivers and API logic |
 | **Mock Mode** | Works without Raspberry Pi hardware (Windows/macOS development) |
 | **REST API** | Complete CRUD operations for all device types |
-| **Swagger UI** | Interactive API documentation at `/api/io/docs` |
+| **Swagger UI** | Interactive API documentation at `/docs` |
 | **Thread-Safe** | Safe concurrent access to IO devices |
 | **Plug-in Architecture** | Easy to add new device types |
 
@@ -88,7 +88,7 @@ All endpoints are under the `/api/io/` prefix and provide device management, LED
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | 8080 | Server port |
+| `PORT` | 8080 | Server port when `main.py` runs directly; `launch.py`, the Dockerfile and `docker-compose.yml` set 8000 |
 | `IO_CONFIG_FILE` | `io_config.json` | Path to configuration file |
 
 ### Hardware Requirements
@@ -437,7 +437,7 @@ For issues or questions:
 
 1. Check the **Troubleshooting** section above
 2. Review the **API Endpoints** documentation
-3. Test with Swagger UI: `http://localhost:8080/api/io/docs`
+3. Test with Swagger UI: `http://localhost:8080/docs` (`http://localhost:8000/docs` under Docker)
 4. Verify hardware connections
 5. Check system logs for errors
 
