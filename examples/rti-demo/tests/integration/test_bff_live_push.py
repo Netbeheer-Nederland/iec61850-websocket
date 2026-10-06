@@ -129,7 +129,7 @@ def test_live_push_delivers_fsp_connect_update():
                 remaining = deadline - time.monotonic()
                 try:
                     raw = await asyncio.wait_for(ws.recv(), timeout=max(remaining, 0.1))
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     break
                 msg = json.loads(raw)
                 if msg.get("type") != "connections":

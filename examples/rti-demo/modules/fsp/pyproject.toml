@@ -7,7 +7,7 @@ name = "fsp"
 version = "0.1.0"
 description = "RTI Demo FSP service (ACSI Server / WebSocket Active)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.139.0",
     "uvicorn>=0.51.0",

@@ -479,7 +479,7 @@ class ACSIClient:
                     self.runtime.endpoint._endpoint_running_event.wait(),
                     timeout=30,  # Match timeout in reconfig-connection
                 )
-            except asyncio.TimeoutError as e:
+            except TimeoutError as e:
                 start_task.cancel()
                 self.runtime.status = "disconnected"
                 self.runtime.error = str(e)

@@ -16,7 +16,7 @@ Covers **Ubuntu 24.04 LTS** and **Fedora 41**.
 1. [System requirements](#1-system-requirements)
 2. [Git](#2-git)
 3. [UV](#3-uv)
-4. [Python 3.12](#4-python-312)
+4. [Python 3.13](#4-python-313)
 5. [Docker and Docker Compose](#5-docker-and-docker-compose)
 6. [cfssl](#6-cfssl)
 7. [Doxygen (optional)](#7-doxygen-optional)
@@ -84,46 +84,42 @@ uv --version
 > UV manages the virtual environment and all Python dependencies. The steps below rely on it exclusively — you do
 > not need to run `pip` directly.
 
-Install Python with `uv` or via your system package manager (see next section):
+Install Python with `uv` (recommended) or via your system package manager (see next section):
 
 ```bash
-uv python install 3.12
+uv python install 3.13
 ```
+
+The repository pins 3.13 in `.python-version`, so `uv sync` also downloads it by itself if it is missing.
 
 ---
 
-## 4. Python 3.12
+## 4. Python 3.13
 
-Python 3.12 is the recommended interpreter. The build requires the development headers (`python3-dev` /
-`python3-devel`) so that C-extension dependencies compile correctly.
+The project requires Python 3.13 or newer (`requires-python` in `pyproject.toml`); development and CI use 3.13. A
+Python installed by `uv` (previous section) needs nothing else. A system Python also needs its development headers
+(`python3-dev` / `python3-devel`) so that C-extension dependencies compile correctly.
 
-**Ubuntu 24.04** (Python 3.12 is in the default repos)
-
-```bash
-sudo apt update
-sudo apt install -y python3.12 python3.12-dev python3.12-venv
-```
-
-**Ubuntu 22.04** (requires the deadsnakes PPA)
+**Ubuntu 24.04 and 22.04** (3.13 is not in the default repos; use the deadsnakes PPA)
 
 ```bash
 sudo apt update
 sudo apt install -y software-properties-common
 sudo add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt update
-sudo apt install -y python3.12 python3.12-dev python3.12-venv
+sudo apt install -y python3.13 python3.13-dev python3.13-venv
 ```
 
-**Fedora 41** (Python 3.12 is in the default repos)
+**Fedora 41** (Python 3.13 is the default `python3`)
 
 ```bash
-sudo dnf install -y python3.12 python3.12-devel
+sudo dnf install -y python3 python3-devel
 ```
 
 Verify:
 
 ```bash
-python3.12 --version
+python3.13 --version
 ```
 
 > **Note:** `bitstruct` is listed as a Python dependency in `pyproject.toml` and is installed automatically by
@@ -352,8 +348,8 @@ both sides with `Ctrl+C`.
 | Symptom                                         | Likely cause                            | Fix                                                                                       |
 |-------------------------------------------------|-----------------------------------------|-------------------------------------------------------------------------------------------|
 | `uv: command not found`                         | Shell env not reloaded after UV install | Run `source "$HOME/.local/bin/env"` or open a new terminal                                |
-| `python3.12: command not found` on Ubuntu 22.04 | deadsnakes PPA not added                | Follow the Ubuntu 22.04 path in [section 4](#4-python-312)                                |
+| `python3.13: command not found` on Ubuntu       | deadsnakes PPA not added                | Follow the Ubuntu path in [section 4](#4-python-313), or use `uv python install 3.13`     |
 | `cfssl: command not found`                      | Binary not on `PATH`                    | Confirm `/usr/local/bin` is on `PATH`; re-run the `sudo mv` step                          |
 | `permission denied` running Docker              | User not in `docker` group              | Run `sudo usermod -aG docker "$USER"` then log out and back in                            |
-| `uv sync` fails on a C extension                | Python headers missing                  | Install `python3.12-dev` (Ubuntu) or `python3.12-devel` (Fedora)                          |
+| `uv sync` fails on a C extension                | Python headers missing                  | Install `python3.13-dev` (Ubuntu) or `python3-devel` (Fedora)                             |
 | TLS test failures                               | Certificates not generated              | Follow the certificate-generation steps in the relevant test markdown file under `tests/` |

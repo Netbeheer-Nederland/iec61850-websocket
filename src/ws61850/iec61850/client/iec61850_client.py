@@ -183,7 +183,7 @@ class IEC61850Client:
             try:
                 await asyncio.wait_for(self.response_received.wait(), timeout=0.2)
                 self.response_received.clear()  # Reset for next wait
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue  # Check again
         self.response_received.clear()
         logger.warning(

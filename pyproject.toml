@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "This project is a proof-of-concept (PoC) that exposes IEC 61850 information and events to modern applications using WebSockets."
 
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 
 license = "Apache-2.0"
 license-files = [
@@ -19,9 +19,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 
 dependencies = [
@@ -72,7 +70,7 @@ markers = [
 
 [tool.ruff]
 # line-length: ruff's default (88)
-target-version = "py310"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]

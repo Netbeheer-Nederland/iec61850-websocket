@@ -44,9 +44,10 @@ path = [
 SPDX-FileCopyrightText = "2026 Netbeheer Nederland"
 SPDX-License-Identifier = "Apache-2.0"
 
-# Generated lock files.
+# Generated lock files, and the pinned Python version for uv.
 [[annotations]]
 path = [
+  ".python-version",
   "uv.lock",
   "examples/rti-demo/modules/io/uv.lock",
   "examples/rti-demo/modules/hmi/package-lock.json",

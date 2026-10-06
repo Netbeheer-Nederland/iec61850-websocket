@@ -7,7 +7,7 @@ name = "bff"
 version = "0.1.0"
 description = "RTI Demo BFF (Backend for Frontend) service"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.139.0",
     # [standard] extra pulls in the 'websockets' library uvicorn needs to

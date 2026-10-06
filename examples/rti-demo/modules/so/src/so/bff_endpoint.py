@@ -2880,7 +2880,7 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
                         await asyncio.wait_for(
                             model_info.model_ready_event.wait(), timeout=12
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         raise HTTPException(
                             status_code=504, detail="model-build-timeout"
                         )

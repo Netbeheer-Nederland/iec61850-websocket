@@ -236,7 +236,7 @@ class PassiveEndpoint:
                             await asyncio.wait_for(
                                 self.stop_passive(), timeout=10.0
                             )  # ← Add timeout
-                        except asyncio.TimeoutError:
+                        except TimeoutError:
                             logger.warning(
                                 "Server stop timed out, continuing reconfigure"
                             )
@@ -293,7 +293,7 @@ class PassiveEndpoint:
                         logger.info(
                             "Old server task ended via close()-triggered cancellation (expected)"
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         logger.error("Old server task did not exit within timeout")
                         raise RuntimeError(
                             "Cannot reconfigure: port 8765 still in use (old task didn't exit)"

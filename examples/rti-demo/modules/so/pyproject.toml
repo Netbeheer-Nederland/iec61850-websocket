@@ -7,7 +7,7 @@ name = "so"
 version = "0.1.0"
 description = "RTI Demo SO service (ACSI Client / WebSocket Passive)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.139.0",
     "uvicorn>=0.51.0",

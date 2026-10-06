@@ -101,7 +101,7 @@ A **FastAPI** application that provides REST endpoints for managing the ACSI cli
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.13+
 - Docker (optional, for containerized deployment)
 - A running IEC 61850 server (FSP or other ACSI server)
 - Required Python packages (see below)

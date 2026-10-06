@@ -358,7 +358,7 @@ python test_lcd_i2c.py     # the I2C LCD works
 
 ## Compatibility
 
-- Python 3.10+
+- Python 3.13+
 - FastAPI 0.100+
 - httpx2
 - demo_IO service (from examples/rti-demo/modules/io/)
