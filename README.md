@@ -116,6 +116,8 @@ iec61850-websocket/
 
 ### Setup environment
 
+If the prerequisites already installaed the environment can be setup using the following commands:
+
 ```shell
 # Clone the repository
 # 1. Clone and enter the project
@@ -133,6 +135,8 @@ uv sync
 # 3. Build the project
 uv build
 ```
+
+or for a more detailed setup see [setup](docs/architecture/setup.md).
 
 ---
 

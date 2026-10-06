@@ -9,8 +9,8 @@ Covers **Ubuntu 24.04 LTS** and **Fedora 41**.
 
 1. [System requirements](#1-system-requirements)
 2. [Git](#2-git)
-3. [Python 3.12](#3-python-312)
-4. [UV](#4-uv)
+3. [UV](#4-uv)
+4. [Python 3.12](#3-python-312)
 5. [Docker and Docker Compose](#5-docker-and-docker-compose)
 6. [cfssl](#6-cfssl)
 7. [Doxygen (optional)](#7-doxygen-optional)
@@ -55,7 +55,38 @@ git --version
 
 ---
 
-## 3. Python 3.12
+## 3. UV
+
+UV is the project's package and virtual-environment manager. It is installed per-user and does **not** require root.
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+After installation, reload your shell environment so the `uv` binary is on `PATH`:
+
+```bash
+source "$HOME/.local/bin/env"
+```
+
+Or restart your terminal. Verify:
+
+```bash
+uv --version
+```
+
+> UV manages the virtual environment and all Python dependencies. The steps below rely on it exclusively — you do
+> not need to run `pip` directly.
+
+Install Python with `uv` or via your system package manager (see next section):
+
+```bash
+uv python install 3.12
+```
+
+---
+
+## 4. Python 3.12
 
 Python 3.12 is the recommended interpreter. The build requires the development headers (`python3-dev` /
 `python3-devel`) so that C-extension dependencies compile correctly.
@@ -94,30 +125,6 @@ python3.12 --version
 
 ---
 
-## 4. UV
-
-UV is the project's package and virtual-environment manager. It is installed per-user and does **not** require root.
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-After installation, reload your shell environment so the `uv` binary is on `PATH`:
-
-```bash
-source "$HOME/.local/bin/env"
-```
-
-Or restart your terminal. Verify:
-
-```bash
-uv --version
-```
-
-> UV manages the virtual environment and all Python dependencies. The steps below rely on it exclusively — you do
-> not need to run `pip` directly.
-
----
 
 ## 5. Docker and Docker Compose
 
