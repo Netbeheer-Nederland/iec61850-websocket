@@ -29,6 +29,9 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
+          # One cache key per job: jobs running in parallel with the same key
+          # race to save it ("Unable to reserve cache ... another job").
+          cache-suffix: lint
       - run: uv sync --locked            # dev group is synced by default
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -44,6 +47,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
+          cache-suffix: test-${{ matrix.python }}
           python-version: ${{ matrix.python }}
       - run: uv sync --locked
       - run: uv run pytest tests/unit -q --junitxml=junit-${{ matrix.python }}.xml
@@ -80,6 +84,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
+          cache-suffix: smoke
       - run: uv sync --locked
       - run: scripts/smoke-test.sh
 
@@ -89,6 +94,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          cache-suffix: build
       - run: uv build                    # -> dist/ws61850-<ver>.whl + .tar.gz
       - run: uvx twine check dist/*
       - uses: actions/upload-artifact@v7
