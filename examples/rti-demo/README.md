@@ -90,57 +90,59 @@ with the service name:
 To disable verbose logging: `python launch.py --no-verbose`
 To run in background: `python launch.py --background`
 
-## Troubleshooting
-
-### Port already in use
-
-```bash
-# Find and kill process on port 8080
-sudo kill -9 $(sudo lsof -t -i :8080) 2>/dev/null
-```
-
-### Module not found
-
-```bash
-# Install dependencies
-pip install -e .
-pip install uvicorn fastapi requests
-```
-
-### connections.json error
-
-```bash
-# Remove directory and create file
-rmdir /S /Q connections.json 2>/dev/null
-echo [] > connections.json
-```
-
 ## Docker
+
+After installing Docker and before starting the demo, create the following network `rti-network` to connect Keycloak for
+the OAuth2 client credentials flow.
 
 ```shell
 docker network create rti-network 2>/dev/null || true
 ```
 
-```shell
-# Build images (each module's Dockerfile builds from the repo root, since
-# fsp/so need the ws61850 core library at src/)
-cd ../..   # repo root
-docker build -f examples/rti-demo/modules/bff/docker/Dockerfile -t rti-demo-bff .
-docker build -f examples/rti-demo/modules/fsp/docker/Dockerfile -t rti-demo-fsp .
-docker build -f examples/rti-demo/modules/so/docker/Dockerfile -t rti-demo-so .
+Images are named:
+
+```
+${RTI_IMAGE_REPO}/rti-<role>:${RTI_IMAGE_TAG}     # role: bff, hmi, fsp, so, io
 ```
 
-# Launch with Docker (all services by default)
+| Variable         | Default                                  | Published on GitHub                                         |
+|------------------|------------------------------------------|-------------------------------------------------------------|
+| `RTI_IMAGE_REPO` | `netbeheer-nederland/iec61850-websocket` | `ghcr.io/netbeheer-nederland/iec61850-websocket`            |
+| `RTI_IMAGE_TAG`  | `latest`                                 | `latest` (main), a branch name, a version or `sha-<commit>` |
 
-```shell
-python launch.py --docker
-```
+`docker-compose.yml`, and `launch.py --docker` all use these names, so an image built here can be used by the demo
+directly, without retagging.
 
-# Docker Compose
+### Locally built images
 
 ```shell
 cd examples/rti-demo
+docker compose build            # -> netbeheer-nederland/iec61850-websocket/rti-<role>:latest
 docker compose up -d
+```
+
+An available `docker-compose.override.yml` is loaded automatically and bind-mounts the module sources over
+the code in the images, so a source edit only needs a container restart.
+
+### Images published on GitHub
+
+```shell
+cd examples/rti-demo
+export RTI_IMAGE_REPO=ghcr.io/netbeheer-nederland/iec61850-websocket
+export RTI_IMAGE_TAG=latest
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
+```
+
+`-f docker-compose.yml` leaves the dev overlay out, so the containers run the code in the
+published images and not your local checkout. `--no-build` stops compose from building an image
+that could not be pulled. Put the two variables in `examples/rti-demo/.env` to make the setting
+persistent.
+
+### Launch with Docker (all services by default)
+
+```shell
+python launch.py --docker       # uses the same RTI_IMAGE_REPO / RTI_IMAGE_TAG
 ```
 
 ### Keycloak (IDP-Server) for OAuth
@@ -163,9 +165,7 @@ issuer check sees a single value. Settings to enter in the HMI (Setup):
 |                        | Token issuer         | `http://localhost:8080/realms/iec61850-test`                              |
 |                        | Client ID / secret   | `ws-client` / see `scripts/keycloak/README.md`                            |
 
-HTTPS (8443) uses `testing/certs/server.pem`, whose certificate only covers
-`rti-so`/`localhost` - so from the containers use plain HTTP on 8080, or
-reissue the certificate with a `keycloak` SAN.
+HTTPS (8443) uses `testing/certs/keycloak.pem`, whose certificate only covers `keycloak`/`localhost`/`127.0.0.1`.
 
 ### BFF connection persistence in Docker
 
@@ -180,8 +180,7 @@ docker volume rm rti-demo_bff-config   # prefix matches your compose project nam
 docker-compose up -d rti-bff
 ```
 
-The `BFF_CONNECTIONS_FILE` env var overrides the path if you need a different
-location (e.g. a host bind mount).
+The `BFF_CONNECTIONS_FILE` env var overrides the path if you need a different location (e.g. a host bind mount).
 
 ## IO API Server
 
@@ -372,4 +371,27 @@ and the python codes can be run using the following command:
 
 ```bash
 uv run python <script_name.py>
+```
+
+## Troubleshooting
+
+* Port already in use
+```bash
+# Find and kill process on port 8080
+sudo kill -9 $(sudo lsof -t -i :8080) 2>/dev/null
+```
+
+* Module not found
+
+```bash
+# Install dependencies
+uv add <packages>
+uv add uvicorn fastapi requests
+```
+
+* connections.json error when running locally
+```bash
+# Remove file and create a new one
+rmdir /S /Q connections.json 2>/dev/null
+echo [] > connections.json
 ```

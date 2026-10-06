@@ -1,6 +1,12 @@
+# Image names follows ${RTI_IMAGE_REPO}/rti-<role>:${RTI_IMAGE_TAG}
+# defaulting to netbeheer-nederland/iec61850-websocket/rti-<role>:latest, so
+# a local `docker compose build` produces exactly the images the demo runs.
+# Point RTI_IMAGE_REPO at ghcr.io/netbeheer-nederland/iec61850-websocket to
+# pull the images published from GitHub instead - see README.md "Docker".
 services:
   # BFF Server
   rti-bff:
+    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-bff:${RTI_IMAGE_TAG:-latest}
     build:
       # Repo root, not modules/bff/ - the Dockerfile needs the shared uv
       # workspace lock and the ws61850 core library at src/, both of which
@@ -21,12 +27,11 @@ services:
       # Playbooks saved from the HMI (recordings, uploads), on the config volume.
       - BFF_PLAYBOOKS_DIR=/config/playbooks
     volumes:
-      - ./modules/bff/src/bff:/app/examples/rti-demo/modules/bff/src/bff
       - bff-config:/config
       - ./playbooks:/app/examples/rti-demo/playbooks:ro
     networks:
       - rti-network
-    # Healthcheck already defined in the Dockerfile (with matching timing).
+    # Health check already defined in the Dockerfile (with matching timing).
     labels:
       - "rti.service=rti-bff"
       - "rti.type=RTI-BFF"
@@ -35,6 +40,7 @@ services:
 
   # HMI Web Server
   rti-hmi:
+    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-hmi:${RTI_IMAGE_TAG:-latest}
     build:
       context: modules/hmi
       dockerfile: docker/Dockerfile
@@ -46,10 +52,11 @@ services:
         condition: service_healthy
     networks:
       - rti-network
-    # Healthcheck already defined in the Dockerfile.
+    # Health check already defined in the Dockerfile.
 
   # RTI-FSP (Acsi-Server)
   rti-fsp01:
+    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-fsp:${RTI_IMAGE_TAG:-latest}
     build:
       # Repo root, not modules/fsp - the Dockerfile needs the shared uv
       # workspace lock and the ws61850 core library at src/, both of which
@@ -66,18 +73,18 @@ services:
       - IO_URL=http://rti-io:8000
     networks:
       - rti-network
-    # Healthcheck already defined in the Dockerfile.
+    # Health check already defined in the Dockerfile.
     labels:
       - "rti.service=rti-fsp01"
       - "rti.type=RTI-FSP"
       - "rti.host=rti-fsp01"
       - "rti.port=5001"
     volumes:
-        - ./modules/fsp/src/fsp:/app/examples/rti-demo/modules/fsp/src/fsp
         - ./config/models:/models
 
   # Second FSP instance
   rti-fsp02:
+    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-fsp:${RTI_IMAGE_TAG:-latest}
     build:
       # Repo root - see rti-fsp01's build.context comment above.
       context: ../..
@@ -88,7 +95,7 @@ services:
     networks:
       - rti-network
     environment:
-      # PORT overrides the Dockerfile's 5001 default - this is a second
+      # PORT overrides the Dockerfile's default 5001 - this is a second
       # instance of the same image, on a different port. PYTHONUNBUFFERED
       # already set by the Dockerfile.
       - PORT=5005
@@ -105,11 +112,11 @@ services:
       - "rti.host=rti-fsp02"
       - "rti.port=5005"
     volumes:
-      - ./modules/fsp/src/fsp:/app/examples/rti-demo/modules/fsp/src/fsp
       - ./config/models:/models
 
   # RTI SO (Acsi-Client)
   rti-so:
+    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-so:${RTI_IMAGE_TAG:-latest}
     build:
       # Repo root, not modules/so - the Dockerfile needs the shared uv
       # workspace lock and the ws61850 core library at src/, both of which
@@ -121,7 +128,7 @@ services:
     ports:
       - "5002:5002"
       - "8765:8765"    # WebSocket port - MUST ADD
-    # PORT/PYTHONUNBUFFERED and healthcheck already set by the Dockerfile.
+    # PORT/PYTHONUNBUFFERED and health check already set by the Dockerfile.
     networks:
       - rti-network
     labels:
@@ -129,11 +136,10 @@ services:
       - "rti.type=RTI-SO"
       - "rti.host=rti-so"
       - "rti.port=5002"
-    volumes:
-        - ./modules/so/src/so:/app/examples/rti-demo/modules/so/src/so
 
   # GPIO LED Control API (io)
   rti-io:
+    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-io:${RTI_IMAGE_TAG:-latest}
     build:
       context: modules/io
       dockerfile: docker/Dockerfile
@@ -172,14 +178,12 @@ services:
       - SYS_RAWIO
     networks:
       - rti-network
-    # Healthcheck already defined in the Dockerfile.
+    # Health check already defined in the Dockerfile.
     labels:
       - "rti.service=rti-io"
       - "rti.type=GPIO-LED-Control"
       - "rti.host=rti-io"
       - "rti.port=8000"
-    volumes:
-      - ./modules/io:/app/io
 
 volumes:
   # Persistent BFF runtime state (connections.json), mounted at /config.

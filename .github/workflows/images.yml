@@ -77,13 +77,13 @@ jobs:
       - id: img
         run: |
           case "${{ matrix.image }}" in
-            so)          c=. ; f=examples/rti-demo/modules/so/docker/Dockerfile  ; n=ws61850-so ;;
-            fsp)         c=. ; f=examples/rti-demo/modules/fsp/docker/Dockerfile ; n=ws61850-fsp ;;
+            so)          c=. ; f=examples/rti-demo/modules/so/docker/Dockerfile  ; n=iec61850-websocket/rti-so ; p=linux/amd64,linux/arm64 ;;
+            fsp)         c=. ; f=examples/rti-demo/modules/fsp/docker/Dockerfile ; n=iec61850-websocket/rti-fsp ; p=linux/amd64,linux/arm64 ;;
             acsi_client) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-client ; n=ws61850-acsi-ws-client ;;
             acsi_server) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-server ; n=ws61850-acsi-ws-server ;;
-            bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=rti-demo-bff ;;
-            io)          c=examples/rti-demo/modules/io ; f=docker/Dockerfile ; n=rti-demo-io ; p=linux/amd64,linux/arm64 ;;
-            hmi)         c=examples/rti-demo/modules/hmi ; f=docker/Dockerfile ; n=rti-demo-hmi ;;
+            bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=iec61850-websocket/rti-bff ;;
+            io)          c=examples/rti-demo/modules/io ; f=docker/Dockerfile ; n=iec61850-websocket/rti-io ; p=linux/amd64,linux/arm64 ;;
+            hmi)         c=examples/rti-demo/modules/hmi ; f=docker/Dockerfile ; n=iec61850-websocket/rti-hmi ;;
           esac
           {
             echo "ctx=$c"

@@ -82,6 +82,19 @@ class ServiceType(Enum):
     IO = "io"
 
 
+def rti_image(role: str) -> str:
+    """Image name for an RTI role, matching docker-compose.yml.
+
+    ${RTI_IMAGE_REPO}/rti-<role>:${RTI_IMAGE_TAG}, defaulting to the locally
+    built netbeheer-nederland/iec61850-websocket/rti-<role>:latest. Set
+    RTI_IMAGE_REPO=ghcr.io/netbeheer-nederland/iec61850-websocket to run the
+    images published from GitHub.
+    """
+    repo = os.environ.get("RTI_IMAGE_REPO", "netbeheer-nederland/iec61850-websocket")
+    tag = os.environ.get("RTI_IMAGE_TAG", "latest")
+    return f"{repo}/rti-{role}:{tag}"
+
+
 @dataclass
 class ServiceConfig:
     """Configuration for a single RTI demo service."""
@@ -109,7 +122,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         default_port=5000,
         description="Backend for Frontend - REST API gateway",
         env_vars={"RTI_DOCKER_ENABLED": "true", "PORT": "5000"},
-        docker_image="rti-demo-bff",
+        docker_image=rti_image("bff"),
         health_check_path="/api/health",
         labels={
             "rti.service": "rti-bff",
@@ -126,7 +139,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         default_port=5001,
         description="RTI-FSP",
         env_vars={"PORT": "5001", "CP": "cp1"},
-        docker_image="rti-demo-fsp",
+        docker_image=rti_image("fsp"),
         health_check_path="/api/status",
         labels={
             "rti.service": "rti-fsp",
@@ -143,7 +156,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         default_port=5005,
         description="RTI-FSP (second instance)",
         env_vars={"PORT": "5005", "CP": "cp2"},
-        docker_image="rti-demo-fsp",
+        docker_image=rti_image("fsp"),
         health_check_path="/api/status",
         labels={
             "rti.service": "rti-fsp-2",
@@ -160,7 +173,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         default_port=5002,
         description="RTI-SO",
         env_vars={"PORT": "5002"},
-        docker_image="rti-demo-so",
+        docker_image=rti_image("so"),
         health_check_path="/api/status",
         labels={
             "rti.service": "rti-so",
@@ -177,7 +190,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         default_port=8000,
         description="IO Device Control API - REST API for Raspberry Pi IO devices",
         env_vars={"PORT": "8000"},
-        docker_image="rti-demo-io",
+        docker_image=rti_image("io"),
         health_check_path="/api/io/health",
         labels={
             "rti.service": "rti-io",
@@ -514,7 +527,7 @@ class RTILauncher:
             cmd.extend(["-v", "/var/run/docker.sock:/var/run/docker.sock"])
 
         # Add image
-        cmd.append(config.docker_image or f"rti-demo-{config.service_type.value}")
+        cmd.append(config.docker_image or rti_image(config.service_type.value))
 
         logger.info(f"Starting Docker container: {' '.join(cmd)}")
 
