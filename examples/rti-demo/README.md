@@ -188,6 +188,32 @@ docker compose up -d rti-bff
 
 The `BFF_CONNECTIONS_FILE` env var overrides the path if you need a different location (e.g. a host bind mount).
 
+## Hardware demo
+
+On Raspberry Pis, the `io` service drives LEDs, LCDs, a button and two potentiometers, so the IEC 61850 exchange between
+RTI-FSP (ACSI server) and RTI-SO (ACSI client) becomes visible. It shows reporting, operate (control) and setpoints.
+FSP and SO each run their own `io` service and use the same mapping, `modules/io/io_client/io_mapping.json`:
+
+| Device         | Mapped to                                    | Shows / does                                                   |
+|----------------|----------------------------------------------|----------------------------------------------------------------|
+| `led1`         | `connected`, `stopped`                       | The WebSocket association is up (off when stopped)             |
+| `led2`         | `rc_rcv`, `oper_rcv`                         | A report was received (SO) or an operate was received (FSP)    |
+| `led3`         | `setpoints`, `read`, `operate`               | Setpoint, read and operate activity                            |
+| `lcd1`, `lcd_i2c` | all events above, plus `oper_send`, `setpoint`, `writeValue` | Text log of the latest events                  |
+| `button1`      | `LD0/DWMX1.DERAvail.stVal` (FC `st`)         | Toggles the status value; the change triggers a report         |
+| `pot1`         | `LD0/MMXU1.TotW.mag.f` (FC `mx`)             | Sets the measured total power, which is reported               |
+| `pot2`         | operate on `LD0/DWMX1.WMaxSpt` (`float32`)   | Sends an operate with the new power limit                      |
+
+Demo flow:
+
+1. Start FSP and SO and let them associate; `led1` lights on both sides.
+2. Press `button1` on the FSP side: `DERAvail.stVal` changes, the report control block fires, and `led2` on the SO side
+   shows the received report.
+3. Turn `pot1` on the FSP side: the new `TotW` value reaches the SO in the next report.
+4. Turn `pot2` on the SO side: the SO sends an operate on `WMaxSpt`, and `led2` on the FSP side shows that it arrived.
+
+Wiring, pin numbers and the I2C LCD setup are in [modules/io/README.md](modules/io/README.md).
+
 ## IO API Server
 
 The IO API Server provides REST API endpoints for controlling physical IO devices (LEDs, buttons, LCDs, etc.) on a

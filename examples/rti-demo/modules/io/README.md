@@ -100,7 +100,7 @@ For **physical hardware operation** (not mock mode):
 - **ADS1115 ADC**: For analog inputs (potentiometers)
 - **Potentiometer**: 10kΩ recommended
 - **LCD**: HD44780-compatible 16x2 display
-- **I2C LCD Backpack**: PCF8574-based (address 0x27 or 0x39)
+- **I2C LCD Backpack**: PCF8574-based (address 0x27 or 0x3F)
 
 ---
 
@@ -304,7 +304,7 @@ The default devices defined in `io_config.json` use the following GPIO configura
 | **GPIO permission denied (Linux)**     | Run with sudo or add user to gpio group                                   |
 | **ADS1115 not detected**               | Check I2C wiring, enable I2C in raspi-config                              |
 | **LEDs not responding**                | Verify wiring (resistor +, GND -), check GPIO numbering                   |
-| **ACSI connection failed**             | Verify DEMO_IO_URL, check demo_IO is running                              |
+| **ACSI connection failed**             | Verify IO_URL, check demo_IO is running                                   |
 | **Docker: `/dev/spidev0.0` not found** | Enable SPI in raspi-config, or remove SPI devices from docker-compose.yml |
 | **Docker: device passthrough errors**  | Verify device files exist on host, check device permissions               |
 
@@ -345,6 +345,46 @@ sudo raspi-config
 # Navigate to: Interface Options -> SPI -> Enable
 sudo reboot
 ```
+
+### I2C LCD backpack (PCF8574)
+
+Check that the I2C bus is up and the backpack answers:
+
+```bash
+lsmod | grep i2c
+ls /dev/i2c*
+sudo i2cdetect -y 1
+```
+
+Most PCF8574 backpacks use address **0x27** or **0x3F**. Set the address in `io_api_server/io_config.json` as a
+decimal number (`39` is 0x27, `63` is 0x3F):
+
+```json
+{
+  "name": "lcd_i2c",
+  "device_type": "lcd_i2c",
+  "i2c_address": 39,
+  "i2c_bus": 1
+}
+```
+
+| Issue                               | Solution                                                                   |
+|-------------------------------------|----------------------------------------------------------------------------|
+| `i2cdetect` shows no devices        | Check the wiring and that I2C is enabled                                   |
+| Address shows `UU`                  | Another driver claims the address; power-cycle the board                   |
+| Wrong address (0x27 vs 0x3F)        | Try the other address in `io_config.json`                                  |
+| Permission denied on `/dev/i2c-1`   | `sudo usermod -aG i2c $USER`, then reboot                                  |
+
+Wiring:
+
+| LCD backpack | Raspberry Pi                         |
+|--------------|--------------------------------------|
+| GND          | Pin 6 (GND)                          |
+| VCC          | Pin 2 (5V) or Pin 1 (3.3V)           |
+| SDA          | Pin 3 (GPIO 2, SDA)                  |
+| SCL          | Pin 5 (GPIO 3, SCL)                  |
+
+Check the backpack's documentation for whether it needs 5V or 3.3V.
 
 ### Configure Docker User for Hardware Access
 

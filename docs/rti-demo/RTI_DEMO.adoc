@@ -64,8 +64,6 @@ image::RTI_Demo_System_Architecture_Overview.png[RTI Demo System Architecture Ov
 
 |===
 
-include::includes/main.adoc[]
-
 include::includes/fsp.adoc[]
 
 include::includes/so.adoc[]
@@ -316,8 +314,7 @@ This document was compiled from the following README files:
 - `examples/rti-demo/modules/so/README.md` - (SO implementation)
 - `examples/rti-demo/modules/bff/README.md` - (BFF implementation)
 - `examples/rti-demo/modules/hmi/README.md` - (HMI implementation)
-- `examples/rti-demo/modules/demo_io/README.md` - (IO control)
-- `examples/rti-demo/demo_setup/README.md` - (Deployment)
+- `examples/rti-demo/modules/io/README.md` - (IO control)
 
 For detailed information on specific components, refer to their respective README files in the `examples/rti-demo` directory.
 

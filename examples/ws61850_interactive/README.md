@@ -26,7 +26,7 @@ The current interactive flow is implemented by:
 
 - starts an active endpoint for `cp1`
 - connects to `localhost:8765`
-- hosts an IEC 61850 server model created by `build_model1()`
+- hosts the IEC 61850 server model loaded from `ied_model1.json`
 - installs a control handler for float control values
 
 ## Prerequisites
@@ -103,7 +103,7 @@ uv run python examples/ws61850_interactive/ws_client.py
 Current active-side behavior:
 
 - connects as `cp1` to `localhost:8765`
-- exposes the sample IEC 61850 model returned by `build_model1()`
+- exposes the sample IEC 61850 model from `ied_model1.json`
 - accepts float control values below `50`
 - keeps the WebSocket connection active so the passive-side console can issue requests
 
@@ -144,7 +144,7 @@ If a control operation fails:
 
 If a command returns an error:
 
-- verify the object reference exists in `build_model1()`
+- verify the object reference exists in `ied_model1.json`
 - verify the command syntax matches the examples expected by `ws_server.py`
 
 ## Minimal run sequence

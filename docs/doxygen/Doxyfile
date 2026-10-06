@@ -74,7 +74,7 @@ PROJECT_ICON           =
 # entered, it will be relative to the location where Doxygen was started. If
 # left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = ./
+OUTPUT_DIRECTORY       = docs/doxygen
 
 # If the CREATE_SUBDIRS tag is set to YES then Doxygen will create up to 4096
 # sub-directories (in 2 levels) under the output directory of each output format
@@ -991,7 +991,7 @@ WARN_LOGFILE           =
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = C:\Users\romin\workspace-git\rti2_protocol_spec\exploration
+INPUT                  = src
 
 # This tag can be used to specify the character encoding of the source files
 # that Doxygen parses. Internally Doxygen uses the UTF-8 encoding. Doxygen uses
@@ -2988,7 +2988,9 @@ MSCGEN_TOOL            =
 MSCFILE_DIRS           =
 
 
-INPUT                  = ../../src
+# Project overrides. Paths are relative to the repository root: run
+#   doxygen docs/doxygen/Doxyfile
+# from there (see docs/README.md).
 FILE_PATTERNS          = *.py
 RECURSIVE              = YES
 

@@ -27,13 +27,15 @@ src/ws61850/iec61850/data_model/
   cdc_registry.py       # CdcRegistry: name → factory function mapping
   builder.py            # Fluent builders (IedModelBuilder, …)
   loader.py             # IedModelLoader: construct from JSON dict/file
-  example_ieds.py       # build_model1() / build_model2() example trees
   schema/
     ied_model.schema.json   # JSON Schema draft-7 for the model file format
 
 src/ws61850/protocol/
   types.py              # DataAttributeType, FunctionalConstraint, TrgOps, OptFlds
 ```
+
+Example models are JSON files loaded with `IedModelLoader` (see [JSON model loading](#json-model-loading)):
+`examples/ws61850_mode/ied_model1.json` and `ied_model2.json`, and `examples/ws61850_interactive/ied_model1.json`.
 
 `protocol/types.py` is the canonical authority for every type that appears in **both** the data model and the wire
 format. Import from there — not from `ied_model.py`.
@@ -327,7 +329,7 @@ CdcRegistry.register("xyz", my_xyz_factory)
 
 # List all known CDCs:
 CdcRegistry.known_cdcs()
-# → ['apc', 'asg', 'cmv', 'del', 'dpl', 'enc', 'ens', 'inc', 'ing', 'lpl', 'mv', 'sps', 'wye']
+# → ['apc', 'asg', 'asg_custom', 'cmv', 'del', 'dpl', 'enc', 'ens', 'inc', 'ing', 'lpl', 'mv', 'sps', 'wye']
 ```
 
 ---

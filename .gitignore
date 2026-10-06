@@ -80,3 +80,5 @@ launch_config.json
 stats.json
 launch.py.local
 config.local.py
+# Doxygen output - generate with: doxygen docs/doxygen/Doxyfile
+docs/doxygen/html/
