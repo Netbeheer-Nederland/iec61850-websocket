@@ -16,8 +16,13 @@ RUN npm ci
 # Copy source files
 COPY . .
 
+# Build-time BFF address (optional): baked into the bundle by Vite. The
+# container's BFF_HOST / BFF_PORT (runtime, below) take precedence over these.
+ARG VITE_BFF_HOST=
+ARG VITE_BFF_PORT=
+
 # Build the application
-RUN npm run build
+RUN VITE_BFF_HOST="$VITE_BFF_HOST" VITE_BFF_PORT="$VITE_BFF_PORT" npm run build
 
 # Production stage
 FROM nginx:alpine
@@ -27,6 +32,10 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Writes /config.js from BFF_HOST / BFF_PORT at container start (the nginx
+# image runs /docker-entrypoint.d/*.sh before starting nginx).
+COPY --chmod=755 docker/40-rti-config.sh /docker-entrypoint.d/40-rti-config.sh
 
 # Expose port
 EXPOSE 80

@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+
+# Installed by `npm ci` in the image; the host's copy would overwrite it.
+node_modules
+dist
+# Local Vite env files stay local; the image takes VITE_BFF_* as build args.
+.env
+.env.*

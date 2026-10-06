@@ -17,6 +17,8 @@
  * limitations under the License.
  */
 
+import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from '../config';
+
 /**
  * API Service for BFF Backend
  * This service provides a standardized way to execute API calls through the BFF's /api/execute endpoint
@@ -87,7 +89,7 @@ const API_DEFINITIONS = [
 export const getApiById = (id) => API_DEFINITIONS.find(api => api.id === id);
 
 /**
- * Get BFF base URL from localStorage or use defaults
+ * Get BFF base URL from localStorage, else the configured default (see config.js)
  * @returns {string} The BFF base URL
  */
 export const getBffBaseUrl = () => {
@@ -97,8 +99,8 @@ export const getBffBaseUrl = () => {
   } catch (e) {
     console.warn(`Failed to parse rti-hmi-settings: ${e.message}`);
   }
-  const host = localStorage.getItem('bffHost') || savedSettings.bffHost || 'localhost';
-  const port = localStorage.getItem('bffPort') || savedSettings.bffPort || '5000';
+  const host = localStorage.getItem('bffHost') || savedSettings.bffHost || DEFAULT_BFF_HOST;
+  const port = localStorage.getItem('bffPort') || savedSettings.bffPort || DEFAULT_BFF_PORT;
   return `http://${host}:${port}`;
 };
 

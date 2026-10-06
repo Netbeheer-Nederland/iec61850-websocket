@@ -32,7 +32,31 @@ npm run preview      # serve the production build
 With Docker, `docker compose up -d rti-hmi` from `examples/rti-demo` serves the production build with nginx on
 http://localhost:3001 (`docker/Dockerfile`, `nginx.conf`).
 
-The BFF address (default `localhost:5000`) is set on the Settings page and kept in the browser's localStorage.
+### BFF address
+
+The HMI calls the BFF directly from the browser, so the address must be one the user's browser can reach (an IP
+address or host name, not a container name such as `rti-bff`). The first that is set wins:
+
+1. **Settings page** - saved per browser in localStorage; overrides everything below. Clear the site data to go back
+   to the configured default.
+2. **Runtime (Docker)** - `BFF_HOST` / `BFF_PORT` on the `rti-hmi` container. At start-up
+   `docker/40-rti-config.sh` writes them to `/config.js`, so one image serves any setup. With
+   `examples/rti-demo/docker-compose.yml`, set `HMI_BFF_HOST` / `HMI_BFF_PORT` in the shell or in
+   `examples/rti-demo/.env`.
+3. **Build time** - `VITE_BFF_HOST` / `VITE_BFF_PORT`, baked into the bundle by Vite: in `modules/hmi/.env.local` for
+   `npm run dev`, or as Docker build args (`--build-arg VITE_BFF_HOST=...`; compose passes them through).
+4. **Built-in** - `localhost:5000`.
+
+```bash
+# development server against a BFF on another machine
+echo 'VITE_BFF_HOST=192.168.100.10' > .env.local
+npm run dev
+
+# Docker: same image, address chosen when the container starts
+HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=5000 docker compose up -d rti-hmi
+```
+
+`src/config.js` resolves the default; `public/config.js` is the empty runtime configuration outside Docker.
 
 ## Technology stack
 
@@ -220,6 +244,7 @@ The BFF address (default `localhost:5000`) is set on the Settings page and kept 
 ```
 src/
 ├── App.jsx, main.jsx        # routes, connections state, live socket wiring
+├── config.js                # default BFF address (runtime config, VITE_BFF_*, localhost:5000)
 ├── pages/                   # one component per route (see Pages)
 ├── components/              # shared UI: Tree, modals (Connection, TLS, OAuth, BRCB, Control, WriteValue),
 │                            # DataAccessPanel, MessageMonitor, ActionLogPanel, InstanceVisualization,

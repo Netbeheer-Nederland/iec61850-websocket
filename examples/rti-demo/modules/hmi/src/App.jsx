@@ -33,6 +33,7 @@ import Overview from './pages/Overview';
 import ACSIClient from './pages/ACSIClient';
 import ACSIServer from './pages/ACSIServer';
 import { executeApiCall, buildTargetValue } from './services/apiService';
+import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from './config';
 import { linkSoToFsps } from './utils/fspLinks';
 import { connect as connectLiveSocket, reconnect as reconnectLiveSocket, subscribe as subscribeLive, onConnectionStateChange as onLiveSocketStateChange } from './services/liveSocket';
 
@@ -47,8 +48,8 @@ function App() {
   const [connectionsLoading, setConnectionsLoading] = useState(true);
   const [models, setModels] = useState({});
   const [settings, setSettings] = useState({
-    bffHost: 'localhost',
-    bffPort: '5000'
+    bffHost: DEFAULT_BFF_HOST,
+    bffPort: DEFAULT_BFF_PORT
   });
 
   // Single source of truth for the BFF base URL, derived from settings.
@@ -243,10 +244,9 @@ function App() {
     }
   }, []);
 
-  // Save settings to localStorage
-  useEffect(() => {
-    localStorage.setItem('rti-hmi-settings', JSON.stringify(settings));
-  }, [settings]);
+  // Settings are persisted only by the Settings page's Save, so localStorage
+  // holds what a user chose - never the defaults. Saving the defaults here
+  // would pin every browser to them and hide a later BFF_HOST / VITE_BFF_HOST.
 
   // Save connections to localStorage
   useEffect(() => {
