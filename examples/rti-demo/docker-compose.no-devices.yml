@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Run the demo without Raspberry Pi hardware (a laptop, a CI runner, a VM).
+# Layer it over docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.no-devices.yml up -d
+#
+# or once per shell:
+#
+#   export COMPOSE_FILE=docker-compose.yml:docker-compose.no-devices.yml
+#
+# docker-compose.yml passes the Pi's GPIO/I2C/SPI devices into rti-io, and
+# Docker refuses to start a container whose device paths don't exist on the
+# host. This file drops the devices and the settings that only exist for them.
+# rti-io then starts and stays healthy; devices without their hardware log an
+# error at startup and stay unavailable (the I2C LCD runs in mock mode). The
+# other services don't change.
+# Needs Docker Compose 2.24 or later for !reset.
+services:
+  rti-io:
+    # The device nodes themselves.
+    devices: !reset []
+    # Host groups that own those nodes (gpio, i2c, spi) and the Pi user that
+    # is a member of them.
+    group_add: !reset []
+    user: !reset null
+    # Shared memory, unrestricted syscalls and raw I/O for gpiod/spidev.
+    ipc: !reset null
+    security_opt: !reset []
+    cap_add: !reset []

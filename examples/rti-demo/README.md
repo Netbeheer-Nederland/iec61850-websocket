@@ -151,6 +151,22 @@ published images and not your local checkout. `--no-build` stops compose from bu
 that could not be pulled. Put the two variables in `examples/rti-demo/.env` to make the setting
 persistent.
 
+### Without Raspberry Pi hardware
+
+`docker-compose.yml` passes the Raspberry Pi's GPIO, I2C and SPI devices into `rti-io`. Docker won't start a container
+whose device paths are missing on the host. On any other machine, add `docker-compose.no-devices.yml`. It removes the
+devices from `rti-io`, along with the settings that only exist for them: `group_add`, `user`, `ipc`, `security_opt`
+and `cap_add`.
+
+```shell
+cd examples/rti-demo
+docker compose -f docker-compose.yml -f docker-compose.no-devices.yml up -d
+```
+
+Set `COMPOSE_FILE=docker-compose.yml:docker-compose.no-devices.yml` in `examples/rti-demo/.env` to make it persistent.
+This needs Docker Compose 2.24 or later. `rti-io` then starts and is healthy. Devices whose hardware is missing log an
+error at startup and stay unavailable, except the I2C LCD, which runs in mock mode. The other services don't change.
+
 ### Launch with Docker (all services by default)
 
 ```shell
@@ -266,7 +282,7 @@ Wiring, pin numbers and the I2C LCD setup are in [modules/io/README.md](modules/
 ## IO API Server
 
 The `io` service is a REST API (under `/api/io/`) for the LEDs, buttons, potentiometers and LCDs on a Raspberry Pi; it
-falls back to simulated devices elsewhere.
+runs without the hardware too (see [Without Raspberry Pi hardware](#without-raspberry-pi-hardware)).
 
 ```bash
 # from examples/rti-demo
@@ -288,6 +304,7 @@ rti-demo/
 ├── launch.py                  # Main entry point
 ├── README.md                  # This file
 ├── docker-compose.yml
+├── docker-compose.no-devices.yml  # Overlay: rti-io without Raspberry Pi devices
 ├── config/
 │   ├── launch_config.json.example
 │   └── models/                # IED model files (model_1.py, model_2.py)
