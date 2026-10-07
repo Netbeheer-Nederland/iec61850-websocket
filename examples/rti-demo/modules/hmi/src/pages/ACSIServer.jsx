@@ -30,8 +30,9 @@ import ContextMenu  from "../components/ContextMenu.jsx";
 import WriteValueModal from '../components/WriteValueModal.jsx';
 import ActionLogPanel from '../components/ActionLogPanel.jsx';
 import { usePersistentFlag } from '../hooks/usePersistentFlag';
+import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from '../config';
 
-function ACSIServer({ settings, updateModel, getModel, connections: propConnections, bffBaseUrl = 'http://localhost:5000'}) {
+function ACSIServer({ settings, updateModel, getModel, connections: propConnections, bffBaseUrl = `http://${DEFAULT_BFF_HOST}:${DEFAULT_BFF_PORT}`}) {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();

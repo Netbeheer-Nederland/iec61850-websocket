@@ -167,6 +167,9 @@ HTTP 8080 -> 8081).
 - The BFF copies its seed connections only on first start, so an existing `bff-config` volume still has the SO on
   5002. Edit the SO connection's port to 5000 on the Connections page, or reset the volume:
   `docker compose down && docker volume rm rti-demo_bff-config && docker compose up -d`.
+- OAuth settings saved before the move (IDP-Server endpoint, token and certificate endpoints, token issuer) still
+  name Keycloak on 8080. Change them to `http://keycloak:8081/...` and the issuer to
+  `http://localhost:8081/realms/iec61850-test` (see the table below), or reset the volume as above.
 
 ### Keycloak (IDP-Server) for OAuth
 

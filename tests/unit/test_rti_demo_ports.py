@@ -27,6 +27,7 @@ EXPECTED_PORTS = {
     "fsp2": 5005,
     "io": 9000,
 }
+KEYCLOAK_HTTP_PORT = 8081
 
 
 def _read(path: Path) -> str:
@@ -109,7 +110,9 @@ def test_io_dockerfile_port_and_health_check():
 )
 def test_code_default_port(path, role):
     text = _read(MODULES / path)
-    assert _one(r'os\.getenv\("PORT", "(\d+)"\)', text, path) == EXPECTED_PORTS[role]
+    # Either quote style: an f-string fallback uses single quotes.
+    pattern = r'os\.getenv\(["\']PORT["\'], ["\'](\d+)["\']\)'
+    assert _one(pattern, text, path) == EXPECTED_PORTS[role]
 
 
 @pytest.mark.parametrize(
@@ -197,3 +200,41 @@ def test_seed_connections_use_the_service_ports():
         "FSP01": EXPECTED_PORTS["fsp"],
         "FSP02": EXPECTED_PORTS["fsp2"],
     }
+
+
+def test_integration_tests_use_the_current_ports():
+    """The Docker-stack integration tests talk to the published BFF/SO ports."""
+    for path in sorted((DEMO / "tests" / "integration").glob("*.py")):
+        text = _read(path)
+        for port in re.findall(r"localhost:(\d+)", text):
+            assert int(port) in EXPECTED_PORTS.values(), (
+                f"{path.name}: localhost:{port}"
+            )
+        for port in re.findall(r'"port":\s*(\d+)', text):
+            assert int(port) in EXPECTED_PORTS.values(), f"{path.name}: port {port}"
+
+
+def _hmi_sources():
+    src = MODULES / "hmi" / "src"
+    return [
+        p
+        for p in sorted(src.rglob("*.js*"))
+        if ".test." not in p.name and p.name != "config.js"
+    ]
+
+
+def test_hmi_takes_the_bff_address_from_config_js():
+    """Only src/config.js holds the default BFF address (see its docstring)."""
+    for path in _hmi_sources():
+        text = _read(path)
+        assert not re.search(r"localhost:\d+", text), f"{path.name} hardcodes a URL"
+
+
+def test_keycloak_http_port():
+    text = _read(ROOT / "scripts" / "keycloak" / "docker-compose.yml")
+    port = KEYCLOAK_HTTP_PORT
+    assert f'"{port}:{port}"' in text
+    assert f"KC_HTTP_PORT: {port}" in text
+    for path in _hmi_sources():
+        for found in re.findall(r"keycloak:(\d+)", _read(path)):
+            assert int(found) == port, f"{path.name}: keycloak:{found}"

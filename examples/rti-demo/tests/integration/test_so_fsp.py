@@ -18,7 +18,7 @@
 """Integration test: FSP <-> SO WebSocket connection lifecycle.
 
 Requires the rti-demo Docker Compose stack running (rti-fsp on :5001,
-rti-so on :5002) - see TESTING.md's "Integration tests (Docker required)"
+rti-so on :5000) - see TESTING.md's "Integration tests (Docker required)"
 section:
 
     docker compose -f docker-compose.yml up -d
@@ -40,7 +40,7 @@ import requests
 pytestmark = pytest.mark.integration
 
 FSP_URL = "http://localhost:5001/api"
-SO_URL = "http://localhost:5002/api"
+SO_URL = "http://localhost:5000/api"
 
 WS_PORT = 8765
 CP = "cp1"

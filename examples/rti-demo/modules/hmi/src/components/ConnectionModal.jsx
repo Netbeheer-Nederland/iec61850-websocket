@@ -280,11 +280,11 @@ function ConnectionModal({
                     id="endpoint"
                     value={formData.endpoint || ''}
                     onChange={handleInputChange}
-                    placeholder="e.g., http://keycloak:8080"
+                    placeholder="e.g., http://keycloak:8081"
                   />
                   <small style={{ color: 'var(--text-muted)' }}>
                     Base URL of this identity provider, as reached from the BFF
-                    (e.g. http://keycloak:8080) - realms live under /realms/&lt;name&gt;.
+                    (e.g. http://keycloak:8081) - realms live under /realms/&lt;name&gt;.
                   </small>
                 </div>
               )}

@@ -18,7 +18,7 @@
 """Integration test for BFF connection management against live containers.
 
 Requires the rti-demo Docker Compose stack running (rti-bff on :3000,
-rti-fsp on :5001, rti-so on :5002) - see TESTING.md's "Integration tests
+rti-fsp on :5001, rti-so on :5000) - see TESTING.md's "Integration tests
 (Docker required)" section:
 
     docker compose -f docker-compose.yml up -d
@@ -78,7 +78,7 @@ def test_add_edit_delete_so_connection():
         json={
             "name": SO_NAME,
             "host": "rti-so",
-            "port": 5002,
+            "port": 5000,
             "ws_port": 8765,
             "type": "RTI-SO",
             "acsi": "client",

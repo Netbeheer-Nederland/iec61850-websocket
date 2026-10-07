@@ -1417,7 +1417,7 @@ playbook_store = PlaybookStore(
 # so Traffic shows every step.
 playbook_runs = PlaybookRuns(
     playbook_store,
-    lambda playbook: BffTransport(f"http://localhost:{os.getenv('PORT', '5000')}"),
+    lambda playbook: BffTransport(f"http://localhost:{os.getenv('PORT', '3000')}"),
 )
 
 
