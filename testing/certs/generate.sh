@@ -42,7 +42,7 @@ cfssl gencert \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
   -profile=server \
-  -cn="{$HOSTNAME}" \
+  -cn="${HOSTNAME}" \
   -hostname="${HOSTNAME},${SERVER_HOSTNAMES}" \
   server-csr.json | cfssljson -bare keycloak
 
@@ -53,7 +53,7 @@ cfssl gencert \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
   -profile=server \
-  -cn="{$HOSTNAME}" \
+  -cn="${HOSTNAME}" \
   -hostname="${HOSTNAME},${SERVER_HOSTNAMES}" \
   server-csr.json | cfssljson -bare server
 
