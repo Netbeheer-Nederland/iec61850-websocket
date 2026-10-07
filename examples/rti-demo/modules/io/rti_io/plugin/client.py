@@ -16,10 +16,10 @@
 # limitations under the License.
 
 """
-Async Client for connecting to demo_IO IO Device Control API.
+Async Client for connecting to the IO server Device Control API.
 
 This module provides an async HTTP client interface using httpx for
-asynchronous control of IO devices exposed by the demo_IO service.
+asynchronous control of IO devices exposed by the IO server.
 
 Perfect for use in async FastAPI applications or any async context.
 
@@ -71,7 +71,7 @@ logger = logging.getLogger(__name__)
 
 # Lazy import to avoid circular dependencies
 def _get_shared_mapping_manager() -> IOMappingManager:
-    """Get the shared mapping manager instance from io_router."""
+    """Get the shared mapping manager instance from router."""
     from .router import get_mapping_manager
 
     return get_mapping_manager()
@@ -90,37 +90,37 @@ DEFAULT_RETRY_STATUS_CODES = [429, 500, 502, 503, 504]
 
 
 class IOClientError(Exception):
-    """Base exception for demo_IO client errors."""
+    """Base exception for the IO server client errors."""
 
     pass
 
 
 class IOConnectionError(Exception):
-    """Connection to demo_IO server failed."""
+    """Connection to the IO server failed."""
 
     pass
 
 
 class RequestTimeoutError(Exception):
-    """Request to demo_IO server timed out."""
+    """Request to the IO server timed out."""
 
     pass
 
 
 class APIError(Exception):
-    """API error from demo_IO server."""
+    """API error from the IO server."""
 
     pass
 
 
 class DeviceNotFoundError(Exception):
-    """Requested device not found in demo_IO."""
+    """Requested device not found in the IO server."""
 
     pass
 
 
 class AuthenticationError(Exception):
-    """Authentication failed for demo_IO."""
+    """Authentication failed for the IO server."""
 
     pass
 
@@ -138,7 +138,7 @@ __all__ = [
 
 
 class AsyncIOClient:
-    """Async HTTP client for the demo_IO IO Device Control API.
+    """Async HTTP client for the IO server Device Control API.
 
     Uses httpx.AsyncClient for async HTTP requests, providing:
     - Full async/await support
@@ -170,10 +170,10 @@ class AsyncIOClient:
         # ACSI server URL for IEC61850 writes
         acsi_base_url: str | None = None,
     ):
-        """Initialize the async demo_IO client.
+        """Initialize the async IO server client.
 
         Args:
-            base_url: Base URL of the demo_IO service (without /api/io suffix)
+            base_url: Base URL of the IO server (without /api/io suffix)
             mapping_file: Optional path to io_mapping.json file
             timeout: Request timeout in seconds (default: 5.0)
             max_retries: Maximum number of retry attempts (default: 3)
@@ -205,7 +205,7 @@ class AsyncIOClient:
         try:
             self.mapping = _get_shared_mapping_manager()
         except (ImportError, AttributeError):
-            # Fallback to local instance if io_router is not available
+            # Fallback to local instance if router is not available
             self.mapping = IOMappingManager(mapping_file=mapping_file)
         self._client: httpx.AsyncClient | None = None
         self._is_closed = True
@@ -271,7 +271,7 @@ class AsyncIOClient:
         params: dict | None = None,
         raise_on_error: bool = True,
     ) -> Any:
-        """Make an async HTTP request to the demo_IO API.
+        """Make an async HTTP request to the IO server API.
 
         Args:
             method: HTTP method (GET, POST, etc.)
@@ -406,11 +406,11 @@ class AsyncIOClient:
     # ==================== HEALTH AND STATUS ====================
 
     async def health_check(self) -> dict[str, Any]:
-        """Check the health of the demo_IO service."""
+        """Check the health of the IO server."""
         return await self._request("GET", "/health")
 
     async def is_healthy(self) -> bool:
-        """Check if the demo_IO service is healthy."""
+        """Check if the IO server is healthy."""
         try:
             health = await self.health_check()
             return health.get("status") == "ok"
@@ -445,7 +445,7 @@ class AsyncIOClient:
         description: str = "",
         initial_state: bool = False,
     ) -> dict[str, Any]:
-        """Configure an LED on the demo_IO service.
+        """Configure an LED on the IO server.
 
         This is a convenience method that uses the device API internally.
         """
@@ -519,11 +519,11 @@ class AsyncIOClient:
         return await self.set_all_leds(False)
 
     async def initialize(self) -> dict[str, Any]:
-        """Initialize the IO controller on the demo_IO service."""
+        """Initialize the IO controller on the IO server."""
         return await self._request("POST", "/initialize")
 
     async def cleanup(self) -> dict[str, Any]:
-        """Clean up IO resources on the demo_IO service."""
+        """Clean up IO resources on the IO server."""
         return await self._request("POST", "/cleanup")
 
     # ==================== CONVENIENCE METHODS (LEGACY) ====================
@@ -914,7 +914,7 @@ class AsyncIOClient:
 class DemoIOClient:
     """Synchronous wrapper for AsyncIOClient.
 
-    This class provides a synchronous interface to the demo_IO API by wrapping
+    This class provides a synchronous interface to the IO server API by wrapping
     the async methods of AsyncIOClient. It uses asyncio.run() to execute
     async code synchronously.
 
@@ -943,12 +943,12 @@ class DemoIOClient:
         limits: httpx.Limits | None = None,
         acsi_base_url: str | None = None,
     ):
-        """Initialize the synchronous demo_IO client.
+        """Initialize the synchronous IO server client.
 
         This creates an AsyncIOClient internally and wraps its methods.
 
         Args:
-            base_url: Base URL of the demo_IO service
+            base_url: Base URL of the IO server
             mapping_file: Optional path to io_mapping.json file
             timeout: Request timeout in seconds
             max_retries: Maximum number of retry attempts

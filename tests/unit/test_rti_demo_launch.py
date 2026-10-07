@@ -17,9 +17,11 @@ LAUNCH_PY = Path(__file__).resolve().parents[2] / "examples" / "rti-demo" / "lau
 def launcher():
     spec = importlib.util.spec_from_file_location("rti_demo_launch", LAUNCH_PY)
     module = importlib.util.module_from_spec(spec)
+    # Registered while the tests run (they look it up by name), then removed.
     sys.modules["rti_demo_launch"] = module
     spec.loader.exec_module(module)
-    return module.RTILauncher()
+    yield module.RTILauncher()
+    sys.modules.pop("rti_demo_launch", None)
 
 
 def test_verbose_by_default(launcher):

@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""IO client package for demo_IO GPIO LED control."""
+"""The IO plugin: the FSP and SO use it to reach the IO server."""
 
 from .client import AsyncIOClient, DemoIOClient
 

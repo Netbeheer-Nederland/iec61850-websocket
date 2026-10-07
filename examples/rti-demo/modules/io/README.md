@@ -100,7 +100,12 @@ All endpoints are under the `/api/io/` prefix and provide device management, LED
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 9000 | Server port (the same for a direct run, `launch.py` and Docker) |
-| `IO_CONFIG_FILE` | `io_config.json` | Path to configuration file |
+| `IO_CONFIG_FILE` | `rti_io/server/io_config.json` | The device configuration the server reads and saves to. A file that doesn't exist yet is seeded from the shipped `io_config.json`. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_config.json`, so saves leave the shipped file unchanged |
+| `IO_PLUGIN_FILES_DIR` | `rti_io/plugin` | The IO plugin files served at `GET /api/io-plugin/files`; `IO_CLIENT_FILES_DIR` (the old name) still works |
+| `IO_PLUGIN_VERSION` | `1.0.0` | The version `GET /api/io-plugin/version` reports; `IO_CLIENT_VERSION` (the old name) still works |
+
+Start the server with `python -m rti_io.server.main` from `examples/rti-demo/modules/io` (or `launch.py io`); the modules
+use relative imports, so they don't run as scripts.
 
 ### Hardware Requirements
 

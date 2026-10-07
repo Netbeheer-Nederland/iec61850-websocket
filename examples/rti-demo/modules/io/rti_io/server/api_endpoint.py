@@ -34,7 +34,6 @@ Legacy LED-only endpoints have been removed.
 from __future__ import annotations
 
 import logging
-import os
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -1532,25 +1531,3 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             raise HTTPException(status_code=500, detail=str(exc))
 
     return router
-
-
-if __name__ == "__main__":
-    import os
-    import platform
-
-    import uvicorn
-
-    # Create the FastAPI app with an IOController
-    app = create_fastapi_app()
-
-    # Get port from environment or use default
-    port = int(os.getenv("PORT", "9000"))
-
-    # On Windows, use localhost instead of 0.0.0.0 to avoid permission issues
-    if platform.system() == "Windows":
-        host = "localhost"
-    else:
-        host = "0.0.0.0"
-
-    # Run the server
-    uvicorn.run(app, host=host, port=port)
