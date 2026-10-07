@@ -16,15 +16,15 @@
 # limitations under the License.
 
 """
-IO Router for ACSI BFF - Provides IO device control routes that proxy to demo_IO.
+IO Router for ACSI BFF - Provides IO device control routes that proxy to the IO server.
 
 This module creates a FastAPI router that provides IO/device control endpoints
-for the ACSI service, which proxy requests to a connected demo_IO instance.
+for the ACSI service, which proxy requests to a connected IO server.
 
 The IO router allows ACSI to:
 - Expose device control endpoints to its clients (primarily LED control)
-- Proxy device control requests to demo_IO
-- Manage connection to demo_IO service
+- Proxy device control requests to the IO server
+- Manage connection to IO server
 - Manage IEC 61850 object mappings to IO devices
 """
 
@@ -83,11 +83,11 @@ class LEDStateRequest(BaseModel):
 
 
 class IOConnectionConfig(BaseModel):
-    """Configuration for demo_IO connection."""
+    """Configuration for IO server connection."""
 
     base_url: str = Field(
         default="http://localhost:9000",
-        description="Base URL of the demo_IO service",
+        description="Base URL of the IO server",
         json_schema_extra={"example": "http://rti-io:9000"},
     )
     acsi_url: str | None = Field(
@@ -211,12 +211,12 @@ _router_state = _IORouterState()
 
 
 def get_io_client() -> AsyncIOClient | None:
-    """Get the demo_IO async client instance."""
+    """Get the IO server async client instance."""
     return _router_state.io_client
 
 
 def set_io_client(client: AsyncIOClient) -> None:
-    """Set the demo_IO async client instance."""
+    """Set the IO server async client instance."""
     with _router_state._lock:
         _router_state.io_client = client
         logger.info(f"AsyncIOClient configured with base URL: {client.base_url}")
@@ -238,10 +238,10 @@ def set_mapping_manager(manager: IOMappingManager) -> None:
 
 
 def create_io_router() -> APIRouter:
-    """Create a FastAPI router for IO/device control via demo_IO proxy.
+    """Create a FastAPI router for IO/device control via the IO server.
 
     This router provides endpoints that proxy device control requests (IO devices)
-    to a connected demo_IO service. The demo_IO connection is configured via
+    to a connected IO server. The IO server connection is configured via
     environment variable IO_URL or through the /api/io/connect endpoint.
 
     Note: If IO_URL is set, the client will be auto-configured on router creation.
@@ -275,12 +275,12 @@ def create_io_router() -> APIRouter:
     # ==================== Helper Functions ====================
 
     async def _get_client_or_error() -> AsyncIOClient:
-        """Get demo_IO async client or raise error if not configured."""
+        """Get IO server async client or raise error if not configured."""
         client = get_io_client()
         if client is None:
             raise HTTPException(
                 status_code=500,
-                detail="demo_IO client not configured. "
+                detail="IO server client not configured. "
                 "Configure connection via POST /api/io/connect or set IO_URL environment variable.",
             )
 
@@ -288,7 +288,7 @@ def create_io_router() -> APIRouter:
         if not await client.is_healthy():
             raise HTTPException(
                 status_code=503,
-                detail=f"demo_IO service at {client.base_url} is not responding. "
+                detail=f"IO server at {client.base_url} is not responding. "
                 "Check if the service is running and accessible.",
             )
 
@@ -385,9 +385,13 @@ def create_io_router() -> APIRouter:
         Returns:
             bool: True if callback was registered successfully
         """
-        from demo_IO.io_api_server.io_controller import get_io_controller
+        try:
+            from io_controller import get_io_controller
+        except ImportError:
+            # Only the IO server's own process has the controller.
+            get_io_controller = None
 
-        controller = get_io_controller()
+        controller = get_io_controller() if get_io_controller else None
         io_client = get_io_client()
         if not controller or not io_client:
             logger.warning(
@@ -463,7 +467,7 @@ def create_io_router() -> APIRouter:
             )
 
     def _handle_io_error(func_name: str):
-        """Decorator to handle demo_IO async client errors."""
+        """Decorator to handle IO server async client errors."""
 
         def decorator(func):
             async def wrapper(*args, **kwargs):
@@ -475,7 +479,8 @@ def create_io_router() -> APIRouter:
                 except Exception as exc:
                     logger.error(f"IO {func_name} failed: {exc}")
                     raise HTTPException(
-                        status_code=500, detail=f"demo_IO operation failed: {str(exc)}"
+                        status_code=500,
+                        detail=f"IO server operation failed: {str(exc)}",
                     )
 
             return wrapper
@@ -484,8 +489,8 @@ def create_io_router() -> APIRouter:
 
     @router.post(
         "/connect",
-        summary="Connect to demo_IO",
-        description="Configure the connection to a demo_IO service. "
+        summary="Connect to the IO server",
+        description="Configure the connection to an IO server. "
         "This must be called before using IO endpoints if IO_URL is not set.",
         response_description="Connection confirmation",
         responses={
@@ -495,11 +500,11 @@ def create_io_router() -> APIRouter:
         tags=["IO Connection"],
     )
     async def api_connect_io(config: IOConnectionConfig, request: Request):
-        """Connect to a demo_IO service.
+        """Connect to an IO server.
 
         Request Body:
             IOConnectionConfig: {
-                "base_url": str  # Base URL of demo_IO service
+                "base_url": str  # Base URL of IO server
             }
 
         Returns:
@@ -556,7 +561,7 @@ def create_io_router() -> APIRouter:
             if not await client.is_healthy():
                 raise HTTPException(
                     status_code=400,
-                    detail=f"demo_IO service at {config.base_url} is not responding",
+                    detail=f"IO server at {config.base_url} is not responding",
                 )
 
             set_io_client(client)
@@ -565,11 +570,11 @@ def create_io_router() -> APIRouter:
             _register_all_input_callbacks()
 
             logger.info(
-                f"Connected to demo_IO at {config.base_url} with ACSI URL: {acsi_base_url}"
+                f"Connected to the IO server at {config.base_url} with ACSI URL: {acsi_base_url}"
             )
             return {
                 "ok": True,
-                "message": f"Connected to demo_IO at {config.base_url}",
+                "message": f"Connected to the IO server at {config.base_url}",
                 "base_url": config.base_url,
                 "acsi_base_url": acsi_base_url,
                 "healthy": True,
@@ -577,7 +582,7 @@ def create_io_router() -> APIRouter:
         except HTTPException:
             raise
         except Exception as exc:
-            logger.error(f"Failed to connect to demo_IO: {exc}")
+            logger.error(f"Failed to connect to the IO server: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
 
     # ==================== Health and Status ====================
@@ -585,7 +590,7 @@ def create_io_router() -> APIRouter:
     @router.get(
         "/health",
         summary="IO Health Check",
-        description="Check health of demo_IO connection.",
+        description="Check health of IO server connection.",
         response_description="Health status",
         responses={
             200: {"description": "Service is healthy"},
@@ -594,7 +599,7 @@ def create_io_router() -> APIRouter:
         tags=["IO Health"],
     )
     async def api_io_health(request: Request):
-        """Check demo_IO service health."""
+        """Check IO server health."""
         try:
             client = await _get_client_or_error()
             health = await client.health_check()
@@ -607,16 +612,16 @@ def create_io_router() -> APIRouter:
     @router.get(
         "/status",
         summary="Get GPIO Status",
-        description="Returns the current status of the demo_IO GPIO controller.",
+        description="Returns the current status of the IO server GPIO controller.",
         response_description="GPIO controller status",
         responses={
             200: {"description": "GPIO status returned successfully"},
-            503: {"description": "demo_IO not connected"},
+            503: {"description": "IO server not connected"},
         },
         tags=["GPIO Status"],
     )
     async def api_io_status(request: Request):
-        """Get current GPIO controller status from demo_IO."""
+        """Get current GPIO controller status from IO server."""
         client = await _get_client_or_error()
         return await client.get_status()
 
@@ -625,16 +630,16 @@ def create_io_router() -> APIRouter:
     @router.post(
         "/leds/config",
         summary="Configure LED",
-        description="Add or configure an LED on the demo_IO service.",
+        description="Add or configure an LED on the IO server.",
         response_description="Configuration confirmation",
         responses={
             200: {"description": "LED configured successfully"},
-            503: {"description": "demo_IO not connected"},
+            503: {"description": "IO server not connected"},
         },
         tags=["LED Configuration"],
     )
     async def api_config_led(request: LEDConfigRequest):
-        """Configure an LED on demo_IO.
+        """Configure an LED on IO server.
 
         Request Body:
             LEDConfigRequest: {
@@ -660,16 +665,16 @@ def create_io_router() -> APIRouter:
     @router.post(
         "/leds/all/set",
         summary="Set All LEDs",
-        description="Set all configured LEDs to a specific state on demo_IO.",
+        description="Set all configured LEDs to a specific state on IO server.",
         response_description="Bulk set confirmation",
         responses={
             200: {"description": "All LEDs set successfully"},
-            503: {"description": "demo_IO not connected"},
+            503: {"description": "IO server not connected"},
         },
         tags=["Bulk Operations"],
     )
     async def api_set_all_leds(request: LEDStateRequest):
-        """Set all LEDs to a specific state on demo_IO.
+        """Set all LEDs to a specific state on IO server.
 
         Request Body:
             LEDStateRequest: {
@@ -685,32 +690,32 @@ def create_io_router() -> APIRouter:
     @router.post(
         "/leds/all/on",
         summary="All LEDs On",
-        description="Turn all configured LEDs ON on demo_IO.",
+        description="Turn all configured LEDs ON on IO server.",
         response_description="Bulk on confirmation",
         responses={
             200: {"description": "All LEDs turned ON successfully"},
-            503: {"description": "demo_IO not connected"},
+            503: {"description": "IO server not connected"},
         },
         tags=["Bulk Operations"],
     )
     async def api_all_on(request: Request):
-        """Turn all LEDs ON on demo_IO."""
+        """Turn all LEDs ON on IO server."""
         client = await _get_client_or_error()
         return await client.all_leds_on()
 
     @router.post(
         "/leds/all/off",
         summary="All LEDs Off",
-        description="Turn all configured LEDs OFF on demo_IO.",
+        description="Turn all configured LEDs OFF on IO server.",
         response_description="Bulk off confirmation",
         responses={
             200: {"description": "All LEDs turned OFF successfully"},
-            503: {"description": "demo_IO not connected"},
+            503: {"description": "IO server not connected"},
         },
         tags=["Bulk Operations"],
     )
     async def api_all_off(request: Request):
-        """Turn all LEDs OFF on demo_IO."""
+        """Turn all LEDs OFF on IO server."""
         client = await _get_client_or_error()
         return await client.all_leds_off()
 
@@ -719,33 +724,33 @@ def create_io_router() -> APIRouter:
     @router.get(
         "/leds",
         summary="List All LEDs",
-        description="Returns the state of all configured LEDs on demo_IO.",
+        description="Returns the state of all configured LEDs on IO server.",
         response_description="All LED states",
         responses={
             200: {"description": "LED states returned successfully"},
-            503: {"description": "demo_IO not connected"},
+            503: {"description": "IO server not connected"},
         },
         tags=["GPIO Status"],
     )
     async def api_list_leds(request: Request):
-        """Get state of all LEDs from demo_IO."""
+        """Get state of all LEDs from IO server."""
         client = await _get_client_or_error()
         return await client.list_leds()
 
     @router.get(
         "/leds/{name}",
         summary="Get LED State",
-        description="Returns the current state of a specific LED from demo_IO.",
+        description="Returns the current state of a specific LED from IO server.",
         response_description="LED state",
         responses={
             200: {"description": "LED state returned successfully"},
-            404: {"description": "LED not found on demo_IO"},
-            503: {"description": "demo_IO not connected"},
+            404: {"description": "LED not found on IO server"},
+            503: {"description": "IO server not connected"},
         },
         tags=["GPIO Status"],
     )
     async def api_get_led_state(name: str, request: Request):
-        """Get state of a specific LED from demo_IO.
+        """Get state of a specific LED from IO server.
 
         Args:
             name: LED identifier
@@ -761,17 +766,17 @@ def create_io_router() -> APIRouter:
     @router.post(
         "/leds/{name}/set",
         summary="Set LED State",
-        description="Set a specific LED to ON or OFF state on demo_IO.",
+        description="Set a specific LED to ON or OFF state on IO server.",
         response_description="Set confirmation",
         responses={
             200: {"description": "LED state set successfully"},
-            404: {"description": "LED not found on demo_IO"},
-            503: {"description": "demo_IO not connected"},
+            404: {"description": "LED not found on IO server"},
+            503: {"description": "IO server not connected"},
         },
         tags=["LED Control"],
     )
     async def api_set_led(name: str, request: LEDStateRequest):
-        """Set LED to a specific state on demo_IO.
+        """Set LED to a specific state on IO server.
 
         Args:
             name: LED identifier
@@ -790,17 +795,17 @@ def create_io_router() -> APIRouter:
     @router.post(
         "/leds/{name}/toggle",
         summary="Toggle LED",
-        description="Toggle the state of a specific LED on demo_IO.",
+        description="Toggle the state of a specific LED on IO server.",
         response_description="Toggle confirmation",
         responses={
             200: {"description": "LED toggled successfully"},
-            404: {"description": "LED not found on demo_IO"},
-            503: {"description": "demo_IO not connected"},
+            404: {"description": "LED not found on IO server"},
+            503: {"description": "IO server not connected"},
         },
         tags=["LED Control"],
     )
     async def api_toggle_led(name: str, request: Request):
-        """Toggle an LED state on demo_IO.
+        """Toggle an LED state on IO server.
 
         Args:
             name: LED identifier
@@ -814,17 +819,17 @@ def create_io_router() -> APIRouter:
     @router.post(
         "/leds/{name}/on",
         summary="Turn LED On",
-        description="Turn a specific LED ON on demo_IO.",
+        description="Turn a specific LED ON on IO server.",
         response_description="On confirmation",
         responses={
             200: {"description": "LED turned ON successfully"},
-            404: {"description": "LED not found on demo_IO"},
-            503: {"description": "demo_IO not connected"},
+            404: {"description": "LED not found on IO server"},
+            503: {"description": "IO server not connected"},
         },
         tags=["LED Control"],
     )
     async def api_turn_on(name: str, request: Request):
-        """Turn an LED ON on demo_IO.
+        """Turn an LED ON on IO server.
 
         Args:
             name: LED identifier
@@ -838,17 +843,17 @@ def create_io_router() -> APIRouter:
     @router.post(
         "/leds/{name}/off",
         summary="Turn LED Off",
-        description="Turn a specific LED OFF on demo_IO.",
+        description="Turn a specific LED OFF on IO server.",
         response_description="Off confirmation",
         responses={
             200: {"description": "LED turned OFF successfully"},
-            404: {"description": "LED not found on demo_IO"},
-            503: {"description": "demo_IO not connected"},
+            404: {"description": "LED not found on IO server"},
+            503: {"description": "IO server not connected"},
         },
         tags=["LED Control"],
     )
     async def api_turn_off(name: str, request: Request):
-        """Turn an LED OFF on demo_IO.
+        """Turn an LED OFF on IO server.
 
         Args:
             name: LED identifier
@@ -864,17 +869,17 @@ def create_io_router() -> APIRouter:
     @router.post(
         "/devices/{name}/set",
         summary="Set Device State",
-        description="Set a specific device to ON or OFF state on demo_IO. Generic endpoint for all devices.",
+        description="Set a specific device to ON or OFF state on IO server. Generic endpoint for all devices.",
         response_description="Set confirmation",
         responses={
             200: {"description": "Device state set successfully"},
-            404: {"description": "Device not found on demo_IO"},
-            503: {"description": "demo_IO not connected"},
+            404: {"description": "Device not found on IO server"},
+            503: {"description": "IO server not connected"},
         },
         tags=["Device Control"],
     )
     async def api_set_device(name: str, request: LEDStateRequest):
-        """Set a device to a specific state on demo_IO.
+        """Set a device to a specific state on IO server.
 
         This is a generic endpoint that works for all output devices (LEDs, etc.).
 
@@ -897,32 +902,32 @@ def create_io_router() -> APIRouter:
     @router.post(
         "/initialize",
         summary="Initialize GPIO",
-        description="Initialize the GPIO controller on demo_IO.",
+        description="Initialize the GPIO controller on IO server.",
         response_description="Initialization confirmation",
         responses={
             200: {"description": "GPIO initialized successfully"},
-            503: {"description": "demo_IO not connected"},
+            503: {"description": "IO server not connected"},
         },
         tags=["GPIO Management"],
     )
     async def api_initialize(request: Request):
-        """Initialize GPIO controller on demo_IO."""
+        """Initialize GPIO controller on IO server."""
         client = await _get_client_or_error()
         return await client.initialize()
 
     @router.post(
         "/cleanup",
         summary="Cleanup GPIO",
-        description="Clean up GPIO resources on demo_IO.",
+        description="Clean up GPIO resources on IO server.",
         response_description="Cleanup confirmation",
         responses={
             200: {"description": "GPIO cleaned up successfully"},
-            503: {"description": "demo_IO not connected"},
+            503: {"description": "IO server not connected"},
         },
         tags=["GPIO Management"],
     )
     async def api_cleanup(request: Request):
-        """Clean up GPIO resources on demo_IO."""
+        """Clean up GPIO resources on IO server."""
         client = await _get_client_or_error()
         return await client.cleanup()
 

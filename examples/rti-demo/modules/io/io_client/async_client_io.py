@@ -94,7 +94,7 @@ class IOClientError(Exception):
     pass
 
 
-class ConnectionError(Exception):
+class IOConnectionError(Exception):
     """Connection to demo_IO server failed."""
 
     pass
@@ -128,7 +128,7 @@ __all__ = [
     "AsyncIOClient",
     "DemoIOClient",
     "IOClientError",
-    "ConnectionError",
+    "IOConnectionError",
     "RequestTimeoutError",
     "APIError",
     "DeviceNotFoundError",
@@ -283,7 +283,7 @@ class AsyncIOClient:
             Parsed JSON response
 
         Raises:
-            ConnectionError: If cannot connect to the service
+            IOConnectionError: If cannot connect to the service
             RequestTimeoutError: If request times out
             APIError: If API returns an error status code
             AuthenticationError: If authentication fails
@@ -389,7 +389,7 @@ class AsyncIOClient:
                     continue
                 else:
                     if raise_on_error:
-                        raise ConnectionError(str(e), self.base_url)
+                        raise IOConnectionError(str(e), self.base_url)
                     return None
 
             except httpx.RequestError as e:
