@@ -205,7 +205,7 @@ services:
     # Health check already defined in the Dockerfile.
     labels:
       - "rti.service=rti-io"
-      - "rti.type=GPIO-LED-Control"
+      - "rti.type=RTI-IO"
       - "rti.host=rti-io"
       - "rti.port=9000"
 

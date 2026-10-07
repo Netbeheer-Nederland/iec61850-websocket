@@ -194,7 +194,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         health_check_path="/api/io/health",
         labels={
             "rti.service": "rti-io",
-            "rti.type": "IO-Device-Control",
+            "rti.type": "RTI-IO",
             "rti.host": "rti-io",
             "rti.port": "9000",
         },
