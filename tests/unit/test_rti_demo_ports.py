@@ -131,11 +131,11 @@ def test_io_server_url_default(path):
     [
         # Not acsi_base_url: that's the FSP's address (5001), in the same files.
         (
-            "io/io_client/async_client_io.py",
+            "io/rti_io/plugin/client.py",
             r'\bbase_url: str = "http://localhost:(\d+)"',
         ),
         (
-            "io/io_client/io_router.py",
+            "io/rti_io/plugin/router.py",
             r'base_url: str = Field\(\s*default="http://localhost:(\d+)"',
         ),
     ],

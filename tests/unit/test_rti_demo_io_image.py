@@ -19,5 +19,4 @@ DOCKERFILE = (
 def test_io_image_ships_the_package():
     text = DOCKERFILE.read_text(encoding="utf-8")
     assert re.search(r"^COPY rti_io/ /app/rti_io/$", text, re.MULTILINE)
-    assert re.search(r"^COPY io_client/ /app/io_client/$", text, re.MULTILINE)
     assert 'CMD ["python", "-u", "-m", "rti_io.server.main"]' in text

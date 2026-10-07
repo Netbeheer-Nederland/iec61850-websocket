@@ -33,7 +33,7 @@ path = [
   "examples/rti-demo/modules/bff/src/bff/connections.json",
   "examples/rti-demo/modules/hmi/package.json",
   "examples/rti-demo/modules/io/rti_io/server/io_config.json",
-  "examples/rti-demo/modules/io/io_client/io_mapping.json",
+  "examples/rti-demo/modules/io/rti_io/plugin/io_mapping.json",
   "scripts/keycloak/data/realm-test.json",
   "testing/certs/*-csr.json",
   "testing/certs/ca-config.json",

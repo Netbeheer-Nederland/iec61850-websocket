@@ -355,13 +355,16 @@ IO_SERVER_URL = os.getenv("IO_SERVER_URL", "http://localhost:9000")
 IO_PLUGIN_MAX_RETRIES = int(os.getenv("io_plugin_MAX_RETRIES", "3"))
 IO_PLUGIN_RETRY_DELAY = float(os.getenv("io_plugin_RETRY_DELAY", "1.0"))
 
-# Default files to fetch from IO server
+# The IO plugin, as the IO server serves it (decision 0018). Loaded as one
+# package under this name, so its modules import each other relatively and
+# none of them takes a top-level module name.
+IO_PLUGIN_PACKAGE = "rti_io_plugin"
 IO_PLUGIN_REQUIRED_FILES = [
-    "io_router.py",
-    "io_utils.py",
-    "mapping_manager.py",
     "__init__.py",
-    "async_client_io.py",
+    "client.py",
+    "router.py",
+    "mapping.py",
+    "utils.py",
     "io_mapping.json",
 ]
 
@@ -383,20 +386,11 @@ def get_io_plugin_file_path(relative_path: str) -> Path:
 
 def check_required_io_plugin_files() -> bool:
     """Check if all required io_plugin files exist."""
-    required_files = [
-        "io_router.py",
-        "io_utils.py",
-        "mapping_manager.py",
-        "__init__.py",
-        "async_client_io.py",
-    ]
-
-    for file in required_files:
+    for file in IO_PLUGIN_REQUIRED_FILES:
         file_path = get_io_plugin_file_path(file)
         if not file_path.exists():
             logger.debug(f"Required io_plugin file not found: {file_path}")
             return False
-
     return True
 
 
@@ -431,6 +425,16 @@ def _rebuild_pydantic_models(module) -> None:
             )
 
 
+def _drop_io_plugin_modules() -> None:
+    """Remove the IO plugin package and its modules from sys.modules."""
+    for name in [
+        n
+        for n in sys.modules
+        if n == IO_PLUGIN_PACKAGE or n.startswith(IO_PLUGIN_PACKAGE + ".")
+    ]:
+        del sys.modules[name]
+
+
 def load_io_plugin_modules() -> bool:
     """Dynamically load io_plugin modules from the dynamic directory."""
     global _io_plugin_module, _mapping_manager_module, _io_utils_module
@@ -440,83 +444,37 @@ def load_io_plugin_modules() -> bool:
         return False
 
     try:
-        # Add the dynamic directory to sys.path so imports work
-        if str(IO_PLUGIN_DYNAMIC_DIR) not in sys.path:
-            sys.path.insert(0, str(IO_PLUGIN_DYNAMIC_DIR))
-
-        # Load async_client_io module (dependency of io_router) — must load first
-        async_client_io_path = get_io_plugin_file_path("async_client_io.py")
         spec = importlib.util.spec_from_file_location(
-            "async_client_io", async_client_io_path
+            IO_PLUGIN_PACKAGE,
+            get_io_plugin_file_path("__init__.py"),
+            submodule_search_locations=[str(IO_PLUGIN_DYNAMIC_DIR)],
         )
-        if spec and spec.loader:
-            async_client_io_module = importlib.util.module_from_spec(spec)
-            sys.modules["async_client_io"] = async_client_io_module
-            spec.loader.exec_module(async_client_io_module)
-            logger.info(
-                f"Successfully loaded async_client_io from {async_client_io_path}"
-            )
-        else:
-            logger.error(f"Failed to load async_client_io from {async_client_io_path}")
+        if spec is None or spec.loader is None:
+            logger.error(f"Failed to load the IO plugin from {IO_PLUGIN_DYNAMIC_DIR}")
             return False
+        package = importlib.util.module_from_spec(spec)
+        # Registered before exec_module: the package's relative imports, and
+        # Pydantic's deferred schema builds (which resolve forward references
+        # through sys.modules[<module>]), look it up there.
+        sys.modules[IO_PLUGIN_PACKAGE] = package
+        spec.loader.exec_module(package)
 
-        # Load io_router module
-        # IMPORTANT: register in sys.modules under its own name BEFORE
-        # exec_module. Pydantic v2 may defer building a model's schema
-        # (e.g. IOConnectionConfig) until first use, and when it does,
-        # it resolves forward references via sys.modules[<module>].__dict__.
-        # Without this registration, that lookup fails and FastAPI's
-        # /openapi.json generation crashes with "is not fully defined".
-        io_router_path = get_io_plugin_file_path("io_router.py")
-        spec = importlib.util.spec_from_file_location("io_router", io_router_path)
-        if spec and spec.loader:
-            _io_plugin_module = importlib.util.module_from_spec(spec)
-            sys.modules["io_router"] = _io_plugin_module
-            spec.loader.exec_module(_io_plugin_module)
-            # Force any deferred Pydantic model schemas in this module to
-            # build now, while we can still report a clean load failure
-            # here, rather than deferring the crash to whenever
-            # /openapi.json happens to be requested next.
-            _rebuild_pydantic_models(_io_plugin_module)
-            logger.info(f"Successfully loaded io_router from {io_router_path}")
-        else:
-            logger.error(f"Failed to load io_router from {io_router_path}")
-            return False
-
-        # Load io_utils module
-        io_utils_path = get_io_plugin_file_path("io_utils.py")
-        spec = importlib.util.spec_from_file_location("io_utils", io_utils_path)
-        if spec and spec.loader:
-            _io_utils_module = importlib.util.module_from_spec(spec)
-            sys.modules["io_utils"] = _io_utils_module
-            spec.loader.exec_module(_io_utils_module)
-            _rebuild_pydantic_models(_io_utils_module)
-            logger.info(f"Successfully loaded io_utils from {io_utils_path}")
-        else:
-            logger.error(f"Failed to load io_utils from {io_utils_path}")
-            return False
-
-        # Load mapping_manager module
-        mapping_manager_path = get_io_plugin_file_path("mapping_manager.py")
-        spec = importlib.util.spec_from_file_location(
-            "mapping_manager", mapping_manager_path
+        _io_plugin_module = importlib.import_module(f"{IO_PLUGIN_PACKAGE}.router")
+        _io_utils_module = importlib.import_module(f"{IO_PLUGIN_PACKAGE}.utils")
+        _mapping_manager_module = importlib.import_module(
+            f"{IO_PLUGIN_PACKAGE}.mapping"
         )
-        if spec and spec.loader:
-            _mapping_manager_module = importlib.util.module_from_spec(spec)
-            sys.modules["mapping_manager"] = _mapping_manager_module
-            spec.loader.exec_module(_mapping_manager_module)
-            _rebuild_pydantic_models(_mapping_manager_module)
-            logger.info(
-                f"Successfully loaded mapping_manager from {mapping_manager_path}"
-            )
-        else:
-            logger.error(f"Failed to load mapping_manager from {mapping_manager_path}")
-            return False
-
+        # Build any deferred Pydantic schemas now, so a broken model fails
+        # this load instead of the next /openapi.json request.
+        for module in (_io_plugin_module, _io_utils_module, _mapping_manager_module):
+            _rebuild_pydantic_models(module)
+        logger.info(f"Loaded the IO plugin from {IO_PLUGIN_DYNAMIC_DIR}")
         return True
 
     except Exception as e:
         logger.error(f"Failed to load io_plugin modules: {e}")
+        _io_plugin_module = _mapping_manager_module = _io_utils_module = None
+        _drop_io_plugin_modules()
         return False
 
 
@@ -617,15 +575,7 @@ def clear_io_plugin_modules():
     _io_plugin_module = None
     _mapping_manager_module = None
     _io_utils_module = None
-    # Remove dynamic directory from sys.path
-    if str(IO_PLUGIN_DYNAMIC_DIR) in sys.path:
-        sys.path.remove(str(IO_PLUGIN_DYNAMIC_DIR))
-    # Remove all dynamically-registered modules from sys.modules so a
-    # subsequent reload picks up freshly-downloaded copies instead of
-    # stale cached modules (and stale Pydantic model classes/schemas).
-    for _mod_name in ("async_client_io", "io_router", "io_utils", "mapping_manager"):
-        if _mod_name in sys.modules:
-            del sys.modules[_mod_name]
+    _drop_io_plugin_modules()
 
 
 # ==================== IO Plugin HTTP Client Functions ====================
@@ -872,10 +822,8 @@ async def fetch_and_load_io_plugin_files(server_url: str) -> dict[str, Any]:
             update_io_plugin_usage()
             results["load_success"] = True
             results["modules_loaded"] = [
-                "async_client_io",
-                "io_router",
-                "io_utils",
-                "mapping_manager",
+                f"{IO_PLUGIN_PACKAGE}.{name}"
+                for name in ("client", "router", "utils", "mapping")
             ]
             results["use_io_plugin_enabled"] = _use_io_plugin
         else:
@@ -3539,10 +3487,8 @@ def create_bff_router(
                     "loaded": True,
                     "message": "IO Plugin modules reloaded successfully",
                     "modules": [
-                        "async_client_io",
-                        "io_router",
-                        "io_utils",
-                        "mapping_manager",
+                        f"{IO_PLUGIN_PACKAGE}.{name}"
+                        for name in ("client", "router", "utils", "mapping")
                     ],
                     "io_plugin_enabled": _use_io_plugin,
                     "io_router_included": _io_router_included,

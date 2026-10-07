@@ -3,13 +3,14 @@
 """The FSP loads the IO plugin's files and finds what it uses from them."""
 
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
 from fsp import bff_endpoint as be
 
 # The plugin files the IO server serves, as they are in the repository.
-PLUGIN_SRC = Path(__file__).resolve().parents[2] / "io" / "io_client"
+PLUGIN_SRC = Path(__file__).resolve().parents[2] / "io" / "rti_io" / "plugin"
 
 ROUTER_FUNCTIONS = ("create_io_router", "get_io_client", "get_mapping_manager")
 UTILS_FUNCTIONS = ("sync_to_io_device", "write_to_lcd", "blink_led_task")
@@ -42,3 +43,31 @@ def test_loads_the_plugin(plugin_dir):
 def test_a_missing_file_fails_the_load(plugin_dir):
     (plugin_dir / be.IO_PLUGIN_REQUIRED_FILES[0]).unlink()
     assert be.load_io_plugin_modules() is False
+
+
+def _plugin_modules():
+    return sorted(n for n in sys.modules if n.split(".")[0] == be.IO_PLUGIN_PACKAGE)
+
+
+def test_loads_as_one_package(plugin_dir):
+    assert be.load_io_plugin_modules() is True
+    assert "rti_io_plugin.router" in _plugin_modules()
+    for bare in ("async_client_io", "io_router", "io_utils", "mapping_manager"):
+        assert bare not in sys.modules
+
+
+def test_reload_replaces_the_plugin_modules(plugin_dir):
+    assert be.load_io_plugin_modules() is True
+    first = be._io_plugin_module
+    be.clear_io_plugin_modules()
+    assert _plugin_modules() == []
+    assert be.load_io_plugin_modules() is True
+    assert be._io_plugin_module is not first
+
+
+def test_failed_load_leaves_no_plugin_modules(plugin_dir):
+    (plugin_dir / "utils.py").write_text(
+        "raise RuntimeError('broken')\n", encoding="utf-8"
+    )
+    assert be.load_io_plugin_modules() is False
+    assert _plugin_modules() == []

@@ -17,6 +17,6 @@
 
 """IO client package for demo_IO GPIO LED control."""
 
-from .async_client_io import AsyncIOClient, DemoIOClient
+from .client import AsyncIOClient, DemoIOClient
 
 __all__ = ["DemoIOClient", "AsyncIOClient"]

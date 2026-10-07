@@ -35,10 +35,11 @@ import os
 import threading
 from typing import Annotated, Any
 
-from async_client_io import AsyncIOClient
 from fastapi import APIRouter, HTTPException, Path, Request
-from mapping_manager import IOMappingManager
 from pydantic import BaseModel, Field
+
+from .client import AsyncIOClient
+from .mapping import IOMappingManager
 
 logger = logging.getLogger(__name__)
 

@@ -25,7 +25,7 @@ Perfect for use in async FastAPI applications or any async context.
 
 Usage:
     import asyncio
-    from async_client_io import AsyncIOClient
+    from rti_io.plugin.client import AsyncIOClient
 
     async def main():
         async with AsyncIOClient(base_url="http://localhost:9000") as client:
@@ -63,7 +63,8 @@ import re
 from typing import Any
 
 import httpx2 as httpx
-from mapping_manager import IOMappingManager
+
+from .mapping import IOMappingManager
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ logger = logging.getLogger(__name__)
 # Lazy import to avoid circular dependencies
 def _get_shared_mapping_manager() -> IOMappingManager:
     """Get the shared mapping manager instance from io_router."""
-    from .io_router import get_mapping_manager
+    from .router import get_mapping_manager
 
     return get_mapping_manager()
 
@@ -147,7 +148,7 @@ class AsyncIOClient:
     - Same interface as sync DemoIOClient
 
     Usage:
-        from async_client_io import AsyncIOClient
+        from rti_io.plugin.client import AsyncIOClient
 
         async with AsyncIOClient(base_url="http://localhost:9000") as client:
             await client.set_device("led1", True)
@@ -920,8 +921,8 @@ class DemoIOClient:
     Note: This should only be used in synchronous contexts. For async applications,
     use AsyncIOClient directly.
 
-    Usage (with examples/rti-demo/modules/io/io_client on sys.path):
-        from async_client_io import DemoIOClient
+    Usage (with examples/rti-demo/modules/io on sys.path):
+        from rti_io.plugin.client import DemoIOClient
 
         client = DemoIOClient(base_url="http://localhost:9000")
         # Use synchronous methods

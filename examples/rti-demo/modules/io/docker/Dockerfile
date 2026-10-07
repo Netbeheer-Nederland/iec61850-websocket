@@ -36,9 +36,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv && uv sync --frozen --no-dev
 
 # Copy application code
+# The server and the IO plugin it serves (rti_io/plugin).
 COPY rti_io/ /app/rti_io/
-# The IO plugin, served to the FSP and SO by GET /api/io-plugin/files.
-COPY io_client/ /app/io_client/
 
 
 # ============================================================

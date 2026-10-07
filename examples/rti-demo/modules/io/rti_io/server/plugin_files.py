@@ -40,8 +40,18 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
-# The plugin's files: modules/io/io_client locally, /app/io_client in the image.
-DEFAULT_PLUGIN_FILES_DIR = Path(__file__).resolve().parents[2] / "io_client"
+# The IO plugin's files, inside this package: modules/io/rti_io/plugin
+# locally, /app/rti_io/plugin in the image.
+DEFAULT_PLUGIN_FILES_DIR = Path(__file__).resolve().parents[1] / "plugin"
+
+# File names from before decision 0018. An FSP or SO that asks for one is older
+# than this IO server, and its loader can't load the renamed files.
+OLD_PLUGIN_FILE_NAMES = {
+    "async_client_io.py",
+    "io_router.py",
+    "io_utils.py",
+    "mapping_manager.py",
+}
 
 
 def create_plugin_files_router() -> APIRouter:
@@ -63,10 +73,14 @@ def create_plugin_files_router() -> APIRouter:
     )
 
     # Configuration for io_client files storage
-    io_client_files_dir = os.getenv("IO_CLIENT_FILES_DIR") or str(
-        DEFAULT_PLUGIN_FILES_DIR
+    io_client_files_dir = (
+        os.getenv("IO_PLUGIN_FILES_DIR")
+        or os.getenv("IO_CLIENT_FILES_DIR")
+        or str(DEFAULT_PLUGIN_FILES_DIR)
     )
-    io_client_version = os.getenv("IO_CLIENT_VERSION", "1.0.0")
+    io_client_version = (
+        os.getenv("IO_PLUGIN_VERSION") or os.getenv("IO_CLIENT_VERSION") or "1.0.0"
+    )
 
     def ensure_io_client_files_dir() -> bool:
         """Ensure the io_client files directory exists."""
@@ -147,6 +161,14 @@ def create_plugin_files_router() -> APIRouter:
     async def api_get_io_client_file(filename: str):
         """Get the content of a specific io_client file."""
         try:
+            if filename in OLD_PLUGIN_FILE_NAMES:
+                raise HTTPException(
+                    status_code=410,
+                    detail=(
+                        f"'{filename}' was renamed (decision 0018). Run the FSP or SO "
+                        "from the same version as this IO server."
+                    ),
+                )
             file_path = get_io_client_file_path(filename)
 
             if not os.path.exists(file_path):
