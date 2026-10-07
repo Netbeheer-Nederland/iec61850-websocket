@@ -6,7 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # Demo Playbook in the HMI - design
 
-> **Archived 2026-10-06 - historical record, not current instructions.** Implemented: see `examples/rti-demo/playbooks/README.md` for the current behaviour. Paths and steps below
+> **Implemented 2026-10-06 - design record, not current instructions.** Implemented: see `../../../examples/rti-demo/playbooks/README.md` for the current behaviour. Paths and steps below
 > describe the repository at the time and may no longer exist.
 
 Date: 2026-10-05 · Status: approved in conversation, spec under review
@@ -39,7 +39,7 @@ one-click buttons stay exactly as they are; on top of them the HMI can:
 
 ### Runner move
 
-- `examples/rti-demo/playbooks/run.py`'s loading, validation, `control_value`,
+- `../../../examples/rti-demo/playbooks/run.py`'s loading, validation, `control_value`,
   `so_answer`, `BffTransport`, `StepResult`, `Runner` and `parse_duration`
   move to `examples/rti-demo/modules/bff/src/bff/playbook.py`. New in the
   module:
@@ -63,7 +63,7 @@ one-click buttons stay exactly as they are; on top of them the HMI can:
 
 - **Built-in:** the Dockerfile copies `examples/rti-demo/playbooks/*.yaml` to
   `/app/playbooks/` (env `BFF_PLAYBOOKS_BUILTIN_DIR`, default: the repo's
-  `examples/rti-demo/playbooks/` when run from source). Read-only.
+  `../../../examples/rti-demo/playbooks` when run from source). Read-only.
 - **Saved:** `BFF_PLAYBOOKS_DIR`, default `/config/playbooks/` in compose
   (on the existing `bff-config` volume), created on first save.
 - A playbook's **name** is its file name without `.yaml`; names match
@@ -195,7 +195,7 @@ Example step from a pinned read:
 
 - `docs/rti-demo/includes/hmi.adoc` - the Demo Playbook block: recording,
   load / run, storage.
-- `examples/rti-demo/playbooks/README.md` - running from the HMI, where saved
+- `../../../examples/rti-demo/playbooks/README.md` - running from the HMI, where saved
   playbooks live, that a recording is a regular playbook.
 - `modules/bff/README.md` - the playbook endpoints and the two env vars.
 

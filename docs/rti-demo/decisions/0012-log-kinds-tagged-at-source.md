@@ -18,7 +18,7 @@ tell "what is on the wire", "what is this instance doing" and "is the system hea
 ## Decision
 
 - Three kinds: `system` (lifecycle, configuration), `websocket` (frames on the wire) and `acsi` (one entry per
-  service call, whether or not it went over the wire).
+  service call, whether it went over the wire).
 - The kind is set at every call site (`_log_action(..., kind=...)`); nothing classifies by matching message text.
 - Two bounded in-memory stores per instance: `messages` (WebSocket frames) and `actions` (system and acsi), so a
   burst of frames can't push the rarer entries out.

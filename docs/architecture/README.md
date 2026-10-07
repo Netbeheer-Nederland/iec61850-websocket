@@ -19,6 +19,6 @@ Architecture and developer guides for the `ws61850` library. To install and set 
 
 ## Context
 
-The endpoint layer was refactored from a single 859-line `WebSocketEndpoint` class controlled by a runtime `mode` string into two focused concrete classes (`PassiveEndpoint`, `ActiveEndpoint`) with shared infrastructure extracted into reusable helpers. The backward-compatible `WebSocketEndpoint` shim has since been removed (commit `c710a2d`); the old migration guide is in [../archive/migration-guide.md](../archive/migration-guide.md).
+The endpoint layer was refactored from a single 859-line `WebSocketEndpoint` class controlled by a runtime `mode` string into two focused concrete classes (`PassiveEndpoint`, `ActiveEndpoint`) with shared infrastructure extracted into reusable helpers. The backward-compatible `WebSocketEndpoint` shim has since been removed (commit `c710a2d`); the old migration guide is in the git history (`docs/archive/migration-guide.md`, up to commit `421f234`).
 
 See the individual documents for details.

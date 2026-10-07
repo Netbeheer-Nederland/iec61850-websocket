@@ -13,7 +13,7 @@ SPDX-License-Identifier: Apache-2.0
 
 A demo is a series of steps: link an FSP, read, write, operate, enable a report, wait. It should be repeatable from
 the HMI, from the command line and as an integration test. Details:
-[2026-10-05-demo-playbook-design.md](../../archive/specs/2026-10-05-demo-playbook-design.md).
+[demo-playbooks.md](../design/demo-playbooks.md).
 
 ## Decision
 

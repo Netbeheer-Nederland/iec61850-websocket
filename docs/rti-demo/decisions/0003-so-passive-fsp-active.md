@@ -17,10 +17,10 @@ many FSPs connect to.
 
 ## Decision
 
-| Service | WebSocket role | ACSI role | ws61850 classes |
-|---|---|---|---|
-| RTI-SO | passive: WebSocket server on 8765 | ACSI client | `PassiveEndpoint` + `IEC61850Client` |
-| RTI-FSP | active: WebSocket client | ACSI server | `ActiveEndpoint` + `IEC61850Server` |
+| Service | WebSocket role                    | ACSI role   | ws61850 classes                      |
+|---------|-----------------------------------|-------------|--------------------------------------|
+| RTI-SO  | passive: WebSocket server on 8765 | ACSI client | `PassiveEndpoint` + `IEC61850Client` |
+| RTI-FSP | active: WebSocket client          | ACSI server | `ActiveEndpoint` + `IEC61850Server`  |
 
 - One SO serves several FSPs, each on its own communication point (`CP`: `cp1`, `cp2`, ...).
 - The SO's WebSocket server starts when the SO starts (`SO_LISTEN_ON_START`, `SO_WS_HOST`, `SO_WS_PORT`;

@@ -12,7 +12,7 @@ SPDX-License-Identifier: Apache-2.0
 ## Context
 
 The SO, FSP and BFF depend on the ws61850 library in the repository's `src/` and share one uv lock. Images should
-be buildable locally and also published to GitHub, and the demo should run either without retagging.
+be buildable locally and also published to GitHub, and the demo should run too without retagging.
 
 ## Decision
 

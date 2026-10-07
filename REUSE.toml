@@ -12,8 +12,7 @@ version = 1
 path = [
   "docs/protocol_specification/media/**",
   "docs/rti-demo/images/**",
-  "docs/rti-demo/architecture/img.png",
-  "docs/rti-demo/architecture/RTIv2- demo-setup - whiteboard.drawio",
+  "docs/rti-demo/design/demo-setup - whiteboard.drawio",
   "docs/rti-demo/design/wireframe.html",
   "scripts/keycloak/images/**",
 ]

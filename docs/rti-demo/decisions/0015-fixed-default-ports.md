@@ -16,16 +16,16 @@ connections, integration tests and docs. The old set clashed: the HMI used 3000,
 
 ## Decision
 
-| Service | Port |
-|---|---|
-| HMI | 8080 (nginx listens on 80 in the container) |
-| BFF | 3000 |
-| RTI-SO | 5000 REST, 8765 WebSocket |
-| RTI-FSP | 5001, second instance 5005 |
-| IO | 9000 |
+| Service  | Port                                                                                               |
+|----------|----------------------------------------------------------------------------------------------------|
+| HMI      | 8080 (nginx listens on 80 in the container)                                                        |
+| BFF      | 3000                                                                                               |
+| RTI-SO   | 5000 REST, 8765 WebSocket                                                                          |
+| RTI-FSP  | 5001, second instance 5005                                                                         |
+| IO       | 9000                                                                                               |
 | Keycloak | 8081 (`KC_HTTP_PORT`, the same inside and outside the container, so the token issuer is identical) |
 
-A service listens on the same port however it's started (directly, `launch.py` or Docker). `PORT` overrides it.
+A service listens on the same port; however, it's started (directly, `launch.py` or Docker). `PORT` overrides it.
 `tests/unit/test_rti_demo_ports.py` reads every place that sets a port and fails when one disagrees.
 
 ## Consequences

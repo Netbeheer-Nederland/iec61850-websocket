@@ -31,15 +31,13 @@ docs/
 │  └─ media/                              # figures referenced by the spec
 ├─ rti-demo/                              # the RTI demo as a whole
 │  ├─ RTI_DEMO.adoc                       #   system overview: components, communication, data model, flows
-│  ├─ architecture/                       #   demo-setup architecture notes and whiteboard
-│  ├─ design/                             #   HMI style guide, log kinds, wireframe
+│  ├─ design/                             #   HMI style guide, log kinds, playbook design, wireframe, whiteboard
 │  ├─ decisions/                          #   architecture decision records (why it is built this way)
 │  └─ images/                             #   architecture diagrams (also used by the module READMEs)
 ├─ scl/
 │  └─ rti_v1.0.scd                        # SCL file used for the PoC
 ├─ doxygen/
 │  └─ Doxyfile                            # Doxygen configuration for the API reference
-├─ archive/                               # finished plans, specs and guides, kept as a record
 ├─ LICENSES/                              # full texts of the third-party packages' licenses
 └─ THIRD_PARTY_LICENSES.txt               # which third-party package uses which license
 ```
