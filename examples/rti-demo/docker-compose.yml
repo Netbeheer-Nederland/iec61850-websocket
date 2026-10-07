@@ -62,7 +62,7 @@ services:
       - BFF_HOST=${HMI_BFF_HOST:-}
       - BFF_PORT=${HMI_BFF_PORT:-}
     ports:
-      - "3001:80"
+      - "8080:80"
     depends_on:
       rti-bff:
         condition: service_healthy
