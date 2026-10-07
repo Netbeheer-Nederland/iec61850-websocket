@@ -383,7 +383,7 @@ IO_PLUGIN_RETRY_DELAY = float(os.getenv("io_plugin_RETRY_DELAY", "1.0"))
 
 # Default files to fetch from IO server.
 # NOTE: async_client_io.py is required because io_router.py imports
-# AsyncDemoIOClient from it - without it, module loading fails with
+# AsyncIOClient from it - without it, module loading fails with
 # "No module named 'async_client_io'".
 IO_PLUGIN_REQUIRED_FILES = [
     "io_router.py",
@@ -471,7 +471,7 @@ def load_io_plugin_modules() -> bool:
             sys.path.insert(0, str(IO_PLUGIN_DYNAMIC_DIR))
 
         # Load async_client_io module FIRST - io_router.py depends on it
-        # (imports AsyncDemoIOClient from it). Registering it in sys.modules
+        # (imports AsyncIOClient from it). Registering it in sys.modules
         # lets io_router.py's own `import async_client_io` resolve.
         async_client_io_path = get_io_plugin_file_path("async_client_io.py")
         spec = importlib.util.spec_from_file_location(

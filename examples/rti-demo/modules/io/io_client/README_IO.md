@@ -25,7 +25,7 @@ The IO server provides a REST API for controlling IO devices (LEDs, potentiomete
 
 ## Components
 
-### 1. `async_client_io.py` - DemoIOClient & AsyncDemoIOClient
+### 1. `async_client_io.py` - DemoIOClient & AsyncIOClient
 
 A Python client library for communicating with the IO server's REST API.
 
@@ -37,7 +37,7 @@ A Python client library for communicating with the IO server's REST API.
 - Health checks and status monitoring
 - Device abstraction supporting multiple device types
 - Convenience methods for common operations
-- Both synchronous (`DemoIOClient`) and asynchronous (`AsyncDemoIOClient`) interfaces
+- Both synchronous (`DemoIOClient`) and asynchronous (`AsyncIOClient`) interfaces
 
 **Usage (Synchronous):**
 
@@ -348,7 +348,7 @@ python test_lcd_i2c.py     # the I2C LCD works
 
 ## Files
 
-- `async_client_io.py` - DemoIOClient & AsyncDemoIOClient HTTP clients
+- `async_client_io.py` - DemoIOClient & AsyncIOClient HTTP clients
 - `io_router.py` - FastAPI IO router that FSP and SO load at runtime
 - `mapping_manager.py` - IEC 61850 object to IO device mapping (`io_mapping.json`)
 - `io_utils.py` - helpers (LED blink, LCD write) used by FSP and SO

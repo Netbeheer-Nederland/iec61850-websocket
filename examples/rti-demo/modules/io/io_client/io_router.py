@@ -35,7 +35,7 @@ import os
 import threading
 from typing import Annotated, Any
 
-from async_client_io import AsyncDemoIOClient
+from async_client_io import AsyncIOClient
 from fastapi import APIRouter, HTTPException, Path, Request
 from mapping_manager import IOMappingManager
 from pydantic import BaseModel, Field
@@ -201,7 +201,7 @@ class _IORouterState:
     """Container for IO router state to avoid global variables."""
 
     def __init__(self):
-        self.io_client: AsyncDemoIOClient | None = None
+        self.io_client: AsyncIOClient | None = None
         self.mapping_manager: IOMappingManager | None = None
         self._lock = threading.Lock()
 
@@ -210,16 +210,16 @@ class _IORouterState:
 _router_state = _IORouterState()
 
 
-def get_io_client() -> AsyncDemoIOClient | None:
+def get_io_client() -> AsyncIOClient | None:
     """Get the demo_IO async client instance."""
     return _router_state.io_client
 
 
-def set_io_client(client: AsyncDemoIOClient) -> None:
+def set_io_client(client: AsyncIOClient) -> None:
     """Set the demo_IO async client instance."""
     with _router_state._lock:
         _router_state.io_client = client
-        logger.info(f"AsyncDemoIOClient configured with base URL: {client.base_url}")
+        logger.info(f"AsyncIOClient configured with base URL: {client.base_url}")
 
 
 def get_mapping_manager() -> IOMappingManager:
@@ -262,10 +262,8 @@ def create_io_router() -> APIRouter:
     demo_io_url = os.getenv("IO_URL")
     acsi_base_url = os.getenv("ACSI_BASE_URL", "http://localhost:5001")
     if demo_io_url:
-        set_io_client(
-            AsyncDemoIOClient(base_url=demo_io_url, acsi_base_url=acsi_base_url)
-        )
-        logger.info(f"AsyncDemoIOClient auto-configured from IO_URL: {demo_io_url}")
+        set_io_client(AsyncIOClient(base_url=demo_io_url, acsi_base_url=acsi_base_url))
+        logger.info(f"AsyncIOClient auto-configured from IO_URL: {demo_io_url}")
 
     # ==================== Startup Event ====================
 
@@ -276,7 +274,7 @@ def create_io_router() -> APIRouter:
 
     # ==================== Helper Functions ====================
 
-    async def _get_client_or_error() -> AsyncDemoIOClient:
+    async def _get_client_or_error() -> AsyncIOClient:
         """Get demo_IO async client or raise error if not configured."""
         client = get_io_client()
         if client is None:
@@ -302,7 +300,7 @@ def create_io_router() -> APIRouter:
         device_name: str,
         obj_ref: str,
         fc: str,
-        io_client: AsyncDemoIOClient,
+        io_client: AsyncIOClient,
         service: str = "writeValue",
         data_type: str = "",
     ):
@@ -550,7 +548,7 @@ def create_io_router() -> APIRouter:
                 acsi_base_url = "http://localhost:5001"
 
             logger.info(f"Using ACSI base URL for IO server: {acsi_base_url}")
-            client = AsyncDemoIOClient(
+            client = AsyncIOClient(
                 base_url=config.base_url, acsi_base_url=acsi_base_url
             )
 

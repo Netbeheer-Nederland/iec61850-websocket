@@ -124,7 +124,7 @@ The `io_client` directory provides connection and synchronization between the IO
 
 | Feature | Description |
 |---------|-------------|
-| **AsyncDemoIOClient** | Python client for the IO server REST API |
+| **AsyncIOClient** | Python client for the IO server REST API |
 | **IO Router** | FastAPI router that proxies requests to the IO server |
 | **IEC 61850 Mapping** | Map IO devices to IEC 61850 data objects |
 | **Automatic Integration** | IO router auto-included in ACSI BFF |
@@ -135,7 +135,7 @@ The `io_client` directory provides connection and synchronization between the IO
 
 The `io_client` provides **two integration paths**:
 
-1. **Direct Client Usage**: Import and use `AsyncDemoIOClient` directly in your code
+1. **Direct Client Usage**: Import and use `AsyncIOClient` directly in your code
 2. **Router Proxy**: ACSI exposes IO endpoints that proxy to the IO server via the IO router
 
 ### IO Router Endpoints
@@ -149,7 +149,7 @@ import sys
 sys.path.insert(0, "examples/rti-demo/modules/io/io_client")  # the modules import each other by bare name
 from async_client_io import DemoIOClient
 
-# Synchronous client; AsyncDemoIOClient has the same methods as coroutines (await them)
+# Synchronous client; AsyncIOClient has the same methods as coroutines (await them)
 client = DemoIOClient(base_url="http://localhost:9000")
 
 # Configure an LED
