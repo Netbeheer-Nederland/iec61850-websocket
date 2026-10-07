@@ -351,7 +351,7 @@ class IOPluginConnectionStatus:
 io_plugin_connection_status = IOPluginConnectionStatus()
 
 # Configuration for IO server connection
-IO_SERVER_URL = os.getenv("IO_SERVER_URL", "http://localhost:8000")
+IO_SERVER_URL = os.getenv("IO_SERVER_URL", "http://localhost:9000")
 IO_PLUGIN_MAX_RETRIES = int(os.getenv("io_plugin_MAX_RETRIES", "3"))
 IO_PLUGIN_RETRY_DELAY = float(os.getenv("io_plugin_RETRY_DELAY", "1.0"))
 
@@ -637,7 +637,7 @@ async def download_file_from_io_server(
     """Download a single file from the IO server.
 
     Args:
-        server_url: URL of the IO server (e.g., 'http://localhost:8000')
+        server_url: URL of the IO server (e.g., 'http://localhost:9000')
         filename: Name of the file to download
         timeout: Timeout in seconds
 
@@ -1185,7 +1185,7 @@ class IoClientConnectRequest(BaseModel):
     server_url: str = Field(
         default=IO_SERVER_URL,
         description="URL of the IO server to connect to",
-        json_schema_extra={"example": "http://localhost:8000"},
+        json_schema_extra={"example": "http://localhost:9000"},
     )
     acsi_url: str = Field(
         default="http://localhost:5001",

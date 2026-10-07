@@ -47,7 +47,7 @@ sys.path.insert(0, "examples/rti-demo/modules/io/io_client")  # the modules impo
 from async_client_io import DemoIOClient
 
 # Create client
-client = DemoIOClient(base_url="http://localhost:8080")
+client = DemoIOClient(base_url="http://localhost:9000")
 
 # Configure an LED
 client.config_led(name="led1", gpio_pin=17, description="Status LED")
@@ -119,12 +119,11 @@ FSP and SO don't ship these files. They download them from the IO server and loa
 ```bash
 curl -X POST http://localhost:5001/api/io-plugin/connect \
   -H "Content-Type: application/json" \
-  -d '{"server_url": "http://localhost:8000", "acsi_url": "http://localhost:5001"}'
+  -d '{"server_url": "http://localhost:9000", "acsi_url": "http://localhost:5001"}'
 ```
 
 This downloads the `io_client` files from the IO server (`GET /api/io-plugin/files`), loads them, and adds the
-`/api/io/*` routes to the running service. Use port 5002 for the SO, and `http://rti-io:8000` as `server_url` in Docker
-(`http://localhost:8080` for an IO server started directly with `main.py`). `server_url` defaults to the
+`/api/io/*` routes to the running service. Use port 5002 for the SO, and `http://rti-io:9000` as `server_url` in Docker. `server_url` defaults to the
 `IO_SERVER_URL` environment variable. If `IO_URL` is set, the loaded router configures its client from it; otherwise
 call `POST /api/io/connect` with `{"base_url": ...}`.
 
@@ -151,7 +150,7 @@ import sys
 sys.path.insert(0, "examples/rti-demo/modules/io/io_client")
 from async_client_io import DemoIOClient
 
-client = DemoIOClient(base_url="http://localhost:8080")
+client = DemoIOClient(base_url="http://localhost:9000")
 client.turn_on("led1")
 client.toggle_led("led2")
 state = client.get_led_state("led1")
@@ -166,7 +165,7 @@ The client needs `httpx2`, which the `fsp` and `so` environments have: run it wi
 The demo_IO service is configured in `examples/rti-demo/modules/io/`.
 
 **Default Configuration:**
-- Port: 8080 when `io_api_server/main.py` is run directly; 8000 under `launch.py` and Docker (`rti-io:8000` on
+- Port: 9000, however it's started (`rti-io:9000` on
   `rti-network`)
 - Default LEDs: led1 (GPIO 17), led2 (GPIO 18), led3 (GPIO 22)
 - Health endpoint: `/api/io/health`
@@ -178,7 +177,7 @@ The demo_IO service is configured in `examples/rti-demo/modules/io/`.
 python examples/rti-demo/modules/io/io_api_server/main.py
 
 # With custom port
-PORT=8000 python examples/rti-demo/modules/io/io_api_server/main.py
+PORT=9100 python examples/rti-demo/modules/io/io_api_server/main.py
 
 # With Docker (from examples/rti-demo)
 docker compose up -d rti-io
@@ -256,7 +255,7 @@ curl http://localhost:5001/api/io-plugin/connection-status
 ### Docker Compose Example
 
 `examples/rti-demo/docker-compose.yml` already wires this up: `rti-fsp01` and `rti-fsp02` get
-`IO_URL=http://rti-io:8000`, and all services share the external `rti-network`:
+`IO_URL=http://rti-io:9000`, and all services share the external `rti-network`:
 
 ```bash
 docker network create rti-network 2>/dev/null || true
@@ -291,9 +290,9 @@ python test_lcd_i2c.py     # the I2C LCD works
 **Error:** `demo_IO service is not responding`
 
 - Check that demo_IO service is running
-- Verify the URL is correct (`http://localhost:8080` when run directly, `http://rti-io:8000` in Docker)
+- Verify the URL is correct (`http://localhost:9000`, or `http://rti-io:9000` from another container)
 - Check that the port is accessible (firewall, Docker networking)
-- Test with: `curl http://localhost:8080/api/io/health` (direct run) or `curl http://localhost:8000/api/io/health` (Docker, published port)
+- Test with: `curl http://localhost:9000/api/io/health`
 
 **Error:** `Client not configured`
 
@@ -302,7 +301,7 @@ python test_lcd_i2c.py     # the I2C LCD works
 
 ### Port Conflicts
 
-- demo_IO uses port 8080 when run directly, 8000 under `launch.py` and Docker
+- demo_IO uses port 9000
 - ACSI uses port 5001 by default
 - Change ports using `PORT` environment variable
 

@@ -47,7 +47,7 @@ Services:
     bff:        Backend for Frontend Server (default: port 3000)
     fsp:        RTI-FSP (default: port 5001)
     so:         RTI-SO (default: port 5000)
-    io:         IO Device Control API (default: port 8000)
+    io:         IO Device Control API (default: port 9000)
 
     Default: Running without arguments launches all services with --foreground -v
 """
@@ -187,16 +187,16 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         service_type=ServiceType.IO,
         module="io.io_api_server.main",
         entry_point="modules/io/io_api_server/main.py",
-        default_port=8000,
+        default_port=9000,
         description="IO Device Control API - REST API for Raspberry Pi IO devices",
-        env_vars={"PORT": "8000"},
+        env_vars={"PORT": "9000"},
         docker_image=rti_image("io"),
         health_check_path="/api/io/health",
         labels={
             "rti.service": "rti-io",
             "rti.type": "IO-Device-Control",
             "rti.host": "rti-io",
-            "rti.port": "8000",
+            "rti.port": "9000",
         },
     ),
 }

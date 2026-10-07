@@ -32,7 +32,7 @@ python launch.py io
 | `fsp`                    | 5001                                 | RTI-FSP - IEC 61850 server                                            |
 | `fsp2`                   | 5005                                 | RTI-FSP, second instance (`cp2`)                                      |
 | `so`                     | 5002, WebSocket 8765                 | RTI-SO - IEC 61850 client                                             |
-| `io`                     | 8000                                 | IO device control API (8080 when `main.py` is run directly)           |
+| `io`                     | 9000                                 | IO device control API                                                 |
 | HMI                      | 3000 (`npm run dev`) / 3001 (Docker) | Web-based HMI                                                         |
 | `keycloak` (Docker only) | 8081 / 8443                          | IDP-Server for OAuth - see [Keycloak](#keycloak-idp-server-for-oauth) |
 
@@ -41,7 +41,7 @@ python launch.py io
 - BFF: http://localhost:5000/api/health
 - FSP: http://localhost:5001/api/status
 - SO: http://localhost:5002/api/status
-- IO: http://localhost:8000/api/io/health
+- IO: http://localhost:9000/api/io/health
 - HMI: http://localhost:3000 (`npm run dev`) or http://localhost:3001 (Docker)
 
 ## Common Commands
@@ -255,16 +255,17 @@ The `io` service is a REST API (under `/api/io/`) for the LEDs, buttons, potenti
 falls back to simulated devices elsewhere.
 
 ```bash
-# from examples/rti-demo, on port 8000
+# from examples/rti-demo
 python launch.py io
 docker compose up rti-io
 
-# or directly, on port 8080
+# or directly
 cd modules/io/io_api_server && python main.py
 ```
 
 Devices, configuration (`io_config.json`), wiring, Raspberry Pi setup (GPIO, I2C, SPI) and troubleshooting are in
-[modules/io/README.md](modules/io/README.md); the endpoints are in its OpenAPI docs at http://localhost:8000/docs.
+[modules/io/README.md](modules/io/README.md); the endpoints are in its OpenAPI docs at http://localhost:9000/docs.
+It listens on 9000 however it's started (`PORT` overrides it).
 
 ## Project Structure
 

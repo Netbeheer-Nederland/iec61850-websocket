@@ -86,9 +86,9 @@ class IOConnectionConfig(BaseModel):
     """Configuration for demo_IO connection."""
 
     base_url: str = Field(
-        default="http://localhost:8080",
+        default="http://localhost:9000",
         description="Base URL of the demo_IO service",
-        json_schema_extra={"example": "http://demo-io:8080"},
+        json_schema_extra={"example": "http://rti-io:9000"},
     )
     acsi_url: str | None = Field(
         default=None,

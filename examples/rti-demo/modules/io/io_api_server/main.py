@@ -28,11 +28,11 @@ Supports:
 - And more
 
 Usage:
-    # Run with default port (8000)
+    # Run with default port (9000)
     python main.py
 
     # Run with custom port
-    PORT=8080 python main.py
+    PORT=9100 python main.py
 
     # Use custom config file
     IO_CONFIG_FILE=/path/to/io_config.json python main.py
@@ -235,8 +235,7 @@ def main():
     app = create_app()
 
     # Get port from environment or use default
-    # On Windows, port 8000 might be reserved, so we use 8080 as default
-    port = int(os.getenv("PORT", "8080"))
+    port = int(os.getenv("PORT", "9000"))
 
     # On Windows, use localhost instead of 0.0.0.0 to avoid permission issues
     # On Linux/macOS, 0.0.0.0 allows external access

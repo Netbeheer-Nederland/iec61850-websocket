@@ -178,11 +178,10 @@ fetched at startup.
 ```bash
 curl -X POST http://localhost:5002/api/io-plugin/connect \
   -H "Content-Type: application/json" \
-  -d '{"server_url": "http://localhost:8000", "acsi_url": "http://localhost:5002"}'
+  -d '{"server_url": "http://localhost:9000", "acsi_url": "http://localhost:5002"}'
 ```
 
-`server_url` defaults to `IO_SERVER_URL`. In Docker use `http://rti-io:8000`; for an IO server started directly with
-`main.py`, `http://localhost:8080`. The mapping between IO devices and IEC 61850 objects is
+`server_url` defaults to `IO_SERVER_URL`. In Docker use `http://rti-io:9000`. The mapping between IO devices and IEC 61850 objects is
 `io/io_client/io_mapping.json`; see the *Hardware demo* section of `examples/rti-demo/README.md`.
 
 ### Check/Disconnect IO
@@ -204,7 +203,7 @@ curl -X POST http://localhost:5002/api/io-plugin/disconnect
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 5002 | REST API port |
-| `IO_SERVER_URL` | `http://localhost:8000` | Default IO server for `/api/io-plugin/connect` |
+| `IO_SERVER_URL` | `http://localhost:9000` | Default IO server for `/api/io-plugin/connect` |
 | `IO_URL` | None | Read by the loaded IO router: connects its IO client without a separate `/api/io/connect` |
 | `IO_PLUGIN_STORAGE` | `/app/io_plugin_dynamic` | Where the downloaded `io_client` files are kept |
 

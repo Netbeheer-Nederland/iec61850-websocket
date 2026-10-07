@@ -86,7 +86,7 @@ services:
       # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
       - CP=cp1
       - MODELPATH=/models/model_1.py
-      - IO_URL=http://rti-io:8000
+      - IO_URL=http://rti-io:9000
     networks:
       - rti-network
     # Health check already defined in the Dockerfile.
@@ -120,7 +120,7 @@ services:
       - PORT=5005
       - CP=cp2
       - MODELPATH=/models/model_2.py
-      - IO_URL=http://rti-io:8000
+      - IO_URL=http://rti-io:9000
     # Healthcheck already defined in the Dockerfile - it reads $PORT at
     # check time (see modules/fsp/docker/Dockerfile), so it correctly
     # targets 5005 for this second instance without needing to be
@@ -176,7 +176,7 @@ services:
         SPI_GID: ${SPI_GID:-989}
     container_name: rti-io
     ports:
-      - "8000:8000"
+      - "9000:9000"
     # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
     user: ${PI_USER:-pi}  # User with gpio group access
     group_add:
@@ -207,7 +207,7 @@ services:
       - "rti.service=rti-io"
       - "rti.type=GPIO-LED-Control"
       - "rti.host=rti-io"
-      - "rti.port=8000"
+      - "rti.port=9000"
 
 volumes:
   # Persistent BFF runtime state (connections.json), mounted at /config.

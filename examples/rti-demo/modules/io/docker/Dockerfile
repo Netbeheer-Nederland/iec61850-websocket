@@ -48,7 +48,7 @@ WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8000 \
+    PORT=9000 \
     GPIO_CHIP=/dev/gpiochip0 \
     PATH="/app/.venv/bin:$PATH"
 
@@ -95,9 +95,9 @@ RUN chmod a+rw /dev/i2c-1 /dev/i2c-13 /dev/i2c-14 2>/dev/null || true
 # either way, so only switch to `USER pi` after confirming GPIO chip
 # access still works for your setup.
 
-EXPOSE 8000
+EXPOSE 9000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:8000/api/io/health || exit 1
+    CMD curl -f http://localhost:$PORT/api/io/health || exit 1
 
 CMD ["python", "-u", "io/io_api_server/main.py"]

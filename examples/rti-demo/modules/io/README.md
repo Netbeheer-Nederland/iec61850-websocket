@@ -98,7 +98,7 @@ All endpoints are under the `/api/io/` prefix and provide device management, LED
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | 8080 | Server port when `main.py` runs directly; `launch.py`, the Dockerfile and `docker-compose.yml` set 8000 |
+| `PORT` | 9000 | Server port (the same for a direct run, `launch.py` and Docker) |
 | `IO_CONFIG_FILE` | `io_config.json` | Path to configuration file |
 
 ### Hardware Requirements
@@ -148,7 +148,7 @@ All endpoints are proxied to the demo_IO server and provide connection managemen
 from demo_IO.io_client.async_client_io import AsyncDemoIOClient
 
 # Create async client
-client = AsyncDemoIOClient(base_url="http://localhost:8080")
+client = AsyncDemoIOClient(base_url="http://localhost:9000")
 
 # Configure an LED
 client.config_led(name="led1", gpio_pin=17, description="Status LED")
@@ -339,16 +339,16 @@ The default devices defined in `io_config.json` use the following GPIO configura
 
 ```bash
 # Check if demo_IO is running
-curl http://localhost:8080/api/io/health
+curl http://localhost:9000/api/io/health
 
 # Check if ACSI IO router is connected
 curl http://localhost:5001/api/io-plugin/connection-status
 
 # List all devices
-curl http://localhost:8080/api/io/devices
+curl http://localhost:9000/api/io/devices
 
 # Get device state
-curl http://localhost:8080/api/io/devices/led1
+curl http://localhost:9000/api/io/devices/led1
 
 # Check I2C devices
 sudo i2cdetect -y 1
@@ -510,7 +510,7 @@ For issues or questions:
 
 1. Check the **Troubleshooting** section above
 2. Review the **API Endpoints** documentation
-3. Test with Swagger UI: `http://localhost:8080/docs` (`http://localhost:8000/docs` under Docker)
+3. Test with Swagger UI: `http://localhost:9000/docs`
 4. Verify hardware connections
 5. Check system logs for errors
 

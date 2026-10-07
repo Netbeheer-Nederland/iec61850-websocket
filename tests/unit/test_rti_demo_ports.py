@@ -122,12 +122,22 @@ def test_io_server_url_default(path):
 
 
 @pytest.mark.parametrize(
-    "path",
-    ["io/io_client/async_client_io.py", "io/io_client/io_router.py"],
+    ("path", "pattern"),
+    [
+        # Not acsi_base_url: that's the FSP's address (5001), in the same files.
+        (
+            "io/io_client/async_client_io.py",
+            r'\bbase_url: str = "http://localhost:(\d+)"',
+        ),
+        (
+            "io/io_client/io_router.py",
+            r'base_url: str = Field\(\s*default="http://localhost:(\d+)"',
+        ),
+    ],
 )
-def test_io_client_default_base_url(path):
+def test_io_client_default_base_url(path, pattern):
     text = _read(MODULES / path)
-    assert _one(r'"http://localhost:(\d+)"', text, path) == EXPECTED_PORTS["io"]
+    assert _one(pattern, text, path) == EXPECTED_PORTS["io"]
 
 
 def test_launch_py_default_ports():

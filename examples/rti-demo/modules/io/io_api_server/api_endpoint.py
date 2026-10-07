@@ -1543,8 +1543,7 @@ if __name__ == "__main__":
     app = create_fastapi_app()
 
     # Get port from environment or use default
-    # On Windows, port 8000 might be reserved, so we use 8080 as default
-    port = int(os.getenv("PORT", "8080"))
+    port = int(os.getenv("PORT", "9000"))
 
     # On Windows, use localhost instead of 0.0.0.0 to avoid permission issues
     if platform.system() == "Windows":

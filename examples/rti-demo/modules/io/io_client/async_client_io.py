@@ -28,7 +28,7 @@ Usage:
     from async_client_io import AsyncIOClient
 
     async def main():
-        async with AsyncIOClient(base_url="http://localhost:8080") as client:
+        async with AsyncIOClient(base_url="http://localhost:9000") as client:
             # Configure a device
             await client.config_led(name="led1", gpio_pin=17)
 
@@ -149,14 +149,14 @@ class AsyncIOClient:
     Usage:
         from async_client_io import AsyncIOClient
 
-        async with AsyncIOClient(base_url="http://localhost:8080") as client:
+        async with AsyncIOClient(base_url="http://localhost:9000") as client:
             await client.set_device("led1", True)
             state = await client.get_led_state("led1")
     """
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8080",
+        base_url: str = "http://localhost:9000",
         mapping_file: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
@@ -923,14 +923,14 @@ class AsyncDemoIOClient:
     Usage:
         from async_client_io import AsyncDemoIOClient
 
-        async with AsyncDemoIOClient(base_url="http://localhost:8080") as client:
+        async with AsyncDemoIOClient(base_url="http://localhost:9000") as client:
             await client.set_device("led1", True)
             state = await client.get_led_state("led1")
     """
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8080",
+        base_url: str = "http://localhost:9000",
         mapping_file: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
@@ -1693,7 +1693,7 @@ class DemoIOClient:
     Usage:
         from demo_IO.io_client.async_client_io import DemoIOClient
 
-        client = DemoIOClient(base_url="http://localhost:8080")
+        client = DemoIOClient(base_url="http://localhost:9000")
         # Use synchronous methods
         state = client.get_led_state("led1")
         client.set_device("led1", state=True)
@@ -1701,7 +1701,7 @@ class DemoIOClient:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8080",
+        base_url: str = "http://localhost:9000",
         mapping_file: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,

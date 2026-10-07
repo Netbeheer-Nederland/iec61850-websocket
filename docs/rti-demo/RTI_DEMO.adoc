@@ -34,7 +34,7 @@ The RTI Demo implements a complete IEC 61850-based Real-Time Infrastructure with
 
 |SO |Service |ACSI-Client |5002 (REST), 8765 (WebSocket server)
 
-|IO |Service |N/A |8000
+|IO |Service |N/A |9000
 
 |IDP Server |Service |N/A |8443 (HTTPS)
 
@@ -56,7 +56,7 @@ image::RTI_Demo_System_Architecture_Overview.png[RTI Demo System Architecture Ov
 
 |BFF |SO |HTTP/REST |5002
 
-|RTI-FSP/RTI-SO |IO |HTTP/REST |8000
+|RTI-FSP/RTI-SO |IO |HTTP/REST |9000
 
 |IO |Physical Devices |Direct Hardware |GPIO, SPI (ADC), I2C (LCD)
 
@@ -104,7 +104,7 @@ Each component's README is its reference: run and test commands, configuration, 
 
 |BFF |SO |5002 |application/json
 
-|FSP/SO |IO |8000 |application/json
+|FSP/SO |IO |9000 |application/json
 
 |===
 
