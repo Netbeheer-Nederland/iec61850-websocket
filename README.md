@@ -117,6 +117,8 @@ iec61850-websocket/
 - **Docker** - [Install Docker](https://docs.docker.com/get-docker/)
 - **Docker Compose** - [Install Docker Compose](https://docs.docker.com/compose/install/)
 - **cfssl** - [Install cfssl](https://github.com/cloudflare/cfssl/releases) – used for TLS certificate generation
+- **Node.js 26** with npm - [Install Node.js](https://nodejs.org/en/download) – only for the rti-demo's HMI (CI and its
+  Docker image use 26.9.0)
 - **doxygen** - [Install doxygen](https://www.doxygen.nl) - used to generate documentation (optional)
 
 - Basic understanding of:

@@ -19,9 +19,10 @@ Covers **Ubuntu 24.04 LTS** and **Fedora 41**.
 4. [Python 3.13](#4-python-313)
 5. [Docker and Docker Compose](#5-docker-and-docker-compose)
 6. [cfssl](#6-cfssl)
-7. [Doxygen (optional)](#7-doxygen-optional)
-8. [Clone and set up the project](#8-clone-and-set-up-the-project)
-9. [Verify the installation](#9-verify-the-installation)
+7. [Node.js (for the HMI)](#7-nodejs-for-the-hmi)
+8. [Doxygen (optional)](#8-doxygen-optional)
+9. [Clone and set up the project](#9-clone-and-set-up-the-project)
+10. [Verify the installation](#10-verify-the-installation)
 
 ---
 
@@ -256,7 +257,38 @@ cfssljson --version
 
 ---
 
-## 7. Doxygen (optional)
+## 7. Node.js (for the HMI)
+
+The rti-demo's HMI (`examples/rti-demo/modules/hmi`) is a React app built with Vite and needs Node.js with npm. CI and
+the HMI's Docker image use Node.js **26.9.0**; any 26.x works. The Python library, the other demo services and their
+tests don't need it.
+
+**Ubuntu** (NodeSource repository)
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_26.x | sudo -E bash -
+sudo apt install -y nodejs
+```
+
+**Fedora** (NodeSource repository)
+
+```bash
+curl -fsSL https://rpm.nodesource.com/setup_26.x | sudo bash -
+sudo dnf install -y nodejs
+```
+
+Or, per user and without root, with [nvm](https://github.com/nvm-sh/nvm): `nvm install 26.9.0`.
+
+Verify:
+
+```bash
+node --version    # v26.x
+npm --version
+```
+
+---
+
+## 8. Doxygen (optional)
 
 Doxygen is used to generate API reference documentation from source docstrings. It is not required to run the
 project or its tests.
@@ -290,7 +322,7 @@ generated reference.
 
 ---
 
-## 8. Clone and set up the project
+## 9. Clone and set up the project
 
 With all prerequisites in place, clone the repository and let UV prepare the environment:
 
@@ -313,7 +345,7 @@ of the same uv workspace); a plain `uv sync` installs only the `ws61850` library
 
 ---
 
-## 9. Verify the installation
+## 10. Verify the installation
 
 Run the unit-test suite to confirm that the environment is configured correctly:
 
@@ -323,6 +355,12 @@ uv run pytest tests/unit -v
 
 All tests should pass. If any test fails with an import error, re-run `uv sync --all-packages` to ensure all
 dependencies were installed.
+
+If you'll work on the rti-demo's HMI, check it too (needs [Node.js](#7-nodejs-for-the-hmi)):
+
+```bash
+cd examples/rti-demo/modules/hmi && npm ci && npm test && cd -
+```
 
 To do a quick smoke-test of a complete message flow, start the example server in one terminal:
 
@@ -350,6 +388,7 @@ both sides with `Ctrl+C`.
 |-------------------------------------------------|-----------------------------------------|-------------------------------------------------------------------------------------------|
 | `uv: command not found`                         | Shell env not reloaded after UV install | Run `source "$HOME/.local/bin/env"` or open a new terminal                                |
 | `python3.13: command not found` on Ubuntu       | deadsnakes PPA not added                | Follow the Ubuntu path in [section 4](#4-python-313), or use `uv python install 3.13`     |
+| `npm: command not found`                        | Node.js not installed                   | Follow [section 7](#7-nodejs-for-the-hmi); only the HMI needs it                         |
 | `cfssl: command not found`                      | Binary not on `PATH`                    | Confirm `/usr/local/bin` is on `PATH`; re-run the `sudo mv` step                          |
 | `permission denied` running Docker              | User not in `docker` group              | Run `sudo usermod -aG docker "$USER"` then log out and back in                            |
 | `uv sync` fails on a C extension                | Python headers missing                  | Install `python3.13-dev` (Ubuntu) or `python3-devel` (Fedora)                             |

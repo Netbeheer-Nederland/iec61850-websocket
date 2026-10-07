@@ -53,4 +53,4 @@ doxygen docs/doxygen/Doxyfile
 ```
 
 The HTML is written to `docs/doxygen/html/index.html` (not tracked in git). Install `doxygen` first; see
-[getting-started.md](getting-started.md#7-doxygen-optional).
+[getting-started.md](getting-started.md#8-doxygen-optional).

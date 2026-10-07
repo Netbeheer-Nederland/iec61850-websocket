@@ -20,6 +20,8 @@ services (RTI-SO and RTI-FSP). It talks only to the BFF (`examples/rti-demo/modu
 
 ## Run it
 
+Needs Node.js 26 with npm; CI and `docker/Dockerfile` use 26.9.0 (installation: `docs/getting-started.md`, section 7).
+
 ```bash
 cd examples/rti-demo/modules/hmi
 npm install
