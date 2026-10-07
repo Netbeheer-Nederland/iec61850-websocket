@@ -33,6 +33,8 @@ services:
     volumes:
       - bff-config:/config
       - ./playbooks:/app/examples/rti-demo/playbooks:ro
+      # TLS certificates (testing/certs), listed for the HMI by GET /api/certs.
+      - ${RTI_CERTS_DIR:-../../testing/certs}:/certs:ro
     networks:
       - rti-network
     # Health check already defined in the Dockerfile (with matching timing).
@@ -95,6 +97,9 @@ services:
       - "rti.port=5001"
     volumes:
         - ./config/models:/models
+        # TLS certificates (testing/certs), referenced as file:<name>
+        # (e.g. file:ca.pem). See README.md "TLS certificates".
+        - ${RTI_CERTS_DIR:-../../testing/certs}:/certs:ro
 
   # Second FSP instance
   rti-fsp02:
@@ -127,6 +132,7 @@ services:
       - "rti.port=5005"
     volumes:
       - ./config/models:/models
+      - ${RTI_CERTS_DIR:-../../testing/certs}:/certs:ro
 
   # RTI SO (Acsi-Client)
   rti-so:
@@ -150,6 +156,10 @@ services:
       - "rti.type=RTI-SO"
       - "rti.host=rti-so"
       - "rti.port=5002"
+    volumes:
+      # TLS certificates (testing/certs), referenced as file:<name>
+      # (e.g. file:server.pem).
+      - ${RTI_CERTS_DIR:-../../testing/certs}:/certs:ro
 
   # GPIO LED Control API (io)
   rti-io:

@@ -63,6 +63,7 @@ modules/bff/
 │   ├── connection_manager.py  # registered RTI-FSP / RTI-SO / IDP-Server connections, health checks
 │   ├── bff_client.py          # HTTP client for BFF-to-instance calls
 │   ├── pydantic_models.py     # request/response models
+│   ├── cert_store.py          # lists the certificate directory for GET /api/certs
 │   ├── playbook.py            # demo playbooks: parse, execute through the BFF, check each step
 │   ├── playbook_store.py      # built-in and saved playbooks
 │   ├── playbook_runs.py       # the one playbook run at a time, in a worker thread
@@ -180,6 +181,7 @@ When HMI calls /api/reconfig-oauth, BFF automatically enriches request with OAut
 ### TLS Configuration
 - POST /api/connections/tls-config - Update TLS for connection
 - GET /api/connections/tls-config - Get TLS config
+- GET /api/certs - Certificates and keys in the certificate directory (`TLS_CERT_DIR`, default `/certs`): name, `file:` reference, subject, SANs, expiry - never key contents
 
 ### OAuth Configuration
 - POST /api/connections/oauth-config - Update OAuth for connection
@@ -269,7 +271,7 @@ The BFF service in docker-compose.yml:
 - Container: rti-bff
 - Port: 5000:5000
 - Network: rti-network
-- Volumes: `bff-config` at `/config` (connections.json and saved playbooks), `./playbooks` read-only (built-in playbooks)
+- Volumes: `bff-config` at `/config` (connections.json and saved playbooks), `./playbooks` read-only (built-in playbooks), `testing/certs` read-only at `/certs` (TLS certificates, see the rti-demo README's *TLS certificates*)
 - Depends on: Healthy rti-bff for HMI
 
 All services communicate through rti-network Docker network.

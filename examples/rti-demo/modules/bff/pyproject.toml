@@ -21,6 +21,8 @@ dependencies = [
     "httpx2>=2.13.0",
     "docker==6.1.0",
     "pyyaml>=6.0",
+    # Reads certificate details for GET /api/certs (bff.cert_store).
+    "cryptography>=46.0",
 ]
 
 [build-system]

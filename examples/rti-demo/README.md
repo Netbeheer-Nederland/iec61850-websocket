@@ -179,6 +179,33 @@ issuer check sees a single value. Settings to enter in the HMI (Setup):
 
 HTTPS (8443) uses `testing/certs/keycloak.pem`, whose certificate only covers `keycloak`/`localhost`/`127.0.0.1`.
 
+### TLS certificates
+
+The SO, the FSPs and the BFF mount `testing/certs` read-only at `/certs` (set `RTI_CERTS_DIR` to use another
+directory). Generate the certificates there once, with [cfssl](https://github.com/cloudflare/cfssl) installed:
+
+```shell
+SERVER_HOSTNAMES=localhost,127.0.0.1,192.168.100.10 ../../testing/certs/generate.sh
+```
+
+`SERVER_HOSTNAMES` lists the extra names and addresses the certificates must cover - add the address the FSPs use to
+reach the SO when they run on other machines. The files used here:
+
+| File in `/certs` | Use it for |
+|---|---|
+| `ca.pem` | the CA certificate a WebSocket client (FSP, active) trusts |
+| `server.pem`, `server-key.pem` | the SO's server certificate (`rti-so`) and key (passive) |
+
+In the HMI's TLS dialog, pick these under *From the certificate directory*. The setting then holds a reference such as
+`file:server-key.pem` instead of PEM text; the SO or FSP reads the file from its own `/certs` mount when it starts
+TLS, so keys never pass through the browser, the BFF or `connections.json`. Pasting or uploading PEM text still works.
+
+Outside Docker (`launch.py`), the services look for referenced files in `TLS_CERT_DIR` (default `/certs`), e.g.
+`TLS_CERT_DIR=$PWD/../../testing/certs python launch.py`. With FSP and SO on different machines, both need
+certificates from the same CA: generate them on one machine and copy the files the other one uses (`ca.pem` for an
+FSP). These are test certificates - `generate.sh` makes the keys, including `ca-key.pem`, readable for everyone in
+the directory.
+
 ### BFF connection persistence in Docker
 
 The `rti-bff` container persists `connections.json` in a dedicated `/config`

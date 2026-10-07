@@ -87,6 +87,48 @@ function useRuntimeTlsEnabled(target) {
   return useRuntimeFlag('runtime-tls-config', 'enable_tls', target);
 }
 
+const FILE_REF_PREFIX = 'file:';
+
+// One option per file in the BFF's certificate directory (GET /api/certs).
+function certFileLabel(file) {
+  if (file.kind !== 'certificate') return file.name;
+  const expires = file.not_after ? `, expires ${file.not_after.slice(0, 10)}` : '';
+  return `${file.name} - ${file.subject}${file.is_ca ? ' (CA)' : ''}${expires}`;
+}
+
+// Pick a file from the certificate directory: the field then holds `file:<name>`,
+// which the instance reads from its own /certs mount, so the PEM text (and a
+// private key) never passes through the browser. Hidden when the directory has
+// nothing that fits.
+function CertFileSelect({ id, files, value, onChange, style }) {
+  if (!files.length) return null;
+  const selected = files.some((f) => f.reference === value) ? value : '';
+  return (
+    <select
+      id={id}
+      value={selected}
+      onChange={(e) => onChange(e.target.value)}
+      style={{ ...style, marginBottom: '10px' }}
+      aria-label="From the certificate directory"
+    >
+      <option value="">From the certificate directory...</option>
+      {files.map((f) => (
+        <option key={f.reference} value={f.reference}>{certFileLabel(f)}</option>
+      ))}
+    </select>
+  );
+}
+
+function CertReferenceNote({ value, certDir }) {
+  if (!value || !value.startsWith(FILE_REF_PREFIX)) return null;
+  const name = value.slice(FILE_REF_PREFIX.length);
+  return (
+    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
+      Read by the instance from {certDir || '/certs'}/{name} in its own certificate directory.
+    </div>
+  );
+}
+
 const TLSConfigModal = ({
   isOpen,
   onClose,
@@ -103,6 +145,10 @@ const TLSConfigModal = ({
   const [serverCert, setServerCert] = useState('');
   const [caCert, setCaCert] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Files in the BFF's certificate directory (/certs), for the "From the
+  // certificate directory" selects. Empty when the BFF has no such directory
+  // (or predates /api/certs).
+  const [certDir, setCertDir] = useState({ path: null, files: [] });
   // Initialize wsMode from connection if available
   const [wsMode, setWsMode] = useState(() => {
     if (connection?.ws_mode) {
@@ -193,6 +239,28 @@ const TLSConfigModal = ({
 
     loadTlsConfig();
   }, [isOpen, connection, wsHost, executeApiCall]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`${bffBaseUrl}/api/certs`);
+        if (!response.ok) return;
+        const body = await response.json();
+        if (!cancelled && body?.available) {
+          setCertDir({ path: body.cert_dir, files: Array.isArray(body.files) ? body.files : [] });
+        }
+      } catch (error) {
+        console.warn('Certificate directory not available:', error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, bffBaseUrl]);
+
+  const dirKeys = certDir.files.filter((f) => f.kind === 'private_key');
+  const dirServerCerts = certDir.files.filter((f) => f.kind === 'certificate' && !f.is_ca);
+  const dirCaCerts = certDir.files.filter((f) => f.kind === 'certificate');
 
   // Clear any previous error whenever the modal is (re)opened for a
   // possibly-different connection, so a stale error from a prior attempt
@@ -407,14 +475,18 @@ const TLSConfigModal = ({
                   <div style={styles.fileInputGroup}>
                     <input type="file" id="tls-private-key" accept=".pem,.key" onChange={(e) => handleFileUpload(e, 'serverKey')} />
                   </div>
-                  <textarea id="tls-key-content" value={serverKey} onChange={(e) => setServerKey(e.target.value)} placeholder="-----BEGIN PRIVATE KEY-----..." style={styles.textarea} />
+                  <CertFileSelect id="tls-key-certfile" files={dirKeys} value={serverKey} onChange={setServerKey} style={styles.select} />
+                  <textarea id="tls-key-content" value={serverKey} onChange={(e) => setServerKey(e.target.value)} placeholder="-----BEGIN PRIVATE KEY-----... or file:<name>" style={styles.textarea} />
+                  <CertReferenceNote value={serverKey} certDir={certDir.path} />
                 </div>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Server Certificate (PEM):</label>
                   <div style={styles.fileInputGroup}>
                     <input type="file" id="tls-server-cert" accept=".pem,.crt,.cer" onChange={(e) => handleFileUpload(e, 'serverCert')} />
                   </div>
-                  <textarea id="tls-server-cert-content" value={serverCert} onChange={(e) => setServerCert(e.target.value)} placeholder="-----BEGIN CERTIFICATE-----..." style={styles.textarea} />
+                  <CertFileSelect id="tls-server-cert-certfile" files={dirServerCerts} value={serverCert} onChange={setServerCert} style={styles.select} />
+                  <textarea id="tls-server-cert-content" value={serverCert} onChange={(e) => setServerCert(e.target.value)} placeholder="-----BEGIN CERTIFICATE-----... or file:<name>" style={styles.textarea} />
+                  <CertReferenceNote value={serverCert} certDir={certDir.path} />
                 </div>
               </>
             )}
@@ -425,7 +497,9 @@ const TLSConfigModal = ({
                 <div style={styles.fileInputGroup}>
                   <input type="file" id="tls-ca-cert" accept=".pem,.crt,.cer" onChange={(e) => handleFileUpload(e, 'caCert')} />
                 </div>
-                <textarea id="tls-ca-cert-content" value={caCert} onChange={(e) => setCaCert(e.target.value)} placeholder="-----BEGIN CERTIFICATE-----..." style={styles.textarea} />
+                <CertFileSelect id="tls-ca-cert-certfile" files={dirCaCerts} value={caCert} onChange={setCaCert} style={styles.select} />
+                <textarea id="tls-ca-cert-content" value={caCert} onChange={(e) => setCaCert(e.target.value)} placeholder="-----BEGIN CERTIFICATE-----... or file:<name>" style={styles.textarea} />
+                <CertReferenceNote value={caCert} certDir={certDir.path} />
               </div>
             )}
 

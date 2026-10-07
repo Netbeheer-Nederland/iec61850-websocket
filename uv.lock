@@ -169,6 +169,7 @@ name = "bff"
 version = "0.1.0"
 source = { editable = "examples/rti-demo/modules/bff" }
 dependencies = [
+    { name = "cryptography" },
     { name = "docker" },
     { name = "fastapi" },
     { name = "httpx2" },
@@ -179,6 +180,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=46.0" },
     { name = "docker", specifier = "==6.1.0" },
     { name = "fastapi", specifier = ">=0.139.0" },
     { name = "httpx2", specifier = ">=2.13.0" },

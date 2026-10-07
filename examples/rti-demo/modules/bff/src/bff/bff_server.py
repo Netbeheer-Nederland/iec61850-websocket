@@ -43,6 +43,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
+from bff import cert_store
 from bff.bff_client import BffClient
 from bff.connection_manager import ConnectionManager
 from bff.playbook import BffTransport, PlaybookError, parse_playbook, step_label
@@ -1732,6 +1733,24 @@ async def _instance_system_entries(con: dict) -> list[dict[str, Any]]:
         for a in actions
         if isinstance(a, dict) and a.get("kind") == "system"
     ]
+
+
+@app.get(
+    "/api/certs",
+    summary="TLS certificates and keys in the certificate directory",
+    description=(
+        "Lists the PEM files in the certificate directory (TLS_CERT_DIR, "
+        "default /certs - testing/certs, mounted by docker-compose.yml). Each "
+        "entry has the `reference` to put in a TLS field (file:<name>), which "
+        "the RTI-SO / RTI-FSP resolve against their own mount. Certificates "
+        "come with subject, issuer, SANs, CA flag and expiry; private keys "
+        "only with their name - their contents are never returned."
+    ),
+    response_description="The certificate directory and its files",
+    tags=["TLS"],
+)
+async def get_certs():
+    return {"ok": True, **cert_store.list_certificates()}
 
 
 @app.get(

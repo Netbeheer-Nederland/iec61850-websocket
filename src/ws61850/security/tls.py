@@ -40,32 +40,77 @@ class TLSConfig:
     keylog_file: str | None = None
 
 
+FILE_REF_PREFIX = "file:"
+DEFAULT_CERT_DIR = "/certs"
+
+
+def resolve_pem(value: str | None, cert_dir: str | None = None) -> str | None:
+    """Return PEM text for a TLS field that is either PEM text or a file reference.
+
+    A value ``file:<name>`` names a file in the certificate directory -
+    ``cert_dir``, else the ``TLS_CERT_DIR`` environment variable, else
+    ``/certs`` (where the rti-demo's docker-compose.yml mounts testing/certs) - and
+    is read when called. Anything else, including ``None``, is returned as is.
+    A name that resolves outside the certificate directory is rejected.
+    """
+    if not value or not value.startswith(FILE_REF_PREFIX):
+        return value
+    name = value[len(FILE_REF_PREFIX) :].strip()
+    if not name:
+        raise ValueError(f"TLS file reference {value!r} has no file name")
+    base = os.path.realpath(
+        cert_dir or os.environ.get("TLS_CERT_DIR") or DEFAULT_CERT_DIR
+    )
+    path = os.path.realpath(os.path.join(base, name))
+    if os.path.commonpath([base, path]) != base:
+        raise ValueError(
+            f"TLS file reference {value!r} points outside the certificate "
+            f"directory {base}"
+        )
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"TLS file reference {value!r}: {path} not found"
+        ) from None
+
+
 def build_tls_context_from_strings(tls_config: TLSConfig) -> ssl.SSLContext:
-    """Build SSLContext from string contents."""
+    """Build SSLContext from string contents.
+
+    certfile, keyfile and cafile hold PEM text or ``file:<name>`` references
+    into the certificate directory (see resolve_pem). References are read
+    here, each time a context is built; tls_config itself keeps them as given.
+    """
     cert_path = key_path = ca_path = None  # ← Initialize first
 
     try:
+        cert_text = resolve_pem(tls_config.certfile)
+        key_text = resolve_pem(tls_config.keyfile)
+        ca_text = resolve_pem(tls_config.cafile)
+
         if tls_config.mode == "server":
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".pem", delete=False
             ) as cert_f:
-                cert_f.write(tls_config.certfile)
+                cert_f.write(cert_text)
                 cert_path = cert_f.name
 
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".pem", delete=False
             ) as key_f:
-                key_f.write(tls_config.keyfile)
+                key_f.write(key_text)
                 key_path = key_f.name
 
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
 
-            if tls_config.cafile:
+            if ca_text:
                 with tempfile.NamedTemporaryFile(
                     mode="w", suffix=".pem", delete=False
                 ) as ca_f:
-                    ca_f.write(tls_config.cafile)
+                    ca_f.write(ca_text)
                     ca_path = ca_f.name
                 ctx.load_verify_locations(ca_path)
 
@@ -76,7 +121,7 @@ def build_tls_context_from_strings(tls_config: TLSConfig) -> ssl.SSLContext:
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".pem", delete=False
             ) as ca_f:
-                ca_f.write(tls_config.cafile)
+                ca_f.write(ca_text)
                 ca_path = ca_f.name
             ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_path)
 

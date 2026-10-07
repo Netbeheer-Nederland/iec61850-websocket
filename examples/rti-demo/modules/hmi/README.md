@@ -108,7 +108,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=5000 docker compose up -d rti-hmi
 * Control operations (for controllable CDC types: SPC, DPC, APC, INC, ENC, BSC, ING, ASG, CTE, ENG)
 * Data write operations via modal dialog
 * BRCB (Buffered Report Control Block) configuration
-* TLS configuration support
+* TLS configuration support: key and certificates as PEM text, an uploaded file, or a file picked from the certificate directory (`file:<name>`, read by the instance itself)
 * OAuth authentication integration
 * Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; an ACSI entry made through the SO also names the WebSocket frame range it produced (shown under the call on Traffic); Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
 * Real-time data updates
@@ -123,7 +123,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=5000 docker compose up -d rti-hmi
 * IEC 61850 data model tree visualization with expandable nodes
 * Data write operations with value modification
 * Tree expansion state persistence
-* TLS configuration support
+* TLS configuration support: key and certificates as PEM text, an uploaded file, or a file picked from the certificate directory (`file:<name>`, read by the instance itself)
 * OAuth authentication integration
 * Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; an ACSI entry made through the SO also names the WebSocket frame range it produced (shown under the call on Traffic); Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
 * Status information display
@@ -276,6 +276,7 @@ The HMI makes two kinds of call, both to the BFF:
 
 1. **The BFF's own API**, called directly: `/api/health`, `/api/connections` (plus `add-connection`,
    `edit-connection/{name}`, `delete-connection/{name}` and the per-connection TLS and OAuth settings),
+   `/api/certs` (the certificate directory, for the TLS dialog),
    `/api/diagnostics`, `/api/playbooks/...`, `/api/idp/discovery`, and the `/ws` push channel.
 2. **Calls on an SO or FSP instance**, sent as `POST /api/execute` with `{ target, method, path, body }`. The BFF
    forwards the request to the instance at `target` (`host:port`). The instance paths are listed in `API_DEFINITIONS`
