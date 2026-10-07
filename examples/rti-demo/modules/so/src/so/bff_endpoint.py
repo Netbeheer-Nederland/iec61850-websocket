@@ -597,6 +597,11 @@ def clear_io_plugin_modules():
 # ==================== IO Plugin HTTP Client Functions ====================
 
 
+class IOPluginVersionMismatchError(Exception):
+    """The IO server answered 410: it serves the IO plugin under other file
+    names (decision 0018), so this FSP/SO and the IO server differ in version."""
+
+
 async def download_file_from_io_server(
     server_url: str, filename: str, timeout: float = 10.0
 ) -> str | None:
@@ -634,10 +639,22 @@ async def download_file_from_io_server(
                 logger.warning(f"File '{filename}' not found on IO server")
                 return None
             else:
+                try:
+                    detail = response.json().get("detail") or ""
+                except ValueError:
+                    detail = ""
                 logger.error(
                     f"Failed to download file '{filename}': HTTP {response.status_code}"
+                    + (f" - {detail}" if detail else "")
                 )
+                if response.status_code == 410:
+                    raise IOPluginVersionMismatchError(
+                        detail or f"'{filename}' is gone"
+                    )
                 return None
+
+    except IOPluginVersionMismatchError:
+        raise
 
     except httpx.TimeoutException:
         logger.error(f"Timeout downloading file '{filename}' from IO server")
@@ -702,6 +719,10 @@ async def download_io_plugin_files(
                         if attempt < IO_PLUGIN_MAX_RETRIES - 1:
                             await asyncio.sleep(IO_PLUGIN_RETRY_DELAY)
 
+                except IOPluginVersionMismatchError as e:
+                    # Retrying can't help: the IO server serves other names.
+                    results["errors"][filename] = str(e)
+                    break
                 except Exception as e:
                     error_msg = f"Error downloading '{filename}': {e} (attempt {attempt + 1}/{IO_PLUGIN_MAX_RETRIES})"
                     results["errors"][filename] = error_msg
@@ -744,14 +765,25 @@ async def check_io_server_health(
 
             if response.status_code == 200:
                 data = response.json()
+                # The plugin files are reported by the IO server's file
+                # server, not by its device health check.
+                files = {}
+                try:
+                    files_response = await client.get(
+                        f"{server_url.rstrip('/')}/api/io-plugin/health"
+                    )
+                    if files_response.status_code == 200:
+                        files = files_response.json()
+                except (httpx.HTTPError, ValueError) as e:
+                    logger.debug(f"IO plugin file check failed: {e}")
                 return {
                     "healthy": True,
                     "server_url": server_url,
                     "status": data.get("status", "unknown"),
                     "service": data.get("service", "unknown"),
                     "version": data.get("version", "unknown"),
-                    "files_available": data.get("files_available", False),
-                    "files_count": data.get("files_count", 0),
+                    "files_available": bool(files.get("files_available", False)),
+                    "files_count": files.get("files_count", 0),
                 }
             else:
                 return {

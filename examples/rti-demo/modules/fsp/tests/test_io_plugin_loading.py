@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """The FSP loads the IO plugin's files and finds what it uses from them."""
 
+import asyncio
 import shutil
 import sys
 from pathlib import Path
@@ -99,3 +100,56 @@ def test_loading_again_without_a_clear_picks_up_changed_files(plugin_dir):
         f.write("\n\ndef added_after_first_load():\n    return 'new'\n")
     assert be.load_io_plugin_modules() is True
     assert be._io_utils_module.added_after_first_load() == "new"
+
+
+def _io_server(monkeypatch, handler):
+    """Route the module's httpx calls to `handler` instead of a real IO server."""
+    real_client = be.httpx.AsyncClient
+    transport = be.httpx.MockTransport(handler)
+    monkeypatch.setattr(
+        be.httpx,
+        "AsyncClient",
+        lambda *args, **kwargs: real_client(*args, transport=transport, **kwargs),
+    )
+
+
+def test_a_renamed_file_is_not_retried_and_says_why(monkeypatch, tmp_path):
+    monkeypatch.setattr(be, "IO_PLUGIN_DYNAMIC_DIR", tmp_path)
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        detail = "'io_router.py' was renamed (decision 0018). Run the FSP or SO from the same version as this IO server."
+        return be.httpx.Response(410, json={"detail": detail})
+
+    _io_server(monkeypatch, handler)
+    result = asyncio.run(
+        be.download_io_plugin_files("http://io.test", files=["io_router.py"])
+    )
+    assert calls == ["/api/io-plugin/files/io_router.py"]
+    assert "same version" in result["errors"]["io_router.py"]
+
+
+def test_health_check_reports_the_plugin_files(monkeypatch):
+    def handler(request):
+        if request.url.path == "/api/io/health":
+            return be.httpx.Response(
+                200,
+                json={
+                    "status": "ok",
+                    "service": "IO Device Control",
+                    "version": "2.0.0",
+                },
+            )
+        if request.url.path == "/api/io-plugin/health":
+            return be.httpx.Response(
+                200,
+                json={"status": "healthy", "files_available": True, "files_count": 6},
+            )
+        return be.httpx.Response(404)
+
+    _io_server(monkeypatch, handler)
+    health = asyncio.run(be.check_io_server_health("http://io.test"))
+    assert health["healthy"] is True
+    assert health["files_available"] is True
+    assert health["files_count"] == 6
