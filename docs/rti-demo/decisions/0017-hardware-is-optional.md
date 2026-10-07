@@ -35,4 +35,4 @@ Docker won't start a container whose device paths don't exist.
 ## In the code
 
 - `examples/rti-demo/docker-compose.yml`, `examples/rti-demo/docker-compose.no-devices.yml`
-- `modules/io/io_api_server/devices.py`
+- `modules/io/rti_io/server/devices.py`

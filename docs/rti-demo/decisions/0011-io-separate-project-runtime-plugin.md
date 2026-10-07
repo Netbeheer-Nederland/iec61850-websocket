@@ -34,7 +34,7 @@ don't install everywhere, and the SO and FSP must run without IO.
 
 ## In the code
 
-- `modules/io/` (`io_api_server/io_client_file_server.py`, `io_client/`)
+- `modules/io/` (`rti_io/server/plugin_files.py`, `rti_io/plugin/`); file and package names: [0018](0018-io-module-names.md)
 - `modules/fsp/src/fsp/bff_endpoint.py`, `modules/so/src/so/bff_endpoint.py` (`load_io_plugin_modules`,
   `_try_include_io_router`)
 - Root `pyproject.toml` (workspace members; `io` excluded)

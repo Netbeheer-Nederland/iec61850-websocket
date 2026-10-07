@@ -142,7 +142,8 @@ docker run --rm -v "$PWD":/input -w /input lycheeverse/lychee:0.24.2 --config ly
 ```
 
 If you changed an rti-demo module, also run its tests, for example
-`uv run --package bff pytest examples/rti-demo/modules/bff/tests -q`, and for the HMI `npm test` in
+`uv run --package bff pytest examples/rti-demo/modules/bff/tests -q` (the `io` module's tests run in the fsp
+environment: `uv run --package fsp pytest examples/rti-demo/modules/io/tests -q`), and for the HMI `npm test` in
 `examples/rti-demo/modules/hmi` (see `examples/rti-demo/TESTING.md`).
 
 ## Attribution

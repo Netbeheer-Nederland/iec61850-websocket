@@ -1105,7 +1105,7 @@ class IoPluginFileUploadRequest(BaseModel):
     file_path: str = Field(
         ...,
         description="The path where the file should be stored (relative to io_plugin dynamic directory)",
-        json_schema_extra={"example": "io_router.py"},
+        json_schema_extra={"example": "router.py"},
     )
     overwrite: bool = Field(
         default=False,
@@ -3404,13 +3404,7 @@ def create_bff_router(
                     )
 
             # Check which required files are missing
-            required_files = [
-                "io_router.py",
-                "io_utils.py",
-                "mapping_manager.py",
-                "__init__.py",
-                "async_client_io.py",
-            ]
+            required_files = IO_PLUGIN_REQUIRED_FILES
             present_files = [
                 f.name for f in IO_PLUGIN_DYNAMIC_DIR.iterdir() if f.is_file()
             ]
@@ -3460,13 +3454,7 @@ def create_bff_router(
                     "message": "Required files are missing",
                     "missing_files": [
                         f
-                        for f in [
-                            "io_router.py",
-                            "io_utils.py",
-                            "mapping_manager.py",
-                            "__init__.py",
-                            "async_client_io.py",
-                        ]
+                        for f in IO_PLUGIN_REQUIRED_FILES
                         if not get_io_plugin_file_path(f).exists()
                     ],
                 }

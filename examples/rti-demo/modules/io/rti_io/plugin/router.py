@@ -373,7 +373,7 @@ def create_io_router() -> APIRouter:
         When the input device value changes, it will write to the ACSI server's
         IEC61850 model via the standard /api/writevalue endpoint.
 
-        NOTE: This only works when io_api_server and io_client are in the same
+        NOTE: This only works when the IO server and the IO plugin are in the same
         Python process. For separate services, use WebSocket/SSE or polling instead.
 
         Args:
@@ -404,7 +404,7 @@ def create_io_router() -> APIRouter:
         if not device:
             logger.warning(
                 f"Device '{device_name}' not found in local IO controller - "
-                f"device may be in a separate io_api_server process. "
+                f"device may be in a separate IO server process. "
                 f"Callback registration skipped for objRef: {obj_ref}"
             )
             return False
@@ -432,7 +432,7 @@ def create_io_router() -> APIRouter:
 
         Scans all mappings and registers callbacks for devices with direction=input.
 
-        NOTE: Callbacks only work when io_api_server and io_client are in the same
+        NOTE: Callbacks only work when the IO server and the IO plugin are in the same
         Python process. For separate services, you need to implement WebSocket/SSE
         or polling for input device state changes.
         """
@@ -464,7 +464,7 @@ def create_io_router() -> APIRouter:
         if skipped_count > 0:
             logger.warning(
                 f"Skipped {skipped_count} input device callback(s) - "
-                f"devices may be in separate io_api_server process"
+                f"devices may be in separate IO server process"
             )
 
     def _handle_io_error(func_name: str):

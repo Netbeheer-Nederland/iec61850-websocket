@@ -35,7 +35,7 @@ The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication 
                                     |                        |
                                     v                        v
                             +--------------------+    +-------------------+
-                            |   Server Directory  |    |   IO client        |
+                            |   Server Directory  |    |   IO plugin        |
                             |   Navigation        |    |   (IO Integration) |
                             +--------------------+    +-------------------+
 ```
@@ -61,7 +61,7 @@ modules/so/
 │                                        # - Model operations (get server/model tree)
 │                                        # - Data operations (read/write values)
 │                                        # - Action/message logging
-│                                        # - IO client integration
+│                                        # - IO plugin integration
 │
 └── README.md                           # This file
 ```
@@ -166,10 +166,10 @@ curl http://localhost:5000/api/iec61850client/status
 
 ---
 
-## IO Client Integration
+## IO Plugin Integration
 
 The SO client can drive the IO devices (LEDs, LCDs) of the `io` service and take input from its buttons and
-potentiometers. The IO code is not part of this package: on request, the service downloads the `io_client` files from
+potentiometers. The IO code is not part of this package: on request, the service downloads the IO plugin files from
 the IO server (`/api/io-plugin/files`), loads them and adds the `/api/io/*` routes to the running app. Nothing is
 fetched at startup.
 
@@ -182,7 +182,7 @@ curl -X POST http://localhost:5000/api/io-plugin/connect \
 ```
 
 `server_url` defaults to `IO_SERVER_URL`. In Docker use `http://rti-io:9000`. The mapping between IO devices and IEC 61850 objects is
-`io/io_client/io_mapping.json`; see the *Hardware demo* section of `examples/rti-demo/README.md`.
+`io/rti_io/plugin/io_mapping.json`; see the *Hardware demo* section of `examples/rti-demo/README.md`.
 
 ### Check/Disconnect IO
 
@@ -207,8 +207,8 @@ curl -X POST http://localhost:5000/api/io-plugin/disconnect
 | `SO_WS_HOST` | `0.0.0.0` | Address the WebSocket server listens on at start |
 | `SO_WS_PORT` | 8765 | Port the WebSocket server listens on at start; the FSPs dial it |
 | `IO_SERVER_URL` | `http://localhost:9000` | Default IO server for `/api/io-plugin/connect` |
-| `IO_URL` | None | Read by the loaded IO router: connects its IO client without a separate `/api/io/connect` |
-| `IO_PLUGIN_STORAGE` | `/app/io_plugin_dynamic` | Where the downloaded `io_client` files are kept |
+| `IO_URL` | None | Read by the loaded IO plugin: connects it to the IO server without a separate `/api/io/connect` |
+| `IO_PLUGIN_STORAGE` | `/app/io_plugin_dynamic` | Where the downloaded IO plugin files are kept |
 
 ### Connection Defaults
 

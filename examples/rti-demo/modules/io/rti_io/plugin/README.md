@@ -4,10 +4,12 @@ SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# ACSI IO Client - Device Control via the IO server
+# IO plugin
 
-> In this document "ACSI" is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` / `so.bff_endpoint`) and the "IO
-> server" is the `io` module's `io_api_server`. For running the whole stack, see `examples/rti-demo/README.md`.
+> The IO plugin is what the FSP and SO download from the IO server (`GET /api/io-plugin/files`) and load as the package
+> `rti_io_plugin` (decision 0018). In this document "ACSI" is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` /
+> `so.bff_endpoint`) and the "IO server" is `rti_io.server`. For running the whole stack, see
+> `examples/rti-demo/README.md`.
 
 This directory provides the ability for ACSI to connect to and control the IO server's IO device functionality.
 
@@ -25,7 +27,7 @@ The IO server provides a REST API for controlling IO devices (LEDs, potentiomete
 
 ## Components
 
-### 1. `async_client_io.py` - DemoIOClient & AsyncIOClient
+### 1. `client.py` - DemoIOClient & AsyncIOClient
 
 A Python client library for communicating with the IO server's REST API.
 
@@ -43,8 +45,8 @@ A Python client library for communicating with the IO server's REST API.
 
 ```python
 import sys
-sys.path.insert(0, "examples/rti-demo/modules/io/io_client")  # the modules import each other by bare name
-from async_client_io import DemoIOClient
+sys.path.insert(0, "examples/rti-demo/modules/io")
+from rti_io.plugin.client import DemoIOClient
 
 # Create client
 client = DemoIOClient(base_url="http://localhost:9000")
@@ -75,7 +77,7 @@ if client.is_healthy():
     print("IO server is healthy")
 ```
 
-### 2. `io_router.py` - FastAPI IO Router
+### 2. `router.py` - FastAPI IO Router
 
 A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying requests to the IO server.
 
@@ -122,7 +124,7 @@ curl -X POST http://localhost:5001/api/io-plugin/connect \
   -d '{"server_url": "http://localhost:9000", "acsi_url": "http://localhost:5001"}'
 ```
 
-This downloads the `io_client` files from the IO server (`GET /api/io-plugin/files`), loads them, and adds the
+This downloads the IO plugin files from the IO server (`GET /api/io-plugin/files`), loads them, and adds the
 `/api/io/*` routes to the running service. Use port 5000 for the SO, and `http://rti-io:9000` as `server_url` in Docker. `server_url` defaults to the
 `IO_SERVER_URL` environment variable. If `IO_URL` is set, the loaded router configures its client from it; otherwise
 call `POST /api/io/connect` with `{"base_url": ...}`.
@@ -147,8 +149,8 @@ curl http://localhost:5001/api/io/leds
 
 ```python
 import sys
-sys.path.insert(0, "examples/rti-demo/modules/io/io_client")
-from async_client_io import DemoIOClient
+sys.path.insert(0, "examples/rti-demo/modules/io")
+from rti_io.plugin.client import DemoIOClient
 
 client = DemoIOClient(base_url="http://localhost:9000")
 client.turn_on("led1")
@@ -173,11 +175,11 @@ The IO server is configured in `examples/rti-demo/modules/io/`.
 **Starting the IO server:**
 
 ```bash
-# With default port
-python examples/rti-demo/modules/io/io_api_server/main.py
+# With default port (from examples/rti-demo/modules/io)
+python -m rti_io.server.main
 
 # With custom port
-PORT=9100 python examples/rti-demo/modules/io/io_api_server/main.py
+PORT=9100 python -m rti_io.server.main
 
 # With Docker (from examples/rti-demo)
 docker compose up -d rti-io
@@ -267,20 +269,20 @@ docker compose up -d rti-io rti-fsp01
 
 ### Testing
 
-There are no automated tests for `io_client` itself; the FSP and SO tests cover how it is loaded
-(`uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -q`, and the same for `so`). On a Raspberry Pi, two
-scripts check the IO server:
+The IO plugin's own tests, and the IO server's file serving, run with the fsp environment (it has FastAPI):
+`uv run --package fsp pytest examples/rti-demo/modules/io/tests -q`. The FSP and SO tests cover how it is loaded
+(`uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -q`, and the same for `so`). On a Raspberry Pi, a
+script checks the I2C LCD:
 
 ```bash
-cd examples/rti-demo/modules/io/io_api_server
-python test_imports.py     # all IO server modules import
-python test_lcd_i2c.py     # the I2C LCD works
+cd examples/rti-demo/modules/io
+python -m rti_io.server.lcd_i2c_check
 ```
 
 ### Adding New IO Functionality
 
-1. **Extend DemoIOClient**: Add new methods to `async_client_io.py` for additional IO server API calls
-2. **Add New Endpoints**: Add new routes to `io_router.py` to expose new functionality
+1. **Extend DemoIOClient**: Add new methods to `client.py` for additional IO server API calls
+2. **Add New Endpoints**: Add new routes to `router.py` to expose new functionality
 3. **Reload**: FSP and SO pick up changed files with `POST /api/io-plugin/reload` (or a new `/api/io-plugin/connect`)
 
 ## Troubleshooting
@@ -296,7 +298,7 @@ python test_lcd_i2c.py     # the I2C LCD works
 
 **Error:** `Client not configured`
 
-- Load the IO client first with `POST /api/io-plugin/connect`, then
+- Load the IO plugin first with `POST /api/io-plugin/connect`, then
 - set the `IO_URL` environment variable, or call `POST /api/io/connect` with `{"base_url": ...}`
 
 ### Port Conflicts
@@ -348,12 +350,12 @@ python test_lcd_i2c.py     # the I2C LCD works
 
 ## Files
 
-- `async_client_io.py` - DemoIOClient & AsyncIOClient HTTP clients
-- `io_router.py` - FastAPI IO router that FSP and SO load at runtime
-- `mapping_manager.py` - IEC 61850 object to IO device mapping (`io_mapping.json`)
-- `io_utils.py` - helpers (LED blink, LCD write) used by FSP and SO
+- `client.py` - DemoIOClient & AsyncIOClient HTTP clients
+- `router.py` - FastAPI IO router that FSP and SO load at runtime
+- `mapping.py` - IEC 61850 object to IO device mapping (`io_mapping.json`)
+- `utils.py` - helpers (LED blink, LCD write) used by FSP and SO
 - `io_mapping.json` - default mapping
-- `README_IO.md` - This file
+- `README.md` - This file
 
 ## Compatibility
 

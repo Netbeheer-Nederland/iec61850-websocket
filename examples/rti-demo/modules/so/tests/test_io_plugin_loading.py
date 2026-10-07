@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 from so import bff_endpoint as be
 
+pytestmark = pytest.mark.unit
+
 # The plugin files the IO server serves, as they are in the repository.
 PLUGIN_SRC = Path(__file__).resolve().parents[2] / "io" / "rti_io" / "plugin"
 

@@ -14,6 +14,8 @@ sys.path.insert(0, str(IO))
 
 from rti_io.server.plugin_files import create_plugin_files_router  # noqa: E402
 
+pytestmark = pytest.mark.unit
+
 PLUGIN_FILES = {
     "__init__.py",
     "client.py",

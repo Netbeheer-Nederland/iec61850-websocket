@@ -8,15 +8,15 @@ SPDX-License-Identifier: Apache-2.0
 
 This directory contains a complete **IO Device Control System** for Raspberry Pi, consisting of two main components:
 
-1. **`io_api_server/`** - A FastAPI-based REST API service for direct hardware control
-2. **`io_client/`** - Connection and use of IO server services and synchronization between IO server and RTI component (ACSI client/server with WebSocket passive/active)
+1. **`rti_io/server/`** - the IO server: a FastAPI-based REST API service for direct hardware control
+2. **`rti_io/plugin/`** - the IO plugin: the FSP and SO download it from the IO server and load it, to reach the IO server and keep devices and IEC 61850 objects in sync (ACSI client/server with WebSocket passive/active)
 
 ## Overview
 
 The IO service enables remote control and monitoring of physical IO devices (LEDs, potentiometers, buttons, LCD displays) through:
 
-- **Direct REST API** via the `io_api_server` service
-- **ACSI Integration** via the `io_client` library that proxies requests to the IO server
+- **Direct REST API** via the IO server (`rti_io.server`)
+- **ACSI Integration** via the IO plugin (`rti_io.plugin`), which proxies requests to the IO server
 - **IEC 61850 Object Mapping** to connect IO devices to power system data model objects
 
 ### Architecture
@@ -26,7 +26,7 @@ The IO service enables remote control and monitoring of physical IO devices (LED
 ```
 +------------------+     +---------------------+     +------------------+
 |                  |     |                     |     |                  |
-|   RTI component  +---->+   io_client/router   +---->+   io_api_server   |
+|   RTI component  +---->+   IO plugin router  +---->+   IO server       |
 |                  |     |   (IO Router)       |     |                  |
 |                  |     |                     |     |                  |
 +------------------+     +---------------------+     +--------+---------+
@@ -34,7 +34,7 @@ The IO service enables remote control and monitoring of physical IO devices (LED
                                             v                    v
                                     +--------------------------------------+
                                     |     Physical IO & Hardware Devices    |
-                                    |       (all connected to io_api_server)|
+                                    |       (all connected to the IO server)|
                                     +--------------------------------------+
 ```
 
@@ -42,29 +42,30 @@ The IO service enables remote control and monitoring of physical IO devices (LED
 
 ```
 modules/io/
-├── pyproject.toml, uv.lock               # standalone uv project (not in the root workspace)
-├── docker/Dockerfile                   # multi-stage build; context is modules/io
-├── io_api_server/                      # IO Device REST API Service
-│   ├── main.py                         # Entry point - creates IOController + FastAPI app
-│   ├── io_controller.py                # Core IO device management (LEDs, pots, buttons, LCDs)
-│   ├── devices.py                      # Device configuration classes and types
-│   ├── api_endpoint.py                 # FastAPI endpoints for device control
-│   ├── io_config.py                    # Configuration loading/saving
-│   └── io_config.json                  # Default device configurations
-│
-├── io_client/                          # Connection and synchronization between IO server and RTI
-│   ├── async_client_io.py              # Async client for the IO server API
-│   ├── io_router.py                    # FastAPI router for ACSI BFF
-│   ├── io_utils.py                     # Utility functions
-│   ├── mapping_manager.py              # IEC 61850 to IO device mapping
-│   └── io_mapping.json                 # Default IEC 61850 object mappings
-│
-└── __init__.py                         # Package initialization
+├── pyproject.toml, uv.lock   # standalone uv project rti-io (not in the root workspace)
+├── docker/Dockerfile         # multi-stage build; context is modules/io
+├── tests/                    # uv run --package fsp pytest examples/rti-demo/modules/io/tests -q
+└── rti_io/                   # the Python package
+    ├── server/               # the IO server: python -m rti_io.server.main
+    │   ├── main.py           # Entry point - creates IOController + FastAPI app
+    │   ├── io_controller.py  # Core IO device management (LEDs, pots, buttons, LCDs)
+    │   ├── devices.py        # Device configuration classes and types
+    │   ├── api_endpoint.py   # FastAPI endpoints for device control
+    │   ├── io_config.py      # Configuration loading/saving
+    │   ├── io_config.json    # Default device configurations
+    │   ├── plugin_files.py   # Serves the IO plugin's files (GET /api/io-plugin/files)
+    │   └── lcd_i2c_check.py  # Hardware check for the I2C LCD
+    └── plugin/               # the IO plugin, downloaded and loaded by the FSP and SO
+        ├── client.py         # AsyncIOClient / DemoIOClient for the IO server API
+        ├── router.py         # FastAPI router the FSP and SO mount (/api/io/...)
+        ├── utils.py          # Utility functions
+        ├── mapping.py        # IEC 61850 to IO device mapping
+        └── io_mapping.json   # Default IEC 61850 object mappings
 ```
 
 ---
 
-## Component 1: io_api_server - IO Device Control API
+## Component 1: the IO server (`rti_io.server`) - IO Device Control API
 
 A **FastAPI-based web service** that provides REST API endpoints for controlling physical IO devices connected to a Raspberry Pi or simulated devices for development.
 
@@ -116,9 +117,9 @@ For **physical hardware operation** (not mock mode):
 
 ---
 
-## Component 2: io_client - Connection and Synchronization Layer
+## Component 2: the IO plugin (`rti_io.plugin`) - Connection and Synchronization Layer
 
-The `io_client` directory provides connection and synchronization between the IO server services and the RTI component, which is a combination of ACSI client/server with WebSocket passive/active.
+The IO plugin provides connection and synchronization between the IO server services and the RTI component, which is a combination of ACSI client/server with WebSocket passive/active.
 
 ### Key Features
 
@@ -133,7 +134,7 @@ The `io_client` directory provides connection and synchronization between the IO
 
 ### Architecture
 
-The `io_client` provides **two integration paths**:
+The IO plugin provides **two integration paths**:
 
 1. **Direct Client Usage**: Import and use `AsyncIOClient` directly in your code
 2. **Router Proxy**: ACSI exposes IO endpoints that proxy to the IO server via the IO router
@@ -146,8 +147,8 @@ All endpoints are proxied to the IO server and provide connection management, de
 
 ```python
 import sys
-sys.path.insert(0, "examples/rti-demo/modules/io/io_client")  # the modules import each other by bare name
-from async_client_io import DemoIOClient
+sys.path.insert(0, "examples/rti-demo/modules/io")
+from rti_io.plugin.client import DemoIOClient
 
 # Synchronous client; AsyncIOClient has the same methods as coroutines (await them)
 client = DemoIOClient(base_url="http://localhost:9000")
@@ -203,7 +204,7 @@ This mapping allows:
 
 ## Configuration Files
 
-### io_api_server/io_config.json
+### rti_io/server/io_config.json
 
 Defines all IO devices and their configurations:
 - Device name, type, and identifier
@@ -214,7 +215,7 @@ Defines all IO devices and their configurations:
 - ACSI server integration settings
 - IEC 61850 object mappings
 
-### io_client/io_mapping.json
+### rti_io/plugin/io_mapping.json
 
 Defines mappings between IEC 61850 objects and IO devices:
 - Which IO device corresponds to which IEC 61850 data object
@@ -327,7 +328,7 @@ The default devices defined in `io_config.json` use the following GPIO configura
 
 | Issue                                  | Solution                                                                  |
 |----------------------------------------|---------------------------------------------------------------------------|
-| **Port already in use**                | Use different port: `PORT=8081 python main.py`                            |
+| **Port already in use**                | Use different port: `PORT=8081 python -m rti_io.server.main`                            |
 | **gpiozero import error (Windows)**    | Normal - uses mock mode. Install gpiozero for Pi.                         |
 | **GPIO permission denied (Linux)**     | Run with sudo or add user to gpio group                                   |
 | **MCP3008 not detected**               | Check SPI wiring, enable SPI in raspi-config                              |
@@ -391,7 +392,7 @@ ls /dev/i2c*
 sudo i2cdetect -y 1
 ```
 
-Most PCF8574 backpacks use address **0x27** or **0x3F**. Set the address in `io_api_server/io_config.json` as a
+Most PCF8574 backpacks use address **0x27** or **0x3F**. Set the address in `rti_io/server/io_config.json` as a
 decimal number (`39` is 0x27, `63` is 0x3F):
 
 ```json

@@ -263,7 +263,7 @@ The `BFF_CONNECTIONS_FILE` env var overrides the path if you need a different lo
 
 On Raspberry Pis, the `io` service drives LEDs, LCDs, a button and two potentiometers, so the IEC 61850 exchange between
 RTI-FSP (ACSI server) and RTI-SO (ACSI client) becomes visible. It shows reporting, operate (control) and setpoints.
-FSP and SO each run their own `io` service and use the same mapping, `modules/io/io_client/io_mapping.json`:
+FSP and SO each run their own `io` service and use the same mapping, `modules/io/rti_io/plugin/io_mapping.json`:
 
 | Device         | Mapped to                                    | Shows / does                                                   |
 |----------------|----------------------------------------------|----------------------------------------------------------------|
@@ -283,8 +283,8 @@ Demo flow:
 3. Turn `pot1` on the FSP side: the new `TotW` value reaches the SO in the next report.
 4. Turn `pot2` on the SO side: the SO sends an operate on `WMaxSpt`, and `led2` on the FSP side shows that it arrived.
 
-FSP and SO load the IO client on request, not at startup: connect each one to its IO server with
-`POST /api/io-plugin/connect` (see *IO Client Integration* in [modules/fsp/README.md](modules/fsp/README.md)).
+FSP and SO load the IO plugin on request, not at startup: connect each one to its IO server with
+`POST /api/io-plugin/connect` (see *IO Plugin Integration* in [modules/fsp/README.md](modules/fsp/README.md)).
 Wiring, pin numbers and the I2C LCD setup are in [modules/io/README.md](modules/io/README.md).
 
 ## IO API Server
@@ -298,7 +298,7 @@ uv run python launch.py io
 docker compose up rti-io
 
 # or directly
-cd modules/io/io_api_server && python main.py
+cd modules/io && uv run python -m rti_io.server.main
 ```
 
 Devices, configuration (`io_config.json`), wiring, Raspberry Pi setup (GPIO, I2C, SPI) and troubleshooting are in
@@ -323,7 +323,7 @@ rti-demo/
     ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }
     ├── fsp/       { pyproject.toml, docker/Dockerfile, src/fsp/, tests/ }
     ├── so/        { pyproject.toml, docker/Dockerfile, src/so/, tests/ }
-    ├── io/        { pyproject.toml, docker/Dockerfile, io_api_server/, io_client/ }
+    ├── io/        { pyproject.toml, docker/Dockerfile, rti_io/server/, rti_io/plugin/, tests/ }
     └── hmi/       { package.json, docker/Dockerfile, src/ }  # Web HMI (React)
 ```
 

@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 from fsp import bff_endpoint as be
 
+pytestmark = pytest.mark.unit
+
 # The plugin files the IO server serves, as they are in the repository.
 PLUGIN_SRC = Path(__file__).resolve().parents[2] / "io" / "rti_io" / "plugin"
 
@@ -71,3 +73,21 @@ def test_failed_load_leaves_no_plugin_modules(plugin_dir):
     )
     assert be.load_io_plugin_modules() is False
     assert _plugin_modules() == []
+
+
+def test_files_endpoint_finds_every_required_file(plugin_dir, tmp_path_factory):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    model_dir = tmp_path_factory.mktemp("model")
+    (model_dir / "model.py").write_text(
+        "from ws61850.iec61850.data_model.ied_model import IedModel\n"
+        "ied = IedModel(name='TestIED')\n",
+        encoding="utf-8",
+    )
+    app = FastAPI()
+    router, _ = be.create_bff_router(model_dir)
+    app.include_router(router)
+    body = TestClient(app).get("/api/io-plugin/files").json()
+    assert body["missing_files"] == []
+    assert body["required_files_present"] is True

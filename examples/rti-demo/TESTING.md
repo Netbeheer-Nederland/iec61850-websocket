@@ -74,6 +74,9 @@ uv which workspace member's environment/dependencies to use):
 uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q
 uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q
 uv run --package so  pytest examples/rti-demo/modules/so/tests  -m unit -q
+# io isn't a workspace member; its tests (IO plugin, plugin file serving) need
+# FastAPI, so they run in the fsp environment
+uv run --package fsp pytest examples/rti-demo/modules/io/tests  -m unit -q
 ```
 
 The `-m unit` flag matters: this project defines two pytest markers,
@@ -123,13 +126,16 @@ examples/rti-demo/modules/
 │   ├── pyproject.toml
 │   ├── src/fsp/bff_endpoint.py, acsi_server.py, model.py
 │   ├── docker/Dockerfile
-│   └── tests/test_bff_endpoint.py
+│   └── tests/test_bff_endpoint.py, test_io_plugin_loading.py
 ├── so/
 │   ├── pyproject.toml
 │   ├── src/so/bff_endpoint.py, acsi_client.py
 │   ├── docker/Dockerfile
-│   └── tests/test_bff_endpoint.py, test_acsi_client.py
+│   └── tests/test_bff_endpoint.py, test_acsi_client.py, test_io_plugin_loading.py
 └── io/        # not a workspace member - see above
+    ├── pyproject.toml   # project rti-io
+    ├── rti_io/server/, rti_io/plugin/
+    └── tests/test_plugin_files.py, test_plugin_client.py
 ```
 
 `fsp` and `so` are each tested through a `fastapi.testclient.TestClient`
@@ -248,6 +254,7 @@ rm -rf dist
 (uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q) \
   && (uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q) \
   && (uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q) \
+  && (uv run --package fsp pytest examples/rti-demo/modules/io/tests -m unit -q) \
   && (cd examples/rti-demo/modules/hmi && npm test) \
   && (cd examples/rti-demo/modules/hmi && npx vite build && rm -rf dist)
 ```

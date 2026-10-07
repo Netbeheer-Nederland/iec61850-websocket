@@ -2,8 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """The IO plugin's client module."""
 
+import asyncio
 import sys
 from pathlib import Path
+
+import pytest
 
 IO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(IO))
@@ -13,15 +16,12 @@ from rti_io.plugin import router as plugin_router  # noqa: E402
 
 PLUGIN = IO / "rti_io" / "plugin"
 
+pytestmark = pytest.mark.unit
+
 
 def test_one_async_client():
     assert not hasattr(plugin_client, "AsyncDemoIOClient")
     assert plugin_router.AsyncIOClient is plugin_client.AsyncIOClient
-
-
-import asyncio  # noqa: E402
-
-import pytest  # noqa: E402
 
 
 def test_connection_failure_raises_io_connection_error():
