@@ -31,7 +31,7 @@ python launch.py io
 | `bff`                    | 3000                                 | Backend for Frontend - REST API gateway                               |
 | `fsp`                    | 5001                                 | RTI-FSP - IEC 61850 server                                            |
 | `fsp2`                   | 5005                                 | RTI-FSP, second instance (`cp2`)                                      |
-| `so`                     | 5000, WebSocket 8765                 | RTI-SO - IEC 61850 client                                             |
+| `so`                     | 5000, WebSocket 8765                 | RTI-SO - IEC 61850 client; its WebSocket server listens from the start |
 | `io`                     | 9000                                 | IO device control API                                                 |
 | HMI                      | 8080 (`npm run dev` and Docker)      | Web-based HMI                                                         |
 | `keycloak` (Docker only) | 8081 / 8443                          | IDP-Server for OAuth - see [Keycloak](#keycloak-idp-server-for-oauth) |

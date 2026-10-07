@@ -552,3 +552,63 @@ class TestHealthReportsItsPort:
         monkeypatch.setenv("PORT", "5100")
         client, _ = app_client
         assert client.get("/api/health").json()["server"]["port"] == 5100
+
+
+class FakeClient:
+    def __init__(self, raises=None):
+        self.raises = raises
+        self.connects = []
+        self.logged = []
+
+    def connect(self, host, port):
+        if self.raises:
+            raise self.raises
+        self.connects.append((host, port))
+
+    def _log_action(self, message, level, kind=None):
+        self.logged.append((level, message))
+
+
+class TestListenOnStart:
+    """The SO's WebSocket server (passive endpoint) starts with the service."""
+
+    def test_listens_on_all_interfaces_port_8765_by_default(self, monkeypatch):
+        for var in ("SO_LISTEN_ON_START", "SO_WS_HOST", "SO_WS_PORT"):
+            monkeypatch.delenv(var, raising=False)
+        client = FakeClient()
+        bff_endpoint._listen_on_start(client)
+        assert client.connects == [("0.0.0.0", 8765)]
+
+    def test_host_and_port_from_environment(self, monkeypatch):
+        monkeypatch.setenv("SO_WS_HOST", "127.0.0.1")
+        monkeypatch.setenv("SO_WS_PORT", "9765")
+        client = FakeClient()
+        bff_endpoint._listen_on_start(client)
+        assert client.connects == [("127.0.0.1", 9765)]
+
+    @pytest.mark.parametrize("value", ["false", "0", "no", "off", "False"])
+    def test_can_be_switched_off(self, monkeypatch, value):
+        monkeypatch.setenv("SO_LISTEN_ON_START", value)
+        client = FakeClient()
+        bff_endpoint._listen_on_start(client)
+        assert client.connects == []
+
+    def test_a_failed_start_is_logged_not_raised(self, monkeypatch):
+        monkeypatch.delenv("SO_LISTEN_ON_START", raising=False)
+        client = FakeClient(raises=RuntimeError("port in use"))
+        bff_endpoint._listen_on_start(client)
+        assert any(
+            level == "warn" and "port in use" in msg for level, msg in client.logged
+        )
+
+    def test_the_app_starts_listening_on_startup(self, monkeypatch, tmp_path):
+        started = []
+        monkeypatch.setattr(bff_endpoint, "_listen_on_start", started.append)
+        # create_fastapi_app prepares the IO plugin directory (/app/... in Docker).
+        monkeypatch.setattr(
+            bff_endpoint, "IO_PLUGIN_DYNAMIC_DIR", tmp_path / "io_plugin"
+        )
+        app = bff_endpoint.create_fastapi_app(tmp_path)
+        with TestClient(app):
+            pass
+        assert started == [app.state.client]

@@ -203,14 +203,18 @@ curl -X POST http://localhost:5000/api/io-plugin/disconnect
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 5000 | REST API port |
+| `SO_LISTEN_ON_START` | `true` | Start the WebSocket server (passive endpoint) with the service; `false` waits for `POST /api/connect` |
+| `SO_WS_HOST` | `0.0.0.0` | Address the WebSocket server listens on at start |
+| `SO_WS_PORT` | 8765 | Port the WebSocket server listens on at start; the FSPs dial it |
 | `IO_SERVER_URL` | `http://localhost:9000` | Default IO server for `/api/io-plugin/connect` |
 | `IO_URL` | None | Read by the loaded IO router: connects its IO client without a separate `/api/io/connect` |
 | `IO_PLUGIN_STORAGE` | `/app/io_plugin_dynamic` | Where the downloaded `io_client` files are kept |
 
 ### Connection Defaults
 
-- **Host**: localhost
-- **Port**: 8765
+The WebSocket server listens on `0.0.0.0:8765` as soon as the SO starts (see `SO_LISTEN_ON_START`). `POST /api/connect`
+starts it again after a `POST /api/disconnect`; while it runs, `/api/connect` is refused.
+
 - **CP**: cp1 (communication point)
 
 ---

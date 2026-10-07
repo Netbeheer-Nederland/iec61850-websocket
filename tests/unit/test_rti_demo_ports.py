@@ -249,3 +249,6 @@ def test_so_websocket_port(compose):
     [so] = [c for c in seed if c["type"] == "RTI-SO"]
     # The demo playbook links an FSP to the SO at this port.
     assert so.get("ws_port") == port
+    text = _read(MODULES / "so" / "src" / "so" / "bff_endpoint.py")
+    pattern = r'os\.getenv\("SO_WS_PORT", "(\d+)"\)'
+    assert _one(pattern, text, "so bff_endpoint.py SO_WS_PORT") == port

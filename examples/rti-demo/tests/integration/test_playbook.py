@@ -36,6 +36,28 @@ sys.modules[_spec.name] = run  # its dataclasses look their module up there
 _spec.loader.exec_module(run)
 
 PLAYBOOK = Path(os.environ.get("RTI_PLAYBOOK", _ROOT / "playbooks" / "demo.yaml"))
+SO_URL = "http://localhost:5000/api"
+SO_WS_PORT = 8765
+
+
+@pytest.fixture(autouse=True)
+def _so_listening():
+    """The SO's WebSocket server must be up for the playbook's FSPs to dial.
+
+    It starts with the SO, but other integration tests disconnect it in
+    their teardown - start it again if needed (refused while it runs).
+    """
+    try:
+        status = requests.get(f"{SO_URL}/status", timeout=5).json().get("status")
+        if status not in ("connected", "connecting"):
+            requests.post(
+                f"{SO_URL}/connect",
+                json={"host": "0.0.0.0", "port": SO_WS_PORT},
+                timeout=5,
+            )
+            time.sleep(1)
+    except requests.RequestException:
+        pass  # the tests skip themselves when the stack isn't running
 
 
 def test_demo_playbook_runs_clean():

@@ -121,11 +121,40 @@ class HealthCheckAccessFilter(logging.Filter):
         return logging.getLogger("uvicorn.access").isEnabledFor(logging.DEBUG)
 
 
+def _listen_on_start(client) -> None:
+    """Start the SO's WebSocket server (passive endpoint) with the service.
+
+    The FSPs dial in to it, so it listens from the start instead of waiting
+    for a POST /api/connect: on SO_WS_HOST (default 0.0.0.0) and SO_WS_PORT
+    (default 8765). SO_LISTEN_ON_START=false leaves it to /api/connect, as
+    before. A failure is logged, not raised - the REST API still starts.
+    """
+    if os.getenv("SO_LISTEN_ON_START", "true").strip().lower() in (
+        "0",
+        "false",
+        "no",
+        "off",
+    ):
+        return
+    host = os.getenv("SO_WS_HOST", "0.0.0.0")
+    port = int(os.getenv("SO_WS_PORT", "8765"))
+    try:
+        client.connect(host, port)
+        client._log_action(
+            f"Listening on start: host={host}, port={port}", "info", kind="system"
+        )
+    except (ValueError, RuntimeError) as exc:
+        client._log_action(f"Listen on start failed: {exc}", "warn", kind="system")
+
+
 @asynccontextmanager
-async def _lifespan(_app: FastAPI):
+async def _lifespan(app: FastAPI):
     # Installed here (not before uvicorn.run) so it survives uvicorn's own
     # logging dictConfig, which runs before app startup.
     logging.getLogger("uvicorn.access").addFilter(HealthCheckAccessFilter())
+    client = getattr(app.state, "client", None)
+    if client is not None:
+        _listen_on_start(client)
     yield
 
 
