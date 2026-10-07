@@ -57,6 +57,41 @@ jobs:
           name: junit-${{ matrix.python }}
           path: junit-*.xml
 
+  # The rti-demo modules' tests, as examples/rti-demo/TESTING.md runs them.
+  # The io module isn't a workspace member; its tests run in the fsp
+  # environment, which has FastAPI.
+  rti-demo-modules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-suffix: rti-demo-modules
+      - run: uv sync --locked --all-packages
+      - run: uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q
+      - run: uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q
+      - run: uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q
+      - run: uv run --package fsp pytest examples/rti-demo/modules/io/tests -m unit -q
+
+  # The HMI's tests and production build (vite), with the Node version its
+  # Docker image builds with (modules/hmi/docker/Dockerfile).
+  hmi:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/rti-demo/modules/hmi
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26.9.0"
+          cache: npm
+          cache-dependency-path: examples/rti-demo/modules/hmi/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npx vite build
+
   # Copyright and license information on every file (REUSE spec; REUSE.toml
   # covers files that can't carry a header).
   reuse:

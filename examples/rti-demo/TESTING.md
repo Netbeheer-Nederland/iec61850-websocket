@@ -259,5 +259,8 @@ rm -rf dist
   && (cd examples/rti-demo/modules/hmi && npx vite build && rm -rf dist)
 ```
 
-If all three steps print a passing summary with no errors, the codebase is
-in a clean, verified state.
+If every step prints a passing summary with no errors, the codebase is
+in a clean, verified state. CI runs the same commands on every push (the
+`rti-demo-modules` and `hmi` jobs in `.github/workflows/ci.yml`);
+`tests/unit/test_ci_runs_the_documented_tests.py` fails if a command here
+is missing from CI.
