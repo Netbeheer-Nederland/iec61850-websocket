@@ -62,3 +62,41 @@ def test_old_files_dir_variable_still_works(monkeypatch, tmp_path):
         f["name"] for f in TestClient(app).get("/api/io-plugin/files").json()["files"]
     }
     assert names == {"router.py"}
+
+
+# Requests for files outside the plugin folder (decision 0019): a step up,
+# an absolute path, and an encoded step up into a sibling folder.
+OUTSIDE_REQUESTS = [
+    "..%2Fserver%2Fio_config.json",
+    "%2Fetc%2Fhostname",
+    "%2E%2E%2Fserver%2Fmain.py",
+    "sub%2F..%2F..%2Fserver%2Fmain.py",
+]
+
+
+@pytest.mark.parametrize("name", OUTSIDE_REQUESTS)
+def test_serves_nothing_outside_the_plugin_folder(client, name):
+    response = client.get(f"/api/io-plugin/files/{name}")
+    assert response.status_code == 404
+    assert "content" not in response.json()
+
+
+def test_serves_no_subfolder(client, monkeypatch, tmp_path):
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "x.py").write_text("# x\n", encoding="utf-8")
+    monkeypatch.setenv("IO_PLUGIN_FILES_DIR", str(tmp_path))
+    app = FastAPI()
+    app.include_router(create_plugin_files_router())
+    assert TestClient(app).get("/api/io-plugin/files/sub%2Fx.py").status_code == 404
+
+
+def test_serves_no_symlink_out_of_the_folder(monkeypatch, tmp_path):
+    secret = tmp_path / "secret.txt"
+    secret.write_text("secret\n", encoding="utf-8")
+    plugin = tmp_path / "plugin"
+    plugin.mkdir()
+    (plugin / "router.py").symlink_to(secret)
+    monkeypatch.setenv("IO_PLUGIN_FILES_DIR", str(plugin))
+    app = FastAPI()
+    app.include_router(create_plugin_files_router())
+    assert TestClient(app).get("/api/io-plugin/files/router.py").status_code == 404

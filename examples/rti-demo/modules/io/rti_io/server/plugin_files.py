@@ -91,9 +91,18 @@ def create_plugin_files_router() -> APIRouter:
             logger.error(f"Failed to create io_client files directory: {e}")
             return False
 
-    def get_io_client_file_path(filename: str) -> str:
-        """Get the full path for an io_client file."""
-        return os.path.join(io_client_files_dir, filename)
+    def get_io_client_file_path(filename: str) -> str | None:
+        """The plugin file `filename` names, or None when it names anything else.
+
+        Only a regular file directly in the plugin folder: a name with a
+        path separator, '..', an absolute path or a symlink that leads out
+        of the folder gives None (decision 0019).
+        """
+        folder = Path(io_client_files_dir).resolve()
+        path = (folder / filename).resolve()
+        if path.parent != folder or not path.is_file():
+            return None
+        return str(path)
 
     def list_io_client_files() -> list[dict[str, Any]]:
         """List all files in the io_client files directory."""
@@ -171,15 +180,10 @@ def create_plugin_files_router() -> APIRouter:
                 )
             file_path = get_io_client_file_path(filename)
 
-            if not os.path.exists(file_path):
-                logger.warning(f"IO client file not found: {filename}")
+            if file_path is None:
+                logger.warning(f"IO plugin file not found: {filename!r}")
                 raise HTTPException(
-                    status_code=404, detail=f"IO client file '{filename}' not found"
-                )
-
-            if not os.path.isfile(file_path):
-                raise HTTPException(
-                    status_code=400, detail=f"'{filename}' is not a file"
+                    status_code=404, detail=f"IO plugin file '{filename}' not found"
                 )
 
             # Read and return file content

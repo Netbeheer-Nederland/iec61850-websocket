@@ -29,5 +29,6 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0016](0016-container-build-and-image-names.md) | Container builds and image names | accepted |
 | [0017](0017-hardware-is-optional.md) | Raspberry Pi hardware is optional | accepted |
 | [0018](0018-io-module-names.md) | Names for the IO module: `io` for the role, `rti_io` for the code | accepted |
+| [0019](0019-io-server-serves-only-plugin-files.md) | The IO server serves only the IO plugin's own files | accepted |
 
 To add a decision, copy the layout of an existing record, take the next number, and add a line to this table.
