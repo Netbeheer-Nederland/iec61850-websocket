@@ -301,14 +301,15 @@ cd iec61850-websocket
 
 # 2. Create the virtual environment and install all dependencies
 uv venv
-uv sync
+uv sync --all-packages
 
 # 3. Build the project wheel (needed by some tests)
 uv build
 ```
 
 UV creates a `.venv/` directory inside the project root. All `uv run` commands automatically activate it — you do
-not need to source it manually.
+not need to source it manually. `--all-packages` also installs the rti-demo's `bff`, `fsp` and `so` modules (members
+of the same uv workspace); a plain `uv sync` installs only the `ws61850` library and is enough for the library alone.
 
 ---
 
@@ -320,8 +321,8 @@ Run the unit-test suite to confirm that the environment is configured correctly:
 uv run pytest tests/unit -v
 ```
 
-All tests should pass. If any test fails with an import error, re-run `uv sync` to ensure all dependencies were
-installed.
+All tests should pass. If any test fails with an import error, re-run `uv sync --all-packages` to ensure all
+dependencies were installed.
 
 To do a quick smoke-test of a complete message flow, start the example server in one terminal:
 

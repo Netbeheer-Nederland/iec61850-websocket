@@ -192,7 +192,7 @@ uv run --package fsp python -m fsp.bff_endpoint
 uv run --package so python -m so.bff_endpoint
 ```
 
-or from `examples/rti-demo`: `python launch.py fsp so`, or `docker compose up -d rti-fsp01 rti-so`.
+or from `examples/rti-demo`: `uv run python launch.py fsp so`, or `docker compose up -d rti-fsp01 rti-so`.
 
 ## Usage Examples
 

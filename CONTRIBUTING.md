@@ -128,7 +128,7 @@ Follow this process for a code change and pull request:
 CI (`.github/workflows/ci.yml`) runs these on every push, on any branch, and on pull requests into `main`; run them locally first, from the repository root:
 
 ```bash
-uv sync --locked
+uv sync --locked --all-packages
 uv run ruff check .
 uv run ruff format --check .      # `uv run ruff format .` fixes the formatting
 uv run pytest tests/unit -q

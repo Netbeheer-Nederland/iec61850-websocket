@@ -137,9 +137,10 @@ cd iec61850-websocket
 ```
 
 ```bash
-# 2. Create and activate a virtual environment
+# 2. Create the virtual environment and install the dependencies,
+#    including the rti-demo's bff, fsp and so modules
 uv venv
-uv sync
+uv sync --all-packages
 ```
 
 ```bash

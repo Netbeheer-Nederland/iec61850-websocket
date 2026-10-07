@@ -15,6 +15,15 @@ SPDX-License-Identifier: Apache-2.0
   test folder.
 * The Keycloak Docker image is used to start the Keycloak server.
 * SSL is enabled for the Keycloak server and uses a self-signed certificate located in the `testing/certs` directory.
+  The certificates aren't in git: generate them once, before the first start (needs
+  [cfssl](../../docs/getting-started.md#6-cfssl)):
+
+```shell
+(cd ../../testing/certs && ./generate.sh)
+```
+
+  Without `keycloak.pem` and `keycloak-key.pem`, Docker creates empty directories with those names in their place and
+  Keycloak doesn't start. Remove them (`sudo rm -rf ../../testing/certs/keycloak*.pem`) and generate the certificates.
 * Run the following command to start Keycloak in the scripts/keycloak directory:
 
 ```shell

@@ -23,25 +23,25 @@ It replaces fragmented startup paths and standardizes service management.
 
 Usage:
     # Launch all demo services
-    python launch.py
+    uv run python launch.py
 
     # Launch specific services
-    python launch.py bff
-    python launch.py fsp
-    python launch.py so
-    python launch.py io
+    uv run python launch.py bff
+    uv run python launch.py fsp
+    uv run python launch.py so
+    uv run python launch.py io
 
     # Launch with custom port
-    python launch.py bff --port 5005
-    python launch.py io --port 8081
+    uv run python launch.py bff --port 5005
+    uv run python launch.py io --port 8081
 
     # Launch with console kept alive (default)
-    python launch.py bff --foreground
-    python launch.py bff -f
+    uv run python launch.py bff --foreground
+    uv run python launch.py bff -f
 
     # Get help
-    python launch.py --help
-    python launch.py bff --help
+    uv run python launch.py --help
+    uv run python launch.py bff --help
 
 Services:
     bff:        Backend for Frontend Server (default: port 3000)
@@ -252,9 +252,9 @@ class RTILauncher:
         parser.add_argument(
             "--verbose",
             "-v",
-            action="store_true",
+            action=argparse.BooleanOptionalAction,
             default=True,
-            help="Show detailed logging (default: True)",
+            help="Show detailed logging (default: on; --no-verbose turns it off)",
         )
         parser.add_argument("--stop", action="store_true", help="Stop running services")
         parser.add_argument(
@@ -290,7 +290,7 @@ class RTILauncher:
             "docker": args.docker,
             "background": args.background,
             "foreground": args.foreground,
-            "verbose": args.verbose or args.verbose,
+            "verbose": args.verbose,
             "stop": args.stop,
             "status": args.status,
             "config": args.config,
@@ -313,28 +313,28 @@ class RTILauncher:
                 "Examples:",
                 "-" * 60,
                 "  # Launch all services (default)",
-                "  python launch.py",
+                "  uv run python launch.py",
                 "",
                 "  # Launch all services explicitly",
-                "  python launch.py bff fsp so io",
+                "  uv run python launch.py bff fsp so io",
                 "",
                 "  # Launch BFF server on port 3000",
-                "  python launch.py bff",
+                "  uv run python launch.py bff",
                 "",
                 "  # Launch FSP ACSI-Server_WebsocketActive on custom port",
-                "  python launch.py fsp --port 5010",
+                "  uv run python launch.py fsp --port 5010",
                 "",
                 "  # Disable foreground mode (run in background)",
-                "  python launch.py --no-foreground",
+                "  uv run python launch.py --no-foreground",
                 "",
                 "  # Disable verbose logging",
-                "  python launch.py --no-verbose",
+                "  uv run python launch.py --no-verbose",
                 "",
                 "  # List available services",
-                "  python launch.py list",
+                "  uv run python launch.py list",
                 "",
                 "  # Show this help",
-                "  python launch.py --help",
+                "  uv run python launch.py --help",
             ]
         )
 
@@ -867,7 +867,7 @@ def main():
         else:
             # Background mode
             print(
-                "\nServices running in background. Use 'python launch.py --status' to check."
+                "\nServices running in background. Use 'uv run python launch.py --status' to check."
             )
 
     except KeyboardInterrupt:

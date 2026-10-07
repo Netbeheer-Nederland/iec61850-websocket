@@ -10,15 +10,22 @@ Unified entry point for launching RTI (Real-Time Infrastructure) demo services.
 
 ## Quick Start
 
+Install the Python services once, from the repository root, then run `launch.py` from `examples/rti-demo`:
+
+```bash
+# from the repository root: the ws61850 library plus the bff, fsp and so modules
+uv sync --all-packages
+```
+
 ```bash
 # Launch all services (default: all services with foreground & verbose mode)
-python launch.py
+uv run python launch.py
 
 # Launch individual services
-python launch.py bff
-python launch.py fsp
-python launch.py so
-python launch.py io
+uv run python launch.py bff
+uv run python launch.py fsp
+uv run python launch.py so
+uv run python launch.py io
 ```
 
 `launch.py` starts the Python services only. Start the HMI separately, from `modules/hmi`, with `npm install` and
@@ -48,28 +55,28 @@ python launch.py io
 
 ```bash
 # Show help
-python launch.py --help
+uv run python launch.py --help
 
 # List available services
-python launch.py list
+uv run python launch.py list
 
 # Launch with custom port
-python launch.py bff --port 5005
+uv run python launch.py bff --port 5005
 
 # Disable foreground mode (run in background)
-python launch.py --background
+uv run python launch.py --background
 
 # Disable verbose logging
-python launch.py --no-verbose
+uv run python launch.py --no-verbose
 
 # Check running services
-python launch.py --status
+uv run python launch.py --status
 
 # Stop all services
-python launch.py --stop
+uv run python launch.py --stop
 
 # Docker mode
-python launch.py --docker
+uv run python launch.py --docker
 ```
 
 ## Demo playbooks
@@ -99,8 +106,8 @@ with the service name:
 [Frontend] Serving HTTP on 0.0.0.0 port 8080
 ```
 
-To disable verbose logging: `python launch.py --no-verbose`
-To run in background: `python launch.py --background`
+To disable verbose logging: `uv run python launch.py --no-verbose`
+To run in background: `uv run python launch.py --background`
 
 ## Docker
 
@@ -170,7 +177,7 @@ error at startup and stay unavailable, except the I2C LCD, which runs in mock mo
 ### Launch with Docker (all services by default)
 
 ```shell
-python launch.py --docker       # uses the same RTI_IMAGE_REPO / RTI_IMAGE_TAG
+uv run python launch.py --docker       # uses the same RTI_IMAGE_REPO / RTI_IMAGE_TAG
 ```
 
 ### Upgrading from the old ports
@@ -190,7 +197,9 @@ HTTP 8080 -> 8081).
 ### Keycloak (IDP-Server) for OAuth
 
 From the directory scripts/keycloak `docker compose up -d` with `iec61850-test` realm (client `ws-client`) imported from
-`scripts/keycloak/data`, on `rti-network`.
+`scripts/keycloak/data`, on `rti-network`. Keycloak needs the test certificates: generate them first (see
+[TLS certificates](#tls-certificates) below), or Docker creates empty directories in their place and Keycloak doesn't
+start (see [scripts/keycloak/README.md](../../scripts/keycloak/README.md)).
 
 - Admin console: http://localhost:8081 (admin / admin)
 - From the other containers: `http://keycloak:8081`
@@ -231,7 +240,7 @@ In the HMI's TLS dialog, pick these under *From the certificate directory*. The 
 TLS, so keys never pass through the browser, the BFF or `connections.json`. Pasting or uploading PEM text still works.
 
 Outside Docker (`launch.py`), the services look for referenced files in `TLS_CERT_DIR` (default `/certs`), e.g.
-`TLS_CERT_DIR=$PWD/../../testing/certs python launch.py`. With FSP and SO on different machines, both need
+`TLS_CERT_DIR=$PWD/../../testing/certs uv run python launch.py`. With FSP and SO on different machines, both need
 certificates from the same CA: generate them on one machine and copy the files the other one uses (`ca.pem` for an
 FSP). These are test certificates - `generate.sh` makes the keys, including `ca-key.pem`, readable for everyone in
 the directory.
@@ -286,7 +295,7 @@ runs without the hardware too (see [Without Raspberry Pi hardware](#without-rasp
 
 ```bash
 # from examples/rti-demo
-python launch.py io
+uv run python launch.py io
 docker compose up rti-io
 
 # or directly
@@ -324,57 +333,37 @@ repository root (alongside the `ws61850` core library at `src/`) - see
 `TESTING.md` for how to install/run them. `demo_io` and `hmi` build and
 run independently (Pi hardware deps / npm toolchain respectively).
 
-## UV
+## Dependencies (uv)
 
-UV is already implemented to manage the dependencies inside the dockers. To add a dependency to the project, you can use
-the following command:
+The Python services share one uv workspace with the `ws61850` library, rooted at the repository root (see
+`TESTING.md`). Run these from the repository root:
 
 ```bash
-uv add <package_name>
+# install everything, including the bff, fsp and so modules
+uv sync --all-packages
+
+# add a dependency to one module, and update uv.lock
+uv add --package bff <package_name>
 ```
 
-This should be followed by rebuilding the dockers to make sure the new dependency is included in the images.
-
-```bash
-
-After adding the dependency, you can run the following command to make sure the lock file is updated with the new dependency:
-
-```bash
-uv lock
-```
-
-To run the python codes without the dockers, you can use the following command to install the dependencies in your local
-environment:
-
-```bash
-uv sync
-```
-
-and the python codes can be run using the following command:
-
-```bash
-uv run python <script_name.py>
-```
+After a dependency change, rebuild the images that use it (`docker compose build`). The `io` module is a separate uv
+project: run `uv add` and `uv lock` in `modules/io`.
 
 ## Troubleshooting
 
-* Port already in use
-```bash
-# Find and kill process on port 8080
-sudo kill -9 $(sudo lsof -t -i :8080) 2>/dev/null
-```
-
-* Module not found
+**Port already in use.** See what holds it, then stop that process or start the service on another port (`--port`):
 
 ```bash
-# Install dependencies
-uv add <packages>
-uv add uvicorn fastapi requests
+ss -ltnp | grep ':3000'
 ```
 
-* connections.json error when running locally
-```bash
-# Remove file and create a new one
-rmdir /S /Q connections.json 2>/dev/null
-echo [] > connections.json
-```
+The demo's own containers use the same ports as `launch.py`: stop them first with `docker compose down`.
+
+**`ModuleNotFoundError` (`fastapi`, `bff`, `fsp`, `so`).** The workspace modules aren't installed. Run
+`uv sync --all-packages` from the repository root and start the services with `uv run python launch.py`, not with
+a bare `python`.
+
+**Connections are wrong or the BFF can't read them.** Started with `launch.py`, the BFF keeps its connections in the
+seed file `modules/bff/src/bff/connections.json` itself. Restore it with
+`git checkout -- modules/bff/src/bff/connections.json`, or set `BFF_CONNECTIONS_FILE` to a file of your own to keep
+the seed unchanged. In Docker they are on the `bff-config` volume; `docker compose down -v` resets it to the seed.
