@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Unit tests for DataAccessService."""
 
+import pytest
+
 from ws61850.iec61850.data_model.ied_model import FunctionalConstraint
 from ws61850.iec61850.services.data_access_service import DataAccessService
 
@@ -144,3 +146,29 @@ def test_get_dataset_values_missing_ln(simple_ied):
     result = svc.get_dataset_values(1, 0, msg, find_ds_in_tree=None)
     flat = str(result)
     assert "instanceNotAvailable" in flat
+
+
+# A reference that doesn't name a data object - too few parts, or an unknown
+# object with attribute parts after it - is answered with instanceNotAvailable.
+# It used to raise, which ended the whole WebSocket session of the FSP.
+UNRESOLVABLE_REFS = ["LD0/LLN0", "LD0", "", "LD0/LLN0.MISSING.stVal", "LD0/NOPE.Health"]
+
+
+@pytest.mark.parametrize("ref", UNRESOLVABLE_REFS)
+def test_get_data_values_unresolvable_ref(simple_ied, ref):
+    svc = DataAccessService(simple_ied)
+    msg = _svc_tuple(
+        "getDataValues", ref={"ref": ref, "fc": "st"}, includeElementName=True
+    )
+    assert "instanceNotAvailable" in str(svc.get_data_values(1, 0, msg))
+
+
+@pytest.mark.parametrize("ref", UNRESOLVABLE_REFS)
+def test_set_data_values_unresolvable_ref(simple_ied, ref):
+    svc = DataAccessService(simple_ied)
+    msg = _svc_tuple(
+        "setDataValues",
+        ref={"ref": ref, "fc": "sp"},
+        dataAttrVal=("float32", 1.0),
+    )
+    assert "instanceNotAvailable" in str(svc.set_data_values(1, 0, msg))

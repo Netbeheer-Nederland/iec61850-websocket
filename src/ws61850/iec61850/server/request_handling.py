@@ -231,10 +231,17 @@ def find_ds_in_tree(data_ref, ied):
 
 def find_object_in_tree(data_ref, ied):
     """
-    Find a DataObject or DataAttribute in the IED tree
+    Find a DataObject or DataAttribute in the IED tree.
+
+    Returns None when the reference doesn't name one - including a reference
+    with fewer than three parts (LD/LN.DO) - so callers answer
+    instanceNotAvailable instead of failing the whole session.
     """
     return_do = None
-    ld_name, ln_name, first_do, *seg_ref = re.split(r"[/ .]", data_ref)
+    parts = re.split(r"[/ .]", data_ref or "")
+    if len(parts) < 3:
+        return None
+    ld_name, ln_name, first_do, *seg_ref = parts
     found_ld: LogicalDevice = next(
         (ld for ld in ied.logical_devices if ld.name == ld_name), None
     )
@@ -246,7 +253,7 @@ def find_object_in_tree(data_ref, ied):
             found_do = next(
                 (do for do in found_ln.data_objects if do.name == first_do), None
             )
-            if len(seg_ref) != 0:
+            if found_do is not None and len(seg_ref) != 0:
                 return_do = look_in_da_or_do_list(seg_ref, found_do)
 
             else:
