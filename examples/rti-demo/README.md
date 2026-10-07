@@ -34,7 +34,7 @@ python launch.py io
 | `so`                     | 5002, WebSocket 8765                 | RTI-SO - IEC 61850 client                                             |
 | `io`                     | 8000                                 | IO device control API (8080 when `main.py` is run directly)           |
 | HMI                      | 3000 (`npm run dev`) / 3001 (Docker) | Web-based HMI                                                         |
-| `keycloak` (Docker only) | 8080 / 8443                          | IDP-Server for OAuth - see [Keycloak](#keycloak-idp-server-for-oauth) |
+| `keycloak` (Docker only) | 8081 / 8443                          | IDP-Server for OAuth - see [Keycloak](#keycloak-idp-server-for-oauth) |
 
 ## Access URLs
 
@@ -162,19 +162,19 @@ python launch.py --docker       # uses the same RTI_IMAGE_REPO / RTI_IMAGE_TAG
 From the directory scripts/keycloak `docker compose up -d` with `iec61850-test` realm (client `ws-client`) imported from
 `scripts/keycloak/data`, on `rti-network`.
 
-- Admin console: http://localhost:8080 (admin / admin)
-- From the other containers: `http://keycloak:8080`
+- Admin console: http://localhost:8081 (admin / admin)
+- From the other containers: `http://keycloak:8081`
 
-Token issuer is always `http://localhost:8080/realms/iec61850-test`,
+Token issuer is always `http://localhost:8081/realms/iec61850-test`,
 whichever address a token was requested on (`KC_HOSTNAME`), so the SO's
 issuer check sees a single value. Settings to enter in the HMI (Setup):
 
 | Where                  | Field                | Value                                                                     |
 |------------------------|----------------------|---------------------------------------------------------------------------|
-| IDP-Server connection  | Endpoint             | `http://keycloak:8080`                                                    |
-| RTI-FSP / RTI-SO OAuth | Token endpoint       | `http://keycloak:8080/realms/iec61850-test/protocol/openid-connect/token` |
-|                        | Certificate endpoint | `http://keycloak:8080/realms/iec61850-test/protocol/openid-connect/certs` |
-|                        | Token issuer         | `http://localhost:8080/realms/iec61850-test`                              |
+| IDP-Server connection  | Endpoint             | `http://keycloak:8081`                                                    |
+| RTI-FSP / RTI-SO OAuth | Token endpoint       | `http://keycloak:8081/realms/iec61850-test/protocol/openid-connect/token` |
+|                        | Certificate endpoint | `http://keycloak:8081/realms/iec61850-test/protocol/openid-connect/certs` |
+|                        | Token issuer         | `http://localhost:8081/realms/iec61850-test`                              |
 |                        | Client ID / secret   | `ws-client` / see `scripts/keycloak/README.md`                            |
 
 HTTPS (8443) uses `testing/certs/keycloak.pem`, whose certificate only covers `keycloak`/`localhost`/`127.0.0.1`.

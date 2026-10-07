@@ -40,7 +40,7 @@ DEFAULT_NUM_CLIENTS = 10
 DEFAULT_CREDENTIALS_FILE = "client_credentials_{batch_name}.json"
 REQUEST_TIMEOUT_SECONDS = 15
 
-BASE = os.environ.get("KEYCLOAK_URL", "http://localhost:8080")
+BASE = os.environ.get("KEYCLOAK_URL", "http://localhost:8081")
 admin_realm = os.environ.get("KEYCLOAK_REALM", "master")
 admin_username = os.environ.get("KEYCLOAK_ADMIN_USER", "admin")
 admin_password = os.environ.get("KEYCLOAK_ADMIN_PASSWORD", "admin")

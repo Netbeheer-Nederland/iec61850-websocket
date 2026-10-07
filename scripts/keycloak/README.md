@@ -8,7 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 
 ## Getting Started
 
-* Keycloak exposed on the local port 8080 and created an initial 'admin' user with the username 'admin"
+* Keycloak exposed on the local port 8081 (HTTP; 8080 is the rti-demo HMI) and created an initial 'admin' user with the username 'admin"
   and password admin (see the Keycloak docker compose file in the scripts/keycloak directory to change the default admin
   user credentials).
 * The Keycloak realm and client configuration used by this test are imported from the local `keycloak` directory in this
@@ -25,21 +25,21 @@ docker network create rti-network 2>/dev/null || true
 docker compose up
 ```
 
-* Log in to the Admin Console (http://localhost:8080), with the username and password you created earlier
+* Log in to the Admin Console (http://localhost:8081), with the username and password you created earlier
 
 ![Keycloak admin console after logging in](./images/keycloak-clients-screen.png)
 
 Or directly test a realm endpoint:
 
 ```shell
-curl "http://localhost:8080/realms/iec61850-test"
+curl "http://localhost:8081/realms/iec61850-test"
 ```
 
 * Get an access token for the ws-client client:
 
 ```shell
 curl -X POST \
-  http://localhost:8080/realms/iec61850-test/protocol/openid-connect/token \
+  http://localhost:8081/realms/iec61850-test/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials" \
   -d "client_id=ws-client" \

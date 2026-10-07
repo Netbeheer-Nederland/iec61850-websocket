@@ -97,7 +97,7 @@ docker compose -f scripts/keycloak/docker-compose.yml up
 The docker-compose file provides:
 
 - starts Keycloak 26.0
-- exposes HTTP on `8080`
+- exposes HTTP on `8081`
 - exposes HTTPS on `8443`
 - bootstraps the admin user as `admin` / `admin`
 - imports the realm from `scripts/keycloak/data/realm-test.json`
@@ -129,7 +129,7 @@ uv run python tests/performance/FT23/client_credentials/create_keycloak_clients.
 Notes:
 
 - The script writes the credentials back to `tests/performance/FT23/data/client_credentials.json`.
-- The provisioning script talks to the Keycloak admin API on `http://localhost:8080`.
+- The provisioning script talks to the Keycloak admin API on `http://localhost:8081`.
 - It uses the admin account from the compose file by default: `admin` / `admin`.
 
 If your Keycloak admin settings are different, set:

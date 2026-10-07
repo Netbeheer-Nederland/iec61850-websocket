@@ -100,7 +100,7 @@ docker compose -f scripts/keycloak/docker-compose.yml up
 The docker-compose file provides:
 
 - starts Keycloak 26.0
-- exposes HTTP on `8080`
+- exposes HTTP on `8081`
 - exposes HTTPS on `8443`
 - bootstraps the admin user as `admin` / `admin`
 - imports the realm from `scripts/keycloak/data/realm-test.json`
