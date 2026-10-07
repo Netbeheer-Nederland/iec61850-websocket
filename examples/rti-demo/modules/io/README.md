@@ -104,8 +104,9 @@ All endpoints are under the `/api/io/` prefix and provide device management, LED
 | `IO_PLUGIN_FILES_DIR` | `rti_io/plugin` | The IO plugin files served at `GET /api/io-plugin/files`; `IO_CLIENT_FILES_DIR` (the old name) still works |
 | `IO_PLUGIN_VERSION` | `1.0.0` | The version `GET /api/io-plugin/version` reports; `IO_CLIENT_VERSION` (the old name) still works |
 
-Start the server with `python -m rti_io.server.main` from `examples/rti-demo/modules/io` (or `launch.py io`); the modules
-use relative imports, so they don't run as scripts.
+Start the server with `uv run python -m rti_io.server.main` from `examples/rti-demo/modules/io`, or with `launch.py io`;
+the modules use relative imports, so they don't run as scripts. The first uses this project's own environment
+(`modules/io/.venv`, with the Raspberry Pi packages), the second the repository's (`uv sync --all-packages`).
 
 ### Hardware Requirements
 

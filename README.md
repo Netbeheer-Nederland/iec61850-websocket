@@ -98,7 +98,8 @@ iec61850-websocket/
 │  └─ security/                    # FT30-FT31 TLS and OAuth
 ├─ testing/                        # test support: certificates, IED models, helpers
 ├─ examples/                       # library examples and the RTI demo (see examples/README.md)
-├─ docs/                           # getting started, architecture, protocol specification (see docs/README.md)
+├─ docs/                           # getting started, architecture, protocol specification, the RTI demo's
+│                                  # overview, design and decisions (see docs/README.md)
 └─ scripts/keycloak/               # Keycloak (IDP-Server) for the OAuth scenarios
 ```
 
@@ -184,6 +185,7 @@ describes how to run them in the [README](examples/README.md).
 | install and verify the project | [docs/getting-started.md](docs/getting-started.md) |
 | understand or change the library | [docs/architecture/](docs/architecture/README.md) |
 | run the examples or the RTI demo | [examples/README.md](examples/README.md), [examples/rti-demo/README.md](examples/rti-demo/README.md) |
+| understand how the RTI demo is built, and why | [docs/rti-demo/README.md](docs/rti-demo/README.md) (system overview), [docs/rti-demo/decisions/](docs/rti-demo/decisions/README.md) (decision records) |
 | read the protocol | [docs/protocol_specification/](docs/protocol_specification/RTI_2.0_Protocol_Specification.md) |
 | contribute a change | [CONTRIBUTING.md](CONTRIBUTING.md) |
 

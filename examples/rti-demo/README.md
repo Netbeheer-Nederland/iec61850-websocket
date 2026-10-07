@@ -8,6 +8,9 @@ SPDX-License-Identifier: Apache-2.0
 
 Unified entry point for launching RTI (Real-Time Infrastructure) demo services.
 
+How the services fit together is in the [system overview](../../docs/rti-demo/README.md); why they are built this way
+is in the [decision records](../../docs/rti-demo/decisions/README.md).
+
 ## Quick Start
 
 Install the Python services once, from the repository root, then run `launch.py` from `examples/rti-demo`:
@@ -297,9 +300,13 @@ runs without the hardware too (see [Without Raspberry Pi hardware](#without-rasp
 uv run python launch.py io
 docker compose up rti-io
 
-# or directly
+# or directly, in the io project's own environment
 cd modules/io && uv run python -m rti_io.server.main
 ```
+
+`launch.py io` uses the repository's environment (`uv sync --all-packages`). The direct command uses the `io` project's
+own environment instead: `uv run` creates `modules/io/.venv` on first use and installs the Raspberry Pi packages there
+(`gpiod`, `gpiozero`, ...). Use it on a Raspberry Pi; where those packages don't install, use `launch.py io`.
 
 Devices, configuration (`io_config.json`), wiring, Raspberry Pi setup (GPIO, I2C, SPI) and troubleshooting are in
 [modules/io/README.md](modules/io/README.md); the endpoints are in its OpenAPI docs at http://localhost:9000/docs.

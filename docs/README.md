@@ -14,6 +14,8 @@ that module's own README under `examples/` (see [examples/README.md](../examples
 | Document | What it covers |
 |---|---|
 | [getting-started.md](getting-started.md) | Install the prerequisites on Ubuntu or Fedora, set up the project, check that it works |
+| [rti-demo/README.md](rti-demo/README.md) | The RTI demo as a system: components, communication, data model, main flows |
+| [rti-demo/decisions/](rti-demo/decisions/README.md) | Why the RTI demo is built the way it is: one record per decision |
 
 ## Contents
 
