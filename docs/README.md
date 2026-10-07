@@ -30,7 +30,7 @@ docs/
 │  ├─ example_messages/                   # example JSON messages
 │  └─ media/                              # figures referenced by the spec
 ├─ rti-demo/                              # the RTI demo as a whole
-│  ├─ RTI_DEMO.adoc                       #   system overview: components, communication, data model, flows
+│  ├─ README.md                           #   system overview: components, communication, data model, flows
 │  ├─ design/                             #   HMI style guide, log kinds, playbook design, wireframe, whiteboard
 │  ├─ decisions/                          #   architecture decision records (why it is built this way)
 │  └─ images/                             #   architecture diagrams (also used by the module READMEs)
