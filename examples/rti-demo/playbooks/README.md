@@ -45,7 +45,7 @@ uv run python -m playbooks.run playbooks/demo.yaml --steps 5-7
 | `--pace 2s` | pause between steps (default: the playbook's `pace`) |
 | `--keep-going` | run on after a failed step (default: stop there) |
 | `--steps 3` / `--steps 2-5` | only these steps |
-| `--bff URL` | the BFF (default: the playbook's `bff`, else `http://localhost:5000`) |
+| `--bff URL` | the BFF (default: the playbook's `bff`, else `http://localhost:3000`) |
 
 Each step prints a line, `[ 6/12] ✓ Reports come in at the SO · 5 report(s) from FSP02 (5.0s)`.
 The exit code is 0 when every step passed, 1 when one failed, and 2 when the
@@ -62,7 +62,7 @@ RTI_PLAYBOOK=playbooks/other.yaml uv run pytest tests/integration -m integration
 
 ```yaml
 name: SO with two FSPs
-bff: http://localhost:5000     # optional
+bff: http://localhost:3000     # optional
 pace: 2s                       # optional, pause between steps
 so: SO                         # optional - needed only with several SOs
 cps: {FSP01: cp1}              # optional - otherwise each FSP is asked

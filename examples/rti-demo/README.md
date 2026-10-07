@@ -28,21 +28,21 @@ python launch.py io
 
 | Service                  | Port                                 | Description                                                           |
 |--------------------------|--------------------------------------|-----------------------------------------------------------------------|
-| `bff`                    | 5000                                 | Backend for Frontend - REST API gateway                               |
+| `bff`                    | 3000                                 | Backend for Frontend - REST API gateway                               |
 | `fsp`                    | 5001                                 | RTI-FSP - IEC 61850 server                                            |
 | `fsp2`                   | 5005                                 | RTI-FSP, second instance (`cp2`)                                      |
-| `so`                     | 5002, WebSocket 8765                 | RTI-SO - IEC 61850 client                                             |
+| `so`                     | 5000, WebSocket 8765                 | RTI-SO - IEC 61850 client                                             |
 | `io`                     | 9000                                 | IO device control API                                                 |
-| HMI                      | 3000 (`npm run dev`) / 3001 (Docker) | Web-based HMI                                                         |
+| HMI                      | 8080 (`npm run dev` and Docker)      | Web-based HMI                                                         |
 | `keycloak` (Docker only) | 8081 / 8443                          | IDP-Server for OAuth - see [Keycloak](#keycloak-idp-server-for-oauth) |
 
 ## Access URLs
 
-- BFF: http://localhost:5000/api/health
+- BFF: http://localhost:3000/api/health
 - FSP: http://localhost:5001/api/status
-- SO: http://localhost:5002/api/status
+- SO: http://localhost:5000/api/status
 - IO: http://localhost:9000/api/io/health
-- HMI: http://localhost:3000 (`npm run dev`) or http://localhost:3001 (Docker)
+- HMI: http://localhost:8080
 
 ## Common Commands
 
@@ -156,6 +156,17 @@ persistent.
 ```shell
 python launch.py --docker       # uses the same RTI_IMAGE_REPO / RTI_IMAGE_TAG
 ```
+
+### Upgrading from the old ports
+
+The defaults changed: HMI 3000/3001 -> 8080, BFF 5000 -> 3000, SO 5002 -> 5000, IO 8000/8080 -> 9000 (Keycloak
+HTTP 8080 -> 8081).
+
+- A browser that saved a BFF address on the HMI's Settings page keeps it - and port 5000 is now the SO. Set the BFF
+  port to 3000 there, or clear the site data.
+- The BFF copies its seed connections only on first start, so an existing `bff-config` volume still has the SO on
+  5002. Edit the SO connection's port to 5000 on the Connections page, or reset the volume:
+  `docker compose down && docker volume rm rti-demo_bff-config && docker compose up -d`.
 
 ### Keycloak (IDP-Server) for OAuth
 

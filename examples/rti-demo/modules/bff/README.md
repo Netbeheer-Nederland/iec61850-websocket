@@ -139,7 +139,7 @@ When HMI calls /api/reconfig-oauth, BFF automatically enriches request with OAut
 
 ### 1. bff_server.py (Main Application)
 - Framework: FastAPI with async support
-- Port: 5000 (default)
+- Port: 3000 (default)
 - Route groups: Health, Endpoints, Connections, Data, Operate, Execute, Reports, Stats
 
 ### 2. connection_manager.py
@@ -269,7 +269,7 @@ Multi-stage Docker build (context: repo root) with:
 
 The BFF service in docker-compose.yml:
 - Container: rti-bff
-- Port: 5000:5000
+- Port: 3000:3000
 - Network: rti-network
 - Volumes: `bff-config` at `/config` (connections.json and saved playbooks), `./playbooks` read-only (built-in playbooks), `testing/certs` read-only at `/certs` (TLS certificates, see the rti-demo README's *TLS certificates*)
 - Depends on: Healthy rti-bff for HMI
@@ -296,12 +296,12 @@ uv run --package bff python -m bff.bff_server
 
 ### Health Check
 ```bash
-curl http://localhost:5000/api/health
+curl http://localhost:3000/api/health
 ```
 
 ### Dynamic Execution
 ```bash
-curl -X POST http://localhost:5000/api/execute \
+curl -X POST http://localhost:3000/api/execute \
   -H "Content-Type: application/json" \
   -d '{"target": "127.0.0.1:5001", "method": "POST", "path": "/api/readvalue", "body": {"objRef": "LD0/LLN0$ST$Mod"}}'
 ```
@@ -309,14 +309,14 @@ curl -X POST http://localhost:5000/api/execute \
 ### Managing Connections
 ```bash
 # Create
-curl -X POST http://localhost:5000/api/add-connection \
+curl -X POST http://localhost:3000/api/add-connection \
   -d '{"name": "my-fsp", "host": "192.168.1.100", "port": 5001, "type": "RTI-FSP", "acsi": "server", "ws_mode": "active"}'
 
 # List
-curl http://localhost:5000/api/connections
+curl http://localhost:3000/api/connections
 
 # Delete
-curl -X DELETE http://localhost:5000/api/delete-connection/my-fsp
+curl -X DELETE http://localhost:3000/api/delete-connection/my-fsp
 ```
 
 ---
@@ -343,6 +343,6 @@ The BFF folder provides a critical middleware layer that:
 - Proxies requests through unified REST API
 
 Built on FastAPI (Python), it communicates with:
-- Frontend: React HMI via HTTP REST (port 5000)
-- Backend: RTI-FSP and RTI-SO via HTTP/REST (ports 5001, 5002, etc.)
+- Frontend: React HMI via HTTP REST (port 3000)
+- Backend: RTI-SO and RTI-FSP via HTTP/REST (ports 5000, 5001, etc.)
 - Identity: Keycloak via OAuth 2.0 (port 8443)

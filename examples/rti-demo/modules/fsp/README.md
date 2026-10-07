@@ -261,7 +261,7 @@ curl -X POST http://localhost:5001/api/io-plugin/disconnect
 
 | Issue | Solution |
 |-------|----------|
-| **Port 5001 in use** | Use different port: `PORT=5002 uv run --package fsp python -m fsp.bff_endpoint` |
+| **Port 5001 in use** | Use different port: `PORT=5011 uv run --package fsp python -m fsp.bff_endpoint` |
 | **Port 8765 in use** | Change WebSocket port in start request |
 | **Docker not found** | Install Docker Desktop and ensure it's running |
 | **Module not found** | Run `uv sync --all-packages` from repository root |

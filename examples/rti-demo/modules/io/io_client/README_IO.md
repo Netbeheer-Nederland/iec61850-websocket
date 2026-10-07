@@ -123,7 +123,7 @@ curl -X POST http://localhost:5001/api/io-plugin/connect \
 ```
 
 This downloads the `io_client` files from the IO server (`GET /api/io-plugin/files`), loads them, and adds the
-`/api/io/*` routes to the running service. Use port 5002 for the SO, and `http://rti-io:9000` as `server_url` in Docker. `server_url` defaults to the
+`/api/io/*` routes to the running service. Use port 5000 for the SO, and `http://rti-io:9000` as `server_url` in Docker. `server_url` defaults to the
 `IO_SERVER_URL` environment variable. If `IO_URL` is set, the loaded router configures its client from it; otherwise
 call `POST /api/io/connect` with `{"base_url": ...}`.
 
@@ -185,7 +185,7 @@ docker compose up -d rti-io
 
 ### ACSI Service (FSP / SO)
 
-FSP runs on port 5001 and SO on 5002. From the repository root:
+FSP runs on port 5001 and SO on 5000. From the repository root:
 
 ```bash
 uv run --package fsp python -m fsp.bff_endpoint

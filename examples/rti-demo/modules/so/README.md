@@ -29,7 +29,7 @@ The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication 
 |                  |     |                     |     |                  |
 |   External       |<--->|   bff_endpoint.py   |<--->|   acsi_client.py  |
 |   Client/API     |     |   (REST API)        |     |   (WebSocket)     |
-|   (Port 5002)    |     |   FastAPI           |     |   IEC 61850 Client|
+|   (Port 5000)    |     |   FastAPI           |     |   IEC 61850 Client|
 |                  |     |                     |     |   (Passive Mode)  |
 +------------------+     +----------+----------+     +----------+----------+
                                     |                        |
@@ -93,7 +93,7 @@ The core client implementation that handles:
 ### 2. bff_endpoint.py - REST API (Backend for Frontend)
 
 A **FastAPI** application that provides REST endpoints for managing the ACSI client. Acts as a bridge between HTTP clients and the WebSocket-based IEC 61850 client in passive mode. For complete API documentation, open the interactive OpenAPI docs that FastAPI serves at
-`http://localhost:5002/docs` while the service runs.
+`http://localhost:5000/docs` while the service runs.
 
 ---
 
@@ -118,17 +118,17 @@ needs `src/ws61850` (the core library) and the shared uv workspace lock.
 docker build -t netbeheer-nederland/iec61850-websocket/rti-so -f examples/rti-demo/modules/so/docker/Dockerfile .
 
 # Run the container
-docker run --rm -p 5002:5002 netbeheer-nederland/iec61850-websocket/rti-so
+docker run --rm -p 5000:5000 netbeheer-nederland/iec61850-websocket/rti-so
 
 # With custom network (for multi-container setup)
 docker network create rti-network
-docker run --rm -p 5002:5002 --network rti-network --name rti-so netbeheer-nederland/iec61850-websocket/rti-so
+docker run --rm -p 5000:5000 --network rti-network --name rti-so netbeheer-nederland/iec61850-websocket/rti-so
 ```
 
 #### API Health Check
 
 ```bash
-curl http://localhost:5002/api/iec61850client/status
+curl http://localhost:5000/api/iec61850client/status
 ```
 
 ### Option 2: Direct Python Execution (Without Docker)
@@ -147,21 +147,21 @@ uv sync --all-packages
 From repository root:
 
 ```bash
-# Default port (5002)
+# Default port (5000)
 uv run --package so python -m so.bff_endpoint
 
 # Custom port (Linux/macOS/WSL/Git Bash)
-PORT=5002 uv run --package so python -m so.bff_endpoint
+PORT=5000 uv run --package so python -m so.bff_endpoint
 
 # Custom port (Windows PowerShell)
-$env:PORT="5002"
+$env:PORT="5000"
 uv run --package so python -m so.bff_endpoint
 ```
 
 #### Health Check
 
 ```bash
-curl http://localhost:5002/api/iec61850client/status
+curl http://localhost:5000/api/iec61850client/status
 ```
 
 ---
@@ -176,9 +176,9 @@ fetched at startup.
 ### Connect to the IO service
 
 ```bash
-curl -X POST http://localhost:5002/api/io-plugin/connect \
+curl -X POST http://localhost:5000/api/io-plugin/connect \
   -H "Content-Type: application/json" \
-  -d '{"server_url": "http://localhost:9000", "acsi_url": "http://localhost:5002"}'
+  -d '{"server_url": "http://localhost:9000", "acsi_url": "http://localhost:5000"}'
 ```
 
 `server_url` defaults to `IO_SERVER_URL`. In Docker use `http://rti-io:9000`. The mapping between IO devices and IEC 61850 objects is
@@ -188,10 +188,10 @@ curl -X POST http://localhost:5002/api/io-plugin/connect \
 
 ```bash
 # Check connection
-curl http://localhost:5002/api/io-plugin/connection-status
+curl http://localhost:5000/api/io-plugin/connection-status
 
 # Disconnect
-curl -X POST http://localhost:5002/api/io-plugin/disconnect
+curl -X POST http://localhost:5000/api/io-plugin/disconnect
 ```
 
 ---
@@ -202,7 +202,7 @@ curl -X POST http://localhost:5002/api/io-plugin/disconnect
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | 5002 | REST API port |
+| `PORT` | 5000 | REST API port |
 | `IO_SERVER_URL` | `http://localhost:9000` | Default IO server for `/api/io-plugin/connect` |
 | `IO_URL` | None | Read by the loaded IO router: connects its IO client without a separate `/api/io/connect` |
 | `IO_PLUGIN_STORAGE` | `/app/io_plugin_dynamic` | Where the downloaded `io_client` files are kept |
@@ -255,7 +255,7 @@ See `examples/rti-demo/TESTING.md` for the other modules and the integration tes
 FSP connects to SO as a WebSocket client (SO in passive mode):
 
 ```
-SO (Server, Port 5002) <--HTTP--> External Clients
+SO (Server, Port 5000) <--HTTP--> External Clients
 SO (WS Server, Passive) <--WebSocket--> FSP (Client)
 ```
 
@@ -272,7 +272,7 @@ SO integrates with `demo_IO` to control physical IO devices through IEC 61850 ob
 |           |    |           |    |           |
 |  Client   +--->+   SO      +--->+   FSP     |
 |  (HTTP)   |    | (BFF)     |    | (Server)  |
-|           |    | Port 5002 |    | Port 5001 |
+|           |    | Port 5000 |    | Port 5001 |
 +-----------+    +-----+-----+    +-----+-----+
                   |                 |           |
                   +-----------------+           |

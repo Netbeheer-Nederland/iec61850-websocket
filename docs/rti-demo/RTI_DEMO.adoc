@@ -26,13 +26,13 @@ The RTI Demo implements a complete IEC 61850-based Real-Time Infrastructure with
 |===
 |Component |Type |ACSI Role |Default Port
 
-|HMI |Frontend |N/A |3001
+|HMI |Frontend |N/A |8080
 
-|BFF |Backend |N/A |5000
+|BFF |Backend |N/A |3000
 
 |FSP |Service |ACSI-Server |5001 (REST); WebSocket client of the SO
 
-|SO |Service |ACSI-Client |5002 (REST), 8765 (WebSocket server)
+|SO |Service |ACSI-Client |5000 (REST), 8765 (WebSocket server)
 
 |IO |Service |N/A |9000
 
@@ -50,11 +50,11 @@ image::RTI_Demo_System_Architecture_Overview.png[RTI Demo System Architecture Ov
 |===
 |From |To |Protocol |Port
 
-|HMI |BFF |HTTP/REST |5000
+|HMI |BFF |HTTP/REST |3000
 
 |BFF |FSP |HTTP/REST |5001
 
-|BFF |SO |HTTP/REST |5002
+|BFF |SO |HTTP/REST |5000
 
 |RTI-FSP/RTI-SO |IO |HTTP/REST |9000
 
@@ -98,11 +98,11 @@ Each component's README is its reference: run and test commands, configuration, 
 |===
 |From |To |Port |Content-Type
 
-|HMI |BFF |5000 |application/json
+|HMI |BFF |3000 |application/json
 
 |BFF |FSP |5001 |application/json
 
-|BFF |SO |5002 |application/json
+|BFF |SO |5000 |application/json
 
 |FSP/SO |IO |9000 |application/json
 
@@ -169,7 +169,7 @@ mapped to an IO device also updates that device (LED, LCD).
 
 === Read, write or operate through the SO
 
-HMI -> BFF -> SO (REST 5002) -> WebSocket (SO port 8765) -> FSP -> FSP's model, and the response back the same way.
+HMI -> BFF -> SO (REST 5000) -> WebSocket (SO port 8765) -> FSP -> FSP's model, and the response back the same way.
 Reports travel FSP -> SO over the same WebSocket.
 
 === Connection Management

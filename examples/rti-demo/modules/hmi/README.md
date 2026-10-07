@@ -23,14 +23,14 @@ services (RTI-SO and RTI-FSP). It talks only to the BFF (`examples/rti-demo/modu
 ```bash
 cd examples/rti-demo/modules/hmi
 npm install
-npm run dev          # development server on http://localhost:3000
+npm run dev          # development server on http://localhost:8080
 npm test             # unit tests (vitest)
 npm run build        # production build in dist/
 npm run preview      # serve the production build
 ```
 
 With Docker, `docker compose up -d rti-hmi` from `examples/rti-demo` serves the production build with nginx on
-http://localhost:3001 (`docker/Dockerfile`, `nginx.conf`).
+http://localhost:8080 (`docker/Dockerfile`, `nginx.conf`).
 
 ### BFF address
 
@@ -38,14 +38,15 @@ The HMI calls the BFF directly from the browser, so the address must be one the 
 address or host name, not a container name such as `rti-bff`). The first that is set wins:
 
 1. **Settings page** - saved per browser in localStorage; overrides everything below. Clear the site data to go back
-   to the configured default.
+   to the configured default. A browser that saved the old default (port 5000) now reaches the RTI-SO there: set the
+   BFF port to 3000 or clear the site data.
 2. **Runtime (Docker)** - `BFF_HOST` / `BFF_PORT` on the `rti-hmi` container. At start-up
    `docker/40-rti-config.sh` writes them to `/config.js`, so one image serves any setup. With
    `examples/rti-demo/docker-compose.yml`, set `HMI_BFF_HOST` / `HMI_BFF_PORT` in the shell or in
    `examples/rti-demo/.env`.
 3. **Build time** - `VITE_BFF_HOST` / `VITE_BFF_PORT`, baked into the bundle by Vite: in `modules/hmi/.env.local` for
    `npm run dev`, or as Docker build args (`--build-arg VITE_BFF_HOST=...`; compose passes them through).
-4. **Built-in** - `localhost:5000`.
+4. **Built-in** - `localhost:3000`.
 
 ```bash
 # development server against a BFF on another machine
@@ -53,7 +54,7 @@ echo 'VITE_BFF_HOST=192.168.100.10' > .env.local
 npm run dev
 
 # Docker: same image, address chosen when the container starts
-HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=5000 docker compose up -d rti-hmi
+HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 ```
 
 `src/config.js` resolves the default; `public/config.js` is the empty runtime configuration outside Docker.
@@ -244,7 +245,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=5000 docker compose up -d rti-hmi
 ```
 src/
 ├── App.jsx, main.jsx        # routes, connections state, live socket wiring
-├── config.js                # default BFF address (runtime config, VITE_BFF_*, localhost:5000)
+├── config.js                # default BFF address (runtime config, VITE_BFF_*, localhost:3000)
 ├── pages/                   # one component per route (see Pages)
 ├── components/              # shared UI: Tree, modals (Connection, TLS, OAuth, BRCB, Control, WriteValue),
 │                            # DataAccessPanel, MessageMonitor, ActionLogPanel, InstanceVisualization,
@@ -284,15 +285,15 @@ The HMI makes two kinds of call, both to the BFF:
    BRCB/URCB read and write, start and stop (FSP), actions and message logs, TLS and OAuth reconfiguration, and
    properties.
 
-The OpenAPI docs list every endpoint: BFF at http://localhost:5000/docs, FSP at http://localhost:5001/docs, SO at
-http://localhost:5002/docs.
+The OpenAPI docs list every endpoint: BFF at http://localhost:3000/docs, FSP at http://localhost:5001/docs, SO at
+http://localhost:5000/docs.
 
 `src/services/apiService.js` exports:
 
 - `executeApiCall(apiId, targetValue, bodyOverride, options)` - run an `API_DEFINITIONS` entry through `/api/execute`
   (or directly, with `options.useDirect`)
 - `getApiById(id)` - look up an `API_DEFINITIONS` entry
-- `getBffBaseUrl()` - BFF URL from the Settings (localStorage), default `http://localhost:5000`
+- `getBffBaseUrl()` - BFF URL from the Settings (localStorage), default `http://localhost:3000`
 - `buildBffApiUrl(path, targetValue)` - full BFF URL for a path
 - `ensureBffHealthy()` - check that the BFF answers
 - `getAutoRefreshIntervalMs()` - polling interval from the Settings, default 5000 ms
