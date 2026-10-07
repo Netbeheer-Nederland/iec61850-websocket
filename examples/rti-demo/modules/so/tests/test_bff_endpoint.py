@@ -538,3 +538,17 @@ class TestOperateRoutePassesControlParameters:
         assert response.status_code == 400
         assert "orCat" in response.json()["error"]
         assert calls == []
+
+
+class TestHealthReportsItsPort:
+    """GET /api/health names the port the SO listens on (PORT, default 5000)."""
+
+    def test_default_port(self, app_client, monkeypatch):
+        monkeypatch.delenv("PORT", raising=False)
+        client, _ = app_client
+        assert client.get("/api/health").json()["server"]["port"] == 5000
+
+    def test_port_from_environment(self, app_client, monkeypatch):
+        monkeypatch.setenv("PORT", "5100")
+        client, _ = app_client
+        assert client.get("/api/health").json()["server"]["port"] == 5100

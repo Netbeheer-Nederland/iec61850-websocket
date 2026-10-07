@@ -31,6 +31,8 @@ function Connections({ settings, connections = [], loading = false, onReload }) 
   const [formData, setFormData] = useState({
     name: '',
     host: '',
+    // The instance's own REST port: 5000 is the RTI-SO's default (an
+    // RTI-FSP uses 5001).
     port: 5000,
     // Only meaningful for RTI-SO: the port its own WebSocket (Passive)
     // endpoint listens on, distinct from `port` above (that instance's

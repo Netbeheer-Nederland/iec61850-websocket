@@ -46,7 +46,7 @@ Usage:
 Services:
     bff:        Backend for Frontend Server (default: port 3000)
     fsp:        RTI-FSP (default: port 5001)
-    so:         RTI-SO (default: port 5002)
+    so:         RTI-SO (default: port 5000)
     io:         IO Device Control API (default: port 8000)
 
     Default: Running without arguments launches all services with --foreground -v
@@ -170,16 +170,16 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         service_type=ServiceType.SO,
         module="so.bff_endpoint",
         entry_point="modules/so/src/so/bff_endpoint.py",
-        default_port=5002,
+        default_port=5000,
         description="RTI-SO",
-        env_vars={"PORT": "5002"},
+        env_vars={"PORT": "5000"},
         docker_image=rti_image("so"),
         health_check_path="/api/status",
         labels={
             "rti.service": "rti-so",
             "rti.type": "RTI-SO",
             "rti.host": "rti-so",
-            "rti.port": "5002",
+            "rti.port": "5000",
         },
     ),
     ServiceType.IO: ServiceConfig(

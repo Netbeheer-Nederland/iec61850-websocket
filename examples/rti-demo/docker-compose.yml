@@ -146,7 +146,7 @@ services:
     container_name: rti-so
     hostname: rti-so
     ports:
-      - "5002:5002"
+      - "5000:5000"
       - "8765:8765"    # WebSocket port - MUST ADD
     # PORT/PYTHONUNBUFFERED and health check already set by the Dockerfile.
     networks:
@@ -155,7 +155,7 @@ services:
       - "rti.service=rti-so"
       - "rti.type=RTI-SO"
       - "rti.host=rti-so"
-      - "rti.port=5002"
+      - "rti.port=5000"
     volumes:
       # TLS certificates (testing/certs), referenced as file:<name>
       # (e.g. file:server.pem).

@@ -210,7 +210,7 @@ async def _bootstrap_io_client_after_connect(
     dict, but never raised - a bootstrap hiccup should not turn an
     otherwise-successful /io-plugin/connect into a failure response.
     """
-    self_port = os.getenv("PORT", "5003")
+    self_port = os.getenv("PORT", "5000")
     base = f"http://127.0.0.1:{self_port}"
     steps: dict[str, Any] = {}
 
@@ -1363,9 +1363,9 @@ class IoClientConnectRequest(BaseModel):
         json_schema_extra={"example": "http://localhost:8000"},
     )
     acsi_url: str = Field(
-        default="http://localhost:5002",
+        default="http://localhost:5000",
         description="URL of the IO server to connect to",
-        json_schema_extra={"example": "http://localhost:5002"},
+        json_schema_extra={"example": "http://localhost:5000"},
     )
     timeout: float = Field(
         default=10.0,
@@ -4001,7 +4001,11 @@ def create_bff_router(app: FastAPI) -> tuple[APIRouter, ACSIClient]:
             return {
                 "status": "ok",
                 "service": "SO",
-                "server": {"status": "ok", "host": "localhost", "port": 8080},
+                "server": {
+                    "status": "ok",
+                    "host": "localhost",
+                    "port": int(os.getenv("PORT", "5000")),
+                },
             }
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
@@ -4884,7 +4888,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--port",
         type=int,
-        default=int(os.getenv("PORT", "5003")),
+        default=int(os.getenv("PORT", "5000")),
         help="Port to listen on (default: %(default)s, env: PORT)",
     )
     parser.add_argument(

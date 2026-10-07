@@ -37,10 +37,10 @@
     },
     
     "so": {
-      "port": 5002,
+      "port": 5000,
       "docker": false,
       "env": {
-        "PORT": "5002",
+        "PORT": "5000",
         "LOG_LEVEL": "INFO"
       },
       "health_check_path": "/api/status",
@@ -48,7 +48,7 @@
         "rti.service": "rti-so",
         "rti.type": "RTI-SO",
         "rti.host": "rti-so",
-        "rti.port": "5002"
+        "rti.port": "5000"
       }
     },
     

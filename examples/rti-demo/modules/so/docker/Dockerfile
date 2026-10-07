@@ -45,7 +45,7 @@ FROM python:3.13-slim-bookworm AS runtime
 
 WORKDIR /app
 
-ARG APP_PORT=5002
+ARG APP_PORT=5000
 ARG HEALTH_PATH=/api/status
 
 ENV PYTHONUNBUFFERED=1 \
@@ -71,7 +71,7 @@ RUN chown app:app /app
 
 USER app
 
-EXPOSE 5002
+EXPOSE 5000
 
 # Shell form (not exec-array) so $PORT/$HEALTH_PATH expand at healthcheck
 # time against the runtime env, not the build-time ARG default - matters
