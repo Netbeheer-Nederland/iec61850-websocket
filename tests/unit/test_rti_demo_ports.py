@@ -28,6 +28,8 @@ EXPECTED_PORTS = {
     "io": 9000,
 }
 KEYCLOAK_HTTP_PORT = 8081
+# The SO's WebSocket server (passive endpoint) that the FSPs dial.
+SO_WS_PORT = 8765
 
 
 def _read(path: Path) -> str:
@@ -238,3 +240,12 @@ def test_keycloak_http_port():
     for path in _hmi_sources():
         for found in re.findall(r"keycloak:(\d+)", _read(path)):
             assert int(found) == port, f"{path.name}: keycloak:{found}"
+
+
+def test_so_websocket_port(compose):
+    port = SO_WS_PORT
+    assert f"{port}:{port}" in compose["rti-so"]["ports"]
+    seed = json.loads(_read(MODULES / "bff" / "src" / "bff" / "connections.json"))
+    [so] = [c for c in seed if c["type"] == "RTI-SO"]
+    # The demo playbook links an FSP to the SO at this port.
+    assert so.get("ws_port") == port

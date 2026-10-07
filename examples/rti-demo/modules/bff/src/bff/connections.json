@@ -4,6 +4,7 @@
     "name": "SO",
     "host": "192.168.178.33",
     "port": 5000,
+    "ws_port": 8765,
     "type": "RTI-SO",
     "acsi": "client",
     "ws_mode": "passive",
