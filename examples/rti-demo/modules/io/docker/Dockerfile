@@ -36,9 +36,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv && uv sync --frozen --no-dev
 
 # Copy application code
-COPY io_api_server/ /app/io/io_api_server/
+COPY rti_io/ /app/rti_io/
 # The IO plugin, served to the FSP and SO by GET /api/io-plugin/files.
-COPY io_client/ /app/io/io_client/
+COPY io_client/ /app/io_client/
 
 
 # ============================================================
@@ -102,4 +102,5 @@ EXPOSE 9000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:$PORT/api/io/health || exit 1
 
-CMD ["python", "-u", "io/io_api_server/main.py"]
+# Run as a module from /app, so rti_io is importable.
+CMD ["python", "-u", "-m", "rti_io.server.main"]

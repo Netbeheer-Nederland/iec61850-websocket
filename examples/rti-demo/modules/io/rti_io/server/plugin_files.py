@@ -40,12 +40,11 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
-# The plugin's files, next to this server: modules/io/io_client locally,
-# /app/io/io_client in the image.
-DEFAULT_PLUGIN_FILES_DIR = Path(__file__).resolve().parent.parent / "io_client"
+# The plugin's files: modules/io/io_client locally, /app/io_client in the image.
+DEFAULT_PLUGIN_FILES_DIR = Path(__file__).resolve().parents[2] / "io_client"
 
 
-def create_io_client_router() -> APIRouter:
+def create_plugin_files_router() -> APIRouter:
     """Create a FastAPI router for serving io_client files.
 
     This router provides endpoints for listing and downloading io_client files

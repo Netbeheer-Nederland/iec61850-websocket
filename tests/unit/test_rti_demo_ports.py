@@ -106,8 +106,8 @@ def test_io_dockerfile_port_and_health_check():
         ("bff/src/bff/bff_server.py", "bff"),
         ("so/src/so/bff_endpoint.py", "so"),
         ("fsp/src/fsp/bff_endpoint.py", "fsp"),
-        ("io/io_api_server/main.py", "io"),
-        ("io/io_api_server/api_endpoint.py", "io"),
+        ("io/rti_io/server/main.py", "io"),
+        ("io/rti_io/server/api_endpoint.py", "io"),
     ],
 )
 def test_code_default_port(path, role):

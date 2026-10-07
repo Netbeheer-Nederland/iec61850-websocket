@@ -36,11 +36,12 @@ from __future__ import annotations
 import logging
 import os
 
-from devices import ButtonConfig, DeviceType, LEDConfig, PotentiometerConfig
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from io_controller import IOController
 from pydantic import BaseModel, Field
+
+from .devices import ButtonConfig, DeviceType, LEDConfig, PotentiometerConfig
+from .io_controller import IOController
 
 logger = logging.getLogger(__name__)
 
@@ -310,9 +311,9 @@ def create_fastapi_app(io_controller: IOController | None = None) -> FastAPI:
     app.state.io_controller = io_controller
 
     # Include IO client file server router
-    from io_client_file_server import create_io_client_router
+    from .plugin_files import create_plugin_files_router
 
-    io_client_router = create_io_client_router()
+    io_client_router = create_plugin_files_router()
     app.include_router(io_client_router)
 
     return app
@@ -943,11 +944,11 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
     async def api_get_config(request: Request):
         """Get the full IO configuration."""
         try:
-            from io_config import _config_to_dict
-            from io_controller import (
+            from .io_config import _config_to_dict
+            from .io_controller import (
                 _device_mappings as global_mappings,
             )
-            from io_controller import (
+            from .io_controller import (
                 get_acsi_config,
             )
 
@@ -1034,7 +1035,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
 
             # Update device configurations if provided
             if "devices" in body:
-                from io_config import _dict_to_config
+                from .io_config import _dict_to_config
 
                 new_configs = body["devices"]
                 for device_dict in new_configs:
@@ -1048,7 +1049,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             # Update ACSI configuration if provided
             if "acsi_server" in body:
                 acsi_data = body["acsi_server"]
-                from io_controller import ACSIConfig, configure_acsi
+                from .io_controller import ACSIConfig, configure_acsi
 
                 acsi_config = ACSIConfig(
                     url=acsi_data.get("url", "http://localhost:5001"),
@@ -1058,16 +1059,16 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
 
             # Update mappings if provided
             if "mappings" in body:
-                from io_controller import _device_mappings as global_mappings
+                from .io_controller import _device_mappings as global_mappings
 
                 new_mappings = body["mappings"]
                 for device_name, mapping in new_mappings.items():
                     global_mappings[device_name] = mapping
 
             # Save full configuration to file
-            from io_config import get_config_path, save_full_config
-            from io_controller import _acsi_config
-            from io_controller import _device_mappings as global_mappings
+            from .io_config import get_config_path, save_full_config
+            from .io_controller import _acsi_config
+            from .io_controller import _device_mappings as global_mappings
 
             config_path = get_config_path()
             acsi_dict = (
@@ -1133,7 +1134,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         Returns:
             JSONResponse: {"ok": True, "device": str, "objRef": str, "fc": str}
         """
-        from io_controller import _device_mappings as global_mappings
+        from .io_controller import _device_mappings as global_mappings
 
         # Check if device exists
         if device_name not in io_controller.configs:
@@ -1145,8 +1146,8 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         global_mappings[device_name] = {"objRef": request.obj_ref, "fc": request.fc}
 
         # Persist mappings to file
-        from io_config import get_config_path, save_full_config
-        from io_controller import _acsi_config
+        from .io_config import get_config_path, save_full_config
+        from .io_controller import _acsi_config
 
         config_path = get_config_path()
         acsi_dict = (
@@ -1182,7 +1183,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
     )
     async def api_get_acsi_mappings(request: Request):
         """Get all device-to-ACSI mappings."""
-        from io_controller import _device_mappings as global_mappings
+        from .io_controller import _device_mappings as global_mappings
 
         return {
             "ok": True,
@@ -1203,7 +1204,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
     )
     async def api_get_acsi_mapping(device_name: str):
         """Get ACSI mapping for a specific device."""
-        from io_controller import get_device_mapping
+        from .io_controller import get_device_mapping
 
         mapping = get_device_mapping(device_name)
         if not mapping:
@@ -1227,7 +1228,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
     )
     async def api_remove_acsi_mapping(device_name: str):
         """Remove ACSI mapping for a specific device."""
-        from io_controller import _device_mappings as global_mappings
+        from .io_controller import _device_mappings as global_mappings
 
         if device_name not in global_mappings:
             raise HTTPException(
@@ -1252,8 +1253,8 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
     )
     async def api_configure_acsi(request: ACSIConfigRequest):
         """Configure ACSI server connection."""
-        from io_config import get_config_path, save_full_config
-        from io_controller import (
+        from .io_config import get_config_path, save_full_config
+        from .io_controller import (
             ACSIConfig,
             _device_mappings,
             configure_acsi,
@@ -1292,7 +1293,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
     )
     async def api_get_acsi_config(request: Request):
         """Get current ACSI server configuration."""
-        from io_controller import get_acsi_config
+        from .io_controller import get_acsi_config
 
         config = get_acsi_config()
         if not config:
@@ -1325,7 +1326,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
 
         Request body should be: {"mappings": {"device_name": {"objRef": "...", "fc": "...", "service": "writeValue"|"operate", "dataType": "BOOLEAN"|"INT32"|"FLOAT32"}, ...}}
         """
-        from io_controller import _device_mappings as global_mappings
+        from .io_controller import _device_mappings as global_mappings
 
         try:
             body = await request.json()
@@ -1339,8 +1340,8 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
                 global_mappings[device_name] = mapping
 
             # Persist mappings to file
-            from io_config import get_config_path, save_full_config
-            from io_controller import _acsi_config
+            from .io_config import get_config_path, save_full_config
+            from .io_controller import _acsi_config
 
             config_path = get_config_path()
             acsi_dict = (

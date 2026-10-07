@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 [project]
-name = "io"
+name = "rti-io"
 version = "0.1.0"
 description = "RTI Demo IO service (Raspberry Pi GPIO/I2C device control API)"
 readme = "README.md"

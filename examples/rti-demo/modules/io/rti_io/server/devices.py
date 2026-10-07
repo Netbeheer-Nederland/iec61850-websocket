@@ -29,7 +29,7 @@ All devices implement a common interface for read/write operations,
 allowing the IOController to manage them uniformly.
 
 Usage:
-    from devices import IODevice, LEDDevice, PotentiometerDevice, DeviceConfig
+    from rti_io.server.devices import IODevice, LEDDevice, PotentiometerDevice, DeviceConfig
 
     # Create a device config
     led_config = LEDConfig(name="led1", gpio_pin=17, initial_state=False)
@@ -563,7 +563,7 @@ class InputDevice(IODevice):
     def _notify_change(self, old_value: Any, new_value: Any) -> None:
         """Notify all registered callbacks of a value change."""
         # Sync to ACSI server if mapping exists
-        from io_controller import sync_device_to_acsi
+        from .io_controller import sync_device_to_acsi
 
         sync_device_to_acsi(self.config.name, new_value)
 

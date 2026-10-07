@@ -29,13 +29,13 @@ Supports:
 
 Usage:
     # Run with default port (9000)
-    python main.py
+    python -m rti_io.server.main      # from examples/rti-demo/modules/io
 
     # Run with custom port
-    PORT=9100 python main.py
+    PORT=9100 python -m rti_io.server.main
 
     # Use custom config file
-    IO_CONFIG_FILE=/path/to/io_config.json python main.py
+    IO_CONFIG_FILE=/path/to/io_config.json python -m rti_io.server.main
 """
 
 from __future__ import annotations
@@ -46,10 +46,11 @@ import os
 from pathlib import Path
 from typing import Any
 
-from api_endpoint import create_fastapi_app
-from devices import ButtonConfig, LEDConfig, PotentiometerConfig
 from fastapi import FastAPI
-from io_controller import ACSIConfig, IOController, configure_acsi
+
+from .api_endpoint import create_fastapi_app
+from .devices import ButtonConfig, LEDConfig, PotentiometerConfig
+from .io_controller import ACSIConfig, IOController, configure_acsi
 
 # Configure logging
 logging.basicConfig(
@@ -259,7 +260,7 @@ def main():
         logger.error(
             "Try using a different port by setting the PORT environment variable."
         )
-        logger.error("Example: PORT=8081 python main.py")
+        logger.error("Example: PORT=8081 python -m rti_io.server.main")
         raise
 
 

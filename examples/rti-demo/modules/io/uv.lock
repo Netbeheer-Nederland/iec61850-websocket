@@ -587,45 +587,6 @@ wheels = [
 ]
 
 [[package]]
-name = "io"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "adafruit-ads1x15" },
-    { name = "aiohttp" },
-    { name = "asn1tools" },
-    { name = "docker" },
-    { name = "fastapi" },
-    { name = "gpiod" },
-    { name = "gpiozero" },
-    { name = "httpx2" },
-    { name = "pyjwt" },
-    { name = "python-multipart" },
-    { name = "requests" },
-    { name = "smbus2" },
-    { name = "uvicorn" },
-    { name = "websockets" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "adafruit-ads1x15" },
-    { name = "aiohttp", specifier = ">=3.14.1" },
-    { name = "asn1tools", specifier = ">=0.167.0" },
-    { name = "docker", specifier = "==6.1.0" },
-    { name = "fastapi", specifier = ">=0.139.0" },
-    { name = "gpiod" },
-    { name = "gpiozero" },
-    { name = "httpx2", specifier = ">=2.13.0" },
-    { name = "pyjwt", specifier = ">=2.0.0,<3.0.0" },
-    { name = "python-multipart", specifier = ">=0.0.32" },
-    { name = "requests", specifier = "==2.31.0" },
-    { name = "smbus2" },
-    { name = "uvicorn", specifier = ">=0.51.0" },
-    { name = "websockets", specifier = ">=16.1" },
-]
-
-[[package]]
 name = "multidict"
 version = "6.9.1"
 source = { registry = "https://pypi.org/simple" }
@@ -973,6 +934,45 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9d/be/10918a2eac4ae9f02f6cfe6414b7a155ccd8f7f9d4380d62fd5b955065c3/requests-2.31.0.tar.gz", hash = "sha256:942c5a758f98d790eaed1a29cb6eefc7ffb0d1cf7af05c3d2791656dbd6ad1e1", size = 110794, upload-time = "2023-05-22T15:12:44.175Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/70/8e/0e2d847013cb52cd35b38c009bb167a1a26b2ce6cd6965bf26b47bc0bf44/requests-2.31.0-py3-none-any.whl", hash = "sha256:58cd2187c01e70e6e26505bca751777aa9f2ee0b7f4300988b709f44e013003f", size = 62574, upload-time = "2023-05-22T15:12:42.313Z" },
+]
+
+[[package]]
+name = "rti-io"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "adafruit-ads1x15" },
+    { name = "aiohttp" },
+    { name = "asn1tools" },
+    { name = "docker" },
+    { name = "fastapi" },
+    { name = "gpiod" },
+    { name = "gpiozero" },
+    { name = "httpx2" },
+    { name = "pyjwt" },
+    { name = "python-multipart" },
+    { name = "requests" },
+    { name = "smbus2" },
+    { name = "uvicorn" },
+    { name = "websockets" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "adafruit-ads1x15" },
+    { name = "aiohttp", specifier = ">=3.14.1" },
+    { name = "asn1tools", specifier = ">=0.167.0" },
+    { name = "docker", specifier = "==6.1.0" },
+    { name = "fastapi", specifier = ">=0.139.0" },
+    { name = "gpiod" },
+    { name = "gpiozero" },
+    { name = "httpx2", specifier = ">=2.13.0" },
+    { name = "pyjwt", specifier = ">=2.0.0,<3.0.0" },
+    { name = "python-multipart", specifier = ">=0.0.32" },
+    { name = "requests", specifier = "==2.31.0" },
+    { name = "smbus2" },
+    { name = "uvicorn", specifier = ">=0.51.0" },
+    { name = "websockets", specifier = ">=16.1" },
 ]
 
 [[package]]

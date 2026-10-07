@@ -51,3 +51,19 @@ def test_compose_and_launch_agree_on_the_type(launcher):
         assert labels["rti.type"] == config.labels["rti.type"], config.labels[
             "rti.service"
         ]
+
+
+def test_io_runs_as_a_module_from_modules_io(launcher):
+    module = importlib.import_module(type(launcher).__module__)
+    config = module.SERVICES[module.ServiceType.IO]
+    cmd, cwd = launcher._command_for(config)
+    assert cmd[-2:] == ["-m", "rti_io.server.main"]
+    assert cwd == LAUNCH_PY.parent / "modules" / "io"
+    assert (cwd / "rti_io" / "server" / "main.py").is_file()
+
+
+def test_bff_still_runs_its_script(launcher):
+    module = importlib.import_module(type(launcher).__module__)
+    cmd, cwd = launcher._command_for(module.SERVICES[module.ServiceType.BFF])
+    assert cmd[-1].endswith("modules/bff/src/bff/bff_server.py")
+    assert cwd == LAUNCH_PY.parent

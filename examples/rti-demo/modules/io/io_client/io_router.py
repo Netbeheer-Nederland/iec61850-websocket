@@ -386,7 +386,7 @@ def create_io_router() -> APIRouter:
             bool: True if callback was registered successfully
         """
         try:
-            from io_controller import get_io_controller
+            from rti_io.server.io_controller import get_io_controller
         except ImportError:
             # Only the IO server's own process has the controller.
             get_io_controller = None

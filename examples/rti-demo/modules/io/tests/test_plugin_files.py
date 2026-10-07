@@ -10,9 +10,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 IO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(IO / "io_api_server"))
+sys.path.insert(0, str(IO))
 
-from io_client_file_server import create_io_client_router  # noqa: E402
+from rti_io.server.plugin_files import create_plugin_files_router  # noqa: E402
 
 PLUGIN_FILES = {
     "__init__.py",
@@ -28,7 +28,7 @@ PLUGIN_FILES = {
 def client(monkeypatch):
     monkeypatch.delenv("IO_CLIENT_FILES_DIR", raising=False)
     app = FastAPI()
-    app.include_router(create_io_client_router())
+    app.include_router(create_plugin_files_router())
     return TestClient(app)
 
 

@@ -32,7 +32,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from devices import (
+from .devices import (
     ButtonConfig,
     DeviceConfig,
     DeviceType,

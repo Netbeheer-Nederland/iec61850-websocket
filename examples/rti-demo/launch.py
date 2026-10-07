@@ -185,8 +185,9 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
     ServiceType.IO: ServiceConfig(
         name="IO Device Control API",
         service_type=ServiceType.IO,
-        module="io.io_api_server.main",
-        entry_point="modules/io/io_api_server/main.py",
+        module="rti_io.server.main",
+        entry_point="modules/io/rti_io/server/main.py",
+        working_dir="modules/io",
         default_port=9000,
         description="IO Device Control API - REST API for Raspberry Pi IO devices",
         env_vars={"PORT": "9000"},
@@ -210,6 +211,23 @@ class RTILauncher:
         self.running_services: dict[ServiceType, subprocess.Popen] = {}
         self.service_ports: dict[ServiceType, int] = {}
         self.verbose = False
+
+    def _command_for(self, config: ServiceConfig) -> tuple[list[str], Path]:
+        """The command and working directory a service starts with.
+
+        A service with a working_dir runs as a module from there (python -m),
+        so its package is importable; the others run their entry-point file.
+        """
+        if config.working_dir:
+            return (
+                [sys.executable, "-u", "-m", config.module],
+                self.base_dir / config.working_dir,
+            )
+        return [
+            sys.executable,
+            "-u",
+            str(self.base_dir / config.entry_point),
+        ], self.base_dir
 
     def parse_args(
         self, args: list[str] | None = None
@@ -411,8 +429,7 @@ class RTILauncher:
             logger.error(f"Entry point not found: {entry_path}")
             raise FileNotFoundError(f"Cannot find {config.entry_point}")
 
-        # Build command with -u for unbuffered output
-        cmd = [sys.executable, "-u", str(entry_path)]
+        cmd, cwd = self._command_for(config)
 
         # Add environment variables
         env = os.environ.copy()
@@ -421,13 +438,13 @@ class RTILauncher:
 
         logger.info(f"Starting {config.name} on port {config.default_port}")
         logger.info(f"  Command: {' '.join(cmd)}")
-        logger.info(f"  Working directory: {self.base_dir}")
+        logger.info(f"  Working directory: {cwd}")
 
         # Always capture both stdout and stderr
         # Use start_new_session to create process group (works on Windows and Unix)
         process = subprocess.Popen(
             cmd,
-            cwd=self.base_dir,
+            cwd=cwd,
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,  # Merge stderr into stdout

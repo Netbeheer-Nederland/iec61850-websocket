@@ -28,8 +28,8 @@ This module provides a unified interface for managing various IO devices:
 It uses the devices module for device-specific implementations.
 
 Usage:
-    from io_controller import IOController
-    from devices import LEDConfig, PotentiometerConfig, DeviceType
+    from rti_io.server.io_controller import IOController
+    from rti_io.server.devices import LEDConfig, PotentiometerConfig, DeviceType
 
     controller = IOController()
 
@@ -53,26 +53,14 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-# Handle both relative and absolute imports
-try:
-    from .devices import (
-        DeviceConfig,
-        DeviceDirection,
-        DeviceFactory,
-        DeviceType,
-        IODevice,
-        validate_device_config,
-    )
-except ImportError:
-    # Fallback to absolute import when running as standalone
-    from devices import (
-        DeviceConfig,
-        DeviceDirection,
-        DeviceFactory,
-        DeviceType,
-        IODevice,
-        validate_device_config,
-    )
+from .devices import (
+    DeviceConfig,
+    DeviceDirection,
+    DeviceFactory,
+    DeviceType,
+    IODevice,
+    validate_device_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -551,8 +539,8 @@ class IOController:
         Returns:
             True if saved successfully, False otherwise
         """
-        from io_config import get_config_path
-        from io_config import save_config as _save_config
+        from .io_config import get_config_path
+        from .io_config import save_config as _save_config
 
         save_path = path or get_config_path()
         return _save_config(self.configs, save_path)
@@ -567,8 +555,8 @@ class IOController:
         Returns:
             True if loaded successfully, False otherwise
         """
-        from io_config import get_config_path
-        from io_config import load_config as _load_config
+        from .io_config import get_config_path
+        from .io_config import load_config as _load_config
 
         load_path = path or get_config_path()
         configs = _load_config(load_path)
