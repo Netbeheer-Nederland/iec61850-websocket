@@ -51,7 +51,7 @@ import websockets
 
 pytestmark = pytest.mark.integration
 
-BFF_WS_URL = "ws://localhost:5000/ws"
+BFF_WS_URL = "ws://localhost:3000/ws"
 FSP_URL = "http://localhost:5001/api"
 SO_URL = "http://localhost:5002/api"
 WS_PORT = 8765

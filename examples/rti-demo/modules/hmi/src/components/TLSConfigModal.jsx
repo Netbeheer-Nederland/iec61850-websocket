@@ -20,6 +20,7 @@
 // TLSConfigModal.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRuntimeFlag } from '../hooks/useRuntimeFlag';
+import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from '../config';
 
 function parsePythonDictString(pythonStr) {
   if (!pythonStr || typeof pythonStr !== 'string') return pythonStr;
@@ -133,7 +134,7 @@ const TLSConfigModal = ({
   isOpen,
   onClose,
   connection,
-  bffBaseUrl = 'http://localhost:5000',
+  bffBaseUrl = `http://${DEFAULT_BFF_HOST}:${DEFAULT_BFF_PORT}`,
   onSuccess = () => {},
   onError = () => {}, 
   wsHost,   

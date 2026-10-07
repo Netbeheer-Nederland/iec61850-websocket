@@ -12,7 +12,7 @@
  *     starts (docker/40-rti-config.sh); empty outside Docker
  *  2. build time - VITE_BFF_HOST / VITE_BFF_PORT, baked in by Vite (an
  *     .env.local file for `npm run dev`, or Docker build args)
- *  3. localhost:5000
+ *  3. localhost:3000
  */
 const runtimeConfig =
   (typeof window !== 'undefined' && window.RTI_CONFIG) || {};
@@ -21,5 +21,5 @@ export const DEFAULT_BFF_HOST =
   runtimeConfig.bffHost || import.meta.env.VITE_BFF_HOST || 'localhost';
 
 export const DEFAULT_BFF_PORT = String(
-  runtimeConfig.bffPort || import.meta.env.VITE_BFF_PORT || '5000'
+  runtimeConfig.bffPort || import.meta.env.VITE_BFF_PORT || '3000'
 );

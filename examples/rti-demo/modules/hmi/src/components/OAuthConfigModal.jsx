@@ -21,6 +21,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { executeApiCall } from '../services/apiService';
 import { useRuntimeFlag } from '../hooks/useRuntimeFlag';
+import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from '../config';
 
 // Whether the instance at `target` (e.g. "rti-so:5002") has OAuth turned on
 // right now, per its own runtime GET /api/oauth-status.
@@ -75,7 +76,7 @@ const OAuthConfigModal = ({
   connections = [],
   target,
   runtimeBody = {},
-  bffBaseUrl = 'http://localhost:5000',
+  bffBaseUrl = `http://${DEFAULT_BFF_HOST}:${DEFAULT_BFF_PORT}`,
   onSuccess = () => {},
   onError = () => {},
 }) => {

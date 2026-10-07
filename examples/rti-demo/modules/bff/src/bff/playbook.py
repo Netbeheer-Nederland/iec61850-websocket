@@ -39,7 +39,7 @@ from typing import Any
 import requests
 import yaml
 
-DEFAULT_BFF = "http://localhost:5000"
+DEFAULT_BFF = "http://localhost:3000"
 
 ACTIONS = (
     "link",

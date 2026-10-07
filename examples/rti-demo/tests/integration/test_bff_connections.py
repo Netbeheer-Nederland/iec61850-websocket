@@ -17,7 +17,7 @@
 
 """Integration test for BFF connection management against live containers.
 
-Requires the rti-demo Docker Compose stack running (rti-bff on :5000,
+Requires the rti-demo Docker Compose stack running (rti-bff on :3000,
 rti-fsp on :5001, rti-so on :5002) - see TESTING.md's "Integration tests
 (Docker required)" section:
 
@@ -39,7 +39,7 @@ import requests
 
 pytestmark = pytest.mark.integration
 
-BFF_URL = "http://localhost:5000/api"
+BFF_URL = "http://localhost:3000/api"
 
 SO_NAME = "test-so-itest"
 FSP_NAME = "test-fsp-itest"

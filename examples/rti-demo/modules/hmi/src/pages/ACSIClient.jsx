@@ -32,10 +32,11 @@ import ActionLogPanel from '../components/ActionLogPanel.jsx';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
 import { subscribe as subscribeLive } from '../services/liveSocket';
 import { usePersistentFlag } from '../hooks/usePersistentFlag';
+import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from '../config';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
-const ACSIClient = ({ updateModel, bffBaseUrl = 'http://localhost:5000', connections: propConnections = [] }) => {
+const ACSIClient = ({ updateModel, bffBaseUrl = `http://${DEFAULT_BFF_HOST}:${DEFAULT_BFF_PORT}`, connections: propConnections = [] }) => {
   const location = useLocation();
   const endpoint = location.state?.endpoint;
   // Two distinct ports for an RTI-SO instance:

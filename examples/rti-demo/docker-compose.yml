@@ -19,7 +19,7 @@ services:
       dockerfile: examples/rti-demo/modules/bff/docker/Dockerfile
     container_name: rti-bff
     ports:
-      - "5000:5000"
+      - "3000:3000"
     environment:
       # PORT/PYTHONUNBUFFERED already set (matching defaults) by the
       # Dockerfile - only override what's actually different here.
@@ -42,7 +42,7 @@ services:
       - "rti.service=rti-bff"
       - "rti.type=RTI-BFF"
       - "rti.host=rti-bff"
-      - "rti.port=5000"
+      - "rti.port=3000"
 
   # HMI Web Server
   rti-hmi:
@@ -58,7 +58,7 @@ services:
     environment:
       # BFF address as the user's browser reaches it, applied when the
       # container starts (wins over the build args). Empty: the build args,
-      # else localhost:5000. See modules/hmi/README.md.
+      # else localhost:3000. See modules/hmi/README.md.
       - BFF_HOST=${HMI_BFF_HOST:-}
       - BFF_PORT=${HMI_BFF_PORT:-}
     ports:

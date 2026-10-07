@@ -4,7 +4,7 @@
   
   "services": {
     "bff": {
-      "port": 5000,
+      "port": 3000,
       "docker": false,
       "env": {
         "RTI_DOCKER_ENABLED": "true",
@@ -16,7 +16,7 @@
         "rti.service": "rti-bff",
         "rti.type": "RTI-BFF",
         "rti.host": "rti-bff",
-        "rti.port": "5000"
+        "rti.port": "3000"
       }
     },
     

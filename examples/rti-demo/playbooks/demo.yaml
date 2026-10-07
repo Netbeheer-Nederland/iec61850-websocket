@@ -11,7 +11,7 @@
 # Step reference: playbooks/README.md.
 
 name: SO with two FSPs
-bff: http://localhost:5000
+bff: http://localhost:3000
 pace: 2s            # pause between steps, for the audience (--pace 0 to skip)
 
 steps:

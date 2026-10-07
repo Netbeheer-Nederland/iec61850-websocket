@@ -44,7 +44,7 @@ Usage:
     python launch.py bff --help
 
 Services:
-    bff:        Backend for Frontend Server (default: port 5000)
+    bff:        Backend for Frontend Server (default: port 3000)
     fsp:        RTI-FSP (default: port 5001)
     so:         RTI-SO (default: port 5002)
     io:         IO Device Control API (default: port 8000)
@@ -119,16 +119,16 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         service_type=ServiceType.BFF,
         module="bff.bff_server",
         entry_point="modules/bff/src/bff/bff_server.py",
-        default_port=5000,
+        default_port=3000,
         description="Backend for Frontend - REST API gateway",
-        env_vars={"RTI_DOCKER_ENABLED": "true", "PORT": "5000"},
+        env_vars={"RTI_DOCKER_ENABLED": "true", "PORT": "3000"},
         docker_image=rti_image("bff"),
         health_check_path="/api/health",
         labels={
             "rti.service": "rti-bff",
             "rti.type": "RTI-BFF",
             "rti.host": "rti-bff",
-            "rti.port": "5000",
+            "rti.port": "3000",
         },
     ),
     ServiceType.FSP: ServiceConfig(
@@ -318,7 +318,7 @@ class RTILauncher:
                 "  # Launch all services explicitly",
                 "  python launch.py bff fsp so io",
                 "",
-                "  # Launch BFF server on port 5000",
+                "  # Launch BFF server on port 3000",
                 "  python launch.py bff",
                 "",
                 "  # Launch FSP ACSI-Server_WebsocketActive on custom port",

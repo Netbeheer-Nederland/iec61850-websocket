@@ -1932,7 +1932,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--port",
         type=int,
-        default=int(os.getenv("PORT", "5000")),
+        default=int(os.getenv("PORT", "3000")),
         help="Port to listen on (default: %(default)s, env: PORT)",
     )
     parser.add_argument(
