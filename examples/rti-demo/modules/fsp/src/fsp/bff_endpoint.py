@@ -444,6 +444,9 @@ def load_io_plugin_modules() -> bool:
         return False
 
     try:
+        # Start clean: a load without a clear first (enabling the plugin,
+        # startup) must run the files on disk, not cached submodules.
+        _drop_io_plugin_modules()
         spec = importlib.util.spec_from_file_location(
             IO_PLUGIN_PACKAGE,
             get_io_plugin_file_path("__init__.py"),

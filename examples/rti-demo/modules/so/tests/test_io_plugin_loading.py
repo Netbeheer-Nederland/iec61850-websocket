@@ -85,3 +85,11 @@ def test_files_endpoint_finds_every_required_file(plugin_dir):
     body = TestClient(app).get("/api/io-plugin/files").json()
     assert body["missing_files"] == []
     assert body["required_files_present"] is True
+
+
+def test_loading_again_without_a_clear_picks_up_changed_files(plugin_dir):
+    assert be.load_io_plugin_modules() is True
+    with (plugin_dir / "utils.py").open("a", encoding="utf-8") as f:
+        f.write("\n\ndef added_after_first_load():\n    return 'new'\n")
+    assert be.load_io_plugin_modules() is True
+    assert be._io_utils_module.added_after_first_load() == "new"
