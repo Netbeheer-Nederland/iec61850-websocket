@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "name": "Demo_Pi1",
+    "name": "SO",
     "host": "192.168.178.33",
     "port": 5002,
     "type": "RTI-SO",
@@ -33,7 +33,7 @@
   },
   {
     "id": 2,
-    "name": "demo_pi2",
+    "name": "FSP01",
     "host": "192.168.178.33",
     "port": 5001,
     "type": "RTI-FSP",
@@ -65,7 +65,7 @@
   },
   {
     "id": 3,
-    "name": "testFSP2",
+    "name": "FSP02",
     "host": "192.168.178.33",
     "port": 5005,
     "type": "RTI-FSP",
