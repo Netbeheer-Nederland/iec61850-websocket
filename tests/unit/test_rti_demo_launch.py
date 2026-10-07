@@ -3,6 +3,7 @@
 """examples/rti-demo/launch.py's options, as its README documents them."""
 
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 
@@ -67,3 +68,16 @@ def test_bff_still_runs_its_script(launcher):
     cmd, cwd = launcher._command_for(module.SERVICES[module.ServiceType.BFF])
     assert cmd[-1].endswith("modules/bff/src/bff/bff_server.py")
     assert cwd == LAUNCH_PY.parent
+
+
+def test_a_local_io_server_keeps_its_config_out_of_git(launcher):
+    module = importlib.import_module(type(launcher).__module__)
+    config = module.SERVICES[module.ServiceType.IO]
+    path = (
+        LAUNCH_PY.parent / config.working_dir / config.env_vars["IO_CONFIG_FILE"]
+    ).resolve()
+    assert path == (LAUNCH_PY.parent / "config" / "io_config.json").resolve()
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", str(path)], cwd=LAUNCH_PY.parent
+    ).returncode
+    assert ignored == 0, f"{path} is not git-ignored"

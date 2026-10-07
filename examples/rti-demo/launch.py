@@ -190,7 +190,9 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         working_dir="modules/io",
         default_port=9000,
         description="IO Device Control API - REST API for Raspberry Pi IO devices",
-        env_vars={"PORT": "9000"},
+        # Relative to working_dir: a git-ignored copy, seeded from the
+        # shipped rti_io/server/io_config.json, so saves leave that unchanged.
+        env_vars={"PORT": "9000", "IO_CONFIG_FILE": "../../config/io_config.json"},
         docker_image=rti_image("io"),
         health_check_path="/api/io/health",
         labels={

@@ -77,6 +77,7 @@ resources.txt
 # RTI Demo - local configuration and generated files
 examples/rti-demo/modules/bff/src/bff/playbooks/
 launch_config.json
+examples/rti-demo/config/io_config.json
 *.local.json
 *.pid
 *.bak

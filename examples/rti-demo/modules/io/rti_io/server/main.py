@@ -43,6 +43,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -93,6 +94,28 @@ def load_device_mappings(config_path: Path) -> dict[str, dict[str, Any]] | None:
     return None
 
 
+# The device configuration shipped with the server.
+SHIPPED_CONFIG = Path(__file__).parent / "io_config.json"
+
+
+def resolve_config_path() -> Path:
+    """The configuration file the server reads and saves to.
+
+    IO_CONFIG_FILE when set - seeded once from the shipped io_config.json if
+    it doesn't exist yet, so saves never change the shipped file - else the
+    shipped file itself.
+    """
+    configured = os.getenv("IO_CONFIG_FILE")
+    if not configured:
+        return SHIPPED_CONFIG
+    path = Path(configured)
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(SHIPPED_CONFIG, path)
+        logger.info(f"Seeded {path} from {SHIPPED_CONFIG}")
+    return path
+
+
 def create_app() -> FastAPI:
     """
     Create and configure the FastAPI application with pre-configured devices.
@@ -110,8 +133,8 @@ def create_app() -> FastAPI:
     # Create IO controller
     io_controller = IOController()
 
-    # Get config file path
-    config_path = Path(__file__).parent / "io_config.json"
+    # Get config file path (IO_CONFIG_FILE, else the shipped file)
+    config_path = resolve_config_path()
 
     # Try to load configuration from io_config.json
     config_loaded = io_controller.load_config(str(config_path))
