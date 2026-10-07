@@ -36,7 +36,7 @@ The RTI Demo implements a complete IEC 61850-based Real-Time Infrastructure with
 
 |IO |Service |N/A |9000
 
-|IDP Server |Service |N/A |8443 (HTTPS)
+|IDP Server (Keycloak) |Service |N/A |8081 (HTTP), 8443 (HTTPS)
 
 |===
 
@@ -60,9 +60,11 @@ image::RTI_Demo_System_Architecture_Overview.png[RTI Demo System Architecture Ov
 
 |IO |Physical Devices |Direct Hardware |GPIO, SPI (ADC), I2C (LCD)
 
-|HMI |IDP Server |OAuth 2.0 |8443 (HTTPS)
+|BFF |IDP Server |HTTP (discovery, health) |8081
 
-|BFF |IDP Server |OAuth 2.0 |8443 (HTTPS)
+|FSP |IDP Server |OAuth 2.0 token request |8081
+
+|SO |IDP Server |OAuth 2.0 signing keys (JWKS) |8081
 
 |===
 
@@ -110,11 +112,13 @@ Each component's README is its reference: run and test commands, configuration, 
 
 === OAuth 2.0
 
-- IDP Server: Keycloak
-- Port: 8443 (HTTPS)
-- Flow: HMI -> BFF (enriches) -> Backend (validates with IDP) -> IDP
-- Configuration: Per connection in connections.json
-- Fields: enable_oauth, idp_server, realm, token_endpoint, client_id, client_secret
+- IDP Server: Keycloak, on 8081 (HTTP) or 8443 (HTTPS); `scripts/keycloak`
+- Flow: the FSP requests a token from the IDP (client credentials) and sends it when it connects to the SO; the SO
+  checks it against the IDP's signing keys (JWKS) and token issuer
+- Settings: entered in the HMI, stored per connection in the BFF's connections.json; the BFF adds them to the calls it
+  forwards to the FSP and SO
+- Fields: enable_oauth, idp_server, realm, token_endpoint, certificate_endpoint, token_issuer, client_id,
+  client_secret, auth_server_ca, enable_token_refresh
 
 === TLS
 

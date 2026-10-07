@@ -4,18 +4,18 @@ SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# ACSI IO Client - Device Control via demo_IO
+# ACSI IO Client - Device Control via the IO server
 
-> In this document "ACSI" is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` / `so.bff_endpoint`) and "demo_IO"
-> is the `io` module's IO server. For running the whole stack, see `examples/rti-demo/README.md`.
+> In this document "ACSI" is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` / `so.bff_endpoint`) and the "IO
+> server" is the `io` module's `io_api_server`. For running the whole stack, see `examples/rti-demo/README.md`.
 
-This directory provides the ability for ACSI to connect to and control the demo_IO service's IO device functionality.
+This directory provides the ability for ACSI to connect to and control the IO server's IO device functionality.
 
 ## Overview
 
-The demo_IO service provides a REST API for controlling IO devices (LEDs, potentiometers, buttons) on a Raspberry Pi (or simulated devices for development). This integration allows ACSI to:
+The IO server provides a REST API for controlling IO devices (LEDs, potentiometers, buttons) on a Raspberry Pi (or simulated devices for development). This integration allows ACSI to:
 
-- Connect to a running demo_IO instance
+- Connect to a running IO server
 - Configure and manage IO devices (primarily LEDs)
 - Control individual or all devices (turn on/off, toggle)
 - Monitor device states and IO controller status
@@ -27,7 +27,7 @@ The demo_IO service provides a REST API for controlling IO devices (LEDs, potent
 
 ### 1. `async_client_io.py` - DemoIOClient & AsyncDemoIOClient
 
-A Python client library for communicating with the demo_IO service's REST API.
+A Python client library for communicating with the IO server's REST API.
 
 **Features:**
 - Full device control API (configure, read, write, toggle)
@@ -72,17 +72,17 @@ print(f"GPIO status: {status}")
 
 # Check health
 if client.is_healthy():
-    print("demo_IO is healthy")
+    print("IO server is healthy")
 ```
 
 ### 2. `io_router.py` - FastAPI IO Router
 
-A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying requests to demo_IO.
+A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying requests to the IO server.
 
 **Features:**
 - Automatic connection via `IO_URL` environment variable
 - Programmatic connection management via API endpoints
-- Full LED control through REST endpoints (proxied to demo_IO device API)
+- Full LED control through REST endpoints (proxied to the IO server device API)
 - Connection status monitoring
 - Health checks
 - IEC 61850 object mapping to IO devices
@@ -91,8 +91,8 @@ A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying 
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/io/connect` | Connect to demo_IO service |
-| GET | `/api/io/health` | Check demo_IO health |
+| POST | `/api/io/connect` | Connect to the IO server |
+| GET | `/api/io/health` | Check the IO server health |
 | GET | `/api/io/status` | Get IO controller status |
 | POST | `/api/io/leds/config` | Configure an LED (proxied to device API) |
 | GET | `/api/io/leds` | List all LEDs and states (proxied to device API) |
@@ -160,9 +160,9 @@ The client needs `httpx2`, which the `fsp` and `so` environments have: run it wi
 
 ## Configuration
 
-### demo_IO Service
+### IO server
 
-The demo_IO service is configured in `examples/rti-demo/modules/io/`.
+The IO server is configured in `examples/rti-demo/modules/io/`.
 
 **Default Configuration:**
 - Port: 9000, however it's started (`rti-io:9000` on
@@ -170,7 +170,7 @@ The demo_IO service is configured in `examples/rti-demo/modules/io/`.
 - Default LEDs: led1 (GPIO 17), led2 (GPIO 18), led3 (GPIO 22)
 - Health endpoint: `/api/io/health`
 
-**Starting demo_IO:**
+**Starting the IO server:**
 
 ```bash
 # With default port
@@ -243,7 +243,7 @@ curl -X POST http://localhost:5001/api/io/leds/all/set \
 # Get GPIO controller status
 curl http://localhost:5001/api/io/status
 
-# Check demo_IO health
+# Check the IO server health
 curl http://localhost:5001/api/io/health
 
 # Check connection status
@@ -279,7 +279,7 @@ python test_lcd_i2c.py     # the I2C LCD works
 
 ### Adding New IO Functionality
 
-1. **Extend DemoIOClient**: Add new methods to `async_client_io.py` for additional demo_IO API calls
+1. **Extend DemoIOClient**: Add new methods to `async_client_io.py` for additional IO server API calls
 2. **Add New Endpoints**: Add new routes to `io_router.py` to expose new functionality
 3. **Reload**: FSP and SO pick up changed files with `POST /api/io-plugin/reload` (or a new `/api/io-plugin/connect`)
 
@@ -287,9 +287,9 @@ python test_lcd_i2c.py     # the I2C LCD works
 
 ### Connection Issues
 
-**Error:** `demo_IO service is not responding`
+**Error:** the IO server doesn't respond
 
-- Check that demo_IO service is running
+- Check that the IO server is running
 - Verify the URL is correct (`http://localhost:9000`, or `http://rti-io:9000` from another container)
 - Check that the port is accessible (firewall, Docker networking)
 - Test with: `curl http://localhost:9000/api/io/health`
@@ -301,7 +301,7 @@ python test_lcd_i2c.py     # the I2C LCD works
 
 ### Port Conflicts
 
-- demo_IO uses port 9000
+- The IO server uses port 9000
 - ACSI uses port 5001 by default
 - Change ports using `PORT` environment variable
 
@@ -360,7 +360,7 @@ python test_lcd_i2c.py     # the I2C LCD works
 - Python 3.13+
 - FastAPI 0.100+
 - httpx2
-- demo_IO service (from examples/rti-demo/modules/io/)
+- The IO server (from examples/rti-demo/modules/io/)
 
 ## License
 

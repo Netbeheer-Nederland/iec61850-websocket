@@ -96,7 +96,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           cache-suffix: build
-      - run: uv build                    # -> dist/ws61850-<ver>.whl + .tar.gz
+      - run: uv build                    # -> dist/iec61850_websocket-<ver>.whl + .tar.gz
       - run: uvx twine check dist/*
       - uses: actions/upload-artifact@v7
         with:

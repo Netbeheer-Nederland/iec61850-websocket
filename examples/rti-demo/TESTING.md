@@ -59,9 +59,9 @@ normally with no `sys.path` hacks. (A bare `uv sync`, without
 use `--all-packages`, or `--package <name>` for just one module, to get
 `bff`/`fsp`/`so` installed too.)
 
-`demo_IO` (Raspberry Pi GPIO/I2C hardware packages) is deliberately **not**
+`io` (Raspberry Pi GPIO/I2C hardware packages) is deliberately **not**
 part of this workspace - it builds via its own fully independent
-Docker-stage venv (`modules/demo_io/docker/Dockerfile`), since its
+Docker-stage venv (`modules/io/docker/Dockerfile`), since its
 dependencies (`gpiozero`, `gpiod`, `Adafruit-ADS1x15`, ...) won't
 resolve/install on a non-Pi dev machine.
 
@@ -129,7 +129,7 @@ examples/rti-demo/modules/
 │   ├── src/so/bff_endpoint.py, acsi_client.py
 │   ├── docker/Dockerfile
 │   └── tests/test_bff_endpoint.py, test_acsi_client.py
-└── demo_io/   # not a workspace member - see above
+└── io/        # not a workspace member - see above
 ```
 
 `fsp` and `so` are each tested through a `fastapi.testclient.TestClient`

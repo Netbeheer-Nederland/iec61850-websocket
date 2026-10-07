@@ -18,7 +18,7 @@ The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication 
 - Reads data values from connected servers
 - Writes data values to connected servers
 - Manages multiple connections and communication points
-- Integrates with IO devices via `demo_IO` service
+- Integrates with IO devices via the IO service (`modules/io`)
 
 ### Architecture
 
@@ -35,7 +35,7 @@ The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication 
                                     |                        |
                                     v                        v
                             +--------------------+    +-------------------+
-                            |   Server Directory  |    |   demo_IO Client   |
+                            |   Server Directory  |    |   IO client        |
                             |   Navigation        |    |   (IO Integration) |
                             +--------------------+    +-------------------+
 ```
@@ -263,11 +263,11 @@ SO (Server, Port 5000) <--HTTP--> External Clients
 SO (WS Server, Passive) <--WebSocket--> FSP (Client)
 ```
 
-### With demo_IO
+### With the IO service
 
-SO integrates with `demo_IO` to control physical IO devices through IEC 61850 objects.
+SO integrates with the IO service to control physical IO devices through IEC 61850 objects.
 
-**Flow**: Write to IEC 61850 object -> SO sends to FSP -> FSP updates -> demo_IO controls physical device
+**Flow**: Write to IEC 61850 object -> SO sends to FSP -> FSP updates -> the IO service controls the physical device
 
 ### Typical Setup
 
@@ -285,7 +285,7 @@ SO integrates with `demo_IO` to control physical IO devices through IEC 61850 ob
                               +-----------+-----------+
                               | Physical Devices   |
                               +-----------+-----------+
-                                    (via demo_IO or direct)
+                                    (via the IO service or direct)
 ```
 
 ---

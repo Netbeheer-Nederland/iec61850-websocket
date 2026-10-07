@@ -302,10 +302,10 @@ cd iec61850-websocket
 # 2. Create the virtual environment and install all dependencies
 uv venv
 uv sync --all-packages
-
-# 3. Build the project wheel (needed by some tests)
-uv build
 ```
+
+Optionally, `uv build` builds the wheel and source archive into `dist/`. CI checks that the package builds; the tests
+and examples don't need it.
 
 UV creates a `.venv/` directory inside the project root. All `uv run` commands automatically activate it — you do
 not need to source it manually. `--all-packages` also installs the rti-demo's `bff`, `fsp` and `so` modules (members

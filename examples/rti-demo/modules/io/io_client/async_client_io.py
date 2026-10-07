@@ -1690,8 +1690,8 @@ class DemoIOClient:
     Note: This should only be used in synchronous contexts. For async applications,
     use AsyncIOClient directly.
 
-    Usage:
-        from demo_IO.io_client.async_client_io import DemoIOClient
+    Usage (with examples/rti-demo/modules/io/io_client on sys.path):
+        from async_client_io import DemoIOClient
 
         client = DemoIOClient(base_url="http://localhost:9000")
         # Use synchronous methods

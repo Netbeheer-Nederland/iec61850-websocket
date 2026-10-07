@@ -61,7 +61,7 @@ uv run python launch.py --help
 uv run python launch.py list
 
 # Launch with custom port
-uv run python launch.py bff --port 5005
+uv run python launch.py bff --port 3010
 
 # Disable foreground mode (run in background)
 uv run python launch.py --background
@@ -103,7 +103,6 @@ with the service name:
 [BFF Server] INFO: 127.0.0.1:35682 - "GET /docs HTTP/1.1" 200 OK
 [FSP ACSI-Server_WebsocketActive] Starting server on port 5001
 [SO ACSI-Client_WebsocketPassive] Connected to endpoint
-[Frontend] Serving HTTP on 0.0.0.0 port 8080
 ```
 
 To disable verbose logging: `uv run python launch.py --no-verbose`
@@ -318,7 +317,7 @@ rti-demo/
 │   ├── launch_config.json.example
 │   └── models/                # IED model files (model_1.py, model_2.py)
 ├── scripts/
-│   ├── set_docker_user.sh     # Detect/export host UID+GID for the demo_io build
+│   ├── set_docker_user.sh     # Detect/export host UID+GID for the io image build
 │   └── setup_raspberry_docker.sh  # Install Docker on a fresh Raspberry Pi
 └── modules/
     ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }
@@ -330,7 +329,7 @@ rti-demo/
 
 `bff`, `fsp` and `so` are members of a single uv workspace rooted at the
 repository root (alongside the `ws61850` core library at `src/`) - see
-`TESTING.md` for how to install/run them. `demo_io` and `hmi` build and
+`TESTING.md` for how to install/run them. `io` and `hmi` build and
 run independently (Pi hardware deps / npm toolchain respectively).
 
 ## Dependencies (uv)

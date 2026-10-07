@@ -17,7 +17,7 @@ The FSP directory implements a complete **IEC 61850 ACSI (Abstract Communication
 - Manages IED (Intelligent Electronic Device) models
 - Handles read/write operations on data objects
 - Supports dynamic model reloading
-- Integrates with IO devices via `demo_IO` service
+- Integrates with IO devices via the IO service (`modules/io`)
 
 ### Architecture
 
@@ -34,7 +34,7 @@ The FSP directory implements a complete **IEC 61850 ACSI (Abstract Communication
                                     |                        |
                                     v                        v
                             +--------------------+    +-------------------+
-                            |   model.py         |    |   demo_IO Client   |
+                            |   model.py         |    |   IO client        |
                             |   (IED Model)      |    |   (IO Integration) |
                             +--------------------+    +-------------------+
 ```
@@ -100,7 +100,7 @@ A **FastAPI** application that provides REST endpoints for managing the ACSI Ser
 - **Model operations** (read values, write values, update model)
 - **Connection management** (list connections, status)
 - **Message/action logging** (view, clear logs)
-- **IO client integration** (connect to demo_IO service)
+- **IO client integration** (connect to the IO service)
 - **CORS support** for web-based clients
 - **Pydantic validation** for request bodies
 
@@ -287,11 +287,11 @@ curl http://localhost:5001/api/iec61850server/messages
 
 ## Integration
 
-### With demo_IO
+### With the IO service
 
-FSP integrates with `demo_IO` to control physical IO devices through IEC 61850 objects.
+FSP integrates with the IO service to control physical IO devices through IEC 61850 objects.
 
-**Flow**: Write to IEC 61850 object -> Mapped to IO device -> demo_IO controls physical device
+**Flow**: Write to IEC 61850 object -> Mapped to IO device -> the IO service controls the physical device
 
 ### With SO (Client)
 

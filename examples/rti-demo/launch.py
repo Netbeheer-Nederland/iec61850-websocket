@@ -32,7 +32,7 @@ Usage:
     uv run python launch.py io
 
     # Launch with custom port
-    uv run python launch.py bff --port 5005
+    uv run python launch.py bff --port 3010
     uv run python launch.py io --port 8081
 
     # Launch with console kept alive (default)

@@ -4,7 +4,7 @@ SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# demo_IO: Raspberry Pi IO Device Control - WebSocket and ACSI Services Integration
+# IO: Raspberry Pi IO Device Control - WebSocket and ACSI Services Integration
 
 This directory contains a complete **IO Device Control System** for Raspberry Pi, consisting of two main components:
 
@@ -13,7 +13,7 @@ This directory contains a complete **IO Device Control System** for Raspberry Pi
 
 ## Overview
 
-The demo_IO system enables remote control and monitoring of physical IO devices (LEDs, potentiometers, buttons, LCD displays) through:
+The IO service enables remote control and monitoring of physical IO devices (LEDs, potentiometers, buttons, LCD displays) through:
 
 - **Direct REST API** via the `io_api_server` service
 - **ACSI Integration** via the `io_client` library that proxies requests to the IO server
@@ -53,7 +53,7 @@ modules/io/
 │   └── io_config.json                  # Default device configurations
 │
 ├── io_client/                          # Connection and synchronization between IO server and RTI
-│   ├── async_client_io.py              # Async client for demo_IO API
+│   ├── async_client_io.py              # Async client for the IO server API
 │   ├── io_router.py                    # FastAPI router for ACSI BFF
 │   ├── io_utils.py                     # Utility functions
 │   ├── mapping_manager.py              # IEC 61850 to IO device mapping
@@ -124,11 +124,11 @@ The `io_client` directory provides connection and synchronization between the IO
 
 | Feature | Description |
 |---------|-------------|
-| **AsyncDemoIOClient** | Python client for demo_IO REST API |
-| **IO Router** | FastAPI router that proxies requests to demo_IO |
+| **AsyncDemoIOClient** | Python client for the IO server REST API |
+| **IO Router** | FastAPI router that proxies requests to the IO server |
 | **IEC 61850 Mapping** | Map IO devices to IEC 61850 data objects |
 | **Automatic Integration** | IO router auto-included in ACSI BFF |
-| **Connection Management** | Connect/disconnect from demo_IO via API |
+| **Connection Management** | Connect/disconnect from the IO server via API |
 | **Bulk Operations** | Control multiple devices at once |
 
 ### Architecture
@@ -136,19 +136,21 @@ The `io_client` directory provides connection and synchronization between the IO
 The `io_client` provides **two integration paths**:
 
 1. **Direct Client Usage**: Import and use `AsyncDemoIOClient` directly in your code
-2. **Router Proxy**: ACSI exposes IO endpoints that proxy to demo_IO via the IO router
+2. **Router Proxy**: ACSI exposes IO endpoints that proxy to the IO server via the IO router
 
 ### IO Router Endpoints
 
-All endpoints are proxied to the demo_IO server and provide connection management, device control, and IEC 61850 object mapping functionality.
+All endpoints are proxied to the IO server and provide connection management, device control, and IEC 61850 object mapping functionality.
 
 ### Direct Client Usage
 
 ```python
-from demo_IO.io_client.async_client_io import AsyncDemoIOClient
+import sys
+sys.path.insert(0, "examples/rti-demo/modules/io/io_client")  # the modules import each other by bare name
+from async_client_io import DemoIOClient
 
-# Create async client
-client = AsyncDemoIOClient(base_url="http://localhost:9000")
+# Synchronous client; AsyncDemoIOClient has the same methods as coroutines (await them)
+client = DemoIOClient(base_url="http://localhost:9000")
 
 # Configure an LED
 client.config_led(name="led1", gpio_pin=17, description="Status LED")
@@ -164,7 +166,7 @@ client.all_leds_off()
 
 # Check health
 if client.is_healthy():
-    print("demo_IO is healthy")
+    print("IO server is healthy")
 ```
 
 ### IEC 61850 Object Mapping
@@ -224,7 +226,7 @@ Defines mappings between IEC 61850 objects and IO devices:
 
 ## IEC 61850 Integration
 
-The demo_IO system integrates with IEC 61850 power system protocols through:
+The IO service integrates with IEC 61850 power system protocols through:
 
 1. **Object Mapping**: Map IO devices to IEC 61850 data objects (LD, LN, DO, DA)
 2. **BFF Endpoints**: Expose IO device states through ACSI's BFF
@@ -331,14 +333,14 @@ The default devices defined in `io_config.json` use the following GPIO configura
 | **MCP3008 not detected**               | Check SPI wiring, enable SPI in raspi-config                              |
 | **ADS1115 not detected**               | Check I2C wiring, enable I2C in raspi-config                              |
 | **LEDs not responding**                | Verify wiring (resistor +, GND -), check GPIO numbering                   |
-| **ACSI connection failed**             | Verify IO_URL, check demo_IO is running                                   |
+| **ACSI connection failed**             | Verify IO_URL, check the IO server is running                                   |
 | **Docker: `/dev/spidev0.0` not found** | Enable SPI in raspi-config, or remove SPI devices from docker-compose.yml |
 | **Docker: device passthrough errors**  | Verify device files exist on host, check device permissions               |
 
 ### Debug Commands
 
 ```bash
-# Check if demo_IO is running
+# Check if the IO server is running
 curl http://localhost:9000/api/io/health
 
 # Check if ACSI IO router is connected
@@ -421,7 +423,7 @@ Check the backpack's documentation for whether it needs 5V or 3.3V.
 
 ### Configure Docker User for Hardware Access
 
-The `rti-io` (demo_io) container runs as a configurable user with access to GPIO, I2C, and SPI groups. By default, the Dockerfile uses standard Raspberry Pi OS values for the `pi` user:
+The `rti-io` container runs as a configurable user with access to GPIO, I2C, and SPI groups. By default, the Dockerfile uses standard Raspberry Pi OS values for the `pi` user:
 
 - `pi` user: UID=1000, GID=1000
 - `gpio` group: GID=986
@@ -466,13 +468,13 @@ docker-compose up --build
 
 ### Docker: Device Passthrough Issues
 
-When running demo_IO in Docker, the `docker-compose.yml` file includes device passthrough for GPIO, I2C, and SPI devices. If you encounter the error:
+When running the IO service in Docker, the `docker-compose.yml` file includes device passthrough for GPIO, I2C, and SPI devices. If you encounter the error:
 
 ```
 Error response from daemon: error gathering device information while adding custom device "/dev/spidev0.0": no such file or directory
 ```
 
-This means the host system (Raspberry Pi) does not have the required device files. The demo_IO service in docker-compose.yml mounts the following devices by default:
+This means the host system (Raspberry Pi) does not have the required device files. The `rti-io` service in docker-compose.yml mounts the following devices by default:
 
 - **GPIO**: `/dev/gpiochip0`, `/dev/gpiochip4`, `/dev/gpiochip10-13`
 - **I2C**: `/dev/i2c-1`, `/dev/i2c-13`, `/dev/i2c-14`

@@ -111,7 +111,7 @@ iec61850-websocket/
 - **UV** - [Install UV](https://docs.astral.sh/uv/getting-started/installation/)
 - **Python 3.13** or newer (3.13 is pinned in `.python-version`; `uv python install 3.13` installs it) -
   [Download Python](https://www.python.org/downloads/), or use a package
-  manager like `apt`, `brew`, or `chocolatey`. including the libraries python3-dev, python3-bitstruct.
+  manager like `apt`, `brew`, or `chocolatey`. A system Python also needs its development headers (`python3-dev`).
 - **Git** - [Install Git](https://git-scm.com/downloads)
 - **Docker** - [Install Docker](https://docs.docker.com/get-docker/)
 - **Docker Compose** - [Install Docker Compose](https://docs.docker.com/compose/install/)
@@ -143,12 +143,10 @@ uv venv
 uv sync --all-packages
 ```
 
-```bash
-# 3. Build the project
-uv build
-```
+Optionally, `uv build` builds the `iec61850-websocket` wheel and source archive into `dist/` (CI checks that it builds; nothing
+else needs it).
 
-or for a more detailed setup see [docs/getting-started.md](docs/getting-started.md).
+For a more detailed setup see [docs/getting-started.md](docs/getting-started.md).
 
 ---
 
