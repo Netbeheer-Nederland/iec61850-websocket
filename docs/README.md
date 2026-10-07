@@ -33,6 +33,7 @@ docs/
 │  ├─ RTI_DEMO.adoc                       #   system overview: components, communication, data model, flows
 │  ├─ architecture/                       #   demo-setup architecture notes and whiteboard
 │  ├─ design/                             #   HMI style guide, log kinds, wireframe
+│  ├─ decisions/                          #   architecture decision records (why it is built this way)
 │  └─ images/                             #   architecture diagrams (also used by the module READMEs)
 ├─ scl/
 │  └─ rti_v1.0.scd                        # SCL file used for the PoC

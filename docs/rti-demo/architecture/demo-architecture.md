@@ -37,7 +37,8 @@ It contains for three docker container:
 | RTI-SO    | PassiveWebSocketConnector (WS server) | ACSI client         | `PassiveEndpoint` + `IEC61850Client` |
 | RTI-FSP   | ActiveWebSocketConnector (WS client)  | ACSI server         | `ActiveEndpoint` + `IEC61850Server`  |
 
-The BFF embeds the RTI-SO in the same Python process for M1. The Flask REST thread and the
+The BFF embeds the RTI-SO in the same Python process for M1 (since replaced by a separate SO service, see
+[decision 0002](../decisions/0002-five-separate-services.md)). The Flask REST thread and the
 asyncio event loop (RTI-SO) run concurrently; the REST endpoints surface IEC 61850 data to the
 HMI.
 
