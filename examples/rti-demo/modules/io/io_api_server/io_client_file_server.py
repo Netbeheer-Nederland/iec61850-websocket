@@ -32,12 +32,17 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
+
+# The plugin's files, next to this server: modules/io/io_client locally,
+# /app/io/io_client in the image.
+DEFAULT_PLUGIN_FILES_DIR = Path(__file__).resolve().parent.parent / "io_client"
 
 
 def create_io_client_router() -> APIRouter:
@@ -59,7 +64,9 @@ def create_io_client_router() -> APIRouter:
     )
 
     # Configuration for io_client files storage
-    io_client_files_dir = os.getenv("IO_CLIENT_FILES_DIR", "/app/io/io_client")
+    io_client_files_dir = os.getenv("IO_CLIENT_FILES_DIR") or str(
+        DEFAULT_PLUGIN_FILES_DIR
+    )
     io_client_version = os.getenv("IO_CLIENT_VERSION", "1.0.0")
 
     def ensure_io_client_files_dir() -> bool:

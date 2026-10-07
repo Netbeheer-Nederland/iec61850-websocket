@@ -37,6 +37,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy application code
 COPY io_api_server/ /app/io/io_api_server/
+# The IO plugin, served to the FSP and SO by GET /api/io-plugin/files.
+COPY io_client/ /app/io/io_client/
 
 
 # ============================================================
