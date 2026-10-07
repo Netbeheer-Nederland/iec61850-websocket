@@ -48,9 +48,9 @@ Each component's README is its reference: run and test commands, configuration, 
 | FSP | SO | WebSocket (ACSI) | 8765 |
 | FSP, SO | IO | HTTP/REST | 9000 |
 | IO | physical devices | direct hardware | GPIO, SPI (ADC), I2C (LCD) |
-| BFF | IDP server | HTTP (discovery, health) | 8081 |
-| FSP | IDP server | OAuth 2.0 token request | 8081 |
-| SO | IDP server | OAuth 2.0 signing keys (JWKS) | 8081 |
+| BFF | IDP server | discovery, health | 8081 (HTTP) or 8443 (HTTPS) |
+| FSP | IDP server | OAuth 2.0 token request | 8081 (HTTP) or 8443 (HTTPS) |
+| SO | IDP server | OAuth 2.0 signing keys (JWKS) | 8081 (HTTP) or 8443 (HTTPS) |
 
 All REST traffic is `application/json`.
 
@@ -63,7 +63,10 @@ All REST traffic is `application/json`.
 
 ### OAuth 2.0
 
-- IDP server: Keycloak, on 8081 (HTTP) or 8443 (HTTPS); see `scripts/keycloak`.
+- IDP server: Keycloak, on 8081 (HTTP) or 8443 (HTTPS); see `scripts/keycloak`. For HTTPS, Keycloak uses
+  `testing/certs/keycloak.pem`, which covers `keycloak`, `localhost` and `127.0.0.1`; set the connection's
+  `auth_server_ca` to the CA certificate (`ca.pem`), which the FSP and SO use to verify it. The BFF's discovery and
+  health calls don't verify the certificate.
 - Flow: the FSP requests a token from the IDP (client credentials) and sends it when it connects to the SO; the SO
   checks it against the IDP's signing keys (JWKS) and token issuer.
 - Settings: entered in the HMI, stored per connection in the BFF's `connections.json`; the BFF adds them to the calls
