@@ -50,8 +50,78 @@ html {
 }
 
 .sidebar-header {
+    position: relative;
     padding: 30px 24px;
     border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-toggle {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.sidebar-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--primary-light);
+}
+
+.sidebar-toggle:focus-visible {
+    outline: 2px solid var(--primary-light);
+    outline-offset: 2px;
+}
+
+/* Collapsed: an icon rail. Labels stay in the DOM for aria-label/title. */
+.sidebar {
+    transition: width 0.2s ease;
+}
+
+.sidebar.collapsed {
+    width: var(--sidebar-collapsed-width);
+}
+
+.sidebar.collapsed .sidebar-header {
+    padding: 56px 8px 16px;
+    text-align: center;
+}
+
+.sidebar.collapsed .logo {
+    justify-content: center;
+    margin-bottom: 0;
+}
+
+.sidebar.collapsed .logo span,
+.sidebar.collapsed .subtitle,
+.sidebar.collapsed .nav-item span,
+.sidebar.collapsed .sidebar-footer-item span {
+    display: none;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+}
+
+.sidebar.collapsed .sidebar-nav {
+    padding: 20px 8px;
+}
+
+.sidebar.collapsed .nav-item {
+    justify-content: center;
+    gap: 0;
+    padding: 14px 0;
 }
 
 .logo {
@@ -1261,6 +1331,7 @@ html {
     --bg-hover: #334155;
     --border-light: #475569;
     --sidebar-width: 280px;
+    --sidebar-collapsed-width: 72px;
     --header-height: 70px;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);

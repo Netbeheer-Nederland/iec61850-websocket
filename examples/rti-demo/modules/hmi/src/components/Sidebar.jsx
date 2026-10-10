@@ -17,10 +17,38 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
+// Whether the sidebar is collapsed to icons, remembered per browser.
+export const COLLAPSED_KEY = 'rti-hmi-sidebar-collapsed';
+
+function readCollapsed() {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function saveCollapsed(collapsed) {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, String(collapsed));
+  } catch {
+    // Storage blocked (private window, site data off): it just isn't remembered.
+  }
+}
+
 function Sidebar() {
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+
+  const toggle = () => {
+    setCollapsed((was) => {
+      saveCollapsed(!was);
+      return !was;
+    });
+  };
+
   const navItems = [
     { path: '/overview', icon: 'fa-diagram-project', label: 'Overview' },
     { path: '/connections', icon: 'fa-gear', label: 'Connections' },
@@ -32,13 +60,23 @@ function Sidebar() {
   ];
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
         <div className="logo">
           <i className="fas fa-network-wired"></i>
           <span>IEC 61850</span>
         </div>
         <p className="subtitle">RTI Demo UI</p>
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <i className={`fas ${collapsed ? 'fa-angles-right' : 'fa-angles-left'}`}></i>
+        </button>
       </div>
 
       <nav className="sidebar-nav">
@@ -49,6 +87,8 @@ function Sidebar() {
             className={({ isActive }) => 
               `nav-item ${isActive ? 'active' : ''}`
             }
+            aria-label={item.label}
+            title={collapsed ? item.label : undefined}
           >
             <i className={`fas ${item.icon}`}></i>
             <span>{item.label}</span>
