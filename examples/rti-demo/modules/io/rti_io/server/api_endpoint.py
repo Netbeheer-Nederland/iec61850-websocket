@@ -309,12 +309,6 @@ def create_fastapi_app(io_controller: IOController | None = None) -> FastAPI:
     # Store controller reference in app state
     app.state.io_controller = io_controller
 
-    # Include IO client file server router
-    from .plugin_files import create_plugin_files_router
-
-    io_client_router = create_plugin_files_router()
-    app.include_router(io_client_router)
-
     return app
 
 

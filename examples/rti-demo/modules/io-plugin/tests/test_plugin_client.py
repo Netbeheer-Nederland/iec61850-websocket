@@ -3,18 +3,13 @@
 """The IO plugin's client module."""
 
 import asyncio
-import sys
 from pathlib import Path
 
 import pytest
+from acsi_io_plugin import client as plugin_client
+from acsi_io_plugin import router as plugin_router
 
-IO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(IO))
-
-from rti_io.plugin import client as plugin_client  # noqa: E402
-from rti_io.plugin import router as plugin_router  # noqa: E402
-
-PLUGIN = IO / "rti_io" / "plugin"
+PLUGIN = Path(__file__).resolve().parents[1] / "src" / "acsi_io_plugin"
 
 pytestmark = pytest.mark.unit
 

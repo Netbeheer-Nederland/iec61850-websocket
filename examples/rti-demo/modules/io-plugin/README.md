@@ -6,12 +6,13 @@ SPDX-License-Identifier: Apache-2.0
 
 # IO plugin
 
-> The IO plugin is what the FSP and SO download from the IO server (`GET /api/io-plugin/files`) and load as the package
-> `acsi_io_plugin`, one of the plugins they can host (decision 0021; package `acsi_plugins`). In this document "ACSI" is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` /
-> `so.bff_endpoint`) and the "IO server" is `rti_io.server`. For running the whole stack, see
-> `examples/rti-demo/README.md`.
+> The IO plugin is the package `acsi_io_plugin` (distribution `acsi-io-plugin`), one of the plugins the FSP and SO
+> host (decision 0021; package `acsi_plugins`). It is installed with them, not downloaded (decision 0022). In this
+> document "ACSI" is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` / `so.bff_endpoint`) and the "IO server" is
+> `rti_io.server` (`modules/io`). For running the whole stack, see `examples/rti-demo/README.md`.
 
-This directory provides the ability for ACSI to connect to and control the IO server's IO device functionality.
+This package lets ACSI connect to and control the IO server's devices. It has no hardware dependencies: it talks to
+the IO server over HTTP.
 
 ## Overview
 
@@ -44,9 +45,7 @@ A Python client library for communicating with the IO server's REST API.
 **Usage (Synchronous):**
 
 ```python
-import sys
-sys.path.insert(0, "examples/rti-demo/modules/io")
-from rti_io.plugin.client import DemoIOClient
+from acsi_io_plugin.client import DemoIOClient
 
 # Create client
 client = DemoIOClient(base_url="http://localhost:9000")
@@ -78,9 +77,10 @@ if client.is_healthy():
 
 ### 2. `plugin.py` - RtiIoPlugin
 
-The plugin itself (`plugin.json` names it as the entry). When loaded it connects to the IO server: the one in its
-settings (`io_url`), else `IO_URL`, else the server it was downloaded from. It tells the IO server where to write input
-changes (`acsi_url`, else `ACSI_BASE_URL`). Then it shows what the FSP or SO tells it:
+The plugin itself, registered under the entry point group `acsi.plugins` as `io` (`pyproject.toml`). The FSP and SO
+start it when they start. It connects to the IO server in its settings (`io_url`), else `IO_URL`; without one it does
+nothing until `POST /api/plugins/io/connect`. It tells the IO server where to write input changes (`acsi_url`, else
+`ACSI_BASE_URL`). Then it shows what the FSP or SO tells it:
 
 | Event | FSP | SO |
 |---|---|---|
@@ -129,29 +129,37 @@ under `/api/plugins/io/`.
 | POST | `/api/plugins/io/cleanup` | Clean up IO resources |
 | POST | `/api/plugins/io/mappings/add` | Add IEC 61850 to device mapping |
 
-### 4. Integration with ACSI BFF
+### 4. `mapping.py` and `io_mapping.json`
 
-FSP and SO don't ship these files. They download them from the IO server and load them at runtime (see below).
+Which IO devices go with which IEC 61850 objects and events. The plugin reads and saves the file in its setting
+`mapping_file`, else `IO_MAPPING_FILE`; a file that doesn't exist yet is first copied from the shipped
+`io_mapping.json`, so a save never changes the shipped file. Without either, it uses the shipped file. `launch.py`
+gives each service its own, `config/plugins/<service>/io_mapping.json`.
 
 ## Quick Start
 
-### Load the IO plugin into the FSP or SO
+### Settings
+
+The FSP and SO depend on `acsi-io-plugin`, so the plugin is in their environment (`uv sync --all-packages`) and their
+images. It starts with them; set where it connects with environment variables, or with `PLUGINS`:
+
+| Setting | Environment variable | |
+|---|---|---|
+| `io_url` | `IO_URL` | The IO server, e.g. `http://localhost:9000` (`http://rti-io:9000` in Docker) |
+| `acsi_url` | `ACSI_BASE_URL` | This FSP or SO, where the IO server writes input changes |
+| `mapping_file` | `IO_MAPPING_FILE` | The `io_mapping.json` to read and save |
 
 ```bash
-curl -X POST http://localhost:5001/api/plugins \
-  -H "Content-Type: application/json" \
-  -d '{"name": "io", "source_url": "http://localhost:9000/api/io-plugin/files", "settings": {"acsi_url": "http://localhost:5001"}}'
+PLUGINS='[{"name": "io", "settings": {"io_url": "http://localhost:9000", "acsi_url": "http://localhost:5001"}}]' \
+  uv run --package fsp python -m fsp.bff_endpoint
 ```
 
-This downloads the IO plugin's files from the IO server (`plugin.json`, then each file it lists), loads them, connects
-to the IO server, and serves the routes under `/api/plugins/io/`. Use port 5000 for the SO. In Docker the source is
-`http://rti-io:9000/api/io-plugin/files`. The FSP or SO only downloads from a source in `PLUGIN_ALLOWED_SOURCES`
-(compose and `launch.py` set it to the IO server). The plugin is kept, and loaded again when the FSP or SO starts.
+`launch.py` and `docker-compose.yml` set `IO_URL` and `ACSI_BASE_URL` for every FSP and the SO.
 
 Then use the IO routes:
 
 ```bash
-# The plugin's status and health
+# The plugin's status ("source": "installed") and health
 curl http://localhost:5001/api/plugins/io
 curl http://localhost:5001/api/plugins/io/health
 
@@ -168,9 +176,7 @@ curl http://localhost:5001/api/plugins/io/leds
 ### Use the client directly
 
 ```python
-import sys
-sys.path.insert(0, "examples/rti-demo/modules/io")
-from rti_io.plugin.client import DemoIOClient
+from acsi_io_plugin.client import DemoIOClient
 
 client = DemoIOClient(base_url="http://localhost:9000")
 client.set_device("led1", state=True)
@@ -178,7 +184,7 @@ client.toggle_led("led2")
 state = client.get_led_state("led1")
 ```
 
-The client needs `httpx2`, which the `fsp` and `so` environments have: run it with `uv run --package fsp python ...`.
+Run it in the workspace: `uv run --package acsi-io-plugin python ...`.
 
 ## Configuration
 
@@ -276,9 +282,9 @@ curl http://localhost:5001/api/plugins
 
 ### Docker Compose Example
 
-`examples/rti-demo/docker-compose.yml` already wires this up: `rti-fsp01`, `rti-fsp02` and `rti-so` may download
-plugins from `http://rti-io:9000` (`PLUGIN_ALLOWED_SOURCES`), the FSPs get `IO_URL=http://rti-io:9000`, and all
-services share the external `rti-network`:
+`examples/rti-demo/docker-compose.yml` already wires this up: `rti-fsp01`, `rti-fsp02` and `rti-so` have the plugin
+in their image and get `IO_URL=http://rti-io:9000` and their own `ACSI_BASE_URL`, and all services share the external
+`rti-network`:
 
 ```bash
 docker network create rti-network 2>/dev/null || true
@@ -290,11 +296,11 @@ docker compose up -d rti-io rti-fsp01
 
 ### Testing
 
-The IO plugin's own tests, and the IO server's file serving, run with the fsp environment (it has FastAPI):
-`uv run --package fsp pytest examples/rti-demo/modules/io/tests -q` (`test_plugin_contract.py`: loading, routes and
-every event). How plugins are loaded is tested in `acsi_plugins`
+`uv run --package acsi-io-plugin pytest examples/rti-demo/modules/io-plugin/tests -q`: that it's installed
+(`test_installed.py`), its mapping file (`test_mapping_file.py`), its routes and every event
+(`test_plugin_contract.py`), and the client. How plugins are loaded is tested in `acsi_plugins`
 (`uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -q`). On a Raspberry Pi, a
-script checks the I2C LCD:
+script in the IO server checks the I2C LCD:
 
 ```bash
 cd examples/rti-demo/modules/io
@@ -305,8 +311,8 @@ python -m rti_io.server.lcd_i2c_check
 
 1. **Extend DemoIOClient**: Add new methods to `client.py` for additional IO server API calls
 2. **Add New Endpoints**: Add new routes to `router.py` to expose new functionality
-3. **New files**: list them in `plugin.json` (`files`); the FSP and SO download only what it lists
-4. **Reload**: FSP and SO download the files again with `POST /api/plugins/io/reload`
+3. **New files**: put them in `src/acsi_io_plugin/`; a data file also goes in `[tool.setuptools.package-data]`
+4. **Reload**: restart the FSP or SO (from source it runs the files in place; an image needs a rebuild)
 
 ## Troubleshooting
 
@@ -321,8 +327,9 @@ python -m rti_io.server.lcd_i2c_check
 
 **Error:** `Client not configured`
 
-- The plugin couldn't reach the IO server when it was loaded (see the FSP's or SO's log), or has no IO server
-- connect it with `POST /api/plugins/io/connect` and `{"base_url": ...}`, or reload it once the IO server runs
+- The plugin couldn't reach the IO server when it started (see the FSP's or SO's log), or has no IO server (`IO_URL`)
+- connect it with `POST /api/plugins/io/connect` and `{"base_url": ...}`, or `POST /api/plugins/io/reload` once the
+  IO server runs
 
 ### Port Conflicts
 
@@ -348,7 +355,6 @@ python -m rti_io.server.lcd_i2c_check
 #### LED Configuration
 - `config_led(name, gpio_pin, description="", initial_state=False)` - Configure an LED
 - `list_leds()` - List all LEDs and their states
-- `get_led_config(name)` - Get LED configuration
 
 #### LED Control
 - `get_led_state(name)` - Get LED state
@@ -366,21 +372,22 @@ python -m rti_io.server.lcd_i2c_check
 
 ## Files
 
-- `plugin.json` - the manifest: name, version, entry class, the files to download
+- `pyproject.toml` - the package, its dependencies and its entry point (`acsi.plugins`: `io`)
+- `src/acsi_io_plugin/`:
 - `plugin.py` - RtiIoPlugin, what the plugin does with each event
 - `client.py` - DemoIOClient & AsyncIOClient HTTP clients
 - `router.py` - FastAPI IO router, served under `/api/plugins/io/`
 - `mapping.py` - IEC 61850 object to IO device mapping (`io_mapping.json`)
 - `utils.py` - helpers (LED blink, LCD write) used by `plugin.py`
-- `io_mapping.json` - default mapping
-- `README.md` - This file
+- `io_mapping.json` - the shipped mapping
+- `tests/` - the plugin's tests
 
 ## Compatibility
 
 - Python 3.13+
 - FastAPI 0.100+
 - httpx2
-- The IO server (from examples/rti-demo/modules/io/)
+- The IO server of the same commit (examples/rti-demo/modules/io/): the plugin's version follows the FSP and SO
 
 ## License
 

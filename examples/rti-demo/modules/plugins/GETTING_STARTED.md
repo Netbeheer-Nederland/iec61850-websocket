@@ -114,7 +114,7 @@ starts.
 ## 4. See it react to the demo
 
 The events come when the FSP and SO talk to each other, so run the whole demo and allow your source in all of them;
-`launch.py` adds your `PLUGIN_ALLOWED_SOURCES` to its own (the IO server):
+`launch.py` passes your `PLUGIN_ALLOWED_SOURCES` on (it allows none of its own):
 
 ```bash
 cd examples/rti-demo

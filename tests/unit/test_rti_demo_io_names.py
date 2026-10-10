@@ -18,13 +18,11 @@ OLD_NAMES = [
     "IO-Device-Control",
     "GPIO-LED-Control",
 ]
-# Where an old name is the point: the decision record, and the server's list
-# of file names it answers with 410.
+# Where an old name is the point: the decision record, and the tests that
+# check the old names are gone.
 ALLOWED = {
     "docs/rti-demo/decisions/0018-io-module-names.md",
-    "examples/rti-demo/modules/io/rti_io/server/plugin_files.py",
-    "examples/rti-demo/modules/io/tests/test_plugin_files.py",
-    "examples/rti-demo/modules/io/tests/test_plugin_client.py",
+    "examples/rti-demo/modules/io-plugin/tests/test_plugin_client.py",
     "examples/rti-demo/modules/fsp/tests/test_io_plugin_loading.py",
     "examples/rti-demo/modules/so/tests/test_io_plugin_loading.py",
     "tests/unit/test_rti_demo_io_names.py",

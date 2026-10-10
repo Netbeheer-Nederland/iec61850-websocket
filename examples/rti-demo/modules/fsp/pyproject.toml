@@ -15,11 +15,13 @@ dependencies = [
     "python-multipart>=0.0.32",
     "iec61850-websocket",
     "acsi-plugins",
+    "acsi-io-plugin",
 ]
 
 [tool.uv.sources]
 iec61850-websocket = { workspace = true }
 acsi-plugins = { workspace = true }
+acsi-io-plugin = { workspace = true }
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]

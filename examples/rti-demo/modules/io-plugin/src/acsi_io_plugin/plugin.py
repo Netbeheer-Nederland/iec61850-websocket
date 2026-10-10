@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""The IO plugin on the plugin contract (decision 0021).
+"""The IO plugin on the plugin contract (decisions 0021, 0022).
 
 The FSP and SO tell it what happens (an association, an Operate, a write,
 a report); it shows that on the IO server's LEDs and LCDs, and passes writes
@@ -9,16 +9,19 @@ io_mapping.json; the names it uses there for events ("connected",
 "oper_rcv", ...) are the plugin's own.
 
 Settings (`POST /api/plugins` "settings", or PLUGINS):
-- io_url: the IO server (default: IO_URL, else the server the plugin came from);
+- io_url: the IO server (default: IO_URL); without one the plugin stays
+  idle until POST /api/plugins/io/connect;
 - acsi_url: where the IO server writes input device changes to, this FSP
-  or SO (default: ACSI_BASE_URL, else the router works it out).
+  or SO (default: ACSI_BASE_URL, else the router works it out);
+- mapping_file: the io_mapping.json it reads and saves to (default:
+  IO_MAPPING_FILE, else the one in this package), seeded from the shipped
+  one when it doesn't exist yet.
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
-from urllib.parse import urlsplit
 
 import httpx2 as httpx
 from acsi_plugins import (
@@ -36,16 +39,8 @@ from acsi_plugins import (
 from fastapi import APIRouter, FastAPI
 
 from . import router as io_router
+from .mapping import IOMappingManager, resolve_mapping_path
 from .utils import blink_led_task, sync_to_io_device, write_to_lcd
-
-
-def _origin(url: str | None) -> str | None:
-    if not url:
-        return None
-    parts = urlsplit(url)
-    if not parts.scheme or not parts.netloc:
-        return None
-    return f"{parts.scheme}://{parts.netloc}"
 
 
 class RtiIoPlugin(AcsiPlugin):
@@ -60,9 +55,11 @@ class RtiIoPlugin(AcsiPlugin):
 
     async def start(self, ctx: PluginContext) -> None:
         self.ctx = ctx
-        io_url = (
-            ctx.settings.get("io_url") or os.getenv("IO_URL") or _origin(ctx.source)
+        mapping_file = resolve_mapping_path(
+            ctx.settings.get("mapping_file") or os.getenv("IO_MAPPING_FILE")
         )
+        io_router.set_mapping_manager(IOMappingManager(mapping_file=str(mapping_file)))
+        io_url = ctx.settings.get("io_url") or os.getenv("IO_URL")
         if not io_url:
             ctx.logger.info(
                 "No IO server configured; connect with POST /api/plugins/io/connect"

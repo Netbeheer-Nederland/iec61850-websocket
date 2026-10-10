@@ -242,7 +242,7 @@ class InstallRequest(BaseModel):
         None,
         description="Where to download it from (<source_url>/plugin.json); "
         "leave out for a plugin installed with the image",
-        examples=["http://rti-io:9000/api/io-plugin/files"],
+        examples=["http://localhost:8099"],
     )
     settings: dict[str, Any] = Field(
         default_factory=dict, description="The plugin's own settings"

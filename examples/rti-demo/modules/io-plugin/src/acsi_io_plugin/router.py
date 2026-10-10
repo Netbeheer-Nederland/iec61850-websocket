@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Request
 from pydantic import BaseModel, Field
@@ -291,178 +291,6 @@ def create_io_router(prefix: str = "/api/io") -> APIRouter:
 
         return client
 
-    # ==================== Input Device Callback Registration ====================
-
-    def _create_io_to_iec_callback(
-        device_name: str,
-        obj_ref: str,
-        fc: str,
-        io_client: AsyncIOClient,
-        service: str = "writeValue",
-        data_type: str = "",
-    ):
-        """Create a callback function that writes IO device changes to IEC61850.
-
-        This wrapper binds device-specific context to the callback handler.
-
-        Args:
-            device_name: Name of the input device
-            obj_ref: IEC61850 object reference to write to
-            fc: Functional constraint
-            io_client: The async IO client instance
-            service: ACSI service type - "writeValue" or "operate" (default: "writeValue")
-            data_type: Data type for ACSI values (e.g., "BOOLEAN", "INT32", "FLOAT32")
-
-        Returns:
-            A callback function that accepts (old_value, new_value) parameters from device
-        """
-
-        async def callback(old_value: Any, new_value: Any):
-            logger.info(
-                f"Device {device_name}: {old_value} -> {new_value}, writing to {obj_ref}"
-            )
-            try:
-                if service == "writeValue":
-                    success = await io_client.write_to_iec61850(
-                        obj_ref, new_value, fc, data_type
-                    )
-                    if success:
-                        logger.info(
-                            f"Successfully wrote {device_name}={new_value} to {obj_ref}"
-                        )
-                    else:
-                        logger.warning(
-                            f"Failed to write {device_name}={new_value} to {obj_ref}"
-                        )
-                else:  # operate
-                    # For operate, use value_type parameter. If data_type is empty, use default "BOOLEAN"
-                    if data_type:
-                        success = await io_client.operate_to_iec61850(
-                            obj_ref, new_value, value_type=data_type
-                        )
-                    else:
-                        success = await io_client.operate_to_iec61850(
-                            obj_ref, new_value
-                        )
-                    if success:
-                        logger.info(
-                            f"Successfully operated {device_name}={new_value} to {obj_ref}"
-                        )
-                    else:
-                        logger.warning(
-                            f"Failed to operate {device_name}={new_value} to {obj_ref}"
-                        )
-            except Exception as e:
-                logger.error(f"Error writing {device_name} to {obj_ref}: {e}")
-
-        return callback
-
-    def _register_input_callback(
-        device_name: str,
-        obj_ref: str,
-        fc: str = "ST",
-        service: str = "writeValue",
-        data_type: str = "",
-    ) -> bool:
-        """Register callback for a specific input device to write to IEC61850.
-
-        When the input device value changes, it will write to the ACSI server's
-        IEC61850 model via the standard /api/writevalue endpoint.
-
-        NOTE: This only works when the IO server and the IO plugin are in the same
-        Python process. For separate services, use WebSocket/SSE or polling instead.
-
-        Args:
-            device_name: Name of the input device
-            obj_ref: IEC61850 object reference to write to
-            fc: Functional constraint (default: "ST")
-            service: ACSI service type - "writeValue" or "operate" (default: "writeValue")
-            data_type: Data type for ACSI values (e.g., "BOOLEAN", "INT32", "FLOAT32")
-
-        Returns:
-            bool: True if callback was registered successfully
-        """
-        try:
-            from rti_io.server.io_controller import get_io_controller
-        except ImportError:
-            # Only the IO server's own process has the controller.
-            get_io_controller = None
-
-        controller = get_io_controller() if get_io_controller else None
-        io_client = get_io_client()
-        if not controller or not io_client:
-            logger.warning(
-                "IO controller or client not available - input device callbacks require same-process operation"
-            )
-            return False
-
-        device = controller.devices.get(device_name)
-        if not device:
-            logger.warning(
-                f"Device '{device_name}' not found in local IO controller - "
-                f"device may be in a separate IO server process. "
-                f"Callback registration skipped for objRef: {obj_ref}"
-            )
-            return False
-
-        if not hasattr(device, "register_change_callback"):
-            logger.warning(f"Device '{device_name}' does not support change callbacks")
-            return False
-
-        # Clear existing callbacks for this device to avoid duplicates
-        if hasattr(device, "clear_change_callbacks"):
-            device.clear_change_callbacks()
-
-        # Create callback using the wrapper approach
-        io_to_iec_callback = _create_io_to_iec_callback(
-            device_name, obj_ref, fc, io_client, service, data_type
-        )
-        device.register_change_callback(io_to_iec_callback)
-        logger.info(
-            f"Registered IEC61850 callback: {device_name} -> {obj_ref} (service={service}, dataType={data_type})"
-        )
-        return True
-
-    def _register_all_input_callbacks():
-        """Register callbacks for all input devices with IEC61850 mappings.
-
-        Scans all mappings and registers callbacks for devices with direction=input.
-
-        NOTE: Callbacks only work when the IO server and the IO plugin are in the same
-        Python process. For separate services, you need to implement WebSocket/SSE
-        or polling for input device state changes.
-        """
-        manager = get_mapping_manager()
-        if not manager:
-            logger.warning("Mapping manager not available")
-            return
-
-        all_mappings = manager.get_all_mappings()
-        registered_count = 0
-        skipped_count = 0
-
-        for device_name, mapping in all_mappings.items():
-            if mapping.get("direction") == "input" and mapping.get("objRef"):
-                success = _register_input_callback(
-                    device_name,
-                    mapping["objRef"],
-                    mapping.get("fc", "ST"),
-                    mapping.get("service", "writeValue"),
-                    mapping.get("dataType", ""),
-                )
-                if success:
-                    registered_count += 1
-                else:
-                    skipped_count += 1
-
-        if registered_count > 0:
-            logger.info(f"Registered {registered_count} input device callback(s)")
-        if skipped_count > 0:
-            logger.warning(
-                f"Skipped {skipped_count} input device callback(s) - "
-                f"devices may be in separate IO server process"
-            )
-
     def _handle_io_error(func_name: str):
         """Decorator to handle IO server async client errors."""
 
@@ -562,9 +390,6 @@ def create_io_router(prefix: str = "/api/io") -> APIRouter:
                 )
 
             set_io_client(client)
-
-            # Register input callbacks after connecting
-            _register_all_input_callbacks()
 
             logger.info(
                 f"Connected to the IO server at {config.base_url} with ACSI URL: {acsi_base_url}"

@@ -6,7 +6,7 @@
 # {so,fsp,bff}/docker/Dockerfile). These COPY only:
 #   pyproject.toml, uv.lock (the shared uv workspace lock)
 #   src/ws61850
-#   examples/rti-demo/modules/{so,fsp,bff}/
+#   examples/rti-demo/modules/{so,fsp,bff,plugins,io-plugin}/
 # Everything else is noise in the context. io and hmi build with their
 # own narrower context (modules/io, modules/hmi) instead.
 

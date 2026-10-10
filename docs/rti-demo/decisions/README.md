@@ -32,5 +32,6 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0019](0019-io-server-serves-only-plugin-files.md) | The IO server serves only the IO plugin's own files | accepted |
 | [0020](0020-so-authorizes-tokens.md) | The SO checks what a token allows, not only that it's genuine | proposed |
 | [0021](0021-acsi-plugin-host.md) | The FSP and SO host several plugins, behind one plugin contract | proposed |
+| [0022](0022-io-plugin-own-package.md) | The IO plugin is its own package, installed with the FSP and SO | proposed |
 
 To add a decision, copy the layout of an existing record, take the next number, and add a line to this table.

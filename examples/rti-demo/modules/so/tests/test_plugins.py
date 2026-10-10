@@ -208,8 +208,11 @@ def app_client(monkeypatch, tmp_path):
         yield client
 
 
-def test_the_app_lists_its_plugins(app_client):
-    assert app_client.get("/api/plugins").json() == {"plugins": [], "failed": {}}
+def test_the_app_starts_the_installed_io_plugin(app_client):
+    # Installed with the SO, not downloaded (decision 0022).
+    body = app_client.get("/api/plugins").json()
+    assert [(p["name"], p["source"]) for p in body["plugins"]] == [("io", "installed")]
+    assert body["failed"] == {}
 
 
 @pytest.mark.parametrize(

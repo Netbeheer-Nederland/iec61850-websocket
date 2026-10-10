@@ -266,7 +266,7 @@ The `BFF_CONNECTIONS_FILE` env var overrides the path if you need a different lo
 
 On Raspberry Pis, the `io` service drives LEDs, LCDs, a button and two potentiometers, so the IEC 61850 exchange between
 RTI-FSP (ACSI server) and RTI-SO (ACSI client) becomes visible. It shows reporting, operate (control) and setpoints.
-FSP and SO each run their own `io` service and use the same mapping, `modules/io/rti_io/plugin/io_mapping.json`:
+FSP and SO each run their own `io` service and use the same mapping, `modules/io-plugin/src/acsi_io_plugin/io_mapping.json`:
 
 | Device         | Mapped to                                    | Shows / does                                                   |
 |----------------|----------------------------------------------|----------------------------------------------------------------|
@@ -286,8 +286,10 @@ Demo flow:
 3. Turn `pot1` on the FSP side: the new `TotW` value reaches the SO in the next report.
 4. Turn `pot2` on the SO side: the SO sends an operate on `WMaxSpt`, and `led2` on the FSP side shows that it arrived.
 
-FSP and SO load the IO plugin on request: install it in each one from its IO server with `POST /api/plugins` (see
-*Plugins* in [modules/fsp/README.md](modules/fsp/README.md)). After that it is kept, and loaded again when they start. To write a plugin of your own, start with
+FSP and SO have the IO plugin installed ([modules/io-plugin](modules/io-plugin/README.md)) and start it with them. It
+connects to the `io` service at `IO_URL`, which writes the button and potentiometers back to `ACSI_BASE_URL`;
+`launch.py` and compose set both, and on two Raspberry Pis each side points `IO_URL` at its own `io` service (see
+*Plugins* in [modules/fsp/README.md](modules/fsp/README.md)). To write a plugin of your own, start with
 [modules/plugins/GETTING_STARTED.md](modules/plugins/GETTING_STARTED.md).
 Wiring, pin numbers and the I2C LCD setup are in [modules/io/README.md](modules/io/README.md).
 
@@ -331,13 +333,15 @@ rti-demo/
     ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }
     ├── fsp/       { pyproject.toml, docker/Dockerfile, src/fsp/, tests/ }
     ├── so/        { pyproject.toml, docker/Dockerfile, src/so/, tests/ }
-    ├── io/        { pyproject.toml, docker/Dockerfile, rti_io/server/, rti_io/plugin/, tests/ }
+    ├── io/        { pyproject.toml, docker/Dockerfile, rti_io/server/, tests/ }  # the IO server
+    ├── io-plugin/ { pyproject.toml, src/acsi_io_plugin/, tests/ }  # the IO plugin, installed in the FSP and SO
+    ├── plugins/   { pyproject.toml, src/acsi_plugins/, samples/, tests/ }  # the plugin host
     └── hmi/       { package.json, docker/Dockerfile, src/ }  # Web HMI (React)
 ```
 
-`bff`, `fsp` and `so` are members of a single uv workspace rooted at the
-repository root (alongside the `ws61850` core library at `src/`) - see
-`TESTING.md` for how to install/run them. `io` and `hmi` build and
+`bff`, `fsp`, `so`, `plugins` and `io-plugin` are members of a single uv
+workspace rooted at the repository root (alongside the `ws61850` core
+library at `src/`) - see `TESTING.md` for how to install/run them. `io` and `hmi` build and
 run independently (Pi hardware deps / npm toolchain respectively).
 
 ## Dependencies (uv)

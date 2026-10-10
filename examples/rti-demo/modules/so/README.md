@@ -170,30 +170,25 @@ curl http://localhost:5000/api/iec61850client/status
 
 The SO hosts plugins: each links ACSI to another integration, for example the IO plugin to the LEDs, LCDs, buttons
 and potentiometers of the `io` service. The SO tells every plugin what happens (an association, a read, a write, an
-Operate answer, a report). The plugin code isn't part of this package: it is downloaded on request from an allowed
-source, or installed with the image. How plugins work, and how to write one:
+Operate answer, a report). A plugin is installed with the image, as the IO plugin is, or downloaded on request from an
+allowed source. How plugins work, and how to write one:
 [`modules/plugins/README.md`](../plugins/README.md) and decision
 [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.md).
 
-### Load the IO plugin
+### The IO plugin
 
-```bash
-curl -X POST http://localhost:5000/api/plugins \
-  -H "Content-Type: application/json" \
-  -d '{"name": "io", "source_url": "http://localhost:9000/api/io-plugin/files", "settings": {"acsi_url": "http://localhost:5000"}}'
-```
-
-In Docker use `http://rti-io:9000/api/io-plugin/files` and `http://rti-so:5000`. The mapping between IO devices and
-IEC 61850 objects is `io/rti_io/plugin/io_mapping.json`; see the *Hardware demo* section of
+The IO plugin (`acsi_io_plugin`, [`modules/io-plugin`](../io-plugin/README.md)) is installed with the SO: it starts
+with it and connects to the IO server at `IO_URL`, which writes input changes back to `ACSI_BASE_URL` (decision
+[0022](../../../../docs/rti-demo/decisions/0022-io-plugin-own-package.md)). `launch.py` and compose set both; in Docker
+they are `http://rti-io:9000` and `http://rti-so:5000`. Without `IO_URL` the plugin does nothing. The mapping between IO
+devices and IEC 61850 objects is `io-plugin/src/acsi_io_plugin/io_mapping.json`; see the *Hardware demo* section of
 `examples/rti-demo/README.md`.
 
 ```bash
 curl http://localhost:5000/api/plugins                     # loaded plugins and their health
 curl http://localhost:5000/api/plugins/io/leds             # the IO plugin's routes
-curl -X DELETE http://localhost:5000/api/plugins/io        # remove it
+curl -X POST http://localhost:5000/api/plugins/io/reload   # start it again, e.g. once the IO server runs
 ```
-
-A downloaded plugin is kept, and loaded again when the SO starts.
 
 ---
 
@@ -211,6 +206,8 @@ A downloaded plugin is kept, and loaded again when the SO starts.
 | `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs plugins may be downloaded from |
 | `PLUGINS` | none | JSON list of plugins to load at startup |
 | `IO_URL` | None | Read by the IO plugin: the IO server to connect to, when its settings don't name one |
+| `ACSI_BASE_URL` | None | Read by the IO plugin: this SO's address, where the IO server writes input changes |
+| `IO_MAPPING_FILE` | None | Read by the IO plugin: its `io_mapping.json` (seeded from the shipped one); else the shipped one |
 
 ### Connection Defaults
 

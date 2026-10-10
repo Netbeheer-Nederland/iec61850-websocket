@@ -36,7 +36,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv && uv sync --frozen --no-dev
 
 # Copy application code
-# The server and the IO plugin it serves (rti_io/plugin).
+# The server; the IO plugin is in modules/io-plugin (decision 0022).
 COPY rti_io/ /app/rti_io/
 
 

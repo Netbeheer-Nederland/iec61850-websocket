@@ -1,14 +1,14 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""The IO plugin on the plugin contract (decision 0021): loaded as acsi_io_plugin,
-its routes under /api/plugins/io/, and what it does with each event."""
+"""The IO plugin on the plugin contract (decision 0021): its routes under
+/api/plugins/io/, and what it does with each event."""
 
 import asyncio
 import json
-import sys
-from pathlib import Path
 
 import pytest
+from acsi_io_plugin import router as io_router
+from acsi_io_plugin.plugin import RtiIoPlugin
 from acsi_plugins import (
     Associated,
     OperateReceived,
@@ -18,14 +18,13 @@ from acsi_plugins import (
     ServerStopped,
     ValueRead,
     ValueWritten,
-    loader,
 )
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.unit
 
-PLUGIN = Path(__file__).resolve().parents[1] / "rti_io" / "plugin"
+VERSION = "2.0.0"
 
 
 class FakeIO:
@@ -55,18 +54,20 @@ class FakeIO:
 @pytest.fixture
 def io_plugin(monkeypatch):
     monkeypatch.delenv("IO_URL", raising=False)
-    plugin, manifest = loader.load("io", PLUGIN)
+    monkeypatch.delenv("IO_MAPPING_FILE", raising=False)
     fake = FakeIO()
-    sys.modules["acsi_io_plugin.router"].set_io_client(fake)
-    yield plugin, manifest, fake
-    loader.unload_modules("io")
+    # The router keeps its client and mapping in module state; put them back
+    # after each test.
+    monkeypatch.setattr(io_router._router_state, "io_client", fake)
+    monkeypatch.setattr(io_router._router_state, "mapping_manager", None)
+    return RtiIoPlugin(), fake
 
 
 async def started(io_plugin, role):
-    plugin, manifest, fake = io_plugin
+    plugin, fake = io_plugin
     host = PluginHost(role=role, event_timeout=10)
     host.bind_loop(asyncio.get_running_loop())
-    await host.add("io", plugin, version=manifest.version)
+    await host.add("io", plugin, version=VERSION)
     # start() gives the router a fresh client when it has an io_url; with
     # none it keeps whatever the router has, here the fake.
     return host, fake
@@ -81,25 +82,7 @@ def lcd(fake):
     return [c[2] for c in fake.calls if c[0] == "lcd" and c[1] == "lcd1"]
 
 
-# ==================== Manifest and loading ====================
-
-
-def test_the_manifest_names_every_plugin_file():
-    manifest = json.loads((PLUGIN / "plugin.json").read_text(encoding="utf-8"))
-    on_disk = sorted(
-        p.name
-        for p in PLUGIN.iterdir()
-        if p.suffix in (".py", ".json") and p.name != "plugin.json"
-    )
-    assert manifest["name"] == "io"
-    assert sorted(manifest["files"]) == on_disk
-
-
-def test_loads_as_acsi_io_plugin(io_plugin):
-    plugin, manifest, _ = io_plugin
-    assert type(plugin).__module__ == "acsi_io_plugin.plugin"
-    assert manifest.entry == "plugin:RtiIoPlugin"
-    assert "rti_io_plugin" not in sys.modules
+# ==================== Routes and start ====================
 
 
 async def test_its_routes_have_no_api_io_prefix(io_plugin):
@@ -111,32 +94,34 @@ async def test_its_routes_have_no_api_io_prefix(io_plugin):
 
 
 async def test_start_without_an_io_server_does_not_fail(io_plugin):
-    plugin, manifest, _ = io_plugin
+    plugin, _ = io_plugin
     host = PluginHost(role="fsp")
     await host.add(
         "io",
         plugin,
         settings={"io_url": "http://127.0.0.1:9"},
-        version=manifest.version,
+        version=VERSION,
     )
     assert host.names() == ["io"]
     await host.remove("io")
 
 
-def test_the_routes_are_reached_through_the_host(io_plugin, tmp_path):
+def test_the_service_starts_it_and_serves_its_routes(io_plugin, tmp_path):
     from acsi_plugins.web import PluginService, attach
 
-    plugin, manifest, _ = io_plugin
     service = PluginService(
         PluginHost(role="fsp"), storage=tmp_path, allowed_sources=[]
     )
     app = FastAPI(lifespan=service.lifespan)
     attach(app, service)
     with TestClient(app) as client:
-        client.portal.call(
-            lambda: service.host.add("io", plugin, version=manifest.version)
-        )
+        [entry] = client.get("/api/plugins").json()["plugins"]
         body = client.get("/api/plugins/io/mappings").json()
+    assert (entry["name"], entry["version"], entry["source"]) == (
+        "io",
+        VERSION,
+        "installed",
+    )
     assert "led1" in json.dumps(body)
 
 

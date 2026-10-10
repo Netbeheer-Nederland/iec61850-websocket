@@ -28,10 +28,30 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+SHIPPED_MAPPING = Path(__file__).parent / "io_mapping.json"
+
+
+def resolve_mapping_path(configured: str | None) -> Path:
+    """The mapping file the plugin reads and saves to (decision 0022).
+
+    `configured` when given - seeded once from the shipped io_mapping.json if
+    it doesn't exist yet, so saves never change the shipped file - else the
+    shipped file itself.
+    """
+    if not configured:
+        return SHIPPED_MAPPING
+    path = Path(configured)
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(SHIPPED_MAPPING, path)
+        logger.info(f"Seeded {path} from {SHIPPED_MAPPING}")
+    return path
 
 
 class IOMappingManager:

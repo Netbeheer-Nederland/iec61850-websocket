@@ -25,7 +25,7 @@ Perfect for use in async FastAPI applications or any async context.
 
 Usage:
     import asyncio
-    from rti_io.plugin.client import AsyncIOClient
+    from acsi_io_plugin.client import AsyncIOClient
 
     async def main():
         async with AsyncIOClient(base_url="http://localhost:9000") as client:
@@ -148,7 +148,7 @@ class AsyncIOClient:
     - Same interface as sync DemoIOClient
 
     Usage:
-        from rti_io.plugin.client import AsyncIOClient
+        from acsi_io_plugin.client import AsyncIOClient
 
         async with AsyncIOClient(base_url="http://localhost:9000") as client:
             await client.set_device("led1", True)
@@ -906,8 +906,8 @@ class DemoIOClient:
     Note: This should only be used in synchronous contexts. For async applications,
     use AsyncIOClient directly.
 
-    Usage (with examples/rti-demo/modules/io on sys.path):
-        from rti_io.plugin.client import DemoIOClient
+    Usage:
+        from acsi_io_plugin.client import DemoIOClient
 
         client = DemoIOClient(base_url="http://localhost:9000")
         # Use synchronous methods

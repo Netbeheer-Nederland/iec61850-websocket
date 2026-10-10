@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
+[project]
+name = "acsi-io-plugin"
+version = "2.0.0"
+description = "RTI Demo IO plugin: links the FSP and SO to the IO server's devices (decisions 0021, 0022)"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "acsi-plugins",
+    "fastapi>=0.139.0",
+    "httpx2>=2.13.0",
+    "pydantic>=2",
+]
+
+# The plugin host finds the plugin here (decision 0021, point 3).
+[project.entry-points."acsi.plugins"]
+io = "acsi_io_plugin.plugin:RtiIoPlugin"
+
+[tool.uv.sources]
+acsi-plugins = { workspace = true }
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+acsi_io_plugin = ["io_mapping.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "unit: fast, isolated unit tests (no Docker/network required)",
+]

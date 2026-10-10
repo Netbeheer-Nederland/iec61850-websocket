@@ -225,9 +225,11 @@ def app_client(model_dir, monkeypatch, tmp_path):
         yield client
 
 
-def test_the_app_lists_its_plugins(app_client):
+def test_the_app_starts_the_installed_io_plugin(app_client):
+    # Installed with the FSP, not downloaded (decision 0022).
     body = app_client.get("/api/plugins").json()
-    assert body == {"plugins": [], "failed": {}}
+    assert [(p["name"], p["source"]) for p in body["plugins"]] == [("io", "installed")]
+    assert body["failed"] == {}
 
 
 @pytest.mark.parametrize("path", ["/api/io/leds", "/api/io-plugin/connect"])

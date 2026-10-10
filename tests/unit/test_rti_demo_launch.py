@@ -89,16 +89,58 @@ def _launch_module():
     return sys.modules["rti_demo_launch"]
 
 
-def test_plugins_come_from_the_io_server_by_default(launcher, monkeypatch):
+def _config(launcher, role, port=None):
+    module = _launch_module()
+    return launcher._get_service_config(module.ServiceType(role), port)
+
+
+@pytest.mark.parametrize(
+    ("role", "port"), [("fsp", 5001), ("fsp2", 5005), ("so", 5000)]
+)
+def test_the_io_plugin_reaches_the_io_server_and_back(launcher, role, port):
+    # The IO plugin is installed and starts by itself (decision 0022).
+    env = _config(launcher, role).env_vars
+    assert env["IO_URL"] == "http://localhost:9000"
+    assert env["ACSI_BASE_URL"] == f"http://localhost:{port}"
+
+
+def test_each_service_keeps_its_io_mapping_out_of_git(launcher):
+    paths = {
+        role: (LAUNCH_PY.parent / _config(launcher, role).env_vars["IO_MAPPING_FILE"])
+        for role in ("fsp", "fsp2", "so")
+    }
+    assert (
+        paths["fsp"]
+        == LAUNCH_PY.parent / "config" / "plugins" / "fsp" / "io_mapping.json"
+    )
+    assert len(set(paths.values())) == 3
+    for path in paths.values():
+        ignored = subprocess.run(
+            ["git", "check-ignore", "-q", str(path)], cwd=LAUNCH_PY.parent
+        ).returncode
+        assert ignored == 0, f"{path} is not git-ignored"
+
+
+def test_another_port_is_where_the_io_server_writes_to(launcher):
+    assert _config(launcher, "so", 5010).env_vars["ACSI_BASE_URL"] == (
+        "http://localhost:5010"
+    )
+
+
+def test_in_docker_the_io_plugin_uses_the_container_names(launcher):
+    env = launcher._docker_env(_config(launcher, "fsp2"))
+    assert env["IO_URL"] == "http://rti-io:9000"
+    assert env["ACSI_BASE_URL"] == "http://rti-fsp2:5005"
+
+
+def test_no_plugin_is_downloaded_by_default(launcher, monkeypatch):
     monkeypatch.delenv("PLUGIN_ALLOWED_SOURCES", raising=False)
-    env = _launch_module()._plugin_env("fsp")
-    assert env["PLUGIN_ALLOWED_SOURCES"] == "http://localhost:9000,http://rti-io:9000"
+    env = _launch_module()._plugin_env("fsp", 5001)
+    assert env["PLUGIN_ALLOWED_SOURCES"] == ""
 
 
-def test_a_developer_s_plugin_sources_are_added(launcher, monkeypatch):
+def test_a_developer_s_plugin_sources_are_allowed(launcher, monkeypatch):
     # GETTING_STARTED.md: serve a plugin folder and allow it when launching.
     monkeypatch.setenv("PLUGIN_ALLOWED_SOURCES", "http://localhost:8099")
-    env = _launch_module()._plugin_env("so")
-    assert env["PLUGIN_ALLOWED_SOURCES"] == (
-        "http://localhost:9000,http://rti-io:9000,http://localhost:8099"
-    )
+    env = _launch_module()._plugin_env("so", 5000)
+    assert env["PLUGIN_ALLOWED_SOURCES"] == "http://localhost:8099"

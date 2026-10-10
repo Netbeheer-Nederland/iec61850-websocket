@@ -112,21 +112,32 @@ class ServiceConfig:
     labels: dict[str, str] = field(default_factory=dict)
 
 
-def _plugin_env(name: str) -> dict[str, str]:
-    """Plugin settings for an FSP or SO (decision 0021).
+def _plugin_env(name: str, port: int) -> dict[str, str]:
+    """Plugin settings for an FSP or SO (decisions 0021, 0022).
 
-    PLUGIN_STORAGE is relative to the working directory: examples/rti-demo
-    when run from source (git-ignored config/plugins/), /app in a container.
-    Plugins may be downloaded from the IO server, locally or on rti-network,
-    and from the sources in the caller's PLUGIN_ALLOWED_SOURCES (a plugin
-    under development, modules/plugins/GETTING_STARTED.md).
+    PLUGIN_STORAGE and IO_MAPPING_FILE are relative to the working
+    directory: examples/rti-demo when run from source (git-ignored
+    config/plugins/), /app in a container. The IO plugin is installed and
+    starts by itself: it reaches the IO server at IO_URL, which writes input
+    changes back to ACSI_BASE_URL. No plugin is downloaded unless the caller
+    allows a source in PLUGIN_ALLOWED_SOURCES (a plugin under development,
+    modules/plugins/GETTING_STARTED.md).
     """
-    allowed = "http://localhost:9000,http://rti-io:9000"
-    extra = os.environ.get("PLUGIN_ALLOWED_SOURCES", "").strip()
     return {
         "PLUGIN_STORAGE": f"config/plugins/{name}",
-        "PLUGIN_ALLOWED_SOURCES": f"{allowed},{extra}" if extra else allowed,
+        "PLUGIN_ALLOWED_SOURCES": os.environ.get("PLUGIN_ALLOWED_SOURCES", "").strip(),
+        "IO_URL": "http://localhost:9000",
+        "IO_MAPPING_FILE": f"config/plugins/{name}/io_mapping.json",
+        "ACSI_BASE_URL": f"http://localhost:{port}",
     }
+
+
+def _with_port(env_vars: dict[str, str], port: int) -> dict[str, str]:
+    """env_vars for a service started on another port."""
+    env = {**env_vars, "PORT": str(port)}
+    if "ACSI_BASE_URL" in env:
+        env["ACSI_BASE_URL"] = f"http://localhost:{port}"
+    return env
 
 
 # Service configurations
@@ -155,7 +166,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         entry_point="modules/fsp/src/fsp/bff_endpoint.py",
         default_port=5001,
         description="RTI-FSP",
-        env_vars={"PORT": "5001", "CP": "cp1", **_plugin_env("fsp")},
+        env_vars={"PORT": "5001", "CP": "cp1", **_plugin_env("fsp", 5001)},
         docker_image=rti_image("fsp"),
         health_check_path="/api/status",
         labels={
@@ -172,7 +183,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         entry_point="modules/fsp/src/fsp/bff_endpoint.py",
         default_port=5005,
         description="RTI-FSP (second instance)",
-        env_vars={"PORT": "5005", "CP": "cp2", **_plugin_env("fsp2")},
+        env_vars={"PORT": "5005", "CP": "cp2", **_plugin_env("fsp2", 5005)},
         docker_image=rti_image("fsp"),
         health_check_path="/api/status",
         labels={
@@ -189,7 +200,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         entry_point="modules/so/src/so/bff_endpoint.py",
         default_port=5000,
         description="RTI-SO",
-        env_vars={"PORT": "5000", **_plugin_env("so")},
+        env_vars={"PORT": "5000", **_plugin_env("so", 5000)},
         docker_image=rti_image("so"),
         health_check_path="/api/status",
         labels={
@@ -398,6 +409,20 @@ class RTILauncher:
 
         print("\n" + "=" * 80)
 
+    @staticmethod
+    def _docker_env(config: ServiceConfig) -> dict[str, str]:
+        """The service's environment in a container on rti-network, where the
+        others are reached by container name (rti-<type>), not localhost."""
+        env = dict(config.env_vars)
+        if "IO_URL" in env:
+            io_port = SERVICES[ServiceType.IO].default_port
+            env["IO_URL"] = f"http://rti-io:{io_port}"
+        if "ACSI_BASE_URL" in env:
+            env["ACSI_BASE_URL"] = (
+                f"http://rti-{config.service_type.value}:{config.default_port}"
+            )
+        return env
+
     def _get_service_config(
         self, svc_type: ServiceType, port: int | None = None
     ) -> ServiceConfig:
@@ -412,7 +437,7 @@ class RTILauncher:
                 entry_point=config.entry_point,
                 default_port=port,
                 description=config.description,
-                env_vars={**config.env_vars, "PORT": str(port)},
+                env_vars=_with_port(config.env_vars, port),
                 working_dir=config.working_dir,
                 docker_image=config.docker_image,
                 health_check_path=config.health_check_path,
@@ -552,7 +577,7 @@ class RTILauncher:
             cmd.extend(["-l", f"{key}={value}"])
 
         # Add environment variables
-        for key, value in config.env_vars.items():
+        for key, value in self._docker_env(config).items():
             cmd.extend(["-e", f"{key}={value}"])
 
         # Add network

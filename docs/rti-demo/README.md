@@ -35,7 +35,9 @@ Each component's README is its reference: run and test commands, configuration, 
 | RTI-SO (ACSI client, WebSocket passive) | [modules/so/README.md](../../examples/rti-demo/modules/so/README.md) |
 | BFF (backend for frontend) | [modules/bff/README.md](../../examples/rti-demo/modules/bff/README.md) |
 | HMI (React frontend) | [modules/hmi/README.md](../../examples/rti-demo/modules/hmi/README.md) |
-| IO (Raspberry Pi devices) | [modules/io/README.md](../../examples/rti-demo/modules/io/README.md) |
+| IO server (Raspberry Pi devices) | [modules/io/README.md](../../examples/rti-demo/modules/io/README.md) |
+| IO plugin (installed in the FSP and SO) | [modules/io-plugin/README.md](../../examples/rti-demo/modules/io-plugin/README.md) |
+| Plugin host | [modules/plugins/README.md](../../examples/rti-demo/modules/plugins/README.md) |
 | Demo playbooks | [playbooks/README.md](../../examples/rti-demo/playbooks/README.md) |
 
 ## Communication

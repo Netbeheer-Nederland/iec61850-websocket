@@ -81,22 +81,29 @@ manifest `plugin.json`:
 ```
 
 The source serves the manifest at `<source_url>/plugin.json` and each file, as it is, at `<source_url>/<file>`. A
-plugin installed with the image registers its class under the entry point group `acsi.plugins` instead.
+plugin installed with the image is a workspace package that registers its class under the entry point group
+`acsi.plugins` instead, and needs no manifest:
 
-The IO plugin (`modules/io/rti_io/plugin/plugin.py`) is a complete example; `samples/sim_leds/` is a small one,
-and [GETTING_STARTED.md](GETTING_STARTED.md) walks through writing, serving, installing and testing a plugin.
+```toml
+[project.entry-points."acsi.plugins"]
+io = "acsi_io_plugin.plugin:RtiIoPlugin"
+```
+
+The IO plugin ([`modules/io-plugin`](../io-plugin/README.md), installed with the FSP and SO, decision 0022) is a
+complete example; `samples/sim_leds/` is a small downloadable one, and [GETTING_STARTED.md](GETTING_STARTED.md) walks
+through writing, serving, installing and testing a plugin.
 
 ## Using plugins
 
 ```bash
 # Install: download from an allowed source, load and start
 curl -X POST http://localhost:5001/api/plugins -H 'Content-Type: application/json' \
-  -d '{"name": "io", "source_url": "http://rti-io:9000/api/io-plugin/files", "settings": {"acsi_url": "http://rti-fsp01:5001"}}'
+  -d '{"name": "sim_leds", "source_url": "http://localhost:8099", "settings": {"blink_seconds": 1}}'
 
-curl http://localhost:5001/api/plugins                     # loaded plugins, health; failed: startup failures
-curl http://localhost:5001/api/plugins/io/leds             # a route of the plugin
-curl -X POST http://localhost:5001/api/plugins/io/reload   # download again and restart; settings stay
-curl -X DELETE http://localhost:5001/api/plugins/io        # stop, remove, delete its files
+curl http://localhost:5001/api/plugins                          # loaded plugins, health; failed: startup failures
+curl http://localhost:5001/api/plugins/sim_leds/leds            # a route of the plugin
+curl -X POST http://localhost:5001/api/plugins/sim_leds/reload  # download again and restart; settings stay
+curl -X DELETE http://localhost:5001/api/plugins/sim_leds       # stop, remove, delete its files
 ```
 
 | Answer | When |
@@ -105,7 +112,9 @@ curl -X DELETE http://localhost:5001/api/plugins/io        # stop, remove, delet
 | 409 | The name is loaded already, or the plugin claims an objRef another plugin owns |
 | 422 | The plugin can't be downloaded or loaded; `detail` says why |
 
-A downloaded plugin is kept with its source and settings, and loaded again when the service starts.
+A downloaded plugin is kept with its source and settings, and loaded again when the service starts. An installed
+plugin (`"source": "installed"`) starts with the service; reloading it restarts it, and removing it stops it until the
+next start.
 
 ## Settings
 
@@ -113,7 +122,7 @@ A downloaded plugin is kept with its source and settings, and loaded again when 
 |---|---|---|
 | `PLUGIN_STORAGE` | `/app/plugins` | Where downloaded plugins are kept, one folder each |
 | `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs plugins may be downloaded from. Scheme, host and port must match exactly; the path by whole segments |
-| `PLUGINS` | none | JSON list of plugins to load at startup: `[{"name": "io", "source": "...", "settings": {...}}]` |
+| `PLUGINS` | none | JSON list of plugins to load at startup: `[{"name": "sim_leds", "source": "...", "settings": {...}}]`; for an installed plugin leave out `source`: `[{"name": "io", "settings": {...}}]` |
 
 The plugins run in the FSP's or SO's process, with its rights: only allow sources you trust.
 

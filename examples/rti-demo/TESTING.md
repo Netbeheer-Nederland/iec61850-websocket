@@ -59,8 +59,9 @@ normally with no `sys.path` hacks. (A bare `uv sync`, without
 use `--all-packages`, or `--package <name>` for just one module, to get
 `bff`/`fsp`/`so` installed too.)
 
-`io` (Raspberry Pi GPIO/I2C hardware packages) is deliberately **not**
-part of this workspace - it builds via its own fully independent
+`io` (the IO server: Raspberry Pi GPIO/I2C hardware packages) is
+deliberately **not** part of this workspace; its plugin, `io-plugin`
+(`acsi-io-plugin`, no hardware packages), is (decision 0022). `io` - it builds via its own fully independent
 Docker-stage venv (`modules/io/docker/Dockerfile`), since its
 dependencies (`gpiozero`, `gpiod`, `Adafruit-ADS1x15`, ...) won't
 resolve/install on a non-Pi dev machine.
@@ -75,8 +76,9 @@ uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q
 uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q
 uv run --package so  pytest examples/rti-demo/modules/so/tests  -m unit -q
 uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q
-# io isn't a workspace member; its tests (IO plugin, plugin file serving) need
-# FastAPI, so they run in the fsp environment
+uv run --package acsi-io-plugin pytest examples/rti-demo/modules/io-plugin/tests -m unit -q
+# io (the IO server) isn't a workspace member; its tests need FastAPI, so
+# they run in the fsp environment
 uv run --package fsp pytest examples/rti-demo/modules/io/tests  -m unit -q
 ```
 
@@ -138,11 +140,15 @@ examples/rti-demo/modules/
 │   ├── src/acsi_plugins/contract.py, host.py, loader.py, web.py
 │   ├── samples/sim_leds/   # a sample plugin (GETTING_STARTED.md)
 │   └── tests/test_host.py, test_loader.py, test_web.py, test_sample_sim_leds.py
-└── io/        # not a workspace member - see above
+├── io-plugin/ # acsi-io-plugin: the IO plugin, installed in the fsp and so (decision 0022)
+│   ├── pyproject.toml   # entry point acsi.plugins: io
+│   ├── src/acsi_io_plugin/plugin.py, client.py, router.py, mapping.py, utils.py
+│   └── tests/test_installed.py, test_mapping_file.py, test_plugin_contract.py,
+│       test_plugin_client.py, test_no_aliases.py
+└── io/        # the IO server; not a workspace member - see above
     ├── pyproject.toml   # project rti-io
-    ├── rti_io/server/, rti_io/plugin/
-    └── tests/test_plugin_files.py, test_plugin_client.py, test_plugin_contract.py,
-        test_no_aliases.py, test_server_config.py
+    ├── rti_io/server/
+    └── tests/test_no_plugin_files.py, test_server_config.py
 ```
 
 `fsp` and `so` are each tested through a `fastapi.testclient.TestClient`
@@ -261,6 +267,8 @@ rm -rf dist
 (uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q) \
   && (uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q) \
   && (uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q) \
+  && (uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q) \
+  && (uv run --package acsi-io-plugin pytest examples/rti-demo/modules/io-plugin/tests -m unit -q) \
   && (uv run --package fsp pytest examples/rti-demo/modules/io/tests -m unit -q) \
   && (cd examples/rti-demo/modules/hmi && npm test) \
   && (cd examples/rti-demo/modules/hmi && npx vite build && rm -rf dist)

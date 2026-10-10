@@ -6,17 +6,16 @@ SPDX-License-Identifier: Apache-2.0
 
 # IO: Raspberry Pi IO Device Control - WebSocket and ACSI Services Integration
 
-This directory contains a complete **IO Device Control System** for Raspberry Pi, consisting of two main components:
-
-1. **`rti_io/server/`** - the IO server: a FastAPI-based REST API service for direct hardware control
-2. **`rti_io/plugin/`** - the IO plugin: the FSP and SO download it from the IO server and load it, to reach the IO server and keep devices and IEC 61850 objects in sync (ACSI client/server with WebSocket passive/active)
+This directory contains the **IO server** for Raspberry Pi (`rti_io/server/`): a FastAPI-based REST API service for
+direct hardware control. The FSP and SO reach it through the **IO plugin**, a separate package installed with them:
+[`modules/io-plugin`](../io-plugin/README.md) (decision 0022). It keeps devices and IEC 61850 objects in sync.
 
 ## Overview
 
 The IO service enables remote control and monitoring of physical IO devices (LEDs, potentiometers, buttons, LCD displays) through:
 
 - **Direct REST API** via the IO server (`rti_io.server`)
-- **ACSI Integration** via the IO plugin (`rti_io.plugin`), which proxies requests to the IO server
+- **ACSI Integration** via the IO plugin (`acsi_io_plugin`, in `modules/io-plugin`), which proxies requests to the IO server
 - **IEC 61850 Object Mapping** to connect IO devices to power system data model objects
 
 ### Architecture
@@ -53,16 +52,7 @@ modules/io/
     │   ├── api_endpoint.py   # FastAPI endpoints for device control
     │   ├── io_config.py      # Configuration loading/saving
     │   ├── io_config.json    # Default device configurations
-    │   ├── plugin_files.py   # Serves the IO plugin's files (GET /api/io-plugin/files)
     │   └── lcd_i2c_check.py  # Hardware check for the I2C LCD
-    └── plugin/               # the IO plugin, downloaded and loaded by the FSP and SO (decision 0021)
-        ├── plugin.json       # Its manifest: name, version, entry class, files
-        ├── plugin.py         # RtiIoPlugin: what the plugin does with each ACSI event
-        ├── client.py         # AsyncIOClient / DemoIOClient for the IO server API
-        ├── router.py         # FastAPI router the FSP and SO serve under /api/plugins/io/
-        ├── utils.py          # Utility functions
-        ├── mapping.py        # IEC 61850 to IO device mapping
-        └── io_mapping.json   # Default IEC 61850 object mappings
 ```
 
 ---
@@ -103,8 +93,6 @@ All endpoints are under the `/api/io/` prefix and provide device management, LED
 |----------|---------|-------------|
 | `PORT` | 9000 | Server port (the same for a direct run, `launch.py` and Docker) |
 | `IO_CONFIG_FILE` | `rti_io/server/io_config.json` | The device configuration the server reads and saves to. A file that doesn't exist yet is seeded from the shipped `io_config.json`. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_config.json`, so saves leave the shipped file unchanged |
-| `IO_PLUGIN_FILES_DIR` | `rti_io/plugin` | The IO plugin files served, as they are, at `GET /api/io-plugin/files/<file>` |
-| `IO_PLUGIN_VERSION` | `1.0.0` | The version `GET /api/io-plugin/version` reports |
 
 Start the server with `uv run python -m rti_io.server.main` from `examples/rti-demo/modules/io`, or with `launch.py io`;
 the modules use relative imports, so they don't run as scripts. The first uses this project's own environment
@@ -125,58 +113,11 @@ For **physical hardware operation** (not mock mode):
 
 ---
 
-## Component 2: the IO plugin (`rti_io.plugin`) - Connection and Synchronization Layer
+## Component 2: the IO plugin
 
-The IO plugin provides connection and synchronization between the IO server services and the RTI component, which is a combination of ACSI client/server with WebSocket passive/active.
-
-### Key Features
-
-| Feature | Description |
-|---------|-------------|
-| **AsyncIOClient** | Python client for the IO server REST API |
-| **IO Router** | FastAPI router that proxies requests to the IO server |
-| **IEC 61850 Mapping** | Map IO devices to IEC 61850 data objects |
-| **Plugin** | Loaded by the FSP and SO as `acsi_io_plugin`; reacts to their ACSI events |
-| **Connection Management** | Connects to the IO server when loaded; again via `POST /api/plugins/io/connect` |
-| **Bulk Operations** | Control multiple devices at once |
-
-### Architecture
-
-The IO plugin provides **two integration paths**:
-
-1. **Direct Client Usage**: Import and use `AsyncIOClient` directly in your code
-2. **Router Proxy**: the FSP and SO serve the IO router's endpoints under `/api/plugins/io/`, proxied to the IO server
-
-### IO Router Endpoints
-
-All endpoints are proxied to the IO server and provide connection management, device control, and IEC 61850 object mapping functionality.
-
-### Direct Client Usage
-
-```python
-import sys
-sys.path.insert(0, "examples/rti-demo/modules/io")
-from rti_io.plugin.client import DemoIOClient
-
-# Synchronous client; AsyncIOClient has the same methods as coroutines (await them)
-client = DemoIOClient(base_url="http://localhost:9000")
-
-# Configure an LED
-client.config_led(name="led1", gpio_pin=17, description="Status LED")
-
-# Control device
-client.set_device("led1", state=True)
-client.toggle_led("led2")
-state = client.get_led_state("led1")
-
-# Bulk operations
-client.all_leds_on()
-client.all_leds_off()
-
-# Check health
-if client.is_healthy():
-    print("IO server is healthy")
-```
+The IO plugin, its client (`AsyncIOClient`, `DemoIOClient`), its routes under `/api/plugins/io/` and its mapping are
+the package `acsi_io_plugin` in [`modules/io-plugin`](../io-plugin/README.md). It is installed with the FSP and SO and
+has no hardware dependencies; this server doesn't serve it (decision 0022).
 
 ### IEC 61850 Object Mapping
 
@@ -223,7 +164,7 @@ Defines all IO devices and their configurations:
 - ACSI server integration settings
 - IEC 61850 object mappings
 
-### rti_io/plugin/io_mapping.json
+### io-plugin/src/acsi_io_plugin/io_mapping.json
 
 Defines mappings between IEC 61850 objects and IO devices:
 - Which IO device corresponds to which IEC 61850 data object

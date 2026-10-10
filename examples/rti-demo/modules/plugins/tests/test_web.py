@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.unit
 
-SOURCE = "http://io.test/api/io-plugin/files"
+SOURCE = "http://io.test/plugins/demo"
 MANIFEST = {
     "name": "demo",
     "version": "1.0.0",
@@ -50,7 +50,7 @@ class DemoPlugin(AcsiPlugin):
 
 
 class Server:
-    """The plugin source, as an IO server would serve it."""
+    """The plugin source: a plain file server."""
 
     def __init__(self, version="1.0.0", claims=()):
         self.set(version, claims)
@@ -290,16 +290,12 @@ def test_from_env_reads_storage_sources_and_configured_plugins(monkeypatch, tmp_
     )
     monkeypatch.setenv(
         "PLUGINS",
-        json.dumps(
-            [{"name": "io", "source": "http://rti-io:9000/api/io-plugin/files"}]
-        ),
+        json.dumps([{"name": "demo", "source": "http://localhost:8099"}]),
     )
     service = PluginService.from_env(PluginHost(role="fsp"))
     assert service.storage == tmp_path
     assert service.allowed_sources == ["http://rti-io:9000", "http://localhost:9000"]
-    assert service.configured == [
-        {"name": "io", "source": "http://rti-io:9000/api/io-plugin/files"}
-    ]
+    assert service.configured == [{"name": "demo", "source": "http://localhost:8099"}]
 
 
 def test_from_env_ignores_io_plugin_storage(monkeypatch, tmp_path):

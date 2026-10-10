@@ -4,11 +4,31 @@ requires-python = ">=3.13"
 
 [manifest]
 members = [
+    "acsi-io-plugin",
     "acsi-plugins",
     "bff",
     "fsp",
     "iec61850-websocket",
     "so",
+]
+
+[[package]]
+name = "acsi-io-plugin"
+version = "2.0.0"
+source = { editable = "examples/rti-demo/modules/io-plugin" }
+dependencies = [
+    { name = "acsi-plugins" },
+    { name = "fastapi" },
+    { name = "httpx2" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "acsi-plugins", editable = "examples/rti-demo/modules/plugins" },
+    { name = "fastapi", specifier = ">=0.139.0" },
+    { name = "httpx2", specifier = ">=2.13.0" },
+    { name = "pydantic", specifier = ">=2" },
 ]
 
 [[package]]
@@ -530,6 +550,7 @@ name = "fsp"
 version = "0.1.0"
 source = { editable = "examples/rti-demo/modules/fsp" }
 dependencies = [
+    { name = "acsi-io-plugin" },
     { name = "acsi-plugins" },
     { name = "fastapi" },
     { name = "httpx2" },
@@ -540,6 +561,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "acsi-io-plugin", editable = "examples/rti-demo/modules/io-plugin" },
     { name = "acsi-plugins", editable = "examples/rti-demo/modules/plugins" },
     { name = "fastapi", specifier = ">=0.139.0" },
     { name = "httpx2", specifier = ">=2.13.0" },
@@ -1190,6 +1212,7 @@ name = "so"
 version = "0.1.0"
 source = { editable = "examples/rti-demo/modules/so" }
 dependencies = [
+    { name = "acsi-io-plugin" },
     { name = "acsi-plugins" },
     { name = "fastapi" },
     { name = "httpx2" },
@@ -1199,6 +1222,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "acsi-io-plugin", editable = "examples/rti-demo/modules/io-plugin" },
     { name = "acsi-plugins", editable = "examples/rti-demo/modules/plugins" },
     { name = "fastapi", specifier = ">=0.139.0" },
     { name = "httpx2", specifier = ">=2.13.0" },

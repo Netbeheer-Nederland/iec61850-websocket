@@ -116,18 +116,25 @@ def test_code_default_port(path, role):
     assert _one(pattern, text, path) == EXPECTED_PORTS[role]
 
 
+@pytest.mark.parametrize(
+    ("service", "role"), [("rti-so", "so"), ("rti-fsp01", "fsp"), ("rti-fsp02", "fsp2")]
+)
+def test_compose_points_the_io_plugin_at_the_io_server_and_back(compose, service, role):
+    # The IO plugin is installed in the FSPs and SO (decision 0022).
+    env = compose[service]["environment"]
+    assert f"IO_URL=http://rti-io:{EXPECTED_PORTS['io']}" in env
+    assert f"ACSI_BASE_URL=http://{service}:{EXPECTED_PORTS[role]}" in env
+
+
 @pytest.mark.parametrize("service", ["rti-so", "rti-fsp01", "rti-fsp02"])
-def test_compose_allows_plugins_from_the_io_port(compose, service):
-    # The FSPs and SO download the IO plugin from the IO server (decision 0021).
-    assert (
-        f"PLUGIN_ALLOWED_SOURCES=http://rti-io:{EXPECTED_PORTS['io']}"
-        in compose[service]["environment"]
-    )
+def test_compose_downloads_no_plugins(compose, service):
+    env = compose[service]["environment"]
+    assert not any(e.startswith("PLUGIN_ALLOWED_SOURCES=") for e in env)
 
 
-def test_launch_py_allows_plugins_from_the_io_port():
+def test_launch_py_points_the_io_plugin_at_the_io_port():
     text = _read(DEMO / "launch.py")
-    pattern = r'allowed = "http://localhost:(\d+),http://rti-io:\1"'
+    pattern = r'"IO_URL": "http://localhost:(\d+)"'
     assert _one(pattern, text, "launch.py") == EXPECTED_PORTS["io"]
 
 
@@ -136,11 +143,11 @@ def test_launch_py_allows_plugins_from_the_io_port():
     [
         # Not acsi_base_url: that's the FSP's address (5001), in the same files.
         (
-            "io/rti_io/plugin/client.py",
+            "io-plugin/src/acsi_io_plugin/client.py",
             r'\bbase_url: str = "http://localhost:(\d+)"',
         ),
         (
-            "io/rti_io/plugin/router.py",
+            "io-plugin/src/acsi_io_plugin/router.py",
             r'base_url: str = Field\(\s*default="http://localhost:(\d+)"',
         ),
     ],
