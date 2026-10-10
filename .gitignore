@@ -89,3 +89,5 @@ launch.py.local
 config.local.py
 # Doxygen output - generate with: doxygen docs/doxygen/Doxyfile
 docs/doxygen/html/
+
+*.drawio.bkp
