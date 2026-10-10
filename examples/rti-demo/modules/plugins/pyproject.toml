@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
+[project]
+name = "acsi-plugins"
+version = "0.1.0"
+description = "RTI Demo plugin host: loads plugins into the FSP and SO and passes ACSI events and operations to them (decision 0021)"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.139.0",
+    "httpx2>=2.13.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "unit: fast, isolated unit tests (no Docker/network required)",
+]

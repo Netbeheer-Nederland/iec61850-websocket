@@ -116,13 +116,19 @@ def test_code_default_port(path, role):
     assert _one(pattern, text, path) == EXPECTED_PORTS[role]
 
 
-@pytest.mark.parametrize(
-    "path", ["so/src/so/bff_endpoint.py", "fsp/src/fsp/bff_endpoint.py"]
-)
-def test_io_server_url_default(path):
-    text = _read(MODULES / path)
-    pattern = r'os\.getenv\("IO_SERVER_URL", "http://localhost:(\d+)"\)'
-    assert _one(pattern, text, path) == EXPECTED_PORTS["io"]
+@pytest.mark.parametrize("service", ["rti-so", "rti-fsp01", "rti-fsp02"])
+def test_compose_allows_plugins_from_the_io_port(compose, service):
+    # The FSPs and SO download the IO plugin from the IO server (decision 0021).
+    assert (
+        f"PLUGIN_ALLOWED_SOURCES=http://rti-io:{EXPECTED_PORTS['io']}"
+        in compose[service]["environment"]
+    )
+
+
+def test_launch_py_allows_plugins_from_the_io_port():
+    text = _read(DEMO / "launch.py")
+    pattern = r'allowed = "http://localhost:(\d+),http://rti-io:\1"'
+    assert _one(pattern, text, "launch.py") == EXPECTED_PORTS["io"]
 
 
 @pytest.mark.parametrize(

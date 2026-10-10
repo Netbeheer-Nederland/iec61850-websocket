@@ -108,6 +108,7 @@ class ACSIServer:
     """IEC 61850 WebSocket server controller."""
 
     def __init__(self, model_path):
+        self.control_hook: Callable | None = None
         self.runtime = ACSIServerRuntime()
         self.runtime.ied_model = None
         self.runtime.model_ied_name = None
@@ -179,34 +180,54 @@ class ACSIServer:
             model_ied_name=self.runtime.ied_model.name,
         )
 
-        def control_handler(obj_ref, ctl_val_value, parameter):
-            ctl_val = ctl_val_value["value"]
-
-            type_map = {
-                "boolean": bool,
-                "int32": int,
-                "float32": float,
-                "string": str,
-            }
-            if ctl_val_value is not None:
-                if ctl_val[0] in type_map:
-                    if isinstance(ctl_val[1], type_map[ctl_val[0]]):
-                        return ControlHandlerResult.OK, None
-                    else:
-                        return (
-                            ControlHandlerResult.FAILED,
-                            ControlServiceStatusKind.invalidPosition,
-                        )
-            else:
-                return None, ServiceStatusKind.instanceNotAvailable
-            return None, None
-
         iec61850_instance = IEC61850Server(self.runtime.ied_model, self.runtime.cp)
-        iec61850_instance.set_control_handler(control_handler, None)
+        iec61850_instance.set_control_handler(self.handle_control, None)
         iec61850_instance.send_msg_callback = self.runtime.endpoint.send_msg_callback
         iec61850_instance.recv_msg_callback = self.runtime.endpoint.recv_msg_callback
         self.runtime.server = iec61850_instance
         self.runtime.endpoint.add_iec61850_server(self.runtime.server)
+
+    def handle_control(self, obj_ref, ctl_val_value, parameter):
+        """Answer an Operate: the plugin that owns `obj_ref` decides, if one
+        does (decision 0021); otherwise ctlVal only has to have its type."""
+        if self.control_hook is not None:
+            answer = self.control_hook(obj_ref, ctl_val_value)
+            if answer is not None:
+                if answer.ok:
+                    return ControlHandlerResult.OK, None
+                cause = ControlServiceStatusKind.__members__.get(
+                    answer.add_cause or "", ControlServiceStatusKind.unknown
+                )
+                return ControlHandlerResult.FAILED, cause
+
+        ctl_val = ctl_val_value["value"]
+
+        type_map = {
+            "boolean": bool,
+            "int32": int,
+            "float32": float,
+            "string": str,
+        }
+        if ctl_val_value is not None:
+            if ctl_val[0] in type_map:
+                if isinstance(ctl_val[1], type_map[ctl_val[0]]):
+                    return ControlHandlerResult.OK, None
+                else:
+                    return (
+                        ControlHandlerResult.FAILED,
+                        ControlServiceStatusKind.invalidPosition,
+                    )
+        else:
+            return None, ServiceStatusKind.instanceNotAvailable
+        return None, None
+
+    def install_control_hook(self, hook):
+        """Install a hook asked first for every Operate.
+
+        The hook receives (objRef, ctlVal) and returns a ControlResult, or
+        None to leave the Operate to the default check.
+        """
+        self.control_hook = hook
 
     def install_write_callback(self, callback):
         """Install a callback to be invoked when write messages are received."""

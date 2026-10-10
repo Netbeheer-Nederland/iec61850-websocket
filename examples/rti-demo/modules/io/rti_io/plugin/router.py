@@ -238,8 +238,11 @@ def set_mapping_manager(manager: IOMappingManager) -> None:
         logger.info("IOMappingManager configured")
 
 
-def create_io_router() -> APIRouter:
+def create_io_router(prefix: str = "/api/io") -> APIRouter:
     """Create a FastAPI router for IO/device control via the IO server.
+
+    As a plugin (decision 0021) the router has no prefix: the FSP and SO
+    serve it under /api/plugins/io/.
 
     This router provides endpoints that proxy device control requests (IO devices)
     to a connected IO server. The IO server connection is configured via
@@ -251,7 +254,7 @@ def create_io_router() -> APIRouter:
         APIRouter instance with all IO endpoints configured
     """
     router = APIRouter(
-        prefix="/api/io",
+        prefix=prefix,
         tags=["IO Control"],
         responses={
             404: {"description": "Not found"},
@@ -265,13 +268,6 @@ def create_io_router() -> APIRouter:
     if demo_io_url:
         set_io_client(AsyncIOClient(base_url=demo_io_url, acsi_base_url=acsi_base_url))
         logger.info(f"AsyncIOClient auto-configured from IO_URL: {demo_io_url}")
-
-    # ==================== Startup Event ====================
-
-    @router.on_event("startup")
-    async def startup_event():
-        """Register input device callbacks on startup."""
-        _register_all_input_callbacks()
 
     # ==================== Helper Functions ====================
 
@@ -839,7 +835,7 @@ def create_io_router() -> APIRouter:
             dict: Confirmation with new state
         """
         client = await _get_client_or_error()
-        return await client.turn_on(name)
+        return await client.set_device(name, state=True)
 
     @router.post(
         "/leds/{name}/off",
@@ -863,7 +859,7 @@ def create_io_router() -> APIRouter:
             dict: Confirmation with new state
         """
         client = await _get_client_or_error()
-        return await client.turn_off(name)
+        return await client.set_device(name, state=False)
 
     # ==================== Device Control (Generic) ====================
 
@@ -1091,28 +1087,30 @@ def create_io_router() -> APIRouter:
             obj_ref: IEC 61850 object reference
 
         Returns:
-            dict: Mapping configuration with device_name
+            dict: The configuration of every device mapped to the objRef
         """
         try:
             manager = get_mapping_manager()
-            mapping = manager.get_device_by_objref(obj_ref)
+            mappings = manager.get_devices_by_objref(obj_ref)
 
-            if not mapping:
+            if not mappings:
                 raise HTTPException(
                     status_code=404, detail=f"No mapping found for objRef: {obj_ref}"
                 )
 
             return {
                 "ok": True,
-                "device_name": mapping["device_name"],
-                "mapping": IOMappingResponse(
-                    device_name=mapping["device_name"],
-                    objRef=mapping.get("objRef"),
-                    description=mapping.get("description", ""),
-                    initial_state=mapping.get("initial_state", False),
-                    service=mapping.get("service"),
-                    dataType=mapping.get("dataType"),
-                ),
+                "mappings": [
+                    IOMappingResponse(
+                        device_name=mapping["device_name"],
+                        objRef=mapping.get("objRef"),
+                        description=mapping.get("description", ""),
+                        initial_state=mapping.get("initial_state", False),
+                        service=mapping.get("service"),
+                        dataType=mapping.get("dataType"),
+                    )
+                    for mapping in mappings
+                ],
             }
         except HTTPException:
             raise

@@ -42,8 +42,8 @@ jobs:
               # bff/fsp/so are now workspace members - the shared root
               # pyproject.toml/uv.lock is what actually pins their deps
               # (examples/rti-demo no longer has its own).
-            so:          [ *rti, 'examples/rti-demo/modules/so/**',  'examples/rti-demo/modules/so/pyproject.toml' ]
-            fsp:         [ *rti, 'examples/rti-demo/modules/fsp/**', 'examples/rti-demo/modules/fsp/pyproject.toml' ]
+            so:          [ *rti, 'examples/rti-demo/modules/so/**',  'examples/rti-demo/modules/so/pyproject.toml', 'examples/rti-demo/modules/plugins/**' ]
+            fsp:         [ *rti, 'examples/rti-demo/modules/fsp/**', 'examples/rti-demo/modules/fsp/pyproject.toml', 'examples/rti-demo/modules/plugins/**' ]
             acsi_client: [ *rti, 'examples/rti-demo/acsi_ws_client/**', 'examples/rti-demo/Dockerfile.acsi-ws-client' ]
             acsi_server: [ *rti, 'examples/rti-demo/acsi_ws_server/**', 'examples/rti-demo/Dockerfile.acsi-ws-server' ]
             bff:         [ 'examples/rti-demo/modules/bff/**', 'pyproject.toml', 'uv.lock' ]

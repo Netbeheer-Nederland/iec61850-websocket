@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +44,13 @@ logger = logging.getLogger(__name__)
 # locally, /app/rti_io/plugin in the image.
 DEFAULT_PLUGIN_FILES_DIR = Path(__file__).resolve().parents[1] / "plugin"
 
-# File names from before decision 0018. An FSP or SO that asks for one is older
-# than this IO server, and its loader can't load the renamed files.
-OLD_PLUGIN_FILE_NAMES = {
-    "async_client_io.py",
-    "io_router.py",
-    "io_utils.py",
-    "mapping_manager.py",
-}
+
+def _media_type(filename: str) -> str:
+    if filename.endswith(".py"):
+        return "text/x-python"
+    if filename.endswith(".json"):
+        return "application/json"
+    return "text/plain"
 
 
 def create_plugin_files_router() -> APIRouter:
@@ -73,14 +72,10 @@ def create_plugin_files_router() -> APIRouter:
     )
 
     # Configuration for io_client files storage
-    io_client_files_dir = (
-        os.getenv("IO_PLUGIN_FILES_DIR")
-        or os.getenv("IO_CLIENT_FILES_DIR")
-        or str(DEFAULT_PLUGIN_FILES_DIR)
+    io_client_files_dir = os.getenv("IO_PLUGIN_FILES_DIR") or str(
+        DEFAULT_PLUGIN_FILES_DIR
     )
-    io_client_version = (
-        os.getenv("IO_PLUGIN_VERSION") or os.getenv("IO_CLIENT_VERSION") or "1.0.0"
-    )
+    io_client_version = os.getenv("IO_PLUGIN_VERSION") or "1.0.0"
 
     def ensure_io_client_files_dir() -> bool:
         """Ensure the io_client files directory exists."""
@@ -158,7 +153,7 @@ def create_plugin_files_router() -> APIRouter:
     @router.get(
         "/files/{filename:path}",
         summary="Get IO Client File",
-        description="Download a specific io_client file by filename. Used for dynamic loading of IO functionality.",
+        description="Download a specific io_client file by filename, as it is. Used for dynamic loading of IO functionality.",
         response_description="File content",
         responses={
             200: {"description": "File content returned successfully"},
@@ -170,14 +165,6 @@ def create_plugin_files_router() -> APIRouter:
     async def api_get_io_client_file(filename: str):
         """Get the content of a specific io_client file."""
         try:
-            if filename in OLD_PLUGIN_FILE_NAMES:
-                raise HTTPException(
-                    status_code=410,
-                    detail=(
-                        f"'{filename}' was renamed (decision 0018). Run the FSP or SO "
-                        "from the same version as this IO server."
-                    ),
-                )
             file_path = get_io_client_file_path(filename)
 
             if file_path is None:
@@ -186,29 +173,7 @@ def create_plugin_files_router() -> APIRouter:
                     status_code=404, detail=f"IO plugin file '{filename}' not found"
                 )
 
-            # Read and return file content
-            with open(file_path, encoding="utf-8") as f:
-                content = f.read()
-
-            # Set appropriate content type based on file extension
-            content_type = "text/plain"
-            if filename.endswith(".py"):
-                content_type = "text/x-python"
-            elif filename.endswith(".json"):
-                content_type = "application/json"
-            elif filename.endswith(".txt"):
-                content_type = "text/plain"
-
-            return JSONResponse(
-                content={
-                    "ok": True,
-                    "filename": filename,
-                    "content": content,
-                    "size": len(content),
-                    "content_type": content_type,
-                },
-                media_type=content_type,
-            )
+            return FileResponse(file_path, media_type=_media_type(filename))
 
         except HTTPException:
             raise

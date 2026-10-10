@@ -13,10 +13,12 @@ dependencies = [
     "uvicorn>=0.51.0",
     "httpx2>=2.13.0",
     "iec61850-websocket",
+    "acsi-plugins",
 ]
 
 [tool.uv.sources]
 iec61850-websocket = { workspace = true }
+acsi-plugins = { workspace = true }
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]

@@ -54,9 +54,9 @@ class IOMappingManager:
             description="GGIO Indication 1"
         )
 
-        # Find IO device by objRef
-        device_config = manager.get_device_by_objref("LD0/GGIO1$ST$Ind1")
-        # Returns: {"device_name": "device1", "gpio_pin": 17, "objRef": "LD0/GGIO1$ST$Ind1", ...}
+        # Find the IO devices mapped to an objRef
+        devices = manager.get_devices_by_objref("LD0/GGIO1$ST$Ind1")
+        # Returns: [{"device_name": "device1", "gpio_pin": 17, "objRef": "LD0/GGIO1$ST$Ind1", ...}]
 
         # Get all mappings
         all_mappings = manager.get_all_mappings()
@@ -105,7 +105,7 @@ class IOMappingManager:
             with open(load_path, encoding="utf-8") as f:
                 data = json.load(f)
 
-            # Handle both formats: flat dict or {"leds": {...}, "buttons": {...}, etc.}
+            # {"leds": {...}, "buttons": {...}, ...}
             if isinstance(data, dict):
                 # Normalize all device type sections (leds, buttons, potentiometers, etc.)
                 self._mappings = {}
@@ -120,33 +120,7 @@ class IOMappingManager:
                 ]:
                     if device_type_section in data:
                         for key, config in data[device_type_section].items():
-                            device_name = key
-                            # Normalize the config to include device_name
-                            normalized_config = {
-                                k: v for k, v in config.items() if k != "led_name"
-                            }
-                            self._mappings[device_name] = {
-                                **normalized_config,
-                                "device_name": device_name,
-                            }
-
-                # Also handle old objRef-indexed format for backward compatibility
-                if not self._mappings and "mappings" in data:
-                    # Convert from objRef-indexed format
-                    self._mappings = {}
-                    for objref, device_config in data["mappings"].items():
-                        device_name = device_config.get(
-                            "device_name"
-                        ) or device_config.get("led_name", objref)
-                        # Normalize the config to use device_name
-                        normalized_config = {
-                            k: v for k, v in device_config.items() if k != "led_name"
-                        }
-                        self._mappings[device_name] = {
-                            **normalized_config,
-                            "device_name": device_name,
-                            "objRef": objref,
-                        }
+                            self._mappings[key] = {**config, "device_name": key}
 
             # Build objRef index (support multiple devices per objRef and multiple objRefs per device)
             self._objref_index = {}
@@ -228,10 +202,6 @@ class IOMappingManager:
                 data["potentiometers"] = potentiometers
             if other_inputs:
                 data["inputs"] = other_inputs
-
-            # If no type was specified, use flat format for backward compatibility
-            if not data:
-                data = {"leds": self._mappings}
 
             # Ensure parent directory exists
             save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -414,29 +384,6 @@ class IOMappingManager:
             dict: Mapping configuration, or None if not found
         """
         return self._mappings.get(device_name)
-
-    def get_device_by_objref(self, obj_ref: str) -> dict[str, Any] | None:
-        """Get IO device configuration by IEC 61850 object reference.
-
-        Args:
-            obj_ref: IEC 61850 object reference
-
-        Returns:
-            dict: IO device configuration with device_name, or None if not found
-            Note: If multiple devices are mapped to the same objRef, returns the first one.
-            Use get_devices_by_objref() to get all devices for an objRef.
-        """
-        device_names = self._objref_index.get(obj_ref, [])
-        if not device_names:
-            return None
-
-        # Return the first device for backward compatibility
-        device_name = device_names[0]
-        config = self._mappings.get(device_name)
-        if config:
-            # Return copy with device_name included
-            return {**config, "device_name": device_name}
-        return None
 
     def get_devices_by_objref(self, obj_ref: str) -> list[dict[str, Any]]:
         """Get all IO device configurations mapped to an IEC 61850 object reference.

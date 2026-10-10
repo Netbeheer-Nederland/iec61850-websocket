@@ -489,7 +489,6 @@ class TestOperateRoutePassesControlParameters:
                 ThreadPoolExecutor(1).submit(asyncio.run, coro).result(timeout)
             ),
         )
-        monkeypatch.setattr(bff_endpoint, "_use_io_client", False)
         return calls
 
     def test_passes_ctlnum_origin_and_test(self, app_client, monkeypatch):
@@ -604,9 +603,15 @@ class TestListenOnStart:
     def test_the_app_starts_listening_on_startup(self, monkeypatch, tmp_path):
         started = []
         monkeypatch.setattr(bff_endpoint, "_listen_on_start", started.append)
-        # create_fastapi_app prepares the IO plugin directory (/app/... in Docker).
+        # Plugins are kept under /app/plugins in Docker; not here.
         monkeypatch.setattr(
-            bff_endpoint, "IO_PLUGIN_DYNAMIC_DIR", tmp_path / "io_plugin"
+            bff_endpoint,
+            "plugin_service",
+            bff_endpoint.PluginService(
+                bff_endpoint.plugin_host,
+                storage=tmp_path / "plugins",
+                allowed_sources=[],
+            ),
         )
         app = bff_endpoint.create_fastapi_app(tmp_path)
         with TestClient(app):

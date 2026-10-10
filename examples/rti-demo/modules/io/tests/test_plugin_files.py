@@ -29,7 +29,6 @@ PLUGIN_FILES = {
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.delenv("IO_PLUGIN_FILES_DIR", raising=False)
-    monkeypatch.delenv("IO_CLIENT_FILES_DIR", raising=False)
     app = FastAPI()
     app.include_router(create_plugin_files_router())
     return TestClient(app)
@@ -40,20 +39,18 @@ def test_lists_the_plugin_files(client):
     assert PLUGIN_FILES <= names
 
 
-def test_serves_a_plugin_file(client):
-    body = client.get("/api/io-plugin/files/router.py").json()
-    assert body["ok"] is True
-    assert "def create_io_router" in body["content"]
+def test_serves_a_plugin_file_as_it_is(client):
+    response = client.get("/api/io-plugin/files/router.py")
+    assert response.status_code == 200
+    assert response.content == (IO / "rti_io" / "plugin" / "router.py").read_bytes()
 
 
-def test_old_file_names_are_gone(client):
-    response = client.get("/api/io-plugin/files/async_client_io.py")
-    assert response.status_code == 410
-    assert "same version" in response.json()["detail"]
+def test_old_file_names_are_not_found(client):
+    assert client.get("/api/io-plugin/files/async_client_io.py").status_code == 404
 
 
-def test_old_files_dir_variable_still_works(monkeypatch, tmp_path):
-    (tmp_path / "router.py").write_text("# test\n", encoding="utf-8")
+def test_the_old_files_dir_variable_is_not_read(monkeypatch, tmp_path):
+    (tmp_path / "only.py").write_text("# test\n", encoding="utf-8")
     monkeypatch.delenv("IO_PLUGIN_FILES_DIR", raising=False)
     monkeypatch.setenv("IO_CLIENT_FILES_DIR", str(tmp_path))
     app = FastAPI()
@@ -61,7 +58,7 @@ def test_old_files_dir_variable_still_works(monkeypatch, tmp_path):
     names = {
         f["name"] for f in TestClient(app).get("/api/io-plugin/files").json()["files"]
     }
-    assert names == {"router.py"}
+    assert "only.py" not in names
 
 
 # Requests for files outside the plugin folder (decision 0019): a step up,
@@ -78,7 +75,6 @@ OUTSIDE_REQUESTS = [
 def test_serves_nothing_outside_the_plugin_folder(client, name):
     response = client.get(f"/api/io-plugin/files/{name}")
     assert response.status_code == 404
-    assert "content" not in response.json()
 
 
 def test_serves_no_subfolder(client, monkeypatch, tmp_path):

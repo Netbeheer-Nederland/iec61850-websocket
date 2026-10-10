@@ -103,4 +103,5 @@ members = [
     "examples/rti-demo/modules/so",
     "examples/rti-demo/modules/fsp",
     "examples/rti-demo/modules/bff",
+    "examples/rti-demo/modules/plugins",
 ]

@@ -34,8 +34,8 @@ The FSP directory implements a complete **IEC 61850 ACSI (Abstract Communication
                                     |                        |
                                     v                        v
                             +--------------------+    +-------------------+
-                            |   model.py         |    |   IO plugin        |
-                            |   (IED Model)      |    |   (IO Integration) |
+                            |   model.py         |    |   plugins          |
+                            |   (IED Model)      |    |   (acsi_plugins)   |
                             +--------------------+    +-------------------+
 ```
 
@@ -100,7 +100,7 @@ A **FastAPI** application that provides REST endpoints for managing the ACSI Ser
 - **Model operations** (read values, write values, update model)
 - **Connection management** (list connections, status)
 - **Message/action logging** (view, clear logs)
-- **IO plugin integration** (connect to the IO service)
+- **Plugins** (the IO plugin and others; decision 0021)
 - **CORS support** for web-based clients
 - **Pydantic validation** for request bodies
 
@@ -120,10 +120,9 @@ A **FastAPI** application that provides REST endpoints for managing the ACSI Ser
 | | POST `/api/iec61850server/actions/clear` | Clear actions |
 | | GET `/api/iec61850server/messages` | View messages |
 | | POST `/api/iec61850server/messages/clear` | Clear messages |
-| **IO Plugin** | POST `/api/io-plugin/connect` | Download and load the IO plugin from the IO server |
-| | GET `/api/io-plugin/connection-status` | IO connection status |
-| | POST `/api/io-plugin/disconnect` | Disconnect from the IO server |
-| | `/api/io/*` | IO router (LEDs, mappings), present once the IO plugin is loaded |
+| **Plugins** | GET, POST `/api/plugins` | List plugins; install one |
+| | POST `/api/plugins/{name}/reload`, DELETE `/api/plugins/{name}` | Reload; remove |
+| | `/api/plugins/{name}/*` | A plugin's own routes, e.g. `/api/plugins/io/leds` |
 
 ---
 
@@ -197,40 +196,42 @@ curl http://localhost:5001/api/iec61850server/status
 
 ## API Usage
 
-The FSP provides a comprehensive REST API for managing the IEC 61850 server in active mode, including server lifecycle control, model operations, data read/write, logging, and IO integration.
+The FSP provides a comprehensive REST API for managing the IEC 61850 server in active mode, including server lifecycle control, model operations, data read/write, logging, and plugins.
 
 For complete API documentation with all endpoints, parameters, and examples, open the interactive OpenAPI docs that
 FastAPI serves at `http://localhost:5001/docs` while the service runs.
 
 ---
 
-## IO Plugin Integration
+## Plugins
 
-The FSP server can drive the IO devices (LEDs, LCDs) of the `io` service and take input from its buttons and
-potentiometers. The IO code is not part of this package: on request, the service downloads the IO plugin files from
-the IO server (`/api/io-plugin/files`), loads them and adds the `/api/io/*` routes to the running app. Nothing is
-fetched at startup.
+The FSP hosts plugins: each links ACSI to another integration, for example the IO plugin to the LEDs, LCDs, buttons and
+potentiometers of the `io` service. The FSP tells every plugin what happens (an association, an Operate, a write, a
+stop), and the plugin that owns an objRef answers an Operate on it. The plugin code isn't part of this package: it is
+downloaded on request from an allowed source, or installed with the image. How plugins work, and how to write one:
+[`modules/plugins/README.md`](../plugins/README.md) and decision
+[0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.md).
 
-### Connect to the IO service
+### Load the IO plugin
 
 ```bash
-curl -X POST http://localhost:5001/api/io-plugin/connect \
+curl -X POST http://localhost:5001/api/plugins \
   -H "Content-Type: application/json" \
-  -d '{"server_url": "http://localhost:9000", "acsi_url": "http://localhost:5001"}'
+  -d '{"name": "io", "source_url": "http://localhost:9000/api/io-plugin/files", "settings": {"acsi_url": "http://localhost:5001"}}'
 ```
 
-`server_url` defaults to `IO_SERVER_URL`. In Docker use `http://rti-io:9000`. The mapping between IO devices and IEC 61850 objects is
+In Docker use `http://rti-io:9000/api/io-plugin/files` and `http://rti-fsp01:5001`. The plugin connects to the server
+it came from (or `settings.io_url`, or `IO_URL`). The mapping between IO devices and IEC 61850 objects is
 `io/rti_io/plugin/io_mapping.json`; see the *Hardware demo* section of `examples/rti-demo/README.md`.
 
-### Check/Disconnect IO
-
 ```bash
-# Check connection
-curl http://localhost:5001/api/io-plugin/connection-status
-
-# Disconnect
-curl -X POST http://localhost:5001/api/io-plugin/disconnect
+curl http://localhost:5001/api/plugins                     # loaded plugins and their health
+curl http://localhost:5001/api/plugins/io/leds             # the IO plugin's routes
+curl -X POST http://localhost:5001/api/plugins/io/reload   # download again, e.g. after an IO server update
+curl -X DELETE http://localhost:5001/api/plugins/io        # remove it
 ```
+
+A downloaded plugin is kept, and loaded again when the FSP starts.
 
 ---
 
@@ -242,9 +243,10 @@ curl -X POST http://localhost:5001/api/io-plugin/disconnect
 |----------|---------|-------------|
 | `PORT` | 5001 | REST API port |
 | `CP` | cp1 | Communication point identifier |
-| `IO_SERVER_URL` | `http://localhost:9000` | Default IO server for `/api/io-plugin/connect` |
-| `IO_URL` | None | Read by the loaded IO plugin: connects it to the IO server without a separate `/api/io/connect` |
-| `IO_PLUGIN_STORAGE` | `/app/io_plugin_dynamic` | Where the downloaded IO plugin files are kept |
+| `PLUGIN_STORAGE` | `/app/plugins` | Where downloaded plugins are kept |
+| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs plugins may be downloaded from |
+| `PLUGINS` | none | JSON list of plugins to load at startup |
+| `IO_URL` | None | Read by the IO plugin: the IO server to connect to, when its settings don't name one |
 
 ### Server Defaults
 

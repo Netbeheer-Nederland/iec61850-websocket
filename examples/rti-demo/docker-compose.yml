@@ -87,6 +87,8 @@ services:
       - CP=cp1
       - MODELPATH=/models/model_1.py
       - IO_URL=http://rti-io:9000
+      # Plugins may be downloaded from the IO server (decision 0021).
+      - PLUGIN_ALLOWED_SOURCES=http://rti-io:9000
     networks:
       - rti-network
     # Health check already defined in the Dockerfile.
@@ -121,6 +123,8 @@ services:
       - CP=cp2
       - MODELPATH=/models/model_2.py
       - IO_URL=http://rti-io:9000
+      # Plugins may be downloaded from the IO server (decision 0021).
+      - PLUGIN_ALLOWED_SOURCES=http://rti-io:9000
     # Healthcheck already defined in the Dockerfile - it reads $PORT at
     # check time (see modules/fsp/docker/Dockerfile), so it correctly
     # targets 5005 for this second instance without needing to be
@@ -149,6 +153,9 @@ services:
       - "5000:5000"
       - "8765:8765"    # WebSocket port - MUST ADD
     # PORT/PYTHONUNBUFFERED and health check already set by the Dockerfile.
+    environment:
+      # Plugins may be downloaded from the IO server (decision 0021).
+      - PLUGIN_ALLOWED_SOURCES=http://rti-io:9000
     networks:
       - rti-network
     labels:

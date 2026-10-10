@@ -70,6 +70,7 @@ jobs:
           cache-suffix: rti-demo-modules
       - run: uv sync --locked --all-packages
       - run: uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q
+      - run: uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q
       - run: uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q
       - run: uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q
       - run: uv run --package fsp pytest examples/rti-demo/modules/io/tests -m unit -q

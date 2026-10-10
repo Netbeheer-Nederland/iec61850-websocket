@@ -1,0 +1,259 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+"""The plugin host: holds the loaded plugins and passes ACSI events and
+operations to them (decision 0021).
+
+Plugin coroutines (start, stop, on_event) all run on one event loop, the web
+app's (`bind_loop`), whichever thread an event comes from. The ACSI runtime
+loop isn't used: the FSP replaces it on every start, and it doesn't exist
+while the server is stopped.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import concurrent.futures
+import logging
+import threading
+from dataclasses import dataclass, field
+from typing import Any
+
+from fastapi import FastAPI
+
+from .contract import AcsiPlugin, ControlResult, Event, PluginContext
+
+logger = logging.getLogger(__name__)
+
+
+class PluginConflictError(Exception):
+    """A plugin can't be added: its name is taken, or it claims an objRef another plugin owns."""
+
+
+@dataclass
+class _Entry:
+    plugin: AcsiPlugin
+    version: str | None
+    source: str | None
+    claims: list[str]
+    app: FastAPI | None
+    healthy: bool = True
+    last_error: str | None = None
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def record(self, error: str | None) -> None:
+        with self.lock:
+            self.healthy = error is None
+            if error is not None:
+                self.last_error = error
+
+
+class PluginHost:
+    """The plugins loaded into one FSP or SO."""
+
+    def __init__(
+        self,
+        role: str,
+        *,
+        event_timeout: float = 5.0,
+        control_timeout: float = 2.0,
+    ):
+        self.role = role
+        self.event_timeout = event_timeout
+        self.control_timeout = control_timeout
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._entries: dict[str, _Entry] = {}
+        self._owners: dict[str, str] = {}
+        self._lock = threading.Lock()
+        # handle_control runs a plugin's handler here, so a handler that
+        # hangs costs a worker thread, not the ACSI runtime loop.
+        self._control_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=4, thread_name_prefix="plugin-control"
+        )
+
+    # ==================== Loop ====================
+
+    def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """Run plugin coroutines on `loop` from now on."""
+        self._loop = loop
+
+    def _bind_running_loop(self) -> None:
+        if self._loop is None or self._loop.is_closed():
+            self._loop = asyncio.get_running_loop()
+
+    # ==================== Plugins ====================
+
+    def names(self) -> list[str]:
+        with self._lock:
+            return list(self._entries)
+
+    def plugin(self, name: str) -> AcsiPlugin | None:
+        with self._lock:
+            entry = self._entries.get(name)
+        return entry.plugin if entry else None
+
+    def app(self, name: str) -> FastAPI | None:
+        """The sub-application serving the plugin's routes, if it has any."""
+        with self._lock:
+            entry = self._entries.get(name)
+        return entry.app if entry else None
+
+    async def add(
+        self,
+        name: str,
+        plugin: AcsiPlugin,
+        *,
+        settings: dict[str, Any] | None = None,
+        version: str | None = None,
+        source: str | None = None,
+    ) -> None:
+        """Start `plugin` and add it under `name`.
+
+        Raises PluginConflictError, without starting the plugin, when the
+        name is taken or an objRef it claims already has an owner.
+        """
+        self._bind_running_loop()
+        claims = list(dict.fromkeys(plugin.claims()))
+        with self._lock:
+            if name in self._entries:
+                raise PluginConflictError(f"A plugin named '{name}' is already loaded")
+            taken = {ref: self._owners[ref] for ref in claims if ref in self._owners}
+        if taken:
+            listed = ", ".join(
+                f"{ref} (owned by '{owner}')" for ref, owner in taken.items()
+            )
+            raise PluginConflictError(
+                f"Plugin '{name}' claims objRefs another plugin owns: {listed}"
+            )
+
+        await plugin.start(
+            PluginContext(
+                name=name,
+                role=self.role,
+                settings=dict(settings or {}),
+                source=source,
+                logger=logging.getLogger(f"acsi_plugins.{name}"),
+            )
+        )
+        router = plugin.router()
+        app = None
+        if router is not None:
+            app = FastAPI(
+                title=f"Plugin {name}", openapi_url=None, docs_url=None, redoc_url=None
+            )
+            app.include_router(router)
+
+        with self._lock:
+            # Checked again: another add may have run while this plugin started.
+            clash = name in self._entries or any(ref in self._owners for ref in claims)
+            if not clash:
+                self._entries[name] = _Entry(plugin, version, source, claims, app)
+                for ref in claims:
+                    self._owners[ref] = name
+        if clash:
+            await self._stop(name, plugin)
+            raise PluginConflictError(
+                f"Plugin '{name}' conflicts with a plugin added meanwhile"
+            )
+        logger.info(f"Plugin '{name}' loaded ({len(claims)} objRefs claimed)")
+
+    async def remove(self, name: str) -> None:
+        """Stop the plugin and remove it. Its objRefs are free again."""
+        with self._lock:
+            entry = self._entries.pop(name, None)
+            if entry is None:
+                return
+            for ref in entry.claims:
+                self._owners.pop(ref, None)
+        await self._stop(name, entry.plugin)
+        logger.info(f"Plugin '{name}' unloaded")
+
+    async def _stop(self, name: str, plugin: AcsiPlugin) -> None:
+        try:
+            await asyncio.wait_for(plugin.stop(), self.event_timeout)
+        except Exception as e:
+            logger.warning(f"Plugin '{name}' failed to stop cleanly: {e!r}")
+
+    def status(self, name: str | None = None) -> Any:
+        """Every plugin's status, or one plugin's (None when it isn't loaded)."""
+        with self._lock:
+            entries = dict(self._entries)
+        listed = [
+            {
+                "name": n,
+                "version": e.version,
+                "source": e.source,
+                "claims": list(e.claims),
+                "routes": e.app is not None,
+                "healthy": e.healthy,
+                "last_error": e.last_error,
+            }
+            for n, e in entries.items()
+        ]
+        if name is None:
+            return listed
+        return next((s for s in listed if s["name"] == name), None)
+
+    # ==================== Events ====================
+
+    def emit(self, event: Event) -> list[concurrent.futures.Future]:
+        """Pass `event` to every plugin. Safe from any thread; doesn't wait.
+
+        Returns one future per plugin, for a caller that has to wait (from a
+        thread other than the plugin loop). Without a loop, nothing is sent.
+        """
+        loop = self._loop
+        if loop is None or loop.is_closed():
+            logger.debug(f"No plugin loop; {type(event).__name__} not delivered")
+            return []
+        with self._lock:
+            entries = list(self._entries.items())
+        return [
+            asyncio.run_coroutine_threadsafe(self._deliver(name, entry, event), loop)
+            for name, entry in entries
+        ]
+
+    async def _deliver(self, name: str, entry: _Entry, event: Event) -> None:
+        kind = type(event).__name__
+        try:
+            await asyncio.wait_for(entry.plugin.on_event(event), self.event_timeout)
+        except TimeoutError:
+            error = f"{kind} timed out after {self.event_timeout}s"
+        except Exception as e:
+            error = f"{kind} failed: {e!r}"
+        else:
+            entry.record(None)
+            return
+        logger.warning(f"Plugin '{name}': {error}")
+        entry.record(error)
+
+    # ==================== Operations ====================
+
+    def handle_control(self, obj_ref: str, ctl_val: dict) -> ControlResult | None:
+        """The owner's answer to an Operate on `obj_ref`; None leaves it to the model
+        (no plugin owns it, or the owner answered None).
+
+        An owner that raises, hangs past the timeout, or answers something
+        that isn't a ControlResult fails the Operate.
+        """
+        with self._lock:
+            name = self._owners.get(obj_ref)
+            entry = self._entries.get(name) if name else None
+        if entry is None:
+            return None
+        future = self._control_pool.submit(
+            entry.plugin.handle_control, obj_ref, ctl_val
+        )
+        try:
+            result = future.result(timeout=self.control_timeout)
+        except concurrent.futures.TimeoutError:
+            error = f"Operate {obj_ref} timed out after {self.control_timeout}s"
+        except Exception as e:
+            error = f"Operate {obj_ref} failed: {e!r}"
+        else:
+            if result is None or isinstance(result, ControlResult):
+                entry.record(None)
+                return result
+            error = f"Operate {obj_ref} answered {result!r}, not a ControlResult"
+        logger.warning(f"Plugin '{name}': {error}")
+        entry.record(error)
+        return ControlResult(False)

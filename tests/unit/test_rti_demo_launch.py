@@ -83,3 +83,22 @@ def test_a_local_io_server_keeps_its_config_out_of_git(launcher):
         ["git", "check-ignore", "-q", str(path)], cwd=LAUNCH_PY.parent
     ).returncode
     assert ignored == 0, f"{path} is not git-ignored"
+
+
+def _launch_module():
+    return sys.modules["rti_demo_launch"]
+
+
+def test_plugins_come_from_the_io_server_by_default(launcher, monkeypatch):
+    monkeypatch.delenv("PLUGIN_ALLOWED_SOURCES", raising=False)
+    env = _launch_module()._plugin_env("fsp")
+    assert env["PLUGIN_ALLOWED_SOURCES"] == "http://localhost:9000,http://rti-io:9000"
+
+
+def test_a_developer_s_plugin_sources_are_added(launcher, monkeypatch):
+    # GETTING_STARTED.md: serve a plugin folder and allow it when launching.
+    monkeypatch.setenv("PLUGIN_ALLOWED_SOURCES", "http://localhost:8099")
+    env = _launch_module()._plugin_env("so")
+    assert env["PLUGIN_ALLOWED_SOURCES"] == (
+        "http://localhost:9000,http://rti-io:9000,http://localhost:8099"
+    )

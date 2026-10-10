@@ -26,6 +26,9 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY src/ ./src/
 COPY examples/rti-demo/modules/so/pyproject.toml ./examples/rti-demo/modules/so/pyproject.toml
+# acsi-plugins, the plugin host: a workspace member this one depends on, so
+# installed with the dependencies - whole, like the ws61850 core in src/.
+COPY examples/rti-demo/modules/plugins/ ./examples/rti-demo/modules/plugins/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project --package so
@@ -66,7 +69,7 @@ COPY --from=builder --chown=app:app /app /app
 # WORKDIR created /app as root before the COPY above - COPY --chown only
 # applies to what it copies in, not retroactively to the pre-existing
 # directory node itself, so /app stays root-owned and the app user can't
-# mkdir into it (e.g. the IO-plugin dynamic-loading directory) without this.
+# mkdir into it (e.g. PLUGIN_STORAGE, /app/plugins) without this.
 RUN chown app:app /app
 
 USER app

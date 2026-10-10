@@ -74,6 +74,7 @@ uv which workspace member's environment/dependencies to use):
 uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q
 uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q
 uv run --package so  pytest examples/rti-demo/modules/so/tests  -m unit -q
+uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q
 # io isn't a workspace member; its tests (IO plugin, plugin file serving) need
 # FastAPI, so they run in the fsp environment
 uv run --package fsp pytest examples/rti-demo/modules/io/tests  -m unit -q
@@ -126,16 +127,22 @@ examples/rti-demo/modules/
 │   ├── pyproject.toml
 │   ├── src/fsp/bff_endpoint.py, acsi_server.py, model.py
 │   ├── docker/Dockerfile
-│   └── tests/test_bff_endpoint.py, test_io_plugin_loading.py
+│   └── tests/test_bff_endpoint.py, test_plugins.py
 ├── so/
 │   ├── pyproject.toml
 │   ├── src/so/bff_endpoint.py, acsi_client.py
 │   ├── docker/Dockerfile
-│   └── tests/test_bff_endpoint.py, test_acsi_client.py, test_io_plugin_loading.py
+│   └── tests/test_bff_endpoint.py, test_acsi_client.py, test_plugins.py
+├── plugins/   # acsi-plugins: the plugin host the fsp and so use (decision 0021)
+│   ├── pyproject.toml
+│   ├── src/acsi_plugins/contract.py, host.py, loader.py, web.py
+│   ├── samples/sim_leds/   # a sample plugin (GETTING_STARTED.md)
+│   └── tests/test_host.py, test_loader.py, test_web.py, test_sample_sim_leds.py
 └── io/        # not a workspace member - see above
     ├── pyproject.toml   # project rti-io
     ├── rti_io/server/, rti_io/plugin/
-    └── tests/test_plugin_files.py, test_plugin_client.py
+    └── tests/test_plugin_files.py, test_plugin_client.py, test_plugin_contract.py,
+        test_no_aliases.py, test_server_config.py
 ```
 
 `fsp` and `so` are each tested through a `fastapi.testclient.TestClient`

@@ -31,5 +31,6 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0018](0018-io-module-names.md) | Names for the IO module: `io` for the role, `rti_io` for the code | accepted |
 | [0019](0019-io-server-serves-only-plugin-files.md) | The IO server serves only the IO plugin's own files | accepted |
 | [0020](0020-so-authorizes-tokens.md) | The SO checks what a token allows, not only that it's genuine | proposed |
+| [0021](0021-acsi-plugin-host.md) | The FSP and SO host several plugins, behind one plugin contract | proposed |
 
 To add a decision, copy the layout of an existing record, take the next number, and add a line to this table.

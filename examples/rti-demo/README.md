@@ -272,8 +272,8 @@ FSP and SO each run their own `io` service and use the same mapping, `modules/io
 |----------------|----------------------------------------------|----------------------------------------------------------------|
 | `led1`         | `connected`, `stopped`                       | The WebSocket association is up (off when stopped)             |
 | `led2`         | `rc_rcv`, `oper_rcv`                         | A report was received (SO) or an operate was received (FSP)    |
-| `led3`         | `setpoints`, `read`, `operate`               | Setpoint, read and operate activity                            |
-| `lcd1`, `lcd_i2c` | all events above, plus `oper_send`, `setpoint`, `writeValue` | Text log of the latest events                  |
+| `led3`         | `setpoint`, `read`, `operate`                | Setpoint, read and operate activity                            |
+| `lcd1`, `lcd_i2c` | all events above, plus `oper_send`, `writeValue`             | Text log of the latest events                  |
 | `button1`      | `LD0/DWMX1.DERAvail.stVal` (FC `st`)         | Toggles the status value; the change triggers a report         |
 | `pot1`         | `LD0/MMXU1.TotW.mag.f` (FC `mx`)             | Sets the measured total power, which is reported               |
 | `pot2`         | operate on `LD0/DWMX1.WMaxSpt` (`float32`)   | Sends an operate with the new power limit                      |
@@ -286,8 +286,9 @@ Demo flow:
 3. Turn `pot1` on the FSP side: the new `TotW` value reaches the SO in the next report.
 4. Turn `pot2` on the SO side: the SO sends an operate on `WMaxSpt`, and `led2` on the FSP side shows that it arrived.
 
-FSP and SO load the IO plugin on request, not at startup: connect each one to its IO server with
-`POST /api/io-plugin/connect` (see *IO Plugin Integration* in [modules/fsp/README.md](modules/fsp/README.md)).
+FSP and SO load the IO plugin on request: install it in each one from its IO server with `POST /api/plugins` (see
+*Plugins* in [modules/fsp/README.md](modules/fsp/README.md)). After that it is kept, and loaded again when they start. To write a plugin of your own, start with
+[modules/plugins/GETTING_STARTED.md](modules/plugins/GETTING_STARTED.md).
 Wiring, pin numbers and the I2C LCD setup are in [modules/io/README.md](modules/io/README.md).
 
 ## IO API Server

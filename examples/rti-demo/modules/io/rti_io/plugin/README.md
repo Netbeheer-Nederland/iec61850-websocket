@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 # IO plugin
 
 > The IO plugin is what the FSP and SO download from the IO server (`GET /api/io-plugin/files`) and load as the package
-> `rti_io_plugin` (decision 0018). In this document "ACSI" is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` /
+> `acsi_io_plugin`, one of the plugins they can host (decision 0021; package `acsi_plugins`). In this document "ACSI" is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` /
 > `so.bff_endpoint`) and the "IO server" is `rti_io.server`. For running the whole stack, see
 > `examples/rti-demo/README.md`.
 
@@ -55,10 +55,9 @@ client = DemoIOClient(base_url="http://localhost:9000")
 client.config_led(name="led1", gpio_pin=17, description="Status LED")
 
 # Control device
-client.turn_on("led1")
-client.turn_off("led1")
-client.toggle_led("led1")
 client.set_device("led1", state=True)
+client.set_device("led1", state=False)
+client.toggle_led("led1")
 
 # Get LED state
 state = client.get_led_state("led1")
@@ -77,12 +76,32 @@ if client.is_healthy():
     print("IO server is healthy")
 ```
 
-### 2. `router.py` - FastAPI IO Router
+### 2. `plugin.py` - RtiIoPlugin
 
-A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying requests to the IO server.
+The plugin itself (`plugin.json` names it as the entry). When loaded it connects to the IO server: the one in its
+settings (`io_url`), else `IO_URL`, else the server it was downloaded from. It tells the IO server where to write input
+changes (`acsi_url`, else `ACSI_BASE_URL`). Then it shows what the FSP or SO tells it:
+
+| Event | FSP | SO |
+|---|---|---|
+| Association | `led1` on, LCD "FSP Connected: <id>" | blink `led1` twice, LCD "Connected: <id>" |
+| Operate request received | blink `led2` | - |
+| Operate answered | LCD "Operation: SUCCESS" / "FAILED - <cause>" | blink `led3`, LCD "Oper <objRef>=<value>" |
+| Write | the value to the mapped devices, LCD "<objRef> : <value>" | the same (if it succeeded), blink `led3`, LCD "Write - ..." |
+| Read | - | blink `led3`, LCD "<objRef> : <value>" |
+| Report | - | blink `led2`, LCD "rptID=... dataSet=..." |
+| Server stop | `led1` off, LCD "Stopped" | - |
+
+Which devices react is in `io_mapping.json`: the names `connected`, `oper_rcv`, `oper_send`, `rc_rcv`, `read`,
+`operate`, `setpoint`, `writeValue` and `stopped` are the plugin's own names for these events.
+
+### 3. `router.py` - FastAPI IO Router
+
+A FastAPI router that provides IO/LED control endpoints, proxying requests to the IO server. The FSP and SO serve it
+under `/api/plugins/io/`.
 
 **Features:**
-- Automatic connection via `IO_URL` environment variable
+- Connected when the plugin is loaded, or with `POST /api/plugins/io/connect`
 - Programmatic connection management via API endpoints
 - Full LED control through REST endpoints (proxied to the IO server device API)
 - Connection status monitoring
@@ -93,56 +112,57 @@ A FastAPI router that provides IO/LED control endpoints for FSP's BFF, proxying 
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/io/connect` | Connect to the IO server |
-| GET | `/api/io/health` | Check the IO server health |
-| GET | `/api/io/status` | Get IO controller status |
-| POST | `/api/io/leds/config` | Configure an LED (proxied to device API) |
-| GET | `/api/io/leds` | List all LEDs and states (proxied to device API) |
-| GET | `/api/io/leds/{name}` | Get specific LED state (proxied to device API) |
-| POST | `/api/io/leds/{name}/set` | Set LED state (proxied to device API) |
-| POST | `/api/io/leds/{name}/toggle` | Toggle LED state (proxied to device API) |
-| POST | `/api/io/leds/{name}/on` | Turn LED on (proxied to device API) |
-| POST | `/api/io/leds/{name}/off` | Turn LED off (proxied to device API) |
-| POST | `/api/io/leds/all/set` | Set all LEDs state (proxied to device API) |
-| POST | `/api/io/leds/all/on` | Turn all LEDs on (proxied to device API) |
-| POST | `/api/io/leds/all/off` | Turn all LEDs off (proxied to device API) |
-| POST | `/api/io/initialize` | Initialize IO controller |
-| POST | `/api/io/cleanup` | Clean up IO resources |
-| POST | `/api/io/mappings/add` | Add IEC 61850 to device mapping |
+| POST | `/api/plugins/io/connect` | Connect to the IO server |
+| GET | `/api/plugins/io/health` | Check the IO server health |
+| GET | `/api/plugins/io/status` | Get IO controller status |
+| POST | `/api/plugins/io/leds/config` | Configure an LED (proxied to device API) |
+| GET | `/api/plugins/io/leds` | List all LEDs and states (proxied to device API) |
+| GET | `/api/plugins/io/leds/{name}` | Get specific LED state (proxied to device API) |
+| POST | `/api/plugins/io/leds/{name}/set` | Set LED state (proxied to device API) |
+| POST | `/api/plugins/io/leds/{name}/toggle` | Toggle LED state (proxied to device API) |
+| POST | `/api/plugins/io/leds/{name}/on` | Turn LED on (proxied to device API) |
+| POST | `/api/plugins/io/leds/{name}/off` | Turn LED off (proxied to device API) |
+| POST | `/api/plugins/io/leds/all/set` | Set all LEDs state (proxied to device API) |
+| POST | `/api/plugins/io/leds/all/on` | Turn all LEDs on (proxied to device API) |
+| POST | `/api/plugins/io/leds/all/off` | Turn all LEDs off (proxied to device API) |
+| POST | `/api/plugins/io/initialize` | Initialize IO controller |
+| POST | `/api/plugins/io/cleanup` | Clean up IO resources |
+| POST | `/api/plugins/io/mappings/add` | Add IEC 61850 to device mapping |
 
-### 3. Integration with ACSI BFF
+### 4. Integration with ACSI BFF
 
 FSP and SO don't ship these files. They download them from the IO server and load them at runtime (see below).
 
 ## Quick Start
 
-### Connect FSP or SO to the IO server
+### Load the IO plugin into the FSP or SO
 
 ```bash
-curl -X POST http://localhost:5001/api/io-plugin/connect \
+curl -X POST http://localhost:5001/api/plugins \
   -H "Content-Type: application/json" \
-  -d '{"server_url": "http://localhost:9000", "acsi_url": "http://localhost:5001"}'
+  -d '{"name": "io", "source_url": "http://localhost:9000/api/io-plugin/files", "settings": {"acsi_url": "http://localhost:5001"}}'
 ```
 
-This downloads the IO plugin files from the IO server (`GET /api/io-plugin/files`), loads them, and adds the
-`/api/io/*` routes to the running service. Use port 5000 for the SO, and `http://rti-io:9000` as `server_url` in Docker. `server_url` defaults to the
-`IO_SERVER_URL` environment variable. If `IO_URL` is set, the loaded router configures its client from it; otherwise
-call `POST /api/io/connect` with `{"base_url": ...}`.
+This downloads the IO plugin's files from the IO server (`plugin.json`, then each file it lists), loads them, connects
+to the IO server, and serves the routes under `/api/plugins/io/`. Use port 5000 for the SO. In Docker the source is
+`http://rti-io:9000/api/io-plugin/files`. The FSP or SO only downloads from a source in `PLUGIN_ALLOWED_SOURCES`
+(compose and `launch.py` set it to the IO server). The plugin is kept, and loaded again when the FSP or SO starts.
 
 Then use the IO routes:
 
 ```bash
-# Connection status
-curl http://localhost:5001/api/io-plugin/connection-status
+# The plugin's status and health
+curl http://localhost:5001/api/plugins/io
+curl http://localhost:5001/api/plugins/io/health
 
 # Control an LED
-curl -X POST http://localhost:5001/api/io/leds/led1/set \
+curl -X POST http://localhost:5001/api/plugins/io/leds/led1/set \
   -H "Content-Type: application/json" \
   -d '{"state": true}'
 
 # Get LED state, or all LEDs
-curl http://localhost:5001/api/io/leds/led1
-curl http://localhost:5001/api/io/leds
+curl http://localhost:5001/api/plugins/io/leds/led1
+curl http://localhost:5001/api/plugins/io/leds
 ```
 
 ### Use the client directly
@@ -153,7 +173,7 @@ sys.path.insert(0, "examples/rti-demo/modules/io")
 from rti_io.plugin.client import DemoIOClient
 
 client = DemoIOClient(base_url="http://localhost:9000")
-client.turn_on("led1")
+client.set_device("led1", state=True)
 client.toggle_led("led2")
 state = client.get_led_state("led1")
 ```
@@ -202,7 +222,7 @@ or from `examples/rti-demo`: `uv run python launch.py fsp so`, or `docker compos
 
 ```bash
 # Configure a new LED
-curl -X POST http://localhost:5001/api/io/leds/config \
+curl -X POST http://localhost:5001/api/plugins/io/leds/config \
   -H "Content-Type: application/json" \
   -d '{
     "name": "new_led",
@@ -212,29 +232,29 @@ curl -X POST http://localhost:5001/api/io/leds/config \
   }'
 
 # Turn it on
-curl -X POST http://localhost:5001/api/io/leds/new_led/on
+curl -X POST http://localhost:5001/api/plugins/io/leds/new_led/on
 
 # Turn it off
-curl -X POST http://localhost:5001/api/io/leds/new_led/off
+curl -X POST http://localhost:5001/api/plugins/io/leds/new_led/off
 
 # Toggle it
-curl -X POST http://localhost:5001/api/io/leds/new_led/toggle
+curl -X POST http://localhost:5001/api/plugins/io/leds/new_led/toggle
 
 # Get its state
-curl http://localhost:5001/api/io/leds/new_led
+curl http://localhost:5001/api/plugins/io/leds/new_led
 ```
 
 ### Example 2: Controlling All LEDs
 
 ```bash
 # Turn all LEDs on
-curl -X POST http://localhost:5001/api/io/leds/all/on
+curl -X POST http://localhost:5001/api/plugins/io/leds/all/on
 
 # Turn all LEDs off
-curl -X POST http://localhost:5001/api/io/leds/all/off
+curl -X POST http://localhost:5001/api/plugins/io/leds/all/off
 
 # Set all LEDs to a specific state
-curl -X POST http://localhost:5001/api/io/leds/all/set \
+curl -X POST http://localhost:5001/api/plugins/io/leds/all/set \
   -H "Content-Type: application/json" \
   -d '{"state": true}'
 ```
@@ -243,21 +263,22 @@ curl -X POST http://localhost:5001/api/io/leds/all/set \
 
 ```bash
 # Get GPIO controller status
-curl http://localhost:5001/api/io/status
+curl http://localhost:5001/api/plugins/io/status
 
 # Check the IO server health
-curl http://localhost:5001/api/io/health
+curl http://localhost:5001/api/plugins/io/health
 
 # Check connection status
-curl http://localhost:5001/api/io-plugin/connection-status
+curl http://localhost:5001/api/plugins
 ```
 
 ## Docker Deployment
 
 ### Docker Compose Example
 
-`examples/rti-demo/docker-compose.yml` already wires this up: `rti-fsp01` and `rti-fsp02` get
-`IO_URL=http://rti-io:9000`, and all services share the external `rti-network`:
+`examples/rti-demo/docker-compose.yml` already wires this up: `rti-fsp01`, `rti-fsp02` and `rti-so` may download
+plugins from `http://rti-io:9000` (`PLUGIN_ALLOWED_SOURCES`), the FSPs get `IO_URL=http://rti-io:9000`, and all
+services share the external `rti-network`:
 
 ```bash
 docker network create rti-network 2>/dev/null || true
@@ -270,8 +291,9 @@ docker compose up -d rti-io rti-fsp01
 ### Testing
 
 The IO plugin's own tests, and the IO server's file serving, run with the fsp environment (it has FastAPI):
-`uv run --package fsp pytest examples/rti-demo/modules/io/tests -q`. The FSP and SO tests cover how it is loaded
-(`uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -q`, and the same for `so`). On a Raspberry Pi, a
+`uv run --package fsp pytest examples/rti-demo/modules/io/tests -q` (`test_plugin_contract.py`: loading, routes and
+every event). How plugins are loaded is tested in `acsi_plugins`
+(`uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -q`). On a Raspberry Pi, a
 script checks the I2C LCD:
 
 ```bash
@@ -283,7 +305,8 @@ python -m rti_io.server.lcd_i2c_check
 
 1. **Extend DemoIOClient**: Add new methods to `client.py` for additional IO server API calls
 2. **Add New Endpoints**: Add new routes to `router.py` to expose new functionality
-3. **Reload**: FSP and SO pick up changed files with `POST /api/io-plugin/reload` (or a new `/api/io-plugin/connect`)
+3. **New files**: list them in `plugin.json` (`files`); the FSP and SO download only what it lists
+4. **Reload**: FSP and SO download the files again with `POST /api/plugins/io/reload`
 
 ## Troubleshooting
 
@@ -298,8 +321,8 @@ python -m rti_io.server.lcd_i2c_check
 
 **Error:** `Client not configured`
 
-- Load the IO plugin first with `POST /api/io-plugin/connect`, then
-- set the `IO_URL` environment variable, or call `POST /api/io/connect` with `{"base_url": ...}`
+- The plugin couldn't reach the IO server when it was loaded (see the FSP's or SO's log), or has no IO server
+- connect it with `POST /api/plugins/io/connect` and `{"base_url": ...}`, or reload it once the IO server runs
 
 ### Port Conflicts
 
@@ -341,19 +364,14 @@ python -m rti_io.server.lcd_i2c_check
 - `initialize()` - Initialize GPIO controller
 - `cleanup()` - Clean up GPIO resources
 
-#### Convenience Methods
-- `turn_on(name)` - Turn LED on
-- `turn_off(name)` - Turn LED off
-- `add_led(name, gpio_pin, **kwargs)` - Alias for config_led
-- `get_all_states()` - Alias for list_leds
-- `create_led(name, gpio_pin, **kwargs)` - Alias for config_led
-
 ## Files
 
+- `plugin.json` - the manifest: name, version, entry class, the files to download
+- `plugin.py` - RtiIoPlugin, what the plugin does with each event
 - `client.py` - DemoIOClient & AsyncIOClient HTTP clients
-- `router.py` - FastAPI IO router that FSP and SO load at runtime
+- `router.py` - FastAPI IO router, served under `/api/plugins/io/`
 - `mapping.py` - IEC 61850 object to IO device mapping (`io_mapping.json`)
-- `utils.py` - helpers (LED blink, LCD write) used by FSP and SO
+- `utils.py` - helpers (LED blink, LCD write) used by `plugin.py`
 - `io_mapping.json` - default mapping
 - `README.md` - This file
 

@@ -33,14 +33,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-# bff_endpoint.py reads IO_PLUGIN_STORAGE at import time and defaults to
-# "/app/io_plugin_dynamic" (a Docker-only path) - unwritable outside a
-# container, so create_bff_router() below would fail on every test. Point it
-# at a throwaway temp dir before the import, same as the env var is meant to
-# be used for any non-Docker deployment.
-os.environ.setdefault(
-    "IO_PLUGIN_STORAGE", tempfile.mkdtemp(prefix="io_plugin_dynamic_")
-)
+# bff_endpoint.py reads PLUGIN_STORAGE at import time and defaults to
+# "/app/plugins" (a Docker-only path). Point it at a throwaway temp dir before
+# the import, so no test can write there.
+os.environ.setdefault("PLUGIN_STORAGE", tempfile.mkdtemp(prefix="plugins_"))
 
 from fsp import bff_endpoint  # noqa: E402 - must follow the env var default above
 
@@ -671,3 +667,12 @@ def test_reconfig_oauth_on_while_stopped_waits_for_connect(client_and_server):
 
     assert response.json()["status"] == "saved"
     assert started == []
+
+
+def test_the_router_takes_no_scl_path():
+    import inspect
+
+    assert (
+        "scl_default_path"
+        not in inspect.signature(bff_endpoint.create_bff_router).parameters
+    )

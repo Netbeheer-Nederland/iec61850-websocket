@@ -17,7 +17,7 @@
     },
     "led3": {
       "device_name": "led3",
-      "objRef": ["setpoints","read", "operate"],
+      "objRef": ["setpoint", "read", "operate"],
       "direction": "output",
       "device_type": "led"
     },

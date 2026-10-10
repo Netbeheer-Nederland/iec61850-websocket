@@ -112,6 +112,23 @@ class ServiceConfig:
     labels: dict[str, str] = field(default_factory=dict)
 
 
+def _plugin_env(name: str) -> dict[str, str]:
+    """Plugin settings for an FSP or SO (decision 0021).
+
+    PLUGIN_STORAGE is relative to the working directory: examples/rti-demo
+    when run from source (git-ignored config/plugins/), /app in a container.
+    Plugins may be downloaded from the IO server, locally or on rti-network,
+    and from the sources in the caller's PLUGIN_ALLOWED_SOURCES (a plugin
+    under development, modules/plugins/GETTING_STARTED.md).
+    """
+    allowed = "http://localhost:9000,http://rti-io:9000"
+    extra = os.environ.get("PLUGIN_ALLOWED_SOURCES", "").strip()
+    return {
+        "PLUGIN_STORAGE": f"config/plugins/{name}",
+        "PLUGIN_ALLOWED_SOURCES": f"{allowed},{extra}" if extra else allowed,
+    }
+
+
 # Service configurations
 SERVICES: dict[ServiceType, ServiceConfig] = {
     ServiceType.BFF: ServiceConfig(
@@ -138,7 +155,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         entry_point="modules/fsp/src/fsp/bff_endpoint.py",
         default_port=5001,
         description="RTI-FSP",
-        env_vars={"PORT": "5001", "CP": "cp1"},
+        env_vars={"PORT": "5001", "CP": "cp1", **_plugin_env("fsp")},
         docker_image=rti_image("fsp"),
         health_check_path="/api/status",
         labels={
@@ -155,7 +172,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         entry_point="modules/fsp/src/fsp/bff_endpoint.py",
         default_port=5005,
         description="RTI-FSP (second instance)",
-        env_vars={"PORT": "5005", "CP": "cp2"},
+        env_vars={"PORT": "5005", "CP": "cp2", **_plugin_env("fsp2")},
         docker_image=rti_image("fsp"),
         health_check_path="/api/status",
         labels={
@@ -172,7 +189,7 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         entry_point="modules/so/src/so/bff_endpoint.py",
         default_port=5000,
         description="RTI-SO",
-        env_vars={"PORT": "5000"},
+        env_vars={"PORT": "5000", **_plugin_env("so")},
         docker_image=rti_image("so"),
         health_check_path="/api/status",
         labels={

@@ -482,6 +482,13 @@ class AsyncIOClient:
             return {"name": name, "state": bool(result["value"])}
         return {"name": name, "state": False}
 
+    async def set_led(self, name: str, state: bool) -> dict[str, Any]:
+        """Turn a specific LED on (True) or off (False).
+
+        This is a convenience method that uses the device API internally.
+        """
+        return await self.set_device(name, state=state)
+
     async def toggle_led(self, name: str) -> dict[str, Any]:
         """Toggle the state of a specific LED.
 
@@ -526,31 +533,7 @@ class AsyncIOClient:
         """Clean up IO resources on the IO server."""
         return await self._request("POST", "/cleanup")
 
-    # ==================== CONVENIENCE METHODS (LEGACY) ====================
-
-    async def turn_on(self, name: str) -> dict[str, Any]:
-        """Turn a device ON."""
-        return await self.set_device(name, state=True)
-
-    async def turn_off(self, name: str) -> dict[str, Any]:
-        """Turn a device OFF."""
-        return await self.set_device(name, state=False)
-
-    async def add_led(
-        self,
-        name: str,
-        gpio_pin: int,
-        description: str = "",
-        initial_state: bool = False,
-    ) -> dict[str, Any]:
-        """Add and configure an LED."""
-        return await self.config_led(name, gpio_pin, description, initial_state)
-
-    async def get_all_states(self) -> dict[str, bool]:
-        """Get the state of all LEDs."""
-        return await self.list_leds()
-
-    # ==================== NEW DEVICE METHODS (v2.0+) ====================
+    # ==================== DEVICE METHODS ====================
 
     async def list_devices(self) -> dict[str, Any]:
         """List all configured devices."""
@@ -746,7 +729,9 @@ class AsyncIOClient:
         Returns:
             Clear confirmation
         """
-        return await self._request("POST", f"/lcd/{device_name}/clear")
+        return await self._request(
+            "POST", f"/lcd/{device_name}/control", json={"clear": True}
+        )
 
     async def write_iec61850_value(self, obj_ref: str, value: Any) -> bool:
         """Handle IEC 61850 write by syncing to mapped device."""
@@ -1076,54 +1061,47 @@ class DemoIOClient:
     def cleanup(self) -> dict[str, Any]:
         return self._sync(self._async_client.cleanup())
 
-    def get_device(self, name: str) -> dict[str, Any]:
-        return self._sync(self._async_client.get_device(name))
-
-    def set_device(self, name: str, state: bool | int | float) -> dict[str, Any]:
-        return self._sync(self._async_client.set_device(name, state))
-
-    def get_device_state(self, name: str) -> dict[str, Any]:
-        return self._sync(self._async_client.get_device_state(name))
-
-    def set_all_devices(self, state: bool | int | float) -> dict[str, Any]:
-        return self._sync(self._async_client.set_all_devices(state))
-
-    def get_all_states(self) -> dict[str, Any]:
-        return self._sync(self._async_client.get_all_states())
-
-    def list_devices(self) -> list[str]:
+    # Device methods
+    def list_devices(self) -> dict[str, Any]:
         return self._sync(self._async_client.list_devices())
 
-    def get_device_info(self, name: str) -> dict[str, Any]:
-        return self._sync(self._async_client.get_device_info(name))
+    def list_device_types(self) -> dict[str, Any]:
+        return self._sync(self._async_client.list_device_types())
 
-    def delete_device(self, name: str) -> dict[str, Any]:
-        return self._sync(self._async_client.delete_device(name))
+    def get_device_status(self, name: str) -> dict[str, Any]:
+        return self._sync(self._async_client.get_device_status(name))
 
-    # Convenience methods
-    def turn_on(self, name: str) -> dict[str, Any]:
-        return self.set_device(name, True)
-
-    def turn_off(self, name: str) -> dict[str, Any]:
-        return self.set_device(name, False)
-
-    def add_led(
+    def config_device(
         self,
         name: str,
-        gpio_pin: int,
+        device_type: str,
+        identifier: int | None = None,
         description: str = "",
-        initial_state: bool = False,
+        **kwargs,
     ) -> dict[str, Any]:
-        return self.config_led(name, gpio_pin, description, initial_state)
+        return self._sync(
+            self._async_client.config_device(
+                name, device_type, identifier, description, **kwargs
+            )
+        )
 
-    def create_led(
-        self,
-        name: str,
-        gpio_pin: int,
-        description: str = "",
-        initial_state: bool = False,
-    ) -> dict[str, Any]:
-        return self.config_led(name, gpio_pin, description, initial_state)
+    def write_device(self, name: str, value: bool | float) -> dict[str, Any]:
+        return self._sync(self._async_client.write_device(name, value))
+
+    def read_device(self, name: str) -> dict[str, Any]:
+        return self._sync(self._async_client.read_device(name))
+
+    def toggle_device(self, name: str) -> dict[str, Any]:
+        return self._sync(self._async_client.toggle_device(name))
+
+    def set_device(self, name: str, state: bool) -> dict[str, Any]:
+        return self._sync(self._async_client.set_device(name, state))
+
+    def read_all_inputs(self) -> dict[str, Any]:
+        return self._sync(self._async_client.read_all_inputs())
+
+    def set_all_outputs(self, state: bool) -> dict[str, Any]:
+        return self._sync(self._async_client.set_all_outputs(state))
 
     # Potentiometer methods
     def config_potentiometer(
@@ -1133,10 +1111,11 @@ class DemoIOClient:
         min_value: float = 0.0,
         max_value: float = 100.0,
         description: str = "",
+        is_inverted: bool = False,
     ) -> dict[str, Any]:
         return self._sync(
             self._async_client.config_potentiometer(
-                name, adc_channel, min_value, max_value, description
+                name, adc_channel, min_value, max_value, description, is_inverted
             )
         )
 
@@ -1146,39 +1125,45 @@ class DemoIOClient:
     def read_potentiometer_scaled(self, name: str) -> float:
         return self._sync(self._async_client.read_potentiometer_scaled(name))
 
-    def list_potentiometers(self) -> list[str]:
-        return self._sync(self._async_client.list_potentiometers())
-
     # Button methods
     def config_button(
-        self, name: str, gpio_pin: int, description: str = "", debounce_ms: int = 50
+        self,
+        name: str,
+        gpio_pin: int,
+        description: str = "",
+        debounce_time: float = 0.05,
+        pull_up: bool = True,
     ) -> dict[str, Any]:
         return self._sync(
-            self._async_client.config_button(name, gpio_pin, description, debounce_ms)
+            self._async_client.config_button(
+                name, gpio_pin, description, debounce_time, pull_up
+            )
         )
 
-    def get_button_state(self, name: str) -> dict[str, Any]:
-        return self._sync(self._async_client.get_button_state(name))
+    def read_button(self, name: str) -> bool:
+        return self._sync(self._async_client.read_button(name))
 
-    def list_buttons(self) -> list[str]:
-        return self._sync(self._async_client.list_buttons())
+    # LCD methods
+    def write_lcd(self, device_name: str, text: str | list[str]) -> dict[str, Any]:
+        return self._sync(self._async_client.write_lcd(device_name, text))
 
-    # Generic IO methods
-    def read_analog(self, channel: int) -> dict[str, Any]:
-        return self._sync(self._async_client.read_analog(channel))
+    def write_lcd_line(
+        self, device_name: str, line_number: int, text: str
+    ) -> dict[str, Any]:
+        return self._sync(
+            self._async_client.write_lcd_line(device_name, line_number, text)
+        )
 
-    def read_digital(self, pin: int) -> dict[str, Any]:
-        return self._sync(self._async_client.read_digital(pin))
-
-    def write_digital(self, pin: int, state: bool) -> dict[str, Any]:
-        return self._sync(self._async_client.write_digital(pin, state))
-
-    def write_pwm(self, pin: int, duty_cycle: float) -> dict[str, Any]:
-        return self._sync(self._async_client.write_pwm(pin, duty_cycle))
+    def clear_lcd(self, device_name: str) -> dict[str, Any]:
+        return self._sync(self._async_client.clear_lcd(device_name))
 
     # IEC61850 write method
-    def write_iec61850(self, obj_ref: str, value: Any, fc: str = "ST") -> bool:
-        return self._sync(self._async_client.write_iec61850(obj_ref, value, fc))
+    def write_to_iec61850(
+        self, obj_ref: str, value: Any, fc: str = "ST", data_type: str = ""
+    ) -> bool:
+        return self._sync(
+            self._async_client.write_to_iec61850(obj_ref, value, fc, data_type)
+        )
 
     # IEC61850 operate method
     def operate_to_iec61850(

@@ -55,9 +55,11 @@ modules/io/
     │   ├── io_config.json    # Default device configurations
     │   ├── plugin_files.py   # Serves the IO plugin's files (GET /api/io-plugin/files)
     │   └── lcd_i2c_check.py  # Hardware check for the I2C LCD
-    └── plugin/               # the IO plugin, downloaded and loaded by the FSP and SO
+    └── plugin/               # the IO plugin, downloaded and loaded by the FSP and SO (decision 0021)
+        ├── plugin.json       # Its manifest: name, version, entry class, files
+        ├── plugin.py         # RtiIoPlugin: what the plugin does with each ACSI event
         ├── client.py         # AsyncIOClient / DemoIOClient for the IO server API
-        ├── router.py         # FastAPI router the FSP and SO mount (/api/io/...)
+        ├── router.py         # FastAPI router the FSP and SO serve under /api/plugins/io/
         ├── utils.py          # Utility functions
         ├── mapping.py        # IEC 61850 to IO device mapping
         └── io_mapping.json   # Default IEC 61850 object mappings
@@ -101,8 +103,8 @@ All endpoints are under the `/api/io/` prefix and provide device management, LED
 |----------|---------|-------------|
 | `PORT` | 9000 | Server port (the same for a direct run, `launch.py` and Docker) |
 | `IO_CONFIG_FILE` | `rti_io/server/io_config.json` | The device configuration the server reads and saves to. A file that doesn't exist yet is seeded from the shipped `io_config.json`. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_config.json`, so saves leave the shipped file unchanged |
-| `IO_PLUGIN_FILES_DIR` | `rti_io/plugin` | The IO plugin files served at `GET /api/io-plugin/files`; `IO_CLIENT_FILES_DIR` (the old name) still works |
-| `IO_PLUGIN_VERSION` | `1.0.0` | The version `GET /api/io-plugin/version` reports; `IO_CLIENT_VERSION` (the old name) still works |
+| `IO_PLUGIN_FILES_DIR` | `rti_io/plugin` | The IO plugin files served, as they are, at `GET /api/io-plugin/files/<file>` |
+| `IO_PLUGIN_VERSION` | `1.0.0` | The version `GET /api/io-plugin/version` reports |
 
 Start the server with `uv run python -m rti_io.server.main` from `examples/rti-demo/modules/io`, or with `launch.py io`;
 the modules use relative imports, so they don't run as scripts. The first uses this project's own environment
@@ -134,8 +136,8 @@ The IO plugin provides connection and synchronization between the IO server serv
 | **AsyncIOClient** | Python client for the IO server REST API |
 | **IO Router** | FastAPI router that proxies requests to the IO server |
 | **IEC 61850 Mapping** | Map IO devices to IEC 61850 data objects |
-| **Automatic Integration** | IO router auto-included in ACSI BFF |
-| **Connection Management** | Connect/disconnect from the IO server via API |
+| **Plugin** | Loaded by the FSP and SO as `acsi_io_plugin`; reacts to their ACSI events |
+| **Connection Management** | Connects to the IO server when loaded; again via `POST /api/plugins/io/connect` |
 | **Bulk Operations** | Control multiple devices at once |
 
 ### Architecture
@@ -143,7 +145,7 @@ The IO plugin provides connection and synchronization between the IO server serv
 The IO plugin provides **two integration paths**:
 
 1. **Direct Client Usage**: Import and use `AsyncIOClient` directly in your code
-2. **Router Proxy**: ACSI exposes IO endpoints that proxy to the IO server via the IO router
+2. **Router Proxy**: the FSP and SO serve the IO router's endpoints under `/api/plugins/io/`, proxied to the IO server
 
 ### IO Router Endpoints
 
@@ -163,7 +165,7 @@ client = DemoIOClient(base_url="http://localhost:9000")
 client.config_led(name="led1", gpio_pin=17, description="Status LED")
 
 # Control device
-client.turn_on("led1")
+client.set_device("led1", state=True)
 client.toggle_led("led2")
 state = client.get_led_state("led1")
 
@@ -350,8 +352,9 @@ The default devices defined in `io_config.json` use the following GPIO configura
 # Check if the IO server is running
 curl http://localhost:9000/api/io/health
 
-# Check if ACSI IO router is connected
-curl http://localhost:5001/api/io-plugin/connection-status
+# Check that the FSP has the IO plugin loaded and healthy
+curl http://localhost:5001/api/plugins
+curl http://localhost:5001/api/plugins/io/health
 
 # List all devices
 curl http://localhost:9000/api/io/devices
