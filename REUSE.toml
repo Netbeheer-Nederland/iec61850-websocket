@@ -12,7 +12,7 @@ version = 1
 path = [
   "docs/protocol_specification/media/**",
   "docs/rti-demo/images/**",
-  "docs/rti-demo/design/demo-setup - whiteboard.drawio",
+  "docs/rti-demo/design/*.drawio",
   "docs/rti-demo/design/wireframe.html",
   "scripts/keycloak/images/**",
 ]
