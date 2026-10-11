@@ -19,9 +19,11 @@ OLD_NAMES = [
     "GPIO-LED-Control",
 ]
 # Where an old name is the point: the decision record, and the tests that
-# check the old names are gone.
+# check the old names are gone. The architecture diagram is drawn by hand and
+# still labels the IO server io_api_server.
 ALLOWED = {
     "docs/rti-demo/decisions/0018-io-module-names.md",
+    "docs/rti-demo/design/RTI-demo-system-architecture.drawio",
     "examples/rti-demo/modules/io-plugin/tests/test_plugin_client.py",
     "examples/rti-demo/modules/fsp/tests/test_io_plugin_loading.py",
     "examples/rti-demo/modules/so/tests/test_io_plugin_loading.py",
