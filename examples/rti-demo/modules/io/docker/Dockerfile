@@ -31,13 +31,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 # Copy io project files (uv.lock must be committed - no in-build resolve)
 COPY pyproject.toml uv.lock /app/
 
-# Create venv and install dependencies (gpiod is in pyproject.toml)
+# Create venv and install the dependencies first, for the layer cache (gpiod is in pyproject.toml)
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv venv && uv sync --frozen --no-dev
+    uv venv && uv sync --frozen --no-dev --no-install-project
 
-# Copy application code
-# The server; the IO plugin is in modules/io-plugin (decision 0022).
-COPY rti_io/ /app/rti_io/
+# The server, the package rpi_io (decision 0023); the IO plugin is in modules/io-plugin (decision 0022).
+COPY README.md /app/
+COPY src/ /app/src/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 
 # ============================================================
@@ -101,5 +103,5 @@ EXPOSE 9000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:$PORT/api/io/health || exit 1
 
-# Run as a module from /app, so rti_io is importable.
-CMD ["python", "-u", "-m", "rti_io.server.main"]
+# rpi_io is installed in /app/.venv, which is first on PATH.
+CMD ["python", "-u", "-m", "rpi_io.main"]

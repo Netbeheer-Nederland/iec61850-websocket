@@ -9,7 +9,7 @@ SPDX-License-Identifier: Apache-2.0
 > The IO plugin is the package `acsi_io_plugin` (distribution `acsi-io-plugin`), one of the plugins the FSP and SO
 > host (decision 0021; package `acsi_plugins`). It is installed with them, not downloaded (decision 0022). In this
 > document "ACSI" is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` / `so.bff_endpoint`) and the "IO server" is
-> `rti_io.server` (`modules/io`). For running the whole stack, see `examples/rti-demo/README.md`.
+> `rpi_io` (`modules/io`). For running the whole stack, see `examples/rti-demo/README.md`.
 
 This package lets ACSI connect to and control the IO server's devices. It has no hardware dependencies: it talks to
 the IO server over HTTP.
@@ -202,10 +202,10 @@ The IO server is configured in `examples/rti-demo/modules/io/`.
 
 ```bash
 # With default port (from examples/rti-demo/modules/io)
-python -m rti_io.server.main
+uv run python -m rpi_io.main
 
 # With custom port
-PORT=9100 python -m rti_io.server.main
+PORT=9100 uv run python -m rpi_io.main
 
 # With Docker (from examples/rti-demo)
 docker compose up -d rti-io
@@ -304,7 +304,7 @@ script in the IO server checks the I2C LCD:
 
 ```bash
 cd examples/rti-demo/modules/io
-python -m rti_io.server.lcd_i2c_check
+uv run python -m rpi_io.lcd_i2c_check
 ```
 
 ### Adding New IO Functionality

@@ -3,17 +3,13 @@
 """Where the IO server keeps its device configuration (IO_CONFIG_FILE)."""
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
+from rpi_io.main import resolve_config_path
 
 IO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(IO))
-
-from rti_io.server.main import resolve_config_path  # noqa: E402
-
-SHIPPED = IO / "rti_io" / "server" / "io_config.json"
+SHIPPED = IO / "src" / "rpi_io" / "io_config.json"
 
 pytestmark = pytest.mark.unit
 

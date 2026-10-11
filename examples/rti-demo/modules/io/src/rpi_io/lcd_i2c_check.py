@@ -21,21 +21,21 @@ Test script for LCD I2C implementation.
 
 Run this script locally to verify the LCD I2C implementation works before deploying to Docker.
 
-Usage, from examples/rti-demo/modules/io:
-    python -m rti_io.server.lcd_i2c_check
+Usage, with the project installed (uv sync), or from src/:
+    python -m rpi_io.lcd_i2c_check
 """
 
 import sys
 from pathlib import Path
 
-from rti_io.server.devices import (
+from .devices import (
     DeviceFactory,
     DeviceType,
     LCDI2CConfig,
     LCDI2CDevice,
     validate_device_config,
 )
-from rti_io.server.io_config import load_config
+from .io_config import load_config
 
 # io_config.json lives next to this file.
 script_dir = Path(__file__).parent

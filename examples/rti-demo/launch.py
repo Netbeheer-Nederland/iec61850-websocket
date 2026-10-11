@@ -213,14 +213,16 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
     ServiceType.IO: ServiceConfig(
         name="IO Device Control API",
         service_type=ServiceType.IO,
-        module="rti_io.server.main",
-        entry_point="modules/io/rti_io/server/main.py",
-        working_dir="modules/io",
+        module="rpi_io.main",
+        entry_point="modules/io/src/rpi_io/main.py",
+        # From src/, so rpi_io is importable without installing its
+        # hardware packages into this environment (decision 0023).
+        working_dir="modules/io/src",
         default_port=9000,
         description="IO Device Control API - REST API for Raspberry Pi IO devices",
         # Relative to working_dir: a git-ignored copy, seeded from the
-        # shipped rti_io/server/io_config.json, so saves leave that unchanged.
-        env_vars={"PORT": "9000", "IO_CONFIG_FILE": "../../config/io_config.json"},
+        # shipped rpi_io/io_config.json, so saves leave that unchanged.
+        env_vars={"PORT": "9000", "IO_CONFIG_FILE": "../../../config/io_config.json"},
         docker_image=rti_image("io"),
         health_check_path="/api/io/health",
         labels={

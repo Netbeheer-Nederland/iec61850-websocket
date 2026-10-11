@@ -304,11 +304,11 @@ uv run python launch.py io
 docker compose up rti-io
 
 # or directly, in the io project's own environment
-cd modules/io && uv run python -m rti_io.server.main
+cd modules/io && uv run python -m rpi_io.main
 ```
 
-`launch.py io` uses the repository's environment (`uv sync --all-packages`). The direct command uses the `io` project's
-own environment instead: `uv run` creates `modules/io/.venv` on first use and installs the Raspberry Pi packages there
+`launch.py io` runs `rpi_io` from `modules/io/src` in the repository's environment (`uv sync --all-packages`). The
+direct command uses the `io` project's own environment instead: `uv run` creates `modules/io/.venv` on first use and installs the Raspberry Pi packages there
 (`gpiod`, `gpiozero`, ...). Use it on a Raspberry Pi; where those packages don't install, use `launch.py io`.
 
 Devices, configuration (`io_config.json`), wiring, Raspberry Pi setup (GPIO, I2C, SPI) and troubleshooting are in
@@ -333,7 +333,7 @@ rti-demo/
     ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }
     ├── fsp/       { pyproject.toml, docker/Dockerfile, src/fsp/, tests/ }
     ├── so/        { pyproject.toml, docker/Dockerfile, src/so/, tests/ }
-    ├── io/        { pyproject.toml, docker/Dockerfile, rti_io/server/, tests/ }  # the IO server
+    ├── io/        { pyproject.toml, docker/Dockerfile, src/rpi_io/, tests/ }  # the IO server (Raspberry Pi)
     ├── io-plugin/ { pyproject.toml, src/acsi_io_plugin/, tests/ }  # the IO plugin, installed in the FSP and SO
     ├── plugins/   { pyproject.toml, src/acsi_plugins/, samples/, tests/ }  # the plugin host
     └── hmi/       { package.json, docker/Dockerfile, src/ }  # Web HMI (React)

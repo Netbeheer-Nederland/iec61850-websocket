@@ -34,4 +34,5 @@ def test_it_imports_nothing_of_the_io_server(path):
         if isinstance(node, ast.Import)
         for alias in node.names
     ]
-    assert [m for m in imported if m.startswith("rti_io")] == []
+    # rpi_io, and rti_io before decision 0023.
+    assert [m for m in imported if m.split(".")[0] in {"rpi_io", "rti_io"}] == []

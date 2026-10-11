@@ -29,7 +29,7 @@ All devices implement a common interface for read/write operations,
 allowing the IOController to manage them uniformly.
 
 Usage:
-    from rti_io.server.devices import IODevice, LEDDevice, PotentiometerDevice, DeviceConfig
+    from rpi_io.devices import IODevice, LEDDevice, PotentiometerDevice, DeviceConfig
 
     # Create a device config
     led_config = LEDConfig(name="led1", gpio_pin=17, initial_state=False)

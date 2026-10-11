@@ -3,17 +3,14 @@
 """The IO server serves no plugin files: the IO plugin is installed with the
 FSP and SO (decision 0022)."""
 
-import sys
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from rpi_io.api_endpoint import create_fastapi_app
+from rpi_io.io_controller import IOController
 
 IO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(IO))
-
-from rti_io.server.api_endpoint import create_fastapi_app  # noqa: E402
-from rti_io.server.io_controller import IOController  # noqa: E402
 
 pytestmark = pytest.mark.unit
 
@@ -37,5 +34,5 @@ def test_the_plugin_files_are_not_served(app, path):
 
 
 def test_it_has_no_plugin_code():
-    assert not (IO / "rti_io" / "plugin").exists()
-    assert not (IO / "rti_io" / "server" / "plugin_files.py").exists()
+    assert not (IO / "src" / "rpi_io" / "plugin").exists()
+    assert not (IO / "src" / "rpi_io" / "plugin_files.py").exists()

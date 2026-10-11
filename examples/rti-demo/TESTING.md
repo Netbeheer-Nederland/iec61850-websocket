@@ -146,9 +146,9 @@ examples/rti-demo/modules/
 │   └── tests/test_installed.py, test_mapping_file.py, test_plugin_contract.py,
 │       test_plugin_client.py, test_no_aliases.py
 └── io/        # the IO server; not a workspace member - see above
-    ├── pyproject.toml   # project rti-io
-    ├── rti_io/server/
-    └── tests/test_no_plugin_files.py, test_server_config.py
+    ├── pyproject.toml   # project rpi-io (decision 0023)
+    ├── src/rpi_io/
+    └── tests/test_no_plugin_files.py, test_server_config.py, test_project.py
 ```
 
 `fsp` and `so` are each tested through a `fastapi.testclient.TestClient`

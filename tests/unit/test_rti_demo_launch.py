@@ -56,13 +56,14 @@ def test_compose_and_launch_agree_on_the_type(launcher):
         ]
 
 
-def test_io_runs_as_a_module_from_modules_io(launcher):
+def test_io_runs_as_a_module_from_modules_io_src(launcher):
     module = importlib.import_module(type(launcher).__module__)
     config = module.SERVICES[module.ServiceType.IO]
     cmd, cwd = launcher._command_for(config)
-    assert cmd[-2:] == ["-m", "rti_io.server.main"]
-    assert cwd == LAUNCH_PY.parent / "modules" / "io"
-    assert (cwd / "rti_io" / "server" / "main.py").is_file()
+    assert cmd[-2:] == ["-m", "rpi_io.main"]
+    assert cwd == LAUNCH_PY.parent / "modules" / "io" / "src"
+    assert (cwd / "rpi_io" / "main.py").is_file()
+    assert (LAUNCH_PY.parent / config.entry_point) == cwd / "rpi_io" / "main.py"
 
 
 def test_bff_still_runs_its_script(launcher):

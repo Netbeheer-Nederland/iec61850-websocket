@@ -16,7 +16,10 @@ DOCKERFILE = (
 )
 
 
-def test_io_image_ships_the_package():
+def test_io_image_installs_the_package():
+    # The code is the package rpi_io in src/, installed by uv (decision 0023).
     text = DOCKERFILE.read_text(encoding="utf-8")
-    assert re.search(r"^COPY rti_io/ /app/rti_io/$", text, re.MULTILINE)
-    assert 'CMD ["python", "-u", "-m", "rti_io.server.main"]' in text
+    assert re.search(r"^COPY src/ /app/src/$", text, re.MULTILINE)
+    assert re.search(r"uv sync --frozen --no-dev$", text, re.MULTILINE)
+    assert 'CMD ["python", "-u", "-m", "rpi_io.main"]' in text
+    assert "rti_io" not in text

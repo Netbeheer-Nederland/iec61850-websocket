@@ -35,3 +35,26 @@ def test_old_name_is_gone(name):
         ["git", "grep", "-l", "-F", name], cwd=ROOT, capture_output=True, text=True
     ).stdout.split()
     assert sorted(set(found) - ALLOWED) == []
+
+
+def test_the_io_server_code_is_rpi_io():
+    # Decision 0023 renamed rti_io to rpi_io; only the decision records keep
+    # the old name, as the paths they were written with, and the tests that
+    # check it is gone.
+    allowed = {
+        "examples/rti-demo/modules/io-plugin/tests/test_installed.py",
+        "examples/rti-demo/modules/io/tests/test_project.py",
+        "tests/unit/test_rti_demo_io_image.py",
+        "tests/unit/test_rti_demo_io_names.py",
+    }
+    found = subprocess.run(
+        ["git", "grep", "-l", "-F", "rti_io"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+    assert [
+        f
+        for f in found
+        if not f.startswith("docs/rti-demo/decisions/") and f not in allowed
+    ] == []

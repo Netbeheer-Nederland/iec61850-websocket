@@ -28,8 +28,8 @@ This module provides a unified interface for managing various IO devices:
 It uses the devices module for device-specific implementations.
 
 Usage:
-    from rti_io.server.io_controller import IOController
-    from rti_io.server.devices import LEDConfig, PotentiometerConfig, DeviceType
+    from rpi_io.io_controller import IOController
+    from rpi_io.devices import LEDConfig, PotentiometerConfig, DeviceType
 
     controller = IOController()
 

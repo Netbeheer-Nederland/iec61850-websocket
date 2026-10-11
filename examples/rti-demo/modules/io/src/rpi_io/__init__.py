@@ -15,8 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-RTI Demo IO Module
-
-Provides GPIO control and FastAPI endpoints for Raspberry Pi I/O operations.
-"""
+"""The rti-demo's IO server for the Raspberry Pi: GPIO and I2C devices behind a
+FastAPI REST API (python -m rpi_io.main). The role is "io"; the IO plugin the
+FSP and SO use to reach it is the package acsi_io_plugin (modules/io-plugin).
+See decisions 0018, 0022 and 0023."""

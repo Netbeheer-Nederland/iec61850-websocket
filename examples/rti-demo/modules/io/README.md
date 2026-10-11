@@ -6,15 +6,15 @@ SPDX-License-Identifier: Apache-2.0
 
 # IO: Raspberry Pi IO Device Control - WebSocket and ACSI Services Integration
 
-This directory contains the **IO server** for Raspberry Pi (`rti_io/server/`): a FastAPI-based REST API service for
-direct hardware control. The FSP and SO reach it through the **IO plugin**, a separate package installed with them:
+This directory contains the **IO server** for Raspberry Pi, the package `rpi_io` (`src/rpi_io/`): a FastAPI-based REST
+API service for direct hardware control. The FSP and SO reach it through the **IO plugin**, a separate package installed with them:
 [`modules/io-plugin`](../io-plugin/README.md) (decision 0022). It keeps devices and IEC 61850 objects in sync.
 
 ## Overview
 
 The IO service enables remote control and monitoring of physical IO devices (LEDs, potentiometers, buttons, LCD displays) through:
 
-- **Direct REST API** via the IO server (`rti_io.server`)
+- **Direct REST API** via the IO server (`rpi_io`)
 - **ACSI Integration** via the IO plugin (`acsi_io_plugin`, in `modules/io-plugin`), which proxies requests to the IO server
 - **IEC 61850 Object Mapping** to connect IO devices to power system data model objects
 
@@ -41,23 +41,22 @@ The IO service enables remote control and monitoring of physical IO devices (LED
 
 ```
 modules/io/
-├── pyproject.toml, uv.lock   # standalone uv project rti-io (not in the root workspace)
+├── pyproject.toml, uv.lock   # standalone uv project rpi-io (not in the root workspace)
 ├── docker/Dockerfile         # multi-stage build; context is modules/io
 ├── tests/                    # uv run --package fsp pytest examples/rti-demo/modules/io/tests -q
-└── rti_io/                   # the Python package
-    ├── server/               # the IO server: python -m rti_io.server.main
-    │   ├── main.py           # Entry point - creates IOController + FastAPI app
-    │   ├── io_controller.py  # Core IO device management (LEDs, pots, buttons, LCDs)
-    │   ├── devices.py        # Device configuration classes and types
-    │   ├── api_endpoint.py   # FastAPI endpoints for device control
-    │   ├── io_config.py      # Configuration loading/saving
-    │   ├── io_config.json    # Default device configurations
-    │   └── lcd_i2c_check.py  # Hardware check for the I2C LCD
+└── src/rpi_io/               # the IO server: python -m rpi_io.main (decision 0023)
+    ├── main.py               # Entry point - creates IOController + FastAPI app
+    ├── io_controller.py      # Core IO device management (LEDs, pots, buttons, LCDs)
+    ├── devices.py            # Device configuration classes and types
+    ├── api_endpoint.py       # FastAPI endpoints for device control
+    ├── io_config.py          # Configuration loading/saving
+    ├── io_config.json        # Default device configurations
+    └── lcd_i2c_check.py      # Hardware check for the I2C LCD
 ```
 
 ---
 
-## Component 1: the IO server (`rti_io.server`) - IO Device Control API
+## Component 1: the IO server (`rpi_io`) - IO Device Control API
 
 A **FastAPI-based web service** that provides REST API endpoints for controlling physical IO devices connected to a Raspberry Pi or simulated devices for development.
 
@@ -92,11 +91,12 @@ All endpoints are under the `/api/io/` prefix and provide device management, LED
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 9000 | Server port (the same for a direct run, `launch.py` and Docker) |
-| `IO_CONFIG_FILE` | `rti_io/server/io_config.json` | The device configuration the server reads and saves to. A file that doesn't exist yet is seeded from the shipped `io_config.json`. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_config.json`, so saves leave the shipped file unchanged |
+| `IO_CONFIG_FILE` | `src/rpi_io/io_config.json` | The device configuration the server reads and saves to. A file that doesn't exist yet is seeded from the shipped `io_config.json`. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_config.json`, so saves leave the shipped file unchanged |
 
-Start the server with `uv run python -m rti_io.server.main` from `examples/rti-demo/modules/io`, or with `launch.py io`;
-the modules use relative imports, so they don't run as scripts. The first uses this project's own environment
-(`modules/io/.venv`, with the Raspberry Pi packages), the second the repository's (`uv sync --all-packages`).
+Start the server with `uv run python -m rpi_io.main` from `examples/rti-demo/modules/io`, or with `launch.py io`;
+the modules use relative imports, so they don't run as scripts. The first installs this project in its own environment
+(`modules/io/.venv`, with the Raspberry Pi packages), the second runs it from `src/` in the repository's
+(`uv sync --all-packages`), where devices whose hardware packages are missing stay unavailable.
 
 ### Hardware Requirements
 
@@ -153,7 +153,7 @@ This mapping allows:
 
 ## Configuration Files
 
-### rti_io/server/io_config.json
+### src/rpi_io/io_config.json
 
 Defines all IO devices and their configurations:
 - Device name, type, and identifier
@@ -277,7 +277,7 @@ The default devices defined in `io_config.json` use the following GPIO configura
 
 | Issue                                  | Solution                                                                  |
 |----------------------------------------|---------------------------------------------------------------------------|
-| **Port already in use**                | Use different port: `PORT=8081 python -m rti_io.server.main`                            |
+| **Port already in use**                | Use different port: `PORT=8081 python -m rpi_io.main`                            |
 | **gpiozero import error (Windows)**    | Normal - uses mock mode. Install gpiozero for Pi.                         |
 | **GPIO permission denied (Linux)**     | Run with sudo or add user to gpio group                                   |
 | **MCP3008 not detected**               | Check SPI wiring, enable SPI in raspi-config                              |
@@ -342,7 +342,7 @@ ls /dev/i2c*
 sudo i2cdetect -y 1
 ```
 
-Most PCF8574 backpacks use address **0x27** or **0x3F**. Set the address in `rti_io/server/io_config.json` as a
+Most PCF8574 backpacks use address **0x27** or **0x3F**. Set the address in `src/rpi_io/io_config.json` as a
 decimal number (`39` is 0x27, `63` is 0x3F):
 
 ```json
