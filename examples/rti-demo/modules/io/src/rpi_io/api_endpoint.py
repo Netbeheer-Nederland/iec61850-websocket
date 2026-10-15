@@ -521,6 +521,18 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             raise HTTPException(status_code=500, detail=str(exc))
 
     @router.get(
+        "/pins",
+        summary="Pin Usage",
+        description="Every GPIO pin of the 40-pin header with the devices or reservations using it, "
+        "the SPI/I2C buses and addresses in use, and the free pins.",
+        response_description="Pin map",
+        tags=["Device Configuration"],
+    )
+    async def api_pins(request: Request):
+        """What uses each header pin."""
+        return {"ok": True, **io_controller.pin_map()}
+
+    @router.get(
         "/devices/types",
         summary="List Device Types",
         description="Returns list of supported device types.",
@@ -620,6 +632,8 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             }
         except HTTPException:
             raise
+        except ValueError as exc:  # invalid config, name taken, or a pin conflict
+            raise HTTPException(status_code=400, detail=str(exc))
         except Exception as exc:
             logger.error(f"Configure device failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
@@ -1026,6 +1040,10 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
         try:
             body = await request.json()
 
+            # Update the reserved pins first: devices are checked against them
+            if "reserved_pins" in body:
+                io_controller.set_reserved_pins(body["reserved_pins"] or [])
+
             # Update device configurations if provided
             if "devices" in body:
                 from .io_config import _dict_to_config
@@ -1074,6 +1092,7 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
                 acsi_config=acsi_dict,
                 device_mappings=global_mappings,
                 path=config_path,
+                reserved_pins=io_controller.reserved_pins,
             )
 
             if not success:
@@ -1098,6 +1117,8 @@ def create_io_router(app: FastAPI, io_controller: IOController) -> APIRouter:
             }
         except HTTPException:
             raise
+        except ValueError as exc:  # invalid config or a pin conflict
+            raise HTTPException(status_code=400, detail=str(exc))
         except Exception as exc:
             logger.error(f"Update full configuration failed: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))

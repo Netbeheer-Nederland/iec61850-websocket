@@ -180,6 +180,10 @@ class PotentiometerConfig(DeviceConfig):
     change_threshold: float = (
         0.01  # Fraction of range to trigger change detection (default 1%)
     )
+    # MCP3008 only: /dev/spidev<spi_bus>.<spi_device> (CE0 = 0, CE1 = 1)
+    spi_bus: int = 0
+    spi_device: int = 0
+    spi_speed_hz: int = 1_000_000
 
     def __post_init__(self):
         if self.identifier == 0 and self.adc_channel != 0:
@@ -199,6 +203,9 @@ class PotentiometerConfig(DeviceConfig):
                 "i2c_bus": self.i2c_bus,
                 "adc_type": self.adc_type,
                 "change_threshold": self.change_threshold,
+                "spi_bus": self.spi_bus,
+                "spi_device": self.spi_device,
+                "spi_speed_hz": self.spi_speed_hz,
             }
         )
         return result
@@ -733,13 +740,14 @@ class PotentiometerDevice(InputDevice):
                         import spidev
 
                         self._spi = spidev.SpiDev()
-                        self._spi.open(0, 0)
-                        self._spi.max_speed_hz = 1000000
+                        self._spi.open(self.config.spi_bus, self.config.spi_device)
+                        self._spi.max_speed_hz = self.config.spi_speed_hz
                         self._adc_type = self.ADC_MCP3008
                         self._channel = self.config.adc_channel
                         self._hardware_available = True
                         logger.info(
-                            f"Initialized potentiometer '{self.config.name}' on MCP3008 ADC channel {self.config.adc_channel}"
+                            f"Initialized potentiometer '{self.config.name}' on MCP3008 ADC channel {self.config.adc_channel} "
+                            f"(/dev/spidev{self.config.spi_bus}.{self.config.spi_device})"
                         )
                         return
                     except (ImportError, AttributeError, OSError) as e:

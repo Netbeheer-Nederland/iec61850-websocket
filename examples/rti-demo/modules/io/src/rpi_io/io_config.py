@@ -135,6 +135,14 @@ def _config_to_dict(config: DeviceConfig) -> dict[str, Any]:
         base_dict["i2c_address"] = getattr(config, "i2c_address", 0x48)
         base_dict["i2c_bus"] = getattr(config, "i2c_bus", 1)
         base_dict["adc_type"] = getattr(config, "adc_type", "ads1115")
+        base_dict["adc_reference_voltage"] = getattr(
+            config, "adc_reference_voltage", 3.3
+        )
+        base_dict["is_inverted"] = getattr(config, "is_inverted", False)
+        base_dict["change_threshold"] = getattr(config, "change_threshold", 0.01)
+        base_dict["spi_bus"] = getattr(config, "spi_bus", 0)
+        base_dict["spi_device"] = getattr(config, "spi_device", 0)
+        base_dict["spi_speed_hz"] = getattr(config, "spi_speed_hz", 1_000_000)
 
     elif config.device_type == DeviceType.PWM:
         base_dict["type"] = "pwm"
@@ -214,6 +222,12 @@ def _dict_to_config(device_dict: dict[str, Any]) -> DeviceConfig | None:
                 i2c_address=device_dict.get("i2c_address", 0x48),
                 i2c_bus=device_dict.get("i2c_bus", 1),
                 adc_type=device_dict.get("adc_type", "ads1115"),
+                adc_reference_voltage=device_dict.get("adc_reference_voltage", 3.3),
+                is_inverted=device_dict.get("is_inverted", False),
+                change_threshold=device_dict.get("change_threshold", 0.01),
+                spi_bus=device_dict.get("spi_bus", 0),
+                spi_device=device_dict.get("spi_device", 0),
+                spi_speed_hz=device_dict.get("spi_speed_hz", 1_000_000),
             )
 
         elif device_type_str == "pwm" or device_dict.get("type") == "pwm":
@@ -268,8 +282,16 @@ def _dict_to_config(device_dict: dict[str, Any]) -> DeviceConfig | None:
         return None
 
 
+def load_reserved_pins(path: str = DEFAULT_CONFIG_FILE) -> list[dict[str, Any]]:
+    """The "reserved_pins" of a config file: pins used by hardware this server doesn't drive."""
+    data = load_full_config(path) if os.path.exists(path) else None
+    return list((data or {}).get("reserved_pins") or [])
+
+
 def save_config(
-    configs: dict[str, DeviceConfig], path: str = DEFAULT_CONFIG_FILE
+    configs: dict[str, DeviceConfig],
+    path: str = DEFAULT_CONFIG_FILE,
+    reserved_pins: list[dict[str, Any]] | None = None,
 ) -> bool:
     """
     Save IO device configurations to a JSON file.
@@ -286,7 +308,11 @@ def save_config(
         for name, config in configs.items():
             devices_list.append(_config_to_dict(config))
 
+        if reserved_pins is None:
+            reserved_pins = load_reserved_pins(path)
         config_data = {"devices": devices_list, "version": 1}
+        if reserved_pins:
+            config_data["reserved_pins"] = reserved_pins
 
         # Ensure directory exists
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -376,6 +402,7 @@ def save_full_config(
     acsi_config: dict[str, Any] | None = None,
     device_mappings: dict[str, dict[str, Any]] | None = None,
     path: str = DEFAULT_CONFIG_FILE,
+    reserved_pins: list[dict[str, Any]] | None = None,
 ) -> bool:
     """
     Save full IO configuration to a JSON file, including devices, ACSI server, and mappings.
@@ -385,11 +412,14 @@ def save_full_config(
         acsi_config: ACSI server configuration dict with 'url' and 'enabled' keys
         device_mappings: Dictionary of device name to mapping dict
         path: Path to the JSON file
+        reserved_pins: Pins reserved for other hardware; None keeps the file's
 
     Returns:
         True if saved successfully, False otherwise
     """
     try:
+        if reserved_pins is None:
+            reserved_pins = load_reserved_pins(path)
         config_data: dict[str, Any] = {}
 
         # Save devices
@@ -409,6 +439,9 @@ def save_full_config(
         # Save mappings if provided
         if device_mappings:
             config_data["mappings"] = device_mappings
+
+        if reserved_pins:
+            config_data["reserved_pins"] = reserved_pins
 
         # Ensure directory exists
         Path(path).parent.mkdir(parents=True, exist_ok=True)

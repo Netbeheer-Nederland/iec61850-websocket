@@ -61,6 +61,7 @@ from .devices import (
     IODevice,
     validate_device_config,
 )
+from .pins import device_claims, find_conflicts, pin_map, reserved_claims
 
 logger = logging.getLogger(__name__)
 
@@ -107,12 +108,15 @@ class IOController:
     configs: dict[str, DeviceConfig] = field(
         default_factory=dict
     )  # name -> DeviceConfig
+    # Pins used by hardware this server doesn't drive (io_config.json "reserved_pins")
+    reserved_pins: list[dict[str, Any]] = field(default_factory=list)
     _initialized: bool = False
 
     def __post_init__(self):
         """Initialize the controller."""
         self.devices = {}
         self.configs = {}
+        self.reserved_pins = []
         self._initialized = False
 
     # ==================== Device Management ====================
@@ -134,6 +138,13 @@ class IOController:
         if config.name in self.configs:
             raise ValueError(
                 f"Device '{config.name}' already exists. Use a unique name."
+            )
+
+        # Check that its pins are free
+        conflicts = find_conflicts(device_claims(config), self._claims())
+        if conflicts:
+            raise ValueError(
+                f"Pin conflict for '{config.name}': " + "; ".join(conflicts)
             )
 
         # Store configuration
@@ -163,6 +174,27 @@ class IOController:
         del self.configs[name]
         logger.info(f"Removed device: {name}")
         return True
+
+    # ==================== Pins ====================
+
+    def _claims(self, reserved: list[dict[str, Any]] | None = None):
+        claims = reserved_claims(self.reserved_pins if reserved is None else reserved)
+        for config in self.configs.values():
+            claims += device_claims(config)
+        return claims
+
+    def set_reserved_pins(self, reserved: list[dict[str, Any]]) -> None:
+        """Reserve pins for other hardware; refused if a configured device uses one."""
+        new = reserved_claims(reserved)
+        devices = [c for config in self.configs.values() for c in device_claims(config)]
+        conflicts = find_conflicts(new, devices)
+        if conflicts:
+            raise ValueError("Reserved pins in use: " + "; ".join(conflicts))
+        self.reserved_pins = list(reserved)
+
+    def pin_map(self) -> dict[str, Any]:
+        """Every header pin and what uses it."""
+        return {**pin_map(self._claims()), "reserved_pins": self.reserved_pins}
 
     def get_device(self, name: str) -> IODevice | None:
         """Get a device by name."""
@@ -543,7 +575,7 @@ class IOController:
         from .io_config import save_config as _save_config
 
         save_path = path or get_config_path()
-        return _save_config(self.configs, save_path)
+        return _save_config(self.configs, save_path, reserved_pins=self.reserved_pins)
 
     def load_config(self, path: str = None) -> bool:
         """
@@ -555,7 +587,7 @@ class IOController:
         Returns:
             True if loaded successfully, False otherwise
         """
-        from .io_config import get_config_path
+        from .io_config import get_config_path, load_reserved_pins
         from .io_config import load_config as _load_config
 
         load_path = path or get_config_path()
@@ -564,14 +596,21 @@ class IOController:
         if configs is None:
             return False
 
+        try:
+            self.set_reserved_pins(load_reserved_pins(load_path))
+        except ValueError as e:
+            logger.error(f"Ignoring reserved_pins in {load_path}: {e}")
+
+        # A device whose pins are taken is left out; the others still load.
+        added = 0
         for name, config in configs.items():
             try:
                 self.add_device(config)
+                added += 1
             except Exception as e:
                 logger.error(f"Failed to add device '{name}' from config: {e}")
-                return False
 
-        logger.info(f"Loaded {len(configs)} device configurations")
+        logger.info(f"Loaded {added}/{len(configs)} device configurations")
         return True
 
     def clear_config(self) -> None:

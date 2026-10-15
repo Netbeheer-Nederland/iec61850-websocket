@@ -223,6 +223,38 @@ The default devices defined in `io_config.json` use the following GPIO configura
 | lcd1        | LCD 16x2      | Multiple       | Multiple     | OUTPUT    | HD44780 4-bit mode                 |
 | lcd_i2c     | LCD I2C       | I2C 0x27       | 3, 5         | OUTPUT    | HD44780 with PCF8574 backpack      |
 
+### Pins are configuration
+
+Every pin is set in `io_config.json`: `gpio_pin` for LEDs, buttons and PWM; `gpio_rs`, `gpio_e`, `gpio_data`
+(`gpio_rw`, `backlight_pin`) for the HD44780 LCD; `i2c_bus` and `i2c_address` for I2C devices; and for an MCP3008
+potentiometer, `spi_bus` and `spi_device` (`/dev/spidev<bus>.<device>`; device 0 is CE0, 1 is CE1) and
+`spi_speed_hz`. Moving a device or adding another one is an edit there, not a code change.
+
+The server checks that no two devices use the same pin. Each device claims the GPIO pins it uses, including the bus
+pins behind it: an SPI device takes SCLK, MOSI, MISO and its chip select; an I2C device takes SDA, SCL and its
+address. Devices on one bus share the bus pins, and the channels of one ADC share its chip select or address. A
+device whose pins are taken is refused: at startup it is logged and left out while the others load, and
+`POST /api/io/devices/config` or `/config/update` answers `400` with the conflict.
+
+Pins used by hardware this server doesn't drive go in `reserved_pins`, so no device is put on them. One example is
+the ST7789V display of dr-st7789v, run on the same Pi with
+`--rst-pin 27 --cs ce1`:
+
+```json
+"reserved_pins": [
+  {"gpio": 25, "by": "ST7789V display DC"},
+  {"gpio": 27, "by": "ST7789V display RST"},
+  {"spi": "0.1", "by": "ST7789V display"}
+]
+```
+
+An entry is `{"gpio": <BCM>}`, `{"spi": "<bus>.<device>"}` (its chip select, sharing the bus pins with this server's
+SPI devices) or `{"i2c": "<bus>@<address>"}`, with `by` saying what uses it. Reserved pins win over devices: a device
+on one is left out. Saving the configuration keeps them, and `/config/update` takes a new list as `reserved_pins`.
+
+`GET /api/io/pins` shows every header pin (BCM and physical number) with what uses it, the SPI and I2C addresses in
+use, and the free pins.
+
 ### LCD Pin Mapping (HD44780 4-bit mode)
 
 | LCD Pin | Pin Name | Raspberry Pi GPIO | Physical Pin | Function                            |
