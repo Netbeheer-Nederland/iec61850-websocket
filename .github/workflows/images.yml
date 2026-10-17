@@ -82,8 +82,8 @@ jobs:
             acsi_client) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-client ; n=ws61850-acsi-ws-client ;;
             acsi_server) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-server ; n=ws61850-acsi-ws-server ;;
             bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=iec61850-websocket/rti-bff ;;
-            io)          c=examples/rti-plugins/io ; f=docker/Dockerfile ; n=iec61850-websocket/rti-io ; p=linux/amd64,linux/arm64 ;;
-            hmi)         c=examples/rti-demo/modules/hmi ; f=docker/Dockerfile ; n=iec61850-websocket/rti-hmi ;;
+            io)          c=examples/rti-plugins/io ; f=examples/rti-plugins/io/docker/Dockerfile ; n=iec61850-websocket/rti-io ; p=linux/amd64,linux/arm64 ;;
+            hmi)         c=examples/rti-demo/modules/hmi ; f=examples/rti-demo/modules/hmi/docker/Dockerfile ; n=iec61850-websocket/rti-hmi ;;
           esac
           {
             echo "ctx=$c"
@@ -117,15 +117,18 @@ jobs:
             type=sha,format=long
             type=raw,value=latest,enable={{is_default_branch}}
 
-#      - uses: docker/build-push-action@v6
-#        with:
-#          context: ${{ steps.img.outputs.ctx }}
-#          file: ${{ steps.img.outputs.file }}
-#          build-args: ${{ steps.img.outputs.args }}
-#          platforms: ${{ steps.img.outputs.platforms }}
-#          push: ${{ github.event_name != 'pull_request' }}
-#          tags: ${{ steps.meta.outputs.tags }}
-#          labels: ${{ steps.meta.outputs.labels }}
-#          cache-from: type=gha,scope=${{ matrix.image }}
-#          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
-#          provenance: false
+      # Builds every image for its platforms, but doesn't publish yet: set
+      # push to ${{ github.event_name != 'pull_request' }} to push to ghcr.io.
+      # `file` is relative to the repository root, not to `context`.
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.img.outputs.ctx }}
+          file: ${{ steps.img.outputs.file }}
+          build-args: ${{ steps.img.outputs.args }}
+          platforms: ${{ steps.img.outputs.platforms }}
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          provenance: false
