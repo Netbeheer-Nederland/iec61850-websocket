@@ -239,9 +239,10 @@ curl -X POST http://localhost:5001/api/plugins/io/reload   # ask it again what i
 |----------|---------|-------------|
 | `PORT` | 5001 | REST API port |
 | `CP` | cp1 | Communication point identifier |
-| `FSP_AUTOSTART` | `true` | Start the ACSI server with the service: dial out to the SO; `false` waits for `POST /api/iec61850server/start` (the HMI's Start) |
-| `FSP_SO_HOST` | `localhost` | The SO to dial at start; `rti-so` in the Docker stack |
-| `FSP_SO_PORT` | 8765 | The SO's WebSocket port to dial at start |
+| `FSP_AUTOSTART` | `true` | Start the ACSI server with the service, not connected (`ready`); `false` waits for `POST /api/iec61850server/start` (the HMI's Connect) |
+| `FSP_AUTOCONNECT` | `false` | With `FSP_AUTOSTART`, also dial out to the SO at `FSP_SO_HOST:FSP_SO_PORT` |
+| `FSP_SO_HOST` | `localhost` | The SO `FSP_AUTOCONNECT` dials; `rti-so` in the Docker stack |
+| `FSP_SO_PORT` | 8765 | Its WebSocket port |
 | `PLUGINS_FILE` | none | The plugin configuration: `{"host_url": ..., "plugins": [{"name", "url", "settings"}]}` |
 | `PLUGINS` | none | The same JSON inline; its plugins and `host_url` win over the file's |
 | `PLUGIN_HOST_URL` | the configuration's `host_url` | Where plugins reach this service, for example to write input changes back |
@@ -250,12 +251,20 @@ curl -X POST http://localhost:5001/api/plugins/io/reload   # ask it again what i
 
 ### Server Defaults
 
-The FSP is the ACSI server and the WebSocket client (decision 0003): it dials out to the SO, it doesn't listen. It
-starts doing so with the service (decision 0033, `FSP_AUTOSTART`), to `FSP_SO_HOST:FSP_SO_PORT` on its `CP`, and
-tries again every few seconds until the SO is there. The auto-start dials without TLS or OAuth; for those, set
-`FSP_AUTOSTART=false` and start it from the HMI, which adds the stored TLS and OAuth settings, or stop it and start
-it again there. `POST /api/iec61850server/stop` and `/start` work as before; `/start` while it runs answers
-"Server is already running".
+The FSP is the ACSI server and the WebSocket client (decision 0003): it dials out to the SO, it doesn't listen.
+Starting the ACSI server and connecting it to the SO are two steps (decision 0033):
+
+| Status | The ACSI server | Connected to the SO | HMI |
+|---|---|---|---|
+| `stopped` | not running: `writevalue` answers `server-not-running` | no | Stopped |
+| `ready` | runs: serves its model, runs its reports, takes writes | no | Ready |
+| `listening` | runs | dials out, tries again every few seconds until the SO is there | Serving |
+
+- `FSP_AUTOSTART` (default on) makes it `ready` when the service starts; `FSP_AUTOCONNECT` (default off) makes it
+  `listening`, to `FSP_SO_HOST:FSP_SO_PORT`.
+- `POST /api/iec61850server/start` (the HMI's Connect) on a `ready` server only dials out; on a stopped one it starts
+  and dials out, as before. With TLS or OAuth from the HMI, connect from there: `FSP_AUTOCONNECT` dials without them.
+- `POST /api/iec61850server/stop` (Disconnect) stops the server, connected or not.
 
 - **SO**: `localhost:8765` (`FSP_SO_HOST`, `FSP_SO_PORT`)
 - **Mode**: `active`, the only one supported

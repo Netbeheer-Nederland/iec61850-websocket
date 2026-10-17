@@ -4,56 +4,64 @@ SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# 33. The FSP dials out to the SO when it starts
+# 33. The FSP's ACSI server starts with the service; connecting to the SO is a separate option
 
 - Status: proposed
 - Date: 2026-10-17
 
 ## Context
 
-[0003](0003-so-passive-fsp-active.md) let the SO listen as soon as it starts (`SO_LISTEN_ON_START`), but kept the
-FSP waiting: its ACSI server, which dials out to the SO, started only on `POST /api/iec61850server/start`, from the
-HMI's Start button. A fresh stack therefore came up with every FSP idle until someone opened the HMI, and:
+The FSP's ACSI server started only on `POST /api/iec61850server/start`, the HMI's Connect, and that one call did two
+things: it started the server (its event loop, the model it serves, its reports) and dialed out to the SO
+([0003](0003-so-passive-fsp-active.md)). Until someone pressed Connect:
 
 - a plugin that writes into the FSP's model (the IO plugin's inputs, the dr-st7789v display) got
-  `server-not-running` until then;
-- an FSP restarted by Docker (`restart`, a crash, a Pi reboot) stayed off the SO until started again by hand;
-- an FSP without the HMI or BFF (on a Pi, beside a display plugin) needed a `curl` to join.
+  `server-not-running`;
+- an FSP restarted by Docker (`restart`, a crash, a Pi reboot) had no running server until started again by hand.
+
+Running the server doesn't need the SO; joining the SO is the operator's choice (0003: "the operator decides when an
+FSP joins"). Tying the two together forced a choice between a server that is down and an FSP that joins unasked.
 
 ## Decision
 
-1. **The FSP starts its ACSI server with the service**, after it has connected its plugins (so they see the
-   association): it dials `FSP_SO_HOST:FSP_SO_PORT` on its `CP`, as `/start` with `mode: active` does.
-2. **Settings**, as the SO's:
+1. **Starting the ACSI server and connecting it to the SO are two steps.** A server started without the SO is
+   `ready`: it serves its model, runs its reports and takes writes, with no connection. Connected, it is `listening`,
+   as before.
+2. **Settings**:
 
    | Variable | Default | |
    |---|---|---|
-   | `FSP_AUTOSTART` | `true` | `false`, `0`, `no` or `off`: wait for `/start`, as before |
-   | `FSP_SO_HOST` | `localhost` | The SO to dial |
+   | `FSP_AUTOSTART` | `true` | Start the ACSI server with the service, `ready`. `false`, `0`, `no` or `off`: wait for `/start` |
+   | `FSP_AUTOCONNECT` | `false` | With `FSP_AUTOSTART`, also dial out to the SO: `listening` |
+   | `FSP_SO_HOST` | `localhost` | The SO `FSP_AUTOCONNECT` dials |
    | `FSP_SO_PORT` | `8765` | Its WebSocket port, the SO's `SO_WS_PORT` |
 
-3. **A failure is logged, not raised**: the REST API starts anyway. An SO that isn't there yet is not a failure;
-   the dial-out tries again every few seconds, so the order in which the services start doesn't matter.
-4. The Docker stack (`docker-compose.yml`) sets `FSP_SO_HOST=rti-so` for both FSPs; `launch.py` sets `localhost`,
-   and `rti-so` with `--docker`.
-5. The auto-start dials **without TLS or OAuth**: those settings are stored by the BFF (`connections.json`) and sent
-   with the HMI's `/start`. An FSP that needs them is started with `FSP_AUTOSTART=false` and from the HMI, or
-   stopped and started again there.
+3. The service starts the server **after it has connected its plugins**, so they see the association. A failure is
+   logged, not raised: the REST API starts anyway. An SO that isn't there yet is not a failure: the dial-out tries
+   again every few seconds.
+4. **`/start` on a `ready` server only dials out**; on a stopped one it starts and dials out, as before. So the
+   HMI's Connect works on an auto-started FSP, and still applies the TLS and OAuth settings the BFF stores
+   (`FSP_AUTOCONNECT` dials without them). `/stop` (Disconnect) stops the server, connected or not.
+5. A running server is `ready` or `listening`: a model loaded in either is applied at once (hot-swap) and the state
+   is kept. The HMI shows `ready` as *Ready*, with Connect enabled.
+6. The Docker stack sets `FSP_SO_HOST=rti-so` for both FSPs; `launch.py` sets `localhost`, and `rti-so` with
+   `--docker`. Neither sets `FSP_AUTOCONNECT`.
 
 ## Consequences
 
-- `docker compose up` gives a running demo: both FSPs associated with the SO, the plugins' writes accepted, without
-  the HMI.
-- The operator no longer decides when an FSP joins (0003's last point); `FSP_AUTOSTART=false` brings that back.
-- The HMI's Start answers "Server is already running" for an auto-started FSP; Stop and Start work as before, and a
-  Start from the HMI is how TLS or OAuth is applied.
-- An FSP started outside the stack, with nothing on `localhost:8765`, keeps trying and logs the connect error
-  (throttled); set `FSP_SO_HOST` or `FSP_AUTOSTART=false`.
-- The FSP's tests switch it off (`modules/fsp/tests/conftest.py`), so an app started in a test doesn't dial out.
+- After `docker compose up` both FSPs serve their models and take the plugins' writes; the operator still connects
+  them, or sets `FSP_AUTOCONNECT=true` for an FSP that joins on its own (on a Pi without the HMI).
+- 0003's "the operator decides when an FSP joins" holds by default.
+- Disconnect stops the server; until the next Connect or a restart of the service, writes get `server-not-running`
+  again.
+- The FSP's tests switch `FSP_AUTOSTART` off (`modules/fsp/tests/conftest.py`), so an app started in a test runs no
+  server.
 
 ## In the code
 
-- `modules/fsp/src/fsp/bff_endpoint.py` (`_autostart`, `_lifespan`)
+- `modules/fsp/src/fsp/acsi_server.py` (`RUNNING`, `start_server`, `connect`), `modules/fsp/src/fsp/bff_endpoint.py`
+  (`_autostart`, `_lifespan`, `/start`)
+- `modules/hmi/src/pages/ACSIServer.jsx` (the label *Ready*)
 - `docker-compose.yml`, `launch.py` (`SERVICES`, `_docker_env`), `modules/fsp/README.md`
-- Tests: `modules/fsp/tests/test_bff_endpoint.py` (`TestAutostart`), `modules/fsp/tests/conftest.py`,
-  `tests/unit/test_rti_demo_launch.py`
+- Tests: `modules/fsp/tests/test_bff_endpoint.py` (`TestAutostart`, `TestReadyServer`), `modules/fsp/tests/conftest.py`,
+  `modules/hmi/src/pages/ACSIServer.test.jsx`, `tests/unit/test_rti_demo_launch.py`

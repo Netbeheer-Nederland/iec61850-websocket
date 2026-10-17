@@ -54,6 +54,10 @@ from ws61850.iec61850.server.service_error import ServiceStatusKind
 ACTION_KINDS = ("system", "acsi")
 
 
+# The states in which the ACSI server runs: without and with the SO.
+RUNNING = ("ready", "listening")
+
+
 class ACSIServerRuntime:
     """Manages IEC 61850 WebSocket server runtime state and lifecycle."""
 
@@ -61,8 +65,10 @@ class ACSIServerRuntime:
         self.endpoint = None
         self.server = None
         self.status: str = (
-            "stopped"  # stopped|starting|listening|stopping|error|reloading
+            "stopped"  # stopped|starting|ready|listening|stopping|error|reloading
         )
+        # ready: the ACSI server runs (model, reports, writes) without a
+        # connection to the SO; listening: it also dials out to the SO.
         self.host: str = "localhost"
         self.port: int = 8765
         self.loop: asyncio.AbstractEventLoop | None = None
@@ -323,7 +329,7 @@ class ACSIServer:
             self.runtime.model_ied_name = ied_model.name
 
         # If server is running and dynamic application is requested, trigger hot-swap
-        if apply_dynamically and self.runtime.status == "listening":
+        if apply_dynamically and self.runtime.status in RUNNING:
             self._apply_model_hot_swap()
         else:
             # Server not running - just update runtime model reference directly
@@ -343,9 +349,10 @@ class ACSIServer:
             bool: True if hot-swap was successful, False otherwise
         """
         with self.runtime.model_lock:
-            if self.runtime.status != "listening":
+            running_status = self.runtime.status
+            if running_status not in RUNNING:
                 self._log_action(
-                    "Hot-swap aborted: server not in listening state",
+                    "Hot-swap aborted: server not running",
                     "warn",
                     kind="system",
                 )
@@ -388,7 +395,7 @@ class ACSIServer:
                 self.runtime.model_reload_in_progress = False
                 if result:
                     self.runtime.pending_model = None
-                    self._set_runtime_state(status="listening")
+                    self._set_runtime_state(status=running_status)
                     self._log_action(
                         "Model hot-swap completed successfully",
                         detail={
@@ -398,7 +405,7 @@ class ACSIServer:
                         kind="system",
                     )
                 else:
-                    self._set_runtime_state(status="listening")
+                    self._set_runtime_state(status=running_status)
                     self._log_action(
                         "Model hot-swap completed with warnings", "warn", kind="system"
                     )
@@ -408,7 +415,7 @@ class ACSIServer:
         except Exception as exc:
             with self.runtime.model_lock:
                 self.runtime.model_reload_in_progress = False
-                self._set_runtime_state(status="listening")
+                self._set_runtime_state(status=running_status)
             self._log_action(f"Model hot-swap failed: {exc}", "error", kind="system")
             # No server restoration needed - we updated in-place
             # The old server instance is still valid with its original model
@@ -804,8 +811,8 @@ class ACSIServer:
             return self.runtime.endpoint._connect_task
         return self.runtime.endpoint.run_in_background(host, port, cp)
 
-    async def _start_server_async(self, host: str, port: int) -> None:
-        """Start the server asynchronously."""
+    async def _start_server_async(self, host: str | None, port: int | None) -> None:
+        """Start the server asynchronously; without a host, don't dial out."""
 
         cp = self.runtime.cp or "cp1"
 
@@ -829,8 +836,8 @@ class ACSIServer:
         )
         tasks: dict[str, asyncio.Task] = {"report": report_task}
 
-        ws_task = await self._start_dial_out(host, port, cp)
-        tasks["ws"] = ws_task
+        if host is not None:
+            tasks["ws"] = await self._start_dial_out(host, port, cp)
 
         self._set_runtime_state(
             endpoint=self.runtime.endpoint,
@@ -843,7 +850,14 @@ class ACSIServer:
         # before we declare the server "listening".
         await asyncio.sleep(0)
 
-        if self.runtime.status != "stopping":
+        if self.runtime.status != "stopping" and host is None:
+            self._set_runtime_state(status="ready")
+            self._log_action(
+                "Server ready, not connected to the SO",
+                detail={"cps": [cp]},
+                kind="system",
+            )
+        elif self.runtime.status != "stopping":
             self._set_runtime_state(status="listening")
             self._log_action(
                 "Server listening",
@@ -867,7 +881,7 @@ class ACSIServer:
             self._log_action(f"Server runtime error: {exc}", "error", kind="system")
             raise
 
-    def _event_loop_thread(self, host: str, port: int) -> None:
+    def _event_loop_thread(self, host: str | None, port: int | None) -> None:
         """Run the event loop in a separate thread."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -902,17 +916,23 @@ class ACSIServer:
             loop.close()
             self._set_runtime_state(loop=None, thread=None)
 
-    def start_server(self, host: str, port: int) -> None:
-        """Start the server in a background thread."""
-        self._validate_port(port)
+    def start_server(self, host: str | None = None, port: int | None = None) -> None:
+        """Start the server in a background thread.
+
+        With a host and port it dials out to the SO there; without, it is
+        "ready": serving its model to no one until connect().
+        """
+        if host is not None:
+            self._validate_port(port)
 
         with self.runtime.lock:
             status = self.runtime.status
-            if status in ("starting", "listening"):
+            if status in ("starting", *RUNNING):
                 raise RuntimeError("Server is already running")
             self.runtime.status = "starting"
-            self.runtime.host = host
-            self.runtime.port = port
+            if host is not None:
+                self.runtime.host = host
+                self.runtime.port = port
             self.runtime.error = None
 
         t = threading.Thread(
@@ -925,6 +945,33 @@ class ACSIServer:
             detail={"host": host, "port": port},
             kind="system",
         )
+
+    def connect(self, host: str, port: int) -> None:
+        """Dial out to the SO: start the server first if it is stopped."""
+        if self.runtime.status != "ready":
+            self.start_server(host, port)
+            return
+        self._validate_port(port)
+        self.invoke_on_runtime_loop(self._connect_async(host, port))
+
+    async def _connect_async(self, host: str, port: int) -> None:
+        """Dial out from a ready server, on its loop."""
+        cp = self.runtime.cp or "cp1"
+        ws_task = await self._start_dial_out(host, port, cp)
+        ws_task.add_done_callback(self._log_failed_dial_out)
+        self.runtime.tasks["ws"] = ws_task
+        self._set_runtime_state(host=host, port=port, status="listening")
+        self._log_action(
+            "Server listening",
+            detail={"host": host, "port": port, "cps": [cp]},
+            kind="system",
+        )
+
+    def _log_failed_dial_out(self, task: asyncio.Task) -> None:
+        if not task.cancelled() and task.exception() is not None:
+            self._log_action(
+                f"Task 'ws' failed: {task.exception()}", "error", kind="system"
+            )
 
     def stop_server(self) -> None:
         """Stop the server."""

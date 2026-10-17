@@ -25,8 +25,9 @@ many FSPs connect to.
 - One SO serves several FSPs, each on its own communication point (`CP`: `cp1`, `cp2`, ...).
 - The SO's WebSocket server starts when the SO starts (`SO_LISTEN_ON_START`, `SO_WS_HOST`, `SO_WS_PORT`;
   default on, `0.0.0.0`, 8765). `POST /api/connect` restarts it after a `POST /api/disconnect`.
-- ~~An FSP dials out only when told to (`/api/start`, the HMI's Connect), so the operator decides when an FSP joins.~~
-  Changed by [0033](0033-fsp-autostart.md): an FSP dials out when it starts, unless `FSP_AUTOSTART=false`.
+- An FSP dials out only when told to (`/api/start`, the HMI's Connect), so the operator decides when an FSP joins.
+  Its ACSI server starts with the service, not connected, and `FSP_AUTOCONNECT` dials out at startup
+  ([0033](0033-fsp-autostart.md)).
 
 ## Consequences
 

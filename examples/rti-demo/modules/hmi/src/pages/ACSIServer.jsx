@@ -836,7 +836,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   }, [stopMonitoring, stopStatusPolling]);
 
   // Display-only translation of the raw backend status (see
-  // fsp/acsi_server.py's runtime.status docstring: stopped|starting|
+  // fsp/acsi_server.py's runtime.status docstring: stopped|starting|ready|
   // listening|stopping|error|reloading) - same approach as
   // ACSIClient.jsx's connectionStatusLabel. The raw value itself is left
   // untouched everywhere it's actually compared (the State color check
@@ -849,6 +849,8 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     const STATUS_LABELS = {
       stopped: 'Stopped',
       starting: 'Starting',
+      // Started with the FSP (FSP_AUTOSTART), not connected: Connect dials out.
+      ready: 'Ready',
       listening: 'Serving',
       stopping: 'Stopping',
       error: 'Error',

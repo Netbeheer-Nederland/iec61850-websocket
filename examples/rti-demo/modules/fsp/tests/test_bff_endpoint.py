@@ -25,6 +25,8 @@ against. Routes are flat (e.g. "/api/status", not
 
 from __future__ import annotations
 
+import socket
+import time
 from pathlib import Path
 
 import pytest
@@ -676,7 +678,7 @@ class FakeServer:
         self.starts = []
         self.logged = []
 
-    def start_server(self, host, port):
+    def start_server(self, host=None, port=None):
         if self.raises:
             raise self.raises
         self.starts.append((host, port))
@@ -686,31 +688,40 @@ class FakeServer:
 
 
 class TestAutostart:
-    """The FSP dials out to the SO when the service starts (decision 0033)."""
+    """The ACSI server starts with the service; connecting is its own option
+    (decision 0033)."""
 
     @pytest.fixture(autouse=True)
     def clean_environment(self, monkeypatch):
-        for var in ("FSP_AUTOSTART", "FSP_SO_HOST", "FSP_SO_PORT"):
+        for var in ("FSP_AUTOSTART", "FSP_AUTOCONNECT", "FSP_SO_HOST", "FSP_SO_PORT"):
             monkeypatch.delenv(var, raising=False)
 
-    def test_dials_localhost_8765_by_default(self):
+    def test_starts_the_server_without_connecting_by_default(self):
+        server = FakeServer()
+        bff_endpoint._autostart(server)
+        assert server.starts == [(None, None)]
+
+    @pytest.mark.parametrize("value", ["false", "0", "no", "off", "False"])
+    def test_can_be_switched_off(self, monkeypatch, value):
+        monkeypatch.setenv("FSP_AUTOSTART", value)
+        monkeypatch.setenv("FSP_AUTOCONNECT", "true")
+        server = FakeServer()
+        bff_endpoint._autostart(server)
+        assert server.starts == []
+
+    def test_autoconnect_dials_localhost_8765_by_default(self, monkeypatch):
+        monkeypatch.setenv("FSP_AUTOCONNECT", "true")
         server = FakeServer()
         bff_endpoint._autostart(server)
         assert server.starts == [("localhost", 8765)]
 
-    def test_host_and_port_from_environment(self, monkeypatch):
+    def test_autoconnect_host_and_port_from_environment(self, monkeypatch):
+        monkeypatch.setenv("FSP_AUTOCONNECT", "true")
         monkeypatch.setenv("FSP_SO_HOST", "rti-so")
         monkeypatch.setenv("FSP_SO_PORT", "9765")
         server = FakeServer()
         bff_endpoint._autostart(server)
         assert server.starts == [("rti-so", 9765)]
-
-    @pytest.mark.parametrize("value", ["false", "0", "no", "off", "False"])
-    def test_can_be_switched_off(self, monkeypatch, value):
-        monkeypatch.setenv("FSP_AUTOSTART", value)
-        server = FakeServer()
-        bff_endpoint._autostart(server)
-        assert server.starts == []
 
     @pytest.mark.parametrize(
         "error", [RuntimeError("Server is already running"), PermissionError("80")]
@@ -721,6 +732,7 @@ class TestAutostart:
         assert any(level == "warn" and str(error) in m for level, m in server.logged)
 
     def test_a_bad_port_is_logged_not_raised(self, monkeypatch):
+        monkeypatch.setenv("FSP_AUTOCONNECT", "true")
         monkeypatch.setenv("FSP_SO_PORT", "so")
         server = FakeServer()
         bff_endpoint._autostart(server)
@@ -728,11 +740,7 @@ class TestAutostart:
         assert server.logged[0][0] == "warn"
 
     def test_the_app_starts_the_server_after_its_plugins(self, monkeypatch, tmp_path):
-        (tmp_path / "model.py").write_text(
-            "from ws61850.iec61850.data_model.ied_model import IedModel\n"
-            "ied = IedModel(name='TestIED')\n",
-            encoding="utf-8",
-        )
+        (tmp_path / "model.py").write_text(MODEL, encoding="utf-8")
         monkeypatch.setenv("MODELPATH", str(tmp_path))
         order = []
 
@@ -748,3 +756,69 @@ class TestAutostart:
         with TestClient(app):
             pass
         assert order == ["plugins", app.state.server]
+
+
+MODEL = (
+    "from ws61850.iec61850.data_model.ied_model import IedModel\n"
+    "ied = IedModel(name='TestIED')\n"
+)
+
+
+def _wait_for(server, status):
+    for _ in range(100):
+        if server.runtime.status == status:
+            return
+        time.sleep(0.02)
+    raise AssertionError(f"{server.runtime.status} != {status}")
+
+
+def _free_port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+class TestReadyServer:
+    """A server started without the SO is ready: it serves its model, and
+    /start only dials out."""
+
+    @pytest.fixture
+    def server(self, client_and_server):
+        _, server = client_and_server
+        yield server
+        server.stop_server()
+
+    def test_ready_then_connected(self, client_and_server, server):
+        client, _ = client_and_server
+        server.start_server()
+        _wait_for(server, "ready")
+        assert "ws" not in server.runtime.tasks
+        assert server.runtime.loop.is_running()  # writes are taken
+
+        port = _free_port()  # nothing there: the dial-out keeps trying
+        response = client.post(
+            "/api/start",
+            json={"host": "127.0.0.1", "port": str(port), "mode": "active"},
+        )
+        assert response.json()["status"] == "listening"
+        assert server.runtime.status == "listening"
+        assert (server.runtime.host, server.runtime.port) == ("127.0.0.1", port)
+        assert not server.runtime.tasks["ws"].done()
+
+        again = client.post(
+            "/api/start",
+            json={"host": "127.0.0.1", "port": str(port), "mode": "active"},
+        )
+        assert "already running" in again.json()["error"]
+
+    def test_a_ready_server_is_started_once(self, server):
+        server.start_server()
+        _wait_for(server, "ready")
+        with pytest.raises(RuntimeError, match="already running"):
+            server.start_server()
+
+    def test_stop_stops_a_ready_server(self, server):
+        server.start_server()
+        _wait_for(server, "ready")
+        server.stop_server()
+        _wait_for(server, "stopped")

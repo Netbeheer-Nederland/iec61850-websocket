@@ -377,6 +377,21 @@ describe('ACSIServer connection status label', () => {
     expect(screen.queryByText('listening')).not.toBeInTheDocument();
     expect(screen.getByText('IED_2')).toBeInTheDocument();
   });
+  it('shows a server started with the FSP as "Ready", with Connect enabled', async () => {
+    executeApiCall.mockImplementation(async (apiId) => {
+      if (apiId === 'status') {
+        return { ok: true, payload: { result: { status: { status: 'ready' } } } };
+      }
+      return { ok: false };
+    });
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Ready')).toBeInTheDocument();
+    });
+    expect(document.getElementById('acsi-start-btn')).not.toBeDisabled();
+    expect(document.getElementById('acsi-stop-btn')).toBeDisabled();
+  });
 });
 
 describe('ACSIServer monitoring - action log ordering', () => {

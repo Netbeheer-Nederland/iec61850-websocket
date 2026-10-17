@@ -50,7 +50,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from fsp.acsi_server import ACSIServer
+from fsp.acsi_server import RUNNING, ACSIServer
 from ws61850.iec61850.data_model.ied_model import DataAttribute, DataObject, IedModel
 from ws61850.security.tls import TLSConfig
 
@@ -129,25 +129,29 @@ class HealthCheckAccessFilter(logging.Filter):
         return logging.getLogger("uvicorn.access").isEnabledFor(logging.DEBUG)
 
 
-def _autostart(server) -> None:
-    """Start the ACSI server (dial out to the SO) with the service.
+def _off(name: str, default: str) -> bool:
+    return os.getenv(name, default).strip().lower() in ("0", "false", "no", "off")
 
-    Decision 0033: the FSP connects to the SO as soon as it starts instead of
-    waiting for a POST /api/iec61850server/start: to FSP_SO_HOST (default
-    localhost) and FSP_SO_PORT (default 8765), on its CP. The dial-out tries
-    again every few seconds while the SO isn't there. FSP_AUTOSTART=false
-    leaves it to /start, as before. A failure is logged, not raised - the
+
+def _autostart(server) -> None:
+    """Start the ACSI server with the service (decision 0033).
+
+    FSP_AUTOSTART (default true) starts it "ready": it serves its model,
+    runs its reports and takes writes, without a connection to the SO; the
+    HMI's Connect (POST /api/iec61850server/start) then only dials out.
+    FSP_AUTOCONNECT (default false) also dials out to FSP_SO_HOST (default
+    localhost) and FSP_SO_PORT (default 8765), trying again every few
+    seconds while the SO isn't there. A failure is logged, not raised - the
     REST API still starts.
     """
-    if os.getenv("FSP_AUTOSTART", "true").strip().lower() in (
-        "0",
-        "false",
-        "no",
-        "off",
-    ):
+    if _off("FSP_AUTOSTART", "true"):
         return
-    host = os.getenv("FSP_SO_HOST", "localhost")
     try:
+        if _off("FSP_AUTOCONNECT", "false"):
+            server.start_server()
+            server._log_action("Autostart: server ready", "info", kind="system")
+            return
+        host = os.getenv("FSP_SO_HOST", "localhost")
         port = int(os.getenv("FSP_SO_PORT", "8765"))
         server.start_server(host, port)
         server._log_action(
@@ -796,7 +800,7 @@ def create_bff_router(factory_dir) -> tuple[APIRouter, ACSIServer]:
         Returns:
             JSONResponse: {
                 "ok": True,
-                "status": str  # One of: "stopped", "starting", "listening", "stopping", "error"
+                "status": str  # One of: "stopped", "starting", "ready", "listening", "stopping", "error"
             }
         """
         try:
@@ -1054,7 +1058,7 @@ def create_bff_router(factory_dir) -> tuple[APIRouter, ACSIServer]:
 
             # Check server status
             server_status = rti_fsp.get_status()
-            is_running = server_status.get("status") == "listening"
+            is_running = server_status.get("status") in RUNNING
 
             # Always apply dynamically if server is running
             ied_model = rti_fsp.update_model_file(model_py, apply_dynamically=True)
@@ -1146,7 +1150,7 @@ def create_bff_router(factory_dir) -> tuple[APIRouter, ACSIServer]:
 
             # Reuse existing logic
             server_status = rti_fsp.get_status()
-            is_running = server_status.get("status") == "listening"
+            is_running = server_status.get("status") in RUNNING
 
             ied_model = rti_fsp.update_model_file(model_py, apply_dynamically=True)
 
@@ -1311,7 +1315,8 @@ def create_bff_router(factory_dir) -> tuple[APIRouter, ACSIServer]:
                 )
 
             try:
-                rti_fsp.start_server(host, port)
+                # A ready server (FSP_AUTOSTART) only dials out.
+                rti_fsp.connect(host, port)
             except Exception as exc:
                 return JSONResponse(
                     content={"ok": False, "error": f"Failed to start server: {exc}"},
