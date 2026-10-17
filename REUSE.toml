@@ -32,9 +32,9 @@ path = [
   "examples/rti-demo/config/launch_config.json.example",
   "examples/rti-demo/modules/bff/src/bff/connections.json",
   "examples/rti-demo/modules/hmi/package.json",
-  "examples/rti-demo/modules/io/src/rpi_io/io_config.json",
-  "examples/rti-demo/modules/io-plugin/src/acsi_io_plugin/io_mapping.json",
-  "examples/rti-demo/modules/plugins/samples/*/plugin.json",
+  "examples/rti-plugins/io/server/src/rpi_io/io_config.json",
+  "examples/rti-plugins/io/plugin/src/acsi_io_plugin/io_mapping.json",
+  "examples/rti-plugins/*/plugin.json",
   "scripts/keycloak/data/realm-test.json",
   "testing/certs/*-csr.json",
   "testing/certs/ca-config.json",
@@ -49,7 +49,7 @@ SPDX-License-Identifier = "Apache-2.0"
 path = [
   ".python-version",
   "uv.lock",
-  "examples/rti-demo/modules/io/uv.lock",
+  "examples/rti-plugins/io/server/uv.lock",
   "examples/rti-demo/modules/hmi/package-lock.json",
 ]
 SPDX-FileCopyrightText = "2026 Netbeheer Nederland"

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Run the demo without Raspberry Pi hardware (a laptop, a CI runner, a VM).
+# Run the IO server without Raspberry Pi hardware (a laptop, a CI runner, a VM).
 # Layer it over docker-compose.yml:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.no-devices.yml up -d
@@ -15,8 +15,7 @@
 # Docker refuses to start a container whose device paths don't exist on the
 # host. This file drops the devices and the settings that only exist for them.
 # rti-io then starts and stays healthy; devices without their hardware log an
-# error at startup and stay unavailable (the I2C LCD runs in mock mode). The
-# other services don't change.
+# error at startup and stay unavailable (the I2C LCD runs in mock mode).
 # Needs Docker Compose 2.24 or later for !reset.
 services:
   rti-io:

@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""The sample plugin samples/sim_leds installs like any downloaded plugin and
-shows events on its two simulated LEDs (GETTING_STARTED.md)."""
+"""The sample plugin sim_leds installs like any downloaded plugin and shows
+events on its two simulated LEDs (modules/plugins/GETTING_STARTED.md in
+examples/rti-demo)."""
 
 import asyncio
 from pathlib import Path
@@ -22,7 +23,7 @@ from fastapi import FastAPI
 
 pytestmark = pytest.mark.unit
 
-SAMPLE = Path(__file__).resolve().parents[1] / "samples" / "sim_leds"
+SAMPLE = Path(__file__).resolve().parents[1]
 SOURCE = "http://dev.test:8099"
 
 

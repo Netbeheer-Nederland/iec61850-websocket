@@ -18,7 +18,10 @@ decision behind it is [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugi
 | `loader.py` | The manifest, the allowed sources, downloading, importing as `acsi_<name>_plugin` |
 | `web.py` | `PluginService` (install, reload, remove, load at startup) and the routes |
 
-`samples/sim_leds/` is a sample plugin (two simulated LEDs); [GETTING_STARTED.md](GETTING_STARTED.md) starts from it.
+The plugins themselves, and the IO server, are in [`examples/rti-plugins`](../../../rti-plugins/README.md) (decision
+[0028](../../../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)): `sim_leds` there is a sample plugin (two
+simulated LEDs), and [GETTING_STARTED.md](GETTING_STARTED.md) starts from it. They depend on this package; it doesn't
+depend on them.
 
 [`openapi.yaml`](openapi.yaml) is the contract for third-party plugins, as OpenAPI 3.1: the `/api/plugins` routes,
 what a plugin source must serve, how a plugin's own routes are reached, and the shapes of the manifest, the events and
@@ -94,8 +97,9 @@ plugin installed with the image is a workspace package that registers its class 
 io = "acsi_io_plugin.plugin:RtiIoPlugin"
 ```
 
-The IO plugin ([`modules/io-plugin`](../io-plugin/README.md), installed with the FSP and SO, decision 0022) is a
-complete example; `samples/sim_leds/` is a small downloadable one, and [GETTING_STARTED.md](GETTING_STARTED.md) walks
+The IO plugin ([`rti-plugins/io/plugin`](../../../rti-plugins/io/plugin/README.md), installed with the FSP and SO,
+decision 0022) is a complete example; [`rti-plugins/sim_leds`](../../../rti-plugins/sim_leds/plugin.py) is a small
+downloadable one, and [GETTING_STARTED.md](GETTING_STARTED.md) walks
 through writing, serving, installing and testing a plugin.
 
 ## Using plugins

@@ -30,8 +30,8 @@ COPY examples/rti-demo/modules/fsp/pyproject.toml ./examples/rti-demo/modules/fs
 # installed with the dependencies - whole, like the ws61850 core in src/.
 COPY examples/rti-demo/modules/plugins/ ./examples/rti-demo/modules/plugins/
 # acsi-io-plugin, the IO plugin: installed with the image, not downloaded
-# (decision 0022).
-COPY examples/rti-demo/modules/io-plugin/ ./examples/rti-demo/modules/io-plugin/
+# (decisions 0022, 0028).
+COPY examples/rti-plugins/io/plugin/ ./examples/rti-plugins/io/plugin/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project --package fsp

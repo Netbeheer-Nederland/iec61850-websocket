@@ -57,9 +57,10 @@ jobs:
           name: junit-${{ matrix.python }}
           path: junit-*.xml
 
-  # The rti-demo modules' tests, as examples/rti-demo/TESTING.md runs them.
-  # The io module (the IO server) isn't a workspace member; its tests run in
-  # the fsp environment, which has FastAPI. Its plugin, io-plugin, is.
+  # The rti-demo modules' tests and the rti-plugins' tests, as
+  # examples/rti-demo/TESTING.md runs them. The IO server isn't a workspace
+  # member; its tests run in the fsp environment, which has FastAPI. Its
+  # plugin is. sim_leds is a downloadable plugin, tested in the host's env.
   rti-demo-modules:
     runs-on: ubuntu-latest
     steps:
@@ -71,10 +72,11 @@ jobs:
       - run: uv sync --locked --all-packages
       - run: uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q
       - run: uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q
-      - run: uv run --package acsi-io-plugin pytest examples/rti-demo/modules/io-plugin/tests -m unit -q
       - run: uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q
       - run: uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q
-      - run: uv run --package fsp pytest examples/rti-demo/modules/io/tests -m unit -q
+      - run: uv run --package acsi-io-plugin pytest examples/rti-plugins/io/plugin/tests -m unit -q
+      - run: uv run --package fsp pytest examples/rti-plugins/io/server/tests -m unit -q
+      - run: uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q
 
   # The HMI's tests and production build (vite), with the Node version its
   # Docker image builds with (modules/hmi/docker/Dockerfile).

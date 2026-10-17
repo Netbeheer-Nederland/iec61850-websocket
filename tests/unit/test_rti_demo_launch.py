@@ -35,6 +35,8 @@ def test_no_verbose_turns_it_off(launcher):
 
 
 COMPOSE = LAUNCH_PY.parent / "docker-compose.yml"
+# The IO server is its own stack (decision 0028); launch.py still runs it.
+IO_SERVER = LAUNCH_PY.parents[1] / "rti-plugins" / "io" / "server"
 
 
 def test_every_service_type_is_an_rti_type(launcher):
@@ -45,7 +47,12 @@ def test_every_service_type_is_an_rti_type(launcher):
 
 def test_compose_and_launch_agree_on_the_type(launcher):
     module = importlib.import_module(type(launcher).__module__)
-    compose = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))["services"]
+    compose = {
+        **yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))["services"],
+        **yaml.safe_load(
+            (IO_SERVER / "docker-compose.yml").read_text(encoding="utf-8")
+        )["services"],
+    }
     for config in module.SERVICES.values():
         service = compose.get(config.labels["rti.service"])
         if service is None:  # the FSPs are named differently in compose
@@ -56,14 +63,16 @@ def test_compose_and_launch_agree_on_the_type(launcher):
         ]
 
 
-def test_io_runs_as_a_module_from_modules_io_src(launcher):
+def test_io_runs_as_a_module_from_the_io_server_s_src(launcher):
     module = importlib.import_module(type(launcher).__module__)
     config = module.SERVICES[module.ServiceType.IO]
     cmd, cwd = launcher._command_for(config)
     assert cmd[-2:] == ["-m", "rpi_io.main"]
-    assert cwd == LAUNCH_PY.parent / "modules" / "io" / "src"
+    assert cwd.resolve() == IO_SERVER / "src"
     assert (cwd / "rpi_io" / "main.py").is_file()
-    assert (LAUNCH_PY.parent / config.entry_point) == cwd / "rpi_io" / "main.py"
+    assert (LAUNCH_PY.parent / config.entry_point).resolve() == (
+        cwd / "rpi_io" / "main.py"
+    ).resolve()
 
 
 def test_bff_still_runs_its_script(launcher):

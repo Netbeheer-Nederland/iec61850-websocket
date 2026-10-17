@@ -22,7 +22,10 @@ From the repository root:
 uv sync --all-packages
 ```
 
-## 1. The sample: `samples/sim_leds/`
+## 1. The sample: `examples/rti-plugins/sim_leds/`
+
+The sample lives with the other plugins, in [`examples/rti-plugins`](../../../rti-plugins/README.md) (decision
+[0028](../../../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)).
 
 | File | What it does |
 |---|---|
@@ -30,6 +33,7 @@ uv sync --all-packages
 | `__init__.py` | Makes the folder a package (`acsi_sim_leds_plugin` once loaded) |
 | `leds.py` | `SimulatedLeds`: two LEDs in memory, blinking, and a history of what changed them |
 | `plugin.py` | `SimLedsPlugin`: the events it reacts to and its routes |
+| `tests/` | Its tests; not in `files`, so not downloaded |
 
 What the LEDs show, in the FSP and in the SO:
 
@@ -73,10 +77,10 @@ class SimLedsPlugin(AcsiPlugin):
 ## 2. Run its tests
 
 ```bash
-uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests/test_sample_sim_leds.py -q
+uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -q
 ```
 
-`tests/test_sample_sim_leds.py` installs the sample the way the FSP does (download from an allowed source, load,
+`tests/test_sim_leds.py` installs the sample the way the FSP does (download from an allowed source, load,
 start), sends it events through the plugin host, and reads the LEDs through its routes. It needs no FSP, SO or
 network: use it as the template for your own plugin's tests, and as the fast way to try a change.
 
@@ -88,7 +92,7 @@ plain file server will do, but only from a source in `PLUGIN_ALLOWED_SOURCES`.
 Serve the sample folder (port 8099; the SO's WebSocket uses 8765):
 
 ```bash
-python3 -m http.server 8099 --bind 127.0.0.1 --directory examples/rti-demo/modules/plugins/samples/sim_leds
+python3 -m http.server 8099 --bind 127.0.0.1 --directory examples/rti-plugins/sim_leds
 ```
 
 In a second terminal, start an FSP that allows that source and keeps its plugins in a scratch folder:
@@ -132,7 +136,7 @@ watch -n 0.5 'curl -s http://localhost:5000/api/plugins/sim_leds/leds'
 
 ## 5. Change it
 
-Edit a file in `samples/sim_leds/`, then load the new version: the FSP downloads it again and restarts the plugin,
+Edit a file in `examples/rti-plugins/sim_leds/`, then load the new version: the FSP downloads it again and restarts the plugin,
 keeping its settings.
 
 ```bash
@@ -151,13 +155,15 @@ When something goes wrong, the answer says why:
 
 ## 6. Make your own
 
-1. Copy the sample: `cp -r samples/sim_leds my_plugins/historian`.
+1. Copy the sample: `cp -r examples/rti-plugins/sim_leds examples/rti-plugins/historian` (or a folder of your own,
+   outside this repository).
 2. In `plugin.json`, set `name` (lowercase letters, digits and `_`; it is loaded as `acsi_<name>_plugin` and served
    under `/api/plugins/<name>/`), `version`, `entry` (`module:Class`) and `files`: every file the plugin needs, in one
    flat folder. Keep `"api": 1`. The rules are the `PluginManifest` schema in [`openapi.yaml`](openapi.yaml).
 3. Import your own modules relatively (`from .leds import ...`). From the host you can import `acsi_plugins`,
    `fastapi` and `pydantic`; a plugin can't bring its own dependencies.
-4. Copy `tests/test_sample_sim_leds.py` next to your plugin and point it at your folder.
+4. Its `tests/` came along: rename `test_sim_leds.py`, and change the name, events and routes to your plugin's. The
+   test serves the folder it sits in, so it needs no other change.
 
 ### Answering an Operate (FSP)
 

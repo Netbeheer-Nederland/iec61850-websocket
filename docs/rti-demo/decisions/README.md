@@ -38,5 +38,6 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0025](0025-plugins-show-attached-devices-in-hmi.md) | Plugins describe what they attach as data; the HMI draws it next to the FSP or SO | proposed |
 | [0026](0026-io-server-pins-are-configuration.md) | The IO server's pins are configuration, claimed per device and checked for conflicts | proposed |
 | [0027](0027-plugin-contract-as-openapi.md) | The plugin contract is published as an OpenAPI 3.1 document, kept in step by a test | proposed |
+| [0028](0028-rti-plugins-folder.md) | Plugins and the IO server move to `examples/rti-plugins`; the IO server is its own stack | proposed |
 
 To add a decision, copy the layout of an existing record, take the next number, and add a line to this table.

@@ -3,7 +3,6 @@
 """openapi.yaml, the contract for third-party plugins, says what the code does."""
 
 import dataclasses
-import json
 from pathlib import Path
 
 import pytest
@@ -63,15 +62,11 @@ async def test_status_fields_are_the_hosts():
     assert set(status) == set(SCHEMAS["PluginStatus"]["properties"])
 
 
-def test_sample_manifest_is_the_example():
-    manifest = json.loads(
-        (ROOT / "samples" / "sim_leds" / "plugin.json").read_text(encoding="utf-8")
-    )
-    loader.Manifest.parse(manifest)
+def test_the_manifest_example_is_a_valid_manifest():
     example = SPEC["paths"]["/plugin.json"]["get"]["responses"]["200"]["content"][
         "application/json"
     ]["example"]
-    assert example == manifest
+    loader.Manifest.parse(example)
 
 
 @pytest.mark.parametrize(

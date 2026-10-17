@@ -15,7 +15,7 @@ members = [
 [[package]]
 name = "acsi-io-plugin"
 version = "2.0.0"
-source = { editable = "examples/rti-demo/modules/io-plugin" }
+source = { editable = "examples/rti-plugins/io/plugin" }
 dependencies = [
     { name = "acsi-plugins" },
     { name = "fastapi" },
@@ -569,7 +569,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "acsi-io-plugin", editable = "examples/rti-demo/modules/io-plugin" },
+    { name = "acsi-io-plugin", editable = "examples/rti-plugins/io/plugin" },
     { name = "acsi-plugins", editable = "examples/rti-demo/modules/plugins" },
     { name = "fastapi", specifier = ">=0.139.0" },
     { name = "httpx2", specifier = ">=2.13.0" },
@@ -1230,7 +1230,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "acsi-io-plugin", editable = "examples/rti-demo/modules/io-plugin" },
+    { name = "acsi-io-plugin", editable = "examples/rti-plugins/io/plugin" },
     { name = "acsi-plugins", editable = "examples/rti-demo/modules/plugins" },
     { name = "fastapi", specifier = ">=0.139.0" },
     { name = "httpx2", specifier = ">=2.13.0" },

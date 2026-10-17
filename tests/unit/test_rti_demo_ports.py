@@ -18,6 +18,9 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 DEMO = ROOT / "examples" / "rti-demo"
 MODULES = DEMO / "modules"
+# The IO server and its plugin, in their own folder (decision 0028).
+IO_SERVER = ROOT / "examples" / "rti-plugins" / "io" / "server"
+IO_PLUGIN = ROOT / "examples" / "rti-plugins" / "io" / "plugin"
 
 EXPECTED_PORTS = {
     "hmi": 8080,
@@ -48,6 +51,11 @@ def compose():
     return yaml.safe_load(_read(DEMO / "docker-compose.yml"))["services"]
 
 
+@pytest.fixture(scope="module")
+def io_compose():
+    return yaml.safe_load(_read(IO_SERVER / "docker-compose.yml"))["services"]
+
+
 @pytest.mark.parametrize(
     ("service", "role"),
     [
@@ -55,7 +63,6 @@ def compose():
         ("rti-so", "so"),
         ("rti-fsp01", "fsp"),
         ("rti-fsp02", "fsp2"),
-        ("rti-io", "io"),
     ],
 )
 def test_compose_publishes_and_labels_the_port(compose, service, role):
@@ -63,6 +70,19 @@ def test_compose_publishes_and_labels_the_port(compose, service, role):
     svc = compose[service]
     assert f"{port}:{port}" in svc["ports"]
     assert f"rti.port={port}" in svc["labels"]
+
+
+def test_the_io_server_s_compose_publishes_and_labels_the_port(io_compose):
+    port = EXPECTED_PORTS["io"]
+    svc = io_compose["rti-io"]
+    assert f"{port}:{port}" in svc["ports"]
+    assert f"rti.port={port}" in svc["labels"]
+
+
+def test_the_io_server_is_its_own_stack_on_the_demo_s_network(compose, io_compose):
+    # Decision 0028: rti-io isn't in the demo's compose, but on its network.
+    assert "rti-io" not in compose
+    assert io_compose["rti-io"]["networks"] == ["rti-network"]
 
 
 def test_compose_publishes_the_hmi_on_8080(compose):
@@ -93,7 +113,7 @@ def test_dockerfile_default_port(module, role):
 
 
 def test_io_dockerfile_port_and_health_check():
-    text = _read(MODULES / "io" / "docker" / "Dockerfile")
+    text = _read(IO_SERVER / "docker" / "Dockerfile")
     assert _one(r"PORT=(\d+)", text, "io Dockerfile ENV") == EXPECTED_PORTS["io"]
     assert _one(r"EXPOSE (\d+)", text, "io Dockerfile EXPOSE") == EXPECTED_PORTS["io"]
     # The health check follows $PORT instead of repeating the number.
@@ -106,7 +126,7 @@ def test_io_dockerfile_port_and_health_check():
         ("bff/src/bff/bff_server.py", "bff"),
         ("so/src/so/bff_endpoint.py", "so"),
         ("fsp/src/fsp/bff_endpoint.py", "fsp"),
-        ("io/src/rpi_io/main.py", "io"),
+        ("../../rti-plugins/io/server/src/rpi_io/main.py", "io"),
     ],
 )
 def test_code_default_port(path, role):
@@ -143,17 +163,17 @@ def test_launch_py_points_the_io_plugin_at_the_io_port():
     [
         # Not acsi_base_url: that's the FSP's address (5001), in the same files.
         (
-            "io-plugin/src/acsi_io_plugin/client.py",
+            "src/acsi_io_plugin/client.py",
             r'\bbase_url: str = "http://localhost:(\d+)"',
         ),
         (
-            "io-plugin/src/acsi_io_plugin/router.py",
+            "src/acsi_io_plugin/router.py",
             r'base_url: str = Field\(\s*default="http://localhost:(\d+)"',
         ),
     ],
 )
 def test_io_client_default_base_url(path, pattern):
-    text = _read(MODULES / path)
+    text = _read(IO_PLUGIN / path)
     assert _one(pattern, text, path) == EXPECTED_PORTS["io"]
 
 

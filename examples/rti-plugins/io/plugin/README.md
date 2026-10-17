@@ -9,7 +9,8 @@ SPDX-License-Identifier: Apache-2.0
 > The IO plugin is the package `acsi_io_plugin` (distribution `acsi-io-plugin`), one of the plugins the FSP and SO
 > host (decision 0021; package `acsi_plugins`). It is installed with them, not downloaded (decision 0022). In this
 > document "ACSI" is the RTI-FSP/RTI-SO REST service (`fsp.bff_endpoint` / `so.bff_endpoint`) and the "IO server" is
-> `rpi_io` (`modules/io`). For running the whole stack, see `examples/rti-demo/README.md`.
+> `rpi_io` (`examples/rti-plugins/io/server`, its own stack; decision 0028). For running the whole stack, see
+> `examples/rti-demo/README.md`.
 
 This package lets ACSI connect to and control the IO server's devices. It has no hardware dependencies: it talks to
 the IO server over HTTP.
@@ -190,7 +191,7 @@ Run it in the workspace: `uv run --package acsi-io-plugin python ...`.
 
 ### IO server
 
-The IO server is configured in `examples/rti-demo/modules/io/`.
+The IO server is configured in `examples/rti-plugins/io/server/`.
 
 **Default Configuration:**
 - Port: 9000, however it's started (`rti-io:9000` on
@@ -201,13 +202,13 @@ The IO server is configured in `examples/rti-demo/modules/io/`.
 **Starting the IO server:**
 
 ```bash
-# With default port (from examples/rti-demo/modules/io)
+# With default port (from examples/rti-plugins/io/server)
 uv run python -m rpi_io.main
 
 # With custom port
 PORT=9100 uv run python -m rpi_io.main
 
-# With Docker (from examples/rti-demo)
+# With Docker, its own stack (from examples/rti-plugins/io/server)
 docker compose up -d rti-io
 ```
 
@@ -283,27 +284,27 @@ curl http://localhost:5001/api/plugins
 ### Docker Compose Example
 
 `examples/rti-demo/docker-compose.yml` already wires this up: `rti-fsp01`, `rti-fsp02` and `rti-so` have the plugin
-in their image and get `IO_URL=http://rti-io:9000` and their own `ACSI_BASE_URL`, and all services share the external
-`rti-network`:
+in their image and get `IO_URL=http://rti-io:9000` and their own `ACSI_BASE_URL`. The IO server is its own stack, and
+both share the external `rti-network`:
 
 ```bash
 docker network create rti-network 2>/dev/null || true
-cd examples/rti-demo
-docker compose up -d rti-io rti-fsp01
+(cd examples/rti-plugins/io/server && docker compose up -d)
+(cd examples/rti-demo && docker compose up -d rti-fsp01)
 ```
 
 ## Development
 
 ### Testing
 
-`uv run --package acsi-io-plugin pytest examples/rti-demo/modules/io-plugin/tests -q`: that it's installed
+`uv run --package acsi-io-plugin pytest examples/rti-plugins/io/plugin/tests -q`: that it's installed
 (`test_installed.py`), its mapping file (`test_mapping_file.py`), its routes and every event
 (`test_plugin_contract.py`), and the client. How plugins are loaded is tested in `acsi_plugins`
 (`uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -q`). On a Raspberry Pi, a
 script in the IO server checks the I2C LCD:
 
 ```bash
-cd examples/rti-demo/modules/io
+cd examples/rti-plugins/io/server
 uv run python -m rpi_io.lcd_i2c_check
 ```
 
@@ -387,7 +388,7 @@ uv run python -m rpi_io.lcd_i2c_check
 - Python 3.13+
 - FastAPI 0.100+
 - httpx2
-- The IO server of the same commit (examples/rti-demo/modules/io/): the plugin's version follows the FSP and SO
+- The IO server of the same commit (examples/rti-plugins/io/server/): the plugin's version follows the FSP and SO
 
 ## License
 

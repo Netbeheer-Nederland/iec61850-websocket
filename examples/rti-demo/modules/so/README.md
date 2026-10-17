@@ -18,7 +18,7 @@ The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication 
 - Reads data values from connected servers
 - Writes data values to connected servers
 - Manages multiple connections and communication points
-- Integrates with IO devices via the IO service (`modules/io`)
+- Integrates with IO devices via the IO service (`examples/rti-plugins/io/server`, its own stack)
 
 ### Architecture
 
@@ -179,11 +179,11 @@ allowed source. How plugins work, and how to write one:
 
 ### The IO plugin
 
-The IO plugin (`acsi_io_plugin`, [`modules/io-plugin`](../io-plugin/README.md)) is installed with the SO: it starts
+The IO plugin (`acsi_io_plugin`, [`rti-plugins/io/plugin`](../../../rti-plugins/io/plugin/README.md)) is installed with the SO: it starts
 with it and connects to the IO server at `IO_URL`, which writes input changes back to `ACSI_BASE_URL` (decision
 [0022](../../../../docs/rti-demo/decisions/0022-io-plugin-own-package.md)). `launch.py` and compose set both; in Docker
 they are `http://rti-io:9000` and `http://rti-so:5000`. Without `IO_URL` the plugin does nothing. The mapping between IO
-devices and IEC 61850 objects is `io-plugin/src/acsi_io_plugin/io_mapping.json`; see the *Hardware demo* section of
+devices and IEC 61850 objects is `examples/rti-plugins/io/plugin/src/acsi_io_plugin/io_mapping.json`; see the *Hardware demo* section of
 `examples/rti-demo/README.md`.
 
 ```bash

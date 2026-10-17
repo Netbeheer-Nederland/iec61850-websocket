@@ -1,9 +1,10 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""docker-compose.no-devices.yml runs the rti-demo without Raspberry Pi hardware.
+"""docker-compose.no-devices.yml runs the IO server without Raspberry Pi hardware.
 
-Layered over docker-compose.yml, it must drop everything in rti-io that needs
-the host's GPIO/I2C/SPI devices, so `docker compose up` works on any machine.
+Layered over the IO server's docker-compose.yml (its own stack, decision
+0028), it must drop everything in rti-io that needs the host's GPIO/I2C/SPI
+devices, so `docker compose up` works on any machine.
 """
 
 from pathlib import Path
@@ -11,7 +12,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-DEMO = Path(__file__).resolve().parents[2] / "examples" / "rti-demo"
+IO_SERVER = (
+    Path(__file__).resolve().parents[2] / "examples" / "rti-plugins" / "io" / "server"
+)
 
 # rti-io settings that only work, or only make sense, with the Pi's devices.
 HARDWARE_KEYS = ["devices", "group_add", "user", "ipc", "security_opt", "cap_add"]
@@ -29,7 +32,7 @@ _ComposeLoader.add_multi_constructor("!", _tagged)
 
 
 def _service(name: str, file: str) -> dict:
-    text = (DEMO / file).read_text(encoding="utf-8")
+    text = (IO_SERVER / file).read_text(encoding="utf-8")
     return yaml.load(text, Loader=_ComposeLoader)["services"][name]  # noqa: S506
 
 

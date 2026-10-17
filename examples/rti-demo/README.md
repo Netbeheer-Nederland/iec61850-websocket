@@ -123,7 +123,7 @@ docker network create rti-network 2>/dev/null || true
 Images are named:
 
 ```
-${RTI_IMAGE_REPO}/rti-<role>:${RTI_IMAGE_TAG}     # role: bff, hmi, fsp, so, io
+${RTI_IMAGE_REPO}/rti-<role>:${RTI_IMAGE_TAG}     # role: bff, hmi, fsp, so; and io (the IO server, its own stack)
 ```
 
 | Variable         | Default                                  | Published on GitHub                                         |
@@ -160,21 +160,22 @@ published images and not your local checkout. `--no-build` stops compose from bu
 that could not be pulled. Put the two variables in `examples/rti-demo/.env` to make the setting
 persistent.
 
-### Without Raspberry Pi hardware
+### The IO server (Raspberry Pi)
 
-`docker-compose.yml` passes the Raspberry Pi's GPIO, I2C and SPI devices into `rti-io`. Docker won't start a container
-whose device paths are missing on the host. On any other machine, add `docker-compose.no-devices.yml`. It removes the
-devices from `rti-io`, along with the settings that only exist for them: `group_add`, `user`, `ipc`, `security_opt`
-and `cap_add`.
+The IO server, `rti-io`, isn't part of this stack: it runs on the Raspberry Pi and has its own compose file in
+[`examples/rti-plugins/io/server`](../rti-plugins/io/server/README.md) (decision
+[0028](../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)). It joins `rti-network` too, so the FSPs and SO reach
+it as `http://rti-io:9000`. The demo runs without it: the IO plugin logs that it can't connect and stays loaded.
 
 ```shell
-cd examples/rti-demo
-docker compose -f docker-compose.yml -f docker-compose.no-devices.yml up -d
+cd examples/rti-plugins/io/server
+docker compose up -d                                                        # on the Raspberry Pi
+docker compose -f docker-compose.yml -f docker-compose.no-devices.yml up -d # anywhere else (mock mode)
 ```
 
-Set `COMPOSE_FILE=docker-compose.yml:docker-compose.no-devices.yml` in `examples/rti-demo/.env` to make it persistent.
-This needs Docker Compose 2.24 or later. `rti-io` then starts and is healthy. Devices whose hardware is missing log an
-error at startup and stay unavailable, except the I2C LCD, which runs in mock mode. The other services don't change.
+`docker-compose.no-devices.yml` removes the Pi's devices from `rti-io`, and the settings that only exist for them,
+because Docker won't start a container whose device paths are missing. It needs Docker Compose 2.24 or later. Devices
+whose hardware is missing log an error at startup and stay unavailable, except the I2C LCD, which runs in mock mode.
 
 ### Launch with Docker (all services by default)
 
@@ -266,7 +267,7 @@ The `BFF_CONNECTIONS_FILE` env var overrides the path if you need a different lo
 
 On Raspberry Pis, the `io` service drives LEDs, LCDs, a button and two potentiometers, so the IEC 61850 exchange between
 RTI-FSP (ACSI server) and RTI-SO (ACSI client) becomes visible. It shows reporting, operate (control) and setpoints.
-FSP and SO each run their own `io` service and use the same mapping, `modules/io-plugin/src/acsi_io_plugin/io_mapping.json`:
+FSP and SO each run their own `io` service and use the same mapping, `../rti-plugins/io/plugin/src/acsi_io_plugin/io_mapping.json`:
 
 | Device         | Mapped to                                    | Shows / does                                                   |
 |----------------|----------------------------------------------|----------------------------------------------------------------|
@@ -286,34 +287,40 @@ Demo flow:
 3. Turn `pot1` on the FSP side: the new `TotW` value reaches the SO in the next report.
 4. Turn `pot2` on the SO side: the SO sends an operate on `WMaxSpt`, and `led2` on the FSP side shows that it arrived.
 
-FSP and SO have the IO plugin installed ([modules/io-plugin](modules/io-plugin/README.md)) and start it with them. It
-connects to the `io` service at `IO_URL`, which writes the button and potentiometers back to `ACSI_BASE_URL`;
-`launch.py` and compose set both, and on two Raspberry Pis each side points `IO_URL` at its own `io` service (see
-*Plugins* in [modules/fsp/README.md](modules/fsp/README.md)). To write a plugin of your own, start with
+FSP and SO have the IO plugin installed ([rti-plugins/io/plugin](../rti-plugins/io/plugin/README.md)) and start it
+with them. It connects to the `io` service at `IO_URL`, which writes the button and potentiometers back to
+`ACSI_BASE_URL`; `launch.py` and compose set both, and on two Raspberry Pis each side points `IO_URL` at its own `io`
+service (see *Plugins* in [modules/fsp/README.md](modules/fsp/README.md)). The IO server and the plugins that can be
+attached to the FSP and SO are in [examples/rti-plugins](../rti-plugins/README.md). To write a plugin of your own, start with
 [modules/plugins/GETTING_STARTED.md](modules/plugins/GETTING_STARTED.md); the contract is
 [modules/plugins/openapi.yaml](modules/plugins/openapi.yaml).
-Wiring, pin numbers and the I2C LCD setup are in [modules/io/README.md](modules/io/README.md).
+Wiring, pin numbers and the I2C LCD setup are in [rti-plugins/io/server/README.md](../rti-plugins/io/server/README.md).
 
 ## IO API Server
 
 The `io` service is a REST API (under `/api/io/`) for the LEDs, buttons, potentiometers and LCDs on a Raspberry Pi; it
-runs without the hardware too (see [Without Raspberry Pi hardware](#without-raspberry-pi-hardware)).
+runs without the hardware too (see [The IO server (Raspberry Pi)](#the-io-server-raspberry-pi)). Its code is in
+[`examples/rti-plugins/io/server`](../rti-plugins/io/server/README.md).
 
 ```bash
 # from examples/rti-demo
 uv run python launch.py io
-docker compose up rti-io
+
+# in Docker, its own stack
+cd ../rti-plugins/io/server && docker compose up rti-io
 
 # or directly, in the io project's own environment
-cd modules/io && uv run python -m rpi_io.main
+cd ../rti-plugins/io/server && uv run python -m rpi_io.main
 ```
 
-`launch.py io` runs `rpi_io` from `modules/io/src` in the repository's environment (`uv sync --all-packages`). The
-direct command uses the `io` project's own environment instead: `uv run` creates `modules/io/.venv` on first use and installs the Raspberry Pi packages there
+`launch.py io` runs `rpi_io` from `../rti-plugins/io/server/src` in the repository's environment
+(`uv sync --all-packages`). The direct command uses the `io` project's own environment instead: `uv run` creates
+`.venv` in `rti-plugins/io/server` on first use and installs the Raspberry Pi packages there
 (`gpiod`, `gpiozero`, ...). Use it on a Raspberry Pi; where those packages don't install, use `launch.py io`.
 
 Devices, configuration (`io_config.json`), wiring, Raspberry Pi setup (GPIO, I2C, SPI) and troubleshooting are in
-[modules/io/README.md](modules/io/README.md); the endpoints are in its OpenAPI docs at http://localhost:9000/docs.
+[rti-plugins/io/server/README.md](../rti-plugins/io/server/README.md); the endpoints are in its OpenAPI docs at
+http://localhost:9000/docs.
 It listens on 9000 however it's started (`PORT` overrides it).
 
 ## Project Structure
@@ -322,27 +329,28 @@ It listens on 9000 however it's started (`PORT` overrides it).
 rti-demo/
 ├── launch.py                  # Main entry point
 ├── README.md                  # This file
-├── docker-compose.yml
-├── docker-compose.no-devices.yml  # Overlay: rti-io without Raspberry Pi devices
+├── docker-compose.yml         # bff, hmi, fsp01, fsp02, so (rti-io: its own stack)
 ├── config/
 │   ├── launch_config.json.example
 │   └── models/                # IED model files (model_1.py, model_2.py)
-├── scripts/
-│   ├── set_docker_user.sh     # Detect/export host UID+GID for the io image build
-│   └── setup_raspberry_docker.sh  # Install Docker on a fresh Raspberry Pi
 └── modules/
     ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }
     ├── fsp/       { pyproject.toml, docker/Dockerfile, src/fsp/, tests/ }
     ├── so/        { pyproject.toml, docker/Dockerfile, src/so/, tests/ }
-    ├── io/        { pyproject.toml, docker/Dockerfile, src/rpi_io/, tests/ }  # the IO server (Raspberry Pi)
-    ├── io-plugin/ { pyproject.toml, src/acsi_io_plugin/, tests/ }  # the IO plugin, installed in the FSP and SO
-    ├── plugins/   { pyproject.toml, openapi.yaml, src/acsi_plugins/, samples/, tests/ }  # the plugin host
+    ├── plugins/   { pyproject.toml, openapi.yaml, src/acsi_plugins/, tests/ }  # the plugin host
     └── hmi/       { package.json, docker/Dockerfile, src/ }  # Web HMI (React)
+
+rti-plugins/                   # what can be attached to the FSP and SO (decision 0028)
+├── io/
+│   ├── server/  { pyproject.toml, docker-compose.yml, docker-compose.no-devices.yml, docker/Dockerfile,
+│   │              scripts/, src/rpi_io/, tests/ }   # the IO server (Raspberry Pi), its own stack
+│   └── plugin/  { pyproject.toml, src/acsi_io_plugin/, tests/ }  # the IO plugin, installed in the FSP and SO
+└── sim_leds/    { plugin.json, plugin.py, leds.py, tests/ }  # a sample downloadable plugin
 ```
 
-`bff`, `fsp`, `so`, `plugins` and `io-plugin` are members of a single uv
+`bff`, `fsp`, `so`, `plugins` and `rti-plugins/io/plugin` are members of a single uv
 workspace rooted at the repository root (alongside the `ws61850` core
-library at `src/`) - see `TESTING.md` for how to install/run them. `io` and `hmi` build and
+library at `src/`) - see `TESTING.md` for how to install/run them. The IO server and `hmi` build and
 run independently (Pi hardware deps / npm toolchain respectively).
 
 ## Dependencies (uv)
@@ -359,7 +367,7 @@ uv add --package bff <package_name>
 ```
 
 After a dependency change, rebuild the images that use it (`docker compose build`). The `io` module is a separate uv
-project: run `uv add` and `uv lock` in `modules/io`.
+project: run `uv add` and `uv lock` in `examples/rti-plugins/io/server`.
 
 ## Troubleshooting
 

@@ -94,15 +94,17 @@ ignore = ["E501"]
 package = true
 
 [tool.uv.workspace]
-# io deliberately excluded - it needs Raspberry Pi hardware packages
-# (gpiozero, gpiod, Adafruit-ADS1x15, smbus2) that won't resolve/install on
-# a non-Pi dev machine, and it already builds via its own fully independent
-# Docker-stage venv (modules/io/docker/Dockerfile), never sharing
-# this workspace's env. Its plugin, io-plugin, is a member (decision 0022).
+# The IO server (examples/rti-plugins/io/server) deliberately excluded - it
+# needs Raspberry Pi hardware packages (gpiozero, gpiod, Adafruit-ADS1x15,
+# smbus2) that won't resolve/install on a non-Pi dev machine, and it already
+# builds via its own fully independent Docker-stage venv (its
+# docker/Dockerfile), never sharing this workspace's env. Its plugin,
+# io/plugin, is a member: it is installed in the FSP and SO images
+# (decisions 0022, 0028).
 members = [
     "examples/rti-demo/modules/so",
     "examples/rti-demo/modules/fsp",
     "examples/rti-demo/modules/bff",
     "examples/rti-demo/modules/plugins",
-    "examples/rti-demo/modules/io-plugin",
+    "examples/rti-plugins/io/plugin",
 ]

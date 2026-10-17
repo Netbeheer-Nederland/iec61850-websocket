@@ -42,12 +42,12 @@ jobs:
               # bff/fsp/so are now workspace members - the shared root
               # pyproject.toml/uv.lock is what actually pins their deps
               # (examples/rti-demo no longer has its own).
-            so:          [ *rti, 'examples/rti-demo/modules/so/**',  'examples/rti-demo/modules/so/pyproject.toml', 'examples/rti-demo/modules/plugins/**', 'examples/rti-demo/modules/io-plugin/**' ]
-            fsp:         [ *rti, 'examples/rti-demo/modules/fsp/**', 'examples/rti-demo/modules/fsp/pyproject.toml', 'examples/rti-demo/modules/plugins/**', 'examples/rti-demo/modules/io-plugin/**' ]
+            so:          [ *rti, 'examples/rti-demo/modules/so/**',  'examples/rti-demo/modules/so/pyproject.toml', 'examples/rti-demo/modules/plugins/**', 'examples/rti-plugins/io/plugin/**' ]
+            fsp:         [ *rti, 'examples/rti-demo/modules/fsp/**', 'examples/rti-demo/modules/fsp/pyproject.toml', 'examples/rti-demo/modules/plugins/**', 'examples/rti-plugins/io/plugin/**' ]
             acsi_client: [ *rti, 'examples/rti-demo/acsi_ws_client/**', 'examples/rti-demo/Dockerfile.acsi-ws-client' ]
             acsi_server: [ *rti, 'examples/rti-demo/acsi_ws_server/**', 'examples/rti-demo/Dockerfile.acsi-ws-server' ]
             bff:         [ 'examples/rti-demo/modules/bff/**', 'pyproject.toml', 'uv.lock' ]
-            io:          [ 'examples/rti-demo/modules/io/**' ]
+            io:          [ 'examples/rti-plugins/io/server/**' ]
             hmi:         [ 'examples/rti-demo/modules/hmi/**' ]
 
       - id: set
@@ -82,7 +82,7 @@ jobs:
             acsi_client) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-client ; n=ws61850-acsi-ws-client ;;
             acsi_server) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-server ; n=ws61850-acsi-ws-server ;;
             bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=iec61850-websocket/rti-bff ;;
-            io)          c=examples/rti-demo/modules/io ; f=docker/Dockerfile ; n=iec61850-websocket/rti-io ; p=linux/amd64,linux/arm64 ;;
+            io)          c=examples/rti-plugins/io/server ; f=docker/Dockerfile ; n=iec61850-websocket/rti-io ; p=linux/amd64,linux/arm64 ;;
             hmi)         c=examples/rti-demo/modules/hmi ; f=docker/Dockerfile ; n=iec61850-websocket/rti-hmi ;;
           esac
           {

@@ -8,14 +8,16 @@ SPDX-License-Identifier: Apache-2.0
 
 This directory contains the **IO server** for Raspberry Pi, the package `rpi_io` (`src/rpi_io/`): a FastAPI-based REST
 API service for direct hardware control. The FSP and SO reach it through the **IO plugin**, a separate package installed with them:
-[`modules/io-plugin`](../io-plugin/README.md) (decision 0022). It keeps devices and IEC 61850 objects in sync.
+[`io/plugin`](../plugin/README.md) (decision 0022). It keeps devices and IEC 61850 objects in sync. The server runs on
+the Raspberry Pi as its own stack, apart from the demo's (decision
+[0028](../../../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)); see [Docker](#docker-its-own-stack).
 
 ## Overview
 
 The IO service enables remote control and monitoring of physical IO devices (LEDs, potentiometers, buttons, LCD displays) through:
 
 - **Direct REST API** via the IO server (`rpi_io`)
-- **ACSI Integration** via the IO plugin (`acsi_io_plugin`, in `modules/io-plugin`), which proxies requests to the IO server
+- **ACSI Integration** via the IO plugin (`acsi_io_plugin`, in `io/plugin`), which proxies requests to the IO server
 - **IEC 61850 Object Mapping** to connect IO devices to power system data model objects
 
 ### Architecture
@@ -40,10 +42,13 @@ The IO service enables remote control and monitoring of physical IO devices (LED
 ## Directory Structure
 
 ```
-modules/io/
+examples/rti-plugins/io/server/
 ├── pyproject.toml, uv.lock   # standalone uv project rpi-io (not in the root workspace)
-├── docker/Dockerfile         # multi-stage build; context is modules/io
-├── tests/                    # uv run --package fsp pytest examples/rti-demo/modules/io/tests -q
+├── docker-compose.yml        # its own stack: rti-io, on the external network rti-network
+├── docker-compose.no-devices.yml  # overlay: rti-io without the Pi's devices (mock mode)
+├── docker/Dockerfile         # multi-stage build; context is this folder
+├── scripts/                  # Raspberry Pi: Docker setup, build user and groups, GPIO simulation
+├── tests/                    # uv run --package fsp pytest examples/rti-plugins/io/server/tests -q
 └── src/rpi_io/               # the IO server: python -m rpi_io.main (decision 0023)
     ├── main.py               # Entry point - creates IOController + FastAPI app
     ├── io_controller.py      # Core IO device management (LEDs, pots, buttons, LCDs)
@@ -93,9 +98,9 @@ All endpoints are under the `/api/io/` prefix and provide device management, LED
 | `PORT` | 9000 | Server port (the same for a direct run, `launch.py` and Docker) |
 | `IO_CONFIG_FILE` | `src/rpi_io/io_config.json` | The device configuration the server reads and saves to. A file that doesn't exist yet is seeded from the shipped `io_config.json`. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_config.json`, so saves leave the shipped file unchanged |
 
-Start the server with `uv run python -m rpi_io.main` from `examples/rti-demo/modules/io`, or with `launch.py io`;
-the modules use relative imports, so they don't run as scripts. The first installs this project in its own environment
-(`modules/io/.venv`, with the Raspberry Pi packages), the second runs it from `src/` in the repository's
+Start the server with `uv run python -m rpi_io.main` from `examples/rti-plugins/io/server`, or with `launch.py io`
+in `examples/rti-demo`; the modules use relative imports, so they don't run as scripts. The first installs this project
+in its own environment (`.venv` here, with the Raspberry Pi packages), the second runs it from `src/` in the repository's
 (`uv sync --all-packages`), where devices whose hardware packages are missing stay unavailable.
 
 ### Hardware Requirements
@@ -116,7 +121,7 @@ For **physical hardware operation** (not mock mode):
 ## Component 2: the IO plugin
 
 The IO plugin, its client (`AsyncIOClient`, `DemoIOClient`), its routes under `/api/plugins/io/` and its mapping are
-the package `acsi_io_plugin` in [`modules/io-plugin`](../io-plugin/README.md). It is installed with the FSP and SO and
+the package `acsi_io_plugin` in [`io/plugin`](../plugin/README.md). It is installed with the FSP and SO and
 has no hardware dependencies; this server doesn't serve it (decision 0022).
 
 ### IEC 61850 Object Mapping
@@ -164,7 +169,7 @@ Defines all IO devices and their configurations:
 - ACSI server integration settings
 - IEC 61850 object mappings
 
-### io-plugin/src/acsi_io_plugin/io_mapping.json
+### io/plugin/src/acsi_io_plugin/io_mapping.json
 
 Defines mappings between IEC 61850 objects and IO devices:
 - Which IO device corresponds to which IEC 61850 data object
@@ -404,6 +409,22 @@ Wiring:
 
 Check the backpack's documentation for whether it needs 5V or 3.3V.
 
+### Docker: its own stack
+
+`rti-io` isn't in the demo's `docker-compose.yml`: it has its own here, and joins the same external network,
+`rti-network`, where the FSPs and SO reach it as `http://rti-io:9000`.
+
+```bash
+docker network create rti-network 2>/dev/null || true
+cd examples/rti-plugins/io/server
+docker compose up -d                                                        # on the Raspberry Pi
+docker compose -f docker-compose.yml -f docker-compose.no-devices.yml up -d # anywhere else (mock mode)
+```
+
+`docker-compose.no-devices.yml` drops the Pi's devices and the settings that only exist for them (`group_add`, `user`,
+`ipc`, `security_opt`, `cap_add`); it needs Docker Compose 2.24 or later. Set
+`COMPOSE_FILE=docker-compose.yml:docker-compose.no-devices.yml` in `.env` here to make it persistent.
+
 ### Configure Docker User for Hardware Access
 
 The `rti-io` container runs as a configurable user with access to GPIO, I2C, and SPI groups. By default, the Dockerfile uses standard Raspberry Pi OS values for the `pi` user:
@@ -417,8 +438,8 @@ If your system has different values, you can configure them in three ways:
 
 **Method 1: Auto-detect with username (Recommended)**
 Just pass the username - the script detects all IDs automatically (run
-from `examples/rti-demo/`, so docker compose finds `docker-compose.yml`
-in the current directory):
+from `examples/rti-plugins/io/server/`, so docker compose finds this
+`docker-compose.yml` in the current directory):
 ```bash
 ./scripts/set_docker_user.sh pi && docker compose up --build
 ```
@@ -479,7 +500,7 @@ This means the host system (Raspberry Pi) does not have the required device file
 
 4. **Check user permissions**: The container runs as user `pi` with group membership in `gpio`, `i2c`, and `spi`. Ensure your host user has access to these device files.
 
-5. **Use mock mode for development**: If running on non-Raspberry Pi systems (Windows, macOS, or Raspberry Pi without hardware), remove all `devices:` entries from docker-compose.yml. The IO server will operate in mock mode.
+5. **Use mock mode for development**: If running on non-Raspberry Pi systems (Windows, macOS, or Raspberry Pi without hardware), layer `docker-compose.no-devices.yml` over `docker-compose.yml` (see [Docker](#docker-its-own-stack)). The IO server will operate in mock mode.
 
 ---
 

@@ -7,6 +7,11 @@
 # a local `docker compose build` produces exactly the images the demo runs.
 # Point RTI_IMAGE_REPO at ghcr.io/netbeheer-nederland/iec61850-websocket to
 # pull the images published from GitHub instead - see README.md "Docker".
+#
+# The IO server, rti-io, isn't part of this stack: it runs on the Raspberry Pi,
+# from examples/rti-plugins/io/server/docker-compose.yml (decision 0028). Both
+# join rti-network. Without it, the IO plugin logs that it can't connect and
+# stays loaded; the rest of the demo works.
 services:
   # BFF Server
   rti-bff:
@@ -86,8 +91,8 @@ services:
       # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
       - CP=cp1
       - MODELPATH=/models/model_1.py
-      # The IO plugin, installed in the image, reaches the IO server, which
-      # writes input changes back here (decision 0022).
+      # The IO plugin, installed in the image, reaches the IO server (its own
+      # stack, decision 0028), which writes input changes back here (0022).
       - IO_URL=http://rti-io:9000
       - ACSI_BASE_URL=http://rti-fsp01:5001
     networks:
@@ -123,8 +128,8 @@ services:
       - PORT=5005
       - CP=cp2
       - MODELPATH=/models/model_2.py
-      # The IO plugin, installed in the image, reaches the IO server, which
-      # writes input changes back here (decision 0022).
+      # The IO plugin, installed in the image, reaches the IO server (its own
+      # stack, decision 0028), which writes input changes back here (0022).
       - IO_URL=http://rti-io:9000
       - ACSI_BASE_URL=http://rti-fsp02:5005
     # Healthcheck already defined in the Dockerfile - it reads $PORT at
@@ -156,8 +161,8 @@ services:
       - "8765:8765"    # WebSocket port - MUST ADD
     # PORT/PYTHONUNBUFFERED and health check already set by the Dockerfile.
     environment:
-      # The IO plugin, installed in the image, reaches the IO server, which
-      # writes input changes back here (decision 0022).
+      # The IO plugin, installed in the image, reaches the IO server (its own
+      # stack, decision 0028), which writes input changes back here (0022).
       - IO_URL=http://rti-io:9000
       - ACSI_BASE_URL=http://rti-so:5000
     networks:
@@ -171,54 +176,6 @@ services:
       # TLS certificates (testing/certs), referenced as file:<name>
       # (e.g. file:server.pem).
       - ${RTI_CERTS_DIR:-../../testing/certs}:/certs:ro
-
-  # GPIO LED Control API (io)
-  rti-io:
-    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-io:${RTI_IMAGE_TAG:-latest}
-    build:
-      context: modules/io
-      dockerfile: docker/Dockerfile
-      args:
-        PI_USER: ${PI_USER:-pi}
-        PI_UID: ${PI_UID:-1000}
-        PI_GID: ${PI_GID:-1000}
-        GPIO_GID: ${GPIO_GID:-986}
-        I2C_GID: ${I2C_GID:-988}
-        SPI_GID: ${SPI_GID:-989}
-    container_name: rti-io
-    ports:
-      - "9000:9000"
-    # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
-    user: ${PI_USER:-pi}  # User with gpio group access
-    group_add:
-      - "gpio"
-      - "i2c"
-      - "spi"
-    devices:
-      - "/dev/gpiochip0:/dev/gpiochip0"
-      - "/dev/gpiochip4:/dev/gpiochip4"
-      - "/dev/gpiochip10:/dev/gpiochip10"
-      - "/dev/gpiochip11:/dev/gpiochip11"
-      - "/dev/gpiochip12:/dev/gpiochip12"
-      - "/dev/gpiochip13:/dev/gpiochip13"
-      - "/dev/i2c-1:/dev/i2c-1"
-      - "/dev/i2c-13:/dev/i2c-13"
-      - "/dev/i2c-14:/dev/i2c-14"
-      - "/dev/spidev0.0:/dev/spidev0.0"
-      - "/dev/spidev0.1:/dev/spidev0.1"
-    ipc: host
-    security_opt:
-      - seccomp:unconfined
-    cap_add:
-      - SYS_RAWIO
-    networks:
-      - rti-network
-    # Health check already defined in the Dockerfile.
-    labels:
-      - "rti.service=rti-io"
-      - "rti.type=RTI-IO"
-      - "rti.host=rti-io"
-      - "rti.port=9000"
 
 volumes:
   # Persistent BFF runtime state (connections.json), mounted at /config.

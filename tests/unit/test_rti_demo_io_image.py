@@ -8,9 +8,9 @@ from pathlib import Path
 DOCKERFILE = (
     Path(__file__).resolve().parents[2]
     / "examples"
-    / "rti-demo"
-    / "modules"
+    / "rti-plugins"
     / "io"
+    / "server"
     / "docker"
     / "Dockerfile"
 )

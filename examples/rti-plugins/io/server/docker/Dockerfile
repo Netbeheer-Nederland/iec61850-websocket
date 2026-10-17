@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # RTI Demo GPIO LED Control API Docker Image - Multi-stage
-# Build context: examples/rti-demo/modules/io
+# Build context: examples/rti-plugins/io/server (decision 0028)
 
 # ============================================================
 # Stage 1: Builder
@@ -35,7 +35,7 @@ COPY pyproject.toml uv.lock /app/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv && uv sync --frozen --no-dev --no-install-project
 
-# The server, the package rpi_io (decision 0023); the IO plugin is in modules/io-plugin (decision 0022).
+# The server, the package rpi_io (decision 0023); the IO plugin is in ../plugin (decisions 0022, 0028).
 COPY README.md /app/
 COPY src/ /app/src/
 RUN --mount=type=cache,target=/root/.cache/uv \
