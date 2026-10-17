@@ -112,31 +112,34 @@ class ServiceConfig:
     labels: dict[str, str] = field(default_factory=dict)
 
 
-def _plugin_env(name: str, port: int) -> dict[str, str]:
-    """Plugin settings for an FSP or SO (decisions 0021, 0022).
+IO_PLUGIN_URL = "http://localhost:9000/plugin"
 
-    PLUGIN_STORAGE and IO_MAPPING_FILE are relative to the working
-    directory: examples/rti-demo when run from source (git-ignored
-    config/plugins/), /app in a container. The IO plugin is installed and
-    starts by itself: it reaches the IO server at IO_URL, which writes input
-    changes back to ACSI_BASE_URL. No plugin is downloaded unless the caller
-    allows a source in PLUGIN_ALLOWED_SOURCES (a plugin under development,
+
+def _plugin_env(name: str, port: int) -> dict[str, str]:
+    """The plugin configuration of an FSP or SO (decision 0029).
+
+    One plugin, the IO server's plugin API at IO_PLUGIN_URL. It writes its
+    input changes back to PLUGIN_HOST_URL of the first FSP only, so a single
+    IO server doesn't send a button press to every FSP and SO. More plugins
+    can be added at runtime from a source the caller allows in
+    PLUGIN_ALLOWED_SOURCES (a plugin under development,
     modules/plugins/GETTING_STARTED.md).
     """
+    io = {"name": "io", "url": IO_PLUGIN_URL}
+    if name != "fsp":
+        io["settings"] = {"write_inputs": False}
     return {
-        "PLUGIN_STORAGE": f"config/plugins/{name}",
+        "PLUGINS": json.dumps([io]),
+        "PLUGIN_HOST_URL": f"http://localhost:{port}",
         "PLUGIN_ALLOWED_SOURCES": os.environ.get("PLUGIN_ALLOWED_SOURCES", "").strip(),
-        "IO_URL": "http://localhost:9000",
-        "IO_MAPPING_FILE": f"config/plugins/{name}/io_mapping.json",
-        "ACSI_BASE_URL": f"http://localhost:{port}",
     }
 
 
 def _with_port(env_vars: dict[str, str], port: int) -> dict[str, str]:
     """env_vars for a service started on another port."""
     env = {**env_vars, "PORT": str(port)}
-    if "ACSI_BASE_URL" in env:
-        env["ACSI_BASE_URL"] = f"http://localhost:{port}"
+    if "PLUGIN_HOST_URL" in env:
+        env["PLUGIN_HOST_URL"] = f"http://localhost:{port}"
     return env
 
 
@@ -222,11 +225,13 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         working_dir="../rti-plugins/io/server/src",
         default_port=9000,
         description="IO Device Control API - REST API for Raspberry Pi IO devices",
-        # Relative to working_dir: a git-ignored copy, seeded from the
-        # shipped rpi_io/io_config.json, so saves leave that unchanged.
+        # Relative to working_dir: git-ignored copies, seeded from the
+        # shipped rpi_io/io_config.json and io_mapping.json, so saves leave
+        # those unchanged.
         env_vars={
             "PORT": "9000",
             "IO_CONFIG_FILE": "../../../../rti-demo/config/io_config.json",
+            "IO_MAPPING_FILE": "../../../../rti-demo/config/io_mapping.json",
         },
         docker_image=rti_image("io"),
         health_check_path="/api/io/health",
@@ -421,11 +426,13 @@ class RTILauncher:
         """The service's environment in a container on rti-network, where the
         others are reached by container name (rti-<type>), not localhost."""
         env = dict(config.env_vars)
-        if "IO_URL" in env:
+        if "PLUGINS" in env:
             io_port = SERVICES[ServiceType.IO].default_port
-            env["IO_URL"] = f"http://rti-io:{io_port}"
-        if "ACSI_BASE_URL" in env:
-            env["ACSI_BASE_URL"] = (
+            env["PLUGINS"] = env["PLUGINS"].replace(
+                f"http://localhost:{io_port}", f"http://rti-io:{io_port}"
+            )
+        if "PLUGIN_HOST_URL" in env:
+            env["PLUGIN_HOST_URL"] = (
                 f"http://rti-{config.service_type.value}:{config.default_port}"
             )
         return env

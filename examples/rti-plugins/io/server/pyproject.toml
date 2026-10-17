@@ -27,13 +27,14 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-rpi_io = ["io_config.json"]
+rpi_io = ["io_config.json", "io_mapping.json"]
 
 [tool.pytest.ini_options]
 # The tests run in the FSP's environment (decision 0023), which doesn't
 # install this project; pythonpath makes rpi_io importable there.
 pythonpath = ["src"]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 markers = [
     "unit: fast, isolated unit tests (no Docker/network required)",
 ]

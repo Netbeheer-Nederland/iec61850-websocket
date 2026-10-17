@@ -39,5 +39,6 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0026](0026-io-server-pins-are-configuration.md) | The IO server's pins are configuration, claimed per device and checked for conflicts | proposed |
 | [0027](0027-plugin-contract-as-openapi.md) | The plugin contract is published as an OpenAPI 3.1 document, kept in step by a test | proposed |
 | [0028](0028-rti-plugins-folder.md) | Plugins and the IO server move to `examples/rti-plugins`; the IO server is its own stack | proposed |
+| [0029](0029-plugins-are-http-services.md) | Plugins are HTTP services the FSP and SO connect to, from a plugin configuration | proposed |
 
 To add a decision, copy the layout of an existing record, take the next number, and add a line to this table.

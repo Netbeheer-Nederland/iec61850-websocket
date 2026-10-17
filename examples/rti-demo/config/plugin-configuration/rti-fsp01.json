@@ -1,0 +1,9 @@
+{
+  "host_url": "http://rti-fsp01:5001",
+  "plugins": [
+    {
+      "name": "io",
+      "url": "http://rti-io:9000/plugin"
+    }
+  ]
+}

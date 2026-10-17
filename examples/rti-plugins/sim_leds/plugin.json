@@ -1,7 +1,0 @@
-{
-  "name": "sim_leds",
-  "version": "1.0.0",
-  "api": 1,
-  "entry": "plugin:SimLedsPlugin",
-  "files": ["__init__.py", "leds.py", "plugin.py"]
-}

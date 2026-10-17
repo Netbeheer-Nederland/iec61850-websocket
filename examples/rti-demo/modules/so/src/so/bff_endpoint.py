@@ -169,9 +169,11 @@ async def _lifespan(app: FastAPI):
 
 
 # ==================== Plugins ====================
-# The plugins this SO hosts (decision 0021). The host passes ACSI events to
-# them; the service installs, reloads and removes them (/api/plugins).
-# Settings from PLUGIN_STORAGE, PLUGIN_ALLOWED_SOURCES and PLUGINS.
+# The plugins this SO hosts (decisions 0021, 0029): HTTP services it
+# connects to. The host passes ACSI events to them; the service connects the
+# configured ones at startup and adds, reloads and removes them
+# (/api/plugins). Settings from PLUGINS_FILE, PLUGINS, PLUGIN_HOST_URL,
+# PLUGIN_ALLOWED_SOURCES and PLUGIN_RETRY_SECONDS.
 plugin_host = PluginHost(role="so")
 plugin_service = PluginService.from_env(plugin_host)
 
@@ -684,7 +686,7 @@ def create_fastapi_app(factory_dir: Path | None = None) -> FastAPI:
             {"name": "Diagnostics", "description": "Internal diagnostic endpoints"},
             {
                 "name": "Plugins",
-                "description": "Install, reload and remove plugins; their routes are under /api/plugins/<name>/",
+                "description": "Connect, add, reload and remove plugins (HTTP services, decision 0029); their routes are under /api/plugins/<name>/",
             },
         ],
     )

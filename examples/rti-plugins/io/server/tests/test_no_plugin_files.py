@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""The IO server serves no plugin files: the IO plugin is installed with the
-FSP and SO (decision 0022)."""
+"""The IO server serves no plugin files: the FSP and SO connect to it over
+HTTP as a plugin, at /plugin (decision 0029), and load no code from it."""
 
 from pathlib import Path
 

@@ -200,19 +200,21 @@ def app_client(monkeypatch, tmp_path):
     monkeypatch.setattr(
         be,
         "plugin_service",
-        be.PluginService(
-            be.plugin_host, storage=tmp_path / "plugins", allowed_sources=[]
-        ),
+        be.PluginService(be.plugin_host),
     )
     with TestClient(be.create_fastapi_app(tmp_path)) as client:
         yield client
 
 
-def test_the_app_starts_the_installed_io_plugin(app_client):
-    # Installed with the SO, not downloaded (decision 0022).
-    body = app_client.get("/api/plugins").json()
-    assert [(p["name"], p["source"]) for p in body["plugins"]] == [("io", "installed")]
-    assert body["failed"] == {}
+def test_without_a_plugin_configuration_the_app_has_no_plugins(app_client):
+    # Nothing is built in: plugins come from the configuration (decision 0029).
+    assert app_client.get("/api/plugins").json() == {"plugins": [], "failed": {}}
+
+
+def test_the_so_has_no_io_plugin_code_installed():
+    import importlib.util
+
+    assert importlib.util.find_spec("acsi_io_plugin") is None
 
 
 @pytest.mark.parametrize(

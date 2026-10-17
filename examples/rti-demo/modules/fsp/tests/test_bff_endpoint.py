@@ -25,20 +25,12 @@ against. Routes are flat (e.g. "/api/status", not
 
 from __future__ import annotations
 
-import os
-import tempfile
 from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-# bff_endpoint.py reads PLUGIN_STORAGE at import time and defaults to
-# "/app/plugins" (a Docker-only path). Point it at a throwaway temp dir before
-# the import, so no test can write there.
-os.environ.setdefault("PLUGIN_STORAGE", tempfile.mkdtemp(prefix="plugins_"))
-
-from fsp import bff_endpoint  # noqa: E402 - must follow the env var default above
+from fsp import bff_endpoint
 
 pytestmark = pytest.mark.unit
 

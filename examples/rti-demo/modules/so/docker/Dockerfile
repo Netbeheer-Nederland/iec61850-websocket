@@ -29,9 +29,6 @@ COPY examples/rti-demo/modules/so/pyproject.toml ./examples/rti-demo/modules/so/
 # acsi-plugins, the plugin host: a workspace member this one depends on, so
 # installed with the dependencies - whole, like the ws61850 core in src/.
 COPY examples/rti-demo/modules/plugins/ ./examples/rti-demo/modules/plugins/
-# acsi-io-plugin, the IO plugin: installed with the image, not downloaded
-# (decisions 0022, 0028).
-COPY examples/rti-plugins/io/plugin/ ./examples/rti-plugins/io/plugin/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project --package so

@@ -6,137 +6,123 @@ SPDX-License-Identifier: Apache-2.0
 
 # Plugins for the FSP and SO (`acsi_plugins`)
 
-The FSP and SO can host several plugins, each linking ACSI to another integration: the IO server's LEDs and LCDs, and
-later others such as a message bus or a historian. This package holds what they share: the contract a plugin
-implements, the host that runs the plugins, the loader that downloads them, and the `/api/plugins` routes. The
-decision behind it is [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.md).
+The FSP and SO can connect to several plugins, each linking ACSI to another integration: the IO server's LEDs and
+displays, and later others such as a message bus or a historian. **A plugin is an HTTP service**, in any language, that
+implements the plugin API; nothing of a plugin is installed in the FSP or SO. This package is the FSP's and SO's side:
+how they talk to plugins, which plugins they connect to, and the `/api/plugins` routes. The decisions behind it are
+[0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.md) (several plugins, one contract) and
+[0029](../../../../docs/rti-demo/decisions/0029-plugins-are-http-services.md) (plugins are HTTP services).
+
+[`openapi.yaml`](openapi.yaml) is the contract, as OpenAPI 3.1: the **plugin API** a plugin implements, the
+`/api/plugins` routes, how a plugin's own routes are reached, and the plugin configuration. `tests/test_openapi.py`
+keeps it in step with the code (decision [0027](../../../../docs/rti-demo/decisions/0027-plugin-contract-as-openapi.md)).
 
 | Module | What it holds |
 |---|---|
-| `contract.py` | `AcsiPlugin`, the events, `ControlResult`, `PluginContext` |
+| `contract.py` | The events and their JSON (`event_json`), `ControlResult`, and `AcsiPlugin`: how the host sees a plugin |
+| `remote.py` | `RemotePlugin`: speaks the plugin API to one plugin service; the allowed-sources check |
 | `host.py` | `PluginHost`: passes events to every plugin, asks the owner of an objRef to answer an Operate |
-| `loader.py` | The manifest, the allowed sources, downloading, importing as `acsi_<name>_plugin` |
-| `web.py` | `PluginService` (install, reload, remove, load at startup) and the routes |
+| `config.py` | The plugin configuration: `PLUGINS_FILE` or `PLUGINS` |
+| `web.py` | `PluginService` (connect the configured plugins, retry, add, reload, remove) and the routes |
 
 The plugins themselves, and the IO server, are in [`examples/rti-plugins`](../../../rti-plugins/README.md) (decision
-[0028](../../../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)): `sim_leds` there is a sample plugin (two
-simulated LEDs), and [GETTING_STARTED.md](GETTING_STARTED.md) starts from it. They depend on this package; it doesn't
-depend on them.
+[0028](../../../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)). `sim_leds` there is a small sample, and
+[GETTING_STARTED.md](GETTING_STARTED.md) starts from it.
 
-[`openapi.yaml`](openapi.yaml) is the contract for third-party plugins, as OpenAPI 3.1: the `/api/plugins` routes,
-what a plugin source must serve, how a plugin's own routes are reached, and the shapes of the manifest, the events and
-`ControlResult`. `tests/test_openapi.py` keeps it in step with the code (decision
-[0027](../../../../docs/rti-demo/decisions/0027-plugin-contract-as-openapi.md)). A change to the contract changes it too.
+## The plugin API
 
-## What a plugin gets
+A plugin serves five calls under its base URL (`url` in the configuration, for example `http://rti-io:9000/plugin`):
 
-**Events**, to every plugin. Each runs with a timeout (5 s); a plugin that fails or is too slow is logged and marked
-unhealthy, and the other plugins still get the event.
-
-| Event | Where | When |
+| Call | When | Answer |
 |---|---|---|
-| `Associated(associate_id)` | FSP, SO | An association was set up |
-| `OperateReceived(data)` | FSP | An Operate request came in |
-| `OperateResponse(success, add_cause, obj_ref, value, data)` | FSP, SO | An Operate was answered (FSP: sent; SO: received) |
-| `ValueWritten(obj_ref, value, ok)` | FSP, SO | A value was written (FSP: its own model; SO: to a server) |
-| `ValueRead(obj_ref, value, ok)` | SO | A value was read from a server |
-| `ReportReceived(rpt_id, data_set, data)` | SO | A report came in |
-| `ServerStopped()` | FSP | The ACSI server is about to stop; the FSP waits for the plugins (up to 5 s) |
+| `GET <url>` | Connecting, and on reload | `{"name", "version", "api": 2, "claims": [...], "routes": "..."}` |
+| `POST <url>/start` | Once per FSP or SO: `{name, role, host_url, settings}` | any 2xx |
+| `POST <url>/events` | Every event: `{host, event: {"type": ..., <fields>}}` | any 2xx, within 5 s |
+| `POST <url>/control` | FSP only: an Operate on a claimed objRef, `{host, obj_ref, ctl_val}` | `{"ok", "add_cause"}`, or `204` to leave it to the FSP, within 2 s |
+| `POST <url>/stop` | Removal, reload, shutdown: `{name, role, host_url}` | any 2xx |
 
-**Operate**, in the FSP only. A plugin lists the objRefs it owns in `claims()`; at most one plugin owns an objRef, and a
-second claim is refused when the plugin loads. An Operate on an owned objRef goes to the owner's `handle_control`.
-It returns `ControlResult(ok, add_cause)`, where `add_cause` is a `ControlServiceStatusKind` name such as
-`blockedByInterlocking`, or `None` to leave the Operate to the FSP's default check. `handle_control` is synchronous,
-because the ACSI library asks for the answer while it builds its response, and runs with a timeout (2 s). An owner that
-raises or hangs fails the Operate.
+`host` (`name`, `role`, `host_url`) says which FSP or SO a call comes from, so one plugin service can serve several.
+`host_url` is where the plugin reaches that FSP's or SO's REST API, for example to write input changes back.
 
-Write and Read on an owned objRef aren't passed to plugins yet: the ACSI library has no hook for them.
+**Events**:
 
-**Routes**: a plugin's `router()` is served under `/api/plugins/<name>/`. Its routes aren't added to the app itself.
-FastAPI can't remove them, so the FSP or SO passes each request on to the plugin's own small app, which goes away when
-the plugin is removed.
+| `type` | Fields | Where | When |
+|---|---|---|---|
+| `Associated` | `associate_id` | FSP, SO | An association was set up |
+| `OperateReceived` | `data` | FSP | An Operate request came in |
+| `OperateResponse` | `success`, `add_cause`, `obj_ref`, `value`, `data` | FSP, SO | An Operate was answered (FSP: sent; SO: received) |
+| `ValueWritten` | `obj_ref`, `value`, `ok` | FSP, SO | A value was written (FSP: its own model; SO: to a server) |
+| `ValueRead` | `obj_ref`, `value`, `ok` | SO | A value was read from a server |
+| `ReportReceived` | `rpt_id`, `data_set`, `data` | SO | A report came in |
+| `ServerStopped` | | FSP | The ACSI server is about to stop; the FSP waits for the plugins (up to 5 s) |
 
-All plugin coroutines run on the web app's event loop, whichever thread an event comes from.
+A plugin ignores the types it doesn't know: new ones can be added without a new contract version. An event that fails
+or takes longer than 5 s is logged and marks the plugin unhealthy; the other plugins still get it. To do slow work (a
+blink), answer `202` first.
 
-## Writing a plugin
+**Operate**, in the FSP only. A plugin lists the objRefs it owns in `claims`; at most one plugin owns an objRef, and a
+second claim is refused when the plugin connects. The owner's answer to `/control` is the ACSI answer: `ok`, or a
+failure with `add_cause`, a `ControlServiceStatusKind` name such as `blockedByInterlocking`. The FSP asks while it builds
+its answer, so `/control` has 2 s; an error, a timeout or an answer that isn't a `ControlResult` fails the Operate. Write
+and Read on an owned objRef aren't passed to plugins yet: the ACSI library has no hook for them.
 
-```python
-from acsi_plugins import AcsiPlugin, ControlResult, ValueWritten
+**Routes**: when the description has `routes` (a URL, or a path on the plugin's server), every request under
+`/api/plugins/<name>/` is passed on to it. The IO server gives `/api/io`, so `/api/plugins/io/leds` reaches its
+`/api/io/leds`.
 
+## Configuring plugins
 
-class HistorianPlugin(AcsiPlugin):
-    async def start(self, ctx):
-        self.url = ctx.settings["url"]
-        ctx.logger.info(f"Writing to {self.url}")
-
-    async def on_event(self, event):
-        if isinstance(event, ValueWritten) and event.ok:
-            ...  # store event.obj_ref, event.value
-
-    def claims(self):
-        return ["LD0/CSWI1.Pos.Oper.ctlVal"]
-
-    def handle_control(self, obj_ref, ctl_val):
-        return ControlResult(False, "blockedByInterlocking")
-```
-
-A downloadable plugin is a flat folder with `__init__.py`, its modules (importing each other relatively), and a
-manifest `plugin.json`:
+An FSP or SO connects to the plugins in its **plugin configuration** at startup:
 
 ```json
-{"name": "historian", "version": "1.0.0", "api": 1, "entry": "plugin:HistorianPlugin",
- "files": ["__init__.py", "plugin.py"]}
+{
+  "host_url": "http://rti-fsp01:5001",
+  "plugins": [
+    {"name": "io", "url": "http://rti-io:9000/plugin", "settings": {}},
+    {"name": "historian", "url": "http://historian:8000/acsi-plugin", "settings": {"retention_days": 30}}
+  ]
+}
 ```
 
-The source serves the manifest at `<source_url>/plugin.json` and each file, as it is, at `<source_url>/<file>`. A
-plugin installed with the image is a workspace package that registers its class under the entry point group
-`acsi.plugins` instead, and needs no manifest:
+A plugin that can't be reached doesn't stop the FSP or SO: it is listed under `failed` in `GET /api/plugins` and tried
+again every `PLUGIN_RETRY_SECONDS`, so plugin services and the FSP or SO can start in any order. The demo's
+configurations are in [`config/plugin-configuration/`](../../config/plugin-configuration) (compose) and `launch.py`.
 
-```toml
-[project.entry-points."acsi.plugins"]
-io = "acsi_io_plugin.plugin:RtiIoPlugin"
-```
+| Variable | Default | Description |
+|---|---|---|
+| `PLUGINS_FILE` | none | The plugin configuration file |
+| `PLUGINS` | none | The same JSON inline (a bare list stands for `{"plugins": [...]}`); its plugins and `host_url` win over the file's |
+| `PLUGIN_HOST_URL` | the configuration's `host_url` | Where plugins reach this FSP or SO |
+| `PLUGIN_RETRY_SECONDS` | `10` | How often a configured plugin that isn't connected is tried again; `0`: never |
+| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs that `POST /api/plugins` may add plugins from. Scheme, host and port must match exactly; the path by whole segments. The configuration itself is trusted |
 
-The IO plugin ([`rti-plugins/io/plugin`](../../../rti-plugins/io/plugin/README.md), installed with the FSP and SO,
-decision 0022) is a complete example; [`rti-plugins/sim_leds`](../../../rti-plugins/sim_leds/plugin.py) is a small
-downloadable one, and [GETTING_STARTED.md](GETTING_STARTED.md) walks
-through writing, serving, installing and testing a plugin.
-
-## Using plugins
+## Managing plugins
 
 ```bash
-# Install: download from an allowed source, load and start
-curl -X POST http://localhost:5001/api/plugins -H 'Content-Type: application/json' \
-  -d '{"name": "sim_leds", "source_url": "http://localhost:8099", "settings": {"blink_seconds": 1}}'
+curl http://localhost:5001/api/plugins                          # connected plugins, health; failed: not (yet) connected
+curl http://localhost:5001/api/plugins/io/leds                  # a route of the plugin
+curl -X POST http://localhost:5001/api/plugins/io/reload        # describe and start again; settings stay
+curl -X DELETE http://localhost:5001/api/plugins/io             # stop it until the next start
 
-curl http://localhost:5001/api/plugins                          # loaded plugins, health; failed: startup failures
-curl http://localhost:5001/api/plugins/sim_leds/leds            # a route of the plugin
-curl -X POST http://localhost:5001/api/plugins/sim_leds/reload  # download again and restart; settings stay
-curl -X DELETE http://localhost:5001/api/plugins/sim_leds       # stop, remove, delete its files
+# Add one until the FSP stops, from an allowed source
+curl -X POST http://localhost:5001/api/plugins -H 'Content-Type: application/json' \
+  -d '{"name": "sim_leds", "url": "http://localhost:8099/plugin", "settings": {"blink_seconds": 1}}'
 ```
 
 | Answer | When |
 |---|---|
-| 403 | The source isn't in `PLUGIN_ALLOWED_SOURCES` |
-| 409 | The name is loaded already, or the plugin claims an objRef another plugin owns |
-| 422 | The plugin can't be downloaded or loaded; `detail` says why |
+| 403 | The URL isn't in `PLUGIN_ALLOWED_SOURCES` |
+| 409 | The name is connected already, or the plugin claims an objRef another plugin owns |
+| 422 | The plugin can't be reached or doesn't answer as the plugin API says; `detail` says why |
+| 502 | (plugin routes) The plugin can't be reached |
 
-A downloaded plugin is kept with its source and settings, and loaded again when the service starts. An installed
-plugin (`"source": "installed"`) starts with the service; reloading it restarts it, and removing it stops it until the
-next start.
-
-## Settings
-
-| Variable | Default | Description |
-|---|---|---|
-| `PLUGIN_STORAGE` | `/app/plugins` | Where downloaded plugins are kept, one folder each |
-| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs plugins may be downloaded from. Scheme, host and port must match exactly; the path by whole segments |
-| `PLUGINS` | none | JSON list of plugins to load at startup: `[{"name": "sim_leds", "source": "...", "settings": {...}}]`; for an installed plugin leave out `source`: `[{"name": "io", "settings": {...}}]` |
-
-The plugins run in the FSP's or SO's process, with its rights: only allow sources you trust.
+A plugin runs in its own process, so a crash or a dependency of it can't take the FSP or SO down. It still takes part
+in the FSP's Operates and sees every event: only configure plugins you trust.
 
 ## Tests
 
 ```bash
 uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -q
 ```
+
+`tests/fake_plugin.py` is a plugin service in memory that the tests connect to.

@@ -18,9 +18,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 DEMO = ROOT / "examples" / "rti-demo"
 MODULES = DEMO / "modules"
-# The IO server and its plugin, in their own folder (decision 0028).
+# The IO server, in its own folder (decision 0028).
 IO_SERVER = ROOT / "examples" / "rti-plugins" / "io" / "server"
-IO_PLUGIN = ROOT / "examples" / "rti-plugins" / "io" / "plugin"
 
 EXPECTED_PORTS = {
     "hmi": 8080,
@@ -89,14 +88,6 @@ def test_compose_publishes_the_hmi_on_8080(compose):
     assert compose["rti-hmi"]["ports"] == [f"{EXPECTED_PORTS['hmi']}:80"]
 
 
-@pytest.mark.parametrize("service", ["rti-fsp01", "rti-fsp02"])
-def test_compose_points_the_fsps_at_the_io_port(compose, service):
-    assert (
-        f"IO_URL=http://rti-io:{EXPECTED_PORTS['io']}"
-        in compose[service]["environment"]
-    )
-
-
 @pytest.mark.parametrize(
     ("module", "role"), [("bff", "bff"), ("so", "so"), ("fsp", "fsp")]
 )
@@ -139,11 +130,19 @@ def test_code_default_port(path, role):
 @pytest.mark.parametrize(
     ("service", "role"), [("rti-so", "so"), ("rti-fsp01", "fsp"), ("rti-fsp02", "fsp2")]
 )
-def test_compose_points_the_io_plugin_at_the_io_server_and_back(compose, service, role):
-    # The IO plugin is installed in the FSPs and SO (decision 0022).
-    env = compose[service]["environment"]
-    assert f"IO_URL=http://rti-io:{EXPECTED_PORTS['io']}" in env
-    assert f"ACSI_BASE_URL=http://{service}:{EXPECTED_PORTS[role]}" in env
+def test_compose_connects_the_io_plugin_and_names_the_way_back(compose, service, role):
+    # The IO server is a plugin over HTTP, from the plugin configuration
+    # (decision 0029).
+    svc = compose[service]
+    assert "PLUGINS_FILE=/plugins/plugins.json" in svc["environment"]
+    [mount] = [v for v in svc["volumes"] if v.endswith(":/plugins/plugins.json:ro")]
+    config = json.loads(_read(DEMO / mount.split(":")[0]))
+    assert config["host_url"] == f"http://{service}:{EXPECTED_PORTS[role]}"
+    [io] = config["plugins"]
+    assert io["url"] == f"http://rti-io:{EXPECTED_PORTS['io']}/plugin"
+    # One IO server writes its inputs to the first FSP only.
+    write_inputs = io.get("settings", {}).get("write_inputs", True)
+    assert write_inputs is (service == "rti-fsp01")
 
 
 @pytest.mark.parametrize("service", ["rti-so", "rti-fsp01", "rti-fsp02"])
@@ -154,27 +153,8 @@ def test_compose_downloads_no_plugins(compose, service):
 
 def test_launch_py_points_the_io_plugin_at_the_io_port():
     text = _read(DEMO / "launch.py")
-    pattern = r'"IO_URL": "http://localhost:(\d+)"'
+    pattern = r'IO_PLUGIN_URL = "http://localhost:(\d+)/plugin"'
     assert _one(pattern, text, "launch.py") == EXPECTED_PORTS["io"]
-
-
-@pytest.mark.parametrize(
-    ("path", "pattern"),
-    [
-        # Not acsi_base_url: that's the FSP's address (5001), in the same files.
-        (
-            "src/acsi_io_plugin/client.py",
-            r'\bbase_url: str = "http://localhost:(\d+)"',
-        ),
-        (
-            "src/acsi_io_plugin/router.py",
-            r'base_url: str = Field\(\s*default="http://localhost:(\d+)"',
-        ),
-    ],
-)
-def test_io_client_default_base_url(path, pattern):
-    text = _read(IO_PLUGIN / path)
-    assert _one(pattern, text, path) == EXPECTED_PORTS["io"]
 
 
 def test_launch_py_default_ports():

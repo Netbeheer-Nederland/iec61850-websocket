@@ -98,13 +98,11 @@ package = true
 # needs Raspberry Pi hardware packages (gpiozero, gpiod, Adafruit-ADS1x15,
 # smbus2) that won't resolve/install on a non-Pi dev machine, and it already
 # builds via its own fully independent Docker-stage venv (its
-# docker/Dockerfile), never sharing this workspace's env. Its plugin,
-# io/plugin, is a member: it is installed in the FSP and SO images
-# (decisions 0022, 0028).
+# docker/Dockerfile), never sharing this workspace's env. It is the FSP's
+# and SO's IO plugin over HTTP (decision 0029), so nothing of it is a member.
 members = [
     "examples/rti-demo/modules/so",
     "examples/rti-demo/modules/fsp",
     "examples/rti-demo/modules/bff",
     "examples/rti-demo/modules/plugins",
-    "examples/rti-plugins/io/plugin",
 ]

@@ -78,6 +78,7 @@ resources.txt
 examples/rti-demo/modules/bff/src/bff/playbooks/
 launch_config.json
 examples/rti-demo/config/io_config.json
+examples/rti-demo/config/io_mapping.json
 # Plugins the FSP and SO downloaded when run with launch.py (decision 0021)
 examples/rti-demo/config/plugins/
 *.local.json

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""The plugin host passes ACSI events and operations to its plugins (decision 0021)."""
+"""The plugin host passes ACSI events and operations to its plugins (decisions 0021, 0029)."""
 
 import asyncio
 import threading
@@ -51,7 +51,12 @@ async def _settle(futures):
 
 @pytest.fixture
 async def host():
-    host = PluginHost(role="fsp", event_timeout=0.5, control_timeout=0.5)
+    host = PluginHost(
+        role="fsp",
+        host_url="http://fsp.test:5001",
+        event_timeout=0.5,
+        control_timeout=0.5,
+    )
     host.bind_loop(asyncio.get_running_loop())
     yield host
     for name in list(host.names()):
@@ -60,11 +65,11 @@ async def host():
 
 async def test_start_gives_the_plugin_its_context(host):
     plugin = Recorder()
-    await host.add("rec", plugin, settings={"a": 1}, source="http://src.test/x")
+    await host.add("rec", plugin, settings={"a": 1}, url="http://plugin.test/rec")
     assert plugin.ctx.name == "rec"
     assert plugin.ctx.role == "fsp"
     assert plugin.ctx.settings == {"a": 1}
-    assert plugin.ctx.source == "http://src.test/x"
+    assert plugin.ctx.host_url == "http://fsp.test:5001"
     assert plugin.ctx.logger.name == "acsi_plugins.rec"
 
 
@@ -220,13 +225,16 @@ async def test_remove_stops_the_plugin_and_frees_its_objrefs(host):
 
 async def test_status_lists_the_plugins(host):
     await host.add(
-        "owner", Recorder(owns=["LD0/CSWI1.Pos"]), version="1.2.0", source="installed"
+        "owner",
+        Recorder(owns=["LD0/CSWI1.Pos"]),
+        version="1.2.0",
+        url="http://plugin.test/owner",
     )
     [entry] = host.status()
     assert entry == {
         "name": "owner",
         "version": "1.2.0",
-        "source": "installed",
+        "url": "http://plugin.test/owner",
         "claims": ["LD0/CSWI1.Pos"],
         "routes": False,
         "healthy": True,

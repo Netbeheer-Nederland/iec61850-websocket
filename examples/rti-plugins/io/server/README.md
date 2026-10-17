@@ -7,9 +7,11 @@ SPDX-License-Identifier: Apache-2.0
 # IO: Raspberry Pi IO Device Control - WebSocket and ACSI Services Integration
 
 This directory contains the **IO server** for Raspberry Pi, the package `rpi_io` (`src/rpi_io/`): a FastAPI-based REST
-API service for direct hardware control. The FSP and SO reach it through the **IO plugin**, a separate package installed with them:
-[`io/plugin`](../plugin/README.md) (decision 0022). It keeps devices and IEC 61850 objects in sync. The server runs on
-the Raspberry Pi as its own stack, apart from the demo's (decision
+API service for direct hardware control. It is also the FSP's and SO's **IO plugin**: it implements the plugin API
+under `/plugin`, and an FSP or SO connects to it from its plugin configuration (decision
+[0029](../../../../docs/rti-demo/decisions/0029-plugins-are-http-services.md)); see
+[The IO plugin](#the-io-plugin-plugin). It keeps devices and IEC 61850 objects in sync. The server runs on the
+Raspberry Pi as its own stack, apart from the demo's (decision
 [0028](../../../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)); see [Docker](#docker-its-own-stack).
 
 ## Overview
@@ -17,7 +19,8 @@ the Raspberry Pi as its own stack, apart from the demo's (decision
 The IO service enables remote control and monitoring of physical IO devices (LEDs, potentiometers, buttons, LCD displays) through:
 
 - **Direct REST API** via the IO server (`rpi_io`)
-- **ACSI Integration** via the IO plugin (`acsi_io_plugin`, in `io/plugin`), which proxies requests to the IO server
+- **ACSI Integration** as a plugin of the FSP and SO (`/plugin`, `rpi_io/plugin.py`): their events light LEDs and
+  write displays, and the input devices write back to them
 - **IEC 61850 Object Mapping** to connect IO devices to power system data model objects
 
 ### Architecture
@@ -97,6 +100,7 @@ All endpoints are under the `/api/io/` prefix and provide device management, LED
 |----------|---------|-------------|
 | `PORT` | 9000 | Server port (the same for a direct run, `launch.py` and Docker) |
 | `IO_CONFIG_FILE` | `src/rpi_io/io_config.json` | The device configuration the server reads and saves to. A file that doesn't exist yet is seeded from the shipped `io_config.json`. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_config.json`, so saves leave the shipped file unchanged |
+| `IO_MAPPING_FILE` | `src/rpi_io/io_mapping.json` | Which devices the IO plugin uses for each event and objRef (see [The IO plugin](#the-io-plugin-plugin)); seeded from the shipped file the same way. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_mapping.json` |
 
 Start the server with `uv run python -m rpi_io.main` from `examples/rti-plugins/io/server`, or with `launch.py io`
 in `examples/rti-demo`; the modules use relative imports, so they don't run as scripts. The first installs this project
@@ -118,11 +122,38 @@ For **physical hardware operation** (not mock mode):
 
 ---
 
-## Component 2: the IO plugin
+## The IO plugin (`/plugin`)
 
-The IO plugin, its client (`AsyncIOClient`, `DemoIOClient`), its routes under `/api/plugins/io/` and its mapping are
-the package `acsi_io_plugin` in [`io/plugin`](../plugin/README.md). It is installed with the FSP and SO and
-has no hardware dependencies; this server doesn't serve it (decision 0022).
+The IO server implements the plugin API (`examples/rti-demo/modules/plugins/openapi.yaml`, tag *Plugin API*) in
+`rpi_io/plugin.py`. An FSP or SO configures it as
+
+```json
+{"name": "io", "url": "http://rti-io:9000/plugin", "settings": {}}
+```
+
+| Call | What the IO server does |
+|---|---|
+| `GET /plugin` | `{"name": "io", "api": 2, "claims": [], "routes": "/api/io"}`: the FSP's or SO's `/api/plugins/io/*` reaches this server's `/api/io/*` |
+| `POST /plugin/start` | Remembers the host, and sends the input devices' changes (button, potentiometers) to its `host_url`, as `io_mapping.json` says (`writeValue` or `operate`). The most recent host gets them, unless its settings say `"write_inputs": false` |
+| `POST /plugin/events` | Answers `202`, then shows the event on the devices `io_mapping.json` maps to its name (below), and sets the output devices mapped to a written objRef |
+| `POST /plugin/control` | `204`: it claims no objRefs, so the FSP decides every Operate itself |
+| `POST /plugin/stop` | Forgets the host; stops sending it input changes |
+| `GET /plugin/mappings` | The mapping in use, the hosts that started it, and where inputs go |
+
+What each event does (the names are the plugin's own, mapped to devices in `io_mapping.json`):
+
+| Event | From an FSP | From an SO |
+|---|---|---|
+| `Associated` | `connected` on, display "FSP Connected: ..." | `connected` blinks twice, display "Connected: ..." |
+| `OperateReceived` | `oper_rcv` blinks | |
+| `OperateResponse` | display `oper_send`: "Operation: SUCCESS" or "FAILED - <cause>" | `operate` blinks, display the objRef and value |
+| `ValueWritten` | the objRef's output devices set, display `writeValue` | the same, `setpoint` blinks, display `setpoint` |
+| `ValueRead` | | `read` blinks, display the value or the failure |
+| `ReportReceived` | | `rc_rcv` blinks, display rptID and dataSet |
+| `ServerStopped` | `stopped` off, display "Stopped" | |
+
+Text goes to every display mapped to the name (the HD44780 LCD and the I2C LCD). `IO_MAPPING_FILE` names the mapping
+file (default: the shipped `src/rpi_io/io_mapping.json`); a file that doesn't exist yet is seeded from the shipped one.
 
 ### IEC 61850 Object Mapping
 
@@ -169,7 +200,7 @@ Defines all IO devices and their configurations:
 - ACSI server integration settings
 - IEC 61850 object mappings
 
-### io/plugin/src/acsi_io_plugin/io_mapping.json
+### src/rpi_io/io_mapping.json
 
 Defines mappings between IEC 61850 objects and IO devices:
 - Which IO device corresponds to which IEC 61850 data object
@@ -320,7 +351,7 @@ use, and the free pins.
 | **MCP3008 not detected**               | Check SPI wiring, enable SPI in raspi-config                              |
 | **ADS1115 not detected**               | Check I2C wiring, enable I2C in raspi-config                              |
 | **LEDs not responding**                | Verify wiring (resistor +, GND -), check GPIO numbering                   |
-| **ACSI connection failed**             | Verify IO_URL, check the IO server is running                                   |
+| **ACSI connection failed**             | Check `GET /api/plugins` on the FSP or SO (`failed` says why) and the plugin URL in its configuration                                   |
 | **Docker: `/dev/spidev0.0` not found** | Enable SPI in raspi-config, or remove SPI devices from docker-compose.yml |
 | **Docker: device passthrough errors**  | Verify device files exist on host, check device permissions               |
 

@@ -603,15 +603,11 @@ class TestListenOnStart:
     def test_the_app_starts_listening_on_startup(self, monkeypatch, tmp_path):
         started = []
         monkeypatch.setattr(bff_endpoint, "_listen_on_start", started.append)
-        # Plugins are kept under /app/plugins in Docker; not here.
+        # No plugin configuration: the app connects no plugins.
         monkeypatch.setattr(
             bff_endpoint,
             "plugin_service",
-            bff_endpoint.PluginService(
-                bff_endpoint.plugin_host,
-                storage=tmp_path / "plugins",
-                allowed_sources=[],
-            ),
+            bff_endpoint.PluginService(bff_endpoint.plugin_host),
         )
         app = bff_endpoint.create_fastapi_app(tmp_path)
         with TestClient(app):

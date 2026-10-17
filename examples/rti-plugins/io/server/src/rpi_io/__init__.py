@@ -16,6 +16,6 @@
 # limitations under the License.
 
 """The rti-demo's IO server for the Raspberry Pi: GPIO and I2C devices behind a
-FastAPI REST API (python -m rpi_io.main). The role is "io"; the IO plugin the
-FSP and SO use to reach it is the package acsi_io_plugin (examples/rti-plugins/io/plugin).
-See decisions 0018, 0022 and 0023."""
+FastAPI REST API (python -m rpi_io.main). The role is "io". It is also the
+FSP's and SO's IO plugin: they connect to it at /plugin (plugin.py, decision
+0029). See decisions 0018, 0023 and 0029."""

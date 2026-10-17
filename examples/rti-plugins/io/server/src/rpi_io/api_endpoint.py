@@ -306,6 +306,13 @@ def create_fastapi_app(io_controller: IOController | None = None) -> FastAPI:
     router = create_io_router(app, io_controller)
     app.include_router(router)
 
+    # The plugin API, for the FSPs and SOs that use this server (decision 0029).
+    from .plugin import create_plugin_router
+
+    plugin_router = create_plugin_router(io_controller)
+    app.include_router(plugin_router)
+    app.state.io_plugin = plugin_router.plugin
+
     # Store controller reference in app state
     app.state.io_controller = io_controller
 

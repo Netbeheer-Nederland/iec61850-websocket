@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""The plugin host: holds the loaded plugins and passes ACSI events and
-operations to them (decision 0021).
+"""The plugin host: holds the plugins of one FSP or SO and passes ACSI
+events and operations to them (decisions 0021, 0029).
 
 Plugin coroutines (start, stop, on_event) all run on one event loop, the web
 app's (`bind_loop`), whichever thread an event comes from. The ACSI runtime
@@ -18,8 +18,6 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any
 
-from fastapi import FastAPI
-
 from .contract import AcsiPlugin, ControlResult, Event, PluginContext
 
 logger = logging.getLogger(__name__)
@@ -33,9 +31,8 @@ class PluginConflictError(Exception):
 class _Entry:
     plugin: AcsiPlugin
     version: str | None
-    source: str | None
+    url: str | None
     claims: list[str]
-    app: FastAPI | None
     healthy: bool = True
     last_error: str | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
@@ -54,10 +51,13 @@ class PluginHost:
         self,
         role: str,
         *,
+        host_url: str | None = None,
         event_timeout: float = 5.0,
         control_timeout: float = 2.0,
     ):
         self.role = role
+        # Where plugins reach this FSP or SO (PluginContext.host_url).
+        self.host_url = host_url
         self.event_timeout = event_timeout
         self.control_timeout = control_timeout
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -91,11 +91,11 @@ class PluginHost:
             entry = self._entries.get(name)
         return entry.plugin if entry else None
 
-    def app(self, name: str) -> FastAPI | None:
-        """The sub-application serving the plugin's routes, if it has any."""
+    def routes_url(self, name: str) -> str | None:
+        """Where the plugin's own routes are, if it has any."""
         with self._lock:
             entry = self._entries.get(name)
-        return entry.app if entry else None
+        return entry.plugin.routes_url if entry else None
 
     async def add(
         self,
@@ -104,7 +104,7 @@ class PluginHost:
         *,
         settings: dict[str, Any] | None = None,
         version: str | None = None,
-        source: str | None = None,
+        url: str | None = None,
     ) -> None:
         """Start `plugin` and add it under `name`.
 
@@ -130,23 +130,16 @@ class PluginHost:
                 name=name,
                 role=self.role,
                 settings=dict(settings or {}),
-                source=source,
+                host_url=self.host_url,
                 logger=logging.getLogger(f"acsi_plugins.{name}"),
             )
         )
-        router = plugin.router()
-        app = None
-        if router is not None:
-            app = FastAPI(
-                title=f"Plugin {name}", openapi_url=None, docs_url=None, redoc_url=None
-            )
-            app.include_router(router)
 
         with self._lock:
             # Checked again: another add may have run while this plugin started.
             clash = name in self._entries or any(ref in self._owners for ref in claims)
             if not clash:
-                self._entries[name] = _Entry(plugin, version, source, claims, app)
+                self._entries[name] = _Entry(plugin, version, url, claims)
                 for ref in claims:
                     self._owners[ref] = name
         if clash:
@@ -181,9 +174,9 @@ class PluginHost:
             {
                 "name": n,
                 "version": e.version,
-                "source": e.source,
+                "url": e.url,
                 "claims": list(e.claims),
-                "routes": e.app is not None,
+                "routes": e.plugin.routes_url is not None,
                 "healthy": e.healthy,
                 "last_error": e.last_error,
             }

@@ -267,7 +267,7 @@ The `BFF_CONNECTIONS_FILE` env var overrides the path if you need a different lo
 
 On Raspberry Pis, the `io` service drives LEDs, LCDs, a button and two potentiometers, so the IEC 61850 exchange between
 RTI-FSP (ACSI server) and RTI-SO (ACSI client) becomes visible. It shows reporting, operate (control) and setpoints.
-FSP and SO each run their own `io` service and use the same mapping, `../rti-plugins/io/plugin/src/acsi_io_plugin/io_mapping.json`:
+FSP and SO each run their own `io` service and use the same mapping, the IO server's `../rti-plugins/io/server/src/rpi_io/io_mapping.json`:
 
 | Device         | Mapped to                                    | Shows / does                                                   |
 |----------------|----------------------------------------------|----------------------------------------------------------------|
@@ -287,11 +287,13 @@ Demo flow:
 3. Turn `pot1` on the FSP side: the new `TotW` value reaches the SO in the next report.
 4. Turn `pot2` on the SO side: the SO sends an operate on `WMaxSpt`, and `led2` on the FSP side shows that it arrived.
 
-FSP and SO have the IO plugin installed ([rti-plugins/io/plugin](../rti-plugins/io/plugin/README.md)) and start it
-with them. It connects to the `io` service at `IO_URL`, which writes the button and potentiometers back to
-`ACSI_BASE_URL`; `launch.py` and compose set both, and on two Raspberry Pis each side points `IO_URL` at its own `io`
-service (see *Plugins* in [modules/fsp/README.md](modules/fsp/README.md)). The IO server and the plugins that can be
-attached to the FSP and SO are in [examples/rti-plugins](../rti-plugins/README.md). To write a plugin of your own, start with
+The IO server is a plugin of the FSP and SO: an HTTP service they connect to from their plugin configuration
+(decision [0029](../../docs/rti-demo/decisions/0029-plugins-are-http-services.md)). Compose configures it in
+`config/plugin-configuration/` as `http://rti-io:9000/plugin`, `launch.py` as `http://localhost:9000/plugin`. Each
+configuration also says where the IO server writes the button and potentiometers back to (`host_url`): the first FSP.
+On two Raspberry Pis, point each side's configuration at its own `io` service (see *Plugins* in
+[modules/fsp/README.md](modules/fsp/README.md)). The IO server and the other plugins are in
+[examples/rti-plugins](../rti-plugins/README.md). To write a plugin of your own, start with
 [modules/plugins/GETTING_STARTED.md](modules/plugins/GETTING_STARTED.md); the contract is
 [modules/plugins/openapi.yaml](modules/plugins/openapi.yaml).
 Wiring, pin numbers and the I2C LCD setup are in [rti-plugins/io/server/README.md](../rti-plugins/io/server/README.md).
@@ -332,6 +334,7 @@ rti-demo/
 ├── docker-compose.yml         # bff, hmi, fsp01, fsp02, so (rti-io: its own stack)
 ├── config/
 │   ├── launch_config.json.example
+│   ├── plugin-configuration/  # the plugins each FSP and SO connects to (compose)
 │   └── models/                # IED model files (model_1.py, model_2.py)
 └── modules/
     ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }
@@ -340,15 +343,15 @@ rti-demo/
     ├── plugins/   { pyproject.toml, openapi.yaml, src/acsi_plugins/, tests/ }  # the plugin host
     └── hmi/       { package.json, docker/Dockerfile, src/ }  # Web HMI (React)
 
-rti-plugins/                   # what can be attached to the FSP and SO (decision 0028)
+rti-plugins/                   # the plugins the FSP and SO connect to (decisions 0028, 0029)
 ├── io/
-│   ├── server/  { pyproject.toml, docker-compose.yml, docker-compose.no-devices.yml, docker/Dockerfile,
-│   │              scripts/, src/rpi_io/, tests/ }   # the IO server (Raspberry Pi), its own stack
-│   └── plugin/  { pyproject.toml, src/acsi_io_plugin/, tests/ }  # the IO plugin, installed in the FSP and SO
-└── sim_leds/    { plugin.json, plugin.py, leds.py, tests/ }  # a sample downloadable plugin
+│   └── server/  { pyproject.toml, docker-compose.yml, docker-compose.no-devices.yml, docker/Dockerfile,
+│                  scripts/, src/rpi_io/, tests/ }   # the IO server (Raspberry Pi), its own stack,
+│                                                    # and the IO plugin at /plugin (decision 0029)
+└── sim_leds/    { sim_leds.py, leds.py, tests/ }  # a sample plugin service (FastAPI)
 ```
 
-`bff`, `fsp`, `so`, `plugins` and `rti-plugins/io/plugin` are members of a single uv
+`bff`, `fsp`, `so` and `plugins` are members of a single uv
 workspace rooted at the repository root (alongside the `ws61850` core
 library at `src/`) - see `TESTING.md` for how to install/run them. The IO server and `hmi` build and
 run independently (Pi hardware deps / npm toolchain respectively).

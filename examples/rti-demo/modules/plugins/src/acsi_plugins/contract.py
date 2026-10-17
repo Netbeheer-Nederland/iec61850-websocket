@@ -1,24 +1,28 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""What a plugin is, and what the FSP and SO tell it (decision 0021).
+"""What the FSP and SO tell a plugin, and how the host sees one (decisions
+0021, 0029).
 
-A plugin subclasses `AcsiPlugin` and overrides what it needs. Events go to
-every plugin; an Operate on an objRef goes to the one plugin that claims it.
+A plugin is an HTTP service that implements the plugin API in openapi.yaml;
+`remote.RemotePlugin` speaks it. The events below are what the host sends,
+as JSON (`event_json`). `AcsiPlugin` is the host's view of a plugin:
+RemotePlugin is the one implementation, and tests use small in-memory ones.
+Events go to every plugin; an Operate on an objRef goes to the one plugin
+that claims it.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from fastapi import APIRouter
-
-# The contract version a plugin's manifest names in "api". The host refuses
-# a plugin written for another version.
-API_VERSION = 1
+# The contract version a plugin's description names in "api". The host
+# refuses a plugin written for another version. Version 1 was the in-process
+# Python contract (decision 0021); 2 is the HTTP one (decision 0029).
+API_VERSION = 2
 
 
 # ==================== Events ====================
@@ -86,6 +90,25 @@ class ServerStopped(Event):
     """The FSP is about to stop its ACSI server."""
 
 
+EVENT_TYPES: dict[str, type[Event]] = {
+    cls.__name__: cls
+    for cls in (
+        Associated,
+        OperateReceived,
+        OperateResponse,
+        ValueWritten,
+        ValueRead,
+        ReportReceived,
+        ServerStopped,
+    )
+}
+
+
+def event_json(event: Event) -> dict[str, Any]:
+    """The event as the plugin API sends it: {"type": <class name>, <fields>}."""
+    return {"type": type(event).__name__, **dataclasses.asdict(event)}
+
+
 # ==================== Operations ====================
 
 
@@ -103,27 +126,33 @@ class ControlResult:
 
 @dataclass(frozen=True)
 class PluginContext:
-    """What a plugin gets from the host when it starts."""
+    """What the host tells a plugin when it starts it."""
 
     name: str
     role: str  # "fsp" or "so"
     settings: dict[str, Any]
-    source: str | None
+    # Where the plugin reaches this FSP or SO (its REST API), for example to
+    # write input changes back; None when the host doesn't know.
+    host_url: str | None
     logger: logging.Logger
 
 
 class AcsiPlugin:
-    """Base class for a plugin. Every method has a do-nothing default."""
+    """The host's view of a plugin. Every method has a do-nothing default."""
+
+    # Where the plugin's own routes are, for /api/plugins/<name>/: a base URL
+    # the host passes requests on to, or None.
+    routes_url: str | None = None
 
     def claims(self) -> Iterable[str]:
         """The objRefs whose Operate this plugin answers. At most one plugin per objRef."""
         return ()
 
     async def start(self, ctx: PluginContext) -> None:
-        """Called once, when the plugin is loaded."""
+        """Called once, when the plugin is added."""
 
     async def stop(self) -> None:
-        """Called once, when the plugin is unloaded or reloaded."""
+        """Called once, when the plugin is removed or reloaded."""
 
     async def on_event(self, event: Event) -> None:
         """Called for every event. Runs with a timeout; errors are logged, not raised."""
@@ -134,8 +163,4 @@ class AcsiPlugin:
         Synchronous: the ACSI server asks for the answer while it builds its
         response. Runs with a timeout; keep it short.
         """
-        return None
-
-    def router(self) -> APIRouter | None:
-        """Routes served under /api/plugins/<name>/, or None."""
         return None

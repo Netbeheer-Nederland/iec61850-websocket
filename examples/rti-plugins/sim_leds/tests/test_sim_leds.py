@@ -1,10 +1,14 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""The sample plugin sim_leds installs like any downloaded plugin and shows
-events on its two simulated LEDs (modules/plugins/GETTING_STARTED.md in
-examples/rti-demo)."""
+"""The sample plugin sim_leds is an HTTP service on the plugin API: an FSP
+connects to it from its plugin configuration and its LEDs show the events
+(decision 0029; modules/plugins/GETTING_STARTED.md in examples/rti-demo).
+
+Copy this file next to your own plugin: it runs the FSP's plugin service
+against the plugin's app, with no FSP, SO or network."""
 
 import asyncio
+import sys
 from pathlib import Path
 
 import httpx2 as httpx
@@ -12,62 +16,53 @@ import pytest
 from acsi_plugins import (
     Associated,
     OperateResponse,
+    PluginEntry,
     PluginHost,
     ServerStopped,
     ValueRead,
     ValueWritten,
-    loader,
 )
 from acsi_plugins.web import PluginService, attach
 from fastapi import FastAPI
 
+# The plugin is a folder with its modules, as uvicorn --app-dir runs it.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import sim_leds  # noqa: E402
+
 pytestmark = pytest.mark.unit
 
-SAMPLE = Path(__file__).resolve().parents[1]
-SOURCE = "http://dev.test:8099"
-
-
-def serve_sample():
-    """The sample folder, as `python -m http.server` would serve it."""
-
-    def handler(request):
-        path = SAMPLE / request.url.path.lstrip("/")
-        if path.parent == SAMPLE and path.is_file():
-            return httpx.Response(200, content=path.read_bytes())
-        return httpx.Response(404)
-
-    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+URL = "http://sim-leds.test/plugin"
+POS = "LD0/CSWI1.Pos.Oper.ctlVal"
 
 
 @pytest.fixture
-async def setup(tmp_path):
-    host = PluginHost(role="fsp")
-    host.bind_loop(asyncio.get_running_loop())
+async def setup(monkeypatch):
+    monkeypatch.setenv("SIM_LEDS_CLAIMS", POS)
+    sim_leds.leds.reset("test start")
+
+    def plugin_client():
+        return httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=sim_leds.app),
+            base_url="http://sim-leds.test",
+        )
+
+    host = PluginHost(role="fsp", host_url="http://fsp.test:5001")
     service = PluginService(
         host,
-        storage=tmp_path,
-        allowed_sources=[SOURCE],
-        client_factory=serve_sample,
+        configured=[PluginEntry("sim_leds", URL, {"blink_seconds": 0.05})],
+        client_factory=plugin_client,
+        retry_seconds=0,
     )
-    app = FastAPI(lifespan=service.lifespan)
+    app = FastAPI()
     attach(app, service)
+    await service.startup()
     client = httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://fsp"
     )
-    response = await client.post(
-        "/api/plugins",
-        json={
-            "name": "sim_leds",
-            "source_url": SOURCE,
-            "settings": {"blink_seconds": 0.05},
-        },
-    )
-    assert response.status_code == 200, response.text
+    assert service.failed == {}
     yield host, client
     await client.aclose()
-    for name in host.names():
-        await host.remove(name)
-    loader.unload_modules("sim_leds")
+    await service.shutdown()
 
 
 async def deliver(host, event):
@@ -79,10 +74,11 @@ async def leds(client):
     return (await client.get("/api/plugins/sim_leds/leds")).json()["leds"]
 
 
-async def test_the_sample_installs_from_a_plain_file_server(setup):
+async def test_the_fsp_connects_to_it(setup):
     _, client = setup
     body = (await client.get("/api/plugins/sim_leds")).json()
-    assert body["version"] == "1.0.0"
+    assert body["version"] == "2.0.0"
+    assert body["claims"] == [POS]
     assert body["healthy"] is True
     assert await leds(client) == {"red": False, "green": False}
 
@@ -121,6 +117,14 @@ async def test_a_failed_write_or_read_turns_red_on(setup, event):
     host, client = setup
     await deliver(host, event)
     assert (await leds(client))["red"] is True
+
+
+async def test_an_operate_is_refused_while_red_is_on(setup):
+    host, client = setup
+    assert await asyncio.to_thread(host.handle_control, POS, {}) is None
+    await client.post("/api/plugins/sim_leds/leds/red", json={"on": True})
+    answer = await asyncio.to_thread(host.handle_control, POS, {})
+    assert (answer.ok, answer.add_cause) == (False, "blockedByInterlocking")
 
 
 async def test_an_led_can_be_set_and_reset_by_hand(setup):

@@ -24,7 +24,6 @@ OLD_NAMES = [
 ALLOWED = {
     "docs/rti-demo/decisions/0018-io-module-names.md",
     "docs/rti-demo/design/RTI-demo-system-architecture.drawio",
-    "examples/rti-plugins/io/plugin/tests/test_plugin_client.py",
     "examples/rti-demo/modules/fsp/tests/test_io_plugin_loading.py",
     "examples/rti-demo/modules/so/tests/test_io_plugin_loading.py",
     "tests/unit/test_rti_demo_io_names.py",
@@ -44,7 +43,6 @@ def test_the_io_server_code_is_rpi_io():
     # the old name, as the paths they were written with, and the tests that
     # check it is gone.
     allowed = {
-        "examples/rti-plugins/io/plugin/tests/test_installed.py",
         "examples/rti-plugins/io/server/tests/test_project.py",
         "tests/unit/test_rti_demo_io_image.py",
         "tests/unit/test_rti_demo_io_names.py",

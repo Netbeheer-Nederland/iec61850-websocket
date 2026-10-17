@@ -59,8 +59,8 @@ jobs:
 
   # The rti-demo modules' tests and the rti-plugins' tests, as
   # examples/rti-demo/TESTING.md runs them. The IO server isn't a workspace
-  # member; its tests run in the fsp environment, which has FastAPI. Its
-  # plugin is. sim_leds is a downloadable plugin, tested in the host's env.
+  # member; its tests run in the fsp environment, which has FastAPI and the
+  # plugin host. sim_leds is tested in the plugin host's environment.
   rti-demo-modules:
     runs-on: ubuntu-latest
     steps:
@@ -74,7 +74,6 @@ jobs:
       - run: uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q
       - run: uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q
       - run: uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q
-      - run: uv run --package acsi-io-plugin pytest examples/rti-plugins/io/plugin/tests -m unit -q
       - run: uv run --package fsp pytest examples/rti-plugins/io/server/tests -m unit -q
       - run: uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q
 

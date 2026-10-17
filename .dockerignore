@@ -7,7 +7,6 @@
 #   pyproject.toml, uv.lock (the shared uv workspace lock)
 #   src/ws61850
 #   examples/rti-demo/modules/{so,fsp,bff,plugins}/
-#   examples/rti-plugins/io/plugin/
 # Everything else is noise in the context. The IO server and the HMI build
 # with their own narrower context (examples/rti-plugins/io/server,
 # examples/rti-demo/modules/hmi) instead.
@@ -40,8 +39,7 @@ keycloak
 examples/ws61850_interactive
 examples/ws61850_mode
 examples/rti-demo/modules/hmi
-examples/rti-plugins/io/server
-examples/rti-plugins/sim_leds
+examples/rti-plugins
 examples/rti-demo/config/models
 
 # Generated / local state

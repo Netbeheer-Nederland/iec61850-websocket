@@ -205,28 +205,28 @@ FastAPI serves at `http://localhost:5001/docs` while the service runs.
 
 ## Plugins
 
-The FSP hosts plugins: each links ACSI to another integration, for example the IO plugin to the LEDs, LCDs, buttons and
-potentiometers of the `io` service. The FSP tells every plugin what happens (an association, an Operate, a write, a
-stop), and the plugin that owns an objRef answers an Operate on it. A plugin is installed with the image, as the IO
-plugin is, or downloaded on request from an allowed source. How plugins work, and how to write one:
-[`modules/plugins/README.md`](../plugins/README.md) and decision
-[0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.md). The contract, as OpenAPI 3.1, is
+The FSP connects to plugins: HTTP services, each linking ACSI to another integration, for example the IO server's
+LEDs, displays, buttons and potentiometers. The FSP tells every plugin what happens (an association, an Operate, a write, a
+stop), and the plugin that owns an objRef answers an Operate on it. No plugin is installed in
+the FSP: it connects to the ones in its plugin configuration (`PLUGINS_FILE` or `PLUGINS`) at startup, and keeps
+trying the ones it can't reach. How plugins work, and how to write one: [`modules/plugins/README.md`](../plugins/README.md)
+and decisions [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.md) and
+[0029](../../../../docs/rti-demo/decisions/0029-plugins-are-http-services.md). The contract, as OpenAPI 3.1, is
 [`modules/plugins/openapi.yaml`](../plugins/openapi.yaml); it also covers plugins' own routes, which this service's
 `/docs` doesn't list.
 
 ### The IO plugin
 
-The IO plugin (`acsi_io_plugin`, [`rti-plugins/io/plugin`](../../../rti-plugins/io/plugin/README.md)) is installed with the FSP: it starts
-with it and connects to the IO server at `IO_URL`, which writes input changes back to `ACSI_BASE_URL` (decision
-[0022](../../../../docs/rti-demo/decisions/0022-io-plugin-own-package.md)). `launch.py` and compose set both; in Docker
-they are `http://rti-io:9000` and `http://rti-fsp01:5001`. Without `IO_URL` the plugin does nothing. The mapping between IO
-devices and IEC 61850 objects is `examples/rti-plugins/io/plugin/src/acsi_io_plugin/io_mapping.json`; see the *Hardware demo* section of
-`examples/rti-demo/README.md`.
+The IO server ([`rti-plugins/io/server`](../../../rti-plugins/io/server/README.md)) is the FSP's IO plugin: compose
+configures it in `config/plugin-configuration/rti-fsp01.json` (`http://rti-io:9000/plugin`), `launch.py` in `PLUGINS`
+(`http://localhost:9000/plugin`). The first FSP gets the input devices' changes (the button, the potentiometers); the second FSP's configuration says
+`"write_inputs": false`. Which devices react to which event or objRef is the IO server's
+`io_mapping.json`; see the *Hardware demo* section of `examples/rti-demo/README.md`.
 
 ```bash
-curl http://localhost:5001/api/plugins                     # loaded plugins and their health
-curl http://localhost:5001/api/plugins/io/leds             # the IO plugin's routes
-curl -X POST http://localhost:5001/api/plugins/io/reload   # start it again, e.g. once the IO server runs
+curl http://localhost:5001/api/plugins                     # connected plugins, health, and the ones not (yet) connected
+curl http://localhost:5001/api/plugins/io/leds             # the IO server's /api/io/leds
+curl -X POST http://localhost:5001/api/plugins/io/reload   # ask it again what it is and start it again
 ```
 
 ---
@@ -239,12 +239,11 @@ curl -X POST http://localhost:5001/api/plugins/io/reload   # start it again, e.g
 |----------|---------|-------------|
 | `PORT` | 5001 | REST API port |
 | `CP` | cp1 | Communication point identifier |
-| `PLUGIN_STORAGE` | `/app/plugins` | Where downloaded plugins are kept |
-| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs plugins may be downloaded from |
-| `PLUGINS` | none | JSON list of plugins to load at startup |
-| `IO_URL` | None | Read by the IO plugin: the IO server to connect to, when its settings don't name one |
-| `ACSI_BASE_URL` | None | Read by the IO plugin: this FSP's address, where the IO server writes input changes |
-| `IO_MAPPING_FILE` | None | Read by the IO plugin: its `io_mapping.json` (seeded from the shipped one); else the shipped one |
+| `PLUGINS_FILE` | none | The plugin configuration: `{"host_url": ..., "plugins": [{"name", "url", "settings"}]}` |
+| `PLUGINS` | none | The same JSON inline; its plugins and `host_url` win over the file's |
+| `PLUGIN_HOST_URL` | the configuration's `host_url` | Where plugins reach this service, for example to write input changes back |
+| `PLUGIN_RETRY_SECONDS` | `10` | How often a configured plugin that isn't connected is tried again; `0`: never |
+| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs that `POST /api/plugins` may add plugins from at runtime |
 
 ### Server Defaults
 

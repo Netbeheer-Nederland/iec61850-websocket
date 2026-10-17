@@ -7,12 +7,12 @@ SPDX-License-Identifier: Apache-2.0
 # Getting started: writing a plugin
 
 A plugin links the FSP or SO to another integration: it hears what happens on the ACSI side (an association, an
-Operate, a write, a report), can serve its own routes, and can answer the Operates on objRefs it owns. This guide walks
-through the sample plugin `sim_leds`, which shows those events on two simulated LEDs, red and green, and then shows how
-to make your own. The contract itself is in the [README](README.md), and as OpenAPI 3.1 in [`openapi.yaml`](openapi.yaml)
-(the `/api/plugins` routes, what your plugin source must serve, the manifest and the events); the decisions behind it
-are [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.md) and
-[0027](../../../../docs/rti-demo/decisions/0027-plugin-contract-as-openapi.md).
+Operate, a write, a report), can serve its own routes, and can answer the Operates on objRefs it owns. **A plugin is an
+HTTP service** that implements the plugin API; the FSP or SO connects to it. You can write it in any language. This
+guide walks through the sample plugin `sim_leds`, which shows those events on two simulated LEDs, red and green, and
+then shows how to make your own. The contract is in the [README](README.md), and as OpenAPI 3.1 in
+[`openapi.yaml`](openapi.yaml) (tag *Plugin API*); the decision behind it is
+[0029](../../../../docs/rti-demo/decisions/0029-plugins-are-http-services.md).
 
 ## Before you start
 
@@ -24,30 +24,27 @@ uv sync --all-packages
 
 ## 1. The sample: `examples/rti-plugins/sim_leds/`
 
-The sample lives with the other plugins, in [`examples/rti-plugins`](../../../rti-plugins/README.md) (decision
-[0028](../../../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)).
+The sample lives with the other plugins, in [`examples/rti-plugins`](../../../rti-plugins/README.md).
 
 | File | What it does |
 |---|---|
-| `plugin.json` | The manifest: name, version, contract version (`api`), entry class, and the files to download |
-| `__init__.py` | Makes the folder a package (`acsi_sim_leds_plugin` once loaded) |
+| `sim_leds.py` | The plugin: a FastAPI app with the plugin API under `/plugin` and its own routes under `/leds-api` |
 | `leds.py` | `SimulatedLeds`: two LEDs in memory, blinking, and a history of what changed them |
-| `plugin.py` | `SimLedsPlugin`: the events it reacts to and its routes |
-| `tests/` | Its tests; not in `files`, so not downloaded |
+| `tests/` | Its tests: the FSP's plugin service connected to the app |
 
-What the LEDs show, in the FSP and in the SO:
+It needs only FastAPI: it imports nothing of the FSP or SO. What the LEDs show, in the FSP and in the SO:
 
 | Event | Red | Green |
 |---|---|---|
 | `Associated` | | on |
 | `OperateResponse`, success | off | blinks |
-| `OperateResponse`, failed | on, with the `AddCause` in the history | |
+| `OperateResponse`, failed | on, with the `add_cause` in the history | |
 | `ValueWritten`, ok | off | blinks |
 | `ValueWritten` or `ValueRead`, failed | on | |
 | `ReportReceived` (SO) | | blinks |
 | `ServerStopped` (FSP) | off | off |
 
-Its routes, under `/api/plugins/sim_leds/`:
+Its routes, under `/api/plugins/sim_leds/` in the FSP or SO:
 
 | Route | |
 |---|---|
@@ -55,23 +52,27 @@ Its routes, under `/api/plugins/sim_leds/`:
 | `POST /leds/{color}` | `{"on": true}` or `{"on": false}`: set `red` or `green` by hand |
 | `POST /leds/reset` | Both off |
 
-Its one setting, `blink_seconds` (default `0.3`), comes from the install request.
+Its one setting, `blink_seconds` (default `0.3`), comes from the plugin configuration with `/start`.
 
-The whole plugin is a subclass of `AcsiPlugin` that overrides what it needs:
+The plugin API is five routes:
 
 ```python
-class SimLedsPlugin(AcsiPlugin):
-    async def start(self, ctx):          # once, when loaded: ctx.settings, ctx.role ("fsp" or "so"), ctx.logger
-        ...
-    async def stop(self):                # once, when removed or reloaded
-        ...
-    async def on_event(self, event):     # every event; match on its type
-        match event:
-            case Associated(associate_id=associate_id):
-                self.leds.set("green", True, f"associated {associate_id}")
-            ...
-    def router(self):                    # routes under /api/plugins/<name>/
-        ...
+plugin = APIRouter(prefix="/plugin")
+
+@plugin.get("")                       # who it is: name, version, "api": 2, claims, routes
+def describe(): ...
+
+@plugin.post("/start")                # once per FSP or SO: role, host_url, settings
+def start(request: StartRequest): ...
+
+@plugin.post("/events")               # every event; match on event["type"], ignore the rest
+async def on_event(request: EventRequest): ...
+
+@plugin.post("/control")              # an Operate on a claimed objRef: {"ok", "add_cause"}, or 204
+def control(request: ControlRequest): ...
+
+@plugin.post("/stop")                 # when the FSP or SO removes it, reloads it or stops
+async def stop(host: Host): ...
 ```
 
 ## 2. Run its tests
@@ -80,55 +81,60 @@ class SimLedsPlugin(AcsiPlugin):
 uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -q
 ```
 
-`tests/test_sim_leds.py` installs the sample the way the FSP does (download from an allowed source, load,
-start), sends it events through the plugin host, and reads the LEDs through its routes. It needs no FSP, SO or
-network: use it as the template for your own plugin's tests, and as the fast way to try a change.
+`tests/test_sim_leds.py` connects the FSP's plugin service to the sample's app (no network), sends it events through
+the plugin host, and reads the LEDs through the FSP's `/api/plugins/sim_leds/` routes. It needs no FSP, SO or server:
+use it as the template for your own plugin's tests, and as the fast way to try a change.
 
-## 3. Install it in an FSP
+## 3. Connect an FSP to it
 
-The FSP and SO download a plugin from a URL: `<source_url>/plugin.json`, then each file in its `files` list. Any
-plain file server will do, but only from a source in `PLUGIN_ALLOWED_SOURCES`.
-
-Serve the sample folder (port 8099; the SO's WebSocket uses 8765):
+Run the plugin (port 8099; the SO's WebSocket uses 8765):
 
 ```bash
-python3 -m http.server 8099 --bind 127.0.0.1 --directory examples/rti-plugins/sim_leds
+uv run --no-project --with fastapi --with uvicorn \
+  uvicorn sim_leds:app --app-dir examples/rti-plugins/sim_leds --port 8099
 ```
 
-In a second terminal, start an FSP that allows that source and keeps its plugins in a scratch folder:
+In a second terminal, start an FSP whose plugin configuration has it:
 
 ```bash
-PLUGIN_ALLOWED_SOURCES=http://localhost:8099 PLUGIN_STORAGE=/tmp/fsp-plugins \
+cd examples/rti-demo
+PLUGINS='[{"name": "sim_leds", "url": "http://localhost:8099/plugin", "settings": {"blink_seconds": 1}}]' \
+PLUGIN_HOST_URL=http://localhost:5001 \
   uv run --package fsp python -m fsp.bff_endpoint
 ```
 
-Install the plugin, then use it:
+Then use it:
 
 ```bash
-curl -X POST http://localhost:5001/api/plugins -H 'Content-Type: application/json' \
-  -d '{"name": "sim_leds", "source_url": "http://localhost:8099", "settings": {"blink_seconds": 1}}'
-
-curl http://localhost:5001/api/plugins                     # loaded plugins and their health
+curl http://localhost:5001/api/plugins                     # connected plugins and their health
 curl http://localhost:5001/api/plugins/sim_leds/leds       # the LEDs
 curl -X POST http://localhost:5001/api/plugins/sim_leds/leds/red \
   -H 'Content-Type: application/json' -d '{"on": true}'
 ```
 
-The plugin stays installed: it is kept in `PLUGIN_STORAGE` with its source and settings, and loaded again when the FSP
-starts.
+For a lasting configuration, put the same JSON in a file and point `PLUGINS_FILE` at it, as compose does
+(`config/plugin-configuration/`). Start order doesn't matter: an FSP whose plugin isn't up yet tries again every 10 s.
+
+To add a plugin to a running FSP without restarting it, allow its URL and post it:
+
+```bash
+PLUGIN_ALLOWED_SOURCES=http://localhost:8099 uv run --package fsp python -m fsp.bff_endpoint
+curl -X POST http://localhost:5001/api/plugins -H 'Content-Type: application/json' \
+  -d '{"name": "sim_leds", "url": "http://localhost:8099/plugin"}'
+```
 
 ## 4. See it react to the demo
 
-The events come when the FSP and SO talk to each other, so run the whole demo and allow your source in all of them;
-`launch.py` passes your `PLUGIN_ALLOWED_SOURCES` on (it allows none of its own):
+The events come when the FSP and SO talk to each other, so run the whole demo and allow your plugin's URL; `launch.py`
+passes your `PLUGIN_ALLOWED_SOURCES` on (it allows none of its own):
 
 ```bash
 cd examples/rti-demo
 PLUGIN_ALLOWED_SOURCES=http://localhost:8099 uv run python launch.py
 ```
 
-Install `sim_leds` in the FSP (port 5001) and in the SO (port 5000) as in step 3, then start the FSP's server, connect
-the SO and write or operate from the HMI. Follow along with:
+Add `sim_leds` to the FSP (port 5001) and the SO (port 5000) as at the end of step 3, then start the FSP's server,
+connect the SO and write or operate from the HMI. Follow along with:
 
 ```bash
 watch -n 0.5 'curl -s http://localhost:5000/api/plugins/sim_leds/leds'
@@ -136,64 +142,56 @@ watch -n 0.5 'curl -s http://localhost:5000/api/plugins/sim_leds/leds'
 
 ## 5. Change it
 
-Edit a file in `examples/rti-plugins/sim_leds/`, then load the new version: the FSP downloads it again and restarts the plugin,
-keeping its settings.
+Edit `sim_leds.py` and restart the plugin (or run uvicorn with `--reload`). Its description is read when it connects, so
+after changing `claims` or `routes`, reload it in the FSP:
 
 ```bash
 curl -X POST http://localhost:5001/api/plugins/sim_leds/reload
-curl -X DELETE http://localhost:5001/api/plugins/sim_leds   # or remove it, files and all
+curl -X DELETE http://localhost:5001/api/plugins/sim_leds   # or remove it until the FSP restarts
 ```
 
 When something goes wrong, the answer says why:
 
 | Answer | Usually |
 |---|---|
-| `403` | The source isn't in `PLUGIN_ALLOWED_SOURCES` (scheme, host and port must match exactly: `localhost` isn't `127.0.0.1`) |
-| `409` | A plugin with that name is loaded already (reload it instead), or it claims an objRef another plugin owns |
-| `422` | It can't be downloaded or loaded: a file in `files` is missing, the name in `plugin.json` isn't the one you asked for, or the code raised on import (`detail` has the error) |
-| `"healthy": false` in `GET /api/plugins` | `on_event` raised or took longer than 5 s; `last_error` says what, and the FSP's log has the traceback |
+| `403` | The URL isn't in `PLUGIN_ALLOWED_SOURCES` (scheme, host and port must match exactly: `localhost` isn't `127.0.0.1`) |
+| `409` | A plugin with that name is connected already (reload it instead), or it claims an objRef another plugin owns |
+| `422` | It can't be reached, its `name` isn't the one you asked for, its `api` isn't 2, or `/start` failed (`detail` has the error) |
+| `"failed"` in `GET /api/plugins` | A configured plugin that isn't connected (yet), with why; it is tried again |
+| `"healthy": false` in `GET /api/plugins` | `/events` or `/control` failed or took too long; `last_error` says what |
 
 ## 6. Make your own
 
 1. Copy the sample: `cp -r examples/rti-plugins/sim_leds examples/rti-plugins/historian` (or a folder of your own,
-   outside this repository).
-2. In `plugin.json`, set `name` (lowercase letters, digits and `_`; it is loaded as `acsi_<name>_plugin` and served
-   under `/api/plugins/<name>/`), `version`, `entry` (`module:Class`) and `files`: every file the plugin needs, in one
-   flat folder. Keep `"api": 1`. The rules are the `PluginManifest` schema in [`openapi.yaml`](openapi.yaml).
-3. Import your own modules relatively (`from .leds import ...`). From the host you can import `acsi_plugins`,
-   `fastapi` and `pydantic`; a plugin can't bring its own dependencies.
-4. Its `tests/` came along: rename `test_sim_leds.py`, and change the name, events and routes to your plugin's. The
-   test serves the folder it sits in, so it needs no other change.
+   outside this repository), or start from [`openapi.yaml`](openapi.yaml) in any language: generate a server stub from
+   the *Plugin API* tag.
+2. In `describe`, set `name` (lowercase letters, digits and `_`; it is served under `/api/plugins/<name>/`, and the
+   configuration must use the same name), `version`, `claims` and `routes`. Keep `"api": 2`.
+3. Handle the events you need in `/events` and answer quickly: start slow work after answering (`202`). Ignore types
+   you don't know.
+4. Its `tests/` came along: rename `test_sim_leds.py`, and change the module, name, events and routes to your plugin's.
+5. Add it to the FSP's or SO's plugin configuration.
 
 ### Answering an Operate (FSP)
 
-A plugin can own objRefs: an Operate on one goes to the plugin's `handle_control`, whose answer is the ACSI answer.
-`claims()` is read before `start()`, so the objRefs are fixed in the code, not in the settings. For example, in
-`sim_leds/plugin.py`, refuse an Operate on a breaker while the red LED is on:
+A plugin can own objRefs: list them in `claims`, and an Operate on one goes to the plugin's `/control`, whose answer is
+the ACSI answer. The sample claims the objRefs in `SIM_LEDS_CLAIMS` and refuses an Operate while the red LED is on:
 
 ```python
-from acsi_plugins import ControlResult
-
-
-class SimLedsPlugin(AcsiPlugin):
-    ...
-
-    def claims(self):
-        return ["LD0/CSWI1.Pos.Oper.ctlVal"]
-
-    def handle_control(self, obj_ref, ctl_val):
-        if self.leds.state["red"]:
-            return ControlResult(False, "blockedByInterlocking")
-        return None  # leave it to the FSP's own check
+@plugin.post("/control")
+def control(request: ControlRequest):
+    if leds.state["red"]:
+        return {"ok": False, "add_cause": "blockedByInterlocking"}
+    return Response(status_code=204)  # leave it to the FSP's own check
 ```
 
-`handle_control` is synchronous and has 2 s; `add_cause` is a `ControlServiceStatusKind` name. At most one plugin owns an
-objRef. Writes and reads on an owned objRef aren't passed to the plugin (yet): it sees them only as events.
+`/control` has 2 s; `add_cause` is a `ControlServiceStatusKind` name. At most one plugin owns an objRef. Writes and reads
+on an owned objRef aren't passed to the plugin (yet): it sees them only as events.
 
 ### Things to keep in mind
 
-- A plugin runs inside the FSP or SO, with its rights. Allow only sources you trust.
-- Everything of a plugin runs on the web app's event loop: don't block in `on_event` or a route. Use `async` I/O, or
-  `asyncio.to_thread` for blocking calls.
-- Each event has 5 s. A slow or failing plugin is marked unhealthy; the others still get the event.
-- `stop()` should end whatever `start()` began (connections, tasks): a reload calls `stop()` on the old instance first.
+- One plugin service can serve several FSPs and SOs: each call names its `host`. Keep what you need per host.
+- `/events` has 5 s. A slow or failing plugin is marked unhealthy; the others still get the event.
+- `/stop` should end what `/start` began for that host: a reload calls `/stop` first.
+- The FSP or SO sends every event to the plugin and lets it decide Operates on its objRefs: only configure plugins you
+  trust, and serve them on a network you trust.

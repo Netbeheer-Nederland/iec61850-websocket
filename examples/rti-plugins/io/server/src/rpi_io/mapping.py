@@ -38,11 +38,11 @@ SHIPPED_MAPPING = Path(__file__).parent / "io_mapping.json"
 
 
 def resolve_mapping_path(configured: str | None) -> Path:
-    """The mapping file the plugin reads and saves to (decision 0022).
+    """The mapping file the IO server's plugin reads and saves to (decision 0029).
 
-    `configured` when given - seeded once from the shipped io_mapping.json if
-    it doesn't exist yet, so saves never change the shipped file - else the
-    shipped file itself.
+    `configured` (IO_MAPPING_FILE) when given - seeded once from the shipped
+    io_mapping.json if it doesn't exist yet, so saves never change the
+    shipped file - else the shipped file itself.
     """
     if not configured:
         return SHIPPED_MAPPING

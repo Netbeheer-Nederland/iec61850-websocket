@@ -3,6 +3,7 @@
 """examples/rti-demo/launch.py's options, as its README documents them."""
 
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -107,40 +108,39 @@ def _config(launcher, role, port=None):
 @pytest.mark.parametrize(
     ("role", "port"), [("fsp", 5001), ("fsp2", 5005), ("so", 5000)]
 )
-def test_the_io_plugin_reaches_the_io_server_and_back(launcher, role, port):
-    # The IO plugin is installed and starts by itself (decision 0022).
+def test_each_fsp_and_so_connects_the_io_plugin(launcher, role, port):
+    # The IO server's plugin API, from the plugin configuration (decision 0029).
     env = _config(launcher, role).env_vars
-    assert env["IO_URL"] == "http://localhost:9000"
-    assert env["ACSI_BASE_URL"] == f"http://localhost:{port}"
+    [io] = json.loads(env["PLUGINS"])
+    assert io["url"] == "http://localhost:9000/plugin"
+    assert env["PLUGIN_HOST_URL"] == f"http://localhost:{port}"
+    # Only the first FSP gets the input devices' changes.
+    assert io.get("settings", {}).get("write_inputs", True) is (role == "fsp")
 
 
-def test_each_service_keeps_its_io_mapping_out_of_git(launcher):
-    paths = {
-        role: (LAUNCH_PY.parent / _config(launcher, role).env_vars["IO_MAPPING_FILE"])
-        for role in ("fsp", "fsp2", "so")
-    }
-    assert (
-        paths["fsp"]
-        == LAUNCH_PY.parent / "config" / "plugins" / "fsp" / "io_mapping.json"
-    )
-    assert len(set(paths.values())) == 3
-    for path in paths.values():
-        ignored = subprocess.run(
-            ["git", "check-ignore", "-q", str(path)], cwd=LAUNCH_PY.parent
-        ).returncode
-        assert ignored == 0, f"{path} is not git-ignored"
+def test_the_io_server_keeps_its_mapping_out_of_git(launcher):
+    module = _launch_module()
+    config = module.SERVICES[module.ServiceType.IO]
+    path = (
+        LAUNCH_PY.parent / config.working_dir / config.env_vars["IO_MAPPING_FILE"]
+    ).resolve()
+    assert path == (LAUNCH_PY.parent / "config" / "io_mapping.json").resolve()
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", str(path)], cwd=LAUNCH_PY.parent
+    ).returncode
+    assert ignored == 0, f"{path} is not git-ignored"
 
 
-def test_another_port_is_where_the_io_server_writes_to(launcher):
-    assert _config(launcher, "so", 5010).env_vars["ACSI_BASE_URL"] == (
+def test_another_port_is_where_the_plugins_reach_it(launcher):
+    assert _config(launcher, "so", 5010).env_vars["PLUGIN_HOST_URL"] == (
         "http://localhost:5010"
     )
 
 
-def test_in_docker_the_io_plugin_uses_the_container_names(launcher):
+def test_in_docker_the_plugins_use_the_container_names(launcher):
     env = launcher._docker_env(_config(launcher, "fsp2"))
-    assert env["IO_URL"] == "http://rti-io:9000"
-    assert env["ACSI_BASE_URL"] == "http://rti-fsp2:5005"
+    assert json.loads(env["PLUGINS"])[0]["url"] == "http://rti-io:9000/plugin"
+    assert env["PLUGIN_HOST_URL"] == "http://rti-fsp2:5005"
 
 
 def test_no_plugin_is_downloaded_by_default(launcher, monkeypatch):
