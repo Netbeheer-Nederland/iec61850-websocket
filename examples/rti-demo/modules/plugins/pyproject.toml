@@ -13,6 +13,12 @@ dependencies = [
     "httpx2>=2.13.0",
 ]
 
+[dependency-groups]
+dev = [
+    # tests/test_openapi.py reads openapi.yaml
+    "pyyaml >= 6.0",
+]
+
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"

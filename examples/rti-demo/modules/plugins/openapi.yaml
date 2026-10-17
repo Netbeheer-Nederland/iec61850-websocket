@@ -1,0 +1,661 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# The HTTP side of the ACSI plugin contract (decision 0021), for third parties
+# writing a plugin. tests/test_openapi.py checks it against the routes in
+# src/acsi_plugins/web.py and the manifest rules in src/acsi_plugins/loader.py.
+openapi: 3.1.0
+info:
+  title: ACSI plugins
+  version: "1"
+  summary: Install, manage and serve plugins for the RTI Demo FSP and SO.
+  description: |
+    The FSP and SO host plugins that link ACSI to another integration (IO hardware, a message bus,
+    a historian, ...). Decision 0021 describes the design; the package README and GETTING_STARTED.md
+    walk through writing one.
+
+    A plugin is **Python code that runs inside the FSP or SO process**: a subclass of
+    `acsi_plugins.AcsiPlugin`. Its events and Operate answers are Python method calls, not HTTP.
+    This document describes the parts that are HTTP:
+
+    | Tag | Who serves it | What it is |
+    |---|---|---|
+    | **Plugin management** | the FSP (port 5001) or SO (port 5000) | install, list, reload and remove plugins |
+    | **Plugin routes** | the FSP or SO, for the plugin | the plugin's own `router()`, mounted under `/api/plugins/{name}/` |
+    | **Plugin source** | **you** | a plain file server the FSP or SO downloads the plugin from |
+
+    The `components.schemas` also give, as JSON Schema, the shapes of the Python contract a plugin
+    implements (`PluginManifest`, the events, `ControlResult`, `PluginContext`), so they can be read
+    alongside the HTTP parts. They are marked `x-python-contract: true` and are never sent over HTTP.
+
+    ### Contract version
+
+    This is contract version **1** (`acsi_plugins.API_VERSION`). A manifest must say `"api": 1`;
+    the host refuses any other value.
+
+    ### The Python contract, in short
+
+    | Method | Called | Limit |
+    |---|---|---|
+    | `claims() -> Iterable[str]` | before `start`, when the plugin loads: the objRefs whose Operate it answers (FSP only). At most one plugin per objRef. | |
+    | `async start(ctx: PluginContext)` | once, when loaded | |
+    | `async stop()` | once, when removed or reloaded | 5 s |
+    | `async on_event(event: Event)` | for every event (see `Event`) | 5 s; a failure marks the plugin unhealthy |
+    | `handle_control(obj_ref, ctl_val) -> ControlResult \| None` | synchronously, for an Operate on a claimed objRef (FSP only) | 2 s; raising or hanging fails the Operate |
+    | `router() -> fastapi.APIRouter \| None` | once, after `start` | its routes are served under `/api/plugins/{name}/` |
+
+    A downloaded plugin can import `acsi_plugins`, `fastapi`, `pydantic` and its own modules
+    (relatively); it can't bring its own dependencies. It runs with the FSP's or SO's rights.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+
+servers:
+  - url: http://localhost:5001
+    description: FSP
+  - url: http://localhost:5000
+    description: SO
+
+tags:
+  - name: Plugin management
+    description: Served by the FSP and SO.
+  - name: Plugin routes
+    description: A plugin's own routes, passed on by the FSP or SO to the plugin.
+  - name: Plugin source
+    description: |
+      **Served by you.** The FSP or SO downloads a plugin from `<source_url>/plugin.json` and then
+      `<source_url>/<file>` for each file the manifest lists. Any plain file server will do, for
+      example `python3 -m http.server`. The source must be in the host's `PLUGIN_ALLOWED_SOURCES`:
+      scheme, host and port equal, and the allowed path a whole-segment prefix of `source_url`.
+
+paths:
+  /api/plugins:
+    get:
+      tags: [Plugin management]
+      operationId: listPlugins
+      summary: List plugins
+      description: The loaded plugins, and the plugins that failed to load at startup.
+      responses:
+        "200":
+          description: The plugins.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginList"
+    post:
+      tags: [Plugin management]
+      operationId: installPlugin
+      summary: Install a plugin
+      description: |
+        Download the plugin from `source_url` (or take the one installed with the image when
+        `source_url` is left out), load it and start it. A downloaded plugin is kept, with its source
+        and settings, in `PLUGIN_STORAGE/<name>/` and loaded again when the service starts. A failed
+        install leaves no files behind.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstallRequest"
+            examples:
+              downloaded:
+                summary: From a plugin source
+                value:
+                  name: sim_leds
+                  source_url: http://localhost:8099
+                  settings: { blink_seconds: 1 }
+              installed:
+                summary: Installed with the image
+                value:
+                  name: io
+                  settings: {}
+      responses:
+        "200":
+          $ref: "#/components/responses/PluginChanged"
+        "403":
+          $ref: "#/components/responses/SourceNotAllowed"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/LoadError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/plugins/{name}:
+    parameters:
+      - $ref: "#/components/parameters/PluginName"
+    get:
+      tags: [Plugin management]
+      operationId: getPlugin
+      summary: A plugin's status
+      responses:
+        "200":
+          description: The plugin's status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Plugin management]
+      operationId: removePlugin
+      summary: Remove a plugin
+      description: |
+        Stop the plugin, free its objRefs and delete its downloaded files. A plugin installed with the
+        image is stopped until the next start of the service.
+      responses:
+        "200":
+          description: Removed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/plugins/{name}/reload:
+    parameters:
+      - $ref: "#/components/parameters/PluginName"
+    post:
+      tags: [Plugin management]
+      operationId: reloadPlugin
+      summary: Reload a plugin
+      description: |
+        Download the plugin again from its source (if it came from one), stop the old instance and
+        start the new one. The settings stay. Because this route comes first, a plugin can't have its
+        own `POST /reload`.
+      responses:
+        "200":
+          $ref: "#/components/responses/PluginChanged"
+        "403":
+          $ref: "#/components/responses/SourceNotAllowed"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/LoadError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/plugins/{name}/{path}:
+    summary: A plugin's own routes
+    description: |
+      Every request under `/api/plugins/{name}/` (other than `POST .../reload`) is passed on, with its
+      method, query, headers and body, to the routes the plugin returns from `router()`, at `/{path}`.
+      The plugin's answer is returned as it is. What the routes are is up to each plugin; the
+      sample `sim_leds`, for example, has `GET /leds`, `POST /leds/{color}` and `POST /leds/reset`.
+
+      Methods passed on: GET, POST, PUT, PATCH, DELETE. The plugin's routes don't appear in the
+      FSP's or SO's own `/openapi.json`.
+    parameters:
+      - $ref: "#/components/parameters/PluginName"
+      - name: path
+        in: path
+        required: true
+        description: The path within the plugin's routes, without the leading `/`. May contain `/`.
+        schema:
+          type: string
+        example: leds/red
+    get:
+      tags: [Plugin routes]
+      operationId: pluginGet
+      summary: GET a plugin route
+      responses: &pluginRouteResponses
+        default:
+          description: Whatever the plugin's route answers.
+        "404":
+          description: No plugin with that name and routes is loaded, or the plugin has no such route.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags: [Plugin routes]
+      operationId: pluginPost
+      summary: POST to a plugin route
+      requestBody: &pluginRouteBody
+        required: false
+        description: Passed on to the plugin as it is.
+        content:
+          "*/*":
+            schema: {}
+      responses: *pluginRouteResponses
+    put:
+      tags: [Plugin routes]
+      operationId: pluginPut
+      summary: PUT to a plugin route
+      requestBody: *pluginRouteBody
+      responses: *pluginRouteResponses
+    patch:
+      tags: [Plugin routes]
+      operationId: pluginPatch
+      summary: PATCH a plugin route
+      requestBody: *pluginRouteBody
+      responses: *pluginRouteResponses
+    delete:
+      tags: [Plugin routes]
+      operationId: pluginDelete
+      summary: DELETE a plugin route
+      responses: *pluginRouteResponses
+
+  /plugin.json:
+    servers: &sourceServers
+      - url: "{source_url}"
+        description: Your plugin source, as passed in `source_url`.
+        variables:
+          source_url:
+            default: http://localhost:8099
+    get:
+      tags: [Plugin source]
+      operationId: sourceGetManifest
+      summary: The plugin's manifest
+      description: |
+        Fetched first. The `name` must be the one asked for in the install request. Any status other
+        than 200 fails the install (a JSON body's `detail` is shown in the error).
+      responses:
+        "200":
+          description: The manifest.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginManifest"
+              example:
+                name: sim_leds
+                version: 1.0.0
+                api: 1
+                entry: plugin:SimLedsPlugin
+                files: [__init__.py, leds.py, plugin.py]
+
+  /{file}:
+    servers: *sourceServers
+    get:
+      tags: [Plugin source]
+      operationId: sourceGetFile
+      summary: One of the plugin's files
+      description: |
+        Fetched for each name in the manifest's `files`, after the manifest. Served as it is (the
+        raw bytes, not wrapped in JSON); the content type isn't checked. The files are written to a
+        temporary folder first, so a failed download leaves an earlier version of the plugin as it
+        was.
+      parameters:
+        - name: file
+          in: path
+          required: true
+          description: A name from the manifest's `files`.
+          schema:
+            $ref: "#/components/schemas/PluginFileName"
+          example: plugin.py
+      responses:
+        "200":
+          description: The file's content.
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+
+components:
+  parameters:
+    PluginName:
+      name: name
+      in: path
+      required: true
+      description: The plugin's name.
+      schema:
+        $ref: "#/components/schemas/PluginName"
+      example: sim_leds
+
+  responses:
+    PluginChanged:
+      description: The plugin is loaded and started.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ok, plugin]
+            properties:
+              ok:
+                const: true
+              plugin:
+                $ref: "#/components/schemas/PluginStatus"
+    NotFound:
+      description: No plugin with that name is loaded.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example: { detail: "No plugin 'sim_leds' is loaded" }
+    SourceNotAllowed:
+      description: The source isn't in `PLUGIN_ALLOWED_SOURCES`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            detail: Source http://127.0.0.1:8099 is not allowed; add it to PLUGIN_ALLOWED_SOURCES
+    Conflict:
+      description: A plugin with that name is loaded already, or the plugin claims an objRef another plugin owns.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            detail: "Plugin 'historian' claims objRefs another plugin owns: LD0/CSWI1.Pos.Oper.ctlVal (owned by 'io')"
+    LoadError:
+      description: |
+        The plugin can't be downloaded or loaded (`detail` says why: a file is missing, the manifest's
+        name isn't the one asked for, the code raised on import, ...), or the request body isn't valid
+        (`detail` is then FastAPI's list of validation errors).
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/Error"
+              - $ref: "#/components/schemas/ValidationError"
+    InternalError:
+      description: Anything else that went wrong, for example the plugin's `start()` raised.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    # ==================== HTTP ====================
+
+    PluginName:
+      type: string
+      pattern: "^[a-z][a-z0-9_]*$"
+      description: |
+        Lowercase letters, digits and `_`, starting with a letter. A downloaded plugin is imported as the
+        package `acsi_<name>_plugin` and served under `/api/plugins/<name>/`.
+      examples: [sim_leds]
+
+    PluginFileName:
+      type: string
+      pattern: "^[A-Za-z0-9_][A-Za-z0-9_.-]*$"
+      description: |
+        A plain file name in one flat folder: no `/`, no `..`, and not `plugin.json` or `install.json`
+        (which the host writes itself).
+      not:
+        anyOf:
+          - const: plugin.json
+          - const: install.json
+          - pattern: "\\.\\."
+      examples: [plugin.py]
+
+    InstallRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: The plugin's name, as in its plugin.json.
+          examples: [io]
+        source_url:
+          type: [string, "null"]
+          description: |
+            Where to download it from (`<source_url>/plugin.json`); leave out for a plugin installed with
+            the image.
+          examples: ["http://localhost:8099"]
+        settings:
+          type: object
+          additionalProperties: true
+          default: {}
+          description: The plugin's own settings, given to it as `PluginContext.settings`.
+
+    PluginStatus:
+      type: object
+      required: [name, version, source, claims, routes, healthy, last_error]
+      properties:
+        name:
+          $ref: "#/components/schemas/PluginName"
+        version:
+          type: [string, "null"]
+          description: From the manifest, or the installed package's version.
+          examples: [1.0.0]
+        source:
+          type: [string, "null"]
+          description: The `source_url` it was downloaded from, or `installed` for a plugin installed with the image.
+          examples: ["http://localhost:8099", installed]
+        claims:
+          type: array
+          items:
+            type: string
+          description: The objRefs whose Operate this plugin answers (from `claims()`).
+          examples: [["LD0/CSWI1.Pos.Oper.ctlVal"]]
+        routes:
+          type: boolean
+          description: Whether the plugin has routes under `/api/plugins/{name}/`.
+        healthy:
+          type: boolean
+          description: |
+            False after the plugin's last `on_event` or `handle_control` raised or timed out; true again
+            after one that succeeds. An unhealthy plugin still gets events.
+        last_error:
+          type: [string, "null"]
+          description: The last error, kept after the plugin is healthy again.
+          examples: ["ValueWritten timed out after 5.0s"]
+
+    PluginList:
+      type: object
+      required: [plugins, failed]
+      properties:
+        plugins:
+          type: array
+          items:
+            $ref: "#/components/schemas/PluginStatus"
+        failed:
+          type: object
+          description: Plugins that failed to load at startup, by name, with the reason.
+          additionalProperties:
+            type: string
+          examples: [{ historian: "Can't fetch http://localhost:8099/plugin.json: HTTP 404" }]
+
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          const: true
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+
+    ValidationError:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  anyOf: [{ type: string }, { type: integer }]
+              msg:
+                type: string
+              type:
+                type: string
+
+    PluginManifest:
+      type: object
+      description: |
+        `plugin.json`, served by the plugin source. Other fields are ignored.
+      required: [name, api, entry, files]
+      properties:
+        name:
+          $ref: "#/components/schemas/PluginName"
+        version:
+          type: string
+          description: Shown in the plugin's status.
+          examples: [1.0.0]
+        api:
+          const: 1
+          description: The contract version the plugin is written for.
+        entry:
+          type: string
+          pattern: "^[^:]+:.+$"
+          description: |
+            `module:Class`. `<module>.py` must be in `files`, and `Class` must subclass
+            `acsi_plugins.AcsiPlugin`; the host creates it with no arguments.
+          examples: ["plugin:SimLedsPlugin"]
+        files:
+          type: array
+          description: Every file of the plugin, in one flat folder. Must include `__init__.py`.
+          items:
+            $ref: "#/components/schemas/PluginFileName"
+          contains:
+            const: __init__.py
+
+    # ==================== Python contract ====================
+
+    PluginContext:
+      x-python-contract: true
+      type: object
+      description: |
+        `acsi_plugins.PluginContext`, passed to `start(ctx)`. Also has `logger`, a `logging.Logger`
+        named `acsi_plugins.<name>`.
+      required: [name, role, settings, source]
+      properties:
+        name:
+          $ref: "#/components/schemas/PluginName"
+        role:
+          enum: [fsp, so]
+          description: Whether the plugin runs in the FSP or the SO.
+        settings:
+          type: object
+          additionalProperties: true
+          description: The `settings` of the install request, or of the `PLUGINS` entry.
+        source:
+          type: [string, "null"]
+          description: The source URL, or `installed`.
+
+    ControlResult:
+      x-python-contract: true
+      type: object
+      description: |
+        `acsi_plugins.ControlResult`, the answer of `handle_control(obj_ref, ctl_val)` to an Operate on a
+        claimed objRef (FSP only). Returning `None` instead leaves the Operate to the FSP's own check.
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        add_cause:
+          type: [string, "null"]
+          description: |
+            When `ok` is false, the IEC 61850 `ControlServiceStatusKind` name sent to the client, for
+            example `blockedByInterlocking`. An unknown name is sent as `unknown`.
+          examples: [blockedByInterlocking]
+
+    Event:
+      x-python-contract: true
+      description: |
+        What `on_event(event)` gets: an instance of one of these frozen dataclasses (exported from
+        `acsi_plugins`). Match on the class; `event_type` here only names the class and isn't an
+        attribute.
+      oneOf:
+        - $ref: "#/components/schemas/Associated"
+        - $ref: "#/components/schemas/OperateReceived"
+        - $ref: "#/components/schemas/OperateResponse"
+        - $ref: "#/components/schemas/ValueWritten"
+        - $ref: "#/components/schemas/ValueRead"
+        - $ref: "#/components/schemas/ReportReceived"
+        - $ref: "#/components/schemas/ServerStopped"
+      discriminator:
+        propertyName: event_type
+
+    Associated:
+      x-python-contract: true
+      x-roles: [fsp, so]
+      type: object
+      description: An association was set up (the FSP answered it, or the SO got the answer).
+      required: [event_type, associate_id]
+      properties:
+        event_type: { const: Associated }
+        associate_id: { type: string }
+
+    OperateReceived:
+      x-python-contract: true
+      x-roles: [fsp]
+      type: object
+      description: The FSP received an Operate request.
+      required: [event_type, data]
+      properties:
+        event_type: { const: OperateReceived }
+        data:
+          type: object
+          additionalProperties: true
+          description: The request as received.
+
+    OperateResponse:
+      x-python-contract: true
+      x-roles: [fsp, so]
+      type: object
+      description: An Operate was answered (FSP sent it; SO received it).
+      required: [event_type, success]
+      properties:
+        event_type: { const: OperateResponse }
+        success: { type: boolean }
+        add_cause: { type: [string, "null"] }
+        obj_ref: { type: [string, "null"] }
+        value: {}
+        data:
+          type: object
+          additionalProperties: true
+
+    ValueWritten:
+      x-python-contract: true
+      x-roles: [fsp, so]
+      type: object
+      description: A value was written (FSP, its own model; SO, to a server).
+      required: [event_type, obj_ref, value]
+      properties:
+        event_type: { const: ValueWritten }
+        obj_ref: { type: string }
+        value: {}
+        ok: { type: boolean, default: true }
+
+    ValueRead:
+      x-python-contract: true
+      x-roles: [so]
+      type: object
+      description: The SO read a value from a server.
+      required: [event_type, obj_ref, value]
+      properties:
+        event_type: { const: ValueRead }
+        obj_ref: { type: string }
+        value: {}
+        ok: { type: boolean, default: true }
+
+    ReportReceived:
+      x-python-contract: true
+      x-roles: [so]
+      type: object
+      description: The SO received a report.
+      required: [event_type, rpt_id, data_set]
+      properties:
+        event_type: { const: ReportReceived }
+        rpt_id: { type: string }
+        data_set: { type: string }
+        data:
+          type: array
+          items: {}
+
+    ServerStopped:
+      x-python-contract: true
+      x-roles: [fsp]
+      type: object
+      description: The FSP is about to stop its ACSI server; it waits for the plugins (up to 5 s).
+      required: [event_type]
+      properties:
+        event_type: { const: ServerStopped }

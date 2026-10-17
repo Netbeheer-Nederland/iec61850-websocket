@@ -20,6 +20,10 @@ decision behind it is [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugi
 
 `samples/sim_leds/` is a sample plugin (two simulated LEDs); [GETTING_STARTED.md](GETTING_STARTED.md) starts from it.
 
+[`openapi.yaml`](openapi.yaml) is the contract for third-party plugins, as OpenAPI 3.1: the `/api/plugins` routes,
+what a plugin source must serve, how a plugin's own routes are reached, and the shapes of the manifest, the events and
+`ControlResult`. `tests/test_openapi.py` keeps it in step with the code.
+
 ## What a plugin gets
 
 **Events**, to every plugin. Each runs with a timeout (5 s); a plugin that fails or is too slow is logged and marked
