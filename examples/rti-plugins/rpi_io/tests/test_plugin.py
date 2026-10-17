@@ -204,10 +204,10 @@ async def test_fsp_operate_response_is_shown(plugin, event, text):
     assert texts(plugin) == [text]
 
 
-async def test_fsp_stop_turns_the_led_off(plugin):
+async def test_fsp_disconnect_turns_the_led_off(plugin):
     await deliver(plugin, FSP, {"type": "ServerStopped"})
     assert ("set", "led1", False) in sets(plugin)
-    assert texts(plugin) == ["Stopped"]
+    assert texts(plugin) == ["Disconnected"]
 
 
 async def test_fsp_write_is_shown(plugin):

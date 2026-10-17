@@ -160,7 +160,7 @@ What each event does (the names are the plugin's own, mapped to devices in `io_m
 | `ValueWritten` | the objRef's output devices set, display `writeValue` | the same, `setpoint` blinks, display `setpoint` |
 | `ValueRead` | | `read` blinks, display the value or the failure |
 | `ReportReceived` | | `rc_rcv` blinks, display rptID and dataSet |
-| `ServerStopped` | `stopped` off, display "Stopped" | |
+| `ServerStopped` (the FSP's Disconnect) | `stopped` off, display "Disconnected" | |
 
 Text goes to every display mapped to the name (the HD44780 LCD and the I2C LCD). `IO_MAPPING_FILE` names the mapping
 file (default: the shipped `src/rpi_io/plugin/io_mapping.json`); a file that doesn't exist yet is seeded from the shipped one.

@@ -151,7 +151,8 @@ class IoPlugin:
             text = f"Operation: FAILED - {cause}" if cause else "Operation: FAILED"
             return [self.show("oper_send", text)]
         if kind == "ServerStopped":
-            return [self.sync("stopped", False), self.show("stopped", "Stopped")]
+            # The FSP dropped its connection to the SO; its server runs on.
+            return [self.sync("stopped", False), self.show("stopped", "Disconnected")]
         if kind == "ValueWritten":
             obj_ref, value = event.get("obj_ref"), event.get("value")
             return [
