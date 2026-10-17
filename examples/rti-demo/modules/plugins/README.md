@@ -22,7 +22,8 @@ decision behind it is [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugi
 
 [`openapi.yaml`](openapi.yaml) is the contract for third-party plugins, as OpenAPI 3.1: the `/api/plugins` routes,
 what a plugin source must serve, how a plugin's own routes are reached, and the shapes of the manifest, the events and
-`ControlResult`. `tests/test_openapi.py` keeps it in step with the code.
+`ControlResult`. `tests/test_openapi.py` keeps it in step with the code (decision
+[0027](../../../../docs/rti-demo/decisions/0027-plugin-contract-as-openapi.md)). A change to the contract changes it too.
 
 ## What a plugin gets
 

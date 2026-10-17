@@ -290,7 +290,8 @@ FSP and SO have the IO plugin installed ([modules/io-plugin](modules/io-plugin/R
 connects to the `io` service at `IO_URL`, which writes the button and potentiometers back to `ACSI_BASE_URL`;
 `launch.py` and compose set both, and on two Raspberry Pis each side points `IO_URL` at its own `io` service (see
 *Plugins* in [modules/fsp/README.md](modules/fsp/README.md)). To write a plugin of your own, start with
-[modules/plugins/GETTING_STARTED.md](modules/plugins/GETTING_STARTED.md).
+[modules/plugins/GETTING_STARTED.md](modules/plugins/GETTING_STARTED.md); the contract is
+[modules/plugins/openapi.yaml](modules/plugins/openapi.yaml).
 Wiring, pin numbers and the I2C LCD setup are in [modules/io/README.md](modules/io/README.md).
 
 ## IO API Server
@@ -335,7 +336,7 @@ rti-demo/
     ├── so/        { pyproject.toml, docker/Dockerfile, src/so/, tests/ }
     ├── io/        { pyproject.toml, docker/Dockerfile, src/rpi_io/, tests/ }  # the IO server (Raspberry Pi)
     ├── io-plugin/ { pyproject.toml, src/acsi_io_plugin/, tests/ }  # the IO plugin, installed in the FSP and SO
-    ├── plugins/   { pyproject.toml, src/acsi_plugins/, samples/, tests/ }  # the plugin host
+    ├── plugins/   { pyproject.toml, openapi.yaml, src/acsi_plugins/, samples/, tests/ }  # the plugin host
     └── hmi/       { package.json, docker/Dockerfile, src/ }  # Web HMI (React)
 ```
 

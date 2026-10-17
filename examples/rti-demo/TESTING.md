@@ -138,8 +138,10 @@ examples/rti-demo/modules/
 ├── plugins/   # acsi-plugins: the plugin host the fsp and so use (decision 0021)
 │   ├── pyproject.toml
 │   ├── src/acsi_plugins/contract.py, host.py, loader.py, web.py
+│   ├── openapi.yaml        # the plugin contract, OpenAPI 3.1 (decision 0027)
 │   ├── samples/sim_leds/   # a sample plugin (GETTING_STARTED.md)
-│   └── tests/test_host.py, test_loader.py, test_web.py, test_sample_sim_leds.py
+│   └── tests/test_host.py, test_loader.py, test_web.py, test_sample_sim_leds.py,
+│       test_openapi.py
 ├── io-plugin/ # acsi-io-plugin: the IO plugin, installed in the fsp and so (decision 0022)
 │   ├── pyproject.toml   # entry point acsi.plugins: io
 │   ├── src/acsi_io_plugin/plugin.py, client.py, router.py, mapping.py, utils.py

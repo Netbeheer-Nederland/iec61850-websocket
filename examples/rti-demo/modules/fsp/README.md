@@ -210,7 +210,9 @@ potentiometers of the `io` service. The FSP tells every plugin what happens (an 
 stop), and the plugin that owns an objRef answers an Operate on it. A plugin is installed with the image, as the IO
 plugin is, or downloaded on request from an allowed source. How plugins work, and how to write one:
 [`modules/plugins/README.md`](../plugins/README.md) and decision
-[0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.md).
+[0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.md). The contract, as OpenAPI 3.1, is
+[`modules/plugins/openapi.yaml`](../plugins/openapi.yaml); it also covers plugins' own routes, which this service's
+`/docs` doesn't list.
 
 ### The IO plugin
 

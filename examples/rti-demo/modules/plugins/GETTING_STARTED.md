@@ -9,8 +9,10 @@ SPDX-License-Identifier: Apache-2.0
 A plugin links the FSP or SO to another integration: it hears what happens on the ACSI side (an association, an
 Operate, a write, a report), can serve its own routes, and can answer the Operates on objRefs it owns. This guide walks
 through the sample plugin `sim_leds`, which shows those events on two simulated LEDs, red and green, and then shows how
-to make your own. The contract itself is in the [README](README.md); the decision behind it is
-[0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.md).
+to make your own. The contract itself is in the [README](README.md), and as OpenAPI 3.1 in [`openapi.yaml`](openapi.yaml)
+(the `/api/plugins` routes, what your plugin source must serve, the manifest and the events); the decisions behind it
+are [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.md) and
+[0027](../../../../docs/rti-demo/decisions/0027-plugin-contract-as-openapi.md).
 
 ## Before you start
 
@@ -152,7 +154,7 @@ When something goes wrong, the answer says why:
 1. Copy the sample: `cp -r samples/sim_leds my_plugins/historian`.
 2. In `plugin.json`, set `name` (lowercase letters, digits and `_`; it is loaded as `acsi_<name>_plugin` and served
    under `/api/plugins/<name>/`), `version`, `entry` (`module:Class`) and `files`: every file the plugin needs, in one
-   flat folder. Keep `"api": 1`.
+   flat folder. Keep `"api": 1`. The rules are the `PluginManifest` schema in [`openapi.yaml`](openapi.yaml).
 3. Import your own modules relatively (`from .leds import ...`). From the host you can import `acsi_plugins`,
    `fastapi` and `pydantic`; a plugin can't bring its own dependencies.
 4. Copy `tests/test_sample_sim_leds.py` next to your plugin and point it at your folder.
