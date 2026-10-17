@@ -16,6 +16,7 @@ Routes: the server's /leds-api, under /api/plugins/sim_leds/ in the FSP or SO.
 
 from __future__ import annotations
 
+import importlib.metadata
 import os
 from typing import Any
 
@@ -26,6 +27,13 @@ from ..server.leds import SimulatedLeds
 
 API_VERSION = 2
 NAME = "sim_leds"
+
+
+def _version() -> str:
+    try:
+        return importlib.metadata.version("sim-leds")
+    except importlib.metadata.PackageNotFoundError:
+        return ""
 
 
 def claims() -> list[str]:
@@ -61,7 +69,7 @@ def create_plugin_router(leds: SimulatedLeds) -> APIRouter:
     def describe():
         return {
             "name": NAME,
-            "version": "2.0.0",
+            "version": _version(),
             "api": API_VERSION,
             "claims": claims(),
             "routes": "/leds-api",

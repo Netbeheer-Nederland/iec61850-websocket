@@ -249,7 +249,7 @@ def create_plugin_router(
             mapping_file=str(resolve_mapping_path(os.getenv("IO_MAPPING_FILE")))
         )
     plugin = IoPlugin(io_controller, mapping)
-    router = APIRouter(prefix="/plugin", tags=["ACSI plugin (decision 0029)"])
+    router = APIRouter(prefix="/plugin", tags=["Plugin API (decision 0029)"])
 
     @router.get("", summary="Describe the plugin")
     def describe():

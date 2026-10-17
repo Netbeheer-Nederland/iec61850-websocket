@@ -46,6 +46,7 @@ def test_it_imports_nothing_of_the_fsp_or_so():
         "asyncio",
         "collections",
         "contextlib",
+        "importlib",
         "os",
         "time",
         "typing",

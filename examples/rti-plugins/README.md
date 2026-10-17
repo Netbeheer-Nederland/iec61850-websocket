@@ -11,8 +11,9 @@ that implements the plugin API in [`openapi.yaml`](../rti-demo/modules/plugins/o
 FSP or SO connects to it from its plugin configuration. Nothing here is installed in the FSP or SO, and nothing here
 imports them: each plugin runs, is built and is released on its own. The decisions behind this are
 [0028](../../docs/rti-demo/decisions/0028-rti-plugins-folder.md) (this folder),
-[0029](../../docs/rti-demo/decisions/0029-plugins-are-http-services.md) (plugins are HTTP services) and
-[0030](../../docs/rti-demo/decisions/0030-plugin-project-layout.md) (the layout of a plugin).
+[0029](../../docs/rti-demo/decisions/0029-plugins-are-http-services.md) (plugins are HTTP services),
+[0030](../../docs/rti-demo/decisions/0030-plugin-project-layout.md) (the layout of a plugin) and
+[0031](../../docs/rti-demo/decisions/0031-plugin-source-layout.md) (its source).
 
 | Folder | What it is | Its plugin URL | Runs on |
 |---|---|---|---|
@@ -37,6 +38,17 @@ Every plugin is its own project, with the same layout (decision 0030; the same a
 │   └── plugin/               # the plugin API (decision 0029) under /plugin, which the FSP and SO connect to
 └── tests/
 ```
+
+In the source (decision 0031):
+
+| Where | What |
+|---|---|
+| `server/` | The service's state and logic, which don't import `plugin/`; its own routes under a prefix of its own; the app factory, the one module that mounts the plugin router; `main.py` with `main()`, the script, reading `HOST` and `PORT` |
+| `plugin/plugin.py` | `NAME`, `API_VERSION = 2`, the request models of `openapi.yaml`, and `create_plugin_router(<the server's state>)`: prefix `/plugin`, tag `Plugin API (decision 0029)`. The description's `version` is the package's, `routes` the server's prefix |
+| `plugin/__init__.py` | Exports `create_plugin_router`; data only the plugin uses sits next to it (`io_mapping.json`) |
+
+The plugin depends on the server, not the other way round, and nothing in `src/` imports the FSP's or SO's code.
+`tests/unit/test_rti_plugins_source_layout.py` checks every plugin here.
 
 To write your own plugin, start with [`GETTING_STARTED.md`](../rti-demo/modules/plugins/GETTING_STARTED.md), which walks
 through `sim_leds`. A new integration is a new folder here (or anywhere else) and an entry in the FSP's or SO's plugin

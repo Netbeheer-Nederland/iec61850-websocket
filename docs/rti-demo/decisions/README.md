@@ -41,5 +41,6 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0028](0028-rti-plugins-folder.md) | Plugins and the IO server move to `examples/rti-plugins`; the IO server is its own stack | proposed |
 | [0029](0029-plugins-are-http-services.md) | Plugins are HTTP services the FSP and SO connect to, from a plugin configuration | proposed |
 | [0030](0030-plugin-project-layout.md) | Every plugin is a project with one layout: `server` and `plugin` subpackages, `docker/`, a compose pair | proposed |
+| [0031](0031-plugin-source-layout.md) | A plugin's source: `server/` is the service, `plugin/` the plugin API, and the plugin depends on the server | proposed |
 
 To add a decision, copy the layout of an existing record, take the next number, and add a line to this table.

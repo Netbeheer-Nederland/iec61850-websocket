@@ -22,6 +22,7 @@ from acsi_plugins import (
 )
 from acsi_plugins.web import PluginService, attach
 from fastapi import FastAPI
+from sim_leds.plugin import plugin
 from sim_leds.server.app import create_app
 
 pytestmark = pytest.mark.unit
@@ -72,7 +73,8 @@ async def leds(client):
 async def test_the_fsp_connects_to_it(setup):
     _, client = setup
     body = (await client.get("/api/plugins/sim_leds")).json()
-    assert body["version"] == "2.0.0"
+    # From the package metadata: "" here, where sim-leds isn't installed.
+    assert body["version"] == plugin._version()
     assert body["claims"] == [POS]
     assert body["healthy"] is True
     assert await leds(client) == {"red": False, "green": False}

@@ -25,7 +25,9 @@ uv sync --all-packages
 ## 1. The sample: `examples/rti-plugins/sim_leds/`
 
 The sample lives with the other plugins, in [`examples/rti-plugins`](../../../rti-plugins/README.md), and has the
-layout every plugin has ([decision 0030](../../../../docs/rti-demo/decisions/0030-plugin-project-layout.md)):
+layout every plugin has (decisions [0030](../../../../docs/rti-demo/decisions/0030-plugin-project-layout.md) and
+[0031](../../../../docs/rti-demo/decisions/0031-plugin-source-layout.md): `server/` is the service, `plugin/` the plugin
+API, and only the server's app factory imports the plugin):
 
 | File | What it does |
 |---|---|
