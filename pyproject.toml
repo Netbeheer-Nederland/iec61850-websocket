@@ -94,12 +94,11 @@ ignore = ["E501"]
 package = true
 
 [tool.uv.workspace]
-# The IO server (examples/rti-plugins/io/server) deliberately excluded - it
-# needs Raspberry Pi hardware packages (gpiozero, gpiod, Adafruit-ADS1x15,
-# smbus2) that won't resolve/install on a non-Pi dev machine, and it already
-# builds via its own fully independent Docker-stage venv (its
-# docker/Dockerfile), never sharing this workspace's env. It is the FSP's
-# and SO's IO plugin over HTTP (decision 0029), so nothing of it is a member.
+# The plugins in examples/rti-plugins are deliberately not members: each is
+# its own uv project with its own lock and image (decisions 0029, 0030). The
+# IO plugin also needs Raspberry Pi hardware packages (gpiozero, gpiod,
+# Adafruit-ADS1x15, smbus2) that won't resolve/install on a non-Pi dev
+# machine. The FSP and SO reach plugins over HTTP, so none is a member.
 members = [
     "examples/rti-demo/modules/so",
     "examples/rti-demo/modules/fsp",

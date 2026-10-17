@@ -10,16 +10,16 @@ DOCKERFILE = (
     / "examples"
     / "rti-plugins"
     / "io"
-    / "server"
     / "docker"
     / "Dockerfile"
 )
 
 
 def test_io_image_installs_the_package():
-    # The code is the package rpi_io in src/, installed by uv (decision 0023).
+    # The code is the package rpi_io in src/, installed by uv (decision 0023),
+    # started with its script (decision 0030).
     text = DOCKERFILE.read_text(encoding="utf-8")
     assert re.search(r"^COPY src/ /app/src/$", text, re.MULTILINE)
     assert re.search(r"uv sync --frozen --no-dev$", text, re.MULTILINE)
-    assert 'CMD ["python", "-u", "-m", "rpi_io.main"]' in text
+    assert 'CMD ["rpi-io"]' in text
     assert "rti_io" not in text

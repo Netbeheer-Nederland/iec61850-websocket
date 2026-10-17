@@ -18,7 +18,7 @@ The SO directory implements a complete **IEC 61850 ACSI (Abstract Communication 
 - Reads data values from connected servers
 - Writes data values to connected servers
 - Manages multiple connections and communication points
-- Integrates with IO devices via the IO service (`examples/rti-plugins/io/server`, its own stack)
+- Integrates with IO devices via the IO service (`examples/rti-plugins/io`, its own stack)
 
 ### Architecture
 
@@ -180,7 +180,7 @@ and decisions [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.m
 
 ### The IO plugin
 
-The IO server ([`rti-plugins/io/server`](../../../rti-plugins/io/server/README.md)) is the SO's IO plugin: compose
+The IO server ([`rti-plugins/io`](../../../rti-plugins/io/README.md)) is the SO's IO plugin: compose
 configures it in `config/plugin-configuration/rti-so.json` (`http://rti-io:9000/plugin`), `launch.py` in `PLUGINS`
 (`http://localhost:9000/plugin`). Its configuration says `"write_inputs": false`, so the input devices write to the FSP. Which devices react to which event or objRef is the IO server's
 `io_mapping.json`; see the *Hardware demo* section of `examples/rti-demo/README.md`.

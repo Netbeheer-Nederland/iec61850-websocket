@@ -24,13 +24,17 @@ uv sync --all-packages
 
 ## 1. The sample: `examples/rti-plugins/sim_leds/`
 
-The sample lives with the other plugins, in [`examples/rti-plugins`](../../../rti-plugins/README.md).
+The sample lives with the other plugins, in [`examples/rti-plugins`](../../../rti-plugins/README.md), and has the
+layout every plugin has ([decision 0030](../../../../docs/rti-demo/decisions/0030-plugin-project-layout.md)):
 
 | File | What it does |
 |---|---|
-| `sim_leds.py` | The plugin: a FastAPI app with the plugin API under `/plugin` and its own routes under `/leds-api` |
-| `leds.py` | `SimulatedLeds`: two LEDs in memory, blinking, and a history of what changed them |
+| `src/sim_leds/server/` | The service: `leds.py` (`SimulatedLeds`: two LEDs in memory, blinking, and a history of what changed them), `app.py` (the FastAPI app, with its own routes under `/leds-api`), `main.py` (the script `sim-leds`) |
+| `src/sim_leds/plugin/` | The plugin API under `/plugin`: `plugin.py` |
 | `tests/` | Its tests: the FSP's plugin service connected to the app |
+| `pyproject.toml`, `uv.lock` | Its own uv project, `sim-leds`, not in the repository's workspace |
+| `docker/Dockerfile`, `docker/Dockerfile.dockerignore` | Its image, built from the project folder |
+| `docker-compose.yaml` | Its own stack, on the network `rti-network` (a plugin with hardware adds `docker-compose.pi.yaml`) |
 
 It needs only FastAPI: it imports nothing of the FSP or SO. What the LEDs show, in the FSP and in the SO:
 
@@ -57,7 +61,7 @@ Its one setting, `blink_seconds` (default `0.3`), comes from the plugin configur
 The plugin API is five routes:
 
 ```python
-plugin = APIRouter(prefix="/plugin")
+plugin = APIRouter(prefix="/plugin")  # in create_plugin_router(leds)
 
 @plugin.get("")                       # who it is: name, version, "api": 2, claims, routes
 def describe(): ...
@@ -90,8 +94,8 @@ use it as the template for your own plugin's tests, and as the fast way to try a
 Run the plugin (port 8099; the SO's WebSocket uses 8765):
 
 ```bash
-uv run --no-project --with fastapi --with uvicorn \
-  uvicorn sim_leds:app --app-dir examples/rti-plugins/sim_leds --port 8099
+cd examples/rti-plugins/sim_leds
+uv run sim-leds                       # or: docker compose up -d (http://sim-leds:8099/plugin on rti-network)
 ```
 
 In a second terminal, start an FSP whose plugin configuration has it:
@@ -142,7 +146,7 @@ watch -n 0.5 'curl -s http://localhost:5000/api/plugins/sim_leds/leds'
 
 ## 5. Change it
 
-Edit `sim_leds.py` and restart the plugin (or run uvicorn with `--reload`). Its description is read when it connects, so
+Edit `src/sim_leds/plugin/plugin.py` and restart the plugin. Its description is read when it connects, so
 after changing `claims` or `routes`, reload it in the FSP:
 
 ```bash
@@ -169,8 +173,10 @@ When something goes wrong, the answer says why:
    configuration must use the same name), `version`, `claims` and `routes`. Keep `"api": 2`.
 3. Handle the events you need in `/events` and answer quickly: start slow work after answering (`202`). Ignore types
    you don't know.
-4. Its `tests/` came along: rename `test_sim_leds.py`, and change the module, name, events and routes to your plugin's.
-5. Add it to the FSP's or SO's plugin configuration.
+4. Rename the package (`src/sim_leds`), the project and its script in `pyproject.toml`, and run `uv lock`. Keep the
+   layout: the service in `server/`, the plugin API in `plugin/`.
+5. Its `tests/` came along: rename `test_sim_leds.py`, and change the module, name, events and routes to your plugin's.
+6. Add it to the FSP's or SO's plugin configuration.
 
 ### Answering an Operate (FSP)
 

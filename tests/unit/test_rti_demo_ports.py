@@ -18,8 +18,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 DEMO = ROOT / "examples" / "rti-demo"
 MODULES = DEMO / "modules"
-# The IO server, in its own folder (decision 0028).
-IO_SERVER = ROOT / "examples" / "rti-plugins" / "io" / "server"
+# The IO plugin, in its own folder (decisions 0028, 0030).
+IO_PLUGIN = ROOT / "examples" / "rti-plugins" / "io"
 
 EXPECTED_PORTS = {
     "hmi": 8080,
@@ -52,7 +52,7 @@ def compose():
 
 @pytest.fixture(scope="module")
 def io_compose():
-    return yaml.safe_load(_read(IO_SERVER / "docker-compose.yml"))["services"]
+    return yaml.safe_load(_read(IO_PLUGIN / "docker-compose.yaml"))["services"]
 
 
 @pytest.mark.parametrize(
@@ -104,7 +104,7 @@ def test_dockerfile_default_port(module, role):
 
 
 def test_io_dockerfile_port_and_health_check():
-    text = _read(IO_SERVER / "docker" / "Dockerfile")
+    text = _read(IO_PLUGIN / "docker" / "Dockerfile")
     assert _one(r"PORT=(\d+)", text, "io Dockerfile ENV") == EXPECTED_PORTS["io"]
     assert _one(r"EXPOSE (\d+)", text, "io Dockerfile EXPOSE") == EXPECTED_PORTS["io"]
     # The health check follows $PORT instead of repeating the number.
@@ -117,7 +117,7 @@ def test_io_dockerfile_port_and_health_check():
         ("bff/src/bff/bff_server.py", "bff"),
         ("so/src/so/bff_endpoint.py", "so"),
         ("fsp/src/fsp/bff_endpoint.py", "fsp"),
-        ("../../rti-plugins/io/server/src/rpi_io/main.py", "io"),
+        ("../../rti-plugins/io/src/rpi_io/server/main.py", "io"),
     ],
 )
 def test_code_default_port(path, role):

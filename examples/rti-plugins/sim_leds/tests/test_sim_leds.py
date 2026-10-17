@@ -8,8 +8,6 @@ Copy this file next to your own plugin: it runs the FSP's plugin service
 against the plugin's app, with no FSP, SO or network."""
 
 import asyncio
-import sys
-from pathlib import Path
 
 import httpx2 as httpx
 import pytest
@@ -24,10 +22,7 @@ from acsi_plugins import (
 )
 from acsi_plugins.web import PluginService, attach
 from fastapi import FastAPI
-
-# The plugin is a folder with its modules, as uvicorn --app-dir runs it.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import sim_leds  # noqa: E402
+from sim_leds.server.app import create_app
 
 pytestmark = pytest.mark.unit
 
@@ -38,11 +33,11 @@ POS = "LD0/CSWI1.Pos.Oper.ctlVal"
 @pytest.fixture
 async def setup(monkeypatch):
     monkeypatch.setenv("SIM_LEDS_CLAIMS", POS)
-    sim_leds.leds.reset("test start")
+    plugin_app = create_app()
 
     def plugin_client():
         return httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=sim_leds.app),
+            transport=httpx.ASGITransport(app=plugin_app),
             base_url="http://sim-leds.test",
         )
 

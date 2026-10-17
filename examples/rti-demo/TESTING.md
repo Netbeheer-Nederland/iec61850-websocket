@@ -59,9 +59,10 @@ normally with no `sys.path` hacks. (A bare `uv sync`, without
 use `--all-packages`, or `--package <name>` for just one module, to get
 `bff`/`fsp`/`so` installed too.)
 
-The IO server (`examples/rti-plugins/io/server`: Raspberry Pi GPIO/I2C
-hardware packages) is deliberately **not** part of this workspace: the
-FSP and SO connect to it over HTTP, as a plugin (decisions 0028, 0029).
+The plugins in `examples/rti-plugins` are deliberately **not** part of
+this workspace: each is its own uv project, and the FSP and SO connect to
+them over HTTP (decisions 0028-0030). The IO plugin (`examples/rti-plugins/io`)
+also needs Raspberry Pi GPIO/I2C hardware packages.
 It builds via its own fully independent
 Docker-stage venv (its `docker/Dockerfile`), since its
 dependencies (`gpiozero`, `gpiod`, `Adafruit-ADS1x15`, ...) won't
@@ -77,11 +78,11 @@ uv run --package bff pytest examples/rti-demo/modules/bff/tests -m unit -q
 uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q
 uv run --package so  pytest examples/rti-demo/modules/so/tests  -m unit -q
 uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q
-# examples/rti-plugins (decisions 0028, 0029): the IO server and the
-# sample plugin. The IO server isn't a workspace member; its tests need
+# examples/rti-plugins (decisions 0028-0030): the IO plugin and the
+# sample plugin. They aren't workspace members; the IO plugin's tests need
 # FastAPI and the plugin host, so they run in the fsp environment.
 # sim_leds runs in the plugin host's environment, which its tests connect.
-uv run --package fsp pytest examples/rti-plugins/io/server/tests -m unit -q
+uv run --package fsp pytest examples/rti-plugins/io/tests -m unit -q
 uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q
 ```
 
@@ -145,15 +146,18 @@ examples/rti-demo/modules/
     └── tests/fake_plugin.py, test_host.py, test_remote.py, test_config.py,
         test_web.py, test_openapi.py
 
-examples/rti-plugins/ (decisions 0028, 0029)
-├── io/server/  # the IO server and IO plugin; not a workspace member - see above
-│   ├── pyproject.toml   # project rpi-io (decision 0023)
-│   ├── docker-compose.yml, docker-compose.no-devices.yml   # its own stack
-│   ├── src/rpi_io/      # plugin.py, mapping.py, io_mapping.json: the plugin API
+examples/rti-plugins/ (decisions 0028-0030); not workspace members - see above
+├── io/         # the IO plugin
+│   ├── pyproject.toml, uv.lock   # project rpi-io (decision 0023)
+│   ├── docker-compose.yaml, docker-compose.pi.yaml   # its own stack; the Pi's devices
+│   ├── src/rpi_io/server/        # the IO server
+│   ├── src/rpi_io/plugin/        # plugin.py, mapping.py, io_mapping.json: the plugin API
 │   └── tests/test_plugin.py, test_no_plugin_files.py, test_server_config.py,
 │       test_project.py, test_pins.py
-└── sim_leds/   # a sample plugin service (modules/plugins/GETTING_STARTED.md)
-    └── tests/test_sim_leds.py
+└── sim_leds/   # a sample plugin (modules/plugins/GETTING_STARTED.md)
+    ├── pyproject.toml, uv.lock, docker-compose.yaml
+    ├── src/sim_leds/server/, src/sim_leds/plugin/
+    └── tests/test_sim_leds.py, test_project.py
 ```
 
 `fsp` and `so` are each tested through a `fastapi.testclient.TestClient`
@@ -273,7 +277,7 @@ rm -rf dist
   && (uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q) \
   && (uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q) \
   && (uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q) \
-  && (uv run --package fsp pytest examples/rti-plugins/io/server/tests -m unit -q) \
+  && (uv run --package fsp pytest examples/rti-plugins/io/tests -m unit -q) \
   && (uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q) \
   && (cd examples/rti-demo/modules/hmi && npm test) \
   && (cd examples/rti-demo/modules/hmi && npx vite build && rm -rf dist)

@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# On the Raspberry Pi: pass its GPIO, I2C and SPI devices into rti-io.
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d
+#
+# or once per shell (or in .env here):
+#
+#   export COMPOSE_FILE=docker-compose.yaml:docker-compose.pi.yaml
+#
+# Docker refuses to start a container whose device paths don't exist on the
+# host, so list only the nodes your Pi has (ls /dev/gpiochip* /dev/i2c-*
+# /dev/spidev0.*).
+services:
+  rti-io:
+    # The Pi user, a member of the host groups that own the device nodes.
+    user: ${PI_USER:-pi}
+    group_add:
+      - "gpio"
+      - "i2c"
+      - "spi"
+    devices:
+      - "/dev/gpiochip0:/dev/gpiochip0"
+      - "/dev/gpiochip4:/dev/gpiochip4"
+      - "/dev/gpiochip10:/dev/gpiochip10"
+      - "/dev/gpiochip11:/dev/gpiochip11"
+      - "/dev/gpiochip12:/dev/gpiochip12"
+      - "/dev/gpiochip13:/dev/gpiochip13"
+      - "/dev/i2c-1:/dev/i2c-1"
+      - "/dev/i2c-13:/dev/i2c-13"
+      - "/dev/i2c-14:/dev/i2c-14"
+      - "/dev/spidev0.0:/dev/spidev0.0"
+      - "/dev/spidev0.1:/dev/spidev0.1"
+    # Shared memory, unrestricted syscalls and raw I/O for gpiod/spidev.
+    ipc: host
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_RAWIO

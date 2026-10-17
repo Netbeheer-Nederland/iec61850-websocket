@@ -7,8 +7,8 @@
 #   pyproject.toml, uv.lock (the shared uv workspace lock)
 #   src/ws61850
 #   examples/rti-demo/modules/{so,fsp,bff,plugins}/
-# Everything else is noise in the context. The IO server and the HMI build
-# with their own narrower context (examples/rti-plugins/io/server,
+# Everything else is noise in the context. The plugins and the HMI build
+# with their own narrower context (examples/rti-plugins/<plugin>,
 # examples/rti-demo/modules/hmi) instead.
 
 # VCS, IDE, tooling

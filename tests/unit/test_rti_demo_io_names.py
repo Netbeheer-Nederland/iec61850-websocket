@@ -43,7 +43,7 @@ def test_the_io_server_code_is_rpi_io():
     # the old name, as the paths they were written with, and the tests that
     # check it is gone.
     allowed = {
-        "examples/rti-plugins/io/server/tests/test_project.py",
+        "examples/rti-plugins/io/tests/test_project.py",
         "tests/unit/test_rti_demo_io_image.py",
         "tests/unit/test_rti_demo_io_names.py",
     }

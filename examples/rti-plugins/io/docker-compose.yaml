@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# The IO plugin, rti-io: the IO server with the plugin API at /plugin
+# (decisions 0028-0030). Its own stack, apart from the rti-demo's: the FSPs,
+# SO, BFF and HMI can run anywhere, the devices are on a Raspberry Pi. Both
+# join the external network rti-network, so the FSPs and SO reach it as
+# http://rti-io:9000/plugin.
+#
+#   docker network create rti-network 2>/dev/null || true
+#   docker compose up -d
+#
+# This runs anywhere (a laptop, a CI runner): devices without their hardware
+# log an error at startup and stay unavailable. On the Raspberry Pi, add
+# docker-compose.pi.yaml to pass the Pi's devices in.
+services:
+  rti-io:
+    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-io:${RTI_IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        PI_USER: ${PI_USER:-pi}
+        PI_UID: ${PI_UID:-1000}
+        PI_GID: ${PI_GID:-1000}
+        GPIO_GID: ${GPIO_GID:-986}
+        I2C_GID: ${I2C_GID:-988}
+        SPI_GID: ${SPI_GID:-989}
+    container_name: rti-io
+    ports:
+      - "9000:9000"
+    # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
+    networks:
+      - rti-network
+    restart: unless-stopped
+    # Health check already defined in the Dockerfile.
+    labels:
+      - "rti.service=rti-io"
+      - "rti.type=RTI-IO"
+      - "rti.host=rti-io"
+      - "rti.port=9000"
+
+networks:
+  rti-network:
+    external: true

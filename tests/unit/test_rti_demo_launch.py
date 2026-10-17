@@ -36,8 +36,8 @@ def test_no_verbose_turns_it_off(launcher):
 
 
 COMPOSE = LAUNCH_PY.parent / "docker-compose.yml"
-# The IO server is its own stack (decision 0028); launch.py still runs it.
-IO_SERVER = LAUNCH_PY.parents[1] / "rti-plugins" / "io" / "server"
+# The IO plugin is its own stack (decisions 0028, 0030); launch.py still runs it.
+IO_PLUGIN = LAUNCH_PY.parents[1] / "rti-plugins" / "io"
 
 
 def test_every_service_type_is_an_rti_type(launcher):
@@ -51,7 +51,7 @@ def test_compose_and_launch_agree_on_the_type(launcher):
     compose = {
         **yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))["services"],
         **yaml.safe_load(
-            (IO_SERVER / "docker-compose.yml").read_text(encoding="utf-8")
+            (IO_PLUGIN / "docker-compose.yaml").read_text(encoding="utf-8")
         )["services"],
     }
     for config in module.SERVICES.values():
@@ -64,16 +64,24 @@ def test_compose_and_launch_agree_on_the_type(launcher):
         ]
 
 
-def test_io_runs_as_a_module_from_the_io_server_s_src(launcher):
+def test_io_runs_as_a_module_from_the_io_plugin_s_src(launcher):
     module = importlib.import_module(type(launcher).__module__)
     config = module.SERVICES[module.ServiceType.IO]
     cmd, cwd = launcher._command_for(config)
-    assert cmd[-2:] == ["-m", "rpi_io.main"]
-    assert cwd.resolve() == IO_SERVER / "src"
-    assert (cwd / "rpi_io" / "main.py").is_file()
-    assert (LAUNCH_PY.parent / config.entry_point).resolve() == (
-        cwd / "rpi_io" / "main.py"
-    ).resolve()
+    assert cmd[-2:] == ["-m", "rpi_io.server.main"]
+    assert cwd.resolve() == IO_PLUGIN / "src"
+    main = cwd / "rpi_io" / "server" / "main.py"
+    assert main.is_file()
+    assert (LAUNCH_PY.parent / config.entry_point).resolve() == main.resolve()
+
+
+def test_io_files_are_the_demo_s_git_ignored_copies(launcher):
+    module = importlib.import_module(type(launcher).__module__)
+    config = module.SERVICES[module.ServiceType.IO]
+    _, cwd = launcher._command_for(config)
+    config_dir = (LAUNCH_PY.parent / "config").resolve()
+    for var in ("IO_CONFIG_FILE", "IO_MAPPING_FILE"):
+        assert (cwd / config.env_vars[var]).resolve().parent == config_dir, var
 
 
 def test_bff_still_runs_its_script(launcher):

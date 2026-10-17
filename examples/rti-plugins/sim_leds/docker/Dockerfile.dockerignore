@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# The build context is the project root; the image needs only these.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+**/__pycache__

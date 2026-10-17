@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
+[project]
+name = "sim-leds"
+version = "2.0.0"
+description = "Sample rti-demo plugin: two simulated LEDs that show what the FSP or SO does"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.139.0",
+    "pydantic>=2",
+    "uvicorn>=0.51.0",
+]
+
+[project.scripts]
+sim-leds = "sim_leds.server.main:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# The tests run in the plugin host's environment (acsi-plugins), which
+# doesn't install this project; pythonpath makes sim_leds importable there.
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "unit: fast, isolated unit tests (no Docker/network required)",
+]
