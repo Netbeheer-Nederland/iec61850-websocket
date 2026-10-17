@@ -112,8 +112,8 @@ A **FastAPI** application that provides REST endpoints for managing the ACSI Ser
 | | GET `/api/iec61850server/connections` | Connection info |
 | **Model** | GET `/api/iec61850server/model` | Model descriptor |
 | | POST `/api/iec61850server/update-iedmodel` | Update model |
-| **Lifecycle** | POST `/api/iec61850server/start` | Start server |
-| | POST `/api/iec61850server/stop` | Stop server |
+| **Lifecycle** | POST `/api/iec61850server/start` | Connect to the SO (starts the server if needed) |
+| | POST `/api/iec61850server/stop` | Disconnect; the server stays ready |
 | **Operations** | POST `/api/iec61850server/readvalue` | Read value |
 | | POST `/api/iec61850server/writevalue` | Write value |
 | **Logging** | GET `/api/iec61850server/actions` | View actions |
@@ -264,7 +264,8 @@ Starting the ACSI server and connecting it to the SO are two steps (decision 003
   `listening`, to `FSP_SO_HOST:FSP_SO_PORT`.
 - `POST /api/iec61850server/start` (the HMI's Connect) on a `ready` server only dials out; on a stopped one it starts
   and dials out, as before. With TLS or OAuth from the HMI, connect from there: `FSP_AUTOCONNECT` dials without them.
-- `POST /api/iec61850server/stop` (Disconnect) stops the server, connected or not.
+- `POST /api/iec61850server/stop` (the HMI's Disconnect) drops the connection and leaves the server `ready`; plugins
+  get `ServerStopped` first. The server stops only with the service.
 
 - **SO**: `localhost:8765` (`FSP_SO_HOST`, `FSP_SO_PORT`)
 - **Mode**: `active`, the only one supported

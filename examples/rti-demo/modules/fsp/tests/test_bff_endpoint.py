@@ -822,3 +822,37 @@ class TestReadyServer:
         _wait_for(server, "ready")
         server.stop_server()
         _wait_for(server, "stopped")
+
+    def test_disconnect_leaves_the_server_ready(self, client_and_server, server):
+        client, _ = client_and_server
+        start = {"host": "127.0.0.1", "port": str(_free_port()), "mode": "active"}
+        server.start_server()
+        _wait_for(server, "ready")
+        client.post("/api/start", json=start)
+        ws = server.runtime.tasks["ws"]
+
+        response = client.post("/api/stop")
+        assert response.json() == {"ok": True, "status": "ready"}
+        assert server.runtime.status == "ready"
+        assert ws.cancelled() and "ws" not in server.runtime.tasks
+        assert server.runtime.endpoint._connect_task is None
+        assert not server.runtime.tasks["report"].done()
+        assert server.runtime.loop.is_running()  # writes are still taken
+
+        assert client.post("/api/start", json=start).json()["status"] == "listening"
+        assert not server.runtime.tasks["ws"].done()
+
+    def test_a_server_started_by_connect_is_left_ready(self, client_and_server, server):
+        client, _ = client_and_server
+        start = {"host": "127.0.0.1", "port": str(_free_port()), "mode": "active"}
+        client.post("/api/start", json=start)
+        _wait_for(server, "listening")
+        client.post("/api/stop")
+        assert server.runtime.status == "ready"
+
+    def test_disconnect_on_a_ready_server_does_nothing(self, client_and_server, server):
+        client, _ = client_and_server
+        server.start_server()
+        _wait_for(server, "ready")
+        assert client.post("/api/stop").json() == {"ok": True, "status": "ready"}
+        assert server.runtime.status == "ready"

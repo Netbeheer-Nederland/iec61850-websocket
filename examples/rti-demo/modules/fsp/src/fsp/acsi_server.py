@@ -967,6 +967,22 @@ class ACSIServer:
             kind="system",
         )
 
+    def disconnect(self) -> None:
+        """Drop the connection to the SO; the server stays ready."""
+        if self.runtime.status != "listening":
+            return
+        self.invoke_on_runtime_loop(self._disconnect_async())
+
+    async def _disconnect_async(self) -> None:
+        """Stop dialing out, on the server's loop; reports and writes go on."""
+        endpoint = self.runtime.endpoint
+        await endpoint._cancel_task(self.runtime.tasks.pop("ws", None))
+        # With OAuth the connect task is the endpoint's own, not tasks["ws"].
+        await endpoint._cancel_task(endpoint._connect_task)
+        endpoint._connect_task = None
+        self._set_runtime_state(status="ready", error=None)
+        self._log_action("Disconnected from the SO, server ready", kind="system")
+
     def _log_failed_dial_out(self, task: asyncio.Task) -> None:
         if not task.cancelled() and task.exception() is not None:
             self._log_action(

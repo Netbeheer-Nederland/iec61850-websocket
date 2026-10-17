@@ -1332,8 +1332,8 @@ def create_bff_router(factory_dir) -> tuple[APIRouter, ACSIServer]:
 
     @router.post(
         "/stop",
-        summary="Stop Server",
-        description="Stops the currently running ACSI WebSocket.",
+        summary="Disconnect",
+        description="Drops the connection to the SO; the ACSI server keeps running, ready (decision 0033).",
         response_description="Server stop confirmation",
         responses={
             200: {"description": "Server stopped or stopping"},
@@ -1342,12 +1342,17 @@ def create_bff_router(factory_dir) -> tuple[APIRouter, ACSIServer]:
         tags=["Server Control"],
     )
     def api_stop():
-        """Stop the ACSI WebSocket Active.
+        """Drop the connection to the SO (the HMI's Disconnect).
+
+        The ACSI server keeps running, "ready": it serves its model, runs its
+        reports and takes writes, and /start connects it again. A server that
+        isn't running or connected is left as it is, except one that is
+        starting or failed, which is stopped.
 
         Returns:
             dict: {
                 "ok": True,
-                "status": str  # "stopped" or "stopping"
+                "status": str  # "ready", "stopped" or "stopping"
             }
 
         Raises:
@@ -1359,10 +1364,14 @@ def create_bff_router(factory_dir) -> tuple[APIRouter, ACSIServer]:
             if status in (None, "stopped"):
                 logger.info("[FSP STOP] early-return: already stopped")
                 return {"ok": True, "status": "stopped"}
+            if status in ("ready", "reloading"):
+                logger.info("[FSP STOP] early-return: not connected")
+                return {"ok": True, "status": status}
 
             try:
                 # Tell the plugins first, and wait for them (up to 5 s): the IO
-                # plugin turns its "connected" LED off. This handler runs on
+                # plugin turns its "connected" LED off. ServerStopped: the
+                # connection ends; the server keeps running. This handler runs on
                 # a worker thread, not the plugin loop, so waiting is safe.
                 done, pending = concurrent.futures.wait(
                     plugin_host.emit(ServerStopped()), timeout=5
@@ -1372,6 +1381,9 @@ def create_bff_router(factory_dir) -> tuple[APIRouter, ACSIServer]:
                         f"[FSP STOP] {len(pending)} plugin(s) still busy after 5 s"
                     )
 
+                if status == "listening":
+                    rti_fsp.disconnect()
+                    return {"ok": True, "status": rti_fsp.runtime.status}
                 rti_fsp.stop_server()
                 current = rti_fsp.runtime.status
                 if current in ("stopping", "starting"):

@@ -41,10 +41,15 @@ FSP joins"). Tying the two together forced a choice between a server that is dow
    again every few seconds.
 4. **`/start` on a `ready` server only dials out**; on a stopped one it starts and dials out, as before. So the
    HMI's Connect works on an auto-started FSP, and still applies the TLS and OAuth settings the BFF stores
-   (`FSP_AUTOCONNECT` dials without them). `/stop` (Disconnect) stops the server, connected or not.
-5. A running server is `ready` or `listening`: a model loaded in either is applied at once (hot-swap) and the state
+   (`FSP_AUTOCONNECT` dials without them).
+5. **`/stop` (the HMI's Disconnect) only drops the connection**: the server goes back to `ready` and keeps serving
+   its model, running its reports and taking writes. The plugins get `ServerStopped` first, as before, so they show
+   the FSP as disconnected; the event keeps its name (the contract doesn't change) and now means the connection to
+   the SO ends. On a `ready` server `/stop` does nothing; a server that is starting or failed is still stopped. The
+   server stops only with the service.
+6. A running server is `ready` or `listening`: a model loaded in either is applied at once (hot-swap) and the state
    is kept. The HMI shows `ready` as *Ready*, with Connect enabled.
-6. The Docker stack sets `FSP_SO_HOST=rti-so` for both FSPs; `launch.py` sets `localhost`, and `rti-so` with
+7. The Docker stack sets `FSP_SO_HOST=rti-so` for both FSPs; `launch.py` sets `localhost`, and `rti-so` with
    `--docker`. Neither sets `FSP_AUTOCONNECT`.
 
 ## Consequences
@@ -52,16 +57,19 @@ FSP joins"). Tying the two together forced a choice between a server that is dow
 - After `docker compose up` both FSPs serve their models and take the plugins' writes; the operator still connects
   them, or sets `FSP_AUTOCONNECT=true` for an FSP that joins on its own (on a Pi without the HMI).
 - 0003's "the operator decides when an FSP joins" holds by default.
-- Disconnect stops the server; until the next Connect or a restart of the service, writes get `server-not-running`
-  again.
+- Once started, the server keeps running: Disconnect and Connect only change the connection, and the plugins' writes
+  are taken throughout. `server-not-running` is left for an FSP with `FSP_AUTOSTART=false` before its first Connect.
+- No route stops the server; to have none running, restart the service with `FSP_AUTOSTART=false`.
 - The FSP's tests switch `FSP_AUTOSTART` off (`modules/fsp/tests/conftest.py`), so an app started in a test runs no
   server.
 
 ## In the code
 
-- `modules/fsp/src/fsp/acsi_server.py` (`RUNNING`, `start_server`, `connect`), `modules/fsp/src/fsp/bff_endpoint.py`
-  (`_autostart`, `_lifespan`, `/start`)
+- `modules/fsp/src/fsp/acsi_server.py` (`RUNNING`, `start_server`, `connect`, `disconnect`),
+  `modules/fsp/src/fsp/bff_endpoint.py` (`_autostart`, `_lifespan`, `/start`, `/stop`)
+- `modules/plugins`: the description of `ServerStopped` (`contract.py`, `openapi.yaml`, `README.md`)
 - `modules/hmi/src/pages/ACSIServer.jsx` (the label *Ready*)
 - `docker-compose.yml`, `launch.py` (`SERVICES`, `_docker_env`), `modules/fsp/README.md`
-- Tests: `modules/fsp/tests/test_bff_endpoint.py` (`TestAutostart`, `TestReadyServer`), `modules/fsp/tests/conftest.py`,
+- Tests: `modules/fsp/tests/test_bff_endpoint.py` (`TestAutostart`, `TestReadyServer`), `modules/fsp/tests/test_plugins.py`,
+  `modules/fsp/tests/conftest.py`,
   `modules/hmi/src/pages/ACSIServer.test.jsx`, `tests/unit/test_rti_demo_launch.py`

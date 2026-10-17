@@ -54,7 +54,7 @@ A plugin serves five calls under its base URL (`url` in the configuration, for e
 | `ValueWritten` | `obj_ref`, `value`, `ok` | FSP, SO | A value was written (FSP: its own model; SO: to a server) |
 | `ValueRead` | `obj_ref`, `value`, `ok` | SO | A value was read from a server |
 | `ReportReceived` | `rpt_id`, `data_set`, `data` | SO | A report came in |
-| `ServerStopped` | | FSP | The ACSI server is about to stop; the FSP waits for the plugins (up to 5 s) |
+| `ServerStopped` | | FSP | The FSP is about to drop its connection to the SO (Disconnect; its ACSI server keeps running); it waits for the plugins (up to 5 s) |
 
 A plugin ignores the types it doesn't know: new ones can be added without a new contract version. An event that fails
 or takes longer than 5 s is logged and marks the plugin unhealthy; the other plugins still get it. To do slow work (a

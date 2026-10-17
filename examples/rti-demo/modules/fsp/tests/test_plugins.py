@@ -186,7 +186,7 @@ def test_a_local_write_is_an_event(host, fsp):
     assert plugin.wait() == [ValueWritten("LD0/MMXU1.TotW.mag.f", 12.5)]
 
 
-def test_stop_tells_the_plugins_before_the_server_stops(host, fsp):
+def test_disconnect_tells_the_plugins_before_the_connection_drops(host, fsp):
     client, server = fsp
     order = []
 
@@ -197,9 +197,9 @@ def test_stop_tells_the_plugins_before_the_server_stops(host, fsp):
 
     host.add_now("watch", Watcher())
     server.runtime.status = "listening"
-    server.stop_server = lambda: order.append("stop_server")
+    server.disconnect = lambda: order.append("disconnect")
     assert client.post("/api/stop").status_code == 200
-    assert order == ["ServerStopped", "stop_server"]
+    assert order == ["ServerStopped", "disconnect"]
 
 
 def test_events_without_plugins_are_fine(host, fsp):
@@ -275,6 +275,6 @@ def test_stop_emits_server_stopped(host, fsp):
     plugin = Recorder()
     host.add_now("rec", plugin)
     server.runtime.status = "listening"
-    server.stop_server = lambda: None
+    server.disconnect = lambda: None
     client.post("/api/stop")
     assert plugin.wait() == [ServerStopped()]

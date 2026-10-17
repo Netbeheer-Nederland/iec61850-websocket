@@ -87,7 +87,10 @@ class ReportReceived(Event):
 
 @dataclass(frozen=True)
 class ServerStopped(Event):
-    """The FSP is about to stop its ACSI server."""
+    """The FSP is about to drop its connection to the SO (Disconnect).
+
+    Its ACSI server keeps running, ready (decision 0033).
+    """
 
 
 EVENT_TYPES: dict[str, type[Event]] = {

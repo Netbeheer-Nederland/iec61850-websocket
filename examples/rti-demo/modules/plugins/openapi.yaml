@@ -621,7 +621,7 @@ components:
     ServerStopped:
       x-roles: [fsp]
       type: object
-      description: The FSP is about to stop its ACSI server; it waits for the plugins (up to 5 s).
+      description: The FSP is about to drop its connection to the SO (Disconnect); its ACSI server keeps running, ready (decision 0033). It waits for the plugins (up to 5 s).
       required: [type]
       properties:
         type: { const: ServerStopped }
