@@ -44,8 +44,6 @@ jobs:
               # (examples/rti-demo no longer has its own).
             so:          [ *rti, 'examples/rti-demo/modules/so/**',  'examples/rti-demo/modules/so/pyproject.toml', 'examples/rti-demo/modules/plugins/**' ]
             fsp:         [ *rti, 'examples/rti-demo/modules/fsp/**', 'examples/rti-demo/modules/fsp/pyproject.toml', 'examples/rti-demo/modules/plugins/**' ]
-            acsi_client: [ *rti, 'examples/rti-demo/acsi_ws_client/**', 'examples/rti-demo/Dockerfile.acsi-ws-client' ]
-            acsi_server: [ *rti, 'examples/rti-demo/acsi_ws_server/**', 'examples/rti-demo/Dockerfile.acsi-ws-server' ]
             bff:         [ 'examples/rti-demo/modules/bff/**', 'pyproject.toml', 'uv.lock' ]
             io:          [ 'examples/rti-plugins/io/**' ]
             hmi:         [ 'examples/rti-demo/modules/hmi/**' ]
@@ -56,7 +54,7 @@ jobs:
         run: |
           force=${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
           out='[]'
-          for k in so fsp acsi_client acsi_server bff io hmi; do
+          for k in so fsp bff io hmi; do
             hit=$(jq -r --arg k "$k" '.[$k] // "false"' <<<"$FIRED")
             if [ "$force" = true ] || [ "$hit" = true ]; then
               out=$(jq -c --arg k "$k" '. + [$k]' <<<"$out")
@@ -79,8 +77,6 @@ jobs:
           case "${{ matrix.image }}" in
             so)          c=. ; f=examples/rti-demo/modules/so/docker/Dockerfile  ; n=iec61850-websocket/rti-so ; p=linux/amd64,linux/arm64 ;;
             fsp)         c=. ; f=examples/rti-demo/modules/fsp/docker/Dockerfile ; n=iec61850-websocket/rti-fsp ; p=linux/amd64,linux/arm64 ;;
-            acsi_client) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-client ; n=ws61850-acsi-ws-client ;;
-            acsi_server) c=. ; f=examples/rti-demo/Dockerfile.acsi-ws-server ; n=ws61850-acsi-ws-server ;;
             bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=iec61850-websocket/rti-bff ;;
             io)          c=examples/rti-plugins/io ; f=examples/rti-plugins/io/docker/Dockerfile ; n=iec61850-websocket/rti-io ; p=linux/amd64,linux/arm64 ;;
             hmi)         c=examples/rti-demo/modules/hmi ; f=examples/rti-demo/modules/hmi/docker/Dockerfile ; n=iec61850-websocket/rti-hmi ;;
