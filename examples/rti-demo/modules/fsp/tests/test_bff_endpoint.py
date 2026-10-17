@@ -668,3 +668,83 @@ def test_the_router_takes_no_scl_path():
         "scl_default_path"
         not in inspect.signature(bff_endpoint.create_bff_router).parameters
     )
+
+
+class FakeServer:
+    def __init__(self, raises=None):
+        self.raises = raises
+        self.starts = []
+        self.logged = []
+
+    def start_server(self, host, port):
+        if self.raises:
+            raise self.raises
+        self.starts.append((host, port))
+
+    def _log_action(self, message, level, kind=None):
+        self.logged.append((level, message))
+
+
+class TestAutostart:
+    """The FSP dials out to the SO when the service starts (decision 0033)."""
+
+    @pytest.fixture(autouse=True)
+    def clean_environment(self, monkeypatch):
+        for var in ("FSP_AUTOSTART", "FSP_SO_HOST", "FSP_SO_PORT"):
+            monkeypatch.delenv(var, raising=False)
+
+    def test_dials_localhost_8765_by_default(self):
+        server = FakeServer()
+        bff_endpoint._autostart(server)
+        assert server.starts == [("localhost", 8765)]
+
+    def test_host_and_port_from_environment(self, monkeypatch):
+        monkeypatch.setenv("FSP_SO_HOST", "rti-so")
+        monkeypatch.setenv("FSP_SO_PORT", "9765")
+        server = FakeServer()
+        bff_endpoint._autostart(server)
+        assert server.starts == [("rti-so", 9765)]
+
+    @pytest.mark.parametrize("value", ["false", "0", "no", "off", "False"])
+    def test_can_be_switched_off(self, monkeypatch, value):
+        monkeypatch.setenv("FSP_AUTOSTART", value)
+        server = FakeServer()
+        bff_endpoint._autostart(server)
+        assert server.starts == []
+
+    @pytest.mark.parametrize(
+        "error", [RuntimeError("Server is already running"), PermissionError("80")]
+    )
+    def test_a_failed_start_is_logged_not_raised(self, error):
+        server = FakeServer(raises=error)
+        bff_endpoint._autostart(server)
+        assert any(level == "warn" and str(error) in m for level, m in server.logged)
+
+    def test_a_bad_port_is_logged_not_raised(self, monkeypatch):
+        monkeypatch.setenv("FSP_SO_PORT", "so")
+        server = FakeServer()
+        bff_endpoint._autostart(server)
+        assert server.starts == []
+        assert server.logged[0][0] == "warn"
+
+    def test_the_app_starts_the_server_after_its_plugins(self, monkeypatch, tmp_path):
+        (tmp_path / "model.py").write_text(
+            "from ws61850.iec61850.data_model.ied_model import IedModel\n"
+            "ied = IedModel(name='TestIED')\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("MODELPATH", str(tmp_path))
+        order = []
+
+        class Service(bff_endpoint.PluginService):
+            async def startup(self):
+                order.append("plugins")
+
+        monkeypatch.setattr(
+            bff_endpoint, "plugin_service", Service(bff_endpoint.plugin_host)
+        )
+        monkeypatch.setattr(bff_endpoint, "_autostart", order.append)
+        app = bff_endpoint.create_fastapi_app()
+        with TestClient(app):
+            pass
+        assert order == ["plugins", app.state.server]

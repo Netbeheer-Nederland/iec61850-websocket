@@ -169,7 +169,12 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         entry_point="modules/fsp/src/fsp/bff_endpoint.py",
         default_port=5001,
         description="RTI-FSP",
-        env_vars={"PORT": "5001", "CP": "cp1", **_plugin_env("fsp", 5001)},
+        env_vars={
+            "PORT": "5001",
+            "CP": "cp1",
+            "FSP_SO_HOST": "localhost",
+            **_plugin_env("fsp", 5001),
+        },
         docker_image=rti_image("fsp"),
         health_check_path="/api/status",
         labels={
@@ -186,7 +191,12 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         entry_point="modules/fsp/src/fsp/bff_endpoint.py",
         default_port=5005,
         description="RTI-FSP (second instance)",
-        env_vars={"PORT": "5005", "CP": "cp2", **_plugin_env("fsp2", 5005)},
+        env_vars={
+            "PORT": "5005",
+            "CP": "cp2",
+            "FSP_SO_HOST": "localhost",
+            **_plugin_env("fsp2", 5005),
+        },
         docker_image=rti_image("fsp"),
         health_check_path="/api/status",
         labels={
@@ -435,6 +445,8 @@ class RTILauncher:
             env["PLUGIN_HOST_URL"] = (
                 f"http://rti-{config.service_type.value}:{config.default_port}"
             )
+        if "FSP_SO_HOST" in env:
+            env["FSP_SO_HOST"] = "rti-so"
         return env
 
     def _get_service_config(

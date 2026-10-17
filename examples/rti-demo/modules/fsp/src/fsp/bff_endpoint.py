@@ -129,13 +129,47 @@ class HealthCheckAccessFilter(logging.Filter):
         return logging.getLogger("uvicorn.access").isEnabledFor(logging.DEBUG)
 
 
+def _autostart(server) -> None:
+    """Start the ACSI server (dial out to the SO) with the service.
+
+    Decision 0033: the FSP connects to the SO as soon as it starts instead of
+    waiting for a POST /api/iec61850server/start: to FSP_SO_HOST (default
+    localhost) and FSP_SO_PORT (default 8765), on its CP. The dial-out tries
+    again every few seconds while the SO isn't there. FSP_AUTOSTART=false
+    leaves it to /start, as before. A failure is logged, not raised - the
+    REST API still starts.
+    """
+    if os.getenv("FSP_AUTOSTART", "true").strip().lower() in (
+        "0",
+        "false",
+        "no",
+        "off",
+    ):
+        return
+    host = os.getenv("FSP_SO_HOST", "localhost")
+    try:
+        port = int(os.getenv("FSP_SO_PORT", "8765"))
+        server.start_server(host, port)
+        server._log_action(
+            f"Autostart: dialing the SO at host={host}, port={port}",
+            "info",
+            kind="system",
+        )
+    except (ValueError, RuntimeError, OSError) as exc:
+        server._log_action(f"Autostart failed: {exc}", "warn", kind="system")
+
+
 @asynccontextmanager
-async def _lifespan(_app: FastAPI):
+async def _lifespan(app: FastAPI):
     # Installed here (not before uvicorn.run), so it survives uvicorn's own
     # logging dictConfig, which runs before app startup.
     logging.getLogger("uvicorn.access").addFilter(HealthCheckAccessFilter())
     # Looked up here, not bound at import, so tests can replace it.
     async with plugin_service.lifespan():
+        # After the plugins, so they see the association.
+        server = getattr(app.state, "server", None)
+        if server is not None:
+            _autostart(server)
         yield
 
 

@@ -43,5 +43,6 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0030](0030-plugin-project-layout.md) | Every plugin is a project with one layout: `server` and `plugin` subpackages, `docker/`, a compose pair | proposed |
 | [0031](0031-plugin-source-layout.md) | A plugin's source: `server/` is the service, `plugin/` the plugin API, and the plugin depends on the server | proposed |
 | [0032](0032-io-plugin-folder-rpi-io.md) | The IO plugin's folder is `rpi_io`, after its package | proposed |
+| [0033](0033-fsp-autostart.md) | The FSP dials out to the SO when it starts (`FSP_AUTOSTART`, default on) | proposed |
 
 To add a decision, copy the layout of an existing record, take the next number, and add a line to this table.

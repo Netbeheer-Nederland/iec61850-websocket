@@ -151,6 +151,13 @@ def test_in_docker_the_plugins_use_the_container_names(launcher):
     assert env["PLUGIN_HOST_URL"] == "http://rti-fsp2:5005"
 
 
+def test_an_fsp_dials_the_so_on_localhost_or_in_docker_by_name(launcher):
+    # Decision 0033: the FSP starts its ACSI server with the service.
+    config = _config(launcher, "fsp")
+    assert config.env_vars["FSP_SO_HOST"] == "localhost"
+    assert launcher._docker_env(config)["FSP_SO_HOST"] == "rti-so"
+
+
 def test_no_plugin_is_downloaded_by_default(launcher, monkeypatch):
     monkeypatch.delenv("PLUGIN_ALLOWED_SOURCES", raising=False)
     env = _launch_module()._plugin_env("fsp", 5001)

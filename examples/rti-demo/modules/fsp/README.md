@@ -239,6 +239,9 @@ curl -X POST http://localhost:5001/api/plugins/io/reload   # ask it again what i
 |----------|---------|-------------|
 | `PORT` | 5001 | REST API port |
 | `CP` | cp1 | Communication point identifier |
+| `FSP_AUTOSTART` | `true` | Start the ACSI server with the service: dial out to the SO; `false` waits for `POST /api/iec61850server/start` (the HMI's Start) |
+| `FSP_SO_HOST` | `localhost` | The SO to dial at start; `rti-so` in the Docker stack |
+| `FSP_SO_PORT` | 8765 | The SO's WebSocket port to dial at start |
 | `PLUGINS_FILE` | none | The plugin configuration: `{"host_url": ..., "plugins": [{"name", "url", "settings"}]}` |
 | `PLUGINS` | none | The same JSON inline; its plugins and `host_url` win over the file's |
 | `PLUGIN_HOST_URL` | the configuration's `host_url` | Where plugins reach this service, for example to write input changes back |
@@ -247,9 +250,15 @@ curl -X POST http://localhost:5001/api/plugins/io/reload   # ask it again what i
 
 ### Server Defaults
 
-- **Host**: 0.0.0.0 (all interfaces)
-- **Port**: 8765
-- **Mode**: server (ACSI Server - active mode). Use `client` to connect to remote servers
+The FSP is the ACSI server and the WebSocket client (decision 0003): it dials out to the SO, it doesn't listen. It
+starts doing so with the service (decision 0033, `FSP_AUTOSTART`), to `FSP_SO_HOST:FSP_SO_PORT` on its `CP`, and
+tries again every few seconds until the SO is there. The auto-start dials without TLS or OAuth; for those, set
+`FSP_AUTOSTART=false` and start it from the HMI, which adds the stored TLS and OAuth settings, or stop it and start
+it again there. `POST /api/iec61850server/stop` and `/start` work as before; `/start` while it runs answers
+"Server is already running".
+
+- **SO**: `localhost:8765` (`FSP_SO_HOST`, `FSP_SO_PORT`)
+- **Mode**: `active`, the only one supported
 - **CP**: cp1 (communication point)
 
 ---
@@ -294,10 +303,10 @@ FSP integrates with the IO service to control physical IO devices through IEC 61
 
 ### With SO (Client)
 
-SO connects to FSP as a WebSocket client:
+The FSP connects to the SO as a WebSocket client, and serves its model to it as the ACSI server:
 
 ```
-FSP (Server, Port 8765) <--WebSocket--> SO (Client)
+FSP (ACSI server, WebSocket client) --dials--> SO (WebSocket server, port 8765; ACSI client)
 FSP (BFF, Port 5001) <--HTTP--> External Clients
 ```
 

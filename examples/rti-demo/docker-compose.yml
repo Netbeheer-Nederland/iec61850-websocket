@@ -92,6 +92,9 @@ services:
       # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
       - CP=cp1
       - MODELPATH=/models/model_1.py
+      # Dial out to the SO at startup (decision 0033); FSP_AUTOSTART=false
+      # waits for the HMI's Start instead.
+      - FSP_SO_HOST=rti-so
       # The plugins it connects to: the IO server (decision 0029).
       - PLUGINS_FILE=/plugins/plugins.json
     networks:
@@ -128,6 +131,9 @@ services:
       - PORT=5005
       - CP=cp2
       - MODELPATH=/models/model_2.py
+      # Dial out to the SO at startup (decision 0033); FSP_AUTOSTART=false
+      # waits for the HMI's Start instead.
+      - FSP_SO_HOST=rti-so
       # The plugins it connects to: the IO server (decision 0029).
       - PLUGINS_FILE=/plugins/plugins.json
     # Healthcheck already defined in the Dockerfile - it reads $PORT at
