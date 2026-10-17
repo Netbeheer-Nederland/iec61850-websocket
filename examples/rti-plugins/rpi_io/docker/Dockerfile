@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # RTI Demo GPIO LED Control API Docker Image - Multi-stage
-# Build from the project root (examples/rti-plugins/io, decision 0030):
+# Build from the project root (examples/rti-plugins/rpi_io, decision 0030):
 #   docker build -f docker/Dockerfile -t rti-io .
 # Dockerfile.dockerignore, next to this file, applies to that build.
 

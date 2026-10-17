@@ -9,7 +9,7 @@
 # pull the images published from GitHub instead - see README.md "Docker".
 #
 # The IO server, rti-io, isn't part of this stack: it runs on the Raspberry Pi,
-# from examples/rti-plugins/io/docker-compose.yaml (decision 0028). Both
+# from examples/rti-plugins/rpi_io/docker-compose.yaml (decision 0028). Both
 # join rti-network. The FSPs and SO connect to it as a plugin, from their
 # plugin configuration in config/plugin-configuration/ (decision 0029); while
 # it isn't reachable they retry, and the rest of the demo works.

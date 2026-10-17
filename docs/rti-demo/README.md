@@ -36,7 +36,7 @@ Each component's README is its reference: run and test commands, configuration, 
 | BFF (backend for frontend) | [modules/bff/README.md](../../examples/rti-demo/modules/bff/README.md) |
 | HMI (React frontend) | [modules/hmi/README.md](../../examples/rti-demo/modules/hmi/README.md) |
 | Plugins (HTTP services the FSP and SO connect to) | [rti-plugins/README.md](../../examples/rti-plugins/README.md) |
-| IO server and IO plugin (Raspberry Pi devices, its own stack) | [rti-plugins/io/README.md](../../examples/rti-plugins/io/README.md) |
+| IO server and IO plugin (Raspberry Pi devices, its own stack) | [rti-plugins/rpi_io/README.md](../../examples/rti-plugins/rpi_io/README.md) |
 | Plugin host | [modules/plugins/README.md](../../examples/rti-demo/modules/plugins/README.md) |
 | Demo playbooks | [playbooks/README.md](../../examples/rti-demo/playbooks/README.md) |
 

@@ -61,7 +61,7 @@ use `--all-packages`, or `--package <name>` for just one module, to get
 
 The plugins in `examples/rti-plugins` are deliberately **not** part of
 this workspace: each is its own uv project, and the FSP and SO connect to
-them over HTTP (decisions 0028-0030). The IO plugin (`examples/rti-plugins/io`)
+them over HTTP (decisions 0028-0030). The IO plugin (`examples/rti-plugins/rpi_io`)
 also needs Raspberry Pi GPIO/I2C hardware packages.
 It builds via its own fully independent
 Docker-stage venv (its `docker/Dockerfile`), since its
@@ -82,7 +82,7 @@ uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m 
 # sample plugin. They aren't workspace members; the IO plugin's tests need
 # FastAPI and the plugin host, so they run in the fsp environment.
 # sim_leds runs in the plugin host's environment, which its tests connect.
-uv run --package fsp pytest examples/rti-plugins/io/tests -m unit -q
+uv run --package fsp pytest examples/rti-plugins/rpi_io/tests -m unit -q
 uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q
 ```
 
@@ -277,7 +277,7 @@ rm -rf dist
   && (uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q) \
   && (uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q) \
   && (uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q) \
-  && (uv run --package fsp pytest examples/rti-plugins/io/tests -m unit -q) \
+  && (uv run --package fsp pytest examples/rti-plugins/rpi_io/tests -m unit -q) \
   && (uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q) \
   && (cd examples/rti-demo/modules/hmi && npm test) \
   && (cd examples/rti-demo/modules/hmi && npx vite build && rm -rf dist)

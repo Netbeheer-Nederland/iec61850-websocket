@@ -9,7 +9,7 @@ DOCKERFILE = (
     Path(__file__).resolve().parents[2]
     / "examples"
     / "rti-plugins"
-    / "io"
+    / "rpi_io"
     / "docker"
     / "Dockerfile"
 )

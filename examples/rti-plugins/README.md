@@ -17,7 +17,7 @@ imports them: each plugin runs, is built and is released on its own. The decisio
 
 | Folder | What it is | Its plugin URL | Runs on |
 |---|---|---|---|
-| [`io`](io/README.md) | The IO plugin, `rpi_io` (image `rti-io`): the IO server with the LEDs, buttons, potentiometers and displays, and the plugin API | `http://rti-io:9000/plugin` | the Raspberry Pi; mock mode elsewhere |
+| [`rpi_io`](rpi_io/README.md) | The IO plugin, `rpi_io` (image `rti-io`, plugin name `io`): the IO server with the LEDs, buttons, potentiometers and displays, and the plugin API | `http://rti-io:9000/plugin` | the Raspberry Pi; mock mode elsewhere |
 | [`sim_leds`](sim_leds/README.md) | A sample plugin: two simulated LEDs, FastAPI only | `http://localhost:8099/plugin` | anywhere |
 
 ## The layout of a plugin
@@ -67,7 +67,7 @@ Pi. All stacks join the external network `rti-network`, where the FSPs and SO re
 ```bash
 docker network create rti-network 2>/dev/null || true
 
-cd examples/rti-plugins/io
+cd examples/rti-plugins/rpi_io
 docker compose up -d                                                      # anywhere (mock mode)
 docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d     # on the Raspberry Pi
 
@@ -77,12 +77,12 @@ docker compose up -d
 
 While a plugin isn't reachable, the FSPs and SO list it as failed and try again every 10 s; the rest of the demo
 works. `launch.py io` in the demo starts the IO plugin as a local process, so one machine can run everything. The Pi's scripts
-(Docker setup, the build user and groups, GPIO simulation) are in [`io/scripts`](io/scripts).
+(Docker setup, the build user and groups, GPIO simulation) are in [`rpi_io/scripts`](rpi_io/scripts).
 
 ## Tests
 
 ```bash
-uv run --package fsp pytest examples/rti-plugins/io/tests -m unit -q   # not a workspace member; needs FastAPI and the plugin host
+uv run --package fsp pytest examples/rti-plugins/rpi_io/tests -m unit -q   # not a workspace member; needs FastAPI and the plugin host
 uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q
 ```
 

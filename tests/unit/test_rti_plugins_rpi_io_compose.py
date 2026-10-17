@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-IO = Path(__file__).resolve().parents[2] / "examples" / "rti-plugins" / "io"
+IO = Path(__file__).resolve().parents[2] / "examples" / "rti-plugins" / "rpi_io"
 
 # rti-io settings that only work, or only make sense, with the Pi's devices.
 HARDWARE_KEYS = ["devices", "group_add", "user", "ipc", "security_opt", "cap_add"]

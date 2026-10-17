@@ -21,7 +21,7 @@
 # Detects UID, GID, and group IDs for a given user and exports them as
 # environment variables for Docker Compose to use when building the rti-io container.
 #
-# Usage (run from examples/rti-plugins/io/, so docker compose finds the IO
+# Usage (run from examples/rti-plugins/rpi_io/, so docker compose finds the IO
 # project's docker-compose.yaml and docker-compose.pi.yaml there):
 #   ./scripts/set_docker_user.sh [username]
 #   Default username: pi

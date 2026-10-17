@@ -47,7 +47,7 @@ The IO service enables remote control and monitoring of physical IO devices (LED
 ## Directory Structure
 
 ```
-examples/rti-plugins/io/
+examples/rti-plugins/rpi_io/
 ├── pyproject.toml, uv.lock   # standalone uv project rpi-io (not in the root workspace); script rpi-io
 ├── docker-compose.yaml       # its own stack: rti-io, on the external network rti-network; runs anywhere
 ├── docker-compose.pi.yaml    # overlay: the Raspberry Pi's devices
@@ -55,7 +55,7 @@ examples/rti-plugins/io/
 │   ├── Dockerfile            # multi-stage build; context is this folder
 │   └── Dockerfile.dockerignore
 ├── scripts/                  # Raspberry Pi: Docker setup, build user and groups, GPIO simulation
-├── tests/                    # uv run --package fsp pytest examples/rti-plugins/io/tests -q
+├── tests/                    # uv run --package fsp pytest examples/rti-plugins/rpi_io/tests -q
 └── src/rpi_io/
     ├── server/               # the IO server: rpi-io, or python -m rpi_io.server.main
     │   ├── main.py           # Entry point - creates IOController + FastAPI app
@@ -112,7 +112,7 @@ All endpoints are under the `/api/io/` prefix and provide device management, LED
 | `IO_CONFIG_FILE` | `src/rpi_io/server/io_config.json` | The device configuration the server reads and saves to. A file that doesn't exist yet is seeded from the shipped `io_config.json`. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_config.json`, so saves leave the shipped file unchanged |
 | `IO_MAPPING_FILE` | `src/rpi_io/plugin/io_mapping.json` | Which devices the IO plugin uses for each event and objRef (see [The IO plugin](#the-io-plugin-plugin)); seeded from the shipped file the same way. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_mapping.json` |
 
-Start the server with `uv run rpi-io` from `examples/rti-plugins/io`, or with `launch.py io`
+Start the server with `uv run rpi-io` from `examples/rti-plugins/rpi_io`, or with `launch.py io`
 in `examples/rti-demo`; the modules use relative imports, so they don't run as scripts. The first installs this project
 in its own environment (`.venv` here, with the Raspberry Pi packages), the second runs it from `src/` in the repository's
 (`uv sync --all-packages`), where devices whose hardware packages are missing stay unavailable.
@@ -457,7 +457,7 @@ Check the backpack's documentation for whether it needs 5V or 3.3V.
 
 ```bash
 docker network create rti-network 2>/dev/null || true
-cd examples/rti-plugins/io
+cd examples/rti-plugins/rpi_io
 docker compose up -d                                                      # anywhere (mock mode)
 docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d     # on the Raspberry Pi
 ```
@@ -480,7 +480,7 @@ If your system has different values, you can configure them in three ways:
 
 **Method 1: Auto-detect with username (Recommended)**
 Just pass the username - the script detects all IDs automatically (run
-from `examples/rti-plugins/io/`, so docker compose finds this
+from `examples/rti-plugins/rpi_io/`, so docker compose finds this
 project's compose files in the current directory):
 ```bash
 ./scripts/set_docker_user.sh pi && docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up --build

@@ -163,12 +163,12 @@ persistent.
 ### The IO server (Raspberry Pi)
 
 The IO server, `rti-io`, isn't part of this stack: it runs on the Raspberry Pi and has its own compose file in
-[`examples/rti-plugins/io`](../rti-plugins/io/README.md) (decision
+[`examples/rti-plugins/rpi_io`](../rti-plugins/rpi_io/README.md) (decision
 [0028](../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)). It joins `rti-network` too, so the FSPs and SO reach
 it as `http://rti-io:9000/plugin`. The demo runs without it: the FSPs and SO list it as failed and try again.
 
 ```shell
-cd examples/rti-plugins/io
+cd examples/rti-plugins/rpi_io
 docker compose up -d                                                      # anywhere (mock mode)
 docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d     # on the Raspberry Pi
 ```
@@ -268,7 +268,7 @@ The `BFF_CONNECTIONS_FILE` env var overrides the path if you need a different lo
 
 On Raspberry Pis, the `io` service drives LEDs, LCDs, a button and two potentiometers, so the IEC 61850 exchange between
 RTI-FSP (ACSI server) and RTI-SO (ACSI client) becomes visible. It shows reporting, operate (control) and setpoints.
-FSP and SO each run their own `io` service and use the same mapping, the IO server's `../rti-plugins/io/src/rpi_io/plugin/io_mapping.json`:
+FSP and SO each run their own `io` service and use the same mapping, the IO server's `../rti-plugins/rpi_io/src/rpi_io/plugin/io_mapping.json`:
 
 | Device         | Mapped to                                    | Shows / does                                                   |
 |----------------|----------------------------------------------|----------------------------------------------------------------|
@@ -297,32 +297,32 @@ On two Raspberry Pis, point each side's configuration at its own `io` service (s
 [examples/rti-plugins](../rti-plugins/README.md). To write a plugin of your own, start with
 [modules/plugins/GETTING_STARTED.md](modules/plugins/GETTING_STARTED.md); the contract is
 [modules/plugins/openapi.yaml](modules/plugins/openapi.yaml).
-Wiring, pin numbers and the I2C LCD setup are in [rti-plugins/io/README.md](../rti-plugins/io/README.md).
+Wiring, pin numbers and the I2C LCD setup are in [rti-plugins/rpi_io/README.md](../rti-plugins/rpi_io/README.md).
 
 ## IO API Server
 
 The `io` service is a REST API (under `/api/io/`) for the LEDs, buttons, potentiometers and LCDs on a Raspberry Pi; it
 runs without the hardware too (see [The IO server (Raspberry Pi)](#the-io-server-raspberry-pi)). Its code is in
-[`examples/rti-plugins/io`](../rti-plugins/io/README.md).
+[`examples/rti-plugins/rpi_io`](../rti-plugins/rpi_io/README.md).
 
 ```bash
 # from examples/rti-demo
 uv run python launch.py io
 
 # in Docker, its own stack (add -f docker-compose.yaml -f docker-compose.pi.yaml on the Pi)
-cd ../rti-plugins/io && docker compose up rti-io
+cd ../rti-plugins/rpi_io && docker compose up rti-io
 
 # or directly, in the io project's own environment
-cd ../rti-plugins/io && uv run rpi-io
+cd ../rti-plugins/rpi_io && uv run rpi-io
 ```
 
-`launch.py io` runs `rpi_io` from `../rti-plugins/io/src` in the repository's environment
+`launch.py io` runs `rpi_io` from `../rti-plugins/rpi_io/src` in the repository's environment
 (`uv sync --all-packages`). The direct command uses the `io` project's own environment instead: `uv run` creates
-`.venv` in `rti-plugins/io` on first use and installs the Raspberry Pi packages there
+`.venv` in `rti-plugins/rpi_io` on first use and installs the Raspberry Pi packages there
 (`gpiod`, `gpiozero`, ...). Use it on a Raspberry Pi; where those packages don't install, use `launch.py io`.
 
 Devices, configuration (`io_config.json`), wiring, Raspberry Pi setup (GPIO, I2C, SPI) and troubleshooting are in
-[rti-plugins/io/README.md](../rti-plugins/io/README.md); the endpoints are in its OpenAPI docs at
+[rti-plugins/rpi_io/README.md](../rti-plugins/rpi_io/README.md); the endpoints are in its OpenAPI docs at
 http://localhost:9000/docs.
 It listens on 9000 however it's started (`PORT` overrides it).
 
@@ -370,7 +370,7 @@ uv add --package bff <package_name>
 ```
 
 After a dependency change, rebuild the images that use it (`docker compose build`). The `io` module is a separate uv
-project: run `uv add` and `uv lock` in `examples/rti-plugins/io`.
+project: run `uv add` and `uv lock` in `examples/rti-plugins/rpi_io`.
 
 ## Troubleshooting
 

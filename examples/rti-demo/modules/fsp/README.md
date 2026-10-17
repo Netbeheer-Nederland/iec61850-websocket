@@ -17,7 +17,7 @@ The FSP directory implements a complete **IEC 61850 ACSI (Abstract Communication
 - Manages IED (Intelligent Electronic Device) models
 - Handles read/write operations on data objects
 - Supports dynamic model reloading
-- Integrates with IO devices via the IO service (`examples/rti-plugins/io`, its own stack)
+- Integrates with IO devices via the IO service (`examples/rti-plugins/rpi_io`, its own stack)
 
 ### Architecture
 
@@ -217,7 +217,7 @@ and decisions [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.m
 
 ### The IO plugin
 
-The IO server ([`rti-plugins/io`](../../../rti-plugins/io/README.md)) is the FSP's IO plugin: compose
+The IO server ([`rti-plugins/rpi_io`](../../../rti-plugins/rpi_io/README.md)) is the FSP's IO plugin: compose
 configures it in `config/plugin-configuration/rti-fsp01.json` (`http://rti-io:9000/plugin`), `launch.py` in `PLUGINS`
 (`http://localhost:9000/plugin`). The first FSP gets the input devices' changes (the button, the potentiometers); the second FSP's configuration says
 `"write_inputs": false`. Which devices react to which event or objRef is the IO server's

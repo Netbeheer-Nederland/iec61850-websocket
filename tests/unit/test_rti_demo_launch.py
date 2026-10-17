@@ -37,7 +37,7 @@ def test_no_verbose_turns_it_off(launcher):
 
 COMPOSE = LAUNCH_PY.parent / "docker-compose.yml"
 # The IO plugin is its own stack (decisions 0028, 0030); launch.py still runs it.
-IO_PLUGIN = LAUNCH_PY.parents[1] / "rti-plugins" / "io"
+IO_PLUGIN = LAUNCH_PY.parents[1] / "rti-plugins" / "rpi_io"
 
 
 def test_every_service_type_is_an_rti_type(launcher):

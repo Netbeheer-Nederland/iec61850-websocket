@@ -75,7 +75,7 @@ jobs:
       - run: uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q
       - run: uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q
       - run: uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q
-      - run: uv run --package fsp pytest examples/rti-plugins/io/tests -m unit -q
+      - run: uv run --package fsp pytest examples/rti-plugins/rpi_io/tests -m unit -q
       - run: uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q
 
   # The HMI's tests and production build (vite), with the Node version its
@@ -115,9 +115,9 @@ jobs:
       - run: docker compose config -q
         working-directory: examples/rti-demo
       - run: docker compose config -q
-        working-directory: examples/rti-plugins/io
+        working-directory: examples/rti-plugins/rpi_io
       - run: docker compose -f docker-compose.yaml -f docker-compose.pi.yaml config -q
-        working-directory: examples/rti-plugins/io
+        working-directory: examples/rti-plugins/rpi_io
       - run: docker compose config -q
         working-directory: examples/rti-plugins/sim_leds
 

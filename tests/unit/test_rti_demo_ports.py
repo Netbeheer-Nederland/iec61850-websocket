@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DEMO = ROOT / "examples" / "rti-demo"
 MODULES = DEMO / "modules"
 # The IO plugin, in its own folder (decisions 0028, 0030).
-IO_PLUGIN = ROOT / "examples" / "rti-plugins" / "io"
+IO_PLUGIN = ROOT / "examples" / "rti-plugins" / "rpi_io"
 
 EXPECTED_PORTS = {
     "hmi": 8080,
@@ -117,7 +117,7 @@ def test_io_dockerfile_port_and_health_check():
         ("bff/src/bff/bff_server.py", "bff"),
         ("so/src/so/bff_endpoint.py", "so"),
         ("fsp/src/fsp/bff_endpoint.py", "fsp"),
-        ("../../rti-plugins/io/src/rpi_io/server/main.py", "io"),
+        ("../../rti-plugins/rpi_io/src/rpi_io/server/main.py", "io"),
     ],
 )
 def test_code_default_port(path, role):
