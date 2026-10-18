@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   # Turn the diff into a JSON list of images to build. On a tag or a manual
-  # dispatch the list is forced to all seven.
+  # dispatch the list is forced to all five.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: f
         with:
           filters: |
