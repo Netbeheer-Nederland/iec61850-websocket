@@ -80,12 +80,14 @@ async def test_the_fsp_connects_to_it(setup):
     assert await leds(client) == {"red": False, "green": False}
 
 
-async def test_an_association_turns_green_on_and_a_stop_turns_it_off(setup):
+async def test_an_association_turns_green_on_and_a_disconnect_turns_it_off(setup):
     host, client = setup
     await deliver(host, Associated("cp1"))
     assert await leds(client) == {"red": False, "green": True}
     await deliver(host, ServerStopped())
     assert await leds(client) == {"red": False, "green": False}
+    history = (await client.get("/api/plugins/sim_leds/leds")).json()["history"]
+    assert history[-1]["reason"] == "disconnected"
 
 
 async def test_a_failed_operate_turns_red_on_until_a_good_one(setup):

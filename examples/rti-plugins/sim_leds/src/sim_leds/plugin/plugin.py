@@ -94,7 +94,8 @@ def create_plugin_router(leds: SimulatedLeds) -> APIRouter:
         if kind == "Associated":
             leds.set("green", True, f"associated {event.get('associate_id')}")
         elif kind == "ServerStopped":
-            leds.reset("server stopped")
+            # The FSP dropped its connection to the SO; its server runs on.
+            leds.reset("disconnected")
         elif kind == "OperateResponse" and event.get("success"):
             leds.set("red", False, "operate succeeded")
             leds.blink("green", f"operate {obj_ref}".strip())
