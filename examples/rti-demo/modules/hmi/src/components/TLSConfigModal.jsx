@@ -67,7 +67,7 @@ const RUNTIME_TLS_CONFIG_API = {
 
 // "1.2"/"1.3" (runtime) or "TLSv1_2"/"TLSv1_3" (connections.json) -> the
 // select's "1.2"/"1.3"; null when there's nothing usable.
-function normalizeTlsVersion(version) {
+export function normalizeTlsVersion(version) {
   const v = String(version ?? '');
   if (/1[._]3/.test(v)) return '1.3';
   if (/1[._]2/.test(v)) return '1.2';

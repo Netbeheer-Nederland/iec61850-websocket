@@ -176,3 +176,28 @@ describe('InstanceVisualization - dropped FSPs (Traffic)', () => {
     expect(screen.queryByTestId('link-down-FSP03')).not.toBeInTheDocument();
   });
 });
+
+describe('InstanceVisualization - TLS badge', () => {
+  const FSP = { name: 'FSP01', type: 'RTI-FSP', status: 'connected', host: 'h', port: 1, connectedClients: 1 };
+
+  it('badges the SO and an FSP whose stored TLS is on, with the version', () => {
+    renderViz([
+      { ...SO, TLS: { enable_tls: true, tls_version: 'TLSv1_3' } },
+      { ...FSP, TLS: { enable_tls: true, tls_version: 'TLSv1_2' } },
+    ]);
+
+    expect(screen.getByTestId('tls-badge-SO').title).toBe('Secure transport: WebSocket over TLS 1.3 (wss)');
+    expect(screen.getByTestId('tls-badge-FSP01').title).toBe('Secure transport: WebSocket over TLS 1.2 (wss)');
+    expect(screen.getByTestId('tls-badge-FSP01').textContent).toBe('TLS');
+  });
+
+  it('draws no badge for plain WS or a connection without TLS config', () => {
+    renderViz([
+      { ...SO, TLS: { enable_tls: false, tls_version: 'TLSv1_2' } },
+      { ...FSP },
+    ]);
+
+    expect(screen.queryByTestId('tls-badge-SO')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tls-badge-FSP01')).not.toBeInTheDocument();
+  });
+});

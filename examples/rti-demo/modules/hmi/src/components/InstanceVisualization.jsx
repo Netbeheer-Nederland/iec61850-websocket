@@ -22,6 +22,7 @@ import { useNavigate } from 'react-router-dom';
 import { EMPTY_LINK } from '../hooks/useLinkActivity';
 import { fspStateOf, useNow } from '../hooks/useFspPresence';
 import { formatDuration } from '../utils/timeline';
+import { normalizeTlsVersion } from './TLSConfigModal';
 
 const DOWN_LABELS = { 'link-down': 'link down', unreachable: 'unreachable' };
 
@@ -30,6 +31,59 @@ const PULSE_COLORS = {
   response: 'var(--success-color)',
   report: 'var(--warning-color)',
 };
+
+/**
+ * A pill on the edge of an SO/FSP circle: TLS at the top left (the SO's FSP
+ * counter has the top right).
+ */
+function SecurityBadge({ testId, title, icon, label, background, edge }) {
+  return (
+    <span
+      data-testid={testId}
+      title={title}
+      style={{
+        position: 'absolute',
+        [edge]: '-4px',
+        left: '-4px',
+        height: '26px',
+        padding: '0 8px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        borderRadius: '13px',
+        background,
+        color: 'white',
+        fontSize: '11px',
+        fontWeight: 700,
+        border: '2px solid var(--bg-card)'
+      }}
+    >
+      <i className={`fas ${icon}`} aria-hidden="true"></i>
+      {label}
+    </span>
+  );
+}
+
+/**
+ * Lock badge on an SO/FSP circle whose stored TLS config is on: its
+ * WebSocket runs over TLS (wss). The BFF keeps the instance's runtime TLS
+ * in line with this stored config (connection_manager.sync_runtime_tls for
+ * an SO, /start for an FSP). Nothing is drawn for plain WS.
+ */
+function TlsBadge({ conn }) {
+  if (!conn.TLS?.enable_tls) return null;
+  const version = normalizeTlsVersion(conn.TLS.tls_version);
+  return (
+    <SecurityBadge
+      testId={`tls-badge-${conn.name}`}
+      title={`Secure transport: WebSocket over TLS${version ? ` ${version}` : ''} (wss)`}
+      icon="fa-lock"
+      label="TLS"
+      background="var(--primary-color)"
+      edge="top"
+    />
+  );
+}
 
 /**
  * The SO-FSP line with live activity (Traffic only): a dot travels along it
@@ -196,6 +250,7 @@ function InstanceVisualization({
                   >
                     <span style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600' }}>{conn.name}</span>
                   </div>
+                  <TlsBadge conn={conn} />
                   {/* Counter of FSPs currently connected to this SO */}
                   <span
                     title={`${connectedFsps} connected FSP${connectedFsps === 1 ? '' : 's'}`}
@@ -292,6 +347,7 @@ function InstanceVisualization({
 
                   {/* FSP circle + label */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '180px', marginLeft: '16px' }}>
+                    <div style={{ position: 'relative' }}>
                     <div
                       style={{
                         width: '120px',
@@ -315,6 +371,8 @@ function InstanceVisualization({
                       <span style={{ color: down ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>
                         {conn.name}
                       </span>
+                    </div>
+                    <TlsBadge conn={conn} />
                     </div>
                     {showLabels && (
                       <div style={{
