@@ -22,6 +22,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { executeApiCall } from '../services/apiService';
 import { useRuntimeFlag } from '../hooks/useRuntimeFlag';
 import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from '../config';
+import { useCertDir, CertFileSelect, CertReferenceNote } from './CertFileSelect';
 
 // Whether the instance at `target` (e.g. "rti-so:5002") has OAuth turned on
 // right now, per its own runtime GET /api/oauth-status.
@@ -95,6 +96,11 @@ const OAuthConfigModal = ({
   // Shown inline: the parent page's message banner sits behind this
   // modal's overlay (same reasoning as TLSConfigModal's localError).
   const [localError, setLocalError] = useState(null);
+
+  // The auth server CA can also come from the BFF's certificate directory,
+  // as `file:<name>` - same as the TLS dialog's CA field.
+  const certDir = useCertDir(isOpen, bffBaseUrl);
+  const dirCaCerts = certDir.files.filter((f) => f.kind === 'certificate');
 
   const idpServers = connections.filter(c => c.type === 'IDP-Server');
   const passive = isPassiveMode(connection, wsMode);
@@ -381,7 +387,9 @@ const OAuthConfigModal = ({
               <div style={styles.fileInputGroup}>
                 <input type="file" id="oauth-ca-file" accept=".pem,.crt,.cer" onChange={handleFileUpload} />
               </div>
-              <textarea id="oauth-ca-content" value={authServerCa} onChange={(e) => setAuthServerCa(e.target.value)} placeholder="-----BEGIN CERTIFICATE-----..." style={styles.textarea} />
+              <CertFileSelect id="oauth-ca-certfile" files={dirCaCerts} value={authServerCa} onChange={setAuthServerCa} style={styles.input} />
+              <textarea id="oauth-ca-content" value={authServerCa} onChange={(e) => setAuthServerCa(e.target.value)} placeholder="-----BEGIN CERTIFICATE-----... or file:<name>" style={styles.textarea} />
+              <CertReferenceNote value={authServerCa} certDir={certDir.path} />
               <small style={styles.hint}>Only needed when the IDP is reached over HTTPS with a private CA.</small>
             </div>
 

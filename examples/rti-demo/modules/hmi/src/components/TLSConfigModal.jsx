@@ -21,6 +21,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRuntimeFlag } from '../hooks/useRuntimeFlag';
 import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from '../config';
+import { useCertDir, CertFileSelect, CertReferenceNote } from './CertFileSelect';
 
 function parsePythonDictString(pythonStr) {
   if (!pythonStr || typeof pythonStr !== 'string') return pythonStr;
@@ -88,48 +89,6 @@ function useRuntimeTlsEnabled(target) {
   return useRuntimeFlag('runtime-tls-config', 'enable_tls', target);
 }
 
-const FILE_REF_PREFIX = 'file:';
-
-// One option per file in the BFF's certificate directory (GET /api/certs).
-function certFileLabel(file) {
-  if (file.kind !== 'certificate') return file.name;
-  const expires = file.not_after ? `, expires ${file.not_after.slice(0, 10)}` : '';
-  return `${file.name} - ${file.subject}${file.is_ca ? ' (CA)' : ''}${expires}`;
-}
-
-// Pick a file from the certificate directory: the field then holds `file:<name>`,
-// which the instance reads from its own /certs mount, so the PEM text (and a
-// private key) never passes through the browser. Hidden when the directory has
-// nothing that fits.
-function CertFileSelect({ id, files, value, onChange, style }) {
-  if (!files.length) return null;
-  const selected = files.some((f) => f.reference === value) ? value : '';
-  return (
-    <select
-      id={id}
-      value={selected}
-      onChange={(e) => onChange(e.target.value)}
-      style={{ ...style, marginBottom: '10px' }}
-      aria-label="From the certificate directory"
-    >
-      <option value="">From the certificate directory...</option>
-      {files.map((f) => (
-        <option key={f.reference} value={f.reference}>{certFileLabel(f)}</option>
-      ))}
-    </select>
-  );
-}
-
-function CertReferenceNote({ value, certDir }) {
-  if (!value || !value.startsWith(FILE_REF_PREFIX)) return null;
-  const name = value.slice(FILE_REF_PREFIX.length);
-  return (
-    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
-      Read by the instance from {certDir || '/certs'}/{name} in its own certificate directory.
-    </div>
-  );
-}
-
 const TLSConfigModal = ({
   isOpen,
   onClose,
@@ -146,10 +105,6 @@ const TLSConfigModal = ({
   const [serverCert, setServerCert] = useState('');
   const [caCert, setCaCert] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  // Files in the BFF's certificate directory (/certs), for the "From the
-  // certificate directory" selects. Empty when the BFF has no such directory
-  // (or predates /api/certs).
-  const [certDir, setCertDir] = useState({ path: null, files: [] });
   // Initialize wsMode from connection if available
   const [wsMode, setWsMode] = useState(() => {
     if (connection?.ws_mode) {
@@ -241,23 +196,8 @@ const TLSConfigModal = ({
     loadTlsConfig();
   }, [isOpen, connection, wsHost, executeApiCall]);
 
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    let cancelled = false;
-    (async () => {
-      try {
-        const response = await fetch(`${bffBaseUrl}/api/certs`);
-        if (!response.ok) return;
-        const body = await response.json();
-        if (!cancelled && body?.available) {
-          setCertDir({ path: body.cert_dir, files: Array.isArray(body.files) ? body.files : [] });
-        }
-      } catch (error) {
-        console.warn('Certificate directory not available:', error);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [isOpen, bffBaseUrl]);
+  // For the "From the certificate directory" selects.
+  const certDir = useCertDir(isOpen, bffBaseUrl);
 
   const dirKeys = certDir.files.filter((f) => f.kind === 'private_key');
   const dirServerCerts = certDir.files.filter((f) => f.kind === 'certificate' && !f.is_ca);

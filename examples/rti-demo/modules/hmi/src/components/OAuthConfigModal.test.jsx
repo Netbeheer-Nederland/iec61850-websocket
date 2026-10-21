@@ -27,11 +27,22 @@ const DISCOVERY = {
   token_endpoint: 'http://keycloak:8080/realms/iec61850-test/protocol/openid-connect/token',
 };
 
+const CERTS = {
+  available: true,
+  cert_dir: '/certs',
+  files: [
+    { name: 'ca.pem', reference: 'file:ca.pem', kind: 'certificate', subject: 'RTI demo CA', is_ca: true, not_after: '2036-10-06T00:00:00+00:00' },
+    { name: 'keycloak-key.pem', reference: 'file:keycloak-key.pem', kind: 'private_key' },
+    { name: 'keycloak.pem', reference: 'file:keycloak.pem', kind: 'certificate', subject: 'keycloak', is_ca: false },
+  ],
+};
+
 let savedBodies;
 beforeEach(() => {
   savedBodies = [];
   global.fetch = vi.fn(async (url, init) => {
     if (String(url).includes('/api/idp/discovery')) return { ok: true, json: async () => DISCOVERY };
+    if (String(url).endsWith('/api/certs')) return { ok: true, json: async () => CERTS };
     if (String(url).endsWith('/api/connections/oauth-config')) {
       savedBodies.push(JSON.parse(init.body));
       return { ok: true, json: async () => ({ ok: true }) };
@@ -143,5 +154,34 @@ describe('OAuthConfigModal', () => {
     expect(await screen.findByText('IDP server unavailable')).toBeInTheDocument();
     expect(onError).toHaveBeenCalledWith('IDP server unavailable');
     expect(savedBodies).toEqual([]);
+  });
+
+  it('takes the auth server CA from the certificate directory, as a file reference', async () => {
+    const onSuccess = vi.fn();
+    const user = userEvent.setup({ delay: null });
+    renderModal({ connection: FSP, target: 'rti-fsp01:5001', onSuccess });
+
+    const select = await waitFor(() => {
+      const el = document.getElementById('oauth-ca-certfile');
+      expect(el).not.toBeNull();
+      return el;
+    });
+    // Certificates only - no private keys.
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(['', 'file:ca.pem', 'file:keycloak.pem']);
+
+    await user.selectOptions(select, 'file:ca.pem');
+    expect(document.getElementById('oauth-ca-content')).toHaveValue('file:ca.pem');
+    expect(screen.getByText(/Read by the instance from \/certs\/ca\.pem/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(savedBodies).toEqual([expect.objectContaining({ ca_certificate: 'file:ca.pem' })]);
+  });
+
+  it('preselects a saved CA reference', async () => {
+    renderModal({ connection: { ...FSP, OAuth: { ...FSP.OAuth, auth_server_ca: 'file:ca.pem' } }, target: 'rti-fsp01:5001' });
+
+    await waitFor(() => expect(document.getElementById('oauth-ca-certfile')).toHaveValue('file:ca.pem'));
   });
 });

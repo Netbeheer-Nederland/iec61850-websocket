@@ -34,7 +34,7 @@ from ws61850.endpoint.base import WebSocketInfo
 from ws61850.endpoint.connection_router import ConnectionRouter
 from ws61850.iec61850.client.request_handling import create_tpaa_associate_request
 from ws61850.security.oauth2.client_credentials import ClientCredentialsProvider
-from ws61850.security.tls import build_tls_context_from_strings
+from ws61850.security.tls import build_tls_context_from_strings, resolve_pem
 from ws61850.shared.extractors import (
     extract_associate_request_type,
     retrieve_associate_id_from_decoded_msg,
@@ -238,6 +238,10 @@ class ActiveEndpoint:
         kc_cert=None,
         enable_token_refresh=False,
     ):
+        # kc_cert is the auth server CA's PEM text, or file:<name> in the
+        # certificate directory - read before anything changes, so a missing
+        # file leaves the current OAuth setup as it was.
+        kc_cert = resolve_pem(kc_cert)
         async with self._reconfig_lock:
             self._oauth_enable = oauth_enable
             self._assoc_handler._kc_cert = kc_cert

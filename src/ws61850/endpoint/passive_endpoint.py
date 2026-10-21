@@ -39,7 +39,7 @@ from ws61850.iec61850.client.iec61850_client import IEC61850Client
 from ws61850.iec61850.client.request_handling import create_tpaa_associate_request
 from ws61850.security.oauth2.jwks import JwksCache
 from ws61850.security.oauth2.validator import JwtValidator
-from ws61850.security.tls import build_tls_context_from_strings
+from ws61850.security.tls import build_tls_context_from_strings, resolve_pem
 from ws61850.shared.extractors import (
     extract_associate_request_type,
     retrieve_associate_id_from_decoded_msg,
@@ -196,6 +196,10 @@ class PassiveEndpoint:
     async def reconfigure_oauth(
         self, oauth_enable, certificate_endpoint=None, token_issuer=None, kc_cert=None
     ):
+        # kc_cert is the auth server CA's PEM text, or file:<name> in the
+        # certificate directory - read before anything changes, so a missing
+        # file leaves the current OAuth setup as it was.
+        kc_cert = resolve_pem(kc_cert)
         async with self._reconfig_lock:
             self._oauth_enable = oauth_enable
 
