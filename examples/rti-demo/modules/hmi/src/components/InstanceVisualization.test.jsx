@@ -201,3 +201,37 @@ describe('InstanceVisualization - TLS badge', () => {
     expect(screen.queryByTestId('tls-badge-FSP01')).not.toBeInTheDocument();
   });
 });
+
+describe('InstanceVisualization - OAuth badge', () => {
+  const FSP = { name: 'FSP01', type: 'RTI-FSP', status: 'connected', host: 'h', port: 1, connectedClients: 1 };
+
+  it('badges the SO and an FSP whose stored OAuth is on, by role', () => {
+    renderViz([
+      { ...SO, OAuth: { enable_oauth: true, idp_server: 'keycloak' } },
+      { ...FSP, OAuth: { enable_oauth: true, client_id: 'rti-fsp', client_secret: 'x' } },
+    ]);
+
+    expect(screen.getByTestId('oauth-badge-SO').title)
+      .toBe("Authenticated: validates the FSPs' OAuth 2.0 access tokens (keycloak)");
+    expect(screen.getByTestId('oauth-badge-FSP01').title)
+      .toBe('Authenticated: presents an OAuth 2.0 access token to the SO');
+    expect(screen.getByTestId('oauth-badge-FSP01').textContent).toBe('OAuth');
+  });
+
+  it('draws no badge when OAuth is off or not configured', () => {
+    renderViz([
+      { ...SO, OAuth: { enable_oauth: false, idp_server: 'keycloak' } },
+      { ...FSP },
+    ]);
+
+    expect(screen.queryByTestId('oauth-badge-SO')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('oauth-badge-FSP01')).not.toBeInTheDocument();
+  });
+
+  it('sits alongside the TLS badge when both are on', () => {
+    renderViz([{ ...SO, TLS: { enable_tls: true, tls_version: '1.3' }, OAuth: { enable_oauth: true } }]);
+
+    expect(screen.getByTestId('tls-badge-SO').style.top).toBe('-4px');
+    expect(screen.getByTestId('oauth-badge-SO').style.bottom).toBe('-4px');
+  });
+});

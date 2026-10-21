@@ -33,8 +33,8 @@ const PULSE_COLORS = {
 };
 
 /**
- * A pill on the edge of an SO/FSP circle: TLS at the top left (the SO's FSP
- * counter has the top right).
+ * A pill on the edge of an SO/FSP circle: TLS at the top left, OAuth at the
+ * bottom left (the SO's FSP counter has the top right).
  */
 function SecurityBadge({ testId, title, icon, label, background, edge }) {
   return (
@@ -81,6 +81,30 @@ function TlsBadge({ conn }) {
       label="TLS"
       background="var(--primary-color)"
       edge="top"
+    />
+  );
+}
+
+/**
+ * Key badge on an SO/FSP circle whose stored OAuth config is on: the
+ * association is authenticated with an OAuth 2.0 access token - the FSP
+ * presents one, the SO validates it. Like TLS, the BFF re-applies this
+ * stored config to the running instance.
+ */
+function OAuthBadge({ conn }) {
+  if (!conn.OAuth?.enable_oauth) return null;
+  const idp = conn.OAuth.idp_server ? ` (${conn.OAuth.idp_server})` : '';
+  const role = conn.type === 'RTI-SO'
+    ? 'validates the FSPs\' OAuth 2.0 access tokens'
+    : 'presents an OAuth 2.0 access token to the SO';
+  return (
+    <SecurityBadge
+      testId={`oauth-badge-${conn.name}`}
+      title={`Authenticated: ${role}${idp}`}
+      icon="fa-key"
+      label="OAuth"
+      background="var(--secondary-color)"
+      edge="bottom"
     />
   );
 }
@@ -251,6 +275,7 @@ function InstanceVisualization({
                     <span style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600' }}>{conn.name}</span>
                   </div>
                   <TlsBadge conn={conn} />
+                  <OAuthBadge conn={conn} />
                   {/* Counter of FSPs currently connected to this SO */}
                   <span
                     title={`${connectedFsps} connected FSP${connectedFsps === 1 ? '' : 's'}`}
@@ -373,6 +398,7 @@ function InstanceVisualization({
                       </span>
                     </div>
                     <TlsBadge conn={conn} />
+                    <OAuthBadge conn={conn} />
                     </div>
                     {showLabels && (
                       <div style={{
