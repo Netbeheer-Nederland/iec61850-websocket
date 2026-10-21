@@ -221,6 +221,7 @@ issuer check sees a single value. Settings to enter in the HMI (Setup):
 |                        | Client ID / secret   | `ws-client` / see `scripts/keycloak/README.md`                            |
 
 HTTPS (8443) uses `testing/certs/keycloak.pem`, whose certificate only covers `keycloak`/`localhost`/`127.0.0.1`.
+It is signed by the test CA: with the HTTPS endpoints, pick `ca.pem` as the *Auth Server CA* in the OAuth dialog.
 
 ### TLS certificates
 
@@ -236,12 +237,12 @@ reach the SO when they run on other machines. The files used here:
 
 | File in `/certs` | Use it for |
 |---|---|
-| `ca.pem` | the CA certificate a WebSocket client (FSP, active) trusts |
+| `ca.pem` | the CA certificate a WebSocket client (FSP, active) trusts; also the OAuth dialog's *Auth Server CA* for Keycloak on HTTPS |
 | `server.pem`, `server-key.pem` | the SO's server certificate (`rti-so`) and key (passive) |
 
-In the HMI's TLS dialog, pick these under *From the certificate directory*. The setting then holds a reference such as
+In the HMI's TLS dialog (and for the auth server CA, the OAuth dialog), pick these under *From the certificate directory*. The setting then holds a reference such as
 `file:server-key.pem` instead of PEM text; the SO or FSP reads the file from its own `/certs` mount when it starts
-TLS, so keys never pass through the browser, the BFF or `connections.json`. Pasting or uploading PEM text still works.
+TLS or applies OAuth, so keys never pass through the browser, the BFF or `connections.json`. Pasting or uploading PEM text still works.
 
 Outside Docker (`launch.py`), the services look for referenced files in `TLS_CERT_DIR` (default `/certs`), e.g.
 `TLS_CERT_DIR=$PWD/../../testing/certs uv run python launch.py`. With FSP and SO on different machines, both need

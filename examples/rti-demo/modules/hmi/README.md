@@ -95,6 +95,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 **Features**:
 * Visual instance visualization (InstanceVisualization) showing SO, FSP, and their connections
 * SO circle turns green and shows a live badge counting its connected FSPs (connectedFsps > 0)
+* 🔒 TLS and 🔑 OAuth badges on an SO or FSP whose saved TLS / OAuth setting is on (`TLS.enable_tls`, `OAuth.enable_oauth` in the BFF's connections push; the BFF keeps the running instance in line with them): TLS at the top left - WebSocket over TLS (wss), version in the tooltip - and OAuth at the bottom left - associations authenticated with an OAuth 2.0 access token, which the FSP presents and the SO validates. Nothing is shown while a setting is off
 * No instance table - when nothing is registered, an empty-state hint points to the Connections page
 * Updates live from the BFF's connections push - no manual refresh button
 * Default route (redirects from `/`)
@@ -112,7 +113,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 * Data write operations via modal dialog
 * BRCB (Buffered Report Control Block) configuration
 * TLS configuration support: key and certificates as PEM text, an uploaded file, or a file picked from the certificate directory (`file:<name>`, read by the instance itself)
-* OAuth authentication integration
+* OAuth authentication integration - the auth server CA the same way: PEM text, an uploaded file, or a file from the certificate directory
 * Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; an ACSI entry made through the SO also names the WebSocket frame range it produced (shown under the call on Traffic); Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
 * Real-time data updates
 
@@ -127,7 +128,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 * Data write operations with value modification
 * Tree expansion state persistence
 * TLS configuration support: key and certificates as PEM text, an uploaded file, or a file picked from the certificate directory (`file:<name>`, read by the instance itself)
-* OAuth authentication integration
+* OAuth authentication integration - the auth server CA the same way: PEM text, an uploaded file, or a file from the certificate directory
 * Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; an ACSI entry made through the SO also names the WebSocket frame range it produced (shown under the call on Traffic); Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
 * Status information display
 
@@ -166,7 +167,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 **Purpose**: Traffic monitoring and data access dashboard.
 
 **Features**:
-* Visual instance visualization showing all SO, FSP, and their connections
+* Visual instance visualization showing all SO, FSP, and their connections, with the same TLS and OAuth badges as Overview
 * Live link activity on each SO-FSP line, counted from that FSP's own frames (pushed by the BFF whether or not a monitor is running): its cp, a dot per frame batch travelling towards the FSP (request) or back (response, report), request / response / report / error counters and the last service with its result and time; the line turns red while the last service failed. Reset counters zeroes them
 * Only instances the BFF can reach are drawn - an SO or FSP it can't reach is left out of the topology, and an FSP it can't reach only keeps a timeline lane while the timeline still holds rows for it (one that dropped mid-demo; a stale entry gets none). An FSP the BFF reaches but whose WebSocket to the SO is closed stays on the picture, its line red with an X, "link down" and how long it has been so; its timeline lane, demo buttons row (buttons disabled) and report values (last known values, dimmed) carry a "link down" or "unreachable" badge. The timeline gets a row when a link goes down, becomes unreachable and comes back up ("link back up after 42s"), timed by the browser's clock; the "Links" filter hides them. Changes are seen through the BFF's connection checks, and only while Traffic is open
 * Clicking an FSP focuses its link - the other links dim and only that FSP's message monitor is listed (the SO's stays); clicking it again, the SO, or Show all shows every link again. On Traffic the circles focus instead of opening the ACSI Client/Server pages
@@ -250,6 +251,7 @@ src/
 ├── config.js                # default BFF address (runtime config, VITE_BFF_*, localhost:3000)
 ├── pages/                   # one component per route (see Pages)
 ├── components/              # shared UI: Tree, modals (Connection, TLS, OAuth, BRCB, Control, WriteValue),
+│                            # CertFileSelect (certificate directory picker for TLS and OAuth),
 │                            # DataAccessPanel, MessageMonitor, ActionLogPanel, InstanceVisualization,
 │                            # TrafficTimeline, ReportValues, DemoActionsBar, PlaybookBar, Sidebar, Header
 ├── hooks/                   # Traffic state: useTrafficTimeline, useLinkActivity, useFspPresence,
@@ -279,7 +281,7 @@ The HMI makes two kinds of call, both to the BFF:
 
 1. **The BFF's own API**, called directly: `/api/health`, `/api/connections` (plus `add-connection`,
    `edit-connection/{name}`, `delete-connection/{name}` and the per-connection TLS and OAuth settings),
-   `/api/certs` (the certificate directory, for the TLS dialog),
+   `/api/certs` (the certificate directory, for the TLS and OAuth dialogs),
    `/api/diagnostics`, `/api/playbooks/...`, `/api/idp/discovery`, and the `/ws` push channel.
 2. **Calls on an SO or FSP instance**, sent as `POST /api/execute` with `{ target, method, path, body }`. The BFF
    forwards the request to the instance at `target` (`host:port`). The instance paths are listed in `API_DEFINITIONS`

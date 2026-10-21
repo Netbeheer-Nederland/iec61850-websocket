@@ -19,8 +19,8 @@ in every image, and made swapping certificates mean editing JSON.
 - A TLS or OAuth certificate field may hold `file:<name>` instead of PEM text. The SO and FSP resolve it against
   `TLS_CERT_DIR` (default `/certs`) with `ws61850.security.tls.resolve_pem`.
 - Docker Compose bind-mounts `testing/certs` (or `RTI_CERTS_DIR`) read-only at `/certs` in the BFF, SO and FSPs.
-- The BFF lists the files there with `GET /api/certs` (name, kind, common name); the HMI's TLS dialog offers them
-  in a dropdown.
+- The BFF lists the files there with `GET /api/certs` (name, kind, common name); the HMI's TLS dialog, and the
+  OAuth dialog for the auth server CA, offer them in a dropdown.
 - The seed connections hold no keys or certificates.
 - The BFF only lists the files; it doesn't depend on ws61850.
 
@@ -33,4 +33,5 @@ in every image, and made swapping certificates mean editing JSON.
 ## In the code
 
 - `src/ws61850/security/tls.py` (`resolve_pem`), `modules/bff/src/bff/cert_store.py`
-- `modules/hmi/src/components/TLSConfigModal.jsx`, `testing/certs/`
+- `src/ws61850/endpoint/passive_endpoint.py`, `active_endpoint.py` (`reconfigure_oauth`: the auth server CA)
+- `modules/hmi/src/components/CertFileSelect.jsx`, `TLSConfigModal.jsx`, `OAuthConfigModal.jsx`, `testing/certs/`

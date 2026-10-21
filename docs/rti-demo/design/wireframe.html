@@ -189,6 +189,14 @@
   /* Live counter badge (e.g. RTI-SO's connected-FSP count) - filled dark so
      it reads as "on"/highlighted even in this doc's otherwise line-only,
      colorless language. */
+  /* TLS / OAuth badges on an SO/FSP: TLS top left, OAuth bottom left (the
+     SO's counter keeps the top right). Shown only while that setting is on. */
+  .sec-badge { position: absolute; left: -22px; height: 14px; padding: 0 4px; border-radius: 7px; background: var(--wf-accent); color: #fff; font-size: 8px; font-weight: 700; display: flex; align-items: center; white-space: nowrap; border: 1.5px solid #fff; }
+  .sec-badge.tls { top: -9px; }
+  .sec-badge.oauth { bottom: -9px; }
+  /* A select whose placeholder option is its label (the certificate directory). */
+  .input.select { position: relative; margin-bottom: 6px; }
+  .input.select::after { content: attr(data-label) "  ▾"; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 9px; color: var(--wf-muted); }
   .count-badge { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; border-radius: 50%; background: var(--wf-accent); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid #fff; }
 
   .modal-overlay { border: 2px dashed var(--wf-line); border-radius: 10px; padding: 16px; background: #fff; margin-top: 18px; position: relative; }
@@ -234,10 +242,10 @@
 
           <div class="section-card">
             <h3>Instance Visualization (InstanceVisualization component)</h3>
-            <p class="placeholder-text" style="margin:0 0 10px;">ⓘ The SO card (first, below) highlights and shows a live badge with its count of currently-connected FSPs (from the SO's own /api/properties → acsi_client_list) - highlighted/badge "on" as soon as one FSP is connected, cleared back to plain/0 when none are.</p>
+            <p class="placeholder-text" style="margin:0 0 10px;">ⓘ The SO card (first, below) highlights and shows a live badge with its count of currently-connected FSPs (from the SO's own /api/properties → acsi_client_list) - highlighted/badge "on" as soon as one FSP is connected, cleared back to plain/0 when none are. 🔒 TLS (top left) and 🔑 OAuth (bottom left) badges mark an SO or FSP whose saved TLS / OAuth setting is on: its WebSocket runs over TLS (wss), its associations are authenticated with an OAuth 2.0 access token (the FSP presents one, the SO validates it). Tooltip: TLS version / role and IDP. Nothing shown while off.</p>
             <div class="grid-cards">
-              <div class="endpoint-card highlighted"><div class="icon-tile"><span class="count-badge">2</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
-              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card highlighted"><div class="icon-tile"><span class="count-badge">2</span><span class="sec-badge tls">🔒 TLS</span><span class="sec-badge oauth">🔑 OAuth</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card"><div class="icon-tile"><span class="sec-badge tls">🔒 TLS</span><span class="sec-badge oauth">🔑 OAuth</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
               <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
             </div>
           </div>
@@ -329,10 +337,10 @@
 
           <div class="section-card">
             <h3>InstanceVisualization — same grid as Model</h3>
-            <p class="placeholder-text" style="margin:0 0 10px;">ⓘ On Traffic each SO–FSP line shows live activity: its cp, a dot per frame batch (→ request, ← response/report), → / ← / ⚑ / ✗ counters and the last service (✓/✗ + time); red while the last service failed. Clicking an FSP focuses its link (others dim, only its monitor listed); clicking it again, the SO or "Show all" unfocuses. "Reset counters" zeroes them. Only instances the BFF can reach are drawn (an unreachable FSP keeps a timeline lane only while it has rows). An FSP whose link to the SO dropped: dashed red circle, red line with ✗ and "link down · 42s"; "link down" / "unreachable" badged on its timeline lane, demo row and report values; "✗ link down" / "✓ link back up after 42s" rows in the timeline (Links filter).</p>
+            <p class="placeholder-text" style="margin:0 0 10px;">ⓘ On Traffic each SO–FSP line shows live activity: its cp, a dot per frame batch (→ request, ← response/report), → / ← / ⚑ / ✗ counters and the last service (✓/✗ + time); red while the last service failed. Clicking an FSP focuses its link (others dim, only its monitor listed); clicking it again, the SO or "Show all" unfocuses. "Reset counters" zeroes them. Only instances the BFF can reach are drawn (an unreachable FSP keeps a timeline lane only while it has rows). An FSP whose link to the SO dropped: dashed red circle, red line with ✗ and "link down · 42s"; "link down" / "unreachable" badged on its timeline lane, demo row and report values; "✗ link down" / "✓ link back up after 42s" rows in the timeline (Links filter). The 🔒 TLS / 🔑 OAuth badges are the same as on Overview.</p>
             <div class="grid-cards">
-              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
-              <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card"><div class="icon-tile"><span class="sec-badge tls">🔒 TLS</span><span class="sec-badge oauth">🔑 OAuth</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card"><div class="icon-tile"><span class="sec-badge tls">🔒 TLS</span><span class="sec-badge oauth">🔑 OAuth</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
               <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
             </div>
           </div>
@@ -576,10 +584,10 @@
               <div class="field" style="min-width:200px;"><span class="label">TLS Version</span><div class="input"></div><span class="hint">TLS 1.2 / TLS 1.3</span></div>
             </div>
             <div class="field-row">
-              <div class="field" style="flex:1;"><span class="label">Server CA Certificate (PEM) - file or paste</span><div class="input" style="height:48px;"></div><span class="hint">CA the SO's certificate is validated against</span></div>
+              <div class="field" style="flex:1;"><span class="label">Server CA Certificate (PEM) - file, certificate directory or paste</span><div class="input select" data-label="From the certificate directory…"></div><div class="input" style="height:48px;"></div><span class="hint">CA the SO's certificate is validated against</span></div>
             </div>
             <div class="section-card" style="padding:8px 12px;margin-bottom:12px;"><span style="font-size:11px;"><strong>Mode:</strong> Client (Active) - validates the SO's certificate</span></div>
-            <p class="placeholder-text" style="margin:0;">Opened by 🛡 TLS Config. Saved to the BFF; applied right away while connected, otherwise on the next Connect ("applies on next Connect"). The checkbox reflects the running FSP; version/certificate come from the saved settings while TLS is off. Button shows "(On)" while TLS is active.</p>
+            <p class="placeholder-text" style="margin:0;">Opened by 🛡 TLS Config. Saved to the BFF; applied right away while connected, otherwise on the next Connect ("applies on next Connect"). The checkbox reflects the running FSP; version/certificate come from the saved settings while TLS is off. Button shows "(On)" while TLS is active. "From the certificate directory…" lists the BFF's <code>/certs</code> (GET /api/certs); picking a file stores <code>file:&lt;name&gt;</code>, which the instance reads from its own <code>/certs</code> - the PEM never passes through the browser.</p>
             <div class="modal-footer"><div class="btn btn-outline">Cancel</div><div class="btn btn-solid">Save</div></div>
           </div>
 
@@ -598,9 +606,9 @@
             </div>
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:12px;"><span style="width:12px;height:12px;border:1.5px solid var(--wf-line);display:inline-block;"></span>Enable Token Refresh</label>
             <div class="field-row">
-              <div class="field" style="flex:1;"><span class="label">Auth Server CA (PEM) - file or paste</span><div class="input" style="height:48px;"></div></div>
+              <div class="field" style="flex:1;"><span class="label">Auth Server CA (PEM) - file, certificate directory or paste</span><div class="input select" data-label="From the certificate directory…"></div><div class="input" style="height:48px;"></div><span class="hint">Only needed for an IDP on HTTPS with a private CA</span></div>
             </div>
-            <p class="placeholder-text" style="margin:0;">Opened by 🔑 OAuth Config. Client (Active) fields. Save stores the settings; applied right away while connected, otherwise on the next Connect.</p>
+            <p class="placeholder-text" style="margin:0;">Opened by 🔑 OAuth Config. Client (Active) fields. Save stores the settings; applied right away while connected, otherwise on the next Connect. The Auth Server CA can be picked from the certificate directory, as in TLS Config (<code>file:&lt;name&gt;</code>).</p>
             <div class="modal-footer"><div class="btn btn-outline">Cancel</div><div class="btn btn-solid">Save</div></div>
           </div>
 
@@ -678,11 +686,11 @@
               <div class="field" style="min-width:200px;"><span class="label">TLS Version</span><div class="input"></div><span class="hint">TLS 1.2 / TLS 1.3</span></div>
             </div>
             <div class="field-row">
-              <div class="field" style="flex:1;"><span class="label">Server Private Key (PEM) - file or paste</span><div class="input" style="height:48px;"></div></div>
-              <div class="field" style="flex:1;"><span class="label">Server Certificate (PEM) - file or paste</span><div class="input" style="height:48px;"></div></div>
+              <div class="field" style="flex:1;"><span class="label">Server Private Key (PEM) - file, certificate directory or paste</span><div class="input select" data-label="From the certificate directory…"></div><div class="input" style="height:48px;"></div></div>
+              <div class="field" style="flex:1;"><span class="label">Server Certificate (PEM) - file, certificate directory or paste</span><div class="input select" data-label="From the certificate directory…"></div><div class="input" style="height:48px;"></div></div>
             </div>
             <div class="section-card" style="padding:8px 12px;margin-bottom:12px;"><span style="font-size:11px;"><strong>Mode:</strong> Server (Passive) - presents its certificate to connecting FSPs</span></div>
-            <p class="placeholder-text" style="margin:0;">Opened by 🛡 TLS Config. Saved to the BFF and applied to the SO right away; the BFF re-applies it after an SO restart. The checkbox reflects the running SO; version/certificates come from the saved settings while TLS is off. Button shows "(On)" while TLS is active.</p>
+            <p class="placeholder-text" style="margin:0;">Opened by 🛡 TLS Config. Saved to the BFF and applied to the SO right away; the BFF re-applies it after an SO restart. The checkbox reflects the running SO; version/certificates come from the saved settings while TLS is off. Button shows "(On)" while TLS is active. "From the certificate directory…" lists the BFF's <code>/certs</code> (GET /api/certs); picking a file stores <code>file:&lt;name&gt;</code>, which the instance reads from its own <code>/certs</code> - the PEM never passes through the browser.</p>
             <div class="modal-footer"><div class="btn btn-outline">Cancel</div><div class="btn btn-solid">Save</div></div>
           </div>
 
@@ -699,9 +707,9 @@
               <div class="field" style="flex:1;"><span class="label">Token Issuer</span><div class="input"></div><span class="hint">Must match the tokens' "iss" exactly</span></div>
             </div>
             <div class="field-row">
-              <div class="field" style="flex:1;"><span class="label">Auth Server CA (PEM) - file or paste</span><div class="input" style="height:48px;"></div></div>
+              <div class="field" style="flex:1;"><span class="label">Auth Server CA (PEM) - file, certificate directory or paste</span><div class="input select" data-label="From the certificate directory…"></div><div class="input" style="height:48px;"></div><span class="hint">Only needed for an IDP on HTTPS with a private CA</span></div>
             </div>
-            <p class="placeholder-text" style="margin:0;">Opened by 🔑 OAuth Config. Server (Passive) fields. Save stores the settings and applies them to the SO right away. Button shows "(On)" while OAuth is active.</p>
+            <p class="placeholder-text" style="margin:0;">Opened by 🔑 OAuth Config. Server (Passive) fields. Save stores the settings and applies them to the SO right away. Button shows "(On)" while OAuth is active. The Auth Server CA can be picked from the certificate directory, as in TLS Config (<code>file:&lt;name&gt;</code>).</p>
             <div class="modal-footer"><div class="btn btn-outline">Cancel</div><div class="btn btn-solid">Save</div></div>
           </div>
 
