@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# The demo's default plugins: one sim_leds (two simulated LEDs, no hardware)
+# per FSP and SO, which config/plugin-configuration/ points them at (decision
+# 0034). An overlay on docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.leds.yaml up -d
+#
+# or COMPOSE_FILE=docker-compose.yml:docker-compose.leds.yaml in .env. Without
+# it the FSPs and SO list sim_leds as failed and try again every 10 s.
+# The image is built from examples/rti-plugins/sim_leds; it isn't published.
+x-sim-leds: &sim-leds
+  image: sim-leds
+  build:
+    context: ../rti-plugins/sim_leds
+    dockerfile: docker/Dockerfile
+  networks:
+    - rti-network
+  restart: unless-stopped
+  # Port 8099 and the health check are set by the Dockerfile; nothing is
+  # published: the HMI reaches the LEDs through /api/plugins/sim_leds/.
+
+services:
+  sim-leds-fsp01:
+    <<: *sim-leds
+    container_name: sim-leds-fsp01
+
+  sim-leds-fsp02:
+    <<: *sim-leds
+    container_name: sim-leds-fsp02
+
+  sim-leds-so:
+    <<: *sim-leds
+    container_name: sim-leds-so

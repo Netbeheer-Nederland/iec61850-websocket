@@ -51,6 +51,16 @@ def compose():
 
 
 @pytest.fixture(scope="module")
+def leds_compose():
+    return yaml.safe_load(_read(DEMO / "docker-compose.leds.yaml"))["services"]
+
+
+@pytest.fixture(scope="module")
+def io_overlay():
+    return yaml.safe_load(_read(DEMO / "docker-compose.io.yaml"))["services"]
+
+
+@pytest.fixture(scope="module")
 def io_compose():
     return yaml.safe_load(_read(IO_PLUGIN / "docker-compose.yaml"))["services"]
 
@@ -127,16 +137,45 @@ def test_code_default_port(path, role):
     assert _one(pattern, text, path) == EXPECTED_PORTS[role]
 
 
+def _plugin_config(compose_services, service):
+    svc = compose_services[service]
+    [mount] = [v for v in svc["volumes"] if v.endswith(":/plugins/plugins.json:ro")]
+    return json.loads(_read(DEMO / mount.split(":")[0]))
+
+
 @pytest.mark.parametrize(
     ("service", "role"), [("rti-so", "so"), ("rti-fsp01", "fsp"), ("rti-fsp02", "fsp2")]
 )
-def test_compose_connects_the_io_plugin_and_names_the_way_back(compose, service, role):
-    # The IO server is a plugin over HTTP, from the plugin configuration
-    # (decision 0029).
-    svc = compose[service]
-    assert "PLUGINS_FILE=/plugins/plugins.json" in svc["environment"]
-    [mount] = [v for v in svc["volumes"] if v.endswith(":/plugins/plugins.json:ro")]
-    config = json.loads(_read(DEMO / mount.split(":")[0]))
+def test_compose_connects_sim_leds_and_names_the_way_back(
+    compose, leds_compose, service, role
+):
+    # Plugins over HTTP, from the plugin configuration (decision 0029): by
+    # default each FSP and SO its own sim_leds, run by docker-compose.leds.yaml
+    # (decision 0034).
+    assert "PLUGINS_FILE=/plugins/plugins.json" in compose[service]["environment"]
+    config = _plugin_config(compose, service)
+    assert config["host_url"] == f"http://{service}:{EXPECTED_PORTS[role]}"
+    [leds] = config["plugins"]
+    assert leds["name"] == "sim_leds"
+    sim = service.replace("rti-", "sim-leds-")
+    assert leds["url"] == f"http://{sim}:8099/plugin"
+    assert leds_compose[sim]["networks"] == ["rti-network"]
+
+
+def test_the_leds_overlay_runs_only_sim_leds(leds_compose):
+    assert set(leds_compose) == {"sim-leds-fsp01", "sim-leds-fsp02", "sim-leds-so"}
+    for svc in leds_compose.values():
+        assert svc["image"] == "sim-leds"
+        assert "ports" not in svc
+
+
+@pytest.mark.parametrize(
+    ("service", "role"), [("rti-so", "so"), ("rti-fsp01", "fsp"), ("rti-fsp02", "fsp2")]
+)
+def test_the_io_overlay_connects_the_io_plugin(io_overlay, service, role):
+    # Opt-in (decision 0034): docker-compose.io.yaml mounts the IO server's
+    # configuration over the default one.
+    config = _plugin_config(io_overlay, service)
     assert config["host_url"] == f"http://{service}:{EXPECTED_PORTS[role]}"
     [io] = config["plugins"]
     assert io["url"] == f"http://rti-io:{EXPECTED_PORTS['io']}/plugin"

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Opt-in: the FSPs and SO connect to the IO server (rti-io, on the Raspberry
+# Pi) instead of sim_leds (decision 0034). An overlay on docker-compose.yml,
+# mounting config/plugin-configuration/io/ over the default configuration:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.io.yaml up -d
+#
+# rti-io is its own stack, examples/rti-plugins/rpi_io (decision 0028); it
+# joins rti-network, where the FSPs and SO reach it as http://rti-io:9000/plugin.
+services:
+  rti-fsp01:
+    volumes:
+      - ./config/plugin-configuration/io/rti-fsp01.json:/plugins/plugins.json:ro
+
+  rti-fsp02:
+    volumes:
+      - ./config/plugin-configuration/io/rti-fsp02.json:/plugins/plugins.json:ro
+
+  rti-so:
+    volumes:
+      - ./config/plugin-configuration/io/rti-so.json:/plugins/plugins.json:ro

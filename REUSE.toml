@@ -31,6 +31,7 @@ path = [
   "examples/ws61850_mode/ied_model2.json",
   "examples/rti-demo/config/launch_config.json.example",
   "examples/rti-demo/config/plugin-configuration/*.json",
+  "examples/rti-demo/config/plugin-configuration/io/*.json",
   "examples/rti-demo/modules/bff/src/bff/connections.json",
   "examples/rti-demo/modules/hmi/package.json",
   "examples/rti-plugins/rpi_io/src/rpi_io/server/io_config.json",

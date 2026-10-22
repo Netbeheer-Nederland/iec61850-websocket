@@ -2,8 +2,8 @@
   "host_url": "http://rti-fsp01:5001",
   "plugins": [
     {
-      "name": "io",
-      "url": "http://rti-io:9000/plugin"
+      "name": "sim_leds",
+      "url": "http://sim-leds-fsp01:8099/plugin"
     }
   ]
 }

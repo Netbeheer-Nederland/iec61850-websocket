@@ -8,11 +8,13 @@
 # Point RTI_IMAGE_REPO at ghcr.io/netbeheer-nederland/iec61850-websocket to
 # pull the images published from GitHub instead - see README.md "Docker".
 #
-# The IO server, rti-io, isn't part of this stack: it runs on the Raspberry Pi,
-# from examples/rti-plugins/rpi_io/docker-compose.yaml (decision 0028). Both
-# join rti-network. The FSPs and SO connect to it as a plugin, from their
-# plugin configuration in config/plugin-configuration/ (decision 0029); while
-# it isn't reachable they retry, and the rest of the demo works.
+# The FSPs and SO connect to their plugins from the plugin configuration in
+# config/plugin-configuration/ (decision 0029): by default one sim_leds each,
+# which the overlay docker-compose.leds.yaml runs (decision 0034). The IO
+# server, rti-io, runs on the Raspberry Pi from
+# examples/rti-plugins/rpi_io/docker-compose.yaml (decision 0028); the overlay
+# docker-compose.io.yaml connects the FSPs and SO to it instead. A plugin that
+# isn't reachable is retried, and the rest of the demo works.
 services:
   # BFF Server
   rti-bff:
@@ -95,7 +97,8 @@ services:
       # The ACSI server starts with the FSP, not connected (decision 0033);
       # FSP_AUTOCONNECT=true also dials out to the SO here.
       - FSP_SO_HOST=rti-so
-      # The plugins it connects to: the IO server (decision 0029).
+      # The plugins it connects to: sim_leds, or the IO server with
+      # docker-compose.io.yaml (decisions 0029, 0034).
       - PLUGINS_FILE=/plugins/plugins.json
     networks:
       - rti-network
@@ -134,7 +137,8 @@ services:
       # The ACSI server starts with the FSP, not connected (decision 0033);
       # FSP_AUTOCONNECT=true also dials out to the SO here.
       - FSP_SO_HOST=rti-so
-      # The plugins it connects to: the IO server (decision 0029).
+      # The plugins it connects to: sim_leds, or the IO server with
+      # docker-compose.io.yaml (decisions 0029, 0034).
       - PLUGINS_FILE=/plugins/plugins.json
     # Healthcheck already defined in the Dockerfile - it reads $PORT at
     # check time (see modules/fsp/docker/Dockerfile), so it correctly
@@ -166,7 +170,8 @@ services:
       - "8765:8765"    # WebSocket port - MUST ADD
     # PORT/PYTHONUNBUFFERED and health check already set by the Dockerfile.
     environment:
-      # The plugins it connects to: the IO server (decision 0029).
+      # The plugins it connects to: sim_leds, or the IO server with
+      # docker-compose.io.yaml (decisions 0029, 0034).
       - PLUGINS_FILE=/plugins/plugins.json
     networks:
       - rti-network
