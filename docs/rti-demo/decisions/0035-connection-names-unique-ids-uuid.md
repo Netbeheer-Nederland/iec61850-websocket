@@ -24,6 +24,9 @@ in use plus 1, and read only to pick the newest IDP-Server at startup. How thing
   or moving one removed the client both used.
 - **Ids came back.** Deleting the highest ones made the next adds reuse them.
 - **The file wasn't checked**, and the HMI put the raw name into the URL path, so `/`, `?` or `#` broke editing.
+- **A save made the file private.** The BFF writes a temporary file and renames it over `connections.json`, and the
+  temporary file is created `0600`. After the first save, a bind-mounted file could no longer be read by its group (on
+  the host: the user next to the container's uid).
 
 ## Decision
 
@@ -42,6 +45,8 @@ in use plus 1, and read only to pick the newest IDP-Server at startup. How thing
    is saved, so ids stay the same across restarts. The seed `connections.json` ships with UUIDs.
 6. **The HMI URL-encodes the name** in the edit and delete calls, and the routes take a name with `/`
    (`{conn_name:path}`). A refused save or delete shows the BFF's reason.
+7. **A save keeps the file's mode.** The temporary file gets the mode of the `connections.json` it replaces; a new
+   file gets `0664`. The save stays atomic.
 
 ## Consequences
 
@@ -51,13 +56,15 @@ in use plus 1, and read only to pick the newest IDP-Server at startup. How thing
   under other names.
 - Connections are still addressed by name in the API. The UUID makes addressing by id possible later without another
   change to the file.
+- Whoever could read or edit `connections.json` still can after the BFF saves it. Making it private is a `chmod` on
+  the file, which saves keep.
 - A client relying on add-as-update (posting a known name to change its address) now gets `409`; it uses
   `PUT /api/edit-connection/{name}` instead.
 
 ## In the code
 
 - `examples/rti-demo/modules/bff/src/bff/connection_manager.py` (`new_connection_id`, `name_key`, `claim_name`,
-  `create_connection`, `rebind_client`, `release_client`, `_checked`), `bff_server.py` (the add, edit and delete
+  `create_connection`, `rebind_client`, `release_client`, `_checked`, `save_connections`, `_file_mode`), `bff_server.py` (the add, edit and delete
   routes), `connections.json` (the seed's ids)
 - `examples/rti-demo/modules/hmi/src/pages/Connections.jsx` (`namePath`, `failureReason`)
 - Tests: `modules/bff/tests/test_connection_names.py`, `test_connection_manager_ids.py`;

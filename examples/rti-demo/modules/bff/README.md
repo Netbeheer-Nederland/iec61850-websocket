@@ -262,6 +262,7 @@ Environment variables:
 Persistent storage of all connection configurations with:
 - `name`: unique (not only in case or surrounding spaces), how the API finds a connection
 - `id`: an opaque UUID, never reused; old integer ids are replaced on load (decision 0035)
+- Saved atomically (a temporary file renamed over it), keeping the file's mode; a new file is `0664`
 - Connection details (host, port, type, acsi role, ws_mode)
 - OAuth configuration
 - TLS configuration

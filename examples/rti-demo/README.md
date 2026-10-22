@@ -292,6 +292,8 @@ docker compose up -d rti-bff
 ```
 
 The `BFF_CONNECTIONS_FILE` env var overrides the path if you need a different location (e.g. a host bind mount).
+A save keeps the file's mode (a new file is `0664`), so a bind-mounted file stays readable and editable by its group
+on the host. The BFF runs as `app` (uid 1000): the file and its directory must be writable for it.
 
 ## Hardware demo
 
