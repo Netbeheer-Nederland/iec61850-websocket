@@ -134,3 +134,29 @@ def test_a_valid_file_is_left_as_it_is(tmp_path):
     _fresh_manager(tmp_path)
 
     assert file.read_text(encoding="utf-8") == text
+
+
+# -------------------- the file's permissions --------------------
+
+
+@pytest.mark.parametrize("mode", [0o664, 0o640, 0o600])
+def test_a_save_keeps_the_file_s_mode(tmp_path, mode):
+    # mkstemp's 0600 used to replace it on every save, leaving a bind-mounted
+    # file readable only by the BFF's user.
+    file = tmp_path / "connections.json"
+    file.write_text("[]", encoding="utf-8")
+    file.chmod(mode)
+    manager = _fresh_manager(tmp_path)
+
+    manager.add_connection(name="a", host="h", port=1, conn_type="RTI-FSP")
+
+    assert file.stat().st_mode & 0o777 == mode
+    assert [c["name"] for c in json.loads(file.read_text())] == ["a"]
+
+
+def test_a_new_file_is_readable_by_its_group(tmp_path):
+    manager = _fresh_manager(tmp_path)
+
+    manager.add_connection(name="a", host="h", port=1, conn_type="RTI-FSP")
+
+    assert (tmp_path / "connections.json").stat().st_mode & 0o777 == 0o664

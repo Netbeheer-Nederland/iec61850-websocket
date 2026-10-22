@@ -36,6 +36,7 @@ The ConnectionManager is a core component of the BFF server, enabling it to:
 import asyncio
 import json
 import os
+import stat
 import tempfile
 import threading
 import time
@@ -77,6 +78,20 @@ def client_key(con: dict) -> str | None:
     """The connection's key in _bff_clients, "host:port"; None without both."""
     host, port = con.get("host"), con.get("port")
     return f"{host}:{port}" if host and port else None
+
+
+# A new connections file: readable and writable by its group too, so a
+# bind-mounted config directory shared through a group (the BFF image's user
+# and the host user) works both ways.
+NEW_FILE_MODE = 0o664
+
+
+def _file_mode(path: str) -> int:
+    """The permission bits `path` has, or NEW_FILE_MODE when it doesn't exist."""
+    try:
+        return stat.S_IMODE(os.stat(path).st_mode)
+    except FileNotFoundError:
+        return NEW_FILE_MODE
 
 
 class ConnectionManager:
@@ -441,6 +456,11 @@ class ConnectionManager:
             fd, tmp_path = tempfile.mkstemp(
                 prefix=".connections-", suffix=".json.tmp", dir=directory
             )
+            # mkstemp makes the file owner-only (0600), and os.replace keeps
+            # that: every save would leave the file unreadable to anyone but
+            # the BFF's user (on a bind mount, not the host user who edits
+            # it). Keep the mode the file had instead.
+            os.fchmod(fd, _file_mode(target))
             with os.fdopen(fd, "w") as f:
                 json.dump(self.connections, f, indent=2)
                 f.flush()
