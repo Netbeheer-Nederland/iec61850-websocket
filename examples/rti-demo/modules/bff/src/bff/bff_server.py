@@ -1701,8 +1701,30 @@ async def execute_dynamic_api(request: ExecuteRequest):
     except Exception as e:
         logger.error(f"Dynamic API call failed: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=_upstream_error(e),
         )
+
+
+def _upstream_error(e: Exception) -> str:
+    """The error of a failed /api/execute call, with the instance's own reason.
+
+    requests' HTTPError only says "403 Client Error: Forbidden for url ...";
+    the SO/FSP's FastAPI `detail` (e.g. why a plugin URL was refused) is
+    added after it.
+    """
+    response = getattr(e, "response", None)
+    if response is None:
+        return str(e)
+    try:
+        detail = response.json().get("detail")
+    except Exception:
+        return str(e)
+    if not detail:
+        return str(e)
+    if not isinstance(detail, str):
+        detail = json.dumps(detail)
+    return f"{e} - {detail}"
 
 
 # -------------------- Diagnostics --------------------

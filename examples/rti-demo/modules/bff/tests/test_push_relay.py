@@ -940,3 +940,45 @@ async def test_health_reports_the_status_monitors_view_without_probing(monkeypat
     ]
     assert body["count"] == 2
     assert probes.calls == []
+
+
+# -------------------- /api/execute errors --------------------
+
+
+def test_execute_error_carries_the_instances_own_reason(monkeypatch):
+    import requests
+
+    class _Client:
+        def request(self, method, path, json=None):
+            response = requests.Response()
+            response.status_code = 403
+            response.reason = "Forbidden"
+            response.url = "http://rti-fsp01:5001/api/plugins"
+            response._content = (
+                b'{"detail": "http://x/plugin is not in PLUGIN_ALLOWED_SOURCES"}'
+            )
+            raise requests.HTTPError(
+                f"403 Client Error: Forbidden for url: {response.url}",
+                response=response,
+            )
+
+    monkeypatch.setitem(bff_server._bff_clients, "rti-fsp01:5001", _Client())
+
+    from fastapi.testclient import TestClient
+
+    response = TestClient(bff_server.app).post(
+        "/api/execute",
+        json={
+            "target": "rti-fsp01:5001",
+            "method": "POST",
+            "path": "/api/plugins",
+            "body": {"name": "x", "url": "http://x/plugin"},
+        },
+    )
+
+    assert response.status_code == 500
+    # The BFF's error handler sends HTTPException.detail as "error".
+    assert response.json()["error"] == (
+        "403 Client Error: Forbidden for url: http://rti-fsp01:5001/api/plugins"
+        " - http://x/plugin is not in PLUGIN_ALLOWED_SOURCES"
+    )
