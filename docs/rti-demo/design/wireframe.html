@@ -293,12 +293,12 @@
               <div class="trow"><div class="cell narrow"><span class="status-pill off">Disconnected</span></div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell placeholder-text">…</div><div class="cell narrow placeholder-text">…</div><div class="cell narrow placeholder-text">✎ 🗑</div></div>
             </div>
           </div>
-          <p class="placeholder-text" style="margin-top:10px;">The only place that lists instances in a table, and the only place to register, edit or delete one - Overview only shows the live graphic. The table updates live (no refresh button). The Status column is a Connected/Disconnected badge - green (<code>--success-color</code>) when connected, red (<code>--danger-color</code>, dashed here) when disconnected.</p>
+          <p class="placeholder-text" style="margin-top:10px;">The only place that lists instances in a table, and the only place to register, edit or delete one - Overview only shows the live graphic. The table updates live (no refresh button). The Status column is a Connected/Disconnected badge - green (<code>--success-color</code>) when connected, red (<code>--danger-color</code>, dashed here) when disconnected. A row is a connection from the BFF's <code>connections.json</code>, addressed by its name; its id (a UUID) isn't shown. 🗑 asks first, removes exactly that one connection, and alerts with the BFF's reason when the delete is refused.</p>
 
           <div class="modal-overlay">
             <div class="modal-title"><span class="t">Register / Edit Instance</span><span class="x">×</span></div>
             <div class="field-row">
-              <div class="field"><span class="label">Name</span><div class="input"></div><span class="hint">Human-readable label for this instance...</span></div>
+              <div class="field"><span class="label">Name</span><div class="input"></div><span class="hint">Human-readable label for this instance; unique (case and surrounding spaces don't count)</span></div>
               <div class="field"><span class="label">Type</span><div class="input"></div><span class="hint">Determines which fields below apply...</span></div>
             </div>
             <div class="field-row">
@@ -315,6 +315,7 @@
               <div class="field"><span class="label">Endpoint <em>(IDP-Server only)</em></span><div class="input"></div><span class="hint">e.g. http://keycloak:8080</span></div>
             </div>
             <p class="placeholder-text" style="margin:0 0 4px;">ⓘ OAuth and TLS are configured on the instance's own page (OAuth Config / TLS Config) - no OAuth fields here.</p>
+            <p class="placeholder-text" style="margin:0 0 4px;">ⓘ Save → POST /api/add-connection (register) or PUT /api/edit-connection/{name} (edit; the name URL-encoded, so <code>/</code>, <code>?</code> and <code>#</code> work). A name another connection has is refused (409) and an empty one (400): the modal stays open with an alert giving the BFF's reason, e.g. "A connection named 'FSP01' already exists (…); choose another name, or edit that one", and nothing of the edit is applied. Saving an unchanged registration again is fine.</p>
             <div class="modal-footer"><div class="btn btn-outline">Cancel</div><div class="btn btn-solid">Save</div></div>
           </div>
         </div>
