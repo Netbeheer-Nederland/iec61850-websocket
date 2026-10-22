@@ -181,9 +181,10 @@ When HMI calls /api/reconfig-oauth, BFF automatically enriches request with OAut
 
 ### Connection Management
 - GET /api/connections - Get all connections
-- POST /api/add-connection - Create new connection
-- DELETE /api/delete-connection/{name} - Delete connection
-- PUT /api/edit-connection/{name} - Update connection
+- POST /api/add-connection - Create new connection; `409` when another connection has the name, `200` when the same
+  one is registered already
+- DELETE /api/delete-connection/{name} - Delete connection (exactly one; the name URL-encoded)
+- PUT /api/edit-connection/{name} - Update connection; `409` when renaming to a name another connection has
 
 ### TLS Configuration
 - POST /api/connections/tls-config - Update TLS for connection
@@ -259,6 +260,8 @@ Environment variables:
 
 ### connections.json
 Persistent storage of all connection configurations with:
+- `name`: unique (not only in case or surrounding spaces), how the API finds a connection
+- `id`: an opaque UUID, never reused; old integer ids are replaced on load (decision 0035)
 - Connection details (host, port, type, acsi role, ws_mode)
 - OAuth configuration
 - TLS configuration
