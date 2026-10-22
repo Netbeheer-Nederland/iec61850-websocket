@@ -39,12 +39,44 @@ import os
 import tempfile
 import threading
 import time
+import uuid
 from collections import deque
 from datetime import datetime
 
 import httpx2 as httpx
 
 from bff.bff_client import BffClient
+
+
+class ConnectionConflictError(Exception):
+    """A connection can't take a name: another connection has it."""
+
+
+def new_connection_id() -> str:
+    """A connection's id: an opaque UUID (version 4), so ids never repeat,
+    across deletes and across BFFs, and carry no meaning of their own."""
+    return str(uuid.uuid4())
+
+
+def is_connection_id(value) -> bool:
+    """Whether `value` is an id as new_connection_id() makes them."""
+    if not isinstance(value, str):
+        return False
+    try:
+        return str(uuid.UUID(value)) == value
+    except ValueError:
+        return False
+
+
+def name_key(name) -> str:
+    """What two names must differ in: not only case or surrounding spaces."""
+    return str(name or "").strip().casefold()
+
+
+def client_key(con: dict) -> str | None:
+    """The connection's key in _bff_clients, "host:port"; None without both."""
+    host, port = con.get("host"), con.get("port")
+    return f"{host}:{port}" if host and port else None
 
 
 class ConnectionManager:
@@ -79,7 +111,12 @@ class ConnectionManager:
         self._bff_clients = bff_clients
         self.logger = logger
 
-        self.connections: list[dict] = self.load_connections()
+        self.connections, repaired = self._checked(self.load_connections())
+        if repaired:
+            try:
+                self.save_connections()
+            except OSError as e:
+                self.logger.warning(f"Could not save the repaired connections: {e}")
         self.status_task = None
         # Reusable HTTP client (connection pooling + keep-alive) for health checks.
         self._client: httpx.AsyncClient | None = None
@@ -346,6 +383,43 @@ class ConnectionManager:
                 self.logger.error(f"Error loading connections: {e}")
         return []
 
+    def _checked(self, loaded) -> tuple[list[dict], bool]:
+        """The loaded connections with unique names and ids, and whether
+        anything had to change.
+
+        A connection without a name, or with the name (see name_key) of one
+        before it, is dropped and logged: names are how connections are
+        found, so a second one could never be reached. An id that isn't a
+        UUID (the old 1, 2, 3, ...) or that repeats gets a new one.
+        """
+        if not isinstance(loaded, list):
+            self.logger.error("connections file isn't a list; starting empty")
+            return [], False
+        kept: list[dict] = []
+        names: set[str] = set()
+        ids: set[str] = set()
+        changed = False
+        for con in loaded:
+            key = name_key(con.get("name")) if isinstance(con, dict) else ""
+            if not key:
+                self.logger.error(f"Dropped a connection without a name: {con!r}")
+                changed = True
+                continue
+            if key in names:
+                self.logger.error(
+                    f"Dropped connection '{con['name']}' ({client_key(con)}): "
+                    "another connection has that name"
+                )
+                changed = True
+                continue
+            names.add(key)
+            if not is_connection_id(con.get("id")) or con["id"] in ids:
+                con["id"] = new_connection_id()
+                changed = True
+            ids.add(con["id"])
+            kept.append(con)
+        return kept, changed
+
     def save_connections(self) -> None:
         """Persist connections to disk atomically.
 
@@ -546,24 +620,13 @@ class ConnectionManager:
                     if field in connection_in_file:
                         del connection_in_file[field]
 
-                # Update _bff_clients if host or port changed
-                new_key = f"{host}:{port}"
-                if old_key != new_key:
-                    if old_key in self._bff_clients:
-                        del self._bff_clients[old_key]
-                    if new_key not in self._bff_clients:
-                        self._bff_clients[new_key] = BffClient(f"http://{host}:{port}")
+                self.rebind_client(old_key, connection_in_file)
 
             self.save_connections()
             return connection_in_file
 
         connection = {
-            # Not len(self.connections) + 1 - that reused ids once a
-            # connection had been deleted (e.g. 3 connections left after a
-            # delete, so the next add got id=4 again, even if a surviving
-            # connection already had id=4). Based on the highest id actually
-            # in use instead, so ids stay unique across deletes.
-            "id": max((c.get("id", 0) for c in self.connections), default=0) + 1,
+            "id": new_connection_id(),
             "name": name,
             "host": host,
             "port": port,
@@ -628,23 +691,85 @@ class ConnectionManager:
         Returns:
             bool: True if connection was found and deleted, False otherwise
         """
-        # Find the connection to get its host:port before deleting
         connection = self.get_connection(conn_name)
+        if connection is None:
+            return False
+        # This one connection, not every one that happens to share its name.
+        self.connections = [c for c in self.connections if c is not connection]
+        self.save_connections()
+        self.release_client(client_key(connection))
+        self.logger.info(f"Connection deleted: {conn_name}")
+        return True
 
-        original_count = len(self.connections)
-        self.connections = [c for c in self.connections if c["name"] != conn_name]
-        if len(self.connections) < original_count:
-            self.save_connections()
+    # ==================== Names and clients ====================
 
-            # Remove from _bff_clients if it exists
-            if connection and connection.get("host") and connection.get("port"):
-                old_key = f"{connection['host']}:{connection['port']}"
-                if old_key in self._bff_clients:
-                    del self._bff_clients[old_key]
+    def find_by_name(self, name: str) -> dict | None:
+        """The connection whose name is `name`, up to case and surrounding spaces."""
+        key = name_key(name)
+        return next(
+            (c for c in self.connections if name_key(c.get("name")) == key), None
+        )
 
-            self.logger.info(f"Connection deleted: {conn_name}")
-            return True
-        return False
+    def claim_name(self, name: str, connection: dict | None = None) -> str:
+        """`name` without surrounding spaces, once it's checked that no
+        connection other than `connection` has it.
+
+        Raises:
+            ValueError: the name is empty.
+            ConnectionConflictError: another connection has it.
+        """
+        clean = str(name or "").strip()
+        if not clean:
+            raise ValueError("A connection needs a name")
+        other = self.find_by_name(clean)
+        if other is not None and other is not connection:
+            where = client_key(other) or other.get("endpoint") or other.get("type")
+            raise ConnectionConflictError(
+                f"A connection named '{other['name']}' already exists ({where}); "
+                "choose another name, or edit that one"
+            )
+        return clean
+
+    def create_connection(self, name: str, **fields) -> tuple[dict, bool]:
+        """Register a new connection under a name no other connection has
+        (POST /api/add-connection); add_connection's keyword arguments.
+
+        Registering the same name, type and address again changes nothing:
+        it returns (that connection, False). Otherwise (new connection, True).
+
+        Raises:
+            ValueError: the name is empty.
+            ConnectionConflictError: another connection has the name.
+        """
+        existing = self.find_by_name(name)
+        if existing is not None and existing.get("type") == fields.get("conn_type"):
+            same = (
+                existing.get("endpoint") == fields.get("endpoint")
+                if existing.get("type") == "IDP-Server"
+                else (existing.get("host"), existing.get("port"))
+                == (fields.get("host"), fields.get("port"))
+            )
+            if same and existing["name"] == str(name).strip():
+                return existing, False
+        clean = self.claim_name(name)
+        return self.add_connection(name=clean, **fields), True
+
+    def rebind_client(self, old_key: str | None, connection: dict) -> None:
+        """After `connection`'s host or port changed from `old_key`: a client
+        for its new address, and the old one released."""
+        new_key = client_key(connection)
+        if new_key == old_key:
+            return
+        if new_key and new_key not in self._bff_clients:
+            self._bff_clients[new_key] = BffClient(f"http://{new_key}")
+        self.release_client(old_key)
+
+    def release_client(self, key: str | None) -> None:
+        """Drop the client for `key`, unless a connection still uses it:
+        two connections may name the same instance."""
+        if not key or any(client_key(c) == key for c in self.connections):
+            return
+        self._bff_clients.pop(key, None)
 
     def get_connection(self, conn_name: str) -> dict | None:
         """Get a specific connection by name.
@@ -707,6 +832,14 @@ class ConnectionManager:
                 service_info["host"], service_info["port"]
             )
             if not existing:
+                taken = self.find_by_name(service_info["name"])
+                if taken is not None:
+                    self.logger.warning(
+                        f"Discovered {service_info['name']} at "
+                        f"{service_info['host']}:{service_info['port']} not "
+                        f"registered: '{taken['name']}' is {client_key(taken)}"
+                    )
+                    continue
                 self.add_connection(
                     name=service_info["name"],
                     host=service_info["host"],
@@ -828,7 +961,8 @@ class ConnectionManager:
     async def validate_idp_server_on_start(self) -> None:
         """Validate the most recently added IDP-Server connection at startup.
 
-        Only the latest one (highest `id`) is checked - if several IDP-Server
+        Only the latest one (latest `created_at`; the last in the list
+        without one) is checked - if several IDP-Server
         connections are registered, older ones are assumed superseded. If it
         isn't reachable, OAuth2 is disabled on every connection that
         authenticates against it (`OAuth.idp_server` matching its name),
@@ -841,7 +975,10 @@ class ConnectionManager:
         if not idp_servers:
             return
 
-        latest = max(idp_servers, key=lambda c: c.get("id", 0))
+        latest = max(
+            enumerate(idp_servers),
+            key=lambda ic: (ic[1].get("created_at") or "", ic[0]),
+        )[1]
         await self.check_connection(latest, self.get_client())
 
         if latest.get("status") == "connected":

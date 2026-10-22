@@ -45,7 +45,11 @@ from fastapi.responses import JSONResponse, Response
 
 from bff import cert_store
 from bff.bff_client import BffClient
-from bff.connection_manager import ConnectionManager
+from bff.connection_manager import (
+    ConnectionConflictError,
+    ConnectionManager,
+    client_key,
+)
 from bff.playbook import BffTransport, PlaybookError, parse_playbook, step_label
 from bff.playbook_runs import PlaybookBusyError, PlaybookRuns
 from bff.playbook_store import BuiltinPlaybookError, PlaybookNameError, PlaybookStore
@@ -1227,22 +1231,29 @@ async def get_oauth_config(connection_name: str):
     description="Create a new connection to a remote endpoint.",
     response_description="Created connection details",
     responses={
+        200: {"description": "The same connection is registered already; unchanged"},
         201: {"description": "Connection created successfully"},
         400: {"description": "Missing required fields"},
+        409: {"description": "Another connection has that name"},
     },
     tags=["Connections"],
 )
 async def create_connection(request: ConnectionCreateRequest):
     """Create a new connection to a remote RTI endpoint.
 
+    Names are unique (up to case and surrounding spaces): a name another
+    connection has is refused, never overwrites it. Registering the same
+    name, type and address again changes nothing (200).
+
     Request Body:
         ConnectionCreateRequest with name, host, port, type
 
     Returns:
-        JSON with the created connection details.
+        JSON with the created connection details; its id is a UUID.
 
     Raises:
         HTTPException 400: If required fields are missing.
+        HTTPException 409: If another connection has the name.
     """
     if not request.name or not request.type:
         raise HTTPException(
@@ -1264,26 +1275,33 @@ async def create_connection(request: ConnectionCreateRequest):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Missing required fields: host, port",
             )
-    connection = conn_manager.add_connection(
-        name=request.name,
-        host=request.host,
-        port=request.port,
-        ws_port=request.ws_port,
-        conn_type=request.type,
-        acsi=request.acsi,
-        ws_mode=request.ws_mode,
-        endpoint=request.endpoint,
-        certificate_endpoint=request.certificate_endpoint,
-        auth_server_ca=request.auth_server_ca,
-        realm=request.realm,
-        token_endpoint=request.token_endpoint,
-        client_id=request.client_id,
-        client_secret=request.client_secret,
-        enable_token_refresh=request.enable_token_refresh,
-        idp_server=request.idp_server,
-        auto_discovered=request.auto_discovered,
-        cp=request.cp,
-    )
+    try:
+        connection, created = conn_manager.create_connection(
+            request.name,
+            host=request.host,
+            port=request.port,
+            ws_port=request.ws_port,
+            conn_type=request.type,
+            acsi=request.acsi,
+            ws_mode=request.ws_mode,
+            endpoint=request.endpoint,
+            certificate_endpoint=request.certificate_endpoint,
+            auth_server_ca=request.auth_server_ca,
+            realm=request.realm,
+            token_endpoint=request.token_endpoint,
+            client_id=request.client_id,
+            client_secret=request.client_secret,
+            enable_token_refresh=request.enable_token_refresh,
+            idp_server=request.idp_server,
+            auto_discovered=request.auto_discovered,
+            cp=request.cp,
+        )
+    except ConnectionConflictError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    if not created:
+        return JSONResponse(content=connection, status_code=status.HTTP_200_OK)
     conn_manager.save_connections()
     # Immediately probe the connection so its status is fresh right away instead
     # of showing "checking" until the background monitor runs.
@@ -1293,7 +1311,8 @@ async def create_connection(request: ConnectionCreateRequest):
 
 
 @app.delete(
-    "/api/delete-connection/{conn_name}",
+    # :path - a name may contain "/" (sent URL-encoded as %2F).
+    "/api/delete-connection/{conn_name:path}",
     summary="Delete Connection",
     description="Delete an existing connection.",
     response_description="Deletion confirmation",
@@ -1321,13 +1340,15 @@ async def delete_connection(conn_name: str):
 
 
 @app.put(
-    "/api/edit-connection/{conn_name}",
+    "/api/edit-connection/{conn_name:path}",
     summary="Update Connection",
     description="Update an existing connection.",
     response_description="Updated connection details",
     responses={
         200: {"description": "Connection updated successfully"},
+        400: {"description": "An empty name"},
         404: {"description": "Connection not found"},
+        409: {"description": "Another connection has the new name"},
     },
     tags=["Connections"],
 )
@@ -1352,14 +1373,23 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
             status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found"
         )
 
+    # Checked before anything changes: a rename to a name another
+    # connection has is refused, so names stay unique.
+    new_name = None
+    if request.name is not None:
+        try:
+            new_name = conn_manager.claim_name(request.name, connection)
+        except ConnectionConflictError as e:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
     # Track old host:port for _bff_clients cleanup
-    old_host = connection.get("host")
-    old_port = connection.get("port")
-    old_key = f"{old_host}:{old_port}" if old_host and old_port else None
+    old_key = client_key(connection)
 
     # Update fields from request
-    if request.name is not None:
-        connection["name"] = request.name
+    if new_name is not None:
+        connection["name"] = new_name
     if request.host is not None:
         connection["host"] = request.host
     if request.port is not None:
@@ -1421,18 +1451,9 @@ async def update_connection(conn_name: str, request: ConnectionUpdateRequest):
         if field in connection:
             del connection[field]
 
-    # Update _bff_clients if host or port changed
-    new_host = connection.get("host")
-    new_port = connection.get("port")
-    new_key = f"{new_host}:{new_port}" if new_host and new_port else None
-
-    if old_key and new_key and old_key != new_key:
-        # Remove old entry
-        if old_key in _bff_clients:
-            del _bff_clients[old_key]
-        # Add new entry
-        if new_key not in _bff_clients:
-            _bff_clients[new_key] = BffClient(f"http://{new_host}:{new_port}")
+    # A client for a changed host:port; the old one only goes when no other
+    # connection still uses it.
+    conn_manager.rebind_client(old_key, connection)
 
     conn_manager.save_connections()
 
