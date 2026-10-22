@@ -194,6 +194,12 @@
   .sec-badge { position: absolute; left: -22px; height: 14px; padding: 0 4px; border-radius: 7px; background: var(--wf-accent); color: #fff; font-size: 8px; font-weight: 700; display: flex; align-items: center; white-space: nowrap; border: 1.5px solid #fff; }
   .sec-badge.tls { top: -9px; }
   .sec-badge.oauth { bottom: -9px; }
+  /* Plugin badge bottom right: the SO/FSP's plugin count; dashed while one is
+     unhealthy or unreachable (red in the HMI). Shown only while it has plugins. */
+  .plug-badge { position: absolute; right: -14px; bottom: -9px; height: 14px; padding: 0 4px; border-radius: 7px; background: #6b7280; color: #fff; font-size: 8px; font-weight: 700; display: flex; align-items: center; white-space: nowrap; border: 1.5px solid #fff; }
+  .plug-badge.problem { background: #fff; color: var(--wf-accent); border: 1.5px dashed var(--wf-accent); }
+  /* Plug tag on a model tree data object whose Operate a plugin answers. */
+  .plug-tag { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid var(--wf-line-soft); border-radius: 8px; font-size: 9px; color: var(--wf-muted); }
   /* A select whose placeholder option is its label (the certificate directory). */
   .input.select { position: relative; margin-bottom: 6px; }
   .input.select::after { content: attr(data-label) "  ▾"; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 9px; color: var(--wf-muted); }
@@ -242,10 +248,10 @@
 
           <div class="section-card">
             <h3>Instance Visualization (InstanceVisualization component)</h3>
-            <p class="placeholder-text" style="margin:0 0 10px;">ⓘ The SO card (first, below) highlights and shows a live badge with its count of currently-connected FSPs (from the SO's own /api/properties → acsi_client_list) - highlighted/badge "on" as soon as one FSP is connected, cleared back to plain/0 when none are. 🔒 TLS (top left) and 🔑 OAuth (bottom left) badges mark an SO or FSP whose saved TLS / OAuth setting is on: its WebSocket runs over TLS (wss), its associations are authenticated with an OAuth 2.0 access token (the FSP presents one, the SO validates it). Tooltip: TLS version / role and IDP. Nothing shown while off.</p>
+            <p class="placeholder-text" style="margin:0 0 10px;">ⓘ The SO card (first, below) highlights and shows a live badge with its count of currently-connected FSPs (from the SO's own /api/properties → acsi_client_list) - highlighted/badge "on" as soon as one FSP is connected, cleared back to plain/0 when none are. 🔒 TLS (top left) and 🔑 OAuth (bottom left) badges mark an SO or FSP whose saved TLS / OAuth setting is on: its WebSocket runs over TLS (wss), its associations are authenticated with an OAuth 2.0 access token (the FSP presents one, the SO validates it). Tooltip: TLS version / role and IDP. Nothing shown while off. 🔌 plugin badge (bottom right) on an SO or FSP with plugins: its plugin count, grey while all are healthy, red (dashed here) while one is unhealthy or unreachable - tooltip "1 plugin, all healthy" or "Plugins: display unreachable - &lt;reason&gt;". From the instance's GET /api/plugins, which the BFF reads in its 2s connection check and pushes as <code>plugins</code>. Nothing shown while it has none.</p>
             <div class="grid-cards">
-              <div class="endpoint-card highlighted"><div class="icon-tile"><span class="count-badge">2</span><span class="sec-badge tls">🔒 TLS</span><span class="sec-badge oauth">🔑 OAuth</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
-              <div class="endpoint-card"><div class="icon-tile"><span class="sec-badge tls">🔒 TLS</span><span class="sec-badge oauth">🔑 OAuth</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card highlighted"><div class="icon-tile"><span class="count-badge">2</span><span class="sec-badge tls">🔒 TLS</span><span class="sec-badge oauth">🔑 OAuth</span><span class="plug-badge">🔌 1</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
+              <div class="endpoint-card"><div class="icon-tile"><span class="sec-badge tls">🔒 TLS</span><span class="sec-badge oauth">🔑 OAuth</span><span class="plug-badge problem">🔌 1</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
               <div class="endpoint-card"><div class="icon-tile"></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
             </div>
           </div>
@@ -337,7 +343,7 @@
 
           <div class="section-card">
             <h3>InstanceVisualization — same grid as Model</h3>
-            <p class="placeholder-text" style="margin:0 0 10px;">ⓘ On Traffic each SO–FSP line shows live activity: its cp, a dot per frame batch (→ request, ← response/report), → / ← / ⚑ / ✗ counters and the last service (✓/✗ + time); red while the last service failed. Clicking an FSP focuses its link (others dim, only its monitor listed); clicking it again, the SO or "Show all" unfocuses. "Reset counters" zeroes them. Only instances the BFF can reach are drawn (an unreachable FSP keeps a timeline lane only while it has rows). An FSP whose link to the SO dropped: dashed red circle, red line with ✗ and "link down · 42s"; "link down" / "unreachable" badged on its timeline lane, demo row and report values; "✗ link down" / "✓ link back up after 42s" rows in the timeline (Links filter). The 🔒 TLS / 🔑 OAuth badges are the same as on Overview.</p>
+            <p class="placeholder-text" style="margin:0 0 10px;">ⓘ On Traffic each SO–FSP line shows live activity: its cp, a dot per frame batch (→ request, ← response/report), → / ← / ⚑ / ✗ counters and the last service (✓/✗ + time); red while the last service failed. Clicking an FSP focuses its link (others dim, only its monitor listed); clicking it again, the SO or "Show all" unfocuses. "Reset counters" zeroes them. Only instances the BFF can reach are drawn (an unreachable FSP keeps a timeline lane only while it has rows). An FSP whose link to the SO dropped: dashed red circle, red line with ✗ and "link down · 42s"; "link down" / "unreachable" badged on its timeline lane, demo row and report values; "✗ link down" / "✓ link back up after 42s" rows in the timeline (Links filter). The 🔒 TLS / 🔑 OAuth and 🔌 plugin badges are the same as on Overview.</p>
             <div class="grid-cards">
               <div class="endpoint-card"><div class="icon-tile"><span class="sec-badge tls">🔒 TLS</span><span class="sec-badge oauth">🔑 OAuth</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
               <div class="endpoint-card"><div class="icon-tile"><span class="sec-badge tls">🔒 TLS</span><span class="sec-badge oauth">🔑 OAuth</span></div><div class="meta"><div class="name"></div><div class="sub"></div></div><div class="pill"></div></div>
@@ -564,8 +570,20 @@
                 <div class="node l2">▾ LD0</div>
                 <div class="node l3">LLN0 · Mod · Beh · Health</div>
                 <div class="node l3">LPHD1 · DWMX1 · MMXU1 …</div>
+                <div class="node l3">CSWI1 · Pos DPC <span class="plug-tag">🔌 io</span></div>
               </div>
+              <p class="placeholder-text" style="margin:6px 0 0;">ⓘ 🔌 &lt;name&gt; on a data object whose Operate a plugin answers: the plugin claims its control attribute (LD0/CSWI1.Pos.Oper.ctlVal), the tag goes on the data object (LD0/CSWI1.Pos). Tooltip "Operate answered by plugin 'io'".</p>
             </div>
+          </div>
+
+          <div class="section-card" id="plugins-panel-fsp">
+            <h3>🔌 Plugins (2) <span style="float:right;" class="btn btn-outline">Add plugin</span></h3>
+            <div class="table-wf">
+              <div class="thead"><span class="cell">Plugin</span><span class="cell">State</span><span class="cell">URL</span><span class="cell narrow">Controls</span><span class="cell narrow">Actions</span></div>
+              <div class="trow"><span class="cell">io 1.0</span><span class="cell">Healthy</span><span class="cell">http://rti-io:9000/plugin</span><span class="cell narrow">1</span><span class="cell narrow">⟳ 🗑</span></div>
+              <div class="trow"><span class="cell">display</span><span class="cell">Unreachable<br><span class="placeholder-text">connection refused</span></span><span class="cell">-</span><span class="cell narrow">-</span><span class="cell narrow">⟳ 🗑</span></div>
+            </div>
+            <p class="placeholder-text" style="margin:10px 0 0;">ⓘ The instance's GET /api/plugins (through /api/execute), then followed from the BFF's connections push - a plugin that drops or comes back shows without polling. State: Healthy / Unhealthy (with last error) / Unreachable (with the reason; the instance retries every 10s). Controls: how many objRefs it answers Operate on (tooltip lists them). ⟳ Reload (POST /api/plugins/{name}/reload), 🗑 Remove (DELETE /api/plugins/{name}, after a confirm). Add plugin: name, URL, settings (JSON, optional) → POST /api/plugins; only URLs in the instance's PLUGIN_ALLOWED_SOURCES, and the instance's own refusal reason is shown. An added plugin lasts until the instance restarts.</p>
           </div>
 
           <div class="wf-page-header" style="margin-top:8px;"><div class="wf-h1" data-label="Monitoring" style="width:150px;"></div></div>
@@ -666,6 +684,15 @@
             <div class="accordion">
               <div class="accordion-head"><span>cp2</span><span class="chev">▸</span></div>
             </div>
+          </div>
+
+          <div class="section-card" id="plugins-panel-so">
+            <h3>🔌 Plugins (1) <span style="float:right;" class="btn btn-outline">Add plugin</span></h3>
+            <div class="table-wf">
+              <div class="thead"><span class="cell">Plugin</span><span class="cell">State</span><span class="cell">URL</span><span class="cell narrow">Actions</span></div>
+              <div class="trow"><span class="cell">io 1.0</span><span class="cell">Healthy</span><span class="cell">http://rti-io:9000/plugin</span><span class="cell narrow">⟳ 🗑</span></div>
+            </div>
+            <p class="placeholder-text" style="margin:10px 0 0;">ⓘ Same panel as on ACSI Server, without the Controls column - SO plugins don't answer Operate.</p>
           </div>
 
           <div class="wf-page-header" style="margin-top:8px;"><div class="wf-h1" data-label="Monitoring" style="width:150px;"></div></div>

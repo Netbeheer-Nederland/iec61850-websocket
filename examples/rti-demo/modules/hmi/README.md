@@ -96,6 +96,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 * Visual instance visualization (InstanceVisualization) showing SO, FSP, and their connections
 * SO circle turns green and shows a live badge counting its connected FSPs (connectedFsps > 0)
 * 🔒 TLS and 🔑 OAuth badges on an SO or FSP whose saved TLS / OAuth setting is on (`TLS.enable_tls`, `OAuth.enable_oauth` in the BFF's connections push; the BFF keeps the running instance in line with them): TLS at the top left - WebSocket over TLS (wss), version in the tooltip - and OAuth at the bottom left - associations authenticated with an OAuth 2.0 access token, which the FSP presents and the SO validates. Nothing is shown while a setting is off
+* 🔌 Plugin badge at the bottom right of an SO or FSP that has plugins: the number of plugins, grey while all are healthy and red while one is unhealthy or unreachable; the tooltip names the problem. It comes from the instance's `GET /api/plugins`, which the BFF reads in its 2s connection check and pushes as `plugins`; App.jsx also reads it once for first paint. Nothing is shown while an instance has no plugins
 * No instance table - when nothing is registered, an empty-state hint points to the Connections page
 * Updates live from the BFF's connections push - no manual refresh button
 * Default route (redirects from `/`)
@@ -115,6 +116,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 * TLS configuration support: key and certificates as PEM text, an uploaded file, or a file picked from the certificate directory (`file:<name>`, read by the instance itself)
 * OAuth authentication integration - the auth server CA the same way: PEM text, an uploaded file, or a file from the certificate directory
 * Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; an ACSI entry made through the SO also names the WebSocket frame range it produced (shown under the call on Traffic); Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
+* Plugins panel (PluginsPanel): the plugins the instance has connected to, one row per plugin - Healthy, Unhealthy (with its last error) or Unreachable (with the reason; the instance retries every 10s) - with Reload and Remove (after a confirm), and Add plugin by name, URL and optional JSON settings. Only URLs in the instance's `PLUGIN_ALLOWED_SOURCES` are accepted, and a refusal shows the instance's own reason. An added plugin lasts until the instance restarts. The panel follows the BFF's connections push, so a plugin that drops or comes back shows without polling
 * Real-time data updates
 
 ### ACSI Server (`/acsi-server`)
@@ -130,6 +132,8 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 * TLS configuration support: key and certificates as PEM text, an uploaded file, or a file picked from the certificate directory (`file:<name>`, read by the instance itself)
 * OAuth authentication integration - the auth server CA the same way: PEM text, an uploaded file, or a file from the certificate directory
 * Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; an ACSI entry made through the SO also names the WebSocket frame range it produced (shown under the call on Traffic); Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
+* Plugins panel (PluginsPanel): the plugins the instance has connected to, one row per plugin - Healthy, Unhealthy (with its last error) or Unreachable (with the reason; the instance retries every 10s) - with Reload and Remove (after a confirm), and Add plugin by name, URL and optional JSON settings. Only URLs in the instance's `PLUGIN_ALLOWED_SOURCES` are accepted, and a refusal shows the instance's own reason. An added plugin lasts until the instance restarts. The panel follows the BFF's connections push, so a plugin that drops or comes back shows without polling. A Controls column counts the objRefs whose Operate each plugin answers (the tooltip lists them)
+* 🔌 Plugin tag in the model tree on a data object whose Operate a plugin answers: plugins claim the control attribute (`LD0/CSWI1.Pos.Oper.ctlVal`), the tag goes on its data object (`LD0/CSWI1.Pos`)
 * Status information display
 
 ### Connections (`/connections`)
@@ -286,8 +290,9 @@ The HMI makes two kinds of call, both to the BFF:
 2. **Calls on an SO or FSP instance**, sent as `POST /api/execute` with `{ target, method, path, body }`. The BFF
    forwards the request to the instance at `target` (`host:port`). The instance paths are listed in `API_DEFINITIONS`
    in `src/services/apiService.js`: read, write, select and operate, model tree, data definition, dataset directory,
-   BRCB/URCB read and write, start and stop (FSP), actions and message logs, TLS and OAuth reconfiguration, and
-   properties.
+   BRCB/URCB read and write, start and stop (FSP), actions and message logs, TLS and OAuth reconfiguration,
+   properties, and the plugin management routes (`GET`/`POST /api/plugins`, `POST /api/plugins/{name}/reload`,
+   `DELETE /api/plugins/{name}`).
 
 The OpenAPI docs list every endpoint: BFF at http://localhost:3000/docs, FSP at http://localhost:5001/docs, SO at
 http://localhost:5000/docs.
@@ -295,7 +300,8 @@ http://localhost:5000/docs.
 `src/services/apiService.js` exports:
 
 - `executeApiCall(apiId, targetValue, bodyOverride, options)` - run an `API_DEFINITIONS` entry through `/api/execute`
-  (or directly, with `options.useDirect`)
+  (or directly, with `options.useDirect`); `options.pathParams` fills `{name}`-style path segments, e.g.
+  `{ name: 'io' }` for `plugin-reload`
 - `getApiById(id)` - look up an `API_DEFINITIONS` entry
 - `getBffBaseUrl()` - BFF URL from the Settings (localStorage), default `http://localhost:3000`
 - `buildBffApiUrl(path, targetValue)` - full BFF URL for a path

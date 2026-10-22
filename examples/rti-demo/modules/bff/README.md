@@ -116,6 +116,9 @@ HMI -> POST /api/execute { target: "127.0.0.1:5001", method: "POST", path: "/api
 
 The dynamic execution mode allows the HMI to target specific backend services and have the BFF enrich requests with OAuth tokens automatically.
 
+When the instance refuses a call, `/api/execute` answers `{"ok": false, "error": ...}` with the instance's own reason
+(its FastAPI `detail`) after the HTTP status, e.g. `403 Client Error: Forbidden ... - http://x/plugin is not allowed; add it to PLUGIN_ALLOWED_SOURCES`.
+
 ---
 
 ## BFF to SO/FSP Connection Flow
@@ -168,6 +171,9 @@ When HMI calls /api/reconfig-oauth, BFF automatically enriches request with OAut
 - GET /api/health - Health check with target reachability
 - GET /api/diagnostics - System log across the BFF and every reachable RTI-SO/RTI-FSP (see `docs/rti-demo/design/logging-kinds.md`)
 - WebSocket /ws - push channel for the HMI: connection list changes, actions, playbook runs
+  - A `connections` push carries, on every RTI-SO and RTI-FSP entry, `plugins`: the instance's own
+    `GET /api/plugins` (`{plugins: [...], failed: {name: reason}}`), read in the same 2s check; `null` while the
+    instance is disconnected or doesn't answer
 
 ### Endpoints Management  
 - GET /api/endpoints - Get all configured and discovered endpoints
