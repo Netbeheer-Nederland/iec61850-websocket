@@ -19,6 +19,7 @@
 
 // src/components/Tree.jsx
 import React, { useState, useCallback } from 'react';
+import { claimOwnerOf } from '../utils/plugins';
 
 const normalizeNodeType = (type) => (type || '').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
 
@@ -81,6 +82,7 @@ const TreeNode = React.memo(({
   cp,
   expandedNodes,
   onExpandToggle,
+  claimOwners,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const isGroupNode = node.type === 'Group';
@@ -152,6 +154,7 @@ const TreeNode = React.memo(({
             cp={cp}
             expandedNodes={expandedNodes}
             onExpandToggle={onExpandToggle}
+            claimOwners={claimOwners}
           />
         ))}
       </ul>
@@ -159,6 +162,8 @@ const TreeNode = React.memo(({
   };
 
   const iconClass = nodeIconClass(node);
+  // The plugin that answers an Operate on this node (FSP: its plugins' claims).
+  const claimOwner = claimOwners ? claimOwnerOf(claimOwners, node.ref) : null;
 
   return (
     <li className={`scl-tree-item ${hasChildren ? 'has-children' : ''} ${isExpanded ? 'expanded' : 'collapsed'}`}>
@@ -190,6 +195,11 @@ const TreeNode = React.memo(({
             {node.bType && <span className="tree-btype-tag">({node.bType})</span>}
             {node.fc && <span className="tree-fc-tag">[{node.fc.toUpperCase()}]</span>}
             {node.cdc && <span className="tree-cdc-tag">({node.cdc})</span>}
+            {claimOwner && (
+              <span className="tree-plugin-tag" data-testid={`plugin-claim-${node.ref}`} title={`Operate answered by plugin '${claimOwner}'`}>
+                <i className="fas fa-plug" aria-hidden="true"></i> {claimOwner}
+              </span>
+            )}
             {node.value !== undefined && <span className="tree-value-display" data-obj-ref={node.ref} style={{ color: node.valueColor || 'var(--text-muted)' }}>{node.value}</span>}
           </>
         )}
@@ -213,7 +223,9 @@ function collectExpandableRefs(node, acc) {
   return acc;
 }
 
-const Tree = ({ data, onNodeClick, onContextMenu, endpoint, cp, className = '', expandedNodes = {}, onExpandToggle }) => {
+// claimOwners: objRef -> plugin name (utils/plugins.js claimOwners), to mark
+// the data objects whose Operate a plugin answers.
+const Tree = ({ data, onNodeClick, onContextMenu, endpoint, cp, className = '', expandedNodes = {}, onExpandToggle, claimOwners = null }) => {
   const [selectedRef, setSelectedRef] = useState(null);
 
   const handleNodeClick = useCallback(
@@ -269,6 +281,7 @@ const Tree = ({ data, onNodeClick, onContextMenu, endpoint, cp, className = '', 
             cp={cp}
             expandedNodes={expandedNodes}
             onExpandToggle={onExpandToggle}
+            claimOwners={claimOwners}
           />
         ))}
       </ul>

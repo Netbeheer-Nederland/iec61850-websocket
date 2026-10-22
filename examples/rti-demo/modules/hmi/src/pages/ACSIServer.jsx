@@ -26,6 +26,7 @@ import { transformModelToTree } from '../utils/modelUtils';
 import TLSConfigModal, { useRuntimeTlsEnabled } from '../components/TLSConfigModal';
 import OAuthConfigModal, { useRuntimeOAuthEnabled } from '../components/OAuthConfigModal';
 import PluginsPanel from '../components/PluginsPanel';
+import { claimOwners } from '../utils/plugins';
 import SecurityActionMessage from '../components/SecurityActionMessage';
 import ContextMenu  from "../components/ContextMenu.jsx";
 import WriteValueModal from '../components/WriteValueModal.jsx';
@@ -356,6 +357,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
     () => (propConnections || []).find(c => c.host === endpoint?.host && String(c.port) === String(endpoint?.port))?.plugins,
     [propConnections, endpoint]
   );
+  const pluginClaims = useMemo(() => claimOwners(pushedPlugins), [pushedPlugins]);
 
   const stopMonitoring = useCallback(() => {
     if (monitorIntervalRef.current) {
@@ -1143,6 +1145,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
                     expandedNodes={expandedNodes}
                     onExpandToggle={handleExpandToggle}
                     onContextMenu={handleContextMenu}
+                    claimOwners={pluginClaims}
                   />
                 ) : (
                   <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>

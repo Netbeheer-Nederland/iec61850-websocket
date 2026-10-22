@@ -485,6 +485,17 @@ html {
 .scl-tree-tag.BRCB { background: transparent; border-color: #3f51b5; color: #3f51b5; }
 .scl-tree-tag.URCB { background: transparent; border-color: #3f51b5; color: #3f51b5; }
 
+/* A data object whose Operate a plugin answers (FSP): the plugin's name. */
+.tree-plugin-tag {
+    margin-left: 6px;
+    padding: 0 6px;
+    border: 1px solid var(--text-secondary);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    white-space: nowrap;
+}
+
 /* One icon per node type, colored to match that type's .scl-tree-tag
    color above - reinforces the existing tag color-coding rather than
    introducing a second scheme. Group nodes (DataSets/ReportControls)
