@@ -235,3 +235,34 @@ describe('InstanceVisualization - OAuth badge', () => {
     expect(screen.getByTestId('oauth-badge-SO').style.bottom).toBe('-4px');
   });
 });
+
+describe('InstanceVisualization - plugin badge', () => {
+  const FSP = { name: 'FSP01', type: 'RTI-FSP', status: 'connected', host: 'h', port: 1, connectedClients: 1 };
+  const io = { name: 'io', claims: [], healthy: true, last_error: null };
+
+  it('counts the plugins, grey while all are healthy', () => {
+    renderViz([{ ...SO, plugins: { plugins: [io], failed: {} } }]);
+
+    const badge = screen.getByTestId('plugin-badge-SO');
+    expect(badge.textContent).toBe('1');
+    expect(badge.title).toBe('1 plugin, all healthy');
+    expect(badge.style.background).toBe('var(--text-muted)');
+    expect(badge.style.right).toBe('-4px');
+  });
+
+  it('turns red and names the problem when a plugin is unreachable', () => {
+    renderViz([{ ...FSP, plugins: { plugins: [io], failed: { display: "Can't reach http://pi:8000/plugin" } } }]);
+
+    const badge = screen.getByTestId('plugin-badge-FSP01');
+    expect(badge.textContent).toBe('2');
+    expect(badge.style.background).toBe('var(--danger-color)');
+    expect(badge.title).toBe("Plugins: display unreachable - Can't reach http://pi:8000/plugin");
+  });
+
+  it('draws nothing without plugins, or while their status is unknown', () => {
+    renderViz([{ ...SO, plugins: { plugins: [], failed: {} } }, { ...FSP, plugins: null }]);
+
+    expect(screen.queryByTestId('plugin-badge-SO')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('plugin-badge-FSP01')).not.toBeInTheDocument();
+  });
+});

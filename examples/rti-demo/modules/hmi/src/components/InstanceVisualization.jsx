@@ -23,6 +23,7 @@ import { EMPTY_LINK } from '../hooks/useLinkActivity';
 import { fspStateOf, useNow } from '../hooks/useFspPresence';
 import { formatDuration } from '../utils/timeline';
 import { normalizeTlsVersion } from './TLSConfigModal';
+import { pluginSummary } from '../utils/plugins';
 
 const DOWN_LABELS = { 'link-down': 'link down', unreachable: 'unreachable' };
 
@@ -34,9 +35,10 @@ const PULSE_COLORS = {
 
 /**
  * A pill on the edge of an SO/FSP circle: TLS at the top left, OAuth at the
- * bottom left (the SO's FSP counter has the top right).
+ * bottom left, plugins at the bottom right (the SO's FSP counter has the top
+ * right).
  */
-function SecurityBadge({ testId, title, icon, label, background, edge }) {
+function CircleBadge({ testId, title, icon, label, background, edge, side = 'left' }) {
   return (
     <span
       data-testid={testId}
@@ -44,7 +46,7 @@ function SecurityBadge({ testId, title, icon, label, background, edge }) {
       style={{
         position: 'absolute',
         [edge]: '-4px',
-        left: '-4px',
+        [side]: '-4px',
         height: '26px',
         padding: '0 8px',
         display: 'flex',
@@ -74,7 +76,7 @@ function TlsBadge({ conn }) {
   if (!conn.TLS?.enable_tls) return null;
   const version = normalizeTlsVersion(conn.TLS.tls_version);
   return (
-    <SecurityBadge
+    <CircleBadge
       testId={`tls-badge-${conn.name}`}
       title={`Secure transport: WebSocket over TLS${version ? ` ${version}` : ''} (wss)`}
       icon="fa-lock"
@@ -98,13 +100,41 @@ function OAuthBadge({ conn }) {
     ? 'validates the FSPs\' OAuth 2.0 access tokens'
     : 'presents an OAuth 2.0 access token to the SO';
   return (
-    <SecurityBadge
+    <CircleBadge
       testId={`oauth-badge-${conn.name}`}
       title={`Authenticated: ${role}${idp}`}
       icon="fa-key"
       label="OAuth"
       background="var(--secondary-color)"
       edge="bottom"
+    />
+  );
+}
+
+const PLUGIN_STATE_LABELS = { unhealthy: 'unhealthy', unreachable: 'unreachable' };
+
+/**
+ * Plug badge on an SO/FSP circle with plugins (its GET /api/plugins, pushed
+ * by the BFF with the connections): how many, red while one is unhealthy or
+ * can't be reached. The tooltip names each problem; the ACSI Client/Server
+ * page's Plugins panel has the details.
+ */
+function PluginBadge({ conn }) {
+  const summary = pluginSummary(conn.plugins);
+  if (!summary) return null;
+  const { count, problems } = summary;
+  const title = problems.length
+    ? `Plugins: ${problems.map((p) => `${p.name} ${PLUGIN_STATE_LABELS[p.state]}${p.error ? ` - ${p.error}` : ''}`).join('; ')}`
+    : `${count} plugin${count === 1 ? '' : 's'}, all healthy`;
+  return (
+    <CircleBadge
+      testId={`plugin-badge-${conn.name}`}
+      title={title}
+      icon="fa-plug"
+      label={String(count)}
+      background={problems.length ? 'var(--danger-color)' : 'var(--text-muted)'}
+      edge="bottom"
+      side="right"
     />
   );
 }
@@ -276,6 +306,7 @@ function InstanceVisualization({
                   </div>
                   <TlsBadge conn={conn} />
                   <OAuthBadge conn={conn} />
+                  <PluginBadge conn={conn} />
                   {/* Counter of FSPs currently connected to this SO */}
                   <span
                     title={`${connectedFsps} connected FSP${connectedFsps === 1 ? '' : 's'}`}
@@ -399,6 +430,7 @@ function InstanceVisualization({
                     </div>
                     <TlsBadge conn={conn} />
                     <OAuthBadge conn={conn} />
+                    <PluginBadge conn={conn} />
                     </div>
                     {showLabels && (
                       <div style={{

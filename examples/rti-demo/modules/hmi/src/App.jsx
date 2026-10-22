@@ -155,6 +155,35 @@ function App() {
     });
   }, [settings.bffHost, settings.bffPort]);
 
+  // Each connected SO's and FSP's GET /api/plugins, as `plugins` (null while
+  // unknown) - the same field _build_enriched_connections pushes, for first
+  // paint: the push only comes when something changes.
+  const enrichPlugins = useCallback(async (connectionsList) => {
+    const bffTarget = buildTargetValue(settings.bffHost, settings.bffPort);
+    const isInstance = (c) => c.type === 'RTI-SO' || c.type === 'RTI-FSP';
+    const live = connectionsList.filter(c => isInstance(c) && c.status === 'connected');
+
+    const results = await Promise.allSettled(
+      live.map(async (conn) => {
+        const target = buildTargetValue(conn.host, conn.port);
+        if (!target || target === bffTarget) return { name: conn.name, plugins: null };
+        const result = await executeApiCall('plugins', target, null);
+        const status = result?.ok ? result.payload?.result : null;
+        return {
+          name: conn.name,
+          plugins: Array.isArray(status?.plugins) ? { plugins: status.plugins, failed: status.failed || {} } : null,
+        };
+      })
+    );
+
+    const pluginMap = {};
+    results.forEach(r => {
+      if (r.status === 'fulfilled') pluginMap[r.value.name] = r.value.plugins;
+    });
+
+    return connectionsList.map(c => (isInstance(c) ? { ...c, plugins: pluginMap[c.name] ?? null } : c));
+  }, [settings.bffHost, settings.bffPort]);
+
   const connectionsRef = useRef([]);
   const isFetchingRef = useRef(false);
 
@@ -168,7 +197,7 @@ function App() {
         const data = await response.json();
         const rawConnections = data.connections || [];
         const withFspCounts = await enrichFspClientCounts(rawConnections);
-        const enriched = await enrichSoClientCounts(withFspCounts);
+        const enriched = await enrichPlugins(await enrichSoClientCounts(withFspCounts));
 
         const changed = JSON.stringify(enriched) !== JSON.stringify(connectionsRef.current);
         if (changed) {
@@ -185,7 +214,7 @@ function App() {
       if (!background) setConnectionsLoading(false);
       isFetchingRef.current = false;
     }
-  }, [settings.bffHost, settings.bffPort, enrichFspClientCounts, enrichSoClientCounts]);
+  }, [settings.bffHost, settings.bffPort, enrichFspClientCounts, enrichSoClientCounts, enrichPlugins]);
 
   // Fetch once on mount / whenever BFF settings change
   useEffect(() => {
