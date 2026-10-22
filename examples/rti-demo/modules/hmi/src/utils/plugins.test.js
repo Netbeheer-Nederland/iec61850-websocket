@@ -23,6 +23,20 @@ describe('plugins', () => {
     ]);
   });
 
+  it("gives each row its definition, and an unreachable one its URL from it", () => {
+    const rows = pluginRows({
+      ...STATUS,
+      definitions: { io: { url: 'http://rpi-io:9000/plugin', settings: {} }, display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } } },
+    });
+    expect(rows.map((r) => [r.name, r.url, r.definition])).toEqual([
+      ['io', 'http://rpi-io:9000/plugin', { url: 'http://rpi-io:9000/plugin', settings: {} }],
+      ['leds', 'http://sim-leds:8099/plugin', null],
+      ['display', 'http://pi:8000/plugin', { url: 'http://pi:8000/plugin', settings: { rotate: 90 } }],
+    ]);
+    // From an instance without definitions: nothing to edit.
+    expect(pluginRows(STATUS).every((r) => r.definition === null)).toBe(true);
+  });
+
   it('summarises for a badge, null without plugins or status', () => {
     const summary = pluginSummary(STATUS);
     expect(summary.count).toBe(3);

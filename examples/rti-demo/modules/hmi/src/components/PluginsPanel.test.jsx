@@ -11,6 +11,10 @@ import PluginsPanel from './PluginsPanel';
 const STATUS = {
   plugins: [{ name: 'io', version: '1.2', url: 'http://rpi-io:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], routes: true, healthy: true, last_error: null }],
   failed: { display: "Can't reach http://pi:8000/plugin" },
+  definitions: {
+    io: { url: 'http://rpi-io:9000/plugin', settings: {} },
+    display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } },
+  },
 };
 
 // Every call goes through the BFF's /api/execute; answers per instance path.
@@ -93,6 +97,47 @@ describe('PluginsPanel', () => {
     expect(calls).toContainEqual(expect.objectContaining({
       method: 'POST', path: '/api/plugins', body: { name: 'x', url: 'http://x/plugin', settings: { blink_seconds: 1 } },
     }));
+  });
+
+  it("edits an unreachable plugin's URL and settings, from its definition", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Edit display'));
+
+    const form = screen.getByRole('form', { name: 'Edit display' });
+    expect(document.getElementById('plugins-add-name')).toBeDisabled();
+    expect(document.getElementById('plugins-add-url')).toHaveValue('http://pi:8000/plugin');
+    expect(JSON.parse(document.getElementById('plugins-add-settings').value)).toEqual({ rotate: 90 });
+
+    await user.clear(document.getElementById('plugins-add-url'));
+    await user.type(document.getElementById('plugins-add-url'), 'http://pi2:8000/plugin');
+    await user.clear(document.getElementById('plugins-add-settings'));
+    await user.click(within(form).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({
+      method: 'PUT', path: '/api/plugins/display', body: { url: 'http://pi2:8000/plugin', settings: {} },
+    })));
+    await waitFor(() => expect(screen.queryByRole('form')).not.toBeInTheDocument());
+  });
+
+  it("keeps the form open with the instance's reason when an edit is refused", async () => {
+    mockBff({
+      'PUT /api/plugins/io': { status: 500, body: { ok: false, error: "422 Client Error - Can't reach http://x/plugin" } },
+    });
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Edit io'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Edit io failed: 422 Client Error - Can't reach http://x/plugin");
+    expect(screen.getByRole('form', { name: 'Edit io' })).toBeInTheDocument();
+  });
+
+  it("can't edit without definitions, from an older instance", async () => {
+    mockBff({ 'GET /api/plugins': { status: 200, body: { ok: true, result: { plugins: STATUS.plugins, failed: {} } } } });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await screen.findByTestId('plugin-row-io');
+    expect(screen.getByTitle(/^Edit io/)).toBeDisabled();
   });
 
   it('refuses settings that are not JSON, without calling the instance', async () => {

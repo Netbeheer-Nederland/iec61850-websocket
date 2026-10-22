@@ -5,13 +5,17 @@
 
 // An SO's or FSP's plugins, as its GET /api/plugins gives them (the plugin
 // contract, modules/plugins/openapi.yaml): { plugins: [{ name, version, url,
-// claims, routes, healthy, last_error }], failed: { name: reason } }. The BFF
-// pushes it with the connections (`plugins`, null while unknown).
+// claims, routes, healthy, last_error }], failed: { name: reason },
+// definitions: { name: { url, settings } } }. The BFF pushes it with the
+// connections (`plugins`, null while unknown).
 
 // One row per plugin: the connected ones, then the ones that couldn't be
-// reached. state: 'healthy' | 'unhealthy' | 'unreachable'.
+// reached. state: 'healthy' | 'unhealthy' | 'unreachable'. definition: its
+// { url, settings }, what an edit changes; null from an instance that
+// doesn't list definitions.
 export function pluginRows(status) {
   if (!status) return [];
+  const definitionOf = (name) => status.definitions?.[name] ?? null;
   const connected = (status.plugins || []).map((p) => ({
     name: p.name,
     version: p.version || '',
@@ -19,14 +23,16 @@ export function pluginRows(status) {
     claims: Array.isArray(p.claims) ? p.claims : [],
     state: p.healthy === false ? 'unhealthy' : 'healthy',
     error: p.last_error || null,
+    definition: definitionOf(p.name),
   }));
   const failed = Object.entries(status.failed || {}).map(([name, reason]) => ({
     name,
     version: '',
-    url: '',
+    url: definitionOf(name)?.url || '',
     claims: [],
     state: 'unreachable',
     error: reason || null,
+    definition: definitionOf(name),
   }));
   return [...connected, ...failed];
 }

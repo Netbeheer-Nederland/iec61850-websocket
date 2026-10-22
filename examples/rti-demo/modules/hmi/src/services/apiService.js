@@ -83,6 +83,7 @@ const API_DEFINITIONS = [
   // Plugins (the plugin contract's management routes, modules/plugins/openapi.yaml)
   { id: 'plugins', label: 'GET /api/plugins', method: 'GET', path: '/api/plugins' },
   { id: 'plugin-add', label: 'POST /api/plugins', method: 'POST', path: '/api/plugins' },
+  { id: 'plugin-edit', label: 'PUT /api/plugins/{name}', method: 'PUT', path: '/api/plugins/{name}' },
   { id: 'plugin-reload', label: 'POST /api/plugins/{name}/reload', method: 'POST', path: '/api/plugins/{name}/reload' },
   { id: 'plugin-remove', label: 'DELETE /api/plugins/{name}', method: 'DELETE', path: '/api/plugins/{name}' },
 ];

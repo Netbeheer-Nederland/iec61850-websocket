@@ -5,9 +5,10 @@
 
 // The plugins an SO or FSP has connected to, on the ACSI Client and ACSI
 // Server pages: one row per plugin (healthy / unhealthy / unreachable, with
-// the reason), Reload and Remove, and Add from a URL. Only the plugin
-// contract's management routes (GET/POST /api/plugins, .../{name}/reload,
-// DELETE .../{name}), through the BFF - nothing here knows any one plugin.
+// the reason), Edit (URL and settings), Reload and Remove, and Add from a URL.
+// Only the plugin contract's management routes (GET/POST /api/plugins,
+// PUT/DELETE .../{name}, .../{name}/reload), through the BFF - nothing here
+// knows any one plugin.
 import React, { useState, useEffect, useCallback } from 'react';
 import { executeApiCall } from '../services/apiService';
 import { pluginRows } from '../utils/plugins';
@@ -33,8 +34,10 @@ function PluginsPanel({ target, role, pushed }) {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
-  const [adding, setAdding] = useState(false);
+  // The form: null (closed), { mode: 'add' }, or { mode: 'edit', name }.
+  const [formFor, setFormFor] = useState(null);
   const [form, setForm] = useState({ name: '', url: '', settings: '' });
+  const editing = formFor?.mode === 'edit';
 
   const load = useCallback(async () => {
     if (!target) return;
@@ -70,7 +73,22 @@ function PluginsPanel({ target, role, pushed }) {
     run(`Remove ${name}`, 'plugin-remove', null, { name });
   }, [run]);
 
-  const handleAdd = useCallback(async (e) => {
+  const openAdd = useCallback(() => {
+    setFormFor((f) => (f?.mode === 'add' ? null : { mode: 'add' }));
+    setForm({ name: '', url: '', settings: '' });
+  }, []);
+
+  const openEdit = useCallback((row) => {
+    const settings = row.definition?.settings || {};
+    setFormFor({ mode: 'edit', name: row.name });
+    setForm({
+      name: row.name,
+      url: row.definition?.url || row.url,
+      settings: Object.keys(settings).length ? JSON.stringify(settings, null, 2) : '',
+    });
+  }, []);
+
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     let settings = {};
     if (form.settings.trim()) {
@@ -81,12 +99,14 @@ function PluginsPanel({ target, role, pushed }) {
         return;
       }
     }
-    const ok = await run(`Add ${form.name}`, 'plugin-add', { name: form.name.trim(), url: form.url.trim(), settings });
+    const ok = editing
+      ? await run(`Edit ${formFor.name}`, 'plugin-edit', { url: form.url.trim(), settings }, { name: formFor.name })
+      : await run(`Add ${form.name}`, 'plugin-add', { name: form.name.trim(), url: form.url.trim(), settings });
     if (ok) {
-      setAdding(false);
+      setFormFor(null);
       setForm({ name: '', url: '', settings: '' });
     }
-  }, [form, run]);
+  }, [form, formFor, editing, run]);
 
   const rows = pluginRows(status);
   const showClaims = role === 'fsp';
@@ -98,21 +118,23 @@ function PluginsPanel({ target, role, pushed }) {
           <i className="fas fa-plug" style={{ marginRight: '8px' }} aria-hidden="true"></i>
           Plugins{rows.length ? ` (${rows.length})` : ''}
         </h3>
-        <button type="button" id="plugins-add-btn" className="btn-secondary" onClick={() => setAdding((a) => !a)} disabled={!target}>
-          {adding ? 'Cancel' : 'Add plugin'}
+        <button type="button" id="plugins-add-btn" className="btn-secondary" onClick={formFor ? () => setFormFor(null) : openAdd} disabled={!target}>
+          {formFor ? 'Cancel' : 'Add plugin'}
         </button>
       </div>
 
-      {adding && (
-        <form onSubmit={handleAdd} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px 12px', marginBottom: '12px' }}>
-          <input id="plugins-add-name" placeholder="Name, e.g. io" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+      {formFor && (
+        <form onSubmit={handleSubmit} aria-label={editing ? `Edit ${formFor.name}` : 'Add plugin'} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px 12px', marginBottom: '12px' }}>
+          <input id="plugins-add-name" placeholder="Name, e.g. io" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={editing} title={editing ? 'The name stays: a plugin with another name is another plugin' : undefined} />
           <input id="plugins-add-url" placeholder="URL, e.g. http://rpi-io:9000/plugin" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} required />
           <textarea id="plugins-add-settings" placeholder='Settings (JSON, optional), e.g. {"write_inputs": false}' value={form.settings} onChange={(e) => setForm({ ...form, settings: e.target.value })} style={{ gridColumn: '1 / -1', fontFamily: 'monospace', minHeight: '48px' }} />
           <small style={{ gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
-            Only URLs in the instance's PLUGIN_ALLOWED_SOURCES are accepted. An added plugin stays until the instance restarts; a lasting one goes in its plugin configuration.
+            {editing
+              ? "A new URL must be in the instance's PLUGIN_ALLOWED_SOURCES; the settings replace all of them. If the plugin doesn't connect with them, it keeps its old URL and settings. The edit stays until the instance restarts; a lasting one goes in its plugin configuration."
+              : "Only URLs in the instance's PLUGIN_ALLOWED_SOURCES are accepted. An added plugin stays until the instance restarts; a lasting one goes in its plugin configuration."}
           </small>
           <div style={{ gridColumn: '1 / -1' }}>
-            <button type="submit" id="plugins-add-submit" className="btn-primary" disabled={Boolean(busy)}>Add</button>
+            <button type="submit" id="plugins-add-submit" className="btn-primary" disabled={Boolean(busy)}>{editing ? 'Save' : 'Add'}</button>
           </div>
         </form>
       )}
@@ -152,6 +174,9 @@ function PluginsPanel({ target, role, pushed }) {
                   {showClaims && <td title={row.claims.join('\n')}>{row.claims.length || '-'}</td>}
                   <td>
                     <div style={{ display: 'flex', gap: '8px' }}>
+                      <button type="button" className="btn-icon" title={row.definition ? `Edit ${row.name}` : `Edit ${row.name}: this instance doesn't list plugin definitions`} disabled={Boolean(busy) || !row.definition} onClick={() => openEdit(row)}>
+                        <i className="fas fa-pen"></i>
+                      </button>
                       <button type="button" className="btn-icon" title={`Reload ${row.name}`} disabled={Boolean(busy)} onClick={() => run(`Reload ${row.name}`, 'plugin-reload', null, { name: row.name })}>
                         <i className="fas fa-sync-alt"></i>
                       </button>
