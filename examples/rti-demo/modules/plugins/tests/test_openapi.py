@@ -13,6 +13,7 @@ import yaml
 from acsi_plugins import (
     EVENT_TYPES,
     PluginContext,
+    PluginEntry,
     PluginHost,
     PluginsConfig,
     RemotePlugin,
@@ -21,7 +22,9 @@ from acsi_plugins import (
     event_json,
     remote,
 )
-from acsi_plugins.web import PluginService, create_plugins_router
+from acsi_plugins.web import EditRequest, PluginService, create_plugins_router
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from .fake_plugin import URL, FakePlugin
 
@@ -159,3 +162,14 @@ async def test_the_host_fields_are_what_the_host_sends():
     await plugin.start(ctx)
     await plugin.stop()
     assert set(SCHEMAS["Host"]["properties"]) == set(fake.calls[-1][1])
+
+
+def test_the_list_and_edit_fields_are_the_router_s():
+    app = FastAPI()
+    app.include_router(create_plugins_router(PluginService(PluginHost(role="fsp"))))
+    listed = TestClient(app).get("/api/plugins").json()
+    assert set(listed) == set(SCHEMAS["PluginList"]["required"])
+    assert set(EditRequest.model_fields) == set(SCHEMAS["EditRequest"]["properties"])
+    assert set(SCHEMAS["PluginDefinition"]["properties"]) == {
+        f.name for f in dataclasses.fields(PluginEntry)
+    } - {"name"}

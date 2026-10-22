@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
 """Plugins in a FastAPI app: connecting the configured plugins at startup,
-adding, reloading and removing them, and their routes under
+adding, editing, reloading and removing them, and their routes under
 /api/plugins/<name>/ (decisions 0021, 0029).
 
     service = PluginService.from_env(PluginHost(role="fsp"))
@@ -204,6 +204,52 @@ class PluginService:
         self.failed.pop(name, None)
         return self.host.status(name)
 
+    async def edit(
+        self,
+        name: str,
+        url: str | None = None,
+        settings: dict[str, Any] | None = None,
+    ) -> dict:
+        """Change the plugin's URL or settings, from PUT /api/plugins/{name}: stop
+        it and connect it from the new definition; what isn't given stays. A new
+        URL must be from an allowed source. When the new definition doesn't
+        connect, the old one is connected again and the error raised: nothing
+        changes. Until the FSP or SO restarts, as an added plugin."""
+        old = self._entries.get(name)
+        if old is None or (name not in self.host.names() and name not in self.failed):
+            raise PluginNotFoundError(name)
+        new = PluginEntry(
+            name,
+            old.url if url is None else url,
+            dict(old.settings if settings is None else settings),
+        )
+        if new.url != old.url and not is_allowed(new.url, self.allowed_sources):
+            raise SourceNotAllowedError(
+                f"{new.url} is not allowed; add it to PLUGIN_ALLOWED_SOURCES"
+            )
+        was_loaded = name in self.host.names()
+        await self.host.remove(name)
+        try:
+            await self._connect(new)
+        except Exception:
+            if was_loaded and not await self._try(old):
+                self._ensure_retrying()
+            raise
+        self._entries[name] = new
+        self.failed.pop(name, None)
+        logger.info(f"Plugin '{name}' edited: {new.url}")
+        return self.host.status(name)
+
+    def definitions(self) -> dict[str, dict[str, Any]]:
+        """The definition (url, settings) of every plugin, connected or not:
+        what PUT /api/plugins/{name} changes."""
+        listed = set(self.host.names()) | set(self.failed)
+        return {
+            name: {"url": entry.url, "settings": dict(entry.settings)}
+            for name, entry in self._entries.items()
+            if name in listed
+        }
+
     async def uninstall(self, name: str) -> None:
         """Stop and remove the plugin; a configured one isn't tried again until the next start."""
         if name not in self._entries:
@@ -256,6 +302,17 @@ class InstallRequest(BaseModel):
     )
 
 
+class EditRequest(BaseModel):
+    url: str | None = Field(
+        None,
+        description="The plugin's new base URL; left out: it stays",
+        examples=["http://rpi-io:9000/plugin"],
+    )
+    settings: dict[str, Any] | None = Field(
+        None, description="The plugin's new settings, all of them; left out: they stay"
+    )
+
+
 def _http_error(e: Exception) -> HTTPException:
     if isinstance(e, PluginNotFoundError):
         return HTTPException(404, f"No plugin '{e}' is configured")
@@ -278,7 +335,11 @@ def create_plugins_router(service: PluginService) -> APIRouter:
     @router.get("", summary="List plugins")
     async def api_list_plugins():
         await service.host.refresh_attached()
-        return {"plugins": service.host.status(), "failed": dict(service.failed)}
+        return {
+            "plugins": service.host.status(),
+            "failed": dict(service.failed),
+            "definitions": service.definitions(),
+        }
 
     @router.post("", summary="Add a plugin")
     async def api_install_plugin(request: InstallRequest):
@@ -298,6 +359,16 @@ def create_plugins_router(service: PluginService) -> APIRouter:
         if status is None:
             raise HTTPException(404, f"No plugin '{name}' is loaded")
         return status
+
+    @router.put("/{name}", summary="Edit a plugin")
+    async def api_edit_plugin(name: str, request: EditRequest):
+        try:
+            return {
+                "ok": True,
+                "plugin": await service.edit(name, request.url, request.settings),
+            }
+        except Exception as e:
+            raise _http_error(e) from e
 
     @router.post("/{name}/reload", summary="Reload a plugin")
     async def api_reload_plugin(name: str):

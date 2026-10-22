@@ -162,6 +162,101 @@ def test_reload_starts_the_plugin_again_with_its_settings(client, fake):
     assert fake.calls[-1][1]["settings"] == {"b": 2}
 
 
+def starts(fake):
+    return [body for call, body in fake.calls if call == "start"]
+
+
+def test_edit_starts_the_plugin_again_with_the_new_settings(client, fake):
+    client.post("/api/plugins", json={"name": "demo", "url": URL, "settings": {"b": 2}})
+    response = client.put("/api/plugins/demo", json={"settings": {"b": 3}})
+    assert response.status_code == 200, response.text
+    assert [c[0] for c in fake.calls] == ["start", "stop", "start"]
+    assert fake.calls[-1][1]["settings"] == {"b": 3}
+    assert client.get("/api/plugins").json()["definitions"] == {
+        "demo": {"url": URL, "settings": {"b": 3}}
+    }
+
+
+def test_edit_moves_the_plugin_to_an_allowed_url(fake):
+    moved = "http://plugin2.test/plugin"
+    app, _ = make_app(fake, allowed=[*ALLOWED, "http://plugin2.test"])
+    with TestClient(app) as client:
+        client.post(
+            "/api/plugins", json={"name": "demo", "url": URL, "settings": {"b": 2}}
+        )
+        response = client.put("/api/plugins/demo", json={"url": moved})
+        assert response.status_code == 200, response.text
+        assert response.json()["plugin"]["url"] == moved
+        # The settings stay.
+        assert fake.calls[-1][1]["settings"] == {"b": 2}
+
+
+def test_edit_refuses_a_url_that_is_not_allowed(client, fake):
+    client.post("/api/plugins", json={"name": "demo", "url": URL})
+    response = client.put(
+        "/api/plugins/demo", json={"url": "http://elsewhere.test/plugin"}
+    )
+    assert response.status_code == 403
+    # Not stopped, and unchanged.
+    assert [c[0] for c in fake.calls] == ["start"]
+    assert client.get("/api/plugins").json()["definitions"]["demo"]["url"] == URL
+
+
+def test_a_configured_plugin_keeps_its_url_without_an_allowed_source(fake):
+    app, _ = make_app(fake, [PluginEntry("demo", URL, {"a": 1})], allowed=[])
+    with TestClient(app) as client:
+        response = client.put("/api/plugins/demo", json={"settings": {"a": 2}})
+    assert response.status_code == 200, response.text
+    assert fake.calls[-2][1]["settings"] == {"a": 2}
+
+
+def test_an_edit_that_does_not_connect_changes_nothing(client, fake):
+    client.post("/api/plugins", json={"name": "demo", "url": URL, "settings": {"b": 2}})
+    fake.description["name"] = "renamed"
+    response = client.put("/api/plugins/demo", json={"settings": {"b": 3}})
+    assert response.status_code == 422
+    assert "is plugin 'renamed', not 'demo'" in response.json()["detail"]
+    fake.description["name"] = "demo"
+    client.post("/api/plugins/demo/reload")
+    body = client.get("/api/plugins").json()
+    assert body["definitions"] == {"demo": {"url": URL, "settings": {"b": 2}}}
+    assert starts(fake)[-1]["settings"] == {"b": 2}
+
+
+def test_an_edit_that_does_not_connect_restores_the_old_plugin(fake):
+    app, service = make_app(fake)
+    with TestClient(app) as client:
+        client.post(
+            "/api/plugins", json={"name": "demo", "url": URL, "settings": {"b": 2}}
+        )
+        down = FakePlugin()
+        down.up = False
+        clients = iter([down.client()])
+        service.client_factory = lambda: next(clients, None) or fake.client()
+        response = client.put("/api/plugins/demo", json={"settings": {"b": 3}})
+        assert response.status_code == 422
+        body = client.get("/api/plugins").json()
+    assert [p["name"] for p in body["plugins"]] == ["demo"]
+    assert body["definitions"]["demo"]["settings"] == {"b": 2}
+    assert [s["settings"] for s in starts(fake)] == [{"b": 2}, {"b": 2}]
+
+
+def test_an_unreachable_configured_plugin_can_be_edited(fake):
+    fake.up = False
+    app, _ = make_app(fake, [PluginEntry("demo", URL)])
+    with TestClient(app) as client:
+        fake.up = True
+        response = client.put("/api/plugins/demo", json={"settings": {"c": 1}})
+        assert response.status_code == 200, response.text
+        body = client.get("/api/plugins").json()
+    assert body["failed"] == {}
+    assert body["definitions"]["demo"]["settings"] == {"c": 1}
+
+
+def test_edit_an_unknown_plugin_is_404(client):
+    assert client.put("/api/plugins/nope", json={}).status_code == 404
+
+
 def test_remove_stops_the_plugin(client, fake):
     client.post("/api/plugins", json={"name": "demo", "url": URL})
     assert client.delete("/api/plugins/demo").json() == {"ok": True}

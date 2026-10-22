@@ -225,7 +225,11 @@ def app_client(model_dir, monkeypatch):
 
 def test_without_a_plugin_configuration_the_app_has_no_plugins(app_client):
     # Nothing is built in: plugins come from the configuration (decision 0029).
-    assert app_client.get("/api/plugins").json() == {"plugins": [], "failed": {}}
+    assert app_client.get("/api/plugins").json() == {
+        "plugins": [],
+        "failed": {},
+        "definitions": {},
+    }
 
 
 def test_the_fsp_has_no_io_plugin_code_installed():

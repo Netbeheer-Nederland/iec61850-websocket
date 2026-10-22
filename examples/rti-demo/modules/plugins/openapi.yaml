@@ -19,7 +19,7 @@ info:
     | Tag | Who serves it | What it is |
     |---|---|---|
     | **Plugin API** | **you**, at the plugin's base URL | what the FSP or SO calls: describe, start, stop, events, control, attached |
-    | **Plugin management** | the FSP (port 5001) or SO (port 5000) | list, add, reload and remove plugins |
+    | **Plugin management** | the FSP (port 5001) or SO (port 5000) | list, add, edit, reload and remove plugins |
     | **Plugin routes** | the FSP or SO, for the plugin | the plugin's own routes, passed on under `/api/plugins/{name}/` |
 
     ### How a plugin is connected
@@ -33,7 +33,7 @@ info:
     3. While it runs, it sends every event to `POST <url>/events`, and, in the FSP, an Operate on an
        objRef the plugin claims to `POST <url>/control`. When its plugin list is asked for, it asks
        `GET <url>/attached` what the plugin attaches (at most once a second), for the HMI (decision 0025).
-    4. On removal, reload or shutdown it calls `POST <url>/stop`.
+    4. On removal, edit, reload or shutdown it calls `POST <url>/stop`.
 
     | Call | Limit | When it fails |
     |---|---|---|
@@ -252,7 +252,9 @@ paths:
       tags: [Plugin management]
       operationId: listPlugins
       summary: List plugins
-      description: The connected plugins, and the configured ones that aren't connected (yet), with why.
+      description: |
+        The connected plugins, and the configured ones that aren't connected (yet), with why; and the
+        definition (URL and settings) of each, as `PUT /api/plugins/{name}` changes it.
       responses:
         "200":
           description: The plugins.
@@ -302,6 +304,38 @@ paths:
                 $ref: "#/components/schemas/PluginStatus"
         "404":
           $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Plugin management]
+      operationId: editPlugin
+      summary: Edit a plugin
+      description: |
+        Change the URL or the settings of a connected plugin, or of a configured one that isn't
+        connected: stop it (`POST <url>/stop`) and connect it from the new definition. What the
+        body leaves out stays; `settings` replaces all of them. A new `url` must be under one in
+        `PLUGIN_ALLOWED_SOURCES`, as for adding; the configured URL needs none. The name stays: a
+        plugin with another name is another plugin (remove it and add that one). When the new
+        definition doesn't connect, the old one is connected again and nothing changes. The edit
+        lasts until the FSP or SO stops; to keep it, change the plugin configuration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditRequest"
+            example: { settings: { blink_seconds: 1 } }
+      responses:
+        "200":
+          $ref: "#/components/responses/PluginChanged"
+        "403":
+          $ref: "#/components/responses/SourceNotAllowed"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/PluginFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
     delete:
       tags: [Plugin management]
       operationId: removePlugin
@@ -692,6 +726,33 @@ components:
           default: {}
           description: The plugin's settings, sent with `/start`.
 
+    EditRequest:
+      type: object
+      properties:
+        url:
+          type: [string, "null"]
+          description: The plugin's new base URL; left out, it stays.
+          examples: ["http://rpi-io:9000/plugin"]
+        settings:
+          type: [object, "null"]
+          additionalProperties: true
+          description: The plugin's new settings, all of them, sent with `/start`; left out, they stay.
+
+    PluginDefinition:
+      type: object
+      required: [url, settings]
+      properties:
+        url:
+          type: string
+          description: The plugin's base URL.
+          examples: ["http://rpi-io:9000/plugin"]
+        settings:
+          type: object
+          additionalProperties: true
+          description: |
+            The plugin's settings, as sent with `/start`. Anyone who can list plugins sees them: don't
+            put secrets in them.
+
     Attached:
       type: object
       required: [items]
@@ -817,7 +878,7 @@ components:
 
     PluginList:
       type: object
-      required: [plugins, failed]
+      required: [plugins, failed, definitions]
       properties:
         plugins:
           type: array
@@ -829,6 +890,12 @@ components:
           additionalProperties:
             type: string
           examples: [{ io: "Can't reach http://rpi-io:9000/plugin: ConnectError(...)" }]
+        definitions:
+          type: object
+          description: The definition of every plugin in `plugins` and `failed`, by name.
+          additionalProperties:
+            $ref: "#/components/schemas/PluginDefinition"
+          examples: [{ io: { url: "http://rpi-io:9000/plugin", settings: {} } }]
 
     Ok:
       type: object
