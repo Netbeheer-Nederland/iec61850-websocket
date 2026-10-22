@@ -29,6 +29,7 @@ import TLSConfigModal, { useRuntimeTlsEnabled } from '../components/TLSConfigMod
 import OAuthConfigModal, { useRuntimeOAuthEnabled } from '../components/OAuthConfigModal';
 import SecurityActionMessage from '../components/SecurityActionMessage';
 import ActionLogPanel from '../components/ActionLogPanel.jsx';
+import PluginsPanel from '../components/PluginsPanel';
 import { executeApiCall, buildTargetValue, getApiById } from '../services/apiService';
 import { subscribe as subscribeLive } from '../services/liveSocket';
 import { usePersistentFlag } from '../hooks/usePersistentFlag';
@@ -141,6 +142,12 @@ const ACSIClient = ({ updateModel, bffBaseUrl = `http://${DEFAULT_BFF_HOST}:${DE
   const liveConnection = useMemo(
     () => connections.find(c => c.host === endpoint?.host && String(c.port) === String(endpoint?.port)) || endpoint,
     [connections, endpoint]
+  );
+  // This SO's plugins, as the BFF pushes them with the connections (App.jsx's
+  // live list - this page's own fetched copy doesn't carry them).
+  const pushedPlugins = useMemo(
+    () => propConnections.find(c => c.host === endpoint?.host && String(c.port) === String(endpoint?.port))?.plugins,
+    [propConnections, endpoint]
   );
   const monitorIntervalRef = useRef(null);
 
@@ -1160,6 +1167,8 @@ const getContextMenuItems = () => {
         </div>
       )}
       */}
+
+      <PluginsPanel target={apiTarget} role="so" pushed={pushedPlugins} />
 
       <div className="page-header" style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

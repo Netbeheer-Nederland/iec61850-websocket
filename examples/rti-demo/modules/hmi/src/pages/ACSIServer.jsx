@@ -25,6 +25,7 @@ import { transformModelToTree } from '../utils/modelUtils';
 
 import TLSConfigModal, { useRuntimeTlsEnabled } from '../components/TLSConfigModal';
 import OAuthConfigModal, { useRuntimeOAuthEnabled } from '../components/OAuthConfigModal';
+import PluginsPanel from '../components/PluginsPanel';
 import SecurityActionMessage from '../components/SecurityActionMessage';
 import ContextMenu  from "../components/ContextMenu.jsx";
 import WriteValueModal from '../components/WriteValueModal.jsx';
@@ -348,6 +349,13 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
   const [tlsEnabled, refreshTlsEnabled] = useRuntimeTlsEnabled(endpointTarget);
   // Same for OAuth - reflected on the OAuth Config button.
   const [oauthEnabled, refreshOAuthEnabled] = useRuntimeOAuthEnabled(endpointTarget);
+
+  // This FSP's plugins, as the BFF pushes them with the connections (App.jsx's
+  // live list - this page's own fetched copy doesn't carry them).
+  const pushedPlugins = useMemo(
+    () => (propConnections || []).find(c => c.host === endpoint?.host && String(c.port) === String(endpoint?.port))?.plugins,
+    [propConnections, endpoint]
+  );
 
   const stopMonitoring = useCallback(() => {
     if (monitorIntervalRef.current) {
@@ -1146,6 +1154,8 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           )}
         </div>
       </div>
+
+      <PluginsPanel target={endpointTarget} role="fsp" pushed={pushedPlugins} />
 
       <div className="page-header">
         <div style={{  display: 'flex', alignItems: 'center', gap: '16px' }}>

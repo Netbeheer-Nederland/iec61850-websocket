@@ -79,7 +79,18 @@ const API_DEFINITIONS = [
 
   // Properties 
   { id: 'properties', label: 'GET /api/properties', method: 'GET', path: '/api/properties' },
+
+  // Plugins (the plugin contract's management routes, modules/plugins/openapi.yaml)
+  { id: 'plugins', label: 'GET /api/plugins', method: 'GET', path: '/api/plugins' },
+  { id: 'plugin-add', label: 'POST /api/plugins', method: 'POST', path: '/api/plugins' },
+  { id: 'plugin-reload', label: 'POST /api/plugins/{name}/reload', method: 'POST', path: '/api/plugins/{name}/reload' },
+  { id: 'plugin-remove', label: 'DELETE /api/plugins/{name}', method: 'DELETE', path: '/api/plugins/{name}' },
 ];
+
+// "/api/plugins/{name}/reload" + { name: 'io' } -> "/api/plugins/io/reload".
+const fillPath = (path, pathParams) => (pathParams
+  ? path.replace(/\{(\w+)\}/g, (match, key) => (key in pathParams ? encodeURIComponent(pathParams[key]) : match))
+  : path);
 
 /**
  * Get API definition by ID
@@ -148,16 +159,18 @@ export const buildBffApiUrl = (path, targetValue = null) => {
  * @param {object|null} bodyOverride - Optional request body
  * @param {object} options - Additional options
  * @param {boolean} options.useDirect - If true, call the endpoint directly instead of through /api/execute
+ * @param {object} options.pathParams - Values for the path's {placeholders}, e.g. { name: 'io' }
  * @returns {Promise<object|null>} The API response object with ok, status, payload, rawText
  */
 export const executeApiCall = async (apiId, targetValue = null, bodyOverride = null, options = {}) => {
-  const { useDirect = false } = options;
-  const api = getApiById(apiId);
+  const { useDirect = false, pathParams = null } = options;
+  const definition = getApiById(apiId);
   
-  if (!api) {
+  if (!definition) {
     console.error(`API ${apiId} not found`);
     return null;
   }
+  const api = { ...definition, path: fillPath(definition.path, pathParams) };
   
   try {
     let url;
