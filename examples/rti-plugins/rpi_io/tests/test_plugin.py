@@ -289,3 +289,104 @@ def test_the_host_sends_events_the_plugin_reads():
     from acsi_plugins import event_json
 
     assert event_json(ValueWritten("LD0/X", 1))["type"] == "ValueWritten"
+
+
+# ==================== What it attaches (decision 0025) ====================
+
+
+class Config:
+    def __init__(self, device_type, description=""):
+        self.device_type, self.description = device_type, description
+
+
+class Reads:
+    def __init__(self, value):
+        self.value = value
+
+    def read(self):
+        return self.value
+
+
+def attaching_io(**devices):
+    from rpi_io.server.devices import DeviceType
+
+    io = FakeIO()
+    io._initialized = True
+    io.configs = {
+        "led1": Config(DeviceType.LED),
+        "button1": Config(DeviceType.BUTTON),
+        "pot1": Config(DeviceType.POTENTIOMETER),
+        "lcd1": Config(DeviceType.LCD, "16x2 LCD"),
+    }
+    io.devices = {
+        "led1": Reads(True),
+        "button1": Reads(False),
+        "pot1": Reads(42.04),
+        "lcd1": Display(io, "lcd1"),
+        **devices,
+    }
+    return io
+
+
+async def test_it_attaches_itself_with_its_devices_and_displays():
+    plugin = IoPlugin(attaching_io(), IOMappingManager(str(SHIPPED_MAPPING)))
+    await deliver(plugin, FSP, {"type": "Associated", "associate_id": "cp1"})
+
+    server, display = plugin.attached("http://rti-io:9000")["items"]
+
+    assert server == {
+        "kind": "io",
+        "label": "IO server",
+        "address": "http://rti-io:9000",
+        "state": "ok",
+        "detail": "4 devices",
+        "live": [
+            {
+                "type": "indicators",
+                "items": [{"name": "led1", "on": True, "color": "green"}],
+            },
+            {
+                "type": "values",
+                "items": [
+                    {"label": "button1", "value": "released"},
+                    {"label": "pot1", "value": 42.0},
+                ],
+            },
+        ],
+    }
+    assert display["kind"] == "display"
+    assert display["label"] == "lcd1"
+    assert display["detail"] == "16x2 LCD"
+    # The text the plugin last wrote to it.
+    assert display["live"] == [{"type": "text", "lines": ["FSP Connected: cp1"]}]
+
+
+def test_a_device_that_did_not_come_up_makes_it_degraded():
+    io = attaching_io()
+    del io.devices["pot1"], io.devices["lcd1"]
+    server, display = IoPlugin(io, IOMappingManager(str(SHIPPED_MAPPING))).attached(
+        None
+    )["items"]
+    assert (server["state"], server["detail"]) == ("degraded", "2 of 4 devices up")
+    assert {"label": "pot1", "value": None} in server["live"][1]["items"]
+    assert display["state"] == "down"
+
+
+def test_it_is_down_until_initialised():
+    io = attaching_io()
+    io._initialized = False
+    [server, _] = IoPlugin(io, IOMappingManager(str(SHIPPED_MAPPING))).attached(None)[
+        "items"
+    ]
+    assert (server["state"], server["detail"]) == ("down", "not initialised")
+
+
+def test_the_attached_route_passes_the_host_s_checks():
+    from acsi_plugins.attached import check
+
+    client = TestClient(create_fastapi_app(IOController()))
+    body = client.get("/plugin/attached").json()
+
+    [server, *_] = check(body)
+    assert server["kind"] == "io"
+    assert server["address"] == "http://testserver"

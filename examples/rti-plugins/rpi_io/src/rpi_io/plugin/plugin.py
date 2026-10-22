@@ -17,6 +17,10 @@ When an FSP or SO starts it, its input devices (buttons, potentiometers)
 write their changes back to that host's host_url (the most recent one,
 unless its settings say "write_inputs": false). Its routes, under
 /api/plugins/io/ in the FSP or SO, are this server's /api/io.
+
+What it attaches (GET /plugin/attached, decision 0025): this server, with its
+LEDs, buttons and potentiometers, and each display, with the text the plugin
+last wrote to it. Read from its own devices when asked.
 """
 
 from __future__ import annotations
@@ -27,10 +31,11 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, Field
 
 from ..server import io_controller as controller_module
+from ..server.devices import DeviceType
 from ..server.io_controller import ACSIConfig, IOController, configure_acsi
 from .mapping import IOMappingManager, resolve_mapping_path
 
@@ -74,6 +79,8 @@ class IoPlugin:
         self.input_target: str | None = None
         self._tasks: set[asyncio.Task] = set()
         self.sleep = asyncio.sleep  # between blinks; tests make it instant
+        # What the plugin last wrote to each display, as lines.
+        self.display_text: dict[str, list[str]] = {}
 
     # ==================== Lifecycle ====================
 
@@ -216,6 +223,7 @@ class IoPlugin:
     async def show(self, name: str, text: str) -> None:
         for device in self._mapped(name, displays=True):
             await asyncio.to_thread(self.io.get_device(device).write, text)
+            self.display_text[device] = str(text).split("\n")
 
     async def blink(self, name: str, interval: float = 0.2, count: int = 1) -> None:
         leds = self._mapped(name, displays=False)
@@ -235,6 +243,71 @@ class IoPlugin:
     def set_device(self, name: str, state: Any) -> None:
         """For IOMappingManager.sync_device_from_iec61850."""
         self.io.write(name, state)
+
+    # ==================== Attached ====================
+
+    def attached(self, address: str | None) -> dict:
+        """This server and its displays, for the HMI (decision 0025). The
+        IO server doesn't know an LED's colour; LEDs are reported green."""
+        configs = getattr(self.io, "configs", {})
+        up = [name for name in configs if self.io.get_device(name) is not None]
+        indicators, values, displays = [], [], []
+        for name, config in configs.items():
+            kind = config.device_type
+            device = self.io.get_device(name)
+            if kind in (DeviceType.LCD, DeviceType.LCD_I2C):
+                displays.append(
+                    {
+                        "kind": "display",
+                        "label": name,
+                        "address": f"{address} ({kind.value})" if address else None,
+                        "state": "ok" if device is not None else "down",
+                        "detail": config.description or None,
+                        "live": [
+                            {"type": "text", "lines": self.display_text.get(name, [])}
+                        ],
+                    }
+                )
+                continue
+            value = _read(device)
+            if kind == DeviceType.LED:
+                indicators.append({"name": name, "on": bool(value), "color": "green"})
+            elif kind == DeviceType.BUTTON:
+                text = None if value is None else ("pressed" if value else "released")
+                values.append({"label": name, "value": text})
+            else:
+                if isinstance(value, float):
+                    value = round(value, 1)
+                values.append({"label": name, "value": value})
+        if not self.io._initialized:
+            state, detail = "down", "not initialised"
+        elif len(up) < len(configs):
+            state, detail = "degraded", f"{len(up)} of {len(configs)} devices up"
+        else:
+            state, detail = "ok", f"{len(configs)} devices"
+        live = []
+        if indicators:
+            live.append({"type": "indicators", "items": indicators})
+        if values:
+            live.append({"type": "values", "items": values})
+        server = {
+            "kind": "io",
+            "label": "IO server",
+            "address": address,
+            "state": state,
+            "detail": detail,
+            "live": live,
+        }
+        return {"items": [server, *displays]}
+
+
+def _read(device) -> Any:
+    if device is None:
+        return None
+    try:
+        return device.read()
+    except Exception:
+        return None
 
 
 def _key(host: Host) -> str:
@@ -282,6 +355,11 @@ def create_plugin_router(
     @router.post("/control", status_code=204, summary="Answer an Operate (claims none)")
     def control():
         return Response(status_code=204)
+
+    @router.get("/attached", summary="What the plugin attaches (decision 0025)")
+    async def attached(request: Request):
+        address = str(request.base_url).rstrip("/")
+        return await asyncio.to_thread(plugin.attached, address)
 
     @router.get("/mappings", summary="The IO mapping the plugin uses")
     def mappings():
