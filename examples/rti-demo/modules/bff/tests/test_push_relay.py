@@ -980,6 +980,10 @@ async def test_build_enriched_connections_adds_plugins(monkeypatch):
         "healthy": True,
         "last_error": None,
     }
+    definitions = {
+        "io": {"url": "http://rpi-io:9000/plugin", "settings": {}},
+        "display": {"url": "http://pi:8000/plugin", "settings": {"rotate": 90}},
+    }
     monkeypatch.setattr(bff_server.conn_manager, "connections", connections)
     monkeypatch.setitem(
         bff_server._bff_clients,
@@ -989,6 +993,7 @@ async def test_build_enriched_connections_adds_plugins(monkeypatch):
                 "/api/plugins": {
                     "plugins": [io],
                     "failed": {"display": "Can't reach http://pi:8000/plugin"},
+                    "definitions": definitions,
                 }
             }
         ),
@@ -1003,6 +1008,7 @@ async def test_build_enriched_connections_adds_plugins(monkeypatch):
     assert by_name["fsp1"]["plugins"] == {
         "plugins": [io],
         "failed": {"display": "Can't reach http://pi:8000/plugin"},
+        "definitions": definitions,
     }
     assert by_name["so1"]["plugins"] is None
     # A disconnected FSP isn't asked; other connection types get no key.

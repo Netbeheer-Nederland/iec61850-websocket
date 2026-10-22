@@ -347,8 +347,9 @@ async def _fetch_plugins(con: dict[str, Any]) -> tuple[str, dict[str, Any] | Non
     """Look up the plugins an RTI-SO or RTI-FSP connection has connected to.
 
     Its GET /api/plugins (the plugin contract, modules/plugins/openapi.yaml):
-    {"plugins": [...], "failed": {name: reason}}. None when the instance
-    doesn't answer it, so the HMI can tell "no plugins" from "unknown".
+    {"plugins": [...], "failed": {name: reason}, "definitions": {name: {url,
+    settings}}} ({} from an instance without definitions). None when the
+    instance doesn't answer it, so the HMI can tell "no plugins" from "unknown".
     """
     key = f"{con.get('host')}:{con.get('port')}"
     client = _bff_clients.get(key)
@@ -358,9 +359,11 @@ async def _fetch_plugins(con: dict[str, Any]) -> tuple[str, dict[str, Any] | Non
         result = await asyncio.to_thread(client.request, "GET", "/api/plugins")
         if isinstance(result, dict) and isinstance(result.get("plugins"), list):
             failed = result.get("failed")
+            definitions = result.get("definitions")
             return con.get("name"), {
                 "plugins": result["plugins"],
                 "failed": failed if isinstance(failed, dict) else {},
+                "definitions": definitions if isinstance(definitions, dict) else {},
             }
     except Exception:
         pass
