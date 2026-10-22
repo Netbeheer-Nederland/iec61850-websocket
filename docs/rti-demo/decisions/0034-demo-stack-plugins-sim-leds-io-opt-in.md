@@ -45,8 +45,12 @@ Options considered:
    `sim-leds-so`, image `sim-leds`, built from `examples/rti-plugins/sim_leds`, on `rti-network`, with no published
    ports (the HMI reaches the LEDs through `/api/plugins/sim_leds/`). Without the overlay the FSPs and SO retry
    sim_leds, as they did the IO server.
-3. **The IO server is opt-in**: its configurations move to `config/plugin-configuration/io/`, unchanged, and
-   `docker-compose.io.yaml` mounts them over the default ones. `rti-io` stays its own stack (0028).
+3. **The IO server is opt-in, through an overlay built like the LEDs one**: `docker-compose.io.yaml` runs `rti-io`
+   (the published image, built from `examples/rti-plugins/rpi_io`, on `rti-network`, no published ports) and mounts
+   its configurations, moved unchanged to `config/plugin-configuration/io/`, over the default ones. One IO server for
+   all three, not one each: on the Pi it drives the pins, which one process can hold. On the Pi,
+   `examples/rti-plugins/rpi_io/docker-compose.pi.yaml` is added as a third file for the devices. `rpi_io`'s own
+   stack (0028) stays, for an IO server apart from the demo stack; the two aren't run together, both being `rti-io`.
 4. **`launch.py` is unchanged.** It runs the IO server itself, in mock mode off the Pi, so its FSPs and SO reach their
    plugin.
 
@@ -56,7 +60,8 @@ Options considered:
   where every plugin is connected: grey plugin badges, Plugins panels with a healthy `sim_leds`, and attached boxes
   whose LEDs follow the association and the services.
 - Plain `docker compose up -d` still shows red badges, now for sim_leds. The README's commands use the overlay.
-- On the Pi, `-f docker-compose.io.yaml` instead of the LEDs overlay gives the hardware demo as before. Both overlays
+- On the Pi, `-f docker-compose.io.yaml -f ../rti-plugins/rpi_io/docker-compose.pi.yaml` instead of the LEDs overlay
+  gives the hardware demo in one command. Off the Pi the same overlay runs the IO server in mock mode. Both overlays
   together are allowed but pointless: the IO configuration replaces sim_leds.
 - `sim-leds` isn't published as an image ([0016](0016-container-build-and-image-names.md)): with the images from
   GitHub it is still built locally, from the overlay.

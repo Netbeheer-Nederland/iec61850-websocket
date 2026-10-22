@@ -174,18 +174,26 @@ The FSPs and SO connect to the plugins in their plugin configuration, `config/pl
 | Overlay | Plugins | Needs |
 |---|---|---|
 | `docker-compose.leds.yaml` (default) | One [`sim_leds`](../rti-plugins/sim_leds/README.md) each (`sim-leds-fsp01`, `sim-leds-fsp02`, `sim-leds-so`): two simulated LEDs that follow the association, Operates, writes and reports | nothing |
-| `docker-compose.io.yaml` | The IO server, `http://rti-io:9000/plugin`, from `config/plugin-configuration/io/` | `rti-io`, on the Raspberry Pi (below) |
+| `docker-compose.io.yaml` | One IO server for all three, `rti-io` (`http://rti-io:9000/plugin`), from `config/plugin-configuration/io/` | nothing; on the Raspberry Pi also `-f ../rti-plugins/rpi_io/docker-compose.pi.yaml` for its devices (below) |
 
 Without either overlay the FSPs and SO list `sim_leds` as failed, show a red plugin badge, and try again every 10 s;
 the rest of the demo works.
 
 ### The IO server (Raspberry Pi)
 
-The IO server, `rti-io`, isn't part of this stack: it runs on the Raspberry Pi and has its own compose file in
+The IO server, `rti-io`, isn't part of `docker-compose.yml`: it is meant for the Raspberry Pi and has its own compose file in
 [`examples/rti-plugins/rpi_io`](../rti-plugins/rpi_io/README.md) (decision
 [0028](../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)). It joins `rti-network` too, so the FSPs and SO reach
-it as `http://rti-io:9000/plugin`. The FSPs and SO connect to it only with the overlay `docker-compose.io.yaml`
-(`docker compose -f docker-compose.yml -f docker-compose.io.yaml up -d`); by default they use sim_leds.
+it as `http://rti-io:9000/plugin`. The FSPs and SO connect to it only with the overlay `docker-compose.io.yaml`;
+by default they use sim_leds. That overlay also runs `rti-io` itself, so on a Pi that runs the whole demo one command
+does it (don't also start the stack below then: both are `rti-io`):
+
+```shell
+cd examples/rti-demo
+docker compose -f docker-compose.yml -f docker-compose.io.yaml -f ../rti-plugins/rpi_io/docker-compose.pi.yaml up -d
+```
+
+To run the IO server on its own instead, for example apart from the demo stack:
 
 ```shell
 cd examples/rti-plugins/rpi_io

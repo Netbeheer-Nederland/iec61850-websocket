@@ -169,6 +169,20 @@ def test_the_leds_overlay_runs_only_sim_leds(leds_compose):
         assert "ports" not in svc
 
 
+def test_the_io_overlay_runs_one_io_server(io_overlay, io_compose):
+    # Like the LEDs overlay: the plugin's service on rti-network, nothing
+    # published. One for all three: on the Pi it holds the pins.
+    svc = io_overlay["rti-io"]
+    assert set(io_overlay) == {"rti-io", "rti-fsp01", "rti-fsp02", "rti-so"}
+    assert svc["image"] == io_compose["rti-io"]["image"]
+    assert svc["build"]["args"] == io_compose["rti-io"]["build"]["args"]
+    assert svc["networks"] == ["rti-network"]
+    assert "ports" not in svc
+    # The Pi's devices come from rpi_io's own docker-compose.pi.yaml.
+    for key in ("devices", "group_add", "user", "ipc", "security_opt", "cap_add"):
+        assert key not in svc
+
+
 @pytest.mark.parametrize(
     ("service", "role"), [("rti-so", "so"), ("rti-fsp01", "fsp"), ("rti-fsp02", "fsp2")]
 )

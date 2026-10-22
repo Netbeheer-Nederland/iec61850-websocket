@@ -2,15 +2,45 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Opt-in: the FSPs and SO connect to the IO server (rti-io, on the Raspberry
-# Pi) instead of sim_leds (decision 0034). An overlay on docker-compose.yml,
-# mounting config/plugin-configuration/io/ over the default configuration:
+# Opt-in: the IO server (rti-io) as the FSPs' and SO's plugin, instead of
+# sim_leds (decision 0034). An overlay on docker-compose.yml:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.io.yaml up -d
 #
-# rti-io is its own stack, examples/rti-plugins/rpi_io (decision 0028); it
-# joins rti-network, where the FSPs and SO reach it as http://rti-io:9000/plugin.
+# or COMPOSE_FILE=docker-compose.yml:docker-compose.io.yaml in .env. One IO
+# server for all three: on a Raspberry Pi it drives the Pi's pins, which one
+# process can hold. It runs anywhere, in mock mode without the Pi's devices;
+# on the Pi, add its device overlay as a third file:
+#
+#   -f ../rti-plugins/rpi_io/docker-compose.pi.yaml
+#
+# The image is the published rti-io, built from examples/rti-plugins/rpi_io.
+# Don't also run rpi_io's own stack (decision 0028): both are named rti-io.
+x-rti-io: &rti-io
+  image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-io:${RTI_IMAGE_TAG:-latest}
+  build:
+    context: ../rti-plugins/rpi_io
+    dockerfile: docker/Dockerfile
+    args:
+      PI_USER: ${PI_USER:-pi}
+      PI_UID: ${PI_UID:-1000}
+      PI_GID: ${PI_GID:-1000}
+      GPIO_GID: ${GPIO_GID:-986}
+      I2C_GID: ${I2C_GID:-988}
+      SPI_GID: ${SPI_GID:-989}
+  networks:
+    - rti-network
+  restart: unless-stopped
+  # Port 9000 and the health check are set by the Dockerfile; nothing is
+  # published: the HMI reaches the devices through /api/plugins/io/.
+
 services:
+  rti-io:
+    <<: *rti-io
+    container_name: rti-io
+
+  # The FSPs and SO connect to it, from config/plugin-configuration/io/
+  # mounted over the default configuration (sim_leds).
   rti-fsp01:
     volumes:
       - ./config/plugin-configuration/io/rti-fsp01.json:/plugins/plugins.json:ro
