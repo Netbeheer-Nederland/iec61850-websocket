@@ -125,7 +125,8 @@ For a lasting configuration, put the same JSON in a file and point `PLUGINS_FILE
 (`config/plugin-configuration/`). The demo stack connects every FSP and SO to its own `sim_leds` by default, run by the
 overlay `docker-compose.leds.yaml`. Start order doesn't matter: an FSP whose plugin isn't up yet tries again every 10 s.
 
-To add a plugin to a running FSP without restarting it, allow its URL and post it:
+To add a plugin to a running FSP without restarting it, allow its URL and post it (and edit it later, with
+`PUT /api/plugins/sim_leds`, see step 5):
 
 ```bash
 PLUGIN_ALLOWED_SOURCES=http://localhost:8099 uv run --package fsp python -m fsp.bff_endpoint
@@ -153,9 +154,12 @@ watch -n 0.5 'curl -s http://localhost:5000/api/plugins/sim_leds/leds'
 ## 5. Change it
 
 Edit `src/sim_leds/plugin/plugin.py` and restart the plugin. Its description is read when it connects, so
-after changing `claims` or `routes`, reload it in the FSP:
+after changing `claims` or `routes`, reload it in the FSP. To try other settings, or move it to another URL, edit its
+definition (the Edit button in the HMI's Plugins panel does the same):
 
 ```bash
+curl -X PUT http://localhost:5001/api/plugins/sim_leds -H 'Content-Type: application/json' \
+  -d '{"settings": {"blink_seconds": 1}}'                   # until the FSP restarts; then the configuration again
 curl -X POST http://localhost:5001/api/plugins/sim_leds/reload
 curl -X DELETE http://localhost:5001/api/plugins/sim_leds   # or remove it until the FSP restarts
 ```

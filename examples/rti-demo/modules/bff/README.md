@@ -172,7 +172,8 @@ When HMI calls /api/reconfig-oauth, BFF automatically enriches request with OAut
 - GET /api/diagnostics - System log across the BFF and every reachable RTI-SO/RTI-FSP (see `docs/rti-demo/design/logging-kinds.md`)
 - WebSocket /ws - push channel for the HMI: connection list changes, actions, playbook runs
   - A `connections` push carries, on every RTI-SO and RTI-FSP entry, `plugins`: the instance's own
-    `GET /api/plugins` (`{plugins: [...], failed: {name: reason}}`), read in the same 2s check; `null` while the
+    `GET /api/plugins` (`{plugins: [...], failed: {name: reason}, definitions: {name: {url, settings}}}`,
+    `definitions` `{}` from an instance without them), read in the same 2s check; `null` while the
     instance is disconnected or doesn't answer. Each plugin's `attached` (what it attaches, decision 0025) comes
     along, so a changed LED, value or display text is pushed in the next check
 

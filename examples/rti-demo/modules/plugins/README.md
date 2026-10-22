@@ -23,7 +23,7 @@ keeps it in step with the code (decision [0027](../../../../docs/rti-demo/decisi
 | `remote.py` | `RemotePlugin`: speaks the plugin API to one plugin service; the allowed-sources check |
 | `host.py` | `PluginHost`: passes events to every plugin, asks the owner of an objRef to answer an Operate |
 | `config.py` | The plugin configuration: `PLUGINS_FILE` or `PLUGINS` |
-| `web.py` | `PluginService` (connect the configured plugins, retry, add, reload, remove) and the routes |
+| `web.py` | `PluginService` (connect the configured plugins, retry, add, edit, reload, remove) and the routes |
 
 The plugins themselves, and the IO server, are in [`examples/rti-plugins`](../../../rti-plugins/README.md) (decision
 [0028](../../../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)). `sim_leds` there is a small sample, and
@@ -39,7 +39,7 @@ A plugin serves five calls, and an optional sixth, under its base URL (`url` in 
 | `POST <url>/start` | Once per FSP or SO: `{name, role, host_url, settings}` | any 2xx |
 | `POST <url>/events` | Every event: `{host, event: {"type": ..., <fields>}}` | any 2xx, within 5 s |
 | `POST <url>/control` | FSP only: an Operate on a claimed objRef, `{host, obj_ref, ctl_val}` | `{"ok", "add_cause"}`, or `204` to leave it to the FSP, within 2 s |
-| `POST <url>/stop` | Removal, reload, shutdown: `{name, role, host_url}` | any 2xx |
+| `POST <url>/stop` | Removal, edit, reload, shutdown: `{name, role, host_url}` | any 2xx |
 | `GET <url>/attached` | Optional: when `GET /api/plugins` is asked for, at most once a second | `{"items": [...]}`, what it attaches, within 1 s; `404`: nothing |
 
 `host` (`name`, `role`, `host_url`) says which FSP or SO a call comes from, so one plugin service can serve several.
@@ -110,8 +110,11 @@ default, the IO server in `io/` with the overlay `docker-compose.io.yaml`) and `
 ## Managing plugins
 
 ```bash
-curl http://localhost:5001/api/plugins                          # connected plugins, health; failed: not (yet) connected
+curl http://localhost:5001/api/plugins                          # connected plugins, health; failed: not (yet) connected;
+                                                                # definitions: each one's url and settings
 curl http://localhost:5001/api/plugins/io/leds                  # a route of the plugin
+curl -X PUT http://localhost:5001/api/plugins/io -H 'Content-Type: application/json' \
+  -d '{"settings": {"write_inputs": false}}'                    # edit: new url and/or settings; the rest stays
 curl -X POST http://localhost:5001/api/plugins/io/reload        # describe and start again; settings stay
 curl -X DELETE http://localhost:5001/api/plugins/io             # stop it until the next start
 
@@ -120,9 +123,19 @@ curl -X POST http://localhost:5001/api/plugins -H 'Content-Type: application/jso
   -d '{"name": "sim_leds", "url": "http://localhost:8099/plugin", "settings": {"blink_seconds": 1}}'
 ```
 
+**Editing** (`PUT /api/plugins/{name}`, decision
+[0036](../../../../docs/rti-demo/decisions/0036-plugin-definitions-editable.md)) changes the URL or the settings of a
+connected plugin, or of a configured one that isn't connected (to fix its URL): the plugin is stopped and connected
+from the new definition. `settings` replaces all of them; what the body leaves out stays. A new URL must be in
+`PLUGIN_ALLOWED_SOURCES`; the configured one needs none, so a configured plugin's settings can always be changed. The
+name stays: another name is another plugin. When the new definition doesn't connect, the old one is connected again and
+nothing changes. Like an added plugin, an edit lasts until the FSP or SO stops: to keep it, change the plugin
+configuration. `GET /api/plugins` lists every plugin's definition, settings included: don't put secrets in settings.
+
 | Answer | When |
 |---|---|
 | 403 | The URL isn't in `PLUGIN_ALLOWED_SOURCES` |
+| 404 | (edit, reload, remove) No plugin with that name |
 | 409 | The name is connected already, or the plugin claims an objRef another plugin owns |
 | 422 | The plugin can't be reached or doesn't answer as the plugin API says; `detail` says why |
 | 502 | (plugin routes) The plugin can't be reached |
