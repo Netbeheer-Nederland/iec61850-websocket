@@ -12,6 +12,8 @@ Settings (from /start): blink_seconds (default 0.3).
 Claims: the objRefs in SIM_LEDS_CLAIMS (comma-separated, default none); an
 Operate on one is refused while red is on.
 Routes: the server's /leds-api, under /api/plugins/sim_leds/ in the FSP or SO.
+Attached (optional, decision 0025): its two LEDs, for the HMI to draw next to
+the FSP or SO.
 """
 
 from __future__ import annotations
@@ -111,6 +113,29 @@ def create_plugin_router(leds: SimulatedLeds) -> APIRouter:
         elif kind == "ReportReceived":
             leds.blink("green", f"report {event.get('rpt_id')}")
         return {"ok": True}
+
+    @plugin.get("/attached")
+    def attached():
+        """What this plugin attaches, for the HMI: answer what you know, fast."""
+        return {
+            "items": [
+                {
+                    "kind": "other",
+                    "label": "Simulated LEDs",
+                    "state": "ok",
+                    "detail": "red: last Operate, write or read failed",
+                    "live": [
+                        {
+                            "type": "indicators",
+                            "items": [
+                                {"name": color, "on": on, "color": color}
+                                for color, on in leds.state.items()
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
 
     @plugin.post("/control")
     def control(request: ControlRequest):

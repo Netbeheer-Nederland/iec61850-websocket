@@ -134,3 +134,22 @@ async def test_an_led_can_be_set_and_reset_by_hand(setup):
     assert await leds(client) == {"red": False, "green": False}
     response = await client.post("/api/plugins/sim_leds/leds/blue", json={"on": True})
     assert response.status_code == 404
+
+
+async def test_the_fsp_lists_its_two_leds_as_attached(setup):
+    host, client = setup
+    await deliver(host, Associated("cp1"))
+
+    [status] = (await client.get("/api/plugins")).json()["plugins"]
+
+    [item] = status["attached"]
+    assert item["label"] == "Simulated LEDs"
+    assert item["live"] == [
+        {
+            "type": "indicators",
+            "items": [
+                {"name": "red", "on": False, "color": "red"},
+                {"name": "green", "on": True, "color": "green"},
+            ],
+        }
+    ]
