@@ -35,7 +35,7 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0022](0022-io-plugin-own-package.md) | The IO plugin is its own package, installed with the FSP and SO | proposed |
 | [0023](0023-io-server-package-rpi-io.md) | The IO server's code is `rpi_io`, flat, in `src/` | proposed |
 | [0024](0024-ssd1306-oled-display-device.md) | The SSD1306 OLED is a display device of the IO server, on any Pi, shown by the IO plugin | proposed |
-| [0025](0025-plugins-show-attached-devices-in-hmi.md) | Plugins describe what they attach as data; the HMI draws it next to the FSP or SO | proposed |
+| [0025](0025-plugins-show-attached-devices-in-hmi.md) | Plugins describe what they attach as data, at `GET <url>/attached`; the HMI draws it next to the FSP or SO | proposed |
 | [0026](0026-io-server-pins-are-configuration.md) | The IO server's pins are configuration, claimed per device and checked for conflicts | proposed |
 | [0027](0027-plugin-contract-as-openapi.md) | The plugin contract is published as an OpenAPI 3.1 document, kept in step by a test | proposed |
 | [0028](0028-rti-plugins-folder.md) | Plugins and the IO server move to `examples/rti-plugins`; the IO server is its own stack | proposed |
