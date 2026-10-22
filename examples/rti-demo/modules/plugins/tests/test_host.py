@@ -239,4 +239,6 @@ async def test_status_lists_the_plugins(host):
         "routes": False,
         "healthy": True,
         "last_error": None,
+        "attached": [],
+        "attached_error": None,
     }

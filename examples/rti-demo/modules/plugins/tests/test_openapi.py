@@ -16,6 +16,7 @@ from acsi_plugins import (
     PluginHost,
     PluginsConfig,
     RemotePlugin,
+    attached,
     contract,
     event_json,
     remote,
@@ -76,6 +77,7 @@ async def test_the_plugin_api_is_what_the_host_calls():
     await plugin.start(ctx)
     await plugin.on_event(contract.Associated("cp1"))
     await asyncio.to_thread(plugin.handle_control, "LD0/X", {})
+    await plugin.attached()
     await plugin.stop()
     assert spec_routes("Plugin API") == seen
 
@@ -104,6 +106,29 @@ def test_the_examples_are_valid():
     event = example("/events", "post", None)["event"]
     fields = {k: v for k, v in event.items() if k != "type"}
     assert event_json(EVENT_TYPES[event["type"]](**fields)) == event
+    # The attached example passes the host's checks as it is (but for the
+    # optional fields the host fills in).
+    checked = attached.check(example("/attached"))
+    assert [i["label"] for i in checked] == ["IO server", "lcd1"]
+    assert checked[0]["live"] == example("/attached")["items"][0]["live"]
+
+
+def test_attached_limits_are_the_host_s():
+    item = SCHEMAS["AttachedItem"]["properties"]
+    assert SCHEMAS["Attached"]["properties"]["items"]["maxItems"] == attached.MAX_ITEMS
+    assert item["live"]["maxItems"] == attached.MAX_BLOCKS
+    assert tuple(item["kind"]["enum"]) == attached.KINDS
+    assert tuple(item["state"]["enum"]) == attached.STATES
+    text, indicators, values = SCHEMAS["AttachedLive"]["oneOf"]
+    assert text["properties"]["lines"]["maxItems"] == attached.MAX_LINES
+    assert text["properties"]["lines"]["items"]["maxLength"] == attached.MAX_LINE_CHARS
+    assert indicators["properties"]["items"]["maxItems"] == attached.MAX_INDICATORS
+    color = indicators["properties"]["items"]["items"]["properties"]["color"]
+    assert tuple(color["enum"]) == attached.COLORS
+    assert values["properties"]["items"]["maxItems"] == attached.MAX_VALUES
+    assert {
+        b["properties"]["type"]["const"] for b in (text, indicators, values)
+    } == set(attached.BLOCKS)
 
 
 @pytest.mark.parametrize("name", list(EVENT_TYPES))

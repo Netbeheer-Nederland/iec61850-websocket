@@ -21,6 +21,7 @@ class FakePlugin:
         claims: list[str] | None = None,
         answer: dict | None = None,
         routes: bool = True,
+        attached: Any = None,
     ):
         self.description: dict[str, Any] = {
             "name": name,
@@ -31,6 +32,8 @@ class FakePlugin:
         if routes:
             self.description["routes"] = "routes"
         self.answer = answer
+        # GET /plugin/attached answers this; None: 404, the route isn't there.
+        self.attached = attached
         self.calls: list[tuple[str, Any]] = []
         self.up = True
         self.app = self._app()
@@ -44,6 +47,13 @@ class FakePlugin:
         @app.get("/plugin")
         def describe():
             return self.description
+
+        @app.get("/plugin/attached")
+        def attached():
+            self.calls.append(("attached", None))
+            if self.attached is None:
+                return Response(status_code=404)
+            return self.attached
 
         @app.post("/plugin/{action}")
         async def act(action: str, request: Request):

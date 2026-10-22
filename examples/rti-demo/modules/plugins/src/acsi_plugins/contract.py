@@ -167,3 +167,8 @@ class AcsiPlugin:
         response. Runs with a timeout; keep it short.
         """
         return None
+
+    async def attached(self) -> Any:
+        """What the plugin attaches, as {"items": [...]} (decision 0025;
+        attached.py checks it). Runs with a timeout; answer what is known."""
+        return {"items": []}

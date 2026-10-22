@@ -15,9 +15,11 @@ import asyncio
 import concurrent.futures
 import logging
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from . import attached as attached_items
 from .contract import AcsiPlugin, ControlResult, Event, PluginContext
 
 logger = logging.getLogger(__name__)
@@ -35,6 +37,11 @@ class _Entry:
     claims: list[str]
     healthy: bool = True
     last_error: str | None = None
+    # What it attaches (decision 0025), as last asked; its own error, which
+    # doesn't change `healthy`.
+    attached: list[dict] = field(default_factory=list)
+    attached_error: str | None = None
+    attached_at: float | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def record(self, error: str | None) -> None:
@@ -54,12 +61,18 @@ class PluginHost:
         host_url: str | None = None,
         event_timeout: float = 5.0,
         control_timeout: float = 2.0,
+        attached_timeout: float = 1.0,
+        attached_max_age: float = 1.0,
     ):
         self.role = role
         # Where plugins reach this FSP or SO (PluginContext.host_url).
         self.host_url = host_url
         self.event_timeout = event_timeout
         self.control_timeout = control_timeout
+        self.attached_timeout = attached_timeout
+        # Asked again at most this often, however often the list is asked for.
+        self.attached_max_age = attached_max_age
+        self.clock = time.monotonic
         self._loop: asyncio.AbstractEventLoop | None = None
         self._entries: dict[str, _Entry] = {}
         self._owners: dict[str, str] = {}
@@ -179,12 +192,51 @@ class PluginHost:
                 "routes": e.plugin.routes_url is not None,
                 "healthy": e.healthy,
                 "last_error": e.last_error,
+                "attached": list(e.attached),
+                "attached_error": e.attached_error,
             }
             for n, e in entries.items()
         ]
         if name is None:
             return listed
         return next((s for s in listed if s["name"] == name), None)
+
+    # ==================== Attached ====================
+
+    async def refresh_attached(self) -> None:
+        """Ask every plugin what it attaches, all at once; one asked less than
+        attached_max_age ago keeps its answer. A plugin that fails or is too
+        slow keeps its last items and gets attached_error."""
+        now = self.clock()
+        with self._lock:
+            due = [
+                (name, entry)
+                for name, entry in self._entries.items()
+                if entry.attached_at is None
+                or now - entry.attached_at >= self.attached_max_age
+            ]
+        await asyncio.gather(*(self._ask_attached(n, e, now) for n, e in due))
+
+    async def _ask_attached(self, name: str, entry: _Entry, now: float) -> None:
+        try:
+            answer = await asyncio.wait_for(
+                entry.plugin.attached(), self.attached_timeout
+            )
+            items = attached_items.check(answer)
+        except TimeoutError:
+            error = f"attached timed out after {self.attached_timeout}s"
+        except Exception as e:
+            error = f"attached failed: {e}"
+        else:
+            with entry.lock:
+                entry.attached, entry.attached_error = items, None
+                entry.attached_at = now
+            return
+        if entry.attached_error != error:
+            logger.warning(f"Plugin '{name}': {error}")
+        with entry.lock:
+            entry.attached_error = error
+            entry.attached_at = now
 
     # ==================== Events ====================
 

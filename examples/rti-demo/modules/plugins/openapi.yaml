@@ -18,7 +18,7 @@ info:
 
     | Tag | Who serves it | What it is |
     |---|---|---|
-    | **Plugin API** | **you**, at the plugin's base URL | what the FSP or SO calls: describe, start, stop, events, control |
+    | **Plugin API** | **you**, at the plugin's base URL | what the FSP or SO calls: describe, start, stop, events, control, attached |
     | **Plugin management** | the FSP (port 5001) or SO (port 5000) | list, add, reload and remove plugins |
     | **Plugin routes** | the FSP or SO, for the plugin | the plugin's own routes, passed on under `/api/plugins/{name}/` |
 
@@ -31,7 +31,8 @@ info:
        that can't be reached is listed in `GET /api/plugins` as failed and tried again every
        `PLUGIN_RETRY_SECONDS` (10 s); the FSP or SO starts without it.
     3. While it runs, it sends every event to `POST <url>/events`, and, in the FSP, an Operate on an
-       objRef the plugin claims to `POST <url>/control`.
+       objRef the plugin claims to `POST <url>/control`. When its plugin list is asked for, it asks
+       `GET <url>/attached` what the plugin attaches (at most once a second), for the HMI (decision 0025).
     4. On removal, reload or shutdown it calls `POST <url>/stop`.
 
     | Call | Limit | When it fails |
@@ -39,6 +40,7 @@ info:
     | `GET <url>` | 5 s | not connected; tried again later |
     | `POST <url>/events` | 5 s | logged; the plugin is marked unhealthy, still gets the next event |
     | `POST <url>/control` | 2 s | the Operate fails |
+    | `GET <url>/attached` | 1 s | the last items stay, with `attached_error`; optional (`404`: attaches nothing) |
 
     Every call but `GET <url>` names the FSP or SO it comes from (`Host`), so one plugin service can
     serve several FSPs and SOs.
@@ -198,6 +200,50 @@ paths:
               example: { ok: false, add_cause: blockedByInterlocking }
         "204":
           description: No answer; the FSP checks the Operate itself.
+
+  /attached:
+    servers: *pluginServers
+    get:
+      tags: [Plugin API]
+      operationId: pluginAttached
+      summary: What the plugin attaches (optional)
+      description: |
+        What the plugin links its FSP or SO to (an IO server, a display, an IED), for the HMI to draw next
+        to the FSP or SO (decision 0025). Optional: a plugin without it answers `404` and attaches
+        nothing. Asked when the FSP's or SO's plugin list is asked for (the BFF does every 2 s), at most
+        once a second, with 1 s to answer: answer with what you know, don't ask other services first.
+
+        The FSP or SO checks and trims the answer: at most 4 items, 4 `live` blocks per item, and the
+        limits in `AttachedLive`; an item without a `label` or with an unknown `kind` or `state`, and a
+        block of an unknown `type`, are dropped; an unknown `color` becomes `white`. Everything is shown
+        as plain text.
+      responses:
+        "200":
+          description: What the plugin attaches.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attached"
+              example:
+                items:
+                  - kind: io
+                    label: IO server
+                    address: http://rti-io:9000
+                    state: ok
+                    detail: 6 devices
+                    live:
+                      - type: indicators
+                        items: [{ name: led1, "on": true, color: green }]
+                      - type: values
+                        items: [{ label: pot1, value: 42.0, unit: "%" }]
+                  - kind: display
+                    label: lcd1
+                    state: ok
+                    live:
+                      - type: text
+                        lines: ["FSP Connected: cp1"]
+        "404":
+          description: The plugin attaches nothing.
 
   # ==================== Plugin management (FSP and SO) ====================
 
@@ -646,9 +692,91 @@ components:
           default: {}
           description: The plugin's settings, sent with `/start`.
 
+    Attached:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 4
+          items:
+            $ref: "#/components/schemas/AttachedItem"
+
+    AttachedItem:
+      type: object
+      required: [kind, label]
+      properties:
+        kind:
+          enum: [io, ied, display, other]
+          description: What it is; the HMI's icon.
+        label:
+          type: string
+          maxLength: 80
+          examples: [IO server]
+        address:
+          type: [string, "null"]
+          maxLength: 80
+          description: Where it is, shown in the details.
+          examples: ["http://rti-io:9000"]
+        state:
+          enum: [ok, degraded, down, unknown]
+          default: unknown
+          description: The HMI's colour.
+        detail:
+          type: [string, "null"]
+          maxLength: 80
+          examples: [6 devices]
+        live:
+          type: array
+          maxItems: 4
+          items:
+            $ref: "#/components/schemas/AttachedLive"
+
+    AttachedLive:
+      description: A little live content, drawn small under the item.
+      oneOf:
+        - type: object
+          required: [type, lines]
+          properties:
+            type: { const: text }
+            lines:
+              type: array
+              maxItems: 8
+              items: { type: string, maxLength: 24 }
+        - type: object
+          required: [type, items]
+          properties:
+            type: { const: indicators }
+            items:
+              type: array
+              maxItems: 8
+              items:
+                type: object
+                required: [name, "on"]
+                properties:
+                  name: { type: string, maxLength: 80 }
+                  "on": { type: boolean }
+                  color: { enum: [green, red, yellow, blue, white], default: white }
+        - type: object
+          required: [type, items]
+          properties:
+            type: { const: values }
+            items:
+              type: array
+              maxItems: 6
+              items:
+                type: object
+                required: [label, value]
+                properties:
+                  label: { type: string, maxLength: 80 }
+                  value: { type: [number, string, "null"] }
+                  unit: { type: [string, "null"], maxLength: 80 }
+      discriminator:
+        propertyName: type
+
     PluginStatus:
       type: object
-      required: [name, version, url, claims, routes, healthy, last_error]
+      required: [name, version, url, claims, routes, healthy, last_error, attached, attached_error]
       properties:
         name:
           $ref: "#/components/schemas/PluginName"
@@ -677,6 +805,15 @@ components:
           type: [string, "null"]
           description: The last error, kept after the plugin is healthy again.
           examples: ["ValueWritten timed out after 5.0s"]
+        attached:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttachedItem"
+          description: What the plugin attaches (`GET <url>/attached`), checked; the last answer when it didn't answer this time.
+        attached_error:
+          type: [string, "null"]
+          description: Why the last `GET <url>/attached` failed; doesn't change `healthy`.
+          examples: ["attached timed out after 1.0s"]
 
     PluginList:
       type: object

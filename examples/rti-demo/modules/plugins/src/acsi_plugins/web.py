@@ -276,7 +276,8 @@ def create_plugins_router(service: PluginService) -> APIRouter:
     router = APIRouter(prefix="/api/plugins", tags=["Plugins"])
 
     @router.get("", summary="List plugins")
-    def api_list_plugins():
+    async def api_list_plugins():
+        await service.host.refresh_attached()
         return {"plugins": service.host.status(), "failed": dict(service.failed)}
 
     @router.post("", summary="Add a plugin")

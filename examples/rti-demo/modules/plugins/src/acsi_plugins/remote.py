@@ -8,6 +8,7 @@
     POST <url>/stop      {name, role, host_url}
     POST <url>/events    {host: {...}, event: {"type": ..., <fields>}}
     POST <url>/control   {host: {...}, obj_ref, ctl_val} -> ControlResult, or 204
+    GET  <url>/attached  {items: [...]}, what it attaches (optional, decision 0025)
 
 `url` is the plugin's base URL, from the plugin configuration.
 """
@@ -36,6 +37,8 @@ from .contract import (
 NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 # A plugin that doesn't answer this fast at startup is tried again later.
 DESCRIBE_TIMEOUT = 5.0
+# GET <url>/attached is asked while GET /api/plugins waits for it.
+ATTACHED_TIMEOUT = 1.0
 
 
 class PluginError(Exception):
@@ -201,6 +204,22 @@ class RemotePlugin(AcsiPlugin):
             )
         cause = data.get("add_cause")
         return ControlResult(data["ok"], cause if isinstance(cause, str) else None)
+
+    async def attached(self) -> Any:
+        """What the plugin attaches (GET <url>/attached); a plugin without
+        the route (404) attaches nothing."""
+        async with self._client_factory() as client:
+            try:
+                response = await client.get(
+                    f"{self.url}/attached", timeout=ATTACHED_TIMEOUT
+                )
+            except httpx.HTTPError as e:
+                raise PluginError(f"Can't reach {self.url}/attached: {e!r}") from e
+        if response.status_code in (404, 405):
+            return {"items": []}
+        if response.status_code >= 300:
+            raise PluginError(f"GET {self.url}/attached: HTTP {response.status_code}")
+        return self._body(response)
 
     async def _call(
         self, client: httpx.AsyncClient, method: str, url: str, body: Any = None
