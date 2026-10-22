@@ -266,3 +266,24 @@ describe('InstanceVisualization - plugin badge', () => {
     expect(screen.queryByTestId('plugin-badge-FSP01')).not.toBeInTheDocument();
   });
 });
+
+describe('InstanceVisualization - attached boxes (decision 0025)', () => {
+  const attached = { plugins: [{ name: 'io', healthy: true, attached: [{ kind: 'io', label: 'IO server', state: 'ok', live: [] }] }], failed: {} };
+  const FSP = { name: 'FSP01', type: 'RTI-FSP', status: 'connected', host: 'rti-fsp01', port: 5001, plugins: attached };
+
+  it('draws them next to the SO and FSP when asked to', () => {
+    render(
+      <MemoryRouter>
+        <InstanceVisualization connections={[{ ...SO, plugins: attached }, FSP]} showAttached />
+      </MemoryRouter>
+    );
+    expect(screen.getByTestId('attached-SO')).toHaveTextContent('IO server');
+    expect(screen.getByTestId('attached-FSP01')).toHaveTextContent('IO server');
+  });
+
+  it('leaves them out by default (Model, Traffic)', () => {
+    renderViz([{ ...SO, plugins: attached }, FSP]);
+    expect(screen.queryByTestId('attached-SO')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('attached-FSP01')).not.toBeInTheDocument();
+  });
+});

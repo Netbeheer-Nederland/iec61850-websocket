@@ -24,6 +24,7 @@ import { fspStateOf, useNow } from '../hooks/useFspPresence';
 import { formatDuration } from '../utils/timeline';
 import { normalizeTlsVersion } from './TLSConfigModal';
 import { pluginSummary } from '../utils/plugins';
+import AttachedBoxes from './AttachedBoxes';
 
 const DOWN_LABELS = { 'link-down': 'link down', unreachable: 'unreachable' };
 
@@ -215,6 +216,8 @@ function ActivityLink({ fspName, cp, link = EMPTY_LINK, detected, down = null })
  * @param {Function|null} onFspSelect - Replaces an FSP circle's navigation to ACSI Server, called with the connection
  * @param {Object|null} presence - useFspPresence's result; when given, an FSP
  *   whose link to the SO dropped is marked "link down" (Traffic)
+ * @param {boolean} showAttached - Draw what each SO's and FSP's plugins
+ *   attach next to it (Overview; decision 0025)
  */
 function InstanceVisualization({
   connections,
@@ -226,7 +229,8 @@ function InstanceVisualization({
   focusedFsp = null,
   onSoSelect = null,
   onFspSelect = null,
-  presence = null
+  presence = null,
+  showAttached = false
 }) {
   const navigate = useNavigate();
 
@@ -347,6 +351,11 @@ function InstanceVisualization({
                     RTI-SO
                   </div>
                 )}
+                {showAttached && (
+                  <div style={{ marginTop: '12px' }}>
+                    <AttachedBoxes conn={conn} direction="row" />
+                  </div>
+                )}
               </React.Fragment>
               );
             })}
@@ -449,6 +458,11 @@ function InstanceVisualization({
                       </div>
                     )}
                   </div>
+                  {showAttached && (
+                    <div style={{ marginLeft: '16px' }}>
+                      <AttachedBoxes conn={conn} />
+                    </div>
+                  )}
                 </div>
               );
             })}

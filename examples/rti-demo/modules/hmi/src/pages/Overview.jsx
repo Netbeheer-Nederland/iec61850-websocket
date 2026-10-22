@@ -47,6 +47,7 @@ function Overview({ connections = [], loading = false }) {
               connections={connections}
               loading={loading}
               onConnectionClick={null}
+              showAttached
             />
           )}
         </div>

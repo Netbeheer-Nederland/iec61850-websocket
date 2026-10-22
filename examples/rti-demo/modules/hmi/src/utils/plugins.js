@@ -56,3 +56,26 @@ export function claimOwnerOf(owners, ref) {
   if (!ref) return null;
   return owners[ref] || owners[`${ref}.Oper.ctlVal`] || null;
 }
+
+// What an SO's or FSP's plugins attach (decision 0025): every plugin's
+// `attached` items, as the instance checked them, each with the plugin it
+// comes from. Only connected plugins have items; [] while unknown.
+export function attachedItems(status) {
+  const items = [];
+  for (const p of status?.plugins || []) {
+    (Array.isArray(p.attached) ? p.attached : []).forEach((item, index) => {
+      items.push({
+        ...item,
+        key: `${p.name}:${index}`,
+        plugin: {
+          name: p.name,
+          version: p.version || '',
+          healthy: p.healthy !== false,
+          lastError: p.last_error || null,
+          attachedError: p.attached_error || null,
+        },
+      });
+    });
+  }
+  return items;
+}
