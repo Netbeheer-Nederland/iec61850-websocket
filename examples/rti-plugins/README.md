@@ -62,7 +62,9 @@ configuration:
 
 Each plugin has its own compose file, apart from the demo stack; the IO plugin is built for and runs on the Raspberry
 Pi. All stacks join the external network `rti-network`, where the FSPs and SO reach the plugins' APIs as
-`http://rti-io:9000/plugin` and `http://sim-leds:8099/plugin`.
+`http://rti-io:9000/plugin` and `http://sim-leds:8099/plugin`. The demo stack runs its own sim_leds, one per FSP and SO,
+with its overlay `docker-compose.leds.yaml`, and connects to the IO server only with `docker-compose.io.yaml`
+(decision [0034](../../docs/rti-demo/decisions/0034-demo-stack-plugins-sim-leds-io-opt-in.md)).
 
 ```bash
 docker network create rti-network 2>/dev/null || true

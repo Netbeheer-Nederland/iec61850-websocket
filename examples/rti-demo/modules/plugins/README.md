@@ -96,7 +96,8 @@ An FSP or SO connects to the plugins in its **plugin configuration** at startup:
 
 A plugin that can't be reached doesn't stop the FSP or SO: it is listed under `failed` in `GET /api/plugins` and tried
 again every `PLUGIN_RETRY_SECONDS`, so plugin services and the FSP or SO can start in any order. The demo's
-configurations are in [`config/plugin-configuration/`](../../config/plugin-configuration) (compose) and `launch.py`.
+configurations are in [`config/plugin-configuration/`](../../config/plugin-configuration) (compose: `sim_leds` by
+default, the IO server in `io/` with the overlay `docker-compose.io.yaml`) and `launch.py`.
 
 | Variable | Default | Description |
 |---|---|---|

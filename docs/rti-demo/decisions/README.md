@@ -44,5 +44,6 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0031](0031-plugin-source-layout.md) | A plugin's source: `server/` is the service, `plugin/` the plugin API, and the plugin depends on the server | proposed |
 | [0032](0032-io-plugin-folder-rpi-io.md) | The IO plugin's folder is `rpi_io`, after its package | proposed |
 | [0033](0033-fsp-autostart.md) | The FSP's ACSI server starts with the service (`FSP_AUTOSTART`, on); connecting to the SO is `FSP_AUTOCONNECT` (off) | proposed |
+| [0034](0034-demo-stack-plugins-sim-leds-io-opt-in.md) | The demo stack connects to sim_leds by default, run by an overlay; the IO server is opt-in | proposed |
 
 To add a decision, copy the layout of an existing record, take the next number, and add a line to this table.

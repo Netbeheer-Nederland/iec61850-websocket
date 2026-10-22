@@ -181,7 +181,8 @@ and decisions [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.m
 ### The IO plugin
 
 The IO server ([`rti-plugins/rpi_io`](../../../rti-plugins/rpi_io/README.md)) is the SO's IO plugin: compose
-configures it in `config/plugin-configuration/rti-so.json` (`http://rti-io:9000/plugin`), `launch.py` in `PLUGINS`
+configures it in `config/plugin-configuration/io/rti-so.json` (`http://rti-io:9000/plugin`, with the overlay
+`docker-compose.io.yaml`; by default the SO connects to its own `sim_leds`), `launch.py` in `PLUGINS`
 (`http://localhost:9000/plugin`). Its configuration says `"write_inputs": false`, so the input devices write to the FSP. Which devices react to which event or objRef is the IO server's
 `io_mapping.json`; see the *Hardware demo* section of `examples/rti-demo/README.md`.
 

@@ -138,12 +138,16 @@ directly, without retagging.
 
 ```shell
 cd examples/rti-demo
-docker compose build            # -> netbeheer-nederland/iec61850-websocket/rti-<role>:latest
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.leds.yaml build   # -> netbeheer-nederland/iec61850-websocket/rti-<role>:latest, and sim-leds
+docker compose -f docker-compose.yml -f docker-compose.leds.yaml up -d
 ```
 
-An available `docker-compose.override.yml` is loaded automatically and bind-mounts the module sources over
-the code in the images, so a source edit only needs a container restart.
+`docker-compose.leds.yaml` runs the demo's default plugins: one `sim_leds` per FSP and SO (see *Plugins* below).
+To save typing, put `COMPOSE_FILE=docker-compose.yml:docker-compose.leds.yaml` in `examples/rti-demo/.env`.
+
+An available `docker-compose.override.yml` is loaded automatically when no `-f` is given, and bind-mounts the module
+sources over the code in the images, so a source edit only needs a container restart. With `-f`, name it too
+(`-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.leds.yaml`), or add it to `COMPOSE_FILE`.
 
 ### Images published on GitHub
 
@@ -152,7 +156,8 @@ cd examples/rti-demo
 export RTI_IMAGE_REPO=ghcr.io/netbeheer-nederland/iec61850-websocket
 export RTI_IMAGE_TAG=latest
 docker compose -f docker-compose.yml pull
-docker compose -f docker-compose.yml up -d --no-build
+docker compose -f docker-compose.yml -f docker-compose.leds.yaml build sim-leds-fsp01   # sim-leds isn't published
+docker compose -f docker-compose.yml -f docker-compose.leds.yaml up -d --no-build
 ```
 
 `-f docker-compose.yml` leaves the dev overlay out, so the containers run the code in the
@@ -160,12 +165,27 @@ published images and not your local checkout. `--no-build` stops compose from bu
 that could not be pulled. Put the two variables in `examples/rti-demo/.env` to make the setting
 persistent.
 
+### Plugins: sim_leds by default, the IO server opt-in
+
+The FSPs and SO connect to the plugins in their plugin configuration, `config/plugin-configuration/` (decisions
+[0029](../../docs/rti-demo/decisions/0029-plugins-are-http-services.md),
+[0034](../../docs/rti-demo/decisions/0034-demo-stack-plugins-sim-leds-io-opt-in.md)):
+
+| Overlay | Plugins | Needs |
+|---|---|---|
+| `docker-compose.leds.yaml` (default) | One [`sim_leds`](../rti-plugins/sim_leds/README.md) each (`sim-leds-fsp01`, `sim-leds-fsp02`, `sim-leds-so`): two simulated LEDs that follow the association, Operates, writes and reports | nothing |
+| `docker-compose.io.yaml` | The IO server, `http://rti-io:9000/plugin`, from `config/plugin-configuration/io/` | `rti-io`, on the Raspberry Pi (below) |
+
+Without either overlay the FSPs and SO list `sim_leds` as failed, show a red plugin badge, and try again every 10 s;
+the rest of the demo works.
+
 ### The IO server (Raspberry Pi)
 
 The IO server, `rti-io`, isn't part of this stack: it runs on the Raspberry Pi and has its own compose file in
 [`examples/rti-plugins/rpi_io`](../rti-plugins/rpi_io/README.md) (decision
 [0028](../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)). It joins `rti-network` too, so the FSPs and SO reach
-it as `http://rti-io:9000/plugin`. The demo runs without it: the FSPs and SO list it as failed and try again.
+it as `http://rti-io:9000/plugin`. The FSPs and SO connect to it only with the overlay `docker-compose.io.yaml`
+(`docker compose -f docker-compose.yml -f docker-compose.io.yaml up -d`); by default they use sim_leds.
 
 ```shell
 cd examples/rti-plugins/rpi_io
@@ -291,7 +311,9 @@ Demo flow:
 
 The IO server is a plugin of the FSP and SO: an HTTP service they connect to from their plugin configuration
 (decision [0029](../../docs/rti-demo/decisions/0029-plugins-are-http-services.md)). Compose configures it in
-`config/plugin-configuration/` as `http://rti-io:9000/plugin`, `launch.py` as `http://localhost:9000/plugin`. Each
+`config/plugin-configuration/io/` as `http://rti-io:9000/plugin`, used with the overlay `docker-compose.io.yaml`
+(decision [0034](../../docs/rti-demo/decisions/0034-demo-stack-plugins-sim-leds-io-opt-in.md)), `launch.py` as
+`http://localhost:9000/plugin`. Each
 configuration also says where the IO server writes the button and potentiometers back to (`host_url`): the first FSP.
 On two Raspberry Pis, point each side's configuration at its own `io` service (see *Plugins* in
 [modules/fsp/README.md](modules/fsp/README.md)). The IO server and the other plugins are in
@@ -334,9 +356,11 @@ rti-demo/
 ├── launch.py                  # Main entry point
 ├── README.md                  # This file
 ├── docker-compose.yml         # bff, hmi, fsp01, fsp02, so (rti-io: its own stack)
+├── docker-compose.leds.yaml   # overlay: a sim_leds per FSP and SO, the default plugins
+├── docker-compose.io.yaml     # overlay: the FSPs and SO connect to the IO server instead
 ├── config/
 │   ├── launch_config.json.example
-│   ├── plugin-configuration/  # the plugins each FSP and SO connects to (compose)
+│   ├── plugin-configuration/  # the plugins each FSP and SO connects to (compose): sim_leds; io/: the IO server
 │   └── models/                # IED model files (model_1.py, model_2.py)
 └── modules/
     ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }

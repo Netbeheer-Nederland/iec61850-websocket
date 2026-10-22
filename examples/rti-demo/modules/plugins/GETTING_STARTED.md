@@ -122,7 +122,8 @@ curl -X POST http://localhost:5001/api/plugins/sim_leds/leds/red \
 ```
 
 For a lasting configuration, put the same JSON in a file and point `PLUGINS_FILE` at it, as compose does
-(`config/plugin-configuration/`). Start order doesn't matter: an FSP whose plugin isn't up yet tries again every 10 s.
+(`config/plugin-configuration/`). The demo stack connects every FSP and SO to its own `sim_leds` by default, run by the
+overlay `docker-compose.leds.yaml`. Start order doesn't matter: an FSP whose plugin isn't up yet tries again every 10 s.
 
 To add a plugin to a running FSP without restarting it, allow its URL and post it:
 
