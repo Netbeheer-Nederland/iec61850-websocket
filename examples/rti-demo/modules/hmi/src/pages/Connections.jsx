@@ -25,6 +25,21 @@ import ConnectionModal from '../components/ConnectionModal';
 // straight to the BFF (add-connection/edit-connection/delete-connection),
 // same as the old combined Setup page used to, then `onReload()` refetches
 // the shared `connections` list App.jsx passes to every page.
+// Why a save or delete failed: the BFF's own reason ({"ok": false, "error"}),
+// e.g. that another connection already has the name.
+export async function failureReason(response) {
+  const text = await response.text().catch(() => '');
+  try {
+    const body = JSON.parse(text);
+    return body.error || body.detail || text || response.statusText;
+  } catch {
+    return text || response.statusText;
+  }
+}
+
+// A name as one path segment: names may contain '/', '?', '#' or spaces.
+const namePath = (name) => encodeURIComponent(name);
+
 function Connections({ settings, connections = [], loading = false, onReload }) {
   const [showModal, setShowModal] = useState(false);
   const [currentConnection, setCurrentConnection] = useState(null);
@@ -134,11 +149,13 @@ function Connections({ settings, connections = [], loading = false, onReload }) 
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/delete-connection/${connection.name}`, {
+      const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/delete-connection/${namePath(connection.name)}`, {
         method: 'DELETE'
       });
       if (response.ok) {
         onReload?.();
+      } else {
+        alert(`Failed to delete connection: ${await failureReason(response)}`);
       }
     } catch (error) {
       console.error('Failed to delete connection:', error);
@@ -189,7 +206,7 @@ function Connections({ settings, connections = [], loading = false, onReload }) 
 
       if (currentConnection) {
         // Update existing connection
-        const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/edit-connection/${currentConnection.name}`, {
+        const response = await fetch(`http://${settings.bffHost}:${settings.bffPort}/api/edit-connection/${namePath(currentConnection.name)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(saveData)
@@ -198,8 +215,7 @@ function Connections({ settings, connections = [], loading = false, onReload }) 
           onReload?.();
           setShowModal(false);
         } else {
-          const errText = await response.text().catch(() => '');
-          alert(`Failed to save connection: ${errText || response.statusText}`);
+          alert(`Failed to save connection: ${await failureReason(response)}`);
         }
       } else {
         // Add new connection
@@ -212,8 +228,7 @@ function Connections({ settings, connections = [], loading = false, onReload }) 
           onReload?.();
           setShowModal(false);
         } else {
-          const errText = await response.text().catch(() => '');
-          alert(`Failed to save connection: ${errText || response.statusText}`);
+          alert(`Failed to save connection: ${await failureReason(response)}`);
         }
       }
     } catch (error) {

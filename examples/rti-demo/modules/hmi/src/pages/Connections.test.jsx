@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import Connections from './Connections';
+import Connections, { failureReason } from './Connections';
 
 const user = () => userEvent.setup({ delay: null });
 
@@ -299,5 +299,59 @@ describe('Connections page - OAuth settings moved to the OAuth Config dialog', (
       'client_id', 'client_secret', 'enable_token_refresh', 'idp_server']) {
       expect(body).not.toHaveProperty(field);
     }
+  });
+});
+
+describe('Connections page - unique names (the BFF refuses a taken one)', () => {
+  it('deletes and edits by the URL-encoded name', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConnections([
+      { name: 'FSP 01/a', host: '10.0.0.1', port: 5001, type: 'RTI-FSP', status: 'connected' },
+    ]);
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:5000/api/delete-connection/FSP%2001%2Fa',
+      expect.objectContaining({ method: 'DELETE' })
+    );
+  });
+
+  it('says why a save was refused, in the BFF\'s own words', async () => {
+    const alert = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    global.fetch = vi.fn(async () => new Response(
+      JSON.stringify({ ok: false, error: "A connection named 'so1' already exists (10.0.0.1:5000); choose another name, or edit that one" }),
+      { status: 409 }
+    ));
+    renderConnections();
+    const u = user();
+
+    await u.click(screen.getByRole('button', { name: /register instance/i }));
+    await u.type(screen.getByLabelText('Name'), 'so1');
+    await u.type(screen.getByLabelText('Host'), '10.0.0.1');
+    await u.click(screen.getByRole('button', { name: /save instance/i }));
+
+    expect(alert).toHaveBeenCalledWith(
+      "Failed to save connection: A connection named 'so1' already exists (10.0.0.1:5000); choose another name, or edit that one"
+    );
+  });
+
+  it('says why a delete failed', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const alert = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({ ok: false, error: 'Connection not found' }), { status: 404 }));
+    renderConnections([
+      { name: 'so1', host: '10.0.0.1', port: 5002, type: 'RTI-SO', status: 'connected' },
+    ]);
+
+    await user().click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(alert).toHaveBeenCalledWith('Failed to delete connection: Connection not found');
+  });
+
+  it('falls back to the text or the status when the answer isn\'t JSON', async () => {
+    expect(await failureReason(new Response('boom', { status: 500 }))).toBe('boom');
+    expect(await failureReason(new Response('', { status: 500, statusText: 'Server Error' }))).toBe('Server Error');
   });
 });
