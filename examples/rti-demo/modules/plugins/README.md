@@ -31,7 +31,7 @@ The plugins themselves, and the IO server, are in [`examples/rti-plugins`](../..
 
 ## The plugin API
 
-A plugin serves five calls, and an optional sixth, under its base URL (`url` in the configuration, for example `http://rti-io:9000/plugin`):
+A plugin serves five calls, and an optional sixth, under its base URL (`url` in the configuration, for example `http://rpi-io:9000/plugin`):
 
 | Call | When | Answer |
 |---|---|---|
@@ -88,7 +88,7 @@ An FSP or SO connects to the plugins in its **plugin configuration** at startup:
 {
   "host_url": "http://rti-fsp01:5001",
   "plugins": [
-    {"name": "io", "url": "http://rti-io:9000/plugin", "settings": {}},
+    {"name": "io", "url": "http://rpi-io:9000/plugin", "settings": {}},
     {"name": "historian", "url": "http://historian:8000/acsi-plugin", "settings": {"retention_days": 30}}
   ]
 }

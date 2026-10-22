@@ -147,7 +147,7 @@ def test_another_port_is_where_the_plugins_reach_it(launcher):
 
 def test_in_docker_the_plugins_use_the_container_names(launcher):
     env = launcher._docker_env(_config(launcher, "fsp2"))
-    assert json.loads(env["PLUGINS"])[0]["url"] == "http://rti-io:9000/plugin"
+    assert json.loads(env["PLUGINS"])[0]["url"] == "http://rpi-io:9000/plugin"
     assert env["PLUGIN_HOST_URL"] == "http://rti-fsp2:5005"
 
 
@@ -169,3 +169,9 @@ def test_a_developer_s_plugin_sources_are_allowed(launcher, monkeypatch):
     monkeypatch.setenv("PLUGIN_ALLOWED_SOURCES", "http://localhost:8099")
     env = _launch_module()._plugin_env("so", 5000)
     assert env["PLUGIN_ALLOWED_SOURCES"] == "http://localhost:8099"
+
+
+def test_in_docker_the_io_server_is_named_after_its_plugin():
+    module = _launch_module()
+    assert module.container_name(module.ServiceType.IO) == "rpi-io"
+    assert module.container_name(module.ServiceType.SO) == "rti-so"

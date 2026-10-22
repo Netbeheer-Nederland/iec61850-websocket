@@ -246,13 +246,21 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         docker_image=rti_image("io"),
         health_check_path="/api/io/health",
         labels={
-            "rti.service": "rti-io",
+            "rti.service": "rpi-io",
             "rti.type": "RTI-IO",
-            "rti.host": "rti-io",
+            "rti.host": "rpi-io",
             "rti.port": "9000",
         },
     ),
 }
+
+
+def container_name(service_type: ServiceType) -> str:
+    """The container's name in Docker, where the others reach it: rti-<type>,
+    and rpi-io for the IO server, after its plugin (rpi_io)."""
+    if service_type == ServiceType.IO:
+        return "rpi-io"
+    return f"rti-{service_type.value}"
 
 
 class RTILauncher:
@@ -434,16 +442,18 @@ class RTILauncher:
     @staticmethod
     def _docker_env(config: ServiceConfig) -> dict[str, str]:
         """The service's environment in a container on rti-network, where the
-        others are reached by container name (rti-<type>), not localhost."""
+        others are reached by container name (container_name: rti-<type>, and
+        rpi-io for the IO server), not localhost."""
         env = dict(config.env_vars)
         if "PLUGINS" in env:
             io_port = SERVICES[ServiceType.IO].default_port
             env["PLUGINS"] = env["PLUGINS"].replace(
-                f"http://localhost:{io_port}", f"http://rti-io:{io_port}"
+                f"http://localhost:{io_port}",
+                f"http://{container_name(ServiceType.IO)}:{io_port}",
             )
         if "PLUGIN_HOST_URL" in env:
             env["PLUGIN_HOST_URL"] = (
-                f"http://rti-{config.service_type.value}:{config.default_port}"
+                f"http://{container_name(config.service_type)}:{config.default_port}"
             )
         if "FSP_SO_HOST" in env:
             env["FSP_SO_HOST"] = "rti-so"
@@ -595,7 +605,7 @@ class RTILauncher:
             "-p",
             f"{port}:{port}",
             "--name",
-            f"rti-{config.service_type.value}",
+            container_name(config.service_type),
         ]
 
         # Add Docker labels for auto-discovery

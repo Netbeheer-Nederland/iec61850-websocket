@@ -594,7 +594,7 @@
             <h3>🔌 Plugins (2) <span style="float:right;" class="btn btn-outline">Add plugin</span></h3>
             <div class="table-wf">
               <div class="thead"><span class="cell">Plugin</span><span class="cell">State</span><span class="cell">URL</span><span class="cell narrow">Controls</span><span class="cell narrow">Actions</span></div>
-              <div class="trow"><span class="cell">io 1.0</span><span class="cell">Healthy</span><span class="cell">http://rti-io:9000/plugin</span><span class="cell narrow">1</span><span class="cell narrow">⟳ 🗑</span></div>
+              <div class="trow"><span class="cell">io 1.0</span><span class="cell">Healthy</span><span class="cell">http://rpi-io:9000/plugin</span><span class="cell narrow">1</span><span class="cell narrow">⟳ 🗑</span></div>
               <div class="trow"><span class="cell">display</span><span class="cell">Unreachable<br><span class="placeholder-text">connection refused</span></span><span class="cell">-</span><span class="cell narrow">-</span><span class="cell narrow">⟳ 🗑</span></div>
             </div>
             <p class="placeholder-text" style="margin:10px 0 0;">ⓘ The instance's GET /api/plugins (through /api/execute), then followed from the BFF's connections push - a plugin that drops or comes back shows without polling. State: Healthy / Unhealthy (with last error) / Unreachable (with the reason; the instance retries every 10s). Controls: how many objRefs it answers Operate on (tooltip lists them). ⟳ Reload (POST /api/plugins/{name}/reload), 🗑 Remove (DELETE /api/plugins/{name}, after a confirm). Add plugin: name, URL, settings (JSON, optional) → POST /api/plugins; only URLs in the instance's PLUGIN_ALLOWED_SOURCES, and the instance's own refusal reason is shown. An added plugin lasts until the instance restarts.</p>
@@ -704,7 +704,7 @@
             <h3>🔌 Plugins (1) <span style="float:right;" class="btn btn-outline">Add plugin</span></h3>
             <div class="table-wf">
               <div class="thead"><span class="cell">Plugin</span><span class="cell">State</span><span class="cell">URL</span><span class="cell narrow">Actions</span></div>
-              <div class="trow"><span class="cell">io 1.0</span><span class="cell">Healthy</span><span class="cell">http://rti-io:9000/plugin</span><span class="cell narrow">⟳ 🗑</span></div>
+              <div class="trow"><span class="cell">io 1.0</span><span class="cell">Healthy</span><span class="cell">http://rpi-io:9000/plugin</span><span class="cell narrow">⟳ 🗑</span></div>
             </div>
             <p class="placeholder-text" style="margin:10px 0 0;">ⓘ Same panel as on ACSI Server, without the Controls column - SO plugins don't answer Operate.</p>
           </div>

@@ -91,7 +91,7 @@ def is_allowed(url: str, allowed: list[str]) -> bool:
 
     Scheme, host and port must be equal, and the allowed path must be a
     whole-segment prefix of the URL's path. Plain string prefixes aren't
-    enough: "http://rti-io:9000" would also match "http://rti-io:9000.evil.test".
+    enough: "http://rpi-io:9000" would also match "http://rpi-io:9000.evil.test".
     """
     target = urlsplit(url)
     for entry in allowed:

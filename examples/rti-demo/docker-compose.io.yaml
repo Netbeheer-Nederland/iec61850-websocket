@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Opt-in: the IO server (rti-io) as the FSPs' and SO's plugin, instead of
+# Opt-in: the IO server (rpi-io) as the FSPs' and SO's plugin, instead of
 # sim_leds (decision 0034). An overlay on docker-compose.yml:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.io.yaml up -d
@@ -15,8 +15,8 @@
 #   -f ../rti-plugins/rpi_io/docker-compose.pi.yaml
 #
 # The image is the published rti-io, built from examples/rti-plugins/rpi_io.
-# Don't also run rpi_io's own stack (decision 0028): both are named rti-io.
-x-rti-io: &rti-io
+# Don't also run rpi_io's own stack (decision 0028): both are named rpi-io.
+x-rpi-io: &rpi-io
   image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-io:${RTI_IMAGE_TAG:-latest}
   build:
     context: ../rti-plugins/rpi_io
@@ -35,9 +35,9 @@ x-rti-io: &rti-io
   # published: the HMI reaches the devices through /api/plugins/io/.
 
 services:
-  rti-io:
-    <<: *rti-io
-    container_name: rti-io
+  rpi-io:
+    <<: *rpi-io
+    container_name: rpi-io
 
   # The FSPs and SO connect to it, from config/plugin-configuration/io/
   # mounted over the default configuration (sim_leds).

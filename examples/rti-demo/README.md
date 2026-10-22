@@ -174,19 +174,19 @@ The FSPs and SO connect to the plugins in their plugin configuration, `config/pl
 | Overlay | Plugins | Needs |
 |---|---|---|
 | `docker-compose.leds.yaml` (default) | One [`sim_leds`](../rti-plugins/sim_leds/README.md) each (`sim-leds-fsp01`, `sim-leds-fsp02`, `sim-leds-so`): two simulated LEDs that follow the association, Operates, writes and reports | nothing |
-| `docker-compose.io.yaml` | One IO server for all three, `rti-io` (`http://rti-io:9000/plugin`), from `config/plugin-configuration/io/` | nothing; on the Raspberry Pi also `-f ../rti-plugins/rpi_io/docker-compose.pi.yaml` for its devices (below) |
+| `docker-compose.io.yaml` | One IO server for all three, `rpi-io` (`http://rpi-io:9000/plugin`), from `config/plugin-configuration/io/` | nothing; on the Raspberry Pi also `-f ../rti-plugins/rpi_io/docker-compose.pi.yaml` for its devices (below) |
 
 Without either overlay the FSPs and SO list `sim_leds` as failed, show a red plugin badge, and try again every 10 s;
 the rest of the demo works.
 
 ### The IO server (Raspberry Pi)
 
-The IO server, `rti-io`, isn't part of `docker-compose.yml`: it is meant for the Raspberry Pi and has its own compose file in
+The IO server, `rpi-io`, isn't part of `docker-compose.yml`: it is meant for the Raspberry Pi and has its own compose file in
 [`examples/rti-plugins/rpi_io`](../rti-plugins/rpi_io/README.md) (decision
 [0028](../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)). It joins `rti-network` too, so the FSPs and SO reach
-it as `http://rti-io:9000/plugin`. The FSPs and SO connect to it only with the overlay `docker-compose.io.yaml`;
-by default they use sim_leds. That overlay also runs `rti-io` itself, so on a Pi that runs the whole demo one command
-does it (don't also start the stack below then: both are `rti-io`):
+it as `http://rpi-io:9000/plugin`. The FSPs and SO connect to it only with the overlay `docker-compose.io.yaml`;
+by default they use sim_leds. That overlay also runs `rpi-io` itself, so on a Pi that runs the whole demo one command
+does it (don't also start the stack below then: both are `rpi-io`):
 
 ```shell
 cd examples/rti-demo
@@ -202,7 +202,7 @@ docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d     # on t
 ```
 
 Like every plugin ([0030](../../docs/rti-demo/decisions/0030-plugin-project-layout.md)), `docker-compose.yaml` runs
-anywhere and `docker-compose.pi.yaml` adds the Pi's devices to `rti-io`, and the settings that only exist for them;
+anywhere and `docker-compose.pi.yaml` adds the Pi's devices to `rpi-io`, and the settings that only exist for them;
 Docker won't start a container whose device paths are missing. Without the overlay, devices whose hardware is missing
 log an error at startup and stay unavailable, except the I2C LCD, which runs in mock mode.
 
@@ -319,7 +319,7 @@ Demo flow:
 
 The IO server is a plugin of the FSP and SO: an HTTP service they connect to from their plugin configuration
 (decision [0029](../../docs/rti-demo/decisions/0029-plugins-are-http-services.md)). Compose configures it in
-`config/plugin-configuration/io/` as `http://rti-io:9000/plugin`, used with the overlay `docker-compose.io.yaml`
+`config/plugin-configuration/io/` as `http://rpi-io:9000/plugin`, used with the overlay `docker-compose.io.yaml`
 (decision [0034](../../docs/rti-demo/decisions/0034-demo-stack-plugins-sim-leds-io-opt-in.md)), `launch.py` as
 `http://localhost:9000/plugin`. Each
 configuration also says where the IO server writes the button and potentiometers back to (`host_url`): the first FSP.
@@ -341,7 +341,7 @@ runs without the hardware too (see [The IO server (Raspberry Pi)](#the-io-server
 uv run python launch.py io
 
 # in Docker, its own stack (add -f docker-compose.yaml -f docker-compose.pi.yaml on the Pi)
-cd ../rti-plugins/rpi_io && docker compose up rti-io
+cd ../rti-plugins/rpi_io && docker compose up rpi-io
 
 # or directly, in the io project's own environment
 cd ../rti-plugins/rpi_io && uv run rpi-io
@@ -363,7 +363,7 @@ It listens on 9000 however it's started (`PORT` overrides it).
 rti-demo/
 ├── launch.py                  # Main entry point
 ├── README.md                  # This file
-├── docker-compose.yml         # bff, hmi, fsp01, fsp02, so (rti-io: its own stack)
+├── docker-compose.yml         # bff, hmi, fsp01, fsp02, so (rpi-io: its own stack)
 ├── docker-compose.leds.yaml   # overlay: a sim_leds per FSP and SO, the default plugins
 ├── docker-compose.io.yaml     # overlay: the FSPs and SO connect to the IO server instead
 ├── config/

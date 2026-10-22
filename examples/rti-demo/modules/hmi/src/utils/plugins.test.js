@@ -8,7 +8,7 @@ import { pluginRows, pluginSummary, claimOwners, claimOwnerOf, attachedItems } f
 
 const STATUS = {
   plugins: [
-    { name: 'io', version: '1.2', url: 'http://rti-io:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], healthy: true, last_error: null },
+    { name: 'io', version: '1.2', url: 'http://rpi-io:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], healthy: true, last_error: null },
     { name: 'leds', version: '0.1', url: 'http://sim-leds:8099/plugin', claims: [], healthy: false, last_error: 'on_event timed out' },
   ],
   failed: { display: "Can't reach http://pi:8000/plugin" },

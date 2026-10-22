@@ -12,13 +12,13 @@ SPDX-License-Identifier: Apache-2.0
 ## Context
 
 Since [0029](0029-plugins-are-http-services.md) the FSPs and SO connect to their plugins from a plugin configuration,
-and compose gave all three the IO server, `http://rti-io:9000/plugin` (point 5). The IO server is its own stack and is
+and compose gave all three the IO server, `http://rpi-io:9000/plugin` (point 5). The IO server is its own stack and is
 meant for the Raspberry Pi ([0017](0017-hardware-is-optional.md), [0028](0028-rti-plugins-folder.md)). How things stood
 (2026-10-22):
 
 - **Without a Pi there is little to see.** Off the Pi, the LEDs and buttons need GPIO and stay unavailable; the
   potentiometers report a fixed mock value and the LCDs accept text and drop it.
-- **Without the IO server the demo looks broken.** Most runs of the stack have no `rti-io`. The FSPs and SO list `io`
+- **Without the IO server the demo looks broken.** Most runs of the stack have no `rpi-io`. The FSPs and SO list `io`
   under `failed`, try again every 10 s, and since the plugin badge their circles on Overview and Traffic carry a red
   badge: a fault that is only a missing Pi.
 - **Plugins are now visible in the HMI**: the Plugins panel, the plugin badge and the attached boxes
@@ -45,14 +45,18 @@ Options considered:
    `sim-leds-so`, image `sim-leds`, built from `examples/rti-plugins/sim_leds`, on `rti-network`, with no published
    ports (the HMI reaches the LEDs through `/api/plugins/sim_leds/`). Without the overlay the FSPs and SO retry
    sim_leds, as they did the IO server.
-3. **The IO server is opt-in, through an overlay built like the LEDs one**: `docker-compose.io.yaml` runs `rti-io`
+3. **The IO server is opt-in, through an overlay built like the LEDs one**: `docker-compose.io.yaml` runs `rpi-io`
    (the published image, built from `examples/rti-plugins/rpi_io`, on `rti-network`, no published ports) and mounts
    its configurations, moved unchanged to `config/plugin-configuration/io/`, over the default ones. One IO server for
    all three, not one each: on the Pi it drives the pins, which one process can hold. On the Pi,
    `examples/rti-plugins/rpi_io/docker-compose.pi.yaml` is added as a third file for the devices. `rpi_io`'s own
-   stack (0028) stays, for an IO server apart from the demo stack; the two aren't run together, both being `rti-io`.
-4. **`launch.py` is unchanged.** It runs the IO server itself, in mock mode off the Pi, so its FSPs and SO reach their
-   plugin.
+   stack (0028) stays, for an IO server apart from the demo stack; the two aren't run together, both being `rpi-io`.
+4. **The IO server's service, container and host name is `rpi-io`**, after its plugin (`rpi_io`), as sim_leds runs as
+   `sim-leds`: `http://rpi-io:9000/plugin`, in `docker-compose.io.yaml`, `rpi_io`'s own stack and `launch.py --docker`.
+   The image keeps its published name, `rti-io` ([0016](0016-container-build-and-image-names.md)), and the plugin its
+   name, `io` (`/api/plugins/io/`).
+5. **`launch.py` otherwise is unchanged.** It runs the IO server itself, in mock mode off the Pi, so its FSPs and SO
+   reach their plugin.
 
 ## Consequences
 
@@ -73,4 +77,6 @@ Options considered:
 
 - `examples/rti-demo/config/plugin-configuration/` (sim_leds), `config/plugin-configuration/io/` (the IO server)
 - `examples/rti-demo/docker-compose.leds.yaml`, `docker-compose.io.yaml`, `docker-compose.yml` (comments)
-- `REUSE.toml`; `tests/unit/test_rti_demo_ports.py`
+- `examples/rti-plugins/rpi_io/docker-compose.yaml`, `docker-compose.pi.yaml` (the service `rpi-io`);
+  `examples/rti-demo/launch.py` (`container_name`)
+- `REUSE.toml`; `tests/unit/test_rti_demo_ports.py`, `test_rti_demo_launch.py`

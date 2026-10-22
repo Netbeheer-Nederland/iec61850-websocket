@@ -83,15 +83,15 @@ def test_compose_publishes_and_labels_the_port(compose, service, role):
 
 def test_the_io_server_s_compose_publishes_and_labels_the_port(io_compose):
     port = EXPECTED_PORTS["io"]
-    svc = io_compose["rti-io"]
+    svc = io_compose["rpi-io"]
     assert f"{port}:{port}" in svc["ports"]
     assert f"rti.port={port}" in svc["labels"]
 
 
 def test_the_io_server_is_its_own_stack_on_the_demo_s_network(compose, io_compose):
-    # Decision 0028: rti-io isn't in the demo's compose, but on its network.
-    assert "rti-io" not in compose
-    assert io_compose["rti-io"]["networks"] == ["rti-network"]
+    # Decision 0028: rpi-io isn't in the demo's compose, but on its network.
+    assert "rpi-io" not in compose
+    assert io_compose["rpi-io"]["networks"] == ["rti-network"]
 
 
 def test_compose_publishes_the_hmi_on_8080(compose):
@@ -172,10 +172,10 @@ def test_the_leds_overlay_runs_only_sim_leds(leds_compose):
 def test_the_io_overlay_runs_one_io_server(io_overlay, io_compose):
     # Like the LEDs overlay: the plugin's service on rti-network, nothing
     # published. One for all three: on the Pi it holds the pins.
-    svc = io_overlay["rti-io"]
-    assert set(io_overlay) == {"rti-io", "rti-fsp01", "rti-fsp02", "rti-so"}
-    assert svc["image"] == io_compose["rti-io"]["image"]
-    assert svc["build"]["args"] == io_compose["rti-io"]["build"]["args"]
+    svc = io_overlay["rpi-io"]
+    assert set(io_overlay) == {"rpi-io", "rti-fsp01", "rti-fsp02", "rti-so"}
+    assert svc["image"] == io_compose["rpi-io"]["image"]
+    assert svc["build"]["args"] == io_compose["rpi-io"]["build"]["args"]
     assert svc["networks"] == ["rti-network"]
     assert "ports" not in svc
     # The Pi's devices come from rpi_io's own docker-compose.pi.yaml.
@@ -192,7 +192,7 @@ def test_the_io_overlay_connects_the_io_plugin(io_overlay, service, role):
     config = _plugin_config(io_overlay, service)
     assert config["host_url"] == f"http://{service}:{EXPECTED_PORTS[role]}"
     [io] = config["plugins"]
-    assert io["url"] == f"http://rti-io:{EXPECTED_PORTS['io']}/plugin"
+    assert io["url"] == f"http://rpi-io:{EXPECTED_PORTS['io']}/plugin"
     # One IO server writes its inputs to the first FSP only.
     write_inputs = io.get("settings", {}).get("write_inputs", True)
     assert write_inputs is (service == "rti-fsp01")

@@ -974,7 +974,7 @@ async def test_build_enriched_connections_adds_plugins(monkeypatch):
     io = {
         "name": "io",
         "version": "1.0",
-        "url": "http://rti-io:9000/plugin",
+        "url": "http://rpi-io:9000/plugin",
         "claims": ["LD0/CSWI1.Pos.Oper.ctlVal"],
         "routes": True,
         "healthy": True,

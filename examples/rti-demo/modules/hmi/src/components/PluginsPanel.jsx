@@ -106,7 +106,7 @@ function PluginsPanel({ target, role, pushed }) {
       {adding && (
         <form onSubmit={handleAdd} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px 12px', marginBottom: '12px' }}>
           <input id="plugins-add-name" placeholder="Name, e.g. io" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <input id="plugins-add-url" placeholder="URL, e.g. http://rti-io:9000/plugin" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} required />
+          <input id="plugins-add-url" placeholder="URL, e.g. http://rpi-io:9000/plugin" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} required />
           <textarea id="plugins-add-settings" placeholder='Settings (JSON, optional), e.g. {"write_inputs": false}' value={form.settings} onChange={(e) => setForm({ ...form, settings: e.target.value })} style={{ gridColumn: '1 / -1', fontFamily: 'monospace', minHeight: '48px' }} />
           <small style={{ gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
             Only URLs in the instance's PLUGIN_ALLOWED_SOURCES are accepted. An added plugin stays until the instance restarts; a lasting one goes in its plugin configuration.

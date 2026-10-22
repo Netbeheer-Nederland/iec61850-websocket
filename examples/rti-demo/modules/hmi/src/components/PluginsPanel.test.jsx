@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event';
 import PluginsPanel from './PluginsPanel';
 
 const STATUS = {
-  plugins: [{ name: 'io', version: '1.2', url: 'http://rti-io:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], routes: true, healthy: true, last_error: null }],
+  plugins: [{ name: 'io', version: '1.2', url: 'http://rpi-io:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], routes: true, healthy: true, last_error: null }],
   failed: { display: "Can't reach http://pi:8000/plugin" },
 };
 

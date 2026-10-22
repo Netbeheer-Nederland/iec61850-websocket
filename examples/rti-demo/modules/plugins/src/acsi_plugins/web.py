@@ -249,7 +249,7 @@ class InstallRequest(BaseModel):
     url: str = Field(
         ...,
         description="The plugin's base URL (GET <url> describes it)",
-        examples=["http://rti-io:9000/plugin"],
+        examples=["http://rpi-io:9000/plugin"],
     )
     settings: dict[str, Any] = Field(
         default_factory=dict, description="The plugin's own settings"

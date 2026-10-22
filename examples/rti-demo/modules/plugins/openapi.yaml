@@ -63,7 +63,7 @@ tags:
   - name: Plugin API
     description: |
       **Implemented by you.** The paths are relative to the plugin's base URL, the `url` in the plugin
-      configuration (for example `http://rti-io:9000/plugin`). Answer with a 2xx status; any other
+      configuration (for example `http://rpi-io:9000/plugin`). Answer with a 2xx status; any other
       status is a failure. Request bodies are JSON.
   - name: Plugin management
     description: Served by the FSP and SO.
@@ -228,7 +228,7 @@ paths:
                 items:
                   - kind: io
                     label: IO server
-                    address: http://rti-io:9000
+                    address: http://rpi-io:9000
                     state: ok
                     detail: 6 devices
                     live:
@@ -510,8 +510,8 @@ components:
           type: [string, "null"]
           description: |
             Where the plugin's own routes are, served under `/api/plugins/<name>/`: a URL, or a path
-            resolved against the plugin's base URL (`/api/io` on `http://rti-io:9000/plugin` is
-            `http://rti-io:9000/api/io`). Leave out for none.
+            resolved against the plugin's base URL (`/api/io` on `http://rpi-io:9000/plugin` is
+            `http://rpi-io:9000/api/io`). Leave out for none.
           examples: [/api/io]
 
     Host:
@@ -685,7 +685,7 @@ components:
         url:
           type: string
           description: The plugin's base URL.
-          examples: ["http://rti-io:9000/plugin"]
+          examples: ["http://rpi-io:9000/plugin"]
         settings:
           type: object
           additionalProperties: true
@@ -717,7 +717,7 @@ components:
           type: [string, "null"]
           maxLength: 80
           description: Where it is, shown in the details.
-          examples: ["http://rti-io:9000"]
+          examples: ["http://rpi-io:9000"]
         state:
           enum: [ok, degraded, down, unknown]
           default: unknown
@@ -787,7 +787,7 @@ components:
         url:
           type: [string, "null"]
           description: The plugin's base URL.
-          examples: ["http://rti-io:9000/plugin"]
+          examples: ["http://rpi-io:9000/plugin"]
         claims:
           type: array
           items:
@@ -828,7 +828,7 @@ components:
           description: The plugins that aren't connected, by name, with why; configured ones are tried again.
           additionalProperties:
             type: string
-          examples: [{ io: "Can't reach http://rti-io:9000/plugin: ConnectError(...)" }]
+          examples: [{ io: "Can't reach http://rpi-io:9000/plugin: ConnectError(...)" }]
 
     Ok:
       type: object
@@ -884,7 +884,7 @@ components:
         host_url: http://rti-fsp01:5001
         plugins:
           - name: io
-            url: http://rti-io:9000/plugin
+            url: http://rpi-io:9000/plugin
             settings: {}
 
     PluginEntry:

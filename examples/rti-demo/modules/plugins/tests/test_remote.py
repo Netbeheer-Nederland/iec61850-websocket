@@ -135,15 +135,15 @@ async def test_a_control_answer_that_is_not_a_result_is_an_error():
 @pytest.mark.parametrize(
     ("url", "allowed"),
     [
-        ("http://rti-io:9000/plugin", True),
-        ("http://rti-io:9000", True),
-        ("https://rti-io:9000/plugin", False),
-        ("http://rti-io:9001/plugin", False),
-        ("http://rti-io:9000.evil.test/plugin", False),
+        ("http://rpi-io:9000/plugin", True),
+        ("http://rpi-io:9000", True),
+        ("https://rpi-io:9000/plugin", False),
+        ("http://rpi-io:9001/plugin", False),
+        ("http://rpi-io:9000.evil.test/plugin", False),
     ],
 )
 def test_a_url_is_allowed_by_scheme_host_port_and_path(url, allowed):
-    assert is_allowed(url, ["http://rti-io:9000"]) is allowed
+    assert is_allowed(url, ["http://rpi-io:9000"]) is allowed
 
 
 def test_an_allowed_path_is_matched_by_whole_segments():
@@ -153,4 +153,4 @@ def test_an_allowed_path_is_matched_by_whole_segments():
 
 
 def test_nothing_is_allowed_by_default():
-    assert not is_allowed("http://rti-io:9000/plugin", [])
+    assert not is_allowed("http://rpi-io:9000/plugin", [])

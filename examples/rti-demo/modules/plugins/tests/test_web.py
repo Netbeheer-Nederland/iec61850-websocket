@@ -206,7 +206,7 @@ def test_from_env_reads_the_file_inline_plugins_and_host_url(monkeypatch, tmp_pa
         json.dumps(
             {
                 "host_url": "http://from-file:5001",
-                "plugins": [{"name": "io", "url": "http://rti-io:9000/plugin"}],
+                "plugins": [{"name": "io", "url": "http://rpi-io:9000/plugin"}],
             }
         ),
         encoding="utf-8",

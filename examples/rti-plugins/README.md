@@ -17,7 +17,7 @@ imports them: each plugin runs, is built and is released on its own. The decisio
 
 | Folder | What it is | Its plugin URL | Runs on |
 |---|---|---|---|
-| [`rpi_io`](rpi_io/README.md) | The IO plugin, `rpi_io` (image `rti-io`, plugin name `io`): the IO server with the LEDs, buttons, potentiometers and displays, and the plugin API | `http://rti-io:9000/plugin` | the Raspberry Pi; mock mode elsewhere |
+| [`rpi_io`](rpi_io/README.md) | The IO plugin, `rpi_io` (image `rti-io`, plugin name `io`): the IO server with the LEDs, buttons, potentiometers and displays, and the plugin API | `http://rpi-io:9000/plugin` | the Raspberry Pi; mock mode elsewhere |
 | [`sim_leds`](sim_leds/README.md) | A sample plugin: two simulated LEDs, FastAPI only | `http://localhost:8099/plugin` | anywhere |
 
 ## The layout of a plugin
@@ -55,14 +55,14 @@ through `sim_leds`. A new integration is a new folder here (or anywhere else) an
 configuration:
 
 ```json
-{"host_url": "http://rti-fsp01:5001", "plugins": [{"name": "io", "url": "http://rti-io:9000/plugin"}]}
+{"host_url": "http://rti-fsp01:5001", "plugins": [{"name": "io", "url": "http://rpi-io:9000/plugin"}]}
 ```
 
 ## Their own stacks
 
 Each plugin has its own compose file, apart from the demo stack; the IO plugin is built for and runs on the Raspberry
 Pi. All stacks join the external network `rti-network`, where the FSPs and SO reach the plugins' APIs as
-`http://rti-io:9000/plugin` and `http://sim-leds:8099/plugin`. The demo stack runs its own sim_leds, one per FSP and SO,
+`http://rpi-io:9000/plugin` and `http://sim-leds:8099/plugin`. The demo stack runs its own sim_leds, one per FSP and SO,
 with its overlay `docker-compose.leds.yaml`, and connects to the IO server only with `docker-compose.io.yaml`
 (decision [0034](../../docs/rti-demo/decisions/0034-demo-stack-plugins-sim-leds-io-opt-in.md)).
 

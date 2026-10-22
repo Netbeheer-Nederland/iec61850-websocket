@@ -3,7 +3,7 @@
   "plugins": [
     {
       "name": "io",
-      "url": "http://rti-io:9000/plugin"
+      "url": "http://rpi-io:9000/plugin"
     }
   ]
 }

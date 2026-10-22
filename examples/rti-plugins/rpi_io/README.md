@@ -49,7 +49,7 @@ The IO service enables remote control and monitoring of physical IO devices (LED
 ```
 examples/rti-plugins/rpi_io/
 ├── pyproject.toml, uv.lock   # standalone uv project rpi-io (not in the root workspace); script rpi-io
-├── docker-compose.yaml       # its own stack: rti-io, on the external network rti-network; runs anywhere
+├── docker-compose.yaml       # its own stack: rpi-io, on the external network rti-network; runs anywhere
 ├── docker-compose.pi.yaml    # overlay: the Raspberry Pi's devices
 ├── docker/
 │   ├── Dockerfile            # multi-stage build; context is this folder
@@ -138,7 +138,7 @@ The IO server implements the plugin API (`examples/rti-demo/modules/plugins/open
 `rpi_io/plugin/plugin.py`. An FSP or SO configures it as
 
 ```json
-{"name": "io", "url": "http://rti-io:9000/plugin", "settings": {}}
+{"name": "io", "url": "http://rpi-io:9000/plugin", "settings": {}}
 ```
 
 | Call | What the IO server does |
@@ -453,8 +453,8 @@ Check the backpack's documentation for whether it needs 5V or 3.3V.
 
 ### Docker: its own stack
 
-`rti-io` isn't in the demo's `docker-compose.yml`: it has its own here, and joins the same external network,
-`rti-network`, where the FSPs and SO reach it as `http://rti-io:9000/plugin`.
+`rpi-io` isn't in the demo's `docker-compose.yml`: it has its own here, and joins the same external network,
+`rti-network`, where the FSPs and SO reach it as `http://rpi-io:9000/plugin`.
 
 ```bash
 docker network create rti-network 2>/dev/null || true
@@ -470,7 +470,7 @@ persistent on the Pi.
 
 ### Configure Docker User for Hardware Access
 
-The `rti-io` container runs as a configurable user with access to GPIO, I2C, and SPI groups. By default, the Dockerfile uses standard Raspberry Pi OS values for the `pi` user:
+The `rpi-io` container runs as a configurable user with access to GPIO, I2C, and SPI groups. By default, the Dockerfile uses standard Raspberry Pi OS values for the `pi` user:
 
 - `pi` user: UID=1000, GID=1000
 - `gpio` group: GID=986
@@ -522,7 +522,7 @@ When running the IO service in Docker on the Pi, `docker-compose.pi.yaml` adds d
 Error response from daemon: error gathering device information while adding custom device "/dev/spidev0.0": no such file or directory
 ```
 
-This means the host system (Raspberry Pi) does not have the required device files. The `rti-io` service in docker-compose.pi.yaml mounts the following devices by default:
+This means the host system (Raspberry Pi) does not have the required device files. The `rpi-io` service in docker-compose.pi.yaml mounts the following devices by default:
 
 - **GPIO**: `/dev/gpiochip0`, `/dev/gpiochip4`, `/dev/gpiochip10-13`
 - **I2C**: `/dev/i2c-1`, `/dev/i2c-13`, `/dev/i2c-14`
@@ -535,7 +535,7 @@ This means the host system (Raspberry Pi) does not have the required device file
    - For I2C: Enable I2C in `raspi-config` (Interface Options -> I2C -> Enable)
    - Reboot after enabling: `sudo reboot`
 
-2. **Remove unused device mappings** from `docker-compose.pi.yaml` if you don't need certain device types. Comment out or remove the corresponding lines under the `devices:` section for the `rti-io` service.
+2. **Remove unused device mappings** from `docker-compose.pi.yaml` if you don't need certain device types. Comment out or remove the corresponding lines under the `devices:` section for the `rpi-io` service.
 
 3. **Verify device files exist** on the host:
    ```bash

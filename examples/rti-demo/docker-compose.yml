@@ -11,7 +11,7 @@
 # The FSPs and SO connect to their plugins from the plugin configuration in
 # config/plugin-configuration/ (decision 0029): by default one sim_leds each,
 # which the overlay docker-compose.leds.yaml runs (decision 0034). The IO
-# server, rti-io, is opt-in: the overlay docker-compose.io.yaml runs it and
+# server, rpi-io, is opt-in: the overlay docker-compose.io.yaml runs it and
 # connects the FSPs and SO to it instead (on the Raspberry Pi with rpi_io's
 # docker-compose.pi.yaml for its devices; decision 0028 has its own stack). A plugin that
 # isn't reachable is retried, and the rest of the demo works.

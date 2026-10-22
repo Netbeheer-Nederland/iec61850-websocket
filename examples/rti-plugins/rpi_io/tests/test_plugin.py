@@ -117,13 +117,13 @@ def test_an_fsp_connects_to_it_through_its_plugin_configuration():
 
     def client():
         return httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=io_app), base_url="http://rti-io:9000"
+            transport=httpx.ASGITransport(app=io_app), base_url="http://rpi-io:9000"
         )
 
     host = PluginHost(role="fsp", host_url="http://fsp.test:5001")
     service = PluginService(
         host,
-        configured=[PluginEntry("io", "http://rti-io:9000/plugin")],
+        configured=[PluginEntry("io", "http://rpi-io:9000/plugin")],
         client_factory=client,
         retry_seconds=0,
     )
@@ -332,12 +332,12 @@ async def test_it_attaches_itself_with_its_devices_and_displays():
     plugin = IoPlugin(attaching_io(), IOMappingManager(str(SHIPPED_MAPPING)))
     await deliver(plugin, FSP, {"type": "Associated", "associate_id": "cp1"})
 
-    server, display = plugin.attached("http://rti-io:9000")["items"]
+    server, display = plugin.attached("http://rpi-io:9000")["items"]
 
     assert server == {
         "kind": "io",
         "label": "IO server",
-        "address": "http://rti-io:9000",
+        "address": "http://rpi-io:9000",
         "state": "ok",
         "detail": "4 devices",
         "live": [
