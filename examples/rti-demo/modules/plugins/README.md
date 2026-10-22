@@ -31,7 +31,7 @@ The plugins themselves, and the IO server, are in [`examples/rti-plugins`](../..
 
 ## The plugin API
 
-A plugin serves five calls under its base URL (`url` in the configuration, for example `http://rti-io:9000/plugin`):
+A plugin serves five calls, and an optional sixth, under its base URL (`url` in the configuration, for example `http://rti-io:9000/plugin`):
 
 | Call | When | Answer |
 |---|---|---|
@@ -40,6 +40,7 @@ A plugin serves five calls under its base URL (`url` in the configuration, for e
 | `POST <url>/events` | Every event: `{host, event: {"type": ..., <fields>}}` | any 2xx, within 5 s |
 | `POST <url>/control` | FSP only: an Operate on a claimed objRef, `{host, obj_ref, ctl_val}` | `{"ok", "add_cause"}`, or `204` to leave it to the FSP, within 2 s |
 | `POST <url>/stop` | Removal, reload, shutdown: `{name, role, host_url}` | any 2xx |
+| `GET <url>/attached` | Optional: when `GET /api/plugins` is asked for, at most once a second | `{"items": [...]}`, what it attaches, within 1 s; `404`: nothing |
 
 `host` (`name`, `role`, `host_url`) says which FSP or SO a call comes from, so one plugin service can serve several.
 `host_url` is where the plugin reaches that FSP's or SO's REST API, for example to write input changes back.
@@ -65,6 +66,15 @@ second claim is refused when the plugin connects. The owner's answer to `/contro
 failure with `add_cause`, a `ControlServiceStatusKind` name such as `blockedByInterlocking`. The FSP asks while it builds
 its answer, so `/control` has 2 s; an error, a timeout or an answer that isn't a `ControlResult` fails the Operate. Write
 and Read on an owned objRef aren't passed to plugins yet: the ACSI library has no hook for them.
+
+**Attached** (decision [0025](../../../../docs/rti-demo/decisions/0025-plugins-show-attached-devices-in-hmi.md)):
+what the plugin links its FSP or SO to (an IO server, a display, an IED), for the HMI to draw next to the FSP or SO on
+Overview. Each item has a `kind` (`io`, `ied`, `display`, `other`), a `label`, a `state` (`ok`, `degraded`, `down`,
+`unknown`), optionally an `address` and a `detail`, and `live` blocks: `text` (`lines`), `indicators` (`name`, `on`,
+`color`) or `values` (`label`, `value`, `unit`). The FSP or SO checks and trims the answer (at most 4 items, 4 blocks
+per item, 8 lines of 24 characters, 8 indicators, 6 values; anything unknown is dropped) and lists it with the plugin
+in `GET /api/plugins`, as `attached` and `attached_error`. A plugin that doesn't answer in time keeps its last items,
+with `attached_error`; it stays healthy.
 
 **Routes**: when the description has `routes` (a URL, or a path on the plugin's server), every request under
 `/api/plugins/<name>/` is passed on to it. The IO server gives `/api/io`, so `/api/plugins/io/leds` reaches its

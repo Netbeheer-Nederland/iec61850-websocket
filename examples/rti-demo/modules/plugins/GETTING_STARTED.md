@@ -60,7 +60,7 @@ Its routes, under `/api/plugins/sim_leds/` in the FSP or SO:
 
 Its one setting, `blink_seconds` (default `0.3`), comes from the plugin configuration with `/start`.
 
-The plugin API is five routes:
+The plugin API is five routes, and an optional sixth:
 
 ```python
 plugin = APIRouter(prefix="/plugin")  # in create_plugin_router(leds)
@@ -79,6 +79,9 @@ def control(request: ControlRequest): ...
 
 @plugin.post("/stop")                 # when the FSP or SO removes it, reloads it or stops
 async def stop(host: Host): ...
+
+@plugin.get("/attached")              # optional: what it attaches, for the HMI's Overview
+def attached(): ...
 ```
 
 ## 2. Run its tests
@@ -165,6 +168,7 @@ When something goes wrong, the answer says why:
 | `422` | It can't be reached, its `name` isn't the one you asked for, its `api` isn't 2, or `/start` failed (`detail` has the error) |
 | `"failed"` in `GET /api/plugins` | A configured plugin that isn't connected (yet), with why; it is tried again |
 | `"healthy": false` in `GET /api/plugins` | `/events` or `/control` failed or took too long; `last_error` says what |
+| `"attached_error"` in `GET /api/plugins` | `/attached` failed, took more than 1 s, or didn't answer `{"items": [...]}`; the last items stay |
 
 ## 6. Make your own
 
@@ -195,6 +199,30 @@ def control(request: ControlRequest):
 
 `/control` has 2 s; `add_cause` is a `ControlServiceStatusKind` name. At most one plugin owns an objRef. Writes and reads
 on an owned objRef aren't passed to the plugin (yet): it sees them only as events.
+
+### Showing what it attaches (HMI)
+
+A plugin can say what it links its FSP or SO to, and the HMI draws a box per item next to the FSP or SO on Overview
+(decision [0025](../../../../docs/rti-demo/decisions/0025-plugins-show-attached-devices-in-hmi.md)). The sample shows
+its two LEDs:
+
+```python
+@plugin.get("/attached")
+def attached():
+    return {"items": [{
+        "kind": "other",                  # io | ied | display | other: the icon
+        "label": "Simulated LEDs",
+        "state": "ok",                    # ok | degraded | down | unknown: the colour
+        "live": [{"type": "indicators", "items": [
+            {"name": color, "on": on, "color": color} for color, on in leds.state.items()
+        ]}],
+    }]}
+```
+
+`live` blocks are `text` (`lines`: a display), `indicators` (`name`, `on`, `color`: LEDs) or `values` (`label`,
+`value`, `unit`). It is asked about every 2 s, with 1 s to answer: answer with what you know, don't ask other services
+first. The FSP or SO trims what is too much (see the plugins [README](README.md)). Without the route (`404`) the plugin
+shows no boxes.
 
 ### Things to keep in mind
 
