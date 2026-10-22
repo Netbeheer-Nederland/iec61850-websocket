@@ -339,6 +339,30 @@ async def _fetch_so_cp_list(con: dict[str, Any]) -> tuple[str, list[str]]:
     return con.get("name"), []
 
 
+async def _fetch_plugins(con: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+    """Look up the plugins an RTI-SO or RTI-FSP connection has connected to.
+
+    Its GET /api/plugins (the plugin contract, modules/plugins/openapi.yaml):
+    {"plugins": [...], "failed": {name: reason}}. None when the instance
+    doesn't answer it, so the HMI can tell "no plugins" from "unknown".
+    """
+    key = f"{con.get('host')}:{con.get('port')}"
+    client = _bff_clients.get(key)
+    if not client:
+        return con.get("name"), None
+    try:
+        result = await asyncio.to_thread(client.request, "GET", "/api/plugins")
+        if isinstance(result, dict) and isinstance(result.get("plugins"), list):
+            failed = result.get("failed")
+            return con.get("name"), {
+                "plugins": result["plugins"],
+                "failed": failed if isinstance(failed, dict) else {},
+            }
+    except Exception:
+        pass
+    return con.get("name"), None
+
+
 def _link_so_to_fsps(
     so_cps: list[str], fsp_entries: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -363,7 +387,8 @@ async def _build_enriched_connections() -> list[dict[str, Any]]:
     FSPs get connectedClients and accessPoints (their cps). SOs get
     connectedFsps and fspLinks - which registered FSP sits behind each
     associated cp - so the HMI can tell which SO-FSP link a cp is without
-    asking the user for it.
+    asking the user for it. Both get plugins: their GET /api/plugins (see
+    _fetch_plugins), for the HMI's plugin badges and Plugins panel.
     """
     conns = conn_manager.connections
     fsp_conns = [
@@ -400,9 +425,21 @@ async def _build_enriched_connections() -> list[dict[str, Any]]:
             if isinstance(r, tuple):
                 so_cps[r[0]] = r[1]
 
+    plugins: dict[str, dict[str, Any] | None] = {}
+    if fsp_conns or so_conns:
+        results = await asyncio.gather(
+            *(_fetch_plugins(c) for c in fsp_conns + so_conns),
+            return_exceptions=True,
+        )
+        for r in results:
+            if isinstance(r, tuple):
+                plugins[r[0]] = r[1]
+
     enriched = []
     for con in conns:
         entry = dict(con)
+        if con.get("type") in ("RTI-FSP", "RTI-SO"):
+            entry["plugins"] = plugins.get(con.get("name"))
         if con.get("type") == "RTI-FSP":
             count, cps = fsp_status.get(con.get("name"), (0, []))
             entry["connectedClients"] = count

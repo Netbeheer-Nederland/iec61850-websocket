@@ -942,6 +942,88 @@ async def test_health_reports_the_status_monitors_view_without_probing(monkeypat
     assert probes.calls == []
 
 
+# -------------------- _fetch_plugins --------------------
+
+
+@pytest.mark.asyncio
+async def test_build_enriched_connections_adds_plugins(monkeypatch):
+    connections = [
+        {
+            "name": "fsp1",
+            "type": "RTI-FSP",
+            "status": "connected",
+            "host": "10.0.0.1",
+            "port": 5001,
+        },
+        {
+            "name": "so1",
+            "type": "RTI-SO",
+            "status": "connected",
+            "host": "10.0.0.3",
+            "port": 5002,
+        },
+        {
+            "name": "fsp2",
+            "type": "RTI-FSP",
+            "status": "disconnected",
+            "host": "10.0.0.2",
+            "port": 5001,
+        },
+        {"name": "idp", "type": "IDP-Server", "status": "connected"},
+    ]
+    io = {
+        "name": "io",
+        "version": "1.0",
+        "url": "http://rti-io:9000/plugin",
+        "claims": ["LD0/CSWI1.Pos.Oper.ctlVal"],
+        "routes": True,
+        "healthy": True,
+        "last_error": None,
+    }
+    monkeypatch.setattr(bff_server.conn_manager, "connections", connections)
+    monkeypatch.setitem(
+        bff_server._bff_clients,
+        "10.0.0.1:5001",
+        FakeBffClient(
+            responses={
+                "/api/plugins": {
+                    "plugins": [io],
+                    "failed": {"display": "Can't reach http://pi:8000/plugin"},
+                }
+            }
+        ),
+    )
+    # The SO doesn't answer /api/plugins (an older SO): unknown, not "none".
+    monkeypatch.setitem(
+        bff_server._bff_clients, "10.0.0.3:5002", FakeBffClient(responses={})
+    )
+
+    by_name = {c["name"]: c for c in await bff_server._build_enriched_connections()}
+
+    assert by_name["fsp1"]["plugins"] == {
+        "plugins": [io],
+        "failed": {"display": "Can't reach http://pi:8000/plugin"},
+    }
+    assert by_name["so1"]["plugins"] is None
+    # A disconnected FSP isn't asked; other connection types get no key.
+    assert by_name["fsp2"]["plugins"] is None
+    assert "plugins" not in by_name["idp"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_plugins_swallows_errors():
+    bff_server._bff_clients["10.0.0.9:5001"] = FakeBffClient(
+        raises=RuntimeError("down")
+    )
+    try:
+        result = await bff_server._fetch_plugins(
+            {"name": "fsp9", "host": "10.0.0.9", "port": 5001}
+        )
+    finally:
+        bff_server._bff_clients.pop("10.0.0.9:5001", None)
+    assert result == ("fsp9", None)
+
+
 # -------------------- /api/execute errors --------------------
 
 
