@@ -322,6 +322,20 @@ def test_from_env_reads_the_file_inline_plugins_and_host_url(monkeypatch, tmp_pa
     assert service.retry_seconds == 3
 
 
+def test_from_env_warns_when_any_source_is_allowed(monkeypatch, caplog):
+    monkeypatch.setenv("PLUGIN_ALLOWED_SOURCES", "*")
+    service = PluginService.from_env(PluginHost(role="fsp"))
+    assert service.allowed_sources == ["*"]
+    assert "any URL" in caplog.text
+
+
+def test_a_wildcard_source_lets_the_api_add_a_plugin(fake):
+    app, _ = make_app(fake, allowed=["http://*:*"])
+    with TestClient(app) as c:
+        answer = c.post("/api/plugins", json={"name": "demo", "url": URL})
+    assert answer.status_code == 200, answer.text
+
+
 def test_from_env_ignores_a_bad_configuration(monkeypatch):
     monkeypatch.delenv("PLUGINS_FILE", raising=False)
     monkeypatch.setenv("PLUGINS", "not json")

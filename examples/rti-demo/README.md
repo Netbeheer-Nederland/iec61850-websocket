@@ -183,7 +183,10 @@ A plugin's settings can be edited in the HMI's Plugins panel (✎, decision
 [0036](../../docs/rti-demo/decisions/0036-plugin-definitions-editable.md)), until the FSP or SO restarts; for a lasting
 change, edit its file in `config/plugin-configuration/`. Moving a plugin to another URL, or adding one, needs that URL in
 the instance's `PLUGIN_ALLOWED_SOURCES`, which compose leaves empty: add it to the service's `environment` in an
-override, e.g. `PLUGIN_ALLOWED_SOURCES=http://192.168.0.226:8000`.
+override, e.g. `PLUGIN_ALLOWED_SOURCES=http://192.168.0.226:8000`. Wildcards allow a whole lab network at once
+(`http://192.168.0.*:8000`, any Pi there on port 8000), and `PLUGIN_ALLOWED_SOURCES=*` allows any URL: for development
+and closed demos only, as anyone using the HMI can then connect the instance to any server, which gets its events and
+can answer its Operates (decision [0037](../../docs/rti-demo/decisions/0037-plugin-allowed-sources-wildcards.md)).
 
 ### The IO server (Raspberry Pi)
 

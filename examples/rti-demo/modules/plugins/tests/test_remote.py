@@ -154,3 +154,62 @@ def test_an_allowed_path_is_matched_by_whole_segments():
 
 def test_nothing_is_allowed_by_default():
     assert not is_allowed("http://rpi-io:9000/plugin", [])
+
+
+@pytest.mark.parametrize(
+    ("url", "allowed"),
+    [
+        ("http://192.168.0.226:8000/plugin", True),
+        ("http://192.168.0.7:8000", True),
+        ("http://192.168.1.226:8000/plugin", False),
+        ("http://192.168.0.226:8001/plugin", False),
+        ("https://192.168.0.226:8000/plugin", False),
+        ("http://192.168.0.226.evil.test:8000/plugin", False),
+        ("http://192.168.0.226:8000.evil.test/plugin", False),
+    ],
+)
+def test_a_wildcard_stands_for_one_part_of_the_host(url, allowed):
+    assert is_allowed(url, ["http://192.168.0.*:8000"]) is allowed
+
+
+def test_a_wildcard_label_in_a_host_name_matches_one_label():
+    allowed = ["http://*.lab.test:9000"]
+    assert is_allowed("http://pi1.lab.test:9000/plugin", allowed)
+    assert is_allowed("http://PI1.Lab.Test:9000/plugin", allowed)
+    assert not is_allowed("http://lab.test:9000/plugin", allowed)
+    assert not is_allowed("http://a.pi1.lab.test:9000/plugin", allowed)
+
+
+def test_a_wildcard_host_matches_any_host_on_that_port():
+    allowed = ["http://*:9000"]
+    assert is_allowed("http://rpi-io:9000/plugin", allowed)
+    assert is_allowed("http://10.0.0.5:9000/plugin", allowed)
+    assert is_allowed("http://[::1]:9000/plugin", allowed)
+    assert not is_allowed("http://rpi-io:9001/plugin", allowed)
+    assert not is_allowed("http://rpi-io/plugin", allowed)
+
+
+def test_a_wildcard_port_matches_any_port_and_none():
+    allowed = ["http://rpi-io:*"]
+    assert is_allowed("http://rpi-io:9000/plugin", allowed)
+    assert is_allowed("http://rpi-io/plugin", allowed)
+    assert not is_allowed("http://other:9000/plugin", allowed)
+
+
+def test_a_wildcard_keeps_the_path_check():
+    allowed = ["http://*:8000/plugins"]
+    assert is_allowed("http://pi:8000/plugins/io", allowed)
+    assert not is_allowed("http://pi:8000/other", allowed)
+
+
+def test_a_star_alone_allows_any_http_url():
+    assert is_allowed("http://anything.test:1234/plugin", ["*"])
+    assert is_allowed("https://10.0.0.5/plugin", [" * "])
+    assert not is_allowed("file:///etc/passwd", ["*"])
+    assert not is_allowed("http:///plugin", ["*"])
+
+
+def test_an_ipv6_host_is_matched_exactly():
+    allowed = ["http://[::1]:9000"]
+    assert is_allowed("http://[::1]:9000/plugin", allowed)
+    assert not is_allowed("http://[::2]:9000/plugin", allowed)

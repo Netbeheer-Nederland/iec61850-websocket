@@ -123,7 +123,8 @@ def _plugin_env(name: str, port: int) -> dict[str, str]:
     IO server doesn't send a button press to every FSP and SO. More plugins
     can be added at runtime from a source the caller allows in
     PLUGIN_ALLOWED_SOURCES (a plugin under development,
-    modules/plugins/GETTING_STARTED.md).
+    modules/plugins/GETTING_STARTED.md; wildcards such as http://*:8099,
+    or * for any URL, decision 0037).
     """
     io = {"name": "io", "url": IO_PLUGIN_URL}
     if name != "fsp":

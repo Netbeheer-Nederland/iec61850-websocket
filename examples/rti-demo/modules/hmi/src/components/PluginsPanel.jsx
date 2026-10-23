@@ -24,6 +24,9 @@ const STATE_STYLES = {
 const errorOf = (result) =>
   result?.payload?.error || result?.payload?.detail || result?.rawText || 'Unknown error';
 
+// What PLUGIN_ALLOWED_SOURCES can hold (decision 0037), for the form's hint.
+const SOURCES_HINT = 'exact URLs, wildcards such as http://192.168.0.*:8000 or http://*:9000, or * for any URL';
+
 /**
  * @param {string|null} target - The SO/FSP's BFF target (host:port)
  * @param {'fsp'|'so'} role - FSP plugins can claim objRefs; SO plugins can't
@@ -130,8 +133,8 @@ function PluginsPanel({ target, role, pushed }) {
           <textarea id="plugins-add-settings" placeholder='Settings (JSON, optional), e.g. {"write_inputs": false}' value={form.settings} onChange={(e) => setForm({ ...form, settings: e.target.value })} style={{ gridColumn: '1 / -1', fontFamily: 'monospace', minHeight: '48px' }} />
           <small style={{ gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
             {editing
-              ? "A new URL must be in the instance's PLUGIN_ALLOWED_SOURCES; the settings replace all of them. If the plugin doesn't connect with them, it keeps its old URL and settings. The edit stays until the instance restarts; a lasting one goes in its plugin configuration."
-              : "Only URLs in the instance's PLUGIN_ALLOWED_SOURCES are accepted. An added plugin stays until the instance restarts; a lasting one goes in its plugin configuration."}
+              ? `A new URL must be allowed by the instance's PLUGIN_ALLOWED_SOURCES (${SOURCES_HINT}); the settings replace all of them. If the plugin doesn't connect with them, it keeps its old URL and settings. The edit stays until the instance restarts; a lasting one goes in its plugin configuration.`
+              : `Only URLs allowed by the instance's PLUGIN_ALLOWED_SOURCES are accepted (${SOURCES_HINT}). An added plugin stays until the instance restarts; a lasting one goes in its plugin configuration.`}
           </small>
           <div style={{ gridColumn: '1 / -1' }}>
             <button type="submit" id="plugins-add-submit" className="btn-primary" disabled={Boolean(busy)}>{editing ? 'Save' : 'Add'}</button>

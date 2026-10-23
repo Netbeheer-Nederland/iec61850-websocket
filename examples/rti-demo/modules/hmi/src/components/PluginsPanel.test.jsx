@@ -99,6 +99,19 @@ describe('PluginsPanel', () => {
     }));
   });
 
+  it('says in the add and edit forms which URLs the instance accepts, wildcards and * included', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByRole('button', { name: 'Add plugin' }));
+    const add = screen.getByRole('form', { name: 'Add plugin' });
+    expect(add.textContent).toMatch(/PLUGIN_ALLOWED_SOURCES.*http:\/\/192\.168\.0\.\*:8000.*\* for any URL/);
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByTitle('Edit display'));
+    const edit = screen.getByRole('form', { name: 'Edit display' });
+    expect(edit.textContent).toMatch(/new URL must be allowed by .*PLUGIN_ALLOWED_SOURCES.*\* for any URL/);
+  });
+
   it("edits an unreachable plugin's URL and settings, from its definition", async () => {
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);

@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field
 from .config import ConfigError, PluginEntry, PluginsConfig
 from .host import PluginConflictError, PluginHost
 from .remote import (
+    ANY_SOURCE,
     ClientFactory,
     PluginError,
     RemotePlugin,
@@ -80,7 +81,9 @@ class PluginService:
         - PLUGIN_HOST_URL: where plugins reach this FSP or SO; wins over the
           configuration's host_url;
         - PLUGIN_ALLOWED_SOURCES: comma-separated URLs that POST /api/plugins
-          may add plugins from (default: none). The configuration is trusted;
+          may add plugins from (default: none), with `*` for any host, host
+          part or port; `*` alone allows any URL (remote.is_allowed). The
+          configuration is trusted;
         - PLUGIN_RETRY_SECONDS: how often a configured plugin that isn't
           reachable is tried again (default 10; 0: never).
         """
@@ -102,6 +105,10 @@ class PluginService:
             for s in os.getenv("PLUGIN_ALLOWED_SOURCES", "").split(",")
             if s.strip()
         ]
+        if ANY_SOURCE in allowed:
+            logger.warning(
+                "PLUGIN_ALLOWED_SOURCES is *: plugins can be added from any URL"
+            )
         try:
             retry = float(os.getenv("PLUGIN_RETRY_SECONDS", DEFAULT_RETRY_SECONDS))
         except ValueError:

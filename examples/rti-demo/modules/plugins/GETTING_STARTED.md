@@ -168,7 +168,7 @@ When something goes wrong, the answer says why:
 
 | Answer | Usually |
 |---|---|
-| `403` | The URL isn't in `PLUGIN_ALLOWED_SOURCES` (scheme, host and port must match exactly: `localhost` isn't `127.0.0.1`) |
+| `403` | The URL isn't in `PLUGIN_ALLOWED_SOURCES` (scheme, host and port must match exactly: `localhost` isn't `127.0.0.1`; `http://*:8099` allows any host on that port, `*` any URL) |
 | `409` | A plugin with that name is connected already (reload it instead), or it claims an objRef another plugin owns |
 | `422` | It can't be reached, its `name` isn't the one you asked for, its `api` isn't 2, or `/start` failed (`detail` has the error) |
 | `"failed"` in `GET /api/plugins` | A configured plugin that isn't connected (yet), with why; it is tried again |

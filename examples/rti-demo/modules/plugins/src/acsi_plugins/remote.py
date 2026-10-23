@@ -86,25 +86,66 @@ class Description:
         )
 
 
+ANY_SOURCE = "*"
+WILDCARD = "*"
+
+
 def is_allowed(url: str, allowed: list[str]) -> bool:
-    """Whether `url` is under one of the `allowed` URLs.
+    """Whether `url` is under one of the `allowed` URLs (decision 0037).
 
     Scheme, host and port must be equal, and the allowed path must be a
     whole-segment prefix of the URL's path. Plain string prefixes aren't
     enough: "http://rpi-io:9000" would also match "http://rpi-io:9000.evil.test".
+
+    In an allowed URL, `*` as the whole host stands for any host, `*` as one
+    part of it for any one part ("http://192.168.0.*:8000", "http://*.lab.test"),
+    and `*` as the port for any port. An entry that is just `*` allows any
+    http or https URL.
     """
     target = urlsplit(url)
+    try:
+        target_port = target.port
+    except ValueError:
+        return False
+    if target.scheme not in ("http", "https") or not target.hostname:
+        return False
     for entry in allowed:
-        base = urlsplit(entry.strip())
-        if not base.scheme or (target.scheme, target.netloc) != (
-            base.scheme,
-            base.netloc,
+        entry = entry.strip()
+        if entry == ANY_SOURCE:
+            return True
+        base = urlsplit(entry)
+        if not base.scheme or base.scheme != target.scheme:
+            continue
+        host, port = _host_and_port(base.netloc)
+        if not _host_matches(host, target.hostname):
+            continue
+        if port != WILDCARD and port != (
+            str(target_port) if target_port is not None else None
         ):
             continue
         base_path = base.path.rstrip("/")
         if target.path == base_path or target.path.startswith(base_path + "/"):
             return True
     return False
+
+
+def _host_and_port(netloc: str) -> tuple[str, str | None]:
+    """An allowed URL's host and port, as written: urlsplit can't take `*` as a port."""
+    netloc = netloc.rpartition("@")[2]
+    if netloc.startswith("["):
+        host, _, rest = netloc[1:].partition("]")
+        return host.lower(), rest[1:] if rest.startswith(":") else None
+    host, colon, port = netloc.partition(":")
+    return host.lower(), port if colon else None
+
+
+def _host_matches(pattern: str, host: str) -> bool:
+    if pattern == WILDCARD:
+        return True
+    parts, wanted = host.lower().split("."), pattern.split(".")
+    return len(parts) == len(wanted) and all(
+        w == WILDCARD or w == p for w, p in zip(wanted, parts)
+    )
 
 
 def _json(data: Any) -> bytes:

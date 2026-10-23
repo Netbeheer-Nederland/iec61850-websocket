@@ -251,7 +251,7 @@ curl -X POST http://localhost:5001/api/plugins/io/reload   # ask it again what i
 | `PLUGINS` | none | The same JSON inline; its plugins and `host_url` win over the file's |
 | `PLUGIN_HOST_URL` | the configuration's `host_url` | Where plugins reach this service, for example to write input changes back |
 | `PLUGIN_RETRY_SECONDS` | `10` | How often a configured plugin that isn't connected is tried again; `0`: never |
-| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs that `POST /api/plugins` may add plugins from at runtime, and `PUT /api/plugins/{name}` may move one to |
+| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs that `POST /api/plugins` may add plugins from at runtime, and `PUT /api/plugins/{name}` may move one to. `*` stands for any host, any one part of it or any port (`http://192.168.0.*:8000`); `*` alone allows any URL, for development only (decision [0037](../../../../docs/rti-demo/decisions/0037-plugin-allowed-sources-wildcards.md)) |
 
 ### Server Defaults
 
