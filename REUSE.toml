@@ -20,11 +20,10 @@ SPDX-FileCopyrightText = "2026 Netbeheer Nederland"
 SPDX-License-Identifier = "Apache-2.0"
 
 # Data and configuration files: example messages, IED models and their
-# schema, the SCL file, demo and test configuration, certificate requests.
+# schema, demo and test configuration, certificate requests.
 [[annotations]]
 path = [
   "docs/protocol_specification/example_messages/*.json",
-  "docs/scl/rti_v1.0.scd",
   "src/ws61850/iec61850/data_model/schema/ied_model.schema.json",
   "examples/ws61850_interactive/ied_model1.json",
   "examples/ws61850_mode/ied_model1.json",
