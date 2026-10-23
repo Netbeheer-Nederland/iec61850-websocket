@@ -120,7 +120,8 @@ A **FastAPI** application that provides REST endpoints for managing the ACSI Ser
 | | POST `/api/iec61850server/actions/clear` | Clear actions |
 | | GET `/api/iec61850server/messages` | View messages |
 | | POST `/api/iec61850server/messages/clear` | Clear messages |
-| **Plugins** | GET, POST `/api/plugins` | List plugins; install one |
+| **Plugins** | GET, POST `/api/plugins` | List plugins, with their definitions (URL, settings); install one |
+| | PUT `/api/plugins/{name}` | Edit its URL or settings, until the FSP restarts (decision 0036) |
 | | POST `/api/plugins/{name}/reload`, DELETE `/api/plugins/{name}` | Reload; remove |
 | | `/api/plugins/{name}/*` | A plugin's own routes, e.g. `/api/plugins/io/leds` |
 
@@ -227,6 +228,8 @@ configures it in `config/plugin-configuration/io/rti-fsp01.json` (`http://rpi-io
 ```bash
 curl http://localhost:5001/api/plugins                     # connected plugins, health, and the ones not (yet) connected
 curl http://localhost:5001/api/plugins/io/leds             # the IO server's /api/io/leds
+curl -X PUT http://localhost:5001/api/plugins/io -H 'Content-Type: application/json' \
+  -d '{"settings": {}}'                                       # edit its url or settings; a failed edit changes nothing
 curl -X POST http://localhost:5001/api/plugins/io/reload   # ask it again what it is and start it again
 ```
 
@@ -248,7 +251,7 @@ curl -X POST http://localhost:5001/api/plugins/io/reload   # ask it again what i
 | `PLUGINS` | none | The same JSON inline; its plugins and `host_url` win over the file's |
 | `PLUGIN_HOST_URL` | the configuration's `host_url` | Where plugins reach this service, for example to write input changes back |
 | `PLUGIN_RETRY_SECONDS` | `10` | How often a configured plugin that isn't connected is tried again; `0`: never |
-| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs that `POST /api/plugins` may add plugins from at runtime |
+| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs that `POST /api/plugins` may add plugins from at runtime, and `PUT /api/plugins/{name}` may move one to |
 
 ### Server Defaults
 

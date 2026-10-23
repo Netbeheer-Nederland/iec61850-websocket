@@ -117,7 +117,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 * TLS configuration support: key and certificates as PEM text, an uploaded file, or a file picked from the certificate directory (`file:<name>`, read by the instance itself)
 * OAuth authentication integration - the auth server CA the same way: PEM text, an uploaded file, or a file from the certificate directory
 * Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; an ACSI entry made through the SO also names the WebSocket frame range it produced (shown under the call on Traffic); Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
-* Plugins panel (PluginsPanel): the plugins the instance has connected to, one row per plugin - Healthy, Unhealthy (with its last error) or Unreachable (with the reason; the instance retries every 10s) - with Reload and Remove (after a confirm), and Add plugin by name, URL and optional JSON settings. Only URLs in the instance's `PLUGIN_ALLOWED_SOURCES` are accepted, and a refusal shows the instance's own reason. An added plugin lasts until the instance restarts. The panel follows the BFF's connections push, so a plugin that drops or comes back shows without polling
+* Plugins panel (PluginsPanel): the plugins the instance has connected to, one row per plugin - Healthy, Unhealthy (with its last error) or Unreachable (with the reason; the instance retries every 10s) - with Edit, Reload and Remove (after a confirm), and Add plugin by name, URL and optional JSON settings. Edit opens the same form filled with the plugin's URL and settings (its definition from `GET /api/plugins`), the name fixed, and saves with `PUT /api/plugins/{name}`; a refused edit keeps the form open, and the plugin keeps its old definition (decision 0036). Only URLs in the instance's `PLUGIN_ALLOWED_SOURCES` are accepted for adding, or as a new URL, and a refusal shows the instance's own reason. An added or edited plugin lasts until the instance restarts. The panel follows the BFF's connections push, so a plugin that drops or comes back shows without polling
 * Real-time data updates
 
 ### ACSI Server (`/acsi-server`)
@@ -133,7 +133,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 * TLS configuration support: key and certificates as PEM text, an uploaded file, or a file picked from the certificate directory (`file:<name>`, read by the instance itself)
 * OAuth authentication integration - the auth server CA the same way: PEM text, an uploaded file, or a file from the certificate directory
 * Monitoring panel's Activity Log (the instance's actions log) - each entry labelled System or ACSI (service call), filterable by kind and by severity; an ACSI entry made through the SO also names the WebSocket frame range it produced (shown under the call on Traffic); Start/Stop is remembered per instance (localStorage), so monitoring left on resumes after switching pages
-* Plugins panel (PluginsPanel): the plugins the instance has connected to, one row per plugin - Healthy, Unhealthy (with its last error) or Unreachable (with the reason; the instance retries every 10s) - with Reload and Remove (after a confirm), and Add plugin by name, URL and optional JSON settings. Only URLs in the instance's `PLUGIN_ALLOWED_SOURCES` are accepted, and a refusal shows the instance's own reason. An added plugin lasts until the instance restarts. The panel follows the BFF's connections push, so a plugin that drops or comes back shows without polling. A Controls column counts the objRefs whose Operate each plugin answers (the tooltip lists them)
+* Plugins panel (PluginsPanel): the plugins the instance has connected to, one row per plugin - Healthy, Unhealthy (with its last error) or Unreachable (with the reason; the instance retries every 10s) - with Edit, Reload and Remove (after a confirm), and Add plugin by name, URL and optional JSON settings. Edit opens the same form filled with the plugin's URL and settings (its definition from `GET /api/plugins`), the name fixed, and saves with `PUT /api/plugins/{name}`; a refused edit keeps the form open, and the plugin keeps its old definition (decision 0036). Only URLs in the instance's `PLUGIN_ALLOWED_SOURCES` are accepted for adding, or as a new URL, and a refusal shows the instance's own reason. An added or edited plugin lasts until the instance restarts. The panel follows the BFF's connections push, so a plugin that drops or comes back shows without polling. A Controls column counts the objRefs whose Operate each plugin answers (the tooltip lists them)
 * 🔌 Plugin tag in the model tree on a data object whose Operate a plugin answers: plugins claim the control attribute (`LD0/CSWI1.Pos.Oper.ctlVal`), the tag goes on its data object (`LD0/CSWI1.Pos`)
 * Status information display
 
@@ -292,8 +292,8 @@ The HMI makes two kinds of call, both to the BFF:
    forwards the request to the instance at `target` (`host:port`). The instance paths are listed in `API_DEFINITIONS`
    in `src/services/apiService.js`: read, write, select and operate, model tree, data definition, dataset directory,
    BRCB/URCB read and write, start and stop (FSP), actions and message logs, TLS and OAuth reconfiguration,
-   properties, and the plugin management routes (`GET`/`POST /api/plugins`, `POST /api/plugins/{name}/reload`,
-   `DELETE /api/plugins/{name}`).
+   properties, and the plugin management routes (`GET`/`POST /api/plugins`, `PUT /api/plugins/{name}`,
+   `POST /api/plugins/{name}/reload`, `DELETE /api/plugins/{name}`).
 
 The OpenAPI docs list every endpoint: BFF at http://localhost:3000/docs, FSP at http://localhost:5001/docs, SO at
 http://localhost:5000/docs.
@@ -302,7 +302,7 @@ http://localhost:5000/docs.
 
 - `executeApiCall(apiId, targetValue, bodyOverride, options)` - run an `API_DEFINITIONS` entry through `/api/execute`
   (or directly, with `options.useDirect`); `options.pathParams` fills `{name}`-style path segments, e.g.
-  `{ name: 'io' }` for `plugin-reload`
+  `{ name: 'io' }` for `plugin-edit` or `plugin-reload`
 - `getApiById(id)` - look up an `API_DEFINITIONS` entry
 - `getBffBaseUrl()` - BFF URL from the Settings (localStorage), default `http://localhost:3000`
 - `buildBffApiUrl(path, targetValue)` - full BFF URL for a path

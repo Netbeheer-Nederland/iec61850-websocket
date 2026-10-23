@@ -189,6 +189,8 @@ configures it in `config/plugin-configuration/io/rti-so.json` (`http://rpi-io:90
 ```bash
 curl http://localhost:5000/api/plugins                     # connected plugins, health, and the ones not (yet) connected
 curl http://localhost:5000/api/plugins/io/leds             # the IO server's /api/io/leds
+curl -X PUT http://localhost:5000/api/plugins/io -H 'Content-Type: application/json' \
+  -d '{"settings": {}}'                                       # edit its url or settings; a failed edit changes nothing
 curl -X POST http://localhost:5000/api/plugins/io/reload   # ask it again what it is and start it again
 ```
 
@@ -208,7 +210,7 @@ curl -X POST http://localhost:5000/api/plugins/io/reload   # ask it again what i
 | `PLUGINS` | none | The same JSON inline; its plugins and `host_url` win over the file's |
 | `PLUGIN_HOST_URL` | the configuration's `host_url` | Where plugins reach this service, for example to write input changes back |
 | `PLUGIN_RETRY_SECONDS` | `10` | How often a configured plugin that isn't connected is tried again; `0`: never |
-| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs that `POST /api/plugins` may add plugins from at runtime |
+| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs that `POST /api/plugins` may add plugins from at runtime, and `PUT /api/plugins/{name}` may move one to |
 
 ### Connection Defaults
 

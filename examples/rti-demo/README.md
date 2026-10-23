@@ -179,6 +179,12 @@ The FSPs and SO connect to the plugins in their plugin configuration, `config/pl
 Without either overlay the FSPs and SO list `sim_leds` as failed, show a red plugin badge, and try again every 10 s;
 the rest of the demo works.
 
+A plugin's settings can be edited in the HMI's Plugins panel (✎, decision
+[0036](../../docs/rti-demo/decisions/0036-plugin-definitions-editable.md)), until the FSP or SO restarts; for a lasting
+change, edit its file in `config/plugin-configuration/`. Moving a plugin to another URL, or adding one, needs that URL in
+the instance's `PLUGIN_ALLOWED_SOURCES`, which compose leaves empty: add it to the service's `environment` in an
+override, e.g. `PLUGIN_ALLOWED_SOURCES=http://192.168.0.226:8000`.
+
 ### The IO server (Raspberry Pi)
 
 The IO server, `rpi-io`, isn't part of `docker-compose.yml`: it is meant for the Raspberry Pi and has its own compose file in
