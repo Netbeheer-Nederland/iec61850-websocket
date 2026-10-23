@@ -121,19 +121,20 @@ def _plugin_env(name: str, port: int) -> dict[str, str]:
     One plugin, the IO server's plugin API at IO_PLUGIN_URL. It writes its
     input changes back to PLUGIN_HOST_URL of the first FSP only, so a single
     IO server doesn't send a button press to every FSP and SO. More plugins
-    can be added at runtime from a source the caller allows in
-    PLUGIN_ALLOWED_SOURCES (a plugin under development,
-    modules/plugins/GETTING_STARTED.md; wildcards such as http://*:8099,
-    or * for any URL, decision 0037).
+    can be added at runtime from any URL by default; the caller's
+    PLUGIN_ALLOWED_SOURCES, when set, is passed on to narrow that (wildcards
+    such as http://*:8099, or empty for none, decision 0037).
     """
     io = {"name": "io", "url": IO_PLUGIN_URL}
     if name != "fsp":
         io["settings"] = {"write_inputs": False}
-    return {
+    env = {
         "PLUGINS": json.dumps([io]),
         "PLUGIN_HOST_URL": f"http://localhost:{port}",
-        "PLUGIN_ALLOWED_SOURCES": os.environ.get("PLUGIN_ALLOWED_SOURCES", "").strip(),
     }
+    if "PLUGIN_ALLOWED_SOURCES" in os.environ:
+        env["PLUGIN_ALLOWED_SOURCES"] = os.environ["PLUGIN_ALLOWED_SOURCES"].strip()
+    return env
 
 
 def _with_port(env_vars: dict[str, str], port: int) -> dict[str, str]:

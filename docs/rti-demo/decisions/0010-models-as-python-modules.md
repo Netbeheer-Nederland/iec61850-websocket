@@ -16,7 +16,7 @@ SCL files are the standard description.
 
 ## Decision
 
-- An FSP loads its model from the Python file `MODELPATH` points at (`config/models/model_1.py`,
+- An FSP loads its model from the Python file `MODEL_PATH` points at (`config/models/model_1.py`,
   `model_2.py`). The file defines `ied` or `build_ied_model()`. It's loaded with `importlib` without registering it
   in `sys.modules`, so a reload picks up a new version (model hot-swap).
 - The HMI's Tools page parses SCL in the browser (`sclParser.js`) and generates that Python model code.

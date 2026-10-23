@@ -64,7 +64,7 @@ modules/fsp/
 │                                        # - Contains DataAttributes, DataObjects
 │                                        # - IEC 61850 data model definitions
 │                                        # - The live demo instead mounts
-│                                        #   config/models/model_N.py via MODELPATH
+│                                        #   config/models/model_N.py via MODEL_PATH
 │
 └── README.md                           # This file
 ```
@@ -247,11 +247,12 @@ curl -X POST http://localhost:5001/api/plugins/io/reload   # ask it again what i
 | `FSP_AUTOCONNECT` | `false` | With `FSP_AUTOSTART`, also dial out to the SO at `FSP_SO_HOST:FSP_SO_PORT` |
 | `FSP_SO_HOST` | `localhost` | The SO `FSP_AUTOCONNECT` dials; `rti-so` in the Docker stack |
 | `FSP_SO_PORT` | 8765 | Its WebSocket port |
+| `MODEL_PATH` | the package's own `model.py` | The IED model: a Python file (`config/models/model_1.py` in the Docker stack), or a folder with `model.py` |
 | `PLUGINS_FILE` | none | The plugin configuration: `{"host_url": ..., "plugins": [{"name", "url", "settings"}]}` |
 | `PLUGINS` | none | The same JSON inline; its plugins and `host_url` win over the file's |
 | `PLUGIN_HOST_URL` | the configuration's `host_url` | Where plugins reach this service, for example to write input changes back |
 | `PLUGIN_RETRY_SECONDS` | `10` | How often a configured plugin that isn't connected is tried again; `0`: never |
-| `PLUGIN_ALLOWED_SOURCES` | none | Comma-separated URLs that `POST /api/plugins` may add plugins from at runtime, and `PUT /api/plugins/{name}` may move one to. `*` stands for any host, any one part of it or any port (`http://192.168.0.*:8000`); `*` alone allows any URL, for development only (decision [0037](../../../../docs/rti-demo/decisions/0037-plugin-allowed-sources-wildcards.md)) |
+| `PLUGIN_ALLOWED_SOURCES` | `*` (any URL) | Comma-separated URLs that `POST /api/plugins` may add plugins from at runtime, and `PUT /api/plugins/{name}` may move one to. `*` stands for any host, any one part of it or any port (`http://192.168.0.*:8000`); `*` alone allows any URL, and set but empty allows none (decision [0037](../../../../docs/rti-demo/decisions/0037-plugin-allowed-sources-wildcards.md)) |
 
 ### Server Defaults
 

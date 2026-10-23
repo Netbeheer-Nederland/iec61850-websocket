@@ -93,7 +93,7 @@ services:
     environment:
       # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
       - CP=cp1
-      - MODELPATH=/models/model_1.py
+      - MODEL_PATH=/models/model_1.py
       # The ACSI server starts with the FSP, not connected (decision 0033);
       # FSP_AUTOCONNECT=true also dials out to the SO here.
       - FSP_SO_HOST=rti-so
@@ -133,7 +133,7 @@ services:
       # already set by the Dockerfile.
       - PORT=5005
       - CP=cp2
-      - MODELPATH=/models/model_2.py
+      - MODEL_PATH=/models/model_2.py
       # The ACSI server starts with the FSP, not connected (decision 0033);
       # FSP_AUTOCONNECT=true also dials out to the SO here.
       - FSP_SO_HOST=rti-so

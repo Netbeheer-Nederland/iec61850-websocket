@@ -343,11 +343,17 @@ def test_from_env_ignores_a_bad_configuration(monkeypatch):
     assert service.configured == []
 
 
-def test_from_env_without_settings_has_no_plugins(monkeypatch):
+def test_from_env_without_settings_has_no_plugins_and_allows_any_source(monkeypatch):
     for var in ("PLUGINS_FILE", "PLUGINS", "PLUGIN_HOST_URL", "PLUGIN_ALLOWED_SOURCES"):
         monkeypatch.delenv(var, raising=False)
     host = PluginHost(role="fsp")
     service = PluginService.from_env(host)
     assert service.configured == []
-    assert service.allowed_sources == []
+    assert service.allowed_sources == ["*"]
     assert host.host_url is None
+
+
+def test_from_env_allows_no_source_when_set_empty(monkeypatch):
+    monkeypatch.setenv("PLUGIN_ALLOWED_SOURCES", "")
+    service = PluginService.from_env(PluginHost(role="fsp"))
+    assert service.allowed_sources == []

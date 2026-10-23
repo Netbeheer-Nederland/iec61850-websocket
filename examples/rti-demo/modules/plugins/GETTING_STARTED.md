@@ -125,23 +125,23 @@ For a lasting configuration, put the same JSON in a file and point `PLUGINS_FILE
 (`config/plugin-configuration/`). The demo stack connects every FSP and SO to its own `sim_leds` by default, run by the
 overlay `docker-compose.leds.yaml`. Start order doesn't matter: an FSP whose plugin isn't up yet tries again every 10 s.
 
-To add a plugin to a running FSP without restarting it, allow its URL and post it (and edit it later, with
-`PUT /api/plugins/sim_leds`, see step 5):
+To add a plugin to a running FSP without restarting it, post it (and edit it later, with
+`PUT /api/plugins/sim_leds`, see step 5). An FSP or SO allows any URL by default; `PLUGIN_ALLOWED_SOURCES` narrows that:
 
 ```bash
-PLUGIN_ALLOWED_SOURCES=http://localhost:8099 uv run --package fsp python -m fsp.bff_endpoint
+uv run --package fsp python -m fsp.bff_endpoint
 curl -X POST http://localhost:5001/api/plugins -H 'Content-Type: application/json' \
   -d '{"name": "sim_leds", "url": "http://localhost:8099/plugin"}'
 ```
 
 ## 4. See it react to the demo
 
-The events come when the FSP and SO talk to each other, so run the whole demo and allow your plugin's URL; `launch.py`
-passes your `PLUGIN_ALLOWED_SOURCES` on (it allows none of its own):
+The events come when the FSP and SO talk to each other, so run the whole demo; any URL is allowed by default, and
+`launch.py` passes your `PLUGIN_ALLOWED_SOURCES` on when you set one (`http://localhost:8099`, say):
 
 ```bash
 cd examples/rti-demo
-PLUGIN_ALLOWED_SOURCES=http://localhost:8099 uv run python launch.py
+uv run python launch.py
 ```
 
 Add `sim_leds` to the FSP (port 5001) and the SO (port 5000) as at the end of step 3, then start the FSP's server,
@@ -168,7 +168,7 @@ When something goes wrong, the answer says why:
 
 | Answer | Usually |
 |---|---|
-| `403` | The URL isn't in `PLUGIN_ALLOWED_SOURCES` (scheme, host and port must match exactly: `localhost` isn't `127.0.0.1`; `http://*:8099` allows any host on that port, `*` any URL) |
+| `403` | The URL isn't in `PLUGIN_ALLOWED_SOURCES` (scheme, host and port must match exactly: `localhost` isn't `127.0.0.1`; `http://*:8099` allows any host on that port, `*` any URL; unset is `*`) |
 | `409` | A plugin with that name is connected already (reload it instead), or it claims an objRef another plugin owns |
 | `422` | It can't be reached, its `name` isn't the one you asked for, its `api` isn't 2, or `/start` failed (`detail` has the error) |
 | `"failed"` in `GET /api/plugins` | A configured plugin that isn't connected (yet), with why; it is tried again |

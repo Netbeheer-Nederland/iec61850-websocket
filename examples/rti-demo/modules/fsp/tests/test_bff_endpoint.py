@@ -741,7 +741,7 @@ class TestAutostart:
 
     def test_the_app_starts_the_server_after_its_plugins(self, monkeypatch, tmp_path):
         (tmp_path / "model.py").write_text(MODEL, encoding="utf-8")
-        monkeypatch.setenv("MODELPATH", str(tmp_path))
+        monkeypatch.setenv("MODEL_PATH", str(tmp_path))
         order = []
 
         class Service(bff_endpoint.PluginService):

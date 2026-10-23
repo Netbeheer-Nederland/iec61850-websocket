@@ -47,6 +47,6 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0034](0034-demo-stack-plugins-sim-leds-io-opt-in.md) | The demo stack connects to sim_leds by default, run by an overlay; the IO server is opt-in | proposed |
 | [0035](0035-connection-names-unique-ids-uuid.md) | A connection's name is unique; its id is a UUID | proposed |
 | [0036](0036-plugin-definitions-editable.md) | A plugin's definition (URL, settings) can be edited, until the FSP or SO restarts | proposed |
-| [0037](0037-plugin-allowed-sources-wildcards.md) | Allowed plugin sources take wildcards; `*` alone allows any URL | proposed |
+| [0037](0037-plugin-allowed-sources-wildcards.md) | Allowed plugin sources take wildcards; `*` alone allows any URL, and is the default | proposed |
 
 To add a decision, copy the layout of an existing record, take the next number, and add a line to this table.

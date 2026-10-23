@@ -158,8 +158,15 @@ def test_the_so_an_fsp_connects_to_is_localhost_or_in_docker_by_name(launcher):
     assert launcher._docker_env(config)["FSP_SO_HOST"] == "rti-so"
 
 
-def test_no_plugin_is_downloaded_by_default(launcher, monkeypatch):
+def test_allowed_sources_are_left_to_the_services_default(launcher, monkeypatch):
+    # Unset, the FSP and SO allow any URL (decision 0037).
     monkeypatch.delenv("PLUGIN_ALLOWED_SOURCES", raising=False)
+    env = _launch_module()._plugin_env("fsp", 5001)
+    assert "PLUGIN_ALLOWED_SOURCES" not in env
+
+
+def test_allowed_sources_set_empty_are_passed_on(launcher, monkeypatch):
+    monkeypatch.setenv("PLUGIN_ALLOWED_SOURCES", "")
     env = _launch_module()._plugin_env("fsp", 5001)
     assert env["PLUGIN_ALLOWED_SOURCES"] == ""
 

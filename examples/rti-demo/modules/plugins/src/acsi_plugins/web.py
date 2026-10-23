@@ -81,9 +81,9 @@ class PluginService:
         - PLUGIN_HOST_URL: where plugins reach this FSP or SO; wins over the
           configuration's host_url;
         - PLUGIN_ALLOWED_SOURCES: comma-separated URLs that POST /api/plugins
-          may add plugins from (default: none), with `*` for any host, host
-          part or port; `*` alone allows any URL (remote.is_allowed). The
-          configuration is trusted;
+          may add plugins from, with `*` for any host, host part or port;
+          `*` alone allows any URL (remote.is_allowed). Default `*`; set but
+          empty: none. The configuration is trusted;
         - PLUGIN_RETRY_SECONDS: how often a configured plugin that isn't
           reachable is tried again (default 10; 0: never).
         """
@@ -102,7 +102,7 @@ class PluginService:
         host.host_url = os.getenv("PLUGIN_HOST_URL") or config.host_url or host.host_url
         allowed = [
             s.strip()
-            for s in os.getenv("PLUGIN_ALLOWED_SOURCES", "").split(",")
+            for s in os.getenv("PLUGIN_ALLOWED_SOURCES", ANY_SOURCE).split(",")
             if s.strip()
         ]
         if ANY_SOURCE in allowed:

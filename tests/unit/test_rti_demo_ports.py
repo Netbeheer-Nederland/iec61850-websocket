@@ -199,7 +199,8 @@ def test_the_io_overlay_connects_the_io_plugin(io_overlay, service, role):
 
 
 @pytest.mark.parametrize("service", ["rti-so", "rti-fsp01", "rti-fsp02"])
-def test_compose_downloads_no_plugins(compose, service):
+def test_compose_leaves_allowed_sources_to_the_default(compose, service):
+    # Unset: any URL (decision 0037); an override narrows it.
     env = compose[service]["environment"]
     assert not any(e.startswith("PLUGIN_ALLOWED_SOURCES=") for e in env)
 

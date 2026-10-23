@@ -692,7 +692,7 @@ def create_fastapi_app(factory_dir: Path | None = None) -> FastAPI:
     )
 
     resolved_factory_dir = (
-        os.getenv("MODELPATH") or factory_dir or Path(__file__).parent
+        os.getenv("MODEL_PATH") or factory_dir or Path(__file__).parent
     )
     router, _client = create_bff_router(resolved_factory_dir)
     app.include_router(router)

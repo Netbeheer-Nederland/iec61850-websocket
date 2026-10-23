@@ -268,7 +268,7 @@ paths:
       summary: Add a plugin
       description: |
         Connect the plugin at `url` now, until the FSP or SO stops. The `url` must be under one in
-        `PLUGIN_ALLOWED_SOURCES` (none by default): scheme, host and port equal, and the allowed path a
+        `PLUGIN_ALLOWED_SOURCES` (`*`, any URL, by default): scheme, host and port equal, and the allowed path a
         whole-segment prefix. In an allowed URL `*` stands for any host, any one part of the host
         (`http://192.168.0.*:8000`) or any port; an entry that is just `*` allows any URL. To keep a
         plugin, put it in the plugin configuration instead.

@@ -213,7 +213,7 @@ def test_events_without_plugins_are_fine(host, fsp):
 
 @pytest.fixture
 def app_client(model_dir, monkeypatch):
-    monkeypatch.setenv("MODELPATH", str(model_dir))
+    monkeypatch.setenv("MODEL_PATH", str(model_dir))
     monkeypatch.setattr(
         be,
         "plugin_service",
@@ -258,7 +258,7 @@ def test_no_io_plugin_code_is_left_in_the_fsp():
 
 
 def test_stopping_the_app_stops_its_plugins(model_dir, monkeypatch):
-    monkeypatch.setenv("MODELPATH", str(model_dir))
+    monkeypatch.setenv("MODEL_PATH", str(model_dir))
     host = PluginHost(role="fsp")
     service = be.PluginService(host)
     monkeypatch.setattr(be, "plugin_host", host)
