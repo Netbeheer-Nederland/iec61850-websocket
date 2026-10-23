@@ -9,9 +9,12 @@
 // Only the plugin contract's management routes (GET/POST /api/plugins,
 // PUT/DELETE .../{name}, .../{name}/reload), through the BFF - nothing here
 // knows any one plugin.
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { executeApiCall } from '../services/apiService';
 import { pluginRows } from '../utils/plugins';
+
+// CodeMirror is most of the HMI's size otherwise; only this form needs it.
+const JsonEditor = lazy(() => import('./JsonEditor'));
 
 const STATE_STYLES = {
   healthy: { label: 'Healthy', color: 'var(--success-color)' },
@@ -41,6 +44,7 @@ function PluginsPanel({ target, role, pushed }) {
   const [formFor, setFormFor] = useState(null);
   const [form, setForm] = useState({ name: '', url: '', settings: '' });
   const editing = formFor?.mode === 'edit';
+  const setSettings = useCallback((settings) => setForm((f) => ({ ...f, settings })), []);
 
   const load = useCallback(async () => {
     if (!target) return;
@@ -130,7 +134,9 @@ function PluginsPanel({ target, role, pushed }) {
         <form onSubmit={handleSubmit} aria-label={editing ? `Edit ${formFor.name}` : 'Add plugin'} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px 12px', marginBottom: '12px' }}>
           <input id="plugins-add-name" placeholder="Name, e.g. io" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={editing} title={editing ? 'The name stays: a plugin with another name is another plugin' : undefined} />
           <input id="plugins-add-url" placeholder="URL, e.g. http://rpi-io:9000/plugin" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} required />
-          <textarea id="plugins-add-settings" placeholder='Settings (JSON, optional), e.g. {"write_inputs": false}' value={form.settings} onChange={(e) => setForm({ ...form, settings: e.target.value })} style={{ gridColumn: '1 / -1', fontFamily: 'monospace', minHeight: '48px' }} />
+          <Suspense fallback={<div style={{ gridColumn: '1 / -1', minHeight: '48px', color: 'var(--text-muted)' }}>Loading the settings editor...</div>}>
+            <JsonEditor id="plugins-add-settings" label="Settings (JSON)" placeholder='Settings (JSON, optional), e.g. {"write_inputs": false}' value={form.settings} onChange={setSettings} style={{ gridColumn: '1 / -1' }} />
+          </Suspense>
           <small style={{ gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
             {editing
               ? `A new URL must be allowed by the instance's PLUGIN_ALLOWED_SOURCES (${SOURCES_HINT}); the settings replace all of them. If the plugin doesn't connect with them, it keeps its old URL and settings. The edit stays until the instance restarts; a lasting one goes in its plugin configuration.`

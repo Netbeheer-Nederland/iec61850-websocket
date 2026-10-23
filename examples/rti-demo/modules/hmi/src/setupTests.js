@@ -12,3 +12,9 @@ import { configure } from '@testing-library/react';
 // passing wait still returns as soon as its condition holds, so this only
 // changes how long a genuinely failing one takes to report.
 configure({ asyncUtilTimeout: 5000 });
+
+// CodeMirror (JsonEditor) measures text ranges for the cursor and scrolling;
+// jsdom has no layout, so its Ranges lack these.
+const noRect = { x: 0, y: 0, top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0, toJSON: () => ({}) };
+Range.prototype.getBoundingClientRect ??= () => noRect;
+Range.prototype.getClientRects ??= () => Object.assign([], { item: () => null });

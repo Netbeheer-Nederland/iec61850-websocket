@@ -4,8 +4,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { EditorView } from '@codemirror/view';
 import PluginsPanel from './PluginsPanel';
 
 const STATUS = {
@@ -30,6 +31,23 @@ function mockBff(answers = {}) {
 }
 
 beforeEach(() => mockBff());
+
+// The settings field is a CodeMirror editor (JsonEditor), not a textarea.
+// It loads lazily, so wait for it before using it.
+const settingsBox = () => screen.findByRole('textbox', { name: 'Settings (JSON)' });
+const settingsEditor = () => EditorView.findFromDOM(document.querySelector('#plugins-add-settings .cm-editor'));
+const settingsText = async () => { await settingsBox(); return settingsEditor().state.doc.toString(); };
+const typeSettings = async (user, text) => {
+  await user.click(await settingsBox());
+  await user.keyboard(text.replace(/[{[]/g, '$&$&'));
+};
+const clearSettings = async () => {
+  await settingsBox();
+  act(() => {
+    const view = settingsEditor();
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length } });
+  });
+};
 
 describe('PluginsPanel', () => {
   it("lists the FSP's plugins, unreachable ones with the reason, and its claims", async () => {
@@ -89,8 +107,7 @@ describe('PluginsPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Add plugin' }));
     await user.type(document.getElementById('plugins-add-name'), 'x');
     await user.type(document.getElementById('plugins-add-url'), 'http://x/plugin');
-    await user.click(document.getElementById('plugins-add-settings'));
-    await user.paste('{"blink_seconds": 1}');
+    await typeSettings(user, '{"blink_seconds": 1}');
     await user.click(document.getElementById('plugins-add-submit'));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Add x failed: 403 Client Error: Forbidden - http://x/plugin is not allowed');
@@ -120,11 +137,11 @@ describe('PluginsPanel', () => {
     const form = screen.getByRole('form', { name: 'Edit display' });
     expect(document.getElementById('plugins-add-name')).toBeDisabled();
     expect(document.getElementById('plugins-add-url')).toHaveValue('http://pi:8000/plugin');
-    expect(JSON.parse(document.getElementById('plugins-add-settings').value)).toEqual({ rotate: 90 });
+    expect(JSON.parse(await settingsText())).toEqual({ rotate: 90 });
 
     await user.clear(document.getElementById('plugins-add-url'));
     await user.type(document.getElementById('plugins-add-url'), 'http://pi2:8000/plugin');
-    await user.clear(document.getElementById('plugins-add-settings'));
+    await clearSettings();
     await user.click(within(form).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({
@@ -160,7 +177,7 @@ describe('PluginsPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Add plugin' }));
     await user.type(document.getElementById('plugins-add-name'), 'x');
     await user.type(document.getElementById('plugins-add-url'), 'http://x/plugin');
-    await user.type(document.getElementById('plugins-add-settings'), 'not json');
+    await typeSettings(user, 'not json');
     await user.click(document.getElementById('plugins-add-submit'));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Settings must be JSON');
