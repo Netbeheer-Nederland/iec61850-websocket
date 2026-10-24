@@ -6,7 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # 0001. Call a plugin's own routes from its Details
 
-- Status: done (2026-10-24)
+- Status: done (2026-10-24, commit fb3ec2f)
 - Date: 2026-10-24
 - Changes: HMI
 
