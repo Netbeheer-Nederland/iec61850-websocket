@@ -5,15 +5,19 @@
 
 // The plugins an SO or FSP has connected to, on the ACSI Client and ACSI
 // Server pages: one row per plugin (healthy / unhealthy / unreachable, with
-// the reason), Details (claims, routes, what it attaches, settings), Edit (URL
+// the reason), Details (claims, routes, what it attaches, settings, and a
+// Request form for the plugin's own routes), Edit (URL
 // and settings), Copy as configuration, Reload (Retry for an unreachable one)
 // and Remove; Add from a URL, and Retry all that have a problem.
 // Only the plugin contract's management routes (GET/POST /api/plugins,
-// PUT/DELETE .../{name}, .../{name}/reload), through the BFF - nothing here
-// knows any one plugin.
+// PUT/DELETE .../{name}, .../{name}/reload) and its plugin routes
+// (/api/plugins/{name}/{path}), through the BFF - nothing here knows any one
+// plugin.
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { executeApiCall } from '../services/apiService';
-import { pluginRows, configEntry } from '../utils/plugins';
+import {
+  pluginRows, configEntry, ROUTE_METHODS, routeHasBody, routeRequest, routeAnswerText,
+} from '../utils/plugins';
 
 // CodeMirror is most of the HMI's size otherwise; only this form needs it.
 const JsonEditor = lazy(() => import('./JsonEditor'));
@@ -44,6 +48,48 @@ const ATTACHED_COLORS = {
 const reloadLabel = (row) => (row.state === 'unreachable' ? `Retry ${row.name} now` : `Reload ${row.name}`);
 
 const detailLabel = { color: 'var(--text-muted)', whiteSpace: 'nowrap', verticalAlign: 'top', paddingRight: '12px' };
+
+const EMPTY_REQUEST = { method: 'GET', path: '', query: '', body: '', answer: null };
+
+// A request to the plugin's own routes (spec 0001), and what it answered.
+// The BFF gives a plugin's answer only on success; a failure comes as the
+// instance's error, with the plugin's status in it.
+function PluginRequest({ row, request, onChange, onSend, busy }) {
+  const { method, path, query, body, answer } = request;
+  const set = (field) => (e) => onChange({ [field]: e.target.value });
+  const setBody = (text) => onChange({ body: text });
+  return (
+    <div style={{ marginTop: '10px' }}>
+      <form
+        aria-label={`Request to ${row.name}`}
+        onSubmit={(e) => { e.preventDefault(); onSend(); }}
+        style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}
+      >
+        <select aria-label="Method" value={method} onChange={set('method')}>
+          {ROUTE_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-muted)' }}>/api/plugins/{row.name}/</span>
+        <input aria-label="Path" placeholder="Path, e.g. leds" value={path} onChange={set('path')} style={{ flex: '1 1 140px' }} />
+        <input aria-label="Query" placeholder="Query, e.g. on=1&color=red" value={query} onChange={set('query')} style={{ flex: '1 1 140px' }} />
+        <button type="submit" className="btn-primary" disabled={Boolean(busy)}>Send</button>
+        {routeHasBody(method) && (
+          <Suspense fallback={<div style={{ flexBasis: '100%', minHeight: '48px', color: 'var(--text-muted)' }}>Loading the body editor...</div>}>
+            <JsonEditor id={`plugin-request-body-${row.name}`} label="Body (JSON)" placeholder='Body (JSON object, optional), e.g. {"on": true}' value={body} onChange={setBody} style={{ flexBasis: '100%' }} />
+          </Suspense>
+        )}
+      </form>
+      {answer && (
+        <div data-testid={`plugin-answer-${row.name}`} style={{ marginTop: '8px' }}>
+          <div style={{ fontWeight: 600, color: answer.ok ? 'var(--success-color)' : 'var(--danger-color)' }}>
+            {answer.ok ? 'OK' : 'Failed'} <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '12px' }}>{answer.request}</span>
+          </div>
+          <pre style={{ margin: '4px 0 0', fontSize: '12px', maxHeight: '300px', overflow: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer.text}</pre>
+          {answer.cut && <small style={{ color: 'var(--text-muted)' }}>Cut at {answer.text.length} characters.</small>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // What a row's Details shows: everything of its status the table doesn't.
 function PluginDetails({ row, showClaims }) {
@@ -104,6 +150,8 @@ function PluginsPanel({ target, role, pushed }) {
   // After Copy: { text } or, where the browser won't copy, { text, json } to copy by hand.
   const [notice, setNotice] = useState(null);
   const [expanded, setExpanded] = useState({});
+  // Per plugin, its Request form and last answer, while the page is open.
+  const [requests, setRequests] = useState({});
   // The form: null (closed), { mode: 'add' }, or { mode: 'edit', name }.
   const [formFor, setFormFor] = useState(null);
   const [form, setForm] = useState({ name: '', url: '', settings: '' });
@@ -171,6 +219,32 @@ function PluginsPanel({ target, role, pushed }) {
       setNotice({ text: `Copy ${row.name}'s entry into ${where}:`, json });
     }
   }, []);
+
+  const changeRequest = useCallback((name, change) => {
+    setRequests((r) => ({ ...r, [name]: { ...EMPTY_REQUEST, ...r[name], ...change } }));
+  }, []);
+
+  // A request to a plugin's route; anything but GET may change the plugin,
+  // so it asks first.
+  const handleSend = useCallback(async (name) => {
+    const req = routeRequest(requests[name] || EMPTY_REQUEST);
+    if (req.problem) {
+      setError(`Request to ${name}: ${req.problem}`);
+      return;
+    }
+    const shown = `${req.method} /api/plugins/${name}/${req.path}${req.query ? `?${req.query.replace(/^\?/, '')}` : ''}`;
+    if (req.method !== 'GET' && !window.confirm(`${shown} may change the plugin's state. Send?`)) return;
+    setBusy('Send');
+    setError(null);
+    const result = await executeApiCall('plugin-route', target, req.body, {
+      pathParams: { name, path: req.path }, method: req.method, query: req.query,
+    });
+    setBusy(null);
+    const answer = result?.ok
+      ? { ok: true, ...routeAnswerText(result.payload?.result ?? result.rawText) }
+      : { ok: false, text: errorOf(result), cut: false };
+    changeRequest(name, { answer: { ...answer, request: shown } });
+  }, [requests, target, changeRequest]);
 
   const toggleDetails = useCallback((name) => {
     setExpanded((e) => ({ ...e, [name]: !e[name] }));
@@ -324,6 +398,15 @@ function PluginsPanel({ target, role, pushed }) {
                   <tr>
                     <td colSpan={columns} style={{ background: 'var(--bg-hover)' }}>
                       <PluginDetails row={row} showClaims={showClaims} />
+                      {row.routes && (
+                        <PluginRequest
+                          row={row}
+                          request={requests[row.name] || EMPTY_REQUEST}
+                          onChange={(change) => changeRequest(row.name, change)}
+                          onSend={() => handleSend(row.name)}
+                          busy={busy}
+                        />
+                      )}
                     </td>
                   </tr>
                 )}

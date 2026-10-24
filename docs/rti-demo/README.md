@@ -12,7 +12,7 @@ a React HMI, with physical feedback from a Raspberry Pi IO service.
 
 This page is the system view: components, how they communicate, the data model and the main flows. How to run each
 part is in the module READMEs (see [Components](#components)); why it is built this way is in
-[decisions/](decisions/README.md).
+[decisions/](decisions/README.md); changes not built yet are described in [specs/](specs/README.md).
 
 ## Components
 

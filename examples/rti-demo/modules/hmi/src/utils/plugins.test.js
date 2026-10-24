@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { pluginRows, configEntry, pluginSummary, claimOwners, claimOwnerOf, attachedItems } from './plugins';
+import { pluginRows, configEntry, routeRequest, routeAnswerText, pluginSummary, claimOwners, claimOwnerOf, attachedItems } from './plugins';
 
 const STATUS = {
   plugins: [
@@ -94,5 +94,31 @@ describe('attachedItems', () => {
   it('is empty while the status is unknown', () => {
     expect(attachedItems(null)).toEqual([]);
     expect(attachedItems(undefined)).toEqual([]);
+  });
+});
+
+describe('plugin route requests', () => {
+  it('takes the path without leading slashes, and the query as given', () => {
+    expect(routeRequest({ method: 'GET', path: ' /leds/1', query: ' on=1 ', body: '{"x": 1}' }))
+      .toEqual({ method: 'GET', path: 'leds/1', query: 'on=1', body: null });
+  });
+
+  it('parses the body of POST, PUT and PATCH, which must be a JSON object', () => {
+    expect(routeRequest({ method: 'PUT', path: 'leds', body: '{"on": true}' }).body).toEqual({ on: true });
+    expect(routeRequest({ method: 'POST', path: 'leds', body: '' }).body).toBeNull();
+    expect(routeRequest({ method: 'POST', path: 'leds', body: 'nope' }).problem).toMatch(/^Body must be JSON/);
+    expect(routeRequest({ method: 'PATCH', path: 'leds', body: '[1]' }).problem).toBe('Body must be a JSON object');
+  });
+
+  it("refuses no path, and POST reload, the instance's own route", () => {
+    expect(routeRequest({ method: 'GET', path: ' / ' }).problem).toMatch(/path is needed/);
+    expect(routeRequest({ method: 'POST', path: '/reload/' }).problem).toMatch(/own Reload/);
+    expect(routeRequest({ method: 'GET', path: 'reload' }).problem).toBeUndefined();
+  });
+
+  it('shows JSON pretty-printed and text as it is, cut at the limit', () => {
+    expect(routeAnswerText({ a: 1 })).toEqual({ text: '{\n  "a": 1\n}', cut: false });
+    expect(routeAnswerText('plain')).toEqual({ text: 'plain', cut: false });
+    expect(routeAnswerText('abcdef', 4)).toEqual({ text: 'abcd', cut: true });
   });
 });

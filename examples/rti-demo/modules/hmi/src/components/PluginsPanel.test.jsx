@@ -136,6 +136,88 @@ describe('PluginsPanel', () => {
     expect(screen.queryByTestId('plugin-details-io')).not.toBeInTheDocument();
   });
 
+  it('sends a request to a plugin route from its details, and shows the answer', async () => {
+    mockBff({ 'GET /api/plugins/io/leds/1?on=1&color=red': { status: 200, body: { ok: true, result: { leds: [{ name: 'red', on: true }] } } } });
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Details io'));
+
+    const form = screen.getByRole('form', { name: 'Request to io' });
+    await user.type(within(form).getByLabelText('Path'), 'leds/1');
+    await user.type(within(form).getByLabelText('Query'), 'on=1&color=red');
+    await user.click(within(form).getByRole('button', { name: 'Send' }));
+
+    const answer = await screen.findByTestId('plugin-answer-io');
+    expect(answer).toHaveTextContent('OK');
+    expect(answer).toHaveTextContent('"name": "red"');
+    expect(calls).toContainEqual(expect.objectContaining({ target: 'rti-fsp01:5001', method: 'GET', path: '/api/plugins/io/leds/1?on=1&color=red' }));
+  });
+
+  it('has no request form for a plugin without routes', async () => {
+    const status = { ...STATUS, plugins: [{ ...STATUS.plugins[0], routes: false }] };
+    mockBff({ 'GET /api/plugins': { status: 200, body: { ok: true, result: status } } });
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Details io'));
+    expect(screen.queryByRole('form', { name: 'Request to io' })).not.toBeInTheDocument();
+  });
+
+  it('asks before a request that may change the plugin, and sends its JSON body', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Details io'));
+    const form = screen.getByRole('form', { name: 'Request to io' });
+    await user.selectOptions(within(form).getByLabelText('Method'), 'POST');
+    await user.type(within(form).getByLabelText('Path'), 'leds');
+    await user.click(await screen.findByRole('textbox', { name: 'Body (JSON)' }));
+    await user.keyboard('{{"on": true}');
+
+    await user.click(within(form).getByRole('button', { name: 'Send' }));
+    expect(confirm).toHaveBeenLastCalledWith("POST /api/plugins/io/leds may change the plugin's state. Send?");
+    expect(calls.filter((c) => c.path === '/api/plugins/io/leds')).toEqual([]);
+
+    await user.click(within(form).getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'POST', path: '/api/plugins/io/leds', body: { on: true } })));
+  });
+
+  it("shows the instance's error as the answer when the plugin route fails", async () => {
+    mockBff({ 'GET /api/plugins/io/nope': { status: 500, body: { detail: '404 Client Error: Not Found for url: http://rpi-io:5001/api/plugins/io/nope' } } });
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Details io'));
+    const form = screen.getByRole('form', { name: 'Request to io' });
+    await user.type(within(form).getByLabelText('Path'), 'nope');
+    await user.click(within(form).getByRole('button', { name: 'Send' }));
+
+    const answer = await screen.findByTestId('plugin-answer-io');
+    expect(answer).toHaveTextContent('Failed');
+    expect(answer).toHaveTextContent('404 Client Error');
+  });
+
+  it("refuses POST reload as a plugin route, without calling the instance", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Details io'));
+    const form = screen.getByRole('form', { name: 'Request to io' });
+    await user.selectOptions(within(form).getByLabelText('Method'), 'POST');
+    await user.type(within(form).getByLabelText('Path'), 'reload');
+    await user.click(within(form).getByRole('button', { name: 'Send' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("POST reload is the instance's own Reload");
+    expect(calls.filter((c) => c.method === 'POST')).toEqual([]);
+  });
+
+  it('keeps the request and its answer when the details are closed and opened again', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Details io'));
+    await user.type(within(screen.getByRole('form', { name: 'Request to io' })).getByLabelText('Path'), 'leds');
+    await user.click(screen.getByTitle('Details io'));
+    await user.click(screen.getByTitle('Details io'));
+    expect(within(screen.getByRole('form', { name: 'Request to io' })).getByLabelText('Path')).toHaveValue('leds');
+  });
+
   it('copies a plugin as a plugin configuration entry', async () => {
     const user = userEvent.setup({ delay: null });
     const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();

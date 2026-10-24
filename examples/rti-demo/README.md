@@ -181,7 +181,8 @@ the rest of the demo works.
 
 A plugin's settings can be edited in the HMI's Plugins panel (✎, decision
 [0036](../../docs/rti-demo/decisions/0036-plugin-definitions-editable.md)), until the FSP or SO restarts; for a lasting
-change, edit its file in `config/plugin-configuration/`. A plugin can be added, or moved to another URL, from any URL:
+change, edit its file in `config/plugin-configuration/` (the panel's Copy as configuration (⧉) gives the plugin's entry
+for it). A plugin can be added, or moved to another URL, from any URL:
 the instance's `PLUGIN_ALLOWED_SOURCES` is `*` by default, and compose doesn't set it. Anyone using the HMI can then
 connect an instance to any server, which gets its events and can answer its Operates, so outside a closed demo narrow
 it in an override of the service's `environment`: an exact URL (`PLUGIN_ALLOWED_SOURCES=http://192.168.0.226:8000`), a

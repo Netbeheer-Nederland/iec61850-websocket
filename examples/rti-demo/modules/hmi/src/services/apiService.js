@@ -86,12 +86,24 @@ const API_DEFINITIONS = [
   { id: 'plugin-edit', label: 'PUT /api/plugins/{name}', method: 'PUT', path: '/api/plugins/{name}' },
   { id: 'plugin-reload', label: 'POST /api/plugins/{name}/reload', method: 'POST', path: '/api/plugins/{name}/reload' },
   { id: 'plugin-remove', label: 'DELETE /api/plugins/{name}', method: 'DELETE', path: '/api/plugins/{name}' },
+  // A plugin's own routes (spec 0001); the method is the caller's.
+  { id: 'plugin-route', label: '/api/plugins/{name}/{path}', method: 'GET', path: '/api/plugins/{name}/{path*}' },
 ];
 
 // "/api/plugins/{name}/reload" + { name: 'io' } -> "/api/plugins/io/reload".
+// A {key*} keeps its slashes, encoding each segment: "leds/1" stays "leds/1".
+const encodeParam = (value, keepSlashes) => (keepSlashes
+  ? String(value).split('/').map(encodeURIComponent).join('/')
+  : encodeURIComponent(value));
 const fillPath = (path, pathParams) => (pathParams
-  ? path.replace(/\{(\w+)\}/g, (match, key) => (key in pathParams ? encodeURIComponent(pathParams[key]) : match))
+  ? path.replace(/\{(\w+)(\*?)\}/g, (match, key, star) => (key in pathParams ? encodeParam(pathParams[key], star === '*') : match))
   : path);
+
+// "on=1&color=red" (or "?on=1...") -> "?on=1&color=red", encoded; "" -> "".
+const queryString = (query) => {
+  const text = new URLSearchParams(String(query || '').replace(/^\?/, '')).toString();
+  return text ? `?${text}` : '';
+};
 
 /**
  * Get API definition by ID
@@ -161,17 +173,23 @@ export const buildBffApiUrl = (path, targetValue = null) => {
  * @param {object} options - Additional options
  * @param {boolean} options.useDirect - If true, call the endpoint directly instead of through /api/execute
  * @param {object} options.pathParams - Values for the path's {placeholders}, e.g. { name: 'io' }
+ * @param {string} options.method - Instead of the definition's method (for plugin-route)
+ * @param {string} options.query - A query string added to the path, e.g. "on=1&color=red"
  * @returns {Promise<object|null>} The API response object with ok, status, payload, rawText
  */
 export const executeApiCall = async (apiId, targetValue = null, bodyOverride = null, options = {}) => {
-  const { useDirect = false, pathParams = null } = options;
+  const { useDirect = false, pathParams = null, method = null, query = '' } = options;
   const definition = getApiById(apiId);
   
   if (!definition) {
     console.error(`API ${apiId} not found`);
     return null;
   }
-  const api = { ...definition, path: fillPath(definition.path, pathParams) };
+  const api = {
+    ...definition,
+    method: method || definition.method,
+    path: fillPath(definition.path, pathParams) + queryString(query),
+  };
   
   try {
     let url;

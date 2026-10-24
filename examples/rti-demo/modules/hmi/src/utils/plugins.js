@@ -103,3 +103,40 @@ export function attachedItems(status) {
   }
   return items;
 }
+
+// A request to a plugin's own routes (spec 0001), as the Details' Request
+// form has it: { method, path, query, body } with the body as JSON text.
+export const ROUTE_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+export const routeHasBody = (method) => ['POST', 'PUT', 'PATCH'].includes(method);
+
+// The request ready to send - { method, path, query, body } with the path
+// without leading slashes and the body parsed (null without one) - or
+// { problem } when it can't be sent. The BFF passes a body only as a JSON
+// object, and POST .../reload is the instance's own Reload.
+export function routeRequest({ method, path, query, body }) {
+  const cleanPath = String(path || '').trim().replace(/^\/+/, '');
+  if (!cleanPath) return { problem: 'A path is needed, e.g. leds' };
+  if (method === 'POST' && cleanPath.replace(/\/+$/, '') === 'reload') {
+    return { problem: "POST reload is the instance's own Reload, not the plugin's route" };
+  }
+  let parsed = null;
+  if (routeHasBody(method) && String(body || '').trim()) {
+    try {
+      parsed = JSON.parse(body);
+    } catch (err) {
+      return { problem: `Body must be JSON: ${err.message}` };
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { problem: 'Body must be a JSON object' };
+    }
+  }
+  return { method, path: cleanPath, query: String(query || '').trim(), body: parsed };
+}
+
+// What the plugin answered, as text to show: JSON pretty-printed, text as it
+// is, cut at `limit` characters.
+export const ROUTE_ANSWER_LIMIT = 20000;
+export function routeAnswerText(result, limit = ROUTE_ANSWER_LIMIT) {
+  const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2) ?? '';
+  return text.length > limit ? { text: text.slice(0, limit), cut: true } : { text, cut: false };
+}
