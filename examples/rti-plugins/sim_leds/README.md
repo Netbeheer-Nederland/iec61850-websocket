@@ -48,7 +48,7 @@ and add it to the FSP's or SO's plugin configuration:
 | `PORT` | `8099` | |
 | `SIM_LEDS_CLAIMS` | none | ObjRefs it claims (comma-separated); an Operate on one is refused while red is on |
 
-Its `GET /plugin/attached` reports the two LEDs, so the HMI's Overview draws them next to the FSP or SO (decision
+Its `GET /plugin/attached` reports the two LEDs, so the HMI's Overview and Traffic draw them next to the FSP or SO (decision
 [0025](../../../docs/rti-demo/decisions/0025-plugins-show-attached-devices-in-hmi.md)).
 
 ## Tests

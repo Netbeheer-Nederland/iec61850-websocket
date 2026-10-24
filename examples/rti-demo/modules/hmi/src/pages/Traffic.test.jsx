@@ -31,8 +31,8 @@ vi.mock('../components/MessageMonitor', () => ({
 }));
 // Exposes its select callbacks as buttons, so focusing can be driven here.
 vi.mock('../components/InstanceVisualization', () => ({
-  default: ({ connections = [], onFspSelect, onSoSelect }) => (
-    <div data-testid="instance-visualization">
+  default: ({ connections = [], onFspSelect, onSoSelect, showAttached }) => (
+    <div data-testid="instance-visualization" data-show-attached={showAttached ? 'true' : 'false'}>
       {connections.filter((c) => c.type === 'RTI-FSP').map((c) => (
         <button key={c.name} onClick={() => onFspSelect?.(c)}>{`focus ${c.name}`}</button>
       ))}
@@ -153,6 +153,13 @@ describe('Traffic - timeline', () => {
     expect(screen.getByTestId('traffic-timeline').textContent).toBe('timeline focus: none');
     fireEvent.click(screen.getByText('focus FSP02'));
     expect(screen.getByTestId('traffic-timeline').textContent).toBe('timeline focus: FSP02');
+  });
+});
+
+describe('Traffic - attached boxes', () => {
+  it("draws what the plugins attach next to the SO and FSPs, as Overview does", () => {
+    renderTraffic([SO, fsp('FSP01', 1)]);
+    expect(screen.getByTestId('instance-visualization')).toHaveAttribute('data-show-attached', 'true');
   });
 });
 

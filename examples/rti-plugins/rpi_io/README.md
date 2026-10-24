@@ -148,7 +148,7 @@ The IO server implements the plugin API (`examples/rti-demo/modules/plugins/open
 | `POST /plugin/events` | Answers `202`, then shows the event on the devices `io_mapping.json` maps to its name (below), and sets the output devices mapped to a written objRef |
 | `POST /plugin/control` | `204`: it claims no objRefs, so the FSP decides every Operate itself |
 | `POST /plugin/stop` | Forgets the host; stops sending it input changes |
-| `GET /plugin/attached` | What it attaches, for the HMI's Overview (decision [0025](../../../docs/rti-demo/decisions/0025-plugins-show-attached-devices-in-hmi.md)): this server, with its LEDs (as green indicators: it doesn't know their colour), buttons and potentiometers, `degraded` while some devices didn't come up; and each display, with the text the plugin last wrote to it |
+| `GET /plugin/attached` | What it attaches, for the HMI's Overview and Traffic (decision [0025](../../../docs/rti-demo/decisions/0025-plugins-show-attached-devices-in-hmi.md)): this server, with its LEDs (as green indicators: it doesn't know their colour), buttons and potentiometers, `degraded` while some devices didn't come up; and each display, with the text the plugin last wrote to it |
 | `GET /plugin/mappings` | The mapping in use, the hosts that started it, and where inputs go |
 
 What each event does (the names are the plugin's own, mapped to devices in `io_mapping.json`):

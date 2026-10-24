@@ -83,6 +83,7 @@ function Traffic({ settings, getModel, updateModel, connections = [], loading = 
           loading={loading}
           onConnectionClick={null}
           showLabels={true}
+          showAttached
           activity={activity}
           focusedFsp={focusedFsp}
           onSoSelect={() => setFocusedFspName(null)}

@@ -104,15 +104,15 @@ Four options were considered:
    The IO server doesn't know an LED's colour, so it reports `green`.
 6. **`sim_leds` reports its two LEDs**, as one `other` item with `indicators` (`green`, `red`), as the example for
    plugin authors in `GETTING_STARTED.md`.
-7. **The HMI draws a box per item.** On Overview, `InstanceVisualization` draws each attached item next to its FSP or
+7. **The HMI draws a box per item.** On Overview and Traffic, `InstanceVisualization` draws each attached item next to its FSP or
    SO: the icon for its `kind`, its `label`, the colour for its `state`, and its `live` blocks small underneath (LED
    dots, values, a text box like the display). Clicking a box opens its details: `address`, `detail`, the plugin's
-   name, `version`, `healthy`, `last_error` and `attached_error`. Model and Traffic keep their focus; they can turn
-   the boxes on by a prop. The HMI draws every plugin's items the same way: a new plugin needs no HMI change.
+   name, `version`, `healthy`, `last_error` and `attached_error`. Model keeps its focus; it can turn the boxes on by
+   a prop (`showAttached`). The HMI draws every plugin's items the same way: a new plugin needs no HMI change.
 
 ## Consequences
 
-- What each FSP and SO is attached to is visible on Overview: an IO server whose devices didn't come up shows
+- What each FSP and SO is attached to is visible on Overview and Traffic: an IO server whose devices didn't come up shows
   `degraded` next to its FSP, and the display's text, the LEDs and the potentiometers show as they change. A plugin
   that is down shows no boxes; its plugin badge is red.
 - **Live means within the poll.** The BFF polls every 2 s and the host asks at most once a second, so what the HMI

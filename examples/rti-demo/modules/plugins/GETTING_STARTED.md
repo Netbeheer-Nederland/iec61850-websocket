@@ -80,7 +80,7 @@ def control(request: ControlRequest): ...
 @plugin.post("/stop")                 # when the FSP or SO removes it, reloads it or stops
 async def stop(host: Host): ...
 
-@plugin.get("/attached")              # optional: what it attaches, for the HMI's Overview
+@plugin.get("/attached")              # optional: what it attaches, for the HMI's Overview and Traffic
 def attached(): ...
 ```
 
@@ -207,7 +207,7 @@ on an owned objRef aren't passed to the plugin (yet): it sees them only as event
 
 ### Showing what it attaches (HMI)
 
-A plugin can say what it links its FSP or SO to, and the HMI draws a box per item next to the FSP or SO on Overview
+A plugin can say what it links its FSP or SO to, and the HMI draws a box per item next to the FSP or SO on Overview and Traffic
 (decision [0025](../../../../docs/rti-demo/decisions/0025-plugins-show-attached-devices-in-hmi.md)). The sample shows
 its two LEDs:
 

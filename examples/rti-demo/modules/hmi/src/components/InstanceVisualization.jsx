@@ -217,7 +217,7 @@ function ActivityLink({ fspName, cp, link = EMPTY_LINK, detected, down = null })
  * @param {Object|null} presence - useFspPresence's result; when given, an FSP
  *   whose link to the SO dropped is marked "link down" (Traffic)
  * @param {boolean} showAttached - Draw what each SO's and FSP's plugins
- *   attach next to it (Overview; decision 0025)
+ *   attach next to it (Overview and Traffic; decision 0025)
  */
 function InstanceVisualization({
   connections,

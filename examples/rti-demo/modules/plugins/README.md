@@ -69,7 +69,7 @@ and Read on an owned objRef aren't passed to plugins yet: the ACSI library has n
 
 **Attached** (decision [0025](../../../../docs/rti-demo/decisions/0025-plugins-show-attached-devices-in-hmi.md)):
 what the plugin links its FSP or SO to (an IO server, a display, an IED), for the HMI to draw next to the FSP or SO on
-Overview. Each item has a `kind` (`io`, `ied`, `display`, `other`), a `label`, a `state` (`ok`, `degraded`, `down`,
+Overview and Traffic. Each item has a `kind` (`io`, `ied`, `display`, `other`), a `label`, a `state` (`ok`, `degraded`, `down`,
 `unknown`), optionally an `address` and a `detail`, and `live` blocks: `text` (`lines`), `indicators` (`name`, `on`,
 `color`) or `values` (`label`, `value`, `unit`). The FSP or SO checks and trims the answer (at most 4 items, 4 blocks
 per item, 8 lines of 24 characters, 8 indicators, 6 values; anything unknown is dropped) and lists it with the plugin

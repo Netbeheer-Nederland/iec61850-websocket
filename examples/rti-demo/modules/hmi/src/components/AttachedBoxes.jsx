@@ -4,7 +4,7 @@
  */
 
 // What an SO's or FSP's plugins attach (decision 0025), drawn next to it on
-// Overview: a box per item - icon for its kind, label, colour for its state -
+// Overview and Traffic: a box per item - icon for its kind, label, colour for its state -
 // with its live blocks small underneath (LED dots, values, a display's text).
 // Clicking a box shows its details. Every plugin's items are drawn the same
 // way, as plain text: nothing here knows any one plugin.
