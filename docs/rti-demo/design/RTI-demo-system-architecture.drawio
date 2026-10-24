@@ -224,7 +224,7 @@
         <mxCell id="KbATax4Mxk-P4ihoyBT5-66" parent="KbATax4Mxk-P4ihoyBT5-57" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Demo Master" vertex="1">
           <mxGeometry height="75" width="120" x="140" y="75" as="geometry" />
         </mxCell>
-        <mxCell id="KbATax4Mxk-P4ihoyBT5-67" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;" value="&lt;div&gt;- one-click setup&lt;/div&gt;- starting with a docker compose up&amp;nbsp;&lt;div&gt;- open browser to &#39;Demo Master&#39;&lt;/div&gt;" vertex="1">
+        <mxCell id="KbATax4Mxk-P4ihoyBT5-67" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;" value="&lt;div&gt;- one-click setup&lt;/div&gt;- starting with a docker compose up&amp;nbsp;&lt;div&gt;- open browser to 'Demo Master'&lt;/div&gt;" vertex="1">
           <mxGeometry height="65" width="200" x="-490" y="710" as="geometry" />
         </mxCell>
         <mxCell id="KbATax4Mxk-P4ihoyBT5-68" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" value="docker-hub&amp;nbsp;&lt;div&gt;registery&lt;/div&gt;" vertex="1">
@@ -659,99 +659,158 @@
     </mxGraphModel>
   </diagram>
   <diagram id="p1" name="01 RTI Demo System Architecture">
-    <mxGraphModel dx="2375" dy="2364" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1490" pageHeight="1005" math="0" shadow="0">
+    <mxGraphModel dx="2375" dy="2364" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1490" pageHeight="1500" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="n1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#adcafb;strokeColor=none;fontColor=#303238;fontSize=28;fontStyle=1;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="RTI DEMO SYSTEM ARCHITECTURE" vertex="1">
-          <mxGeometry height="76" width="1350" x="30" y="-360" as="geometry" />
+        <mxCell id="n1" parent="1" vertex="1" value="RTI DEMO SYSTEM ARCHITECTURE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#adcafb;strokeColor=none;fontColor=#303238;fontSize=28;fontStyle=1;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="30" y="-360" width="1350" height="76" as="geometry" />
         </mxCell>
-        <mxCell id="n2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f2ff;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;spacing=6;opacity=100;" value="Layer 1 — Frontend" vertex="1">
-          <mxGeometry height="30" width="255" x="30" y="-260" as="geometry" />
+        <mxCell id="n2" parent="1" vertex="1" value="Layer 1 — Frontend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f2ff;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="30" y="-260" width="360" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="n3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f2ff;strokeColor=none;fontColor=#303238;fontSize=18;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;container=0;" value="" vertex="1">
-          <mxGeometry height="340" width="1340" x="24" y="-210" as="geometry" />
+        <mxCell id="n3" parent="1" vertex="1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f2ff;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;container=0;">
+          <mxGeometry x="24" y="-210" width="1340" height="340" as="geometry" />
         </mxCell>
-        <mxCell id="n4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ddfff1;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;spacing=6;opacity=100;" value="Layer 2 — Backend Services" vertex="1">
-          <mxGeometry height="30" width="255" x="30" y="170" as="geometry" />
+        <mxCell id="n4" parent="1" vertex="1" value="Layer 2 — Backend services (docker-compose.yml)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f2ff;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="30" y="170" width="520" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="n5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ddfff1;strokeColor=none;fontColor=#303238;fontSize=18;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;container=0;" value="" vertex="1">
-          <mxGeometry height="390" width="1340" x="24" y="200" as="geometry" />
+        <mxCell id="n5" parent="1" vertex="1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f2ff;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;container=0;">
+          <mxGeometry x="24" y="200" width="1340" height="390" as="geometry" />
         </mxCell>
-        <mxCell id="n6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5eafa;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;spacing=6;opacity=100;" value="Layer 3 — Plugin Services" vertex="1">
-          <mxGeometry height="30" width="255" x="30" y="630" as="geometry" />
+        <mxCell id="n6" parent="1" vertex="1" value="Layer 3 — Plugins: HTTP services the FSPs and SO connect to (plugin contract, api 2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5eafa;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="30" y="630" width="820" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="n7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5eafa;strokeColor=none;fontColor=#303238;fontSize=18;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;container=0;" value="" vertex="1">
-          <mxGeometry height="179" width="1340" x="30" y="662" as="geometry" />
+        <mxCell id="n7" parent="1" vertex="1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5eafa;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;container=0;">
+          <mxGeometry x="24" y="662" width="1340" height="240" as="geometry" />
         </mxCell>
-        <mxCell id="n8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3d8;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;spacing=6;opacity=100;" value="Layer 4 — Physical IO Devices" vertex="1">
-          <mxGeometry height="30" width="255" x="30" y="851" as="geometry" />
+        <mxCell id="n8" parent="1" vertex="1" value="Layer 4 — Physical IO devices (Raspberry Pi)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4d6;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="30" y="920" width="520" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="n9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3d8;strokeColor=none;fontColor=#303238;fontSize=18;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;container=0;" value="" vertex="1">
-          <mxGeometry height="179" width="1340" x="30" y="883" as="geometry" />
+        <mxCell id="n9" parent="1" vertex="1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4d6;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;container=0;">
+          <mxGeometry x="24" y="952" width="1340" height="130" as="geometry" />
         </mxCell>
-        <mxCell id="n10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cfe0fc;strokeColor=none;fontColor=#303238;fontSize=18;fontStyle=1;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="Web Browser (User)" vertex="1">
-          <mxGeometry height="100" width="220" x="435" y="-180" as="geometry" />
+        <mxCell id="n10" parent="1" vertex="1" value="Web browser (user)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cfe0fc;strokeColor=none;fontColor=#303238;fontSize=18;fontStyle=1;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="560" y="-195" width="220" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="n11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#adcafb;strokeColor=none;fontColor=#303238;fontSize=18;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="HMI (reactive)&lt;div&gt;Port 8080&lt;/div&gt;" vertex="1">
-          <mxGeometry height="100" width="220" x="279" y="-30" as="geometry" />
+        <mxCell id="n11" parent="1" vertex="1" value="&lt;b&gt;HMI&lt;/b&gt; (React, nginx)&lt;br&gt;Port 8080&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;Overview · Traffic · Model · ACSI Client (SO) · ACSI Server (FSP) · Connections · Data · Reports · Diagnostics · Tools · Settings&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#adcafb;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="200" y="-70" width="330" height="170" as="geometry" />
         </mxCell>
-        <mxCell id="n12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#adcafb;strokeColor=none;fontColor=#303238;fontSize=18;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="BFF FastAP&lt;br&gt;Port 3000" vertex="1">
-          <mxGeometry height="100" width="220" x="680" y="-23" as="geometry" />
+        <mxCell id="n12" parent="1" vertex="1" value="&lt;b&gt;BFF&lt;/b&gt; (FastAPI)&lt;br&gt;Port 3000&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;connections.json · POST /api/execute → an instance · /ws push (connections, plugins, activity) · playbooks&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#adcafb;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="700" y="-70" width="330" height="170" as="geometry" />
         </mxCell>
-        <mxCell id="n13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=18;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="IDP Server&amp;lt;br&amp;gt;Keycloak / Port 8443" vertex="1">
-          <mxGeometry height="100" width="220" x="70" y="230" as="geometry" />
+        <mxCell id="n30" parent="1" vertex="1" value="&lt;b&gt;Plugins panel&lt;/b&gt; (ACSI Client / Server)&lt;br&gt;Add · Edit · Details (claims, routes, attached, settings, route requests) · Copy as configuration · Reload / Retry · Remove&lt;br&gt;&lt;br&gt;&lt;b&gt;Attached boxes&lt;/b&gt; next to each SO / FSP on Overview and Traffic · 🔌 plugin badge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#adcafb;fontColor=#303238;fontSize=12;fontStyle=0;align=left;verticalAlign=top;spacing=6;opacity=100;dashed=1;">
+          <mxGeometry x="1065" y="-195" width="285" height="170" as="geometry" />
         </mxCell>
-        <mxCell id="n14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=17;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="RTI-FSP&amp;lt;br&amp;gt;ACSI Server - WS Active&amp;lt;br&amp;gt;Port 5001" vertex="1">
-          <mxGeometry height="100" width="220" x="860" y="320" as="geometry" />
+        <mxCell id="n13" parent="1" vertex="1" value="&lt;b&gt;IDP server&lt;/b&gt;&lt;br&gt;Keycloak&lt;br&gt;Port 8081 / 8443&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;optional, scripts/keycloak&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="50" y="250" width="230" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="n15" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=17;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="RTI-SO&amp;lt;br&amp;gt;ACSI Client - WS Passive&amp;lt;br&amp;gt;Port 5002" vertex="1">
-          <mxGeometry height="100" width="220" x="490" y="320" as="geometry" />
+        <mxCell id="n15" parent="1" vertex="1" value="&lt;b&gt;RTI-SO&lt;/b&gt;&lt;br&gt;ACSI client · WebSocket passive&lt;br&gt;REST 5000 · WS 8765&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;plugin host&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="380" y="400" width="280" height="130" as="geometry" />
         </mxCell>
-        <mxCell id="n16" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=none;fontColor=#303238;fontSize=17;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="WebSocket&amp;lt;br&amp;gt;Port 8765 — ACSI Protocol" vertex="1">
-          <mxGeometry height="100" width="220" x="860" y="440" as="geometry" />
+        <mxCell id="n14" parent="1" vertex="1" value="&lt;b&gt;RTI-FSP01&lt;/b&gt;&lt;br&gt;ACSI server · WebSocket active&lt;br&gt;REST 5001&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;plugin host&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="800" y="240" width="280" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="n17" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=none;fontColor=#303238;fontSize=18;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="RTI-IO&lt;div&gt;Port 9000&lt;/div&gt;" vertex="1">
-          <mxGeometry height="100" width="220" x="496" y="690" as="geometry" />
+        <mxCell id="n16" parent="1" vertex="1" value="&lt;b&gt;RTI-FSP02&lt;/b&gt;&lt;br&gt;ACSI server · WebSocket active&lt;br&gt;REST 5005&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;plugin host&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="800" y="430" width="280" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="n18" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffdb7d;strokeColor=none;fontColor=#303238;fontSize=18;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="Physical IO Devices&amp;lt;br&amp;gt;GPIO · ADC · I2C · LCD" vertex="1">
-          <mxGeometry height="80" width="570" x="321" y="915" as="geometry" />
+        <mxCell id="n17" parent="1" vertex="1" value="&lt;b&gt;rpi-io&lt;/b&gt; (opt-in)&lt;br&gt;IO server + plugin &lt;i&gt;io&lt;/i&gt;&lt;br&gt;:9000/plugin · routes /api/io&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;docker-compose.io.yaml: one for the FSPs and SO, instead of sim_leds&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=#8b3cb8;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;dashed=1;">
+          <mxGeometry x="60" y="690" width="270" height="125" as="geometry" />
         </mxCell>
-        <mxCell id="e19" edge="1" parent="1" source="n10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1959c4;endArrow=classic;endFill=1;fontSize=15;fontColor=#1959c4;labelBackgroundColor=#ffffff;dashed=0;" target="n11" value="">
+        <mxCell id="n19" parent="1" vertex="1" value="&lt;b&gt;sim-leds-so&lt;/b&gt;&lt;br&gt;plugin &lt;i&gt;sim_leds&lt;/i&gt;&lt;br&gt;:8099/plugin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="410" y="700" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="n20" parent="1" vertex="1" value="&lt;b&gt;sim-leds-fsp02&lt;/b&gt;&lt;br&gt;plugin &lt;i&gt;sim_leds&lt;/i&gt;&lt;br&gt;:8099/plugin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="830" y="700" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="n21" parent="1" vertex="1" value="&lt;b&gt;sim-leds-fsp01&lt;/b&gt;&lt;br&gt;plugin &lt;i&gt;sim_leds&lt;/i&gt;&lt;br&gt;:8099/plugin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="1110" y="700" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="n22" parent="1" vertex="1" value="&lt;b&gt;Default&lt;/b&gt;: docker-compose.leds.yaml, one sim_leds per instance (two simulated LEDs, no hardware). &lt;b&gt;FSP / SO → plugin&lt;/b&gt;: GET / (describe) · POST /start · /stop · /events · /control (FSP: Operates on claimed objRefs) · GET /attached. &lt;b&gt;HMI → BFF → instance&lt;/b&gt;: /api/plugins (list, add, edit, reload, remove) and /api/plugins/{name}/{path} → the plugin's own routes. Configuration: config/plugin-configuration/ (PLUGINS_FILE), PLUGIN_ALLOWED_SOURCES." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#e4c5f7;fontColor=#303238;fontSize=12;fontStyle=0;align=left;verticalAlign=top;spacing=6;opacity=100;">
+          <mxGeometry x="360" y="815" width="990" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="n18" parent="1" vertex="1" value="&lt;b&gt;Physical IO devices&lt;/b&gt;&lt;br&gt;GPIO (LEDs, buttons) · SPI ADC (potentiometers) · I2C (SSD1306 OLED, LCD)&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;mock mode off the Pi; on the Pi with rpi_io/docker-compose.pi.yaml&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffdb7d;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+          <mxGeometry x="60" y="975" width="640" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e19" parent="1" edge="1" source="n10" target="n11" value="loads the app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1959c4;endArrow=classic;endFill=1;fontSize=13;fontColor=#1959c4;labelBackgroundColor=#ffffff;dashed=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e20" edge="1" parent="1" source="n10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1959c4;endArrow=classic;endFill=1;fontSize=15;fontColor=#1959c4;labelBackgroundColor=#ffffff;dashed=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" target="n12" value="">
+        <mxCell id="e20" parent="1" edge="1" source="n10" target="n12" value="REST · /ws push" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1959c4;endArrow=classic;endFill=1;fontSize=13;fontColor=#1959c4;labelBackgroundColor=#ffffff;dashed=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e21" edge="1" parent="1" source="n14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#267951;endArrow=classic;endFill=1;fontSize=15;fontColor=#267951;labelBackgroundColor=#ffffff;dashed=0;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" target="n13" value="">
-          <mxGeometry relative="1" x="0.0812" as="geometry" />
-        </mxCell>
-        <mxCell id="e22" edge="1" parent="1" source="n12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#267951;endArrow=classic;endFill=1;fontSize=15;fontColor=#267951;labelBackgroundColor=#ffffff;dashed=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" target="n14" value="">
+        <mxCell id="e23" parent="1" edge="1" source="n12" target="n15" value="REST :5000" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#267951;endArrow=classic;endFill=1;fontSize=13;fontColor=#267951;labelBackgroundColor=#ffffff;dashed=0;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="845" y="160" />
-              <mxPoint x="970" y="160" />
+              <mxPoint x="750" y="160" />
+              <mxPoint x="520" y="160" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e23" edge="1" parent="1" source="n12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#267951;endArrow=classic;endFill=1;fontSize=15;fontColor=#267951;labelBackgroundColor=#ffffff;dashed=0;exitX=0.25;exitY=1;exitDx=0;exitDy=0;" target="n15" value="">
-          <mxGeometry relative="1" x="-0.2547" as="geometry">
+        <mxCell id="e22" parent="1" edge="1" source="n12" target="n14" value="REST :5001" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#267951;endArrow=classic;endFill=1;fontSize=13;fontColor=#267951;labelBackgroundColor=#ffffff;dashed=0;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="735" y="160" />
-              <mxPoint x="600" y="160" />
+              <mxPoint x="898" y="160" />
+              <mxPoint x="940" y="160" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e24" edge="1" parent="1" source="n13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#8b3cb8;endArrow=classic;endFill=1;fontSize=15;fontColor=#8b3cb8;labelBackgroundColor=#ffffff;dashed=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.75;exitDx=0;exitDy=0;" target="n15" value="">
-          <mxGeometry relative="1" x="0.0899" as="geometry" />
+        <mxCell id="e31" parent="1" edge="1" source="n12" target="n16" value="REST :5005" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#267951;endArrow=classic;endFill=1;fontSize=13;fontColor=#267951;labelBackgroundColor=#ffffff;dashed=0;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1140" y="53" />
+              <mxPoint x="1140" y="490" />
+            </Array>
+          </mxGeometry>
         </mxCell>
-        <mxCell id="e25" edge="1" parent="1" source="n14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#8b3cb8;endArrow=classic;endFill=1;fontSize=15;fontColor=#8b3cb8;labelBackgroundColor=#ffffff;dashed=0;" target="n16" value="">
+        <mxCell id="e32" parent="1" edge="1" source="n12" target="n13" value="discovery, health" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#6b7280;endArrow=classic;endFill=1;fontSize=13;fontColor=#6b7280;labelBackgroundColor=#ffffff;dashed=1;exitX=0.05;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="717" y="118" />
+              <mxPoint x="165" y="118" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e25" parent="1" edge="1" source="n14" target="n15" value="WebSocket ACSI :8765&lt;br&gt;(ws / wss, OAuth token)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#8b3cb8;endArrow=classic;endFill=1;fontSize=13;fontColor=#8b3cb8;labelBackgroundColor=#ffffff;dashed=0;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="590" y="336" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e33" parent="1" edge="1" source="n16" target="n15" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#8b3cb8;endArrow=classic;endFill=1;fontSize=13;fontColor=#8b3cb8;labelBackgroundColor=#ffffff;dashed=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e26" edge="1" parent="1" source="n15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#8b3cb8;endArrow=classic;endFill=1;fontSize=15;fontColor=#8b3cb8;labelBackgroundColor=#ffffff;dashed=0;" target="n17" value="">
+        <mxCell id="e21" parent="1" edge="1" source="n14" target="n13" value="token (client credentials)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#8b3cb8;endArrow=classic;endFill=1;fontSize=13;fontColor=#8b3cb8;labelBackgroundColor=#ffffff;dashed=1;exitX=0;exitY=0.15;exitDx=0;exitDy=0;entryX=1;entryY=0.15;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e27" edge="1" parent="1" source="n17" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#a34c07;endArrow=classic;endFill=1;fontSize=15;fontColor=#a34c07;labelBackgroundColor=#ffffff;dashed=0;" target="n18" value="">
+        <mxCell id="e24" parent="1" edge="1" source="n15" target="n13" value="JWKS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#8b3cb8;endArrow=classic;endFill=1;fontSize=13;fontColor=#8b3cb8;labelBackgroundColor=#ffffff;dashed=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="165" y="465" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e26" parent="1" edge="1" source="n15" target="n19" value="events, control,&lt;br&gt;attached" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#b46504;endArrow=classic;endFill=1;fontSize=13;fontColor=#b46504;labelBackgroundColor=#ffffff;dashed=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e34" parent="1" edge="1" source="n16" target="n20" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#b46504;endArrow=classic;endFill=1;fontSize=13;fontColor=#b46504;labelBackgroundColor=#ffffff;dashed=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e35" parent="1" edge="1" source="n14" target="n21" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#b46504;endArrow=classic;endFill=1;fontSize=13;fontColor=#b46504;labelBackgroundColor=#ffffff;dashed=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1220" y="300" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e36" parent="1" edge="1" source="n15" target="n17" value="opt-in: rpi-io" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#b46504;endArrow=classic;endFill=1;fontSize=13;fontColor=#b46504;labelBackgroundColor=#ffffff;dashed=1;exitX=0;exitY=0.85;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="195" y="510" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e27" parent="1" edge="1" source="n17" target="n18" value="GPIO · SPI · I2C" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#b46504;endArrow=classic;endFill=1;fontSize=13;fontColor=#b46504;labelBackgroundColor=#ffffff;dashed=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="8tcJ8k6AEhQGBQObWsZ0-1" connectable="0" parent="1" style="group" value="" vertex="1">
