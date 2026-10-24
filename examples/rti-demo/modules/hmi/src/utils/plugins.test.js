@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { pluginRows, pluginSummary, claimOwners, claimOwnerOf, attachedItems } from './plugins';
+import { pluginRows, configEntry, pluginSummary, claimOwners, claimOwnerOf, attachedItems } from './plugins';
 
 const STATUS = {
   plugins: [
@@ -35,6 +35,29 @@ describe('plugins', () => {
     ]);
     // From an instance without definitions: nothing to edit.
     expect(pluginRows(STATUS).every((r) => r.definition === null)).toBe(true);
+  });
+
+  it("gives each connected row its routes and what it attaches", () => {
+    const rows = pluginRows({
+      plugins: [{ name: 'io', routes: true, attached: [{ kind: 'io', label: 'IO server' }], attached_error: 'attached timed out after 1.0s' }],
+      failed: { display: 'down' },
+    });
+    expect(rows.map((r) => [r.name, r.routes, r.attached.length, r.attachedError])).toEqual([
+      ['io', true, 1, 'attached timed out after 1.0s'],
+      ['display', false, 0, null],
+    ]);
+  });
+
+  it('gives a row as a plugin configuration entry, settings only when there are some', () => {
+    const rows = pluginRows({
+      ...STATUS,
+      definitions: { io: { url: 'http://rpi-io:9000/plugin', settings: {} }, display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } } },
+    });
+    expect(rows.map(configEntry)).toEqual([
+      { name: 'io', url: 'http://rpi-io:9000/plugin' },
+      null,
+      { name: 'display', url: 'http://pi:8000/plugin', settings: { rotate: 90 } },
+    ]);
   });
 
   it('summarises for a badge, null without plugins or status', () => {

@@ -79,9 +79,82 @@ describe('PluginsPanel', () => {
   it("reloads a plugin by name, through the instance's management route", async () => {
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Reload display'));
+    await user.click(await screen.findByTitle('Reload io'));
+
+    await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'POST', path: '/api/plugins/io/reload' })));
+  });
+
+  it('retries an unreachable plugin now, with the same reload', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Retry display now'));
 
     await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'POST', path: '/api/plugins/display/reload' })));
+  });
+
+  it('retries every plugin with a problem, and says which still fail', async () => {
+    const status = { ...STATUS, plugins: [...STATUS.plugins, { name: 'leds', url: 'http://leds/plugin', claims: [], healthy: false, last_error: 'timed out' }] };
+    mockBff({
+      'GET /api/plugins': { status: 200, body: { ok: true, result: status } },
+      'POST /api/plugins/display/reload': { status: 500, body: { ok: false, error: "422 Client Error - Can't reach http://pi:8000/plugin" } },
+    });
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByRole('button', { name: 'Retry 2 plugins' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Retry failed for display: 422 Client Error - Can't reach http://pi:8000/plugin");
+    expect(calls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual(['/api/plugins/leds/reload', '/api/plugins/display/reload']);
+  });
+
+  it('has no Retry button while every plugin is healthy', async () => {
+    mockBff({ 'GET /api/plugins': { status: 200, body: { ok: true, result: { plugins: STATUS.plugins, failed: {} } } } });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await screen.findByTestId('plugin-row-io');
+    expect(screen.queryByRole('button', { name: /^Retry \d+ plugin/ })).not.toBeInTheDocument();
+  });
+
+  it("shows a plugin's claims, routes, attached items and settings in its details", async () => {
+    const status = {
+      ...STATUS,
+      plugins: [{ ...STATUS.plugins[0], attached: [{ kind: 'io', label: 'IO server', state: 'ok', address: 'http://rpi-io:9000' }], attached_error: 'attached timed out after 1.0s' }],
+    };
+    mockBff({ 'GET /api/plugins': { status: 200, body: { ok: true, result: status } } });
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Details io'));
+
+    const details = screen.getByTestId('plugin-details-io');
+    expect(details).toHaveTextContent('LD0/CSWI1.Pos.Oper.ctlVal');
+    expect(details).toHaveTextContent('/api/plugins/io/');
+    expect(details).toHaveTextContent('IO server');
+    expect(details).toHaveTextContent('http://rpi-io:9000');
+    expect(details).toHaveTextContent('attached timed out after 1.0s');
+
+    await user.click(screen.getByTitle('Details display'));
+    expect(screen.getByTestId('plugin-details-display')).toHaveTextContent('"rotate": 90');
+    await user.click(screen.getByTitle('Details io'));
+    expect(screen.queryByTestId('plugin-details-io')).not.toBeInTheDocument();
+  });
+
+  it('copies a plugin as a plugin configuration entry', async () => {
+    const user = userEvent.setup({ delay: null });
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Copy display as configuration'));
+
+    expect(JSON.parse(writeText.mock.calls[0][0])).toEqual({ name: 'display', url: 'http://pi:8000/plugin', settings: { rotate: 90 } });
+    expect(await screen.findByRole('status')).toHaveTextContent('Copied display');
+  });
+
+  it("shows the entry to copy by hand where the browser won't copy", async () => {
+    const user = userEvent.setup({ delay: null });
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('not allowed'));
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Copy io as configuration'));
+
+    expect(JSON.parse((await screen.findByTestId('plugins-config-entry')).textContent)).toEqual({ name: 'io', url: 'http://rpi-io:9000/plugin' });
+    await user.click(screen.getByTitle('Dismiss'));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('removes a plugin after confirming', async () => {
@@ -168,6 +241,7 @@ describe('PluginsPanel', () => {
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
     await screen.findByTestId('plugin-row-io');
     expect(screen.getByTitle(/^Edit io/)).toBeDisabled();
+    expect(screen.getByTitle(/^Copy io as configuration/)).toBeDisabled();
   });
 
   it('refuses settings that are not JSON, without calling the instance', async () => {

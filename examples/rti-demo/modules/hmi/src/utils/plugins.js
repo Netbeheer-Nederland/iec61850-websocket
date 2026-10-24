@@ -12,7 +12,8 @@
 // One row per plugin: the connected ones, then the ones that couldn't be
 // reached. state: 'healthy' | 'unhealthy' | 'unreachable'. definition: its
 // { url, settings }, what an edit changes; null from an instance that
-// doesn't list definitions.
+// doesn't list definitions. routes: whether it has routes under
+// /api/plugins/{name}/; attached and attachedError: what it attaches.
 export function pluginRows(status) {
   if (!status) return [];
   const definitionOf = (name) => status.definitions?.[name] ?? null;
@@ -23,6 +24,9 @@ export function pluginRows(status) {
     claims: Array.isArray(p.claims) ? p.claims : [],
     state: p.healthy === false ? 'unhealthy' : 'healthy',
     error: p.last_error || null,
+    routes: Boolean(p.routes),
+    attached: Array.isArray(p.attached) ? p.attached : [],
+    attachedError: p.attached_error || null,
     definition: definitionOf(p.name),
   }));
   const failed = Object.entries(status.failed || {}).map(([name, reason]) => ({
@@ -32,9 +36,23 @@ export function pluginRows(status) {
     claims: [],
     state: 'unreachable',
     error: reason || null,
+    routes: false,
+    attached: [],
+    attachedError: null,
     definition: definitionOf(name),
   }));
   return [...connected, ...failed];
+}
+
+// A row as an entry of the instance's plugin configuration (PluginsConfig's
+// `plugins`), to make an edit or an added plugin last; null without its
+// definition.
+export function configEntry(row) {
+  if (!row.definition) return null;
+  const entry = { name: row.name, url: row.definition.url };
+  const settings = row.definition.settings || {};
+  if (Object.keys(settings).length) entry.settings = settings;
+  return entry;
 }
 
 // For a badge: how many plugins, and which have a problem. null while the
