@@ -81,6 +81,27 @@ While a plugin isn't reachable, the FSPs and SO list it as failed and try again 
 works. `launch.py io` in the demo starts the IO plugin as a local process, so one machine can run everything. The Pi's scripts
 (Docker setup, the build user and groups, GPIO simulation) are in [`rpi_io/scripts`](rpi_io/scripts).
 
+## Design decisions
+
+The decisions behind plugins are kept with the demo's, in [`docs/rti-demo/decisions`](../../docs/rti-demo/decisions/README.md).
+The ones a plugin author needs:
+
+| Decision | What it decides |
+|---|---|
+| [0021](../../docs/rti-demo/decisions/0021-acsi-plugin-host.md) | The FSP and SO host several plugins, behind one plugin contract |
+| [0025](../../docs/rti-demo/decisions/0025-plugins-show-attached-devices-in-hmi.md) | A plugin describes what it attaches at `GET /attached`; the HMI draws it next to the FSP or SO |
+| [0027](../../docs/rti-demo/decisions/0027-plugin-contract-as-openapi.md) | The plugin contract is published as `openapi.yaml`, kept in step by a test |
+| [0028](../../docs/rti-demo/decisions/0028-rti-plugins-folder.md) | Plugins live in this folder; the IO server is its own stack |
+| [0029](../../docs/rti-demo/decisions/0029-plugins-are-http-services.md) | Plugins are HTTP services the FSP and SO connect to, from a plugin configuration |
+| [0030](../../docs/rti-demo/decisions/0030-plugin-project-layout.md) | Every plugin is a project with one layout |
+| [0031](../../docs/rti-demo/decisions/0031-plugin-source-layout.md) | `server/` is the service, `plugin/` the plugin API, and the plugin depends on the server |
+| [0034](../../docs/rti-demo/decisions/0034-demo-stack-plugins-sim-leds-io-opt-in.md) | The demo stack uses sim_leds by default; the IO server is opt-in |
+| [0036](../../docs/rti-demo/decisions/0036-plugin-definitions-editable.md) | A plugin's URL and settings can be edited, until the FSP or SO restarts |
+| [0037](../../docs/rti-demo/decisions/0037-plugin-allowed-sources-wildcards.md) | `PLUGIN_ALLOWED_SOURCES` takes wildcards; `*` alone allows any URL |
+
+Planned changes to the plugin contract (disable, settings schema, check, clear error) are in
+[`docs/rti-demo/specs`](../../docs/rti-demo/specs/README.md).
+
 ## Tests
 
 ```bash
