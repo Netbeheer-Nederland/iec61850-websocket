@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { pluginRows, configEntry, routeRequest, routeAnswerText, pluginSummary, claimOwners, claimOwnerOf, attachedItems } from './plugins';
+import { pluginRows, configEntry, addTargets, routeRequest, routeAnswerText, pluginSummary, claimOwners, claimOwnerOf, attachedItems } from './plugins';
 
 const STATUS = {
   plugins: [
@@ -58,6 +58,19 @@ describe('plugins', () => {
       null,
       { name: 'display', url: 'http://pi:8000/plugin', settings: { rotate: 90 } },
     ]);
+  });
+
+  it('lists the other connected SOs and FSPs to add a plugin to; only FSPs for one with claims', () => {
+    const connections = [
+      { name: 'so', type: 'RTI-SO', host: 'rti-so', port: 5000, status: 'connected', plugins: { plugins: [{ name: 'leds' }], failed: {} } },
+      { name: 'fsp01', type: 'RTI-FSP', host: 'rti-fsp01', port: 5001, status: 'connected' },
+      { name: 'fsp02', type: 'RTI-FSP', host: 'rti-fsp02', port: 5005, status: 'disconnected' },
+      { name: 'idp', type: 'IDP-Server', host: 'keycloak', port: 8081, status: 'connected' },
+    ];
+    const [io, leds] = pluginRows(STATUS);
+    expect(addTargets(connections, 'rti-fsp01:5001', leds)).toEqual([{ name: 'so', role: 'SO', target: 'rti-so:5000', has: true }]);
+    expect(addTargets(connections, 'rti-so:5000', io)).toEqual([{ name: 'fsp01', role: 'FSP', target: 'rti-fsp01:5001', has: false }]);
+    expect(addTargets(undefined, 'rti-so:5000', io)).toEqual([]);
   });
 
   it('summarises for a badge, null without plugins or status', () => {

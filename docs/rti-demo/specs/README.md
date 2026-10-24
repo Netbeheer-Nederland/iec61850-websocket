@@ -16,13 +16,13 @@ Status: **draft** (open for comments), **accepted** (to be built), **done** (bui
 ## Plugins panel
 
 The HMI's Plugins panel (PluginsPanel, on ACSI Client and ACSI Server) has Details (with a request form for the
-plugin's own routes, 0001), Edit, Copy as configuration, Reload / Retry now and Remove per plugin, and Add plugin and
+plugin's own routes, 0001), Edit, Add to another SO or FSP (0002), Copy as configuration, Reload / Retry now and Remove per plugin, and Add plugin and
 Retry in its header. These specs extend it.
 
 | Spec | What | Changes | Status |
 |---|---|---|---|
 | [0001](0001-plugin-route-console.md) | Call a plugin's own routes from its Details | HMI | done |
-| [0002](0002-add-plugin-to-another-instance.md) | Add a plugin to another SO or FSP | HMI | draft |
+| [0002](0002-add-plugin-to-another-instance.md) | Add a plugin to another SO or FSP | HMI | done |
 | [0003](0003-export-plugin-configuration.md) | Download an instance's plugin configuration | HMI | draft |
 | [0004](0004-disable-plugin.md) | Disable and enable a plugin without removing it | contract, plugin host, HMI | draft |
 | [0005](0005-plugin-settings-schema.md) | A plugin describes its settings as JSON Schema | contract, plugin host, HMI | draft |

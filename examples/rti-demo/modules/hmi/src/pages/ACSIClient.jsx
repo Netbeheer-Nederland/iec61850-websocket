@@ -1168,7 +1168,7 @@ const getContextMenuItems = () => {
       )}
       */}
 
-      <PluginsPanel target={apiTarget} role="so" pushed={pushedPlugins} />
+      <PluginsPanel target={apiTarget} role="so" pushed={pushedPlugins} instances={propConnections} />
 
       <div className="page-header" style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

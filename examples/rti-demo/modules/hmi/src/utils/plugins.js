@@ -55,6 +55,23 @@ export function configEntry(row) {
   return entry;
 }
 
+// The other SOs and FSPs a row's plugin can be added to (spec 0002): the
+// connected instances among the BFF's connections, without `current` (a
+// target, host:port). Only FSPs for a plugin with claims, as an SO answers
+// no Operate. has: the instance already has a plugin of that name.
+export function addTargets(connections, current, row) {
+  const roles = row.claims.length ? ['RTI-FSP'] : ['RTI-FSP', 'RTI-SO'];
+  return (connections || [])
+    .filter((c) => roles.includes(c.type) && c.status === 'connected' && c.host && c.port != null)
+    .map((c) => ({
+      name: c.name || `${c.host}:${c.port}`,
+      role: c.type === 'RTI-FSP' ? 'FSP' : 'SO',
+      target: `${c.host}:${c.port}`,
+      has: Boolean(c.plugins?.plugins?.some((p) => p.name === row.name) || c.plugins?.failed?.[row.name] !== undefined),
+    }))
+    .filter((t) => t.target !== current);
+}
+
 // A plugin's status as its SO or FSP sees it, and its colour wherever the
 // HMI shows it: the Plugins panel, the plugin badge and the attached boxes.
 // stale: connected and running, but its last GET <url>/attached failed, so

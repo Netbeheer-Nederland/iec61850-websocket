@@ -1158,7 +1158,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         </div>
       </div>
 
-      <PluginsPanel target={endpointTarget} role="fsp" pushed={pushedPlugins} />
+      <PluginsPanel target={endpointTarget} role="fsp" pushed={pushedPlugins} instances={propConnections || []} />
 
       <div className="page-header">
         <div style={{  display: 'flex', alignItems: 'center', gap: '16px' }}>

@@ -6,9 +6,10 @@
 // The plugins an SO or FSP has connected to, on the ACSI Client and ACSI
 // Server pages: one row per plugin (healthy / unhealthy / unreachable, with
 // the reason), Details (claims, routes, what it attaches, settings, and a
-// Request form for the plugin's own routes), Edit (URL
-// and settings), Copy as configuration, Reload (Retry for an unreachable one)
-// and Remove; Add from a URL, and Retry all that have a problem.
+// Request form for the plugin's own routes), Edit (URL and settings), Add
+// to another SO or FSP, Copy as configuration, Reload (Retry for an
+// unreachable one) and Remove; Add from a URL, and Retry all that have a
+// problem.
 // Only the plugin contract's management routes (GET/POST /api/plugins,
 // PUT/DELETE .../{name}, .../{name}/reload) and its plugin routes
 // (/api/plugins/{name}/{path}), through the BFF - nothing here knows any one
@@ -16,7 +17,7 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { executeApiCall } from '../services/apiService';
 import {
-  pluginRows, configEntry, ROUTE_METHODS, routeHasBody, routeRequest, routeAnswerText,
+  pluginRows, configEntry, addTargets, ROUTE_METHODS, routeHasBody, routeRequest, routeAnswerText,
 } from '../utils/plugins';
 
 // CodeMirror is most of the HMI's size otherwise; only this form needs it.
@@ -50,6 +51,17 @@ const reloadLabel = (row) => (row.state === 'unreachable' ? `Retry ${row.name} n
 const detailLabel = { color: 'var(--text-muted)', whiteSpace: 'nowrap', verticalAlign: 'top', paddingRight: '12px' };
 
 const EMPTY_REQUEST = { method: 'GET', path: '', query: '', body: '', answer: null };
+
+// Edit, and Add to another instance, start from the row's definition.
+const formOf = (row, to = '') => {
+  const settings = row.definition?.settings || {};
+  return {
+    name: row.name,
+    url: row.definition?.url || row.url,
+    settings: Object.keys(settings).length ? JSON.stringify(settings, null, 2) : '',
+    to,
+  };
+};
 
 // A request to the plugin's own routes (spec 0001), and what it answered.
 // The BFF gives a plugin's answer only on success; a failure comes as the
@@ -142,8 +154,9 @@ function PluginDetails({ row, showClaims }) {
  * @param {'fsp'|'so'} role - FSP plugins can claim objRefs; SO plugins can't
  * @param {Object|null|undefined} pushed - The instance's `plugins` from the
  *   BFF's connections push; followed when it changes
+ * @param {Array} instances - The BFF's connections, for Add to... (spec 0002)
  */
-function PluginsPanel({ target, role, pushed }) {
+function PluginsPanel({ target, role, pushed, instances = [] }) {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
@@ -152,10 +165,12 @@ function PluginsPanel({ target, role, pushed }) {
   const [expanded, setExpanded] = useState({});
   // Per plugin, its Request form and last answer, while the page is open.
   const [requests, setRequests] = useState({});
-  // The form: null (closed), { mode: 'add' }, or { mode: 'edit', name }.
+  // The form: null (closed), { mode: 'add' }, { mode: 'edit', name }, or
+  // { mode: 'copy', name, targets } (Add to another instance, its `to`).
   const [formFor, setFormFor] = useState(null);
-  const [form, setForm] = useState({ name: '', url: '', settings: '' });
+  const [form, setForm] = useState({ name: '', url: '', settings: '', to: '' });
   const editing = formFor?.mode === 'edit';
+  const copying = formFor?.mode === 'copy';
   const setSettings = useCallback((settings) => setForm((f) => ({ ...f, settings })), []);
 
   const load = useCallback(async () => {
@@ -173,10 +188,10 @@ function PluginsPanel({ target, role, pushed }) {
     if (pushedKey) setStatus(JSON.parse(pushedKey));
   }, [pushedKey]);
 
-  const run = useCallback(async (label, apiId, body, pathParams) => {
+  const run = useCallback(async (label, apiId, body, pathParams, to = target) => {
     setBusy(label);
     setError(null);
-    const result = await executeApiCall(apiId, target, body, { pathParams });
+    const result = await executeApiCall(apiId, to, body, { pathParams });
     setBusy(null);
     if (!result?.ok) {
       setError(`${label} failed: ${errorOf(result)}`);
@@ -252,18 +267,19 @@ function PluginsPanel({ target, role, pushed }) {
 
   const openAdd = useCallback(() => {
     setFormFor((f) => (f?.mode === 'add' ? null : { mode: 'add' }));
-    setForm({ name: '', url: '', settings: '' });
+    setForm({ name: '', url: '', settings: '', to: '' });
   }, []);
 
   const openEdit = useCallback((row) => {
-    const settings = row.definition?.settings || {};
     setFormFor({ mode: 'edit', name: row.name });
-    setForm({
-      name: row.name,
-      url: row.definition?.url || row.url,
-      settings: Object.keys(settings).length ? JSON.stringify(settings, null, 2) : '',
-    });
+    setForm(formOf(row));
   }, []);
+
+  const openCopy = useCallback((row) => {
+    const targets = addTargets(instances, target, row);
+    setFormFor({ mode: 'copy', name: row.name, targets });
+    setForm(formOf(row, targets.find((t) => !t.has)?.target || ''));
+  }, [instances, target]);
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
@@ -276,14 +292,27 @@ function PluginsPanel({ target, role, pushed }) {
         return;
       }
     }
-    const ok = editing
-      ? await run(`Edit ${formFor.name}`, 'plugin-edit', { url: form.url.trim(), settings }, { name: formFor.name })
-      : await run(`Add ${form.name}`, 'plugin-add', { name: form.name.trim(), url: form.url.trim(), settings });
+    const name = form.name.trim();
+    let ok;
+    if (editing) {
+      ok = await run(`Edit ${formFor.name}`, 'plugin-edit', { url: form.url.trim(), settings }, { name: formFor.name });
+    } else if (copying) {
+      // The other instance's panel shows it through the push.
+      const to = formFor.targets.find((t) => t.target === form.to);
+      if (!to) {
+        setError('Choose an instance to add to');
+        return;
+      }
+      ok = await run(`Add ${name} to ${to.name}`, 'plugin-add', { name, url: form.url.trim(), settings }, undefined, to.target);
+      if (ok) setNotice({ text: `Added ${name} to ${to.name}.` });
+    } else {
+      ok = await run(`Add ${name}`, 'plugin-add', { name, url: form.url.trim(), settings });
+    }
     if (ok) {
       setFormFor(null);
-      setForm({ name: '', url: '', settings: '' });
+      setForm({ name: '', url: '', settings: '', to: '' });
     }
-  }, [form, formFor, editing, run]);
+  }, [form, formFor, editing, copying, run]);
 
   const rows = pluginRows(status);
   const showClaims = role === 'fsp';
@@ -310,19 +339,31 @@ function PluginsPanel({ target, role, pushed }) {
       </div>
 
       {formFor && (
-        <form onSubmit={handleSubmit} aria-label={editing ? `Edit ${formFor.name}` : 'Add plugin'} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px 12px', marginBottom: '12px' }}>
+        <form onSubmit={handleSubmit} aria-label={editing ? `Edit ${formFor.name}` : copying ? `Add ${formFor.name} to another instance` : 'Add plugin'} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px 12px', marginBottom: '12px' }}>
+          {copying && (
+            <select id="plugins-add-to" aria-label="Add to" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} required style={{ gridColumn: '1 / -1' }}>
+              <option value="" disabled>{formFor.targets.length ? 'Choose an SO or FSP' : 'No other SO or FSP is connected'}</option>
+              {formFor.targets.map((t) => (
+                <option key={t.target} value={t.target} disabled={t.has}>
+                  {t.name} ({t.role}, {t.target}){t.has ? ` - has ${formFor.name}` : ''}
+                </option>
+              ))}
+            </select>
+          )}
           <input id="plugins-add-name" placeholder="Name, e.g. io" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={editing} title={editing ? 'The name stays: a plugin with another name is another plugin' : undefined} />
           <input id="plugins-add-url" placeholder="URL, e.g. http://rpi-io:9000/plugin" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} required />
           <Suspense fallback={<div style={{ gridColumn: '1 / -1', minHeight: '48px', color: 'var(--text-muted)' }}>Loading the settings editor...</div>}>
             <JsonEditor id="plugins-add-settings" label="Settings (JSON)" placeholder='Settings (JSON, optional), e.g. {"write_inputs": false}' value={form.settings} onChange={setSettings} style={{ gridColumn: '1 / -1' }} />
           </Suspense>
           <small style={{ gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
-            {editing
+            {copying
+              ? `The plugin's name is the one it describes itself with. ${formFor.targets.some((t) => t.role === 'SO') ? '' : 'It controls objects, so only FSPs are offered. '}The other instance's PLUGIN_ALLOWED_SOURCES applies (${SOURCES_HINT}); the plugin stays there until it restarts.`
+              : editing
               ? `A new URL must be allowed by the instance's PLUGIN_ALLOWED_SOURCES (${SOURCES_HINT}); the settings replace all of them. If the plugin doesn't connect with them, it keeps its old URL and settings. The edit stays until the instance restarts; a lasting one goes in its plugin configuration.`
               : `Only URLs allowed by the instance's PLUGIN_ALLOWED_SOURCES are accepted (${SOURCES_HINT}). An added plugin stays until the instance restarts; a lasting one goes in its plugin configuration.`}
           </small>
           <div style={{ gridColumn: '1 / -1' }}>
-            <button type="submit" id="plugins-add-submit" className="btn-primary" disabled={Boolean(busy)}>{editing ? 'Save' : 'Add'}</button>
+            <button type="submit" id="plugins-add-submit" className="btn-primary" disabled={Boolean(busy)}>{editing ? 'Save' : copying ? 'Add to instance' : 'Add'}</button>
           </div>
         </form>
       )}
@@ -381,6 +422,9 @@ function PluginsPanel({ target, role, pushed }) {
                       </button>
                       <button type="button" className="btn-icon" title={row.definition ? `Edit ${row.name}` : `Edit ${row.name}: this instance doesn't list plugin definitions`} disabled={Boolean(busy) || !row.definition} onClick={() => openEdit(row)}>
                         <i className="fas fa-pen"></i>
+                      </button>
+                      <button type="button" className="btn-icon" title={row.definition ? `Add ${row.name} to another SO or FSP` : `Add ${row.name} to another SO or FSP: this instance doesn't list plugin definitions`} disabled={Boolean(busy) || !row.definition} onClick={() => openCopy(row)}>
+                        <i className="fas fa-share-square"></i>
                       </button>
                       <button type="button" className="btn-icon" title={row.definition ? `Copy ${row.name} as configuration` : `Copy ${row.name} as configuration: this instance doesn't list plugin definitions`} disabled={!row.definition} onClick={() => handleCopy(row)}>
                         <i className="fas fa-copy"></i>

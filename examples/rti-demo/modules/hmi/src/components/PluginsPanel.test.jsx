@@ -318,12 +318,71 @@ describe('PluginsPanel', () => {
     expect(screen.getByRole('form', { name: 'Edit io' })).toBeInTheDocument();
   });
 
+  // The BFF's connections, as App.jsx passes them; rti-fsp02 has display already.
+  const INSTANCES = [
+    { name: 'rti-so', type: 'RTI-SO', host: 'rti-so', port: 5000, status: 'connected' },
+    { name: 'rti-fsp01', type: 'RTI-FSP', host: 'rti-fsp01', port: 5001, status: 'connected' },
+    { name: 'rti-fsp02', type: 'RTI-FSP', host: 'rti-fsp02', port: 5005, status: 'connected', plugins: { plugins: [], failed: { display: 'down' } } },
+    { name: 'rti-fsp03', type: 'RTI-FSP', host: 'rti-fsp03', port: 5006, status: 'disconnected' },
+    { name: 'idp', type: 'IDP-Server', host: 'keycloak', port: 8081, status: 'connected' },
+  ];
+  const addToOptions = () => within(document.getElementById('plugins-add-to')).getAllByRole('option').slice(1);
+
+  it('offers the other connected SOs and FSPs to add to, not this one', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" instances={INSTANCES} />);
+    await user.click(await screen.findByTitle('Add display to another SO or FSP'));
+
+    expect(addToOptions().map((o) => [o.textContent, o.disabled])).toEqual([
+      ['rti-so (SO, rti-so:5000)', false],
+      ['rti-fsp02 (FSP, rti-fsp02:5005) - has display', true],
+    ]);
+    expect(document.getElementById('plugins-add-to')).toHaveValue('rti-so:5000');
+    expect(document.getElementById('plugins-add-url')).toHaveValue('http://pi:8000/plugin');
+    expect(JSON.parse(await settingsText())).toEqual({ rotate: 90 });
+  });
+
+  it('offers only FSPs for a plugin with claims', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" instances={INSTANCES} />);
+    await user.click(await screen.findByTitle('Add io to another SO or FSP'));
+    expect(addToOptions().map((o) => o.value)).toEqual(['rti-fsp02:5005']);
+    expect(screen.getByRole('form', { name: 'Add io to another instance' }).textContent).toMatch(/only FSPs are offered/);
+  });
+
+  it('adds the plugin to the chosen instance, with its definition', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" instances={INSTANCES} />);
+    await user.click(await screen.findByTitle('Add io to another SO or FSP'));
+    await user.click(screen.getByRole('button', { name: 'Add to instance' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Added io to rti-fsp02.');
+    expect(calls).toContainEqual(expect.objectContaining({
+      target: 'rti-fsp02:5005', method: 'POST', path: '/api/plugins', body: { name: 'io', url: 'http://rpi-io:9000/plugin', settings: {} },
+    }));
+    expect(screen.queryByRole('form')).not.toBeInTheDocument();
+  });
+
+  it("keeps the form open with the other instance's reason when it refuses", async () => {
+    mockBff({
+      'POST /api/plugins': { status: 500, body: { ok: false, error: "409 Client Error - 'LD0/CSWI1.Pos.Oper.ctlVal' is claimed by io" } },
+    });
+    const user = userEvent.setup({ delay: null });
+    render(<PluginsPanel target="rti-fsp01:5001" role="fsp" instances={INSTANCES} />);
+    await user.click(await screen.findByTitle('Add io to another SO or FSP'));
+    await user.click(screen.getByRole('button', { name: 'Add to instance' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Add io to rti-fsp02 failed: 409 Client Error - 'LD0/CSWI1.Pos.Oper.ctlVal' is claimed by io");
+    expect(screen.getByRole('form', { name: 'Add io to another instance' })).toBeInTheDocument();
+  });
+
   it("can't edit without definitions, from an older instance", async () => {
     mockBff({ 'GET /api/plugins': { status: 200, body: { ok: true, result: { plugins: STATUS.plugins, failed: {} } } } });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
     await screen.findByTestId('plugin-row-io');
     expect(screen.getByTitle(/^Edit io/)).toBeDisabled();
     expect(screen.getByTitle(/^Copy io as configuration/)).toBeDisabled();
+    expect(screen.getByTitle(/^Add io to another SO or FSP/)).toBeDisabled();
   });
 
   it('refuses settings that are not JSON, without calling the instance', async () => {

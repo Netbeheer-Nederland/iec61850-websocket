@@ -6,7 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # 0002. Add a plugin to another SO or FSP
 
-- Status: draft
+- Status: done
 - Date: 2026-10-24
 - Changes: HMI
 
@@ -28,7 +28,7 @@ Give a second FSP (or the SO) the same plugin as the first, from the HMI, withou
 
 ### HMI
 
-1. A per-row action **Add to...** (icon `fa-share-square`), enabled when the row has a definition.
+1. A per-row action **Add to another SO or FSP** (icon `fa-share-square`), enabled when the row has a definition.
 2. It opens a small form: a select of the other instances the BFF knows (name and role; the current one left out;
    FSPs only for a plugin with claims, as SO plugins answer no Operate), and the plugin's name, URL and settings,
    filled in and editable.
@@ -56,8 +56,8 @@ target with the definition; refusal keeps the form open with the reason.
 
 Wireframe (an "Add to..." icon in the rows, the form in the ⓘ text), HMI README (Plugins panel).
 
-## Open questions
+## Answered
 
-- Where does the panel get the list of instances: a prop from the page (ACSIServer/ACSIClient already have the
-  connections), or its own read of the BFF's connections?
-- Also offer **Add to all FSPs** for a plugin that serves every FSP (sim_leds)?
+- The list of instances is a prop from the page: ACSIServer and ACSIClient pass App.jsx's live connections
+  (`instances`), which also carry each instance's plugins, so an instance that has the plugin already is greyed.
+- **Add to all FSPs** is left out for now: one Add per FSP does the same, and each refusal stays clear.
