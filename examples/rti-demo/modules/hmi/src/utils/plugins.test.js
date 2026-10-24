@@ -64,6 +64,9 @@ describe('plugins', () => {
     const summary = pluginSummary(STATUS);
     expect(summary.count).toBe(3);
     expect(summary.problems.map((p) => p.name)).toEqual(['leds', 'display']);
+    expect(summary.worst).toBe('unreachable');
+    expect(pluginSummary({ plugins: STATUS.plugins, failed: {} }).worst).toBe('unhealthy');
+    expect(pluginSummary({ plugins: [STATUS.plugins[0]], failed: {} }).worst).toBe('healthy');
     expect(pluginSummary({ plugins: [], failed: {} })).toBeNull();
     expect(pluginSummary(null)).toBeNull();
   });
@@ -87,8 +90,15 @@ describe('attachedItems', () => {
       ],
       failed: { display: 'down' },
     });
-    expect(items.map((i) => i.key)).toEqual(['io:0', 'io:1', 'sim_leds:0']);
-    expect(items[2].plugin).toEqual({ name: 'sim_leds', version: '', healthy: false, lastError: 'boom', attachedError: 'attached timed out after 1.0s' });
+    expect(items.map((i) => i.key)).toEqual(['io:0', 'io:1', 'sim_leds:0', 'display:disconnected']);
+    expect(items[2].plugin).toEqual({ name: 'sim_leds', version: '', healthy: false, state: 'unhealthy', lastError: 'boom', attachedError: 'attached timed out after 1.0s' });
+    expect(items[0].plugin.state).toBe('healthy');
+    expect(items[3]).toMatchObject({ label: 'display', disconnected: true, plugin: { state: 'unreachable', lastError: 'down' } });
+  });
+
+  it("marks a running plugin whose /attached failed as stale", () => {
+    const [item] = attachedItems({ plugins: [{ name: 'io', healthy: true, attached_error: 'timed out', attached: [{ kind: 'io', label: 'IO server' }] }], failed: {} });
+    expect(item.plugin.state).toBe('stale');
   });
 
   it('is empty while the status is unknown', () => {

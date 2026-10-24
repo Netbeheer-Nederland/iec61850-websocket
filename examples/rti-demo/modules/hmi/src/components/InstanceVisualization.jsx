@@ -23,7 +23,7 @@ import { EMPTY_LINK } from '../hooks/useLinkActivity';
 import { fspStateOf, useNow } from '../hooks/useFspPresence';
 import { formatDuration } from '../utils/timeline';
 import { normalizeTlsVersion } from './TLSConfigModal';
-import { pluginSummary } from '../utils/plugins';
+import { pluginSummary, PLUGIN_STATES } from '../utils/plugins';
 import AttachedBoxes from './AttachedBoxes';
 
 const DOWN_LABELS = { 'link-down': 'link down', unreachable: 'unreachable' };
@@ -112,28 +112,28 @@ function OAuthBadge({ conn }) {
   );
 }
 
-const PLUGIN_STATE_LABELS = { unhealthy: 'unhealthy', unreachable: 'unreachable' };
 
 /**
  * Plug badge on an SO/FSP circle with plugins (its GET /api/plugins, pushed
- * by the BFF with the connections): how many, red while one is unhealthy or
- * can't be reached. The tooltip names each problem; the ACSI Client/Server
- * page's Plugins panel has the details.
+ * by the BFF with the connections): how many, coloured for the worst state
+ * (PLUGIN_STATES): green while all are connected and running, orange while
+ * one is unhealthy, red while one is disconnected. The tooltip names each
+ * problem; the ACSI Client/Server page's Plugins panel has the details.
  */
 function PluginBadge({ conn }) {
   const summary = pluginSummary(conn.plugins);
   if (!summary) return null;
-  const { count, problems } = summary;
+  const { count, problems, worst } = summary;
   const title = problems.length
-    ? `Plugins: ${problems.map((p) => `${p.name} ${PLUGIN_STATE_LABELS[p.state]}${p.error ? ` - ${p.error}` : ''}`).join('; ')}`
-    : `${count} plugin${count === 1 ? '' : 's'}, all healthy`;
+    ? `Plugins: ${problems.map((p) => `${p.name} ${PLUGIN_STATES[p.state].label}${p.error ? ` - ${p.error}` : ''}`).join('; ')}`
+    : `${count} plugin${count === 1 ? '' : 's'}, all connected and running`;
   return (
     <CircleBadge
       testId={`plugin-badge-${conn.name}`}
       title={title}
       icon="fa-plug"
       label={String(count)}
-      background={problems.length ? 'var(--danger-color)' : 'var(--text-muted)'}
+      background={PLUGIN_STATES[worst].color}
       edge="bottom"
       side="right"
     />

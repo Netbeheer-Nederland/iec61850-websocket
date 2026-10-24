@@ -240,23 +240,28 @@ describe('InstanceVisualization - plugin badge', () => {
   const FSP = { name: 'FSP01', type: 'RTI-FSP', status: 'connected', host: 'h', port: 1, connectedClients: 1 };
   const io = { name: 'io', claims: [], healthy: true, last_error: null };
 
-  it('counts the plugins, grey while all are healthy', () => {
+  it('counts the plugins, green while all are connected and running', () => {
     renderViz([{ ...SO, plugins: { plugins: [io], failed: {} } }]);
 
     const badge = screen.getByTestId('plugin-badge-SO');
     expect(badge.textContent).toBe('1');
-    expect(badge.title).toBe('1 plugin, all healthy');
-    expect(badge.style.background).toBe('var(--text-muted)');
+    expect(badge.title).toBe('1 plugin, all connected and running');
+    expect(badge.style.background).toBe('var(--success-color)');
     expect(badge.style.right).toBe('-4px');
   });
 
-  it('turns red and names the problem when a plugin is unreachable', () => {
-    renderViz([{ ...FSP, plugins: { plugins: [io], failed: { display: "Can't reach http://pi:8000/plugin" } } }]);
+  it('turns red and names the problem when a plugin is disconnected', () => {
+    renderViz([{ ...FSP, plugins: { plugins: [{ ...io, healthy: false, last_error: 'timed out' }], failed: { display: "Can't reach http://pi:8000/plugin" } } }]);
 
     const badge = screen.getByTestId('plugin-badge-FSP01');
     expect(badge.textContent).toBe('2');
     expect(badge.style.background).toBe('var(--danger-color)');
-    expect(badge.title).toBe("Plugins: display unreachable - Can't reach http://pi:8000/plugin");
+    expect(badge.title).toBe("Plugins: io connected, its last event or Operate failed - timed out; display disconnected - Can't reach http://pi:8000/plugin");
+  });
+
+  it('turns orange while a connected plugin is unhealthy', () => {
+    renderViz([{ ...FSP, plugins: { plugins: [{ ...io, healthy: false, last_error: 'timed out' }], failed: {} } }]);
+    expect(screen.getByTestId('plugin-badge-FSP01').style.background).toBe('var(--warning-color)');
   });
 
   it('draws nothing without plugins, or while their status is unknown', () => {

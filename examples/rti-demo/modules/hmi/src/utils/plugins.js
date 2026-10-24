@@ -55,13 +55,26 @@ export function configEntry(row) {
   return entry;
 }
 
-// For a badge: how many plugins, and which have a problem. null while the
-// status is unknown or there are no plugins at all.
+// A plugin's status as its SO or FSP sees it, and its colour wherever the
+// HMI shows it: the Plugins panel, the plugin badge and the attached boxes.
+// stale: connected and running, but its last GET <url>/attached failed, so
+// its boxes show the last answer.
+export const PLUGIN_STATES = {
+  healthy: { label: 'connected and running', color: 'var(--success-color)' },
+  unhealthy: { label: 'connected, its last event or Operate failed', color: 'var(--warning-color)' },
+  stale: { label: "connected, not answering what it attaches", color: 'var(--warning-color)' },
+  unreachable: { label: 'disconnected', color: 'var(--danger-color)' },
+};
+
+// For a badge: how many plugins, which have a problem, and the worst state
+// (unreachable, then unhealthy, else healthy). null while the status is
+// unknown or there are no plugins at all.
 export function pluginSummary(status) {
   const rows = pluginRows(status);
   if (!rows.length) return null;
   const problems = rows.filter((r) => r.state !== 'healthy');
-  return { count: rows.length, problems };
+  const worst = ['unreachable', 'unhealthy'].find((s) => problems.some((r) => r.state === s)) || 'healthy';
+  return { count: rows.length, problems, worst };
 }
 
 // objRef -> name of the plugin that answers an Operate on it.
@@ -83,22 +96,35 @@ export function claimOwnerOf(owners, ref) {
 
 // What an SO's or FSP's plugins attach (decision 0025): every plugin's
 // `attached` items, as the instance checked them, each with the plugin it
-// comes from. Only connected plugins have items; [] while unknown.
+// comes from and that plugin's state (PLUGIN_STATES). A plugin that can't be
+// reached has no items; it gets one box of its own, `disconnected`, so it
+// doesn't just vanish. [] while unknown.
 export function attachedItems(status) {
   const items = [];
   for (const p of status?.plugins || []) {
+    const healthy = p.healthy !== false;
+    const attachedError = p.attached_error || null;
+    const plugin = {
+      name: p.name,
+      version: p.version || '',
+      healthy,
+      state: !healthy ? 'unhealthy' : attachedError ? 'stale' : 'healthy',
+      lastError: p.last_error || null,
+      attachedError,
+    };
     (Array.isArray(p.attached) ? p.attached : []).forEach((item, index) => {
-      items.push({
-        ...item,
-        key: `${p.name}:${index}`,
-        plugin: {
-          name: p.name,
-          version: p.version || '',
-          healthy: p.healthy !== false,
-          lastError: p.last_error || null,
-          attachedError: p.attached_error || null,
-        },
-      });
+      items.push({ ...item, key: `${p.name}:${index}`, plugin });
+    });
+  }
+  for (const [name, reason] of Object.entries(status?.failed || {})) {
+    items.push({
+      kind: 'other',
+      label: name,
+      state: 'unknown',
+      live: [],
+      disconnected: true,
+      key: `${name}:disconnected`,
+      plugin: { name, version: '', healthy: false, state: 'unreachable', lastError: reason || null, attachedError: null },
     });
   }
   return items;

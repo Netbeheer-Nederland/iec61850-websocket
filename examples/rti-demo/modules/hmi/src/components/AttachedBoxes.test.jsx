@@ -57,6 +57,32 @@ describe('AttachedBoxes', () => {
     expect(details).toHaveTextContent('attached timed out after 1.0s');
   });
 
+  it("colours each box's left edge for its plugin's state, the icon for the item's own", () => {
+    render(<AttachedBoxes conn={conn([IO, LCD])} />);
+    const lcd = screen.getByTestId('attached-box-io:1');
+    expect(lcd).toHaveAttribute('data-plugin-state', 'healthy');
+    expect(lcd.style.borderLeft).toContain('var(--success-color)');
+    expect(lcd.querySelector('i').style.color).toBe('var(--danger-color)');
+  });
+
+  it('is orange while the plugin is unhealthy or not answering /attached', () => {
+    const { unmount } = render(<AttachedBoxes conn={conn([IO], { healthy: false, last_error: 'boom' })} />);
+    expect(screen.getByTestId('attached-box-io:0').style.borderLeft).toContain('var(--warning-color)');
+    unmount();
+    render(<AttachedBoxes conn={conn([IO], { attached_error: 'timed out' })} />);
+    expect(screen.getByTestId('attached-box-io:0')).toHaveAttribute('data-plugin-state', 'stale');
+    expect(screen.getByTestId('attached-box-io:0').style.borderLeft).toContain('var(--warning-color)');
+  });
+
+  it('draws a red Disconnected box for a plugin that can\'t be reached', () => {
+    render(<AttachedBoxes conn={{ name: 'FSP01', plugins: { plugins: [], failed: { sim_leds: "Can't reach http://sim-leds:8099/plugin" } } }} />);
+    const box = screen.getByTestId('attached-box-sim_leds:disconnected');
+    expect(box).toHaveTextContent('sim_leds');
+    expect(box).toHaveTextContent('Disconnected');
+    expect(box.style.borderLeft).toContain('var(--danger-color)');
+    expect(box.title).toBe("Plugin sim_leds: disconnected - Can't reach http://sim-leds:8099/plugin; click for details");
+  });
+
   it('draws nothing while there is nothing attached', () => {
     const { container } = render(<AttachedBoxes conn={{ name: 'SO', plugins: null }} />);
     expect(container).toBeEmptyDOMElement();

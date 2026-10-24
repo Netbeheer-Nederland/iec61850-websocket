@@ -104,11 +104,13 @@ Four options were considered:
    The IO server doesn't know an LED's colour, so it reports `green`.
 6. **`sim_leds` reports its two LEDs**, as one `other` item with `indicators` (`green`, `red`), as the example for
    plugin authors in `GETTING_STARTED.md`.
-7. **The HMI draws a box per item.** On Overview and Traffic, `InstanceVisualization` draws each attached item next to its FSP or
-   SO: the icon for its `kind`, its `label`, the colour for its `state`, and its `live` blocks small underneath (LED
-   dots, values, a text box like the display). Clicking a box opens its details: `address`, `detail`, the plugin's
-   name, `version`, `healthy`, `last_error` and `attached_error`. Model keeps its focus; it can turn the boxes on by
-   a prop (`showAttached`). The HMI draws every plugin's items the same way: a new plugin needs no HMI change.
+7. **The HMI draws a box per item.** On Overview and Traffic, `InstanceVisualization` draws each attached item next to
+   its FSP or SO: the icon for its `kind`, coloured for its `state`, its `label`, a left edge coloured for its plugin's
+   state as the FSP or SO sees it (green connected and running, orange unhealthy or not answering `/attached`, red
+   disconnected - a disconnected plugin gets one box of its own), and its `live` blocks small underneath (LED dots,
+   values, a text box like the display). Clicking a box opens its details: `address`, `detail`, the plugin's name,
+   `version`, `healthy`, `last_error` and `attached_error`. Model keeps its focus; it can turn the boxes on by a prop
+   (`showAttached`). The HMI draws every plugin's items the same way: a new plugin needs no HMI change.
 
 ## Consequences
 

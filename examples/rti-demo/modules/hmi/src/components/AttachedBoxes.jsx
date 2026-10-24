@@ -4,12 +4,15 @@
  */
 
 // What an SO's or FSP's plugins attach (decision 0025), drawn next to it on
-// Overview and Traffic: a box per item - icon for its kind, label, colour for its state -
-// with its live blocks small underneath (LED dots, values, a display's text).
-// Clicking a box shows its details. Every plugin's items are drawn the same
-// way, as plain text: nothing here knows any one plugin.
+// Overview and Traffic: a box per item - its left edge coloured for its
+// plugin's state (green connected and running, orange unhealthy or not
+// answering /attached, red disconnected), an icon for its kind coloured for
+// its own state, its label - with its live blocks small underneath (LED dots,
+// values, a display's text). A disconnected plugin has one red box of its
+// own. Clicking a box shows its details. Every plugin's items are drawn the
+// same way, as plain text: nothing here knows any one plugin.
 import React, { useState } from 'react';
-import { attachedItems } from '../utils/plugins';
+import { attachedItems, PLUGIN_STATES } from '../utils/plugins';
 
 const KIND_ICONS = {
   io: 'fa-microchip',
@@ -97,7 +100,7 @@ function Details({ item }) {
   const rows = [
     ['Address', item.address],
     ['Detail', item.detail],
-    ['Plugin', `${plugin.name}${plugin.version ? ` ${plugin.version}` : ''}${plugin.healthy ? '' : ' (unhealthy)'}`],
+    ['Plugin', `${plugin.name}${plugin.version ? ` ${plugin.version}` : ''}: ${PLUGIN_STATES[plugin.state].label}`],
     ['Last error', plugin.lastError],
     ['Attached', plugin.attachedError],
   ].filter(([, value]) => value);
@@ -116,7 +119,9 @@ function Details({ item }) {
 function AttachedBox({ item }) {
   const [open, setOpen] = useState(false);
   // The last answer, kept while the plugin couldn't say: greyed.
-  const stale = item.state === 'down' || Boolean(item.plugin.attachedError);
+  const stale = item.state === 'down' || Boolean(item.plugin.attachedError) || item.disconnected;
+  // The left edge is the plugin's state; the icon, the item's own.
+  const pluginState = PLUGIN_STATES[item.plugin.state];
   const toggle = () => setOpen((o) => !o);
   return (
     <div
@@ -125,15 +130,18 @@ function AttachedBox({ item }) {
       aria-expanded={open}
       data-testid={`attached-box-${item.key}`}
       data-state={item.state}
+      data-plugin-state={item.plugin.state}
       onClick={toggle}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
-      title={`${item.label} - ${item.state}${item.plugin.attachedError ? ` (${item.plugin.attachedError})` : ''}; click for details`}
+      title={item.disconnected
+        ? `Plugin ${item.plugin.name}: disconnected${item.plugin.lastError ? ` - ${item.plugin.lastError}` : ''}; click for details`
+        : `${item.label} - ${item.state}; plugin ${item.plugin.name}: ${pluginState.label}${item.plugin.attachedError ? ` (${item.plugin.attachedError})` : ''}; click for details`}
       style={{
         width: '170px',
         padding: '6px 8px',
         background: 'var(--bg-card)',
         border: '1px solid var(--border-color)',
-        borderLeft: `4px solid ${STATE_COLORS[item.state] || STATE_COLORS.unknown}`,
+        borderLeft: `4px solid ${pluginState.color}`,
         borderRadius: '6px',
         fontSize: '11px',
         cursor: 'pointer',
@@ -141,9 +149,12 @@ function AttachedBox({ item }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, marginBottom: item.live?.length ? '4px' : 0 }}>
-        <i className={`fas ${KIND_ICONS[item.kind] || KIND_ICONS.other}`} aria-hidden="true" style={{ color: STATE_COLORS[item.state] || STATE_COLORS.unknown }}></i>
+        <i className={`fas ${item.disconnected ? 'fa-plug' : KIND_ICONS[item.kind] || KIND_ICONS.other}`} aria-hidden="true" style={{ color: STATE_COLORS[item.state] || STATE_COLORS.unknown }}></i>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
       </div>
+      {item.disconnected && (
+        <div style={{ marginTop: '4px', color: pluginState.color, fontWeight: 600 }}>Disconnected</div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', opacity: stale ? 0.5 : 1 }}>
         {(item.live || []).map((block, i) => {
           const Block = BLOCKS[block.type];
