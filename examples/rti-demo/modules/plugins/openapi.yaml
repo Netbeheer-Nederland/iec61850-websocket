@@ -387,7 +387,7 @@ paths:
       Every request under `/api/plugins/{name}/` (other than `POST .../reload`) is passed on, with its
       method, query, headers and body, to `<routes>/{path}`, where `routes` is the base the plugin
       gives in its description. The plugin's answer is returned as it is. For example, the IO server
-      gives `/api/io`, so `/api/plugins/io/leds` reaches its `/api/io/leds`.
+      gives `/api/io`, so `/api/plugins/dr_panel/leds` reaches its `/api/io/leds`.
 
       Methods passed on: GET, POST, PUT, PATCH, DELETE.
     parameters:
@@ -477,7 +477,7 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
-          example: { detail: "No plugin 'io' is loaded" }
+          example: { detail: "No plugin 'dr_panel' is loaded" }
     SourceNotAllowed:
       description: The plugin's URL isn't in `PLUGIN_ALLOWED_SOURCES`.
       content:
@@ -493,7 +493,7 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
           example:
-            detail: "Plugin 'historian' claims objRefs another plugin owns: LD0/CSWI1.Pos.Oper.ctlVal (owned by 'io')"
+            detail: "Plugin 'historian' claims objRefs another plugin owns: LD0/CSWI1.Pos.Oper.ctlVal (owned by 'dr_panel')"
     PluginFailed:
       description: |
         The plugin can't be reached, or doesn't answer as the Plugin API says (`detail` says why: a

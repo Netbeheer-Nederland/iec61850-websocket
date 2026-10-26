@@ -589,7 +589,7 @@
                 <div class="node l3">LPHD1 · DWMX1 · MMXU1 …</div>
                 <div class="node l3">CSWI1 · Pos DPC <span class="plug-tag">🔌 io</span></div>
               </div>
-              <p class="placeholder-text" style="margin:6px 0 0;">ⓘ 🔌 &lt;name&gt; on a data object whose Operate a plugin answers: the plugin claims its control attribute (LD0/CSWI1.Pos.Oper.ctlVal), the tag goes on the data object (LD0/CSWI1.Pos). Tooltip "Operate answered by plugin 'io'".</p>
+              <p class="placeholder-text" style="margin:6px 0 0;">ⓘ 🔌 &lt;name&gt; on a data object whose Operate a plugin answers: the plugin claims its control attribute (LD0/CSWI1.Pos.Oper.ctlVal), the tag goes on the data object (LD0/CSWI1.Pos). Tooltip "Operate answered by plugin 'dr_panel'".</p>
             </div>
           </div>
 
@@ -601,11 +601,11 @@
               <div class="trow" style="display:block;background:var(--wf-fill);">
                 <div class="placeholder-text" style="margin:0 0 4px;">▴ Details io:</div>
                 <div><b>Controls</b> LD0/CSWI1.Pos.Oper.ctlVal</div>
-                <div><b>Routes</b> /api/plugins/io/</div>
+                <div><b>Routes</b> /api/plugins/dr_panel/</div>
                 <div><b>Attached</b> ● IO server (io, 6 devices) http://dr-panel:9000 <span class="placeholder-text">- or the attached error, e.g. attached timed out after 1.0s</span></div>
                 <div><b>Settings</b> - <span class="placeholder-text">(or the settings JSON)</span></div>
-                <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span class="btn btn-outline">GET ▾</span><span class="placeholder-text">/api/plugins/io/</span><span style="border:1.5px dashed var(--wf-line-soft);border-radius:5px;padding:2px 8px;">leds</span><span style="border:1.5px dashed var(--wf-line-soft);border-radius:5px;padding:2px 8px;">on=1</span><span class="btn btn-solid">Send</span> <span class="placeholder-text">(Body (JSON) editor under it for POST, PUT, PATCH)</span></div>
-                <div style="margin-top:4px;"><b>OK</b> <span class="placeholder-text">GET /api/plugins/io/leds?on=1</span></div>
+                <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span class="btn btn-outline">GET ▾</span><span class="placeholder-text">/api/plugins/dr_panel/</span><span style="border:1.5px dashed var(--wf-line-soft);border-radius:5px;padding:2px 8px;">leds</span><span style="border:1.5px dashed var(--wf-line-soft);border-radius:5px;padding:2px 8px;">on=1</span><span class="btn btn-solid">Send</span> <span class="placeholder-text">(Body (JSON) editor under it for POST, PUT, PATCH)</span></div>
+                <div style="margin-top:4px;"><b>OK</b> <span class="placeholder-text">GET /api/plugins/dr_panel/leds?on=1</span></div>
                 <pre style="margin:2px 0 0;font-size:10px;">{ "leds": [ { "name": "red", "on": true } ] }</pre>
               </div>
               <div class="trow"><span class="cell">display</span><span class="cell">Unreachable<br><span class="placeholder-text">connection refused</span></span><span class="cell">http://pi:8000/plugin</span><span class="cell narrow">-</span><span class="cell narrow" style="flex-basis:130px;">▾ ✎ ↗ ⧉ ⟳ 🗑<br><span class="placeholder-text">⟳ = Retry now</span></span></div>

@@ -125,7 +125,7 @@ def _plugin_env(name: str, port: int) -> dict[str, str]:
     PLUGIN_ALLOWED_SOURCES, when set, is passed on to narrow that (wildcards
     such as http://*:8099, or empty for none, decision 0037).
     """
-    io = {"name": "io", "url": IO_PLUGIN_URL}
+    io = {"name": "dr_panel", "url": IO_PLUGIN_URL}
     if name != "fsp":
         io["settings"] = {"write_inputs": False}
     env = {

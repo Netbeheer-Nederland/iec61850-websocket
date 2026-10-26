@@ -54,6 +54,8 @@ The IO plugin's code was `rpi_io` ([0023](0023-io-server-package-rpi-io.md)), it
   they went.
 - Renaming the role `io` itself (the plugin name and its routes) is left open: it would change every plugin
   configuration and the HMI's links to the plugin's routes.
+- Superseded in [0040](0040-io-plugin-plugin-name-dr-panel.md): point 2 for the plugin name `io` and its routes
+  `/api/plugins/io/*`, now `dr_panel`; the rest of point 2 stands.
 
 ## In the code
 

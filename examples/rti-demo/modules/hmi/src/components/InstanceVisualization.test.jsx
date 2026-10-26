@@ -238,7 +238,7 @@ describe('InstanceVisualization - OAuth badge', () => {
 
 describe('InstanceVisualization - plugin badge', () => {
   const FSP = { name: 'FSP01', type: 'RTI-FSP', status: 'connected', host: 'h', port: 1, connectedClients: 1 };
-  const io = { name: 'io', claims: [], healthy: true, last_error: null };
+  const io = { name: 'dr_panel', claims: [], healthy: true, last_error: null };
 
   it('counts the plugins, green while all are connected and running', () => {
     renderViz([{ ...SO, plugins: { plugins: [io], failed: {} } }]);
@@ -256,7 +256,7 @@ describe('InstanceVisualization - plugin badge', () => {
     const badge = screen.getByTestId('plugin-badge-FSP01');
     expect(badge.textContent).toBe('2');
     expect(badge.style.background).toBe('var(--danger-color)');
-    expect(badge.title).toBe("Plugins: io connected, its last event or Operate failed - timed out; display disconnected - Can't reach http://pi:8000/plugin");
+    expect(badge.title).toBe("Plugins: dr_panel connected, its last event or Operate failed - timed out; display disconnected - Can't reach http://pi:8000/plugin");
   });
 
   it('turns orange while a connected plugin is unhealthy', () => {
@@ -273,7 +273,7 @@ describe('InstanceVisualization - plugin badge', () => {
 });
 
 describe('InstanceVisualization - attached boxes (decision 0025)', () => {
-  const attached = { plugins: [{ name: 'io', healthy: true, attached: [{ kind: 'io', label: 'IO server', state: 'ok', live: [] }] }], failed: {} };
+  const attached = { plugins: [{ name: 'dr_panel', healthy: true, attached: [{ kind: 'io', label: 'IO server', state: 'ok', live: [] }] }], failed: {} };
   const FSP = { name: 'FSP01', type: 'RTI-FSP', status: 'connected', host: 'rti-fsp01', port: 5001, plugins: attached };
 
   it('draws them next to the SO and FSP when asked to', () => {

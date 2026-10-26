@@ -138,12 +138,12 @@ The IO server implements the plugin API (`examples/rti-demo/modules/plugins/open
 `dr_panel/plugin/plugin.py`. An FSP or SO configures it as
 
 ```json
-{"name": "io", "url": "http://dr-panel:9000/plugin", "settings": {}}
+{"name": "dr_panel", "url": "http://dr-panel:9000/plugin", "settings": {}}
 ```
 
 | Call | What the IO server does |
 |---|---|
-| `GET /plugin` | `{"name": "io", "api": 2, "claims": [], "routes": "/api/io"}`: the FSP's or SO's `/api/plugins/io/*` reaches this server's `/api/io/*` |
+| `GET /plugin` | `{"name": "dr_panel", "api": 2, "claims": [], "routes": "/api/io"}`: the FSP's or SO's `/api/plugins/dr_panel/*` reaches this server's `/api/io/*` |
 | `POST /plugin/start` | Remembers the host, and sends the input devices' changes (button, potentiometers) to its `host_url`, as `io_mapping.json` says (`writeValue` or `operate`). The most recent host gets them, unless its settings say `"write_inputs": false` |
 | `POST /plugin/events` | Answers `202`, then shows the event on the devices `io_mapping.json` maps to its name (below), and sets the output devices mapped to a written objRef |
 | `POST /plugin/control` | `204`: it claims no objRefs, so the FSP decides every Operate itself |
@@ -374,7 +374,7 @@ curl http://localhost:9000/api/io/health
 
 # Check that the FSP has the IO plugin loaded and healthy
 curl http://localhost:5001/api/plugins
-curl http://localhost:5001/api/plugins/io/health
+curl http://localhost:5001/api/plugins/dr_panel/health
 
 # List all devices
 curl http://localhost:9000/api/io/devices

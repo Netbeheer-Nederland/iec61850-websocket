@@ -32,7 +32,7 @@ x-dr-panel: &dr-panel
     - rti-network
   restart: unless-stopped
   # Port 9000 and the health check are set by the Dockerfile; nothing is
-  # published: the HMI reaches the devices through /api/plugins/io/.
+  # published: the HMI reaches the devices through /api/plugins/dr_panel/.
 
 services:
   dr-panel:

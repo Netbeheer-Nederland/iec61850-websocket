@@ -34,11 +34,11 @@ and without waiting for an event or Operate to fail.
 
    ```json
    {
-     "name": "io",
+     "name": "dr_panel",
      "reachable": true,
      "milliseconds": 12,
      "changed": ["version", "claims"],
-     "description": { "name": "io", "version": "1.1.0", "api": 2, "claims": [], "routes": "/api/io" }
+     "description": { "name": "dr_panel", "version": "1.1.0", "api": 2, "claims": [], "routes": "/api/io" }
    }
    ```
 

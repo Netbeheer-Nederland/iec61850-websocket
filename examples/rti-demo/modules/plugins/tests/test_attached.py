@@ -167,19 +167,19 @@ def host():
 
 
 async def test_status_lists_what_the_plugin_attaches(host):
-    await host.add("io", Attaching())
-    assert host.status("io")["attached"] == []
+    await host.add("dr_panel", Attaching())
+    assert host.status("dr_panel")["attached"] == []
 
     await host.refresh_attached()
 
-    status = host.status("io")
+    status = host.status("dr_panel")
     assert status["attached"] == [IO]
     assert status["attached_error"] is None
 
 
 async def test_it_is_asked_at_most_once_a_second(host):
     plugin = Attaching()
-    await host.add("io", plugin)
+    await host.add("dr_panel", plugin)
 
     await host.refresh_attached()
     host.now += 0.5
@@ -193,14 +193,14 @@ async def test_it_is_asked_at_most_once_a_second(host):
 
 async def test_a_plugin_that_fails_keeps_its_items_and_stays_healthy(host):
     plugin = Attaching()
-    await host.add("io", plugin)
+    await host.add("dr_panel", plugin)
     await host.refresh_attached()
 
     plugin.error = RuntimeError("devices gone")
     host.now += 1
     await host.refresh_attached()
 
-    status = host.status("io")
+    status = host.status("dr_panel")
     assert status["attached"] == [IO]
     assert status["attached_error"] == "attached failed: devices gone"
     assert status["healthy"] is True
@@ -208,24 +208,24 @@ async def test_a_plugin_that_fails_keeps_its_items_and_stays_healthy(host):
     plugin.error = None
     host.now += 1
     await host.refresh_attached()
-    assert host.status("io")["attached_error"] is None
+    assert host.status("dr_panel")["attached_error"] is None
 
 
 async def test_a_slow_plugin_does_not_hold_up_the_others(host):
     await host.add("slow", Attaching(delay=5))
-    await host.add("io", Attaching())
+    await host.add("dr_panel", Attaching())
 
     await asyncio.wait_for(host.refresh_attached(), 1)
 
     assert host.status("slow")["attached_error"] == "attached timed out after 0.2s"
-    assert host.status("io")["attached"] == [IO]
+    assert host.status("dr_panel")["attached"] == [IO]
 
 
 async def test_a_bad_answer_is_an_error(host):
-    await host.add("io", Attaching(answer=[IO]))
+    await host.add("dr_panel", Attaching(answer=[IO]))
     await host.refresh_attached()
-    assert host.status("io")["attached"] == []
-    assert host.status("io")["attached_error"].startswith("attached failed: answered")
+    assert host.status("dr_panel")["attached"] == []
+    assert host.status("dr_panel")["attached_error"].startswith("attached failed: answered")
 
 
 # -------------------- over HTTP --------------------

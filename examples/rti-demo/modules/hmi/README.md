@@ -303,7 +303,7 @@ http://localhost:5000/docs.
 
 - `executeApiCall(apiId, targetValue, bodyOverride, options)` - run an `API_DEFINITIONS` entry through `/api/execute`
   (or directly, with `options.useDirect`); `options.pathParams` fills `{name}`-style path segments, e.g.
-  `{ name: 'io' }` for `plugin-edit` or `plugin-reload`; a `{path*}` segment keeps its slashes (`leds/1`).
+  `{ name: 'dr_panel' }` for `plugin-edit` or `plugin-reload`; a `{path*}` segment keeps its slashes (`leds/1`).
   `options.method` replaces the entry's method and `options.query` adds a query string (`on=1&color=red`), for
   `plugin-route`
 - `getApiById(id)` - look up an `API_DEFINITIONS` entry

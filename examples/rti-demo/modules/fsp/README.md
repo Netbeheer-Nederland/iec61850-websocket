@@ -123,7 +123,7 @@ A **FastAPI** application that provides REST endpoints for managing the ACSI Ser
 | **Plugins** | GET, POST `/api/plugins` | List plugins, with their definitions (URL, settings); install one |
 | | PUT `/api/plugins/{name}` | Edit its URL or settings, until the FSP restarts (decision 0036) |
 | | POST `/api/plugins/{name}/reload`, DELETE `/api/plugins/{name}` | Reload; remove |
-| | `/api/plugins/{name}/*` | A plugin's own routes, e.g. `/api/plugins/io/leds` |
+| | `/api/plugins/{name}/*` | A plugin's own routes, e.g. `/api/plugins/dr_panel/leds` |
 
 ---
 
@@ -227,10 +227,10 @@ configures it in `config/plugin-configuration/io/rti-fsp01.json` (`http://dr-pan
 
 ```bash
 curl http://localhost:5001/api/plugins                     # connected plugins, health, and the ones not (yet) connected
-curl http://localhost:5001/api/plugins/io/leds             # the IO server's /api/io/leds
-curl -X PUT http://localhost:5001/api/plugins/io -H 'Content-Type: application/json' \
+curl http://localhost:5001/api/plugins/dr_panel/leds             # the IO server's /api/io/leds
+curl -X PUT http://localhost:5001/api/plugins/dr_panel -H 'Content-Type: application/json' \
   -d '{"settings": {}}'                                       # edit its url or settings; a failed edit changes nothing
-curl -X POST http://localhost:5001/api/plugins/io/reload   # ask it again what it is and start it again
+curl -X POST http://localhost:5001/api/plugins/dr_panel/reload   # ask it again what it is and start it again
 ```
 
 ---

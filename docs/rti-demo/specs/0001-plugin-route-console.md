@@ -34,7 +34,7 @@ instance's port, while the HMI still knows nothing of any one plugin.
 2. The answer below it: **OK** with the body pretty-printed when it is JSON, as text otherwise, cut at 20 000
    characters with a note; or **Failed** with the instance's error. The BFF doesn't pass on the plugin's status on
    success, and gives it inside the error text on failure (`404 Client Error: ...`), so there is no separate status.
-3. A method other than GET asks first (`window.confirm`): "POST /api/plugins/io/leds may change the plugin's state.
+3. A method other than GET asks first (`window.confirm`): "POST /api/plugins/dr_panel/leds may change the plugin's state.
    Send?".
 4. The form refuses `POST reload` (and, once there are any, the other reserved names, see the
    [specs README](README.md)): that is the instance's own route, not the plugin's. `GET reload` reaches the plugin,
@@ -52,9 +52,9 @@ the HMI shows it as the answer, not as the panel's alert.
 ## Acceptance
 
 - On a plugin with routes, Details has the Request line; without routes it doesn't.
-- `GET leds` with query `on=1` on `io` calls `/api/execute` with `{method: 'GET', path: '/api/plugins/io/leds?on=1'}`
+- `GET leds` with query `on=1` on `dr_panel` calls `/api/execute` with `{method: 'GET', path: '/api/plugins/dr_panel/leds?on=1'}`
   and shows the answer.
-- `leds/1` stays `/api/plugins/io/leds/1`, not `leds%2F1`.
+- `leds/1` stays `/api/plugins/dr_panel/leds/1`, not `leds%2F1`.
 - POST asks first; cancelled, nothing is sent.
 - A body that isn't JSON is refused before sending, as in the add form.
 

@@ -23,11 +23,11 @@ const ALL_OPEN = { LD0: true, 'LD0/CSWI1': true };
 
 describe('Tree - plugin claims', () => {
   it('names the plugin on the data object whose Operate it answers', () => {
-    render(<Tree data={MODEL} expandedNodes={ALL_OPEN} onExpandToggle={() => {}} claimOwners={{ 'LD0/CSWI1.Pos.Oper.ctlVal': 'io' }} />);
+    render(<Tree data={MODEL} expandedNodes={ALL_OPEN} onExpandToggle={() => {}} claimOwners={{ 'LD0/CSWI1.Pos.Oper.ctlVal': 'dr_panel' }} />);
 
     const tag = screen.getByTestId('plugin-claim-LD0/CSWI1.Pos');
-    expect(tag.textContent.trim()).toBe('io');
-    expect(tag.title).toBe("Operate answered by plugin 'io'");
+    expect(tag.textContent.trim()).toBe('dr_panel');
+    expect(tag.title).toBe("Operate answered by plugin 'dr_panel'");
     expect(screen.queryByTestId('plugin-claim-LD0/CSWI1.Beh')).not.toBeInTheDocument();
     expect(screen.queryByTestId('plugin-claim-LD0/CSWI1')).not.toBeInTheDocument();
   });

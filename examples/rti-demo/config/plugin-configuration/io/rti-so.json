@@ -2,7 +2,7 @@
   "host_url": "http://rti-so:5000",
   "plugins": [
     {
-      "name": "io",
+      "name": "dr_panel",
       "url": "http://dr-panel:9000/plugin",
       "settings": {
         "write_inputs": false

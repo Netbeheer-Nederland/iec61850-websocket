@@ -301,7 +301,7 @@ def test_from_env_reads_the_file_inline_plugins_and_host_url(monkeypatch, tmp_pa
         json.dumps(
             {
                 "host_url": "http://from-file:5001",
-                "plugins": [{"name": "io", "url": "http://dr-panel:9000/plugin"}],
+                "plugins": [{"name": "dr_panel", "url": "http://dr-panel:9000/plugin"}],
             }
         ),
         encoding="utf-8",
@@ -316,7 +316,7 @@ def test_from_env_reads_the_file_inline_plugins_and_host_url(monkeypatch, tmp_pa
     monkeypatch.setenv("PLUGIN_RETRY_SECONDS", "3")
     host = PluginHost(role="so")
     service = PluginService.from_env(host)
-    assert [p.name for p in service.configured] == ["io", "dr_leds"]
+    assert [p.name for p in service.configured] == ["dr_panel", "dr_leds"]
     assert host.host_url == "http://from-env:5001"
     assert service.allowed_sources == ["http://a.test", "http://b.test"]
     assert service.retry_seconds == 3

@@ -8,7 +8,7 @@ import { pluginRows, configEntry, addTargets, routeRequest, routeAnswerText, plu
 
 const STATUS = {
   plugins: [
-    { name: 'io', version: '1.2', url: 'http://dr-panel:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], healthy: true, last_error: null },
+    { name: 'dr_panel', version: '1.2', url: 'http://dr-panel:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], healthy: true, last_error: null },
     { name: 'leds', version: '0.1', url: 'http://dr-leds:8099/plugin', claims: [], healthy: false, last_error: 'on_event timed out' },
   ],
   failed: { display: "Can't reach http://pi:8000/plugin" },
@@ -17,7 +17,7 @@ const STATUS = {
 describe('plugins', () => {
   it('lists connected plugins, then the unreachable ones', () => {
     expect(pluginRows(STATUS).map((r) => [r.name, r.state, r.error])).toEqual([
-      ['io', 'healthy', null],
+      ['dr_panel', 'healthy', null],
       ['leds', 'unhealthy', 'on_event timed out'],
       ['display', 'unreachable', "Can't reach http://pi:8000/plugin"],
     ]);
@@ -26,10 +26,10 @@ describe('plugins', () => {
   it("gives each row its definition, and an unreachable one its URL from it", () => {
     const rows = pluginRows({
       ...STATUS,
-      definitions: { io: { url: 'http://dr-panel:9000/plugin', settings: {} }, display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } } },
+      definitions: { dr_panel: { url: 'http://dr-panel:9000/plugin', settings: {} }, display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } } },
     });
     expect(rows.map((r) => [r.name, r.url, r.definition])).toEqual([
-      ['io', 'http://dr-panel:9000/plugin', { url: 'http://dr-panel:9000/plugin', settings: {} }],
+      ['dr_panel', 'http://dr-panel:9000/plugin', { url: 'http://dr-panel:9000/plugin', settings: {} }],
       ['leds', 'http://dr-leds:8099/plugin', null],
       ['display', 'http://pi:8000/plugin', { url: 'http://pi:8000/plugin', settings: { rotate: 90 } }],
     ]);
@@ -39,11 +39,11 @@ describe('plugins', () => {
 
   it("gives each connected row its routes and what it attaches", () => {
     const rows = pluginRows({
-      plugins: [{ name: 'io', routes: true, attached: [{ kind: 'io', label: 'IO server' }], attached_error: 'attached timed out after 1.0s' }],
+      plugins: [{ name: 'dr_panel', routes: true, attached: [{ kind: 'io', label: 'IO server' }], attached_error: 'attached timed out after 1.0s' }],
       failed: { display: 'down' },
     });
     expect(rows.map((r) => [r.name, r.routes, r.attached.length, r.attachedError])).toEqual([
-      ['io', true, 1, 'attached timed out after 1.0s'],
+      ['dr_panel', true, 1, 'attached timed out after 1.0s'],
       ['display', false, 0, null],
     ]);
   });
@@ -51,10 +51,10 @@ describe('plugins', () => {
   it('gives a row as a plugin configuration entry, settings only when there are some', () => {
     const rows = pluginRows({
       ...STATUS,
-      definitions: { io: { url: 'http://dr-panel:9000/plugin', settings: {} }, display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } } },
+      definitions: { dr_panel: { url: 'http://dr-panel:9000/plugin', settings: {} }, display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } } },
     });
     expect(rows.map(configEntry)).toEqual([
-      { name: 'io', url: 'http://dr-panel:9000/plugin' },
+      { name: 'dr_panel', url: 'http://dr-panel:9000/plugin' },
       null,
       { name: 'display', url: 'http://pi:8000/plugin', settings: { rotate: 90 } },
     ]);
@@ -86,8 +86,8 @@ describe('plugins', () => {
 
   it("shows a control attribute's claim on its data object", () => {
     const owners = claimOwners(STATUS);
-    expect(claimOwnerOf(owners, 'LD0/CSWI1.Pos')).toBe('io');
-    expect(claimOwnerOf(owners, 'LD0/CSWI1.Pos.Oper.ctlVal')).toBe('io');
+    expect(claimOwnerOf(owners, 'LD0/CSWI1.Pos')).toBe('dr_panel');
+    expect(claimOwnerOf(owners, 'LD0/CSWI1.Pos.Oper.ctlVal')).toBe('dr_panel');
     expect(claimOwnerOf(owners, 'LD0/CSWI1')).toBeNull();
     expect(claimOwnerOf(owners, undefined)).toBeNull();
   });
@@ -97,20 +97,20 @@ describe('attachedItems', () => {
   it('lists every plugin\'s items with the plugin they come from', () => {
     const items = attachedItems({
       plugins: [
-        { name: 'io', version: '1.0', healthy: true, last_error: null, attached_error: null, attached: [{ kind: 'io', label: 'IO server', state: 'ok' }, { kind: 'display', label: 'lcd1', state: 'ok' }] },
+        { name: 'dr_panel', version: '1.0', healthy: true, last_error: null, attached_error: null, attached: [{ kind: 'io', label: 'IO server', state: 'ok' }, { kind: 'display', label: 'lcd1', state: 'ok' }] },
         { name: 'dr_leds', healthy: false, last_error: 'boom', attached_error: 'attached timed out after 1.0s', attached: [{ kind: 'other', label: 'Simulated LEDs', state: 'ok' }] },
         { name: 'old' },
       ],
       failed: { display: 'down' },
     });
-    expect(items.map((i) => i.key)).toEqual(['io:0', 'io:1', 'dr_leds:0', 'display:disconnected']);
+    expect(items.map((i) => i.key)).toEqual(['dr_panel:0', 'dr_panel:1', 'dr_leds:0', 'display:disconnected']);
     expect(items[2].plugin).toEqual({ name: 'dr_leds', version: '', healthy: false, state: 'unhealthy', lastError: 'boom', attachedError: 'attached timed out after 1.0s' });
     expect(items[0].plugin.state).toBe('healthy');
     expect(items[3]).toMatchObject({ label: 'display', disconnected: true, plugin: { state: 'unreachable', lastError: 'down' } });
   });
 
   it("marks a running plugin whose /attached failed as stale", () => {
-    const [item] = attachedItems({ plugins: [{ name: 'io', healthy: true, attached_error: 'timed out', attached: [{ kind: 'io', label: 'IO server' }] }], failed: {} });
+    const [item] = attachedItems({ plugins: [{ name: 'dr_panel', healthy: true, attached_error: 'timed out', attached: [{ kind: 'io', label: 'IO server' }] }], failed: {} });
     expect(item.plugin.state).toBe('stale');
   });
 

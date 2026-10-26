@@ -24,15 +24,15 @@ describe('executeApiCall', () => {
 
   it("keeps a plugin route's slashes, encoding each segment, with the caller's method and query", async () => {
     await executeApiCall('plugin-route', 'fsp:5001', { on: true }, {
-      pathParams: { name: 'io', path: 'leds/red led' }, method: 'PUT', query: '?on=1&color=dark red',
+      pathParams: { name: 'dr_panel', path: 'leds/red led' }, method: 'PUT', query: '?on=1&color=dark red',
     });
     expect(sent[0]).toEqual({
-      target: 'fsp:5001', method: 'PUT', path: '/api/plugins/io/leds/red%20led?on=1&color=dark+red', body: { on: true },
+      target: 'fsp:5001', method: 'PUT', path: '/api/plugins/dr_panel/leds/red%20led?on=1&color=dark+red', body: { on: true },
     });
   });
 
   it("uses the definition's method and no query by default", async () => {
-    await executeApiCall('plugin-route', 'fsp:5001', null, { pathParams: { name: 'io', path: 'leds' } });
-    expect(sent[0]).toEqual({ target: 'fsp:5001', method: 'GET', path: '/api/plugins/io/leds' });
+    await executeApiCall('plugin-route', 'fsp:5001', null, { pathParams: { name: 'dr_panel', path: 'leds' } });
+    expect(sent[0]).toEqual({ target: 'fsp:5001', method: 'GET', path: '/api/plugins/dr_panel/leds' });
   });
 });

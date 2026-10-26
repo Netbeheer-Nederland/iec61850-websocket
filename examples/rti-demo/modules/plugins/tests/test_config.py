@@ -13,7 +13,7 @@ pytestmark = pytest.mark.unit
 CONFIG = {
     "host_url": "http://rti-fsp01:5001",
     "plugins": [
-        {"name": "io", "url": "http://dr-panel:9000/plugin", "settings": {"a": 1}},
+        {"name": "dr_panel", "url": "http://dr-panel:9000/plugin", "settings": {"a": 1}},
         {"name": "dr_leds", "url": "http://localhost:8099/plugin"},
     ],
 }
@@ -25,7 +25,7 @@ def test_a_configuration_is_read(tmp_path):
     config = PluginsConfig.read(path)
     assert config.host_url == "http://rti-fsp01:5001"
     assert config.plugins == [
-        PluginEntry("io", "http://dr-panel:9000/plugin", {"a": 1}),
+        PluginEntry("dr_panel", "http://dr-panel:9000/plugin", {"a": 1}),
         PluginEntry("dr_leds", "http://localhost:8099/plugin", {}),
     ]
 
@@ -33,17 +33,17 @@ def test_a_configuration_is_read(tmp_path):
 def test_a_list_is_the_plugins():
     config = PluginsConfig.parse(CONFIG["plugins"])
     assert config.host_url is None
-    assert [p.name for p in config.plugins] == ["io", "dr_leds"]
+    assert [p.name for p in config.plugins] == ["dr_panel", "dr_leds"]
 
 
 @pytest.mark.parametrize(
     "plugins",
     [
         [{"name": "Bad", "url": "http://x"}],
-        [{"name": "io", "url": "ftp://x"}],
-        [{"name": "io"}],
-        [{"name": "io", "url": "http://x", "settings": []}],
-        [{"name": "io", "url": "http://x"}, {"name": "io", "url": "http://y"}],
+        [{"name": "dr_panel", "url": "ftp://x"}],
+        [{"name": "dr_panel"}],
+        [{"name": "dr_panel", "url": "http://x", "settings": []}],
+        [{"name": "dr_panel", "url": "http://x"}, {"name": "dr_panel", "url": "http://y"}],
         "io",
     ],
 )
@@ -60,11 +60,11 @@ def test_an_unreadable_file_is_refused(tmp_path):
 def test_merged_lets_the_other_win():
     base = PluginsConfig.parse(CONFIG)
     other = PluginsConfig.parse(
-        {"host_url": "http://h:1", "plugins": [{"name": "io", "url": "http://io2"}]}
+        {"host_url": "http://h:1", "plugins": [{"name": "dr_panel", "url": "http://io2"}]}
     )
     merged = base.merged(other)
     assert merged.host_url == "http://h:1"
     assert {p.name: p.url for p in merged.plugins} == {
-        "io": "http://io2",
+        "dr_panel": "http://io2",
         "dr_leds": "http://localhost:8099/plugin",
     }

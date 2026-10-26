@@ -5,7 +5,7 @@
 It implements the plugin API (examples/rti-demo/modules/plugins/openapi.yaml)
 under /plugin, so an FSP or SO configures
 
-    {"name": "io", "url": "http://dr-panel:9000/plugin"}
+    {"name": "dr_panel", "url": "http://dr-panel:9000/plugin"}
 
 and nothing of IO is installed in it. The FSP or SO tells it what happens
 (an association, an Operate, a write, a report); it shows that on its LEDs
@@ -16,7 +16,7 @@ the names it uses there for events ("connected", "oper_rcv", ...) are its own.
 When an FSP or SO starts it, its input devices (buttons, potentiometers)
 write their changes back to that host's host_url (the most recent one,
 unless its settings say "write_inputs": false). Its routes, under
-/api/plugins/io/ in the FSP or SO, are this server's /api/io.
+/api/plugins/dr_panel/ in the FSP or SO, are this server's /api/io.
 
 What it attaches (GET /plugin/attached, decision 0025): this server, with its
 LEDs, buttons and potentiometers, and each display, with the text the plugin
@@ -42,7 +42,7 @@ from .mapping import IOMappingManager, resolve_mapping_path
 logger = logging.getLogger(__name__)
 
 API_VERSION = 2
-NAME = "io"
+NAME = "dr_panel"
 
 
 class Host(BaseModel):

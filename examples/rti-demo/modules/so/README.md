@@ -188,10 +188,10 @@ configures it in `config/plugin-configuration/io/rti-so.json` (`http://dr-panel:
 
 ```bash
 curl http://localhost:5000/api/plugins                     # connected plugins, health, and the ones not (yet) connected
-curl http://localhost:5000/api/plugins/io/leds             # the IO server's /api/io/leds
-curl -X PUT http://localhost:5000/api/plugins/io -H 'Content-Type: application/json' \
+curl http://localhost:5000/api/plugins/dr_panel/leds             # the IO server's /api/io/leds
+curl -X PUT http://localhost:5000/api/plugins/dr_panel -H 'Content-Type: application/json' \
   -d '{"settings": {}}'                                       # edit its url or settings; a failed edit changes nothing
-curl -X POST http://localhost:5000/api/plugins/io/reload   # ask it again what it is and start it again
+curl -X POST http://localhost:5000/api/plugins/dr_panel/reload   # ask it again what it is and start it again
 ```
 
 ---

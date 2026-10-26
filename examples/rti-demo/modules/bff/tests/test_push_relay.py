@@ -972,7 +972,7 @@ async def test_build_enriched_connections_adds_plugins(monkeypatch):
         {"name": "idp", "type": "IDP-Server", "status": "connected"},
     ]
     io = {
-        "name": "io",
+        "name": "dr_panel",
         "version": "1.0",
         "url": "http://dr-panel:9000/plugin",
         "claims": ["LD0/CSWI1.Pos.Oper.ctlVal"],
@@ -981,7 +981,7 @@ async def test_build_enriched_connections_adds_plugins(monkeypatch):
         "last_error": None,
     }
     definitions = {
-        "io": {"url": "http://dr-panel:9000/plugin", "settings": {}},
+        "dr_panel": {"url": "http://dr-panel:9000/plugin", "settings": {}},
         "display": {"url": "http://pi:8000/plugin", "settings": {"rotate": 90}},
     }
     monkeypatch.setattr(bff_server.conn_manager, "connections", connections)

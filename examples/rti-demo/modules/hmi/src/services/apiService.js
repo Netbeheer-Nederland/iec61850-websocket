@@ -90,7 +90,7 @@ const API_DEFINITIONS = [
   { id: 'plugin-route', label: '/api/plugins/{name}/{path}', method: 'GET', path: '/api/plugins/{name}/{path*}' },
 ];
 
-// "/api/plugins/{name}/reload" + { name: 'io' } -> "/api/plugins/io/reload".
+// "/api/plugins/{name}/reload" + { name: 'dr_panel' } -> "/api/plugins/dr_panel/reload".
 // A {key*} keeps its slashes, encoding each segment: "leds/1" stays "leds/1".
 const encodeParam = (value, keepSlashes) => (keepSlashes
   ? String(value).split('/').map(encodeURIComponent).join('/')
@@ -172,7 +172,7 @@ export const buildBffApiUrl = (path, targetValue = null) => {
  * @param {object|null} bodyOverride - Optional request body
  * @param {object} options - Additional options
  * @param {boolean} options.useDirect - If true, call the endpoint directly instead of through /api/execute
- * @param {object} options.pathParams - Values for the path's {placeholders}, e.g. { name: 'io' }
+ * @param {object} options.pathParams - Values for the path's {placeholders}, e.g. { name: 'dr_panel' }
  * @param {string} options.method - Instead of the definition's method (for plugin-route)
  * @param {string} options.query - A query string added to the path, e.g. "on=1&color=red"
  * @returns {Promise<object|null>} The API response object with ok, status, payload, rawText

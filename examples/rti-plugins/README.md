@@ -17,7 +17,7 @@ imports them: each plugin runs, is built and is released on its own. The decisio
 
 | Folder | What it is | Its plugin URL | Runs on |
 |---|---|---|---|
-| [`dr_panel`](dr_panel/README.md) | The IO plugin, `dr_panel` (image `dr-panel`, plugin name `io`): the IO server with the LEDs, buttons, potentiometers and displays, and the plugin API | `http://dr-panel:9000/plugin` | the Raspberry Pi; mock mode elsewhere |
+| [`dr_panel`](dr_panel/README.md) | The IO plugin, `dr_panel` (image `dr-panel`, plugin name `dr_panel`): the IO server with the LEDs, buttons, potentiometers and displays, and the plugin API | `http://dr-panel:9000/plugin` | the Raspberry Pi; mock mode elsewhere |
 | [`dr_leds`](dr_leds/README.md) | A sample plugin: two simulated LEDs, FastAPI only | `http://localhost:8099/plugin` | anywhere |
 
 ## The layout of a plugin
@@ -55,7 +55,7 @@ through `dr_leds`. A new integration is a new folder here (or anywhere else) and
 configuration:
 
 ```json
-{"host_url": "http://rti-fsp01:5001", "plugins": [{"name": "io", "url": "http://dr-panel:9000/plugin"}]}
+{"host_url": "http://rti-fsp01:5001", "plugins": [{"name": "dr_panel", "url": "http://dr-panel:9000/plugin"}]}
 ```
 
 ## Their own stacks

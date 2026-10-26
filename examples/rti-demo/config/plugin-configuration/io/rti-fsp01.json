@@ -2,7 +2,7 @@
   "host_url": "http://rti-fsp01:5001",
   "plugins": [
     {
-      "name": "io",
+      "name": "dr_panel",
       "url": "http://dr-panel:9000/plugin"
     }
   ]

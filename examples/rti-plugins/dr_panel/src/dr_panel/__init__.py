@@ -18,7 +18,8 @@
 """The rti-demo's IO plugin for the Raspberry Pi (decisions 0018, 0029, 0030, 0038).
 
 - dr_panel.server: the IO server, GPIO and I2C devices behind the REST API
-  /api/io (python -m dr_panel.server.main, or the script dr-panel). The role is "io".
+  /api/io (python -m dr_panel.server.main, or the script dr-panel). The role is "io";
+  the plugin name "dr_panel" (decision 0040).
 - dr_panel.plugin: the plugin API under /plugin, which the FSP and SO connect
   to, and io_mapping.json, which says what the devices show.
 """

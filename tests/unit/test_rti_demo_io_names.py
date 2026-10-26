@@ -62,6 +62,26 @@ def test_the_io_server_code_is_dr_panel(old):
     ] == []
 
 
+@pytest.mark.parametrize(
+    "pattern", [r"/api/plugins/io\b", r"""["']name["']\s*:\s*["']io["']""", r"name: 'io'"]
+)
+def test_the_io_plugin_name_is_dr_panel(pattern):
+    # Decision 0040 renamed the plugin io to dr_panel, and its routes
+    # /api/plugins/io to /api/plugins/dr_panel; the role keeps io.
+    found = subprocess.run(
+        ["git", "grep", "-l", "-P", pattern],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+    assert [
+        f
+        for f in found
+        if not f.startswith("docs/rti-demo/decisions/")
+        and f != "tests/unit/test_rti_demo_io_names.py"
+    ] == []
+
+
 # Links to decision 0034 keep the file name it was written with.
 DECISION_0034 = "0034-demo-stack-plugins-sim-leds-io-opt-in.md"
 

@@ -10,10 +10,10 @@ import { EditorView } from '@codemirror/view';
 import PluginsPanel from './PluginsPanel';
 
 const STATUS = {
-  plugins: [{ name: 'io', version: '1.2', url: 'http://dr-panel:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], routes: true, healthy: true, last_error: null }],
+  plugins: [{ name: 'dr_panel', version: '1.2', url: 'http://dr-panel:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], routes: true, healthy: true, last_error: null }],
   failed: { display: "Can't reach http://pi:8000/plugin" },
   definitions: {
-    io: { url: 'http://dr-panel:9000/plugin', settings: {} },
+    dr_panel: { url: 'http://dr-panel:9000/plugin', settings: {} },
     display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } },
   },
 };
@@ -53,7 +53,7 @@ describe('PluginsPanel', () => {
   it("lists the FSP's plugins, unreachable ones with the reason, and its claims", async () => {
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
 
-    const io = await screen.findByTestId('plugin-row-io');
+    const io = await screen.findByTestId('plugin-row-dr_panel');
     expect(within(io).getByText('Healthy')).toBeInTheDocument();
     expect(within(io).getByTitle('LD0/CSWI1.Pos.Oper.ctlVal').textContent).toBe('1');
     const display = screen.getByTestId('plugin-row-display');
@@ -64,7 +64,7 @@ describe('PluginsPanel', () => {
 
   it('has no Controls column on the SO, whose plugins claim nothing', async () => {
     render(<PluginsPanel target="rti-so:5000" role="so" />);
-    await screen.findByTestId('plugin-row-io');
+    await screen.findByTestId('plugin-row-dr_panel');
     expect(screen.queryByText('Controls')).not.toBeInTheDocument();
   });
 
@@ -79,9 +79,9 @@ describe('PluginsPanel', () => {
   it("reloads a plugin by name, through the instance's management route", async () => {
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Reload io'));
+    await user.click(await screen.findByTitle('Reload dr_panel'));
 
-    await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'POST', path: '/api/plugins/io/reload' })));
+    await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'POST', path: '/api/plugins/dr_panel/reload' })));
   });
 
   it('retries an unreachable plugin now, with the same reload', async () => {
@@ -109,7 +109,7 @@ describe('PluginsPanel', () => {
   it('has no Retry button while every plugin is healthy', async () => {
     mockBff({ 'GET /api/plugins': { status: 200, body: { ok: true, result: { plugins: STATUS.plugins, failed: {} } } } });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await screen.findByTestId('plugin-row-io');
+    await screen.findByTestId('plugin-row-dr_panel');
     expect(screen.queryByRole('button', { name: /^Retry \d+ plugin/ })).not.toBeInTheDocument();
   });
 
@@ -121,36 +121,36 @@ describe('PluginsPanel', () => {
     mockBff({ 'GET /api/plugins': { status: 200, body: { ok: true, result: status } } });
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Details io'));
+    await user.click(await screen.findByTitle('Details dr_panel'));
 
-    const details = screen.getByTestId('plugin-details-io');
+    const details = screen.getByTestId('plugin-details-dr_panel');
     expect(details).toHaveTextContent('LD0/CSWI1.Pos.Oper.ctlVal');
-    expect(details).toHaveTextContent('/api/plugins/io/');
+    expect(details).toHaveTextContent('/api/plugins/dr_panel/');
     expect(details).toHaveTextContent('IO server');
     expect(details).toHaveTextContent('http://dr-panel:9000');
     expect(details).toHaveTextContent('attached timed out after 1.0s');
 
     await user.click(screen.getByTitle('Details display'));
     expect(screen.getByTestId('plugin-details-display')).toHaveTextContent('"rotate": 90');
-    await user.click(screen.getByTitle('Details io'));
-    expect(screen.queryByTestId('plugin-details-io')).not.toBeInTheDocument();
+    await user.click(screen.getByTitle('Details dr_panel'));
+    expect(screen.queryByTestId('plugin-details-dr_panel')).not.toBeInTheDocument();
   });
 
   it('sends a request to a plugin route from its details, and shows the answer', async () => {
-    mockBff({ 'GET /api/plugins/io/leds/1?on=1&color=red': { status: 200, body: { ok: true, result: { leds: [{ name: 'red', on: true }] } } } });
+    mockBff({ 'GET /api/plugins/dr_panel/leds/1?on=1&color=red': { status: 200, body: { ok: true, result: { leds: [{ name: 'red', on: true }] } } } });
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Details io'));
+    await user.click(await screen.findByTitle('Details dr_panel'));
 
-    const form = screen.getByRole('form', { name: 'Request to io' });
+    const form = screen.getByRole('form', { name: 'Request to dr_panel' });
     await user.type(within(form).getByLabelText('Path'), 'leds/1');
     await user.type(within(form).getByLabelText('Query'), 'on=1&color=red');
     await user.click(within(form).getByRole('button', { name: 'Send' }));
 
-    const answer = await screen.findByTestId('plugin-answer-io');
+    const answer = await screen.findByTestId('plugin-answer-dr_panel');
     expect(answer).toHaveTextContent('OK');
     expect(answer).toHaveTextContent('"name": "red"');
-    expect(calls).toContainEqual(expect.objectContaining({ target: 'rti-fsp01:5001', method: 'GET', path: '/api/plugins/io/leds/1?on=1&color=red' }));
+    expect(calls).toContainEqual(expect.objectContaining({ target: 'rti-fsp01:5001', method: 'GET', path: '/api/plugins/dr_panel/leds/1?on=1&color=red' }));
   });
 
   it('has no request form for a plugin without routes', async () => {
@@ -158,39 +158,39 @@ describe('PluginsPanel', () => {
     mockBff({ 'GET /api/plugins': { status: 200, body: { ok: true, result: status } } });
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Details io'));
-    expect(screen.queryByRole('form', { name: 'Request to io' })).not.toBeInTheDocument();
+    await user.click(await screen.findByTitle('Details dr_panel'));
+    expect(screen.queryByRole('form', { name: 'Request to dr_panel' })).not.toBeInTheDocument();
   });
 
   it('asks before a request that may change the plugin, and sends its JSON body', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Details io'));
-    const form = screen.getByRole('form', { name: 'Request to io' });
+    await user.click(await screen.findByTitle('Details dr_panel'));
+    const form = screen.getByRole('form', { name: 'Request to dr_panel' });
     await user.selectOptions(within(form).getByLabelText('Method'), 'POST');
     await user.type(within(form).getByLabelText('Path'), 'leds');
     await user.click(await screen.findByRole('textbox', { name: 'Body (JSON)' }));
     await user.keyboard('{{"on": true}');
 
     await user.click(within(form).getByRole('button', { name: 'Send' }));
-    expect(confirm).toHaveBeenLastCalledWith("POST /api/plugins/io/leds may change the plugin's state. Send?");
-    expect(calls.filter((c) => c.path === '/api/plugins/io/leds')).toEqual([]);
+    expect(confirm).toHaveBeenLastCalledWith("POST /api/plugins/dr_panel/leds may change the plugin's state. Send?");
+    expect(calls.filter((c) => c.path === '/api/plugins/dr_panel/leds')).toEqual([]);
 
     await user.click(within(form).getByRole('button', { name: 'Send' }));
-    await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'POST', path: '/api/plugins/io/leds', body: { on: true } })));
+    await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'POST', path: '/api/plugins/dr_panel/leds', body: { on: true } })));
   });
 
   it("shows the instance's error as the answer when the plugin route fails", async () => {
-    mockBff({ 'GET /api/plugins/io/nope': { status: 500, body: { detail: '404 Client Error: Not Found for url: http://dr-panel:5001/api/plugins/io/nope' } } });
+    mockBff({ 'GET /api/plugins/dr_panel/nope': { status: 500, body: { detail: '404 Client Error: Not Found for url: http://dr-panel:5001/api/plugins/dr_panel/nope' } } });
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Details io'));
-    const form = screen.getByRole('form', { name: 'Request to io' });
+    await user.click(await screen.findByTitle('Details dr_panel'));
+    const form = screen.getByRole('form', { name: 'Request to dr_panel' });
     await user.type(within(form).getByLabelText('Path'), 'nope');
     await user.click(within(form).getByRole('button', { name: 'Send' }));
 
-    const answer = await screen.findByTestId('plugin-answer-io');
+    const answer = await screen.findByTestId('plugin-answer-dr_panel');
     expect(answer).toHaveTextContent('Failed');
     expect(answer).toHaveTextContent('404 Client Error');
   });
@@ -198,8 +198,8 @@ describe('PluginsPanel', () => {
   it("refuses POST reload as a plugin route, without calling the instance", async () => {
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Details io'));
-    const form = screen.getByRole('form', { name: 'Request to io' });
+    await user.click(await screen.findByTitle('Details dr_panel'));
+    const form = screen.getByRole('form', { name: 'Request to dr_panel' });
     await user.selectOptions(within(form).getByLabelText('Method'), 'POST');
     await user.type(within(form).getByLabelText('Path'), 'reload');
     await user.click(within(form).getByRole('button', { name: 'Send' }));
@@ -211,11 +211,11 @@ describe('PluginsPanel', () => {
   it('keeps the request and its answer when the details are closed and opened again', async () => {
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Details io'));
-    await user.type(within(screen.getByRole('form', { name: 'Request to io' })).getByLabelText('Path'), 'leds');
-    await user.click(screen.getByTitle('Details io'));
-    await user.click(screen.getByTitle('Details io'));
-    expect(within(screen.getByRole('form', { name: 'Request to io' })).getByLabelText('Path')).toHaveValue('leds');
+    await user.click(await screen.findByTitle('Details dr_panel'));
+    await user.type(within(screen.getByRole('form', { name: 'Request to dr_panel' })).getByLabelText('Path'), 'leds');
+    await user.click(screen.getByTitle('Details dr_panel'));
+    await user.click(screen.getByTitle('Details dr_panel'));
+    expect(within(screen.getByRole('form', { name: 'Request to dr_panel' })).getByLabelText('Path')).toHaveValue('leds');
   });
 
   it('copies a plugin as a plugin configuration entry', async () => {
@@ -232,9 +232,9 @@ describe('PluginsPanel', () => {
     const user = userEvent.setup({ delay: null });
     vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('not allowed'));
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Copy io as configuration'));
+    await user.click(await screen.findByTitle('Copy dr_panel as configuration'));
 
-    expect(JSON.parse((await screen.findByTestId('plugins-config-entry')).textContent)).toEqual({ name: 'io', url: 'http://dr-panel:9000/plugin' });
+    expect(JSON.parse((await screen.findByTestId('plugins-config-entry')).textContent)).toEqual({ name: 'dr_panel', url: 'http://dr-panel:9000/plugin' });
     await user.click(screen.getByTitle('Dismiss'));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
@@ -243,9 +243,9 @@ describe('PluginsPanel', () => {
     const user = userEvent.setup({ delay: null });
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Remove io'));
+    await user.click(await screen.findByTitle('Remove dr_panel'));
 
-    await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'DELETE', path: '/api/plugins/io' })));
+    await waitFor(() => expect(calls).toContainEqual(expect.objectContaining({ method: 'DELETE', path: '/api/plugins/dr_panel' })));
   });
 
   it("adds a plugin from a URL, and shows the instance's reason when it refuses", async () => {
@@ -257,7 +257,7 @@ describe('PluginsPanel', () => {
     });
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await screen.findByTestId('plugin-row-io');
+    await screen.findByTestId('plugin-row-dr_panel');
 
     await user.click(screen.getByRole('button', { name: 'Add plugin' }));
     await user.type(document.getElementById('plugins-add-name'), 'x');
@@ -307,15 +307,15 @@ describe('PluginsPanel', () => {
 
   it("keeps the form open with the instance's reason when an edit is refused", async () => {
     mockBff({
-      'PUT /api/plugins/io': { status: 500, body: { ok: false, error: "422 Client Error - Can't reach http://x/plugin" } },
+      'PUT /api/plugins/dr_panel': { status: 500, body: { ok: false, error: "422 Client Error - Can't reach http://x/plugin" } },
     });
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await user.click(await screen.findByTitle('Edit io'));
+    await user.click(await screen.findByTitle('Edit dr_panel'));
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Edit io failed: 422 Client Error - Can't reach http://x/plugin");
-    expect(screen.getByRole('form', { name: 'Edit io' })).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent("Edit dr_panel failed: 422 Client Error - Can't reach http://x/plugin");
+    expect(screen.getByRole('form', { name: 'Edit dr_panel' })).toBeInTheDocument();
   });
 
   // The BFF's connections, as App.jsx passes them; rti-fsp02 has display already.
@@ -345,50 +345,50 @@ describe('PluginsPanel', () => {
   it('offers only FSPs for a plugin with claims', async () => {
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" instances={INSTANCES} />);
-    await user.click(await screen.findByTitle('Add io to another SO or FSP'));
+    await user.click(await screen.findByTitle('Add dr_panel to another SO or FSP'));
     expect(addToOptions().map((o) => o.value)).toEqual(['rti-fsp02:5005']);
-    expect(screen.getByRole('form', { name: 'Add io to another instance' }).textContent).toMatch(/only FSPs are offered/);
+    expect(screen.getByRole('form', { name: 'Add dr_panel to another instance' }).textContent).toMatch(/only FSPs are offered/);
   });
 
   it('adds the plugin to the chosen instance, with its definition', async () => {
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" instances={INSTANCES} />);
-    await user.click(await screen.findByTitle('Add io to another SO or FSP'));
+    await user.click(await screen.findByTitle('Add dr_panel to another SO or FSP'));
     await user.click(screen.getByRole('button', { name: 'Add to instance' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Added io to rti-fsp02.');
+    expect(await screen.findByRole('status')).toHaveTextContent('Added dr_panel to rti-fsp02.');
     expect(calls).toContainEqual(expect.objectContaining({
-      target: 'rti-fsp02:5005', method: 'POST', path: '/api/plugins', body: { name: 'io', url: 'http://dr-panel:9000/plugin', settings: {} },
+      target: 'rti-fsp02:5005', method: 'POST', path: '/api/plugins', body: { name: 'dr_panel', url: 'http://dr-panel:9000/plugin', settings: {} },
     }));
     expect(screen.queryByRole('form')).not.toBeInTheDocument();
   });
 
   it("keeps the form open with the other instance's reason when it refuses", async () => {
     mockBff({
-      'POST /api/plugins': { status: 500, body: { ok: false, error: "409 Client Error - 'LD0/CSWI1.Pos.Oper.ctlVal' is claimed by io" } },
+      'POST /api/plugins': { status: 500, body: { ok: false, error: "409 Client Error - 'LD0/CSWI1.Pos.Oper.ctlVal' is claimed by dr_panel" } },
     });
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" instances={INSTANCES} />);
-    await user.click(await screen.findByTitle('Add io to another SO or FSP'));
+    await user.click(await screen.findByTitle('Add dr_panel to another SO or FSP'));
     await user.click(screen.getByRole('button', { name: 'Add to instance' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Add io to rti-fsp02 failed: 409 Client Error - 'LD0/CSWI1.Pos.Oper.ctlVal' is claimed by io");
-    expect(screen.getByRole('form', { name: 'Add io to another instance' })).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent("Add dr_panel to rti-fsp02 failed: 409 Client Error - 'LD0/CSWI1.Pos.Oper.ctlVal' is claimed by dr_panel");
+    expect(screen.getByRole('form', { name: 'Add dr_panel to another instance' })).toBeInTheDocument();
   });
 
   it("can't edit without definitions, from an older instance", async () => {
     mockBff({ 'GET /api/plugins': { status: 200, body: { ok: true, result: { plugins: STATUS.plugins, failed: {} } } } });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await screen.findByTestId('plugin-row-io');
-    expect(screen.getByTitle(/^Edit io/)).toBeDisabled();
-    expect(screen.getByTitle(/^Copy io as configuration/)).toBeDisabled();
-    expect(screen.getByTitle(/^Add io to another SO or FSP/)).toBeDisabled();
+    await screen.findByTestId('plugin-row-dr_panel');
+    expect(screen.getByTitle(/^Edit dr_panel/)).toBeDisabled();
+    expect(screen.getByTitle(/^Copy dr_panel as configuration/)).toBeDisabled();
+    expect(screen.getByTitle(/^Add dr_panel to another SO or FSP/)).toBeDisabled();
   });
 
   it('refuses settings that are not JSON, without calling the instance', async () => {
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
-    await screen.findByTestId('plugin-row-io');
+    await screen.findByTestId('plugin-row-dr_panel');
     await user.click(screen.getByRole('button', { name: 'Add plugin' }));
     await user.type(document.getElementById('plugins-add-name'), 'x');
     await user.type(document.getElementById('plugins-add-url'), 'http://x/plugin');

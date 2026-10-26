@@ -77,7 +77,7 @@ in `GET /api/plugins`, as `attached` and `attached_error`. A plugin that doesn't
 with `attached_error`; it stays healthy.
 
 **Routes**: when the description has `routes` (a URL, or a path on the plugin's server), every request under
-`/api/plugins/<name>/` is passed on to it. The IO server gives `/api/io`, so `/api/plugins/io/leds` reaches its
+`/api/plugins/<name>/` is passed on to it. The IO server gives `/api/io`, so `/api/plugins/dr_panel/leds` reaches its
 `/api/io/leds`.
 
 ## Configuring plugins
@@ -88,7 +88,7 @@ An FSP or SO connects to the plugins in its **plugin configuration** at startup:
 {
   "host_url": "http://rti-fsp01:5001",
   "plugins": [
-    {"name": "io", "url": "http://dr-panel:9000/plugin", "settings": {}},
+    {"name": "dr_panel", "url": "http://dr-panel:9000/plugin", "settings": {}},
     {"name": "historian", "url": "http://historian:8000/acsi-plugin", "settings": {"retention_days": 30}}
   ]
 }
@@ -112,11 +112,11 @@ default, the IO server in `io/` with the overlay `docker-compose.io.yaml`) and `
 ```bash
 curl http://localhost:5001/api/plugins                          # connected plugins, health; failed: not (yet) connected;
                                                                 # definitions: each one's url and settings
-curl http://localhost:5001/api/plugins/io/leds                  # a route of the plugin
-curl -X PUT http://localhost:5001/api/plugins/io -H 'Content-Type: application/json' \
+curl http://localhost:5001/api/plugins/dr_panel/leds                  # a route of the plugin
+curl -X PUT http://localhost:5001/api/plugins/dr_panel -H 'Content-Type: application/json' \
   -d '{"settings": {"write_inputs": false}}'                    # edit: new url and/or settings; the rest stays
-curl -X POST http://localhost:5001/api/plugins/io/reload        # describe and start again; settings stay
-curl -X DELETE http://localhost:5001/api/plugins/io             # stop it until the next start
+curl -X POST http://localhost:5001/api/plugins/dr_panel/reload        # describe and start again; settings stay
+curl -X DELETE http://localhost:5001/api/plugins/dr_panel             # stop it until the next start
 
 # Add one until the FSP stops, from an allowed source
 curl -X POST http://localhost:5001/api/plugins -H 'Content-Type: application/json' \

@@ -19,8 +19,8 @@ from dr_panel.server.io_controller import IOController
 
 pytestmark = pytest.mark.unit
 
-FSP = {"name": "io", "role": "fsp", "host_url": "http://fsp.test:5001"}
-SO = {"name": "io", "role": "so", "host_url": "http://so.test:5000"}
+FSP = {"name": "dr_panel", "role": "fsp", "host_url": "http://fsp.test:5001"}
+SO = {"name": "dr_panel", "role": "so", "host_url": "http://so.test:5000"}
 
 
 class Led:
@@ -97,7 +97,7 @@ def sets(plugin):
 def test_it_describes_itself():
     client = TestClient(create_fastapi_app(IOController()))
     body = client.get("/plugin").json()
-    assert body["name"] == "io"
+    assert body["name"] == "dr_panel"
     assert body["api"] == 2
     assert body["claims"] == []
     assert body["routes"] == "/api/io"
@@ -123,7 +123,7 @@ def test_an_fsp_connects_to_it_through_its_plugin_configuration():
     host = PluginHost(role="fsp", host_url="http://fsp.test:5001")
     service = PluginService(
         host,
-        configured=[PluginEntry("io", "http://dr-panel:9000/plugin")],
+        configured=[PluginEntry("dr_panel", "http://dr-panel:9000/plugin")],
         client_factory=client,
         retry_seconds=0,
     )
@@ -131,14 +131,14 @@ def test_an_fsp_connects_to_it_through_its_plugin_configuration():
     attach(app, service)
     with TestClient(app) as fsp:
         [status] = fsp.get("/api/plugins").json()["plugins"]
-        assert (status["name"], status["routes"]) == ("io", True)
+        assert (status["name"], status["routes"]) == ("dr_panel", True)
         # Its routes are this server's /api/io.
-        assert fsp.get("/api/plugins/io/health").status_code == 200
+        assert fsp.get("/api/plugins/dr_panel/health").status_code == 200
         for f in host.emit(Associated("cp1")):
             f.result(5)
-        assert fsp.get("/api/plugins/io").json()["healthy"] is True
+        assert fsp.get("/api/plugins/dr_panel").json()["healthy"] is True
         hosts = TestClient(io_app).get("/plugin/mappings").json()["hosts"]
-    assert hosts == [{"name": "io", "role": "fsp", "host_url": "http://fsp.test:5001"}]
+    assert hosts == [{"name": "dr_panel", "role": "fsp", "host_url": "http://fsp.test:5001"}]
 
 
 # ==================== Start and stop: where inputs go ====================
