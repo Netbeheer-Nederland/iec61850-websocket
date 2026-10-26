@@ -47,6 +47,12 @@ management route there (`.../disable`, `.../check`, `.../last_error`) hides a pl
 
 Recommended: 2, since the list of actions is growing and plugins are written by third parties.
 
+## Configuration
+
+| Spec | What | Changes | Status |
+|---|---|---|---|
+| [0008](0008-hmi-log-level.md) | The HMI takes `LOG_LEVEL` and `--log-level`, as the FSP, SO and BFF do | HMI | draft |
+
 ## Format
 
 Each spec has: Status and Date; Goal; Now (how it is today); Proposal (per part that changes); Acceptance; Tests;
