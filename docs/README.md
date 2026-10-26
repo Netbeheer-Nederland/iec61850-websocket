@@ -33,7 +33,7 @@ docs/
 │  └─ media/                              # figures referenced by the spec
 ├─ rti-demo/                              # the RTI demo as a whole
 │  ├─ README.md                           #   system overview: components, communication, data model, flows
-│  ├─ design/                             #   HMI style guide, log kinds, playbook design, wireframe, whiteboard
+│  ├─ design/                             #   HMI style guide, log kinds, playbook design, wireframe, architecture diagram
 │  ├─ decisions/                          #   architecture decision records (why it is built this way)
 │  └─ images/                             #   architecture diagrams (also used by the module READMEs)
 ├─ scl/
