@@ -70,7 +70,8 @@ IEC61850Client  <-- ACSI services, reports -->  IEC61850Server
   [docs/architecture/data-model-architecture.md](docs/architecture/data-model-architecture.md)).
 - `ws61850.asn1` and `ws61850.protocol` encode and decode the messages defined by the ASN.1 schema.
 - The RTI demo in `examples/rti-demo` builds a complete system on top: RTI-FSP (IEC 61850 server), RTI-SO (IEC 61850
-  client), a BFF and a React HMI, with plugins for LEDs and a Raspberry Pi's devices. Its
+  client), a BFF, and a React HMI. Plugins in `examples/rti-plugins` connect to the FSPs and SO over HTTP: dr_leds
+  (two simulated LEDs, the default) and dr_panel (a Raspberry Pi's LEDs, buttons, potentiometers, and displays). Its
   [system overview](docs/rti-demo/README.md) has the diagrams of each part.
 
 ![RTI demo system architecture overview](docs/rti-demo/images/RTI_Demo_System_Architecture_Overview.png)
@@ -81,7 +82,7 @@ IEC61850Client  <-- ACSI services, reports -->  IEC61850Server
 
 ```
 iec61850-websocket/
-├─ pyproject.toml, uv.lock         # uv workspace: ws61850 plus the rti-demo bff, fsp and so modules
+├─ pyproject.toml, uv.lock         # uv workspace: ws61850 plus the rti-demo bff, fsp, so and plugins modules
 ├─ src/ws61850/
 │  ├─ endpoint/                    # PassiveEndpoint / ActiveEndpoint, association handling, routing
 │  ├─ transport/                   # WebSocket transport, reconnect policy, sessions, auth strategies
@@ -100,10 +101,14 @@ iec61850-websocket/
 │  ├─ performance/                 # FT20-FT23 encoding, multiple clients, OAuth + TLS
 │  └─ security/                    # FT30-FT31 TLS and OAuth
 ├─ testing/                        # test support: certificates, IED models, helpers
-├─ examples/                       # library examples and the RTI demo (see examples/README.md)
+├─ examples/                       # library examples, the RTI demo and its plugins (see examples/README.md)
+│  ├─ rti-demo/                    # RTI-FSP, RTI-SO, BFF, HMI and the plugin host
+│  └─ rti-plugins/                 # dr_leds and dr_panel, each its own uv project and image
 ├─ docs/                           # getting started, architecture, protocol specification, the RTI demo's
 │                                  # overview, design and decisions (see docs/README.md)
-└─ scripts/keycloak/               # Keycloak (IDP-Server) for the OAuth scenarios
+└─ scripts/
+   ├─ keycloak/                    # Keycloak (IDP-Server) for the OAuth scenarios
+   └─ smoke-test.sh                # the first-run check of docs/getting-started.md, also run in CI
 ```
 
 ---
@@ -136,7 +141,6 @@ iec61850-websocket/
 If the prerequisites are already installed, the environment can be set up using the following commands:
 
 ```shell
-# Clone the repository
 # 1. Clone and enter the project
 git clone https://github.com/Netbeheer-Nederland/iec61850-websocket.git
 cd iec61850-websocket
@@ -144,7 +148,7 @@ cd iec61850-websocket
 
 ```bash
 # 2. Create the virtual environment and install the dependencies,
-#    including the rti-demo's bff, fsp and so modules
+#    including the rti-demo's bff, fsp, so and plugins modules
 uv venv
 uv sync --all-packages
 ```
@@ -162,7 +166,11 @@ The unit tests run in CI and are the quickest check that everything works:
 
 ```bash
 uv run pytest tests/unit -q
+scripts/smoke-test.sh          # an example server and client associate and exchange a directory request
 ```
+
+The RTI demo's modules and plugins have their own tests; [examples/rti-demo/TESTING.md](examples/rti-demo/TESTING.md)
+lists how to run each.
 
 The functional and performance scenarios in `tests/` are intended to be run from the repository root with `uv`.
 Start by installing dependencies with `uv sync`, then open the markdown description for the scenario you want to run in
@@ -185,14 +193,15 @@ describes how to run them in the [README](examples/README.md).
 
 ## Where next
 
-| You want to... | Read |
-|---|---|
-| install and verify the project | [docs/getting-started.md](docs/getting-started.md) |
-| understand or change the library | [docs/architecture/](docs/architecture/README.md) |
-| run the examples or the RTI demo | [examples/README.md](examples/README.md), [examples/rti-demo/README.md](examples/rti-demo/README.md) |
-| understand how the RTI demo is built, and why | [docs/rti-demo/README.md](docs/rti-demo/README.md) (system overview), [docs/rti-demo/decisions/](docs/rti-demo/decisions/README.md) (decision records) |
-| read the protocol | [docs/protocol_specification/](docs/protocol_specification/RTI_2.0_Protocol_Specification.md) |
-| contribute a change | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| You want to...                                | Read                                                                                                                                                                                                                                                    |
+|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| install and verify the project                | [docs/getting-started.md](docs/getting-started.md)                                                                                                                                                                                                      |
+| understand or change the library              | [docs/architecture/](docs/architecture/README.md)                                                                                                                                                                                                       |
+| run the examples or the RTI demo              | [examples/README.md](examples/README.md), [examples/rti-demo/README.md](examples/rti-demo/README.md)                                                                                                                                                    |
+| understand how the RTI demo is built, and why | [docs/rti-demo/README.md](docs/rti-demo/README.md) (system overview, diagrams, design), [docs/rti-demo/decisions/](docs/rti-demo/decisions/README.md) (decision records), [docs/rti-demo/specs/](docs/rti-demo/specs/README.md) (changes not built yet) |
+| write a plugin for the FSP and SO             | [examples/rti-demo/modules/plugins/GETTING_STARTED.md](examples/rti-demo/modules/plugins/GETTING_STARTED.md), [examples/rti-plugins/README.md](examples/rti-plugins/README.md)                                                                          |
+| read the protocol                             | [docs/protocol_specification/](docs/protocol_specification/RTI_2.0_Protocol_Specification.md)                                                                                                                                                           |
+| contribute a change                           | [CONTRIBUTING.md](CONTRIBUTING.md)                                                                                                                                                                                                                      |
 
 ## Contributing
 
