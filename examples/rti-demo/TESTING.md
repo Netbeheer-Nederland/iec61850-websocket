@@ -61,7 +61,7 @@ use `--all-packages`, or `--package <name>` for just one module, to get
 
 The plugins in `examples/rti-plugins` are deliberately **not** part of
 this workspace: each is its own uv project, and the FSP and SO connect to
-them over HTTP (decisions 0028-0030). The IO plugin (`examples/rti-plugins/rpi_io`)
+them over HTTP (decisions 0028-0030). The IO plugin (`examples/rti-plugins/dr_panel`)
 also needs Raspberry Pi GPIO/I2C hardware packages.
 It builds via its own fully independent
 Docker-stage venv (its `docker/Dockerfile`), since its
@@ -82,7 +82,7 @@ uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m 
 # sample plugin. They aren't workspace members; the IO plugin's tests need
 # FastAPI and the plugin host, so they run in the fsp environment.
 # sim_leds runs in the plugin host's environment, which its tests connect.
-uv run --package fsp pytest examples/rti-plugins/rpi_io/tests -m unit -q
+uv run --package fsp pytest examples/rti-plugins/dr_panel/tests -m unit -q
 uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q
 ```
 
@@ -148,10 +148,10 @@ examples/rti-demo/modules/
 
 examples/rti-plugins/ (decisions 0028-0030); not workspace members - see above
 ├── io/         # the IO plugin
-│   ├── pyproject.toml, uv.lock   # project rpi-io (decision 0023)
+│   ├── pyproject.toml, uv.lock   # project dr-panel (decision 0038)
 │   ├── docker-compose.yaml, docker-compose.pi.yaml   # its own stack; the Pi's devices
-│   ├── src/rpi_io/server/        # the IO server
-│   ├── src/rpi_io/plugin/        # plugin.py, mapping.py, io_mapping.json: the plugin API
+│   ├── src/dr_panel/server/        # the IO server
+│   ├── src/dr_panel/plugin/        # plugin.py, mapping.py, io_mapping.json: the plugin API
 │   └── tests/test_plugin.py, test_no_plugin_files.py, test_server_config.py,
 │       test_project.py, test_pins.py
 └── sim_leds/   # a sample plugin (modules/plugins/GETTING_STARTED.md)
@@ -277,7 +277,7 @@ rm -rf dist
   && (uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q) \
   && (uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q) \
   && (uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q) \
-  && (uv run --package fsp pytest examples/rti-plugins/rpi_io/tests -m unit -q) \
+  && (uv run --package fsp pytest examples/rti-plugins/dr_panel/tests -m unit -q) \
   && (uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q) \
   && (cd examples/rti-demo/modules/hmi && npm test) \
   && (cd examples/rti-demo/modules/hmi && npx vite build && rm -rf dist)

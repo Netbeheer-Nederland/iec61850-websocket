@@ -174,7 +174,7 @@ The FSPs and SO connect to the plugins in their plugin configuration, `config/pl
 | Overlay | Plugins | Needs |
 |---|---|---|
 | `docker-compose.leds.yaml` (default) | One [`sim_leds`](../rti-plugins/sim_leds/README.md) each (`sim-leds-fsp01`, `sim-leds-fsp02`, `sim-leds-so`): two simulated LEDs that follow the association, Operates, writes and reports | nothing |
-| `docker-compose.io.yaml` | One IO server for all three, `rpi-io` (`http://rpi-io:9000/plugin`), from `config/plugin-configuration/io/` | nothing; on the Raspberry Pi also `-f ../rti-plugins/rpi_io/docker-compose.pi.yaml` for its devices (below) |
+| `docker-compose.io.yaml` | One IO server for all three, `dr-panel` (`http://dr-panel:9000/plugin`), from `config/plugin-configuration/io/` | nothing; on the Raspberry Pi also `-f ../rti-plugins/dr_panel/docker-compose.pi.yaml` for its devices (below) |
 
 Without either overlay the FSPs and SO list `sim_leds` as failed, show a red plugin badge, and try again every 10 s;
 the rest of the demo works.
@@ -191,28 +191,28 @@ whole lab network (`http://192.168.0.*:8000`, any Pi there on port 8000), or emp
 
 ### The IO server (Raspberry Pi)
 
-The IO server, `rpi-io`, isn't part of `docker-compose.yml`: it is meant for the Raspberry Pi and has its own compose file in
-[`examples/rti-plugins/rpi_io`](../rti-plugins/rpi_io/README.md) (decision
+The IO server, `dr-panel`, isn't part of `docker-compose.yml`: it is meant for the Raspberry Pi and has its own compose file in
+[`examples/rti-plugins/dr_panel`](../rti-plugins/dr_panel/README.md) (decision
 [0028](../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)). It joins `rti-network` too, so the FSPs and SO reach
-it as `http://rpi-io:9000/plugin`. The FSPs and SO connect to it only with the overlay `docker-compose.io.yaml`;
-by default they use sim_leds. That overlay also runs `rpi-io` itself, so on a Pi that runs the whole demo one command
-does it (don't also start the stack below then: both are `rpi-io`):
+it as `http://dr-panel:9000/plugin`. The FSPs and SO connect to it only with the overlay `docker-compose.io.yaml`;
+by default they use sim_leds. That overlay also runs `dr-panel` itself, so on a Pi that runs the whole demo one command
+does it (don't also start the stack below then: both are `dr-panel`):
 
 ```shell
 cd examples/rti-demo
-docker compose -f docker-compose.yml -f docker-compose.io.yaml -f ../rti-plugins/rpi_io/docker-compose.pi.yaml up -d
+docker compose -f docker-compose.yml -f docker-compose.io.yaml -f ../rti-plugins/dr_panel/docker-compose.pi.yaml up -d
 ```
 
 To run the IO server on its own instead, for example apart from the demo stack:
 
 ```shell
-cd examples/rti-plugins/rpi_io
+cd examples/rti-plugins/dr_panel
 docker compose up -d                                                      # anywhere (mock mode)
 docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d     # on the Raspberry Pi
 ```
 
 Like every plugin ([0030](../../docs/rti-demo/decisions/0030-plugin-project-layout.md)), `docker-compose.yaml` runs
-anywhere and `docker-compose.pi.yaml` adds the Pi's devices to `rpi-io`, and the settings that only exist for them;
+anywhere and `docker-compose.pi.yaml` adds the Pi's devices to `dr-panel`, and the settings that only exist for them;
 Docker won't start a container whose device paths are missing. Without the overlay, devices whose hardware is missing
 log an error at startup and stay unavailable, except the I2C LCD, which runs in mock mode.
 
@@ -309,7 +309,7 @@ on the host. The BFF runs as `app` (uid 1000): the file and its directory must b
 
 On Raspberry Pis, the `io` service drives LEDs, LCDs, a button and two potentiometers, so the IEC 61850 exchange between
 RTI-FSP (ACSI server) and RTI-SO (ACSI client) becomes visible. It shows reporting, operate (control) and setpoints.
-FSP and SO each run their own `io` service and use the same mapping, the IO server's `../rti-plugins/rpi_io/src/rpi_io/plugin/io_mapping.json`:
+FSP and SO each run their own `io` service and use the same mapping, the IO server's `../rti-plugins/dr_panel/src/dr_panel/plugin/io_mapping.json`:
 
 | Device         | Mapped to                                    | Shows / does                                                   |
 |----------------|----------------------------------------------|----------------------------------------------------------------|
@@ -331,7 +331,7 @@ Demo flow:
 
 The IO server is a plugin of the FSP and SO: an HTTP service they connect to from their plugin configuration
 (decision [0029](../../docs/rti-demo/decisions/0029-plugins-are-http-services.md)). Compose configures it in
-`config/plugin-configuration/io/` as `http://rpi-io:9000/plugin`, used with the overlay `docker-compose.io.yaml`
+`config/plugin-configuration/io/` as `http://dr-panel:9000/plugin`, used with the overlay `docker-compose.io.yaml`
 (decision [0034](../../docs/rti-demo/decisions/0034-demo-stack-plugins-sim-leds-io-opt-in.md)), `launch.py` as
 `http://localhost:9000/plugin`. Each
 configuration also says where the IO server writes the button and potentiometers back to (`host_url`): the first FSP.
@@ -340,32 +340,32 @@ On two Raspberry Pis, point each side's configuration at its own `io` service (s
 [examples/rti-plugins](../rti-plugins/README.md). To write a plugin of your own, start with
 [modules/plugins/GETTING_STARTED.md](modules/plugins/GETTING_STARTED.md); the contract is
 [modules/plugins/openapi.yaml](modules/plugins/openapi.yaml).
-Wiring, pin numbers and the I2C LCD setup are in [rti-plugins/rpi_io/README.md](../rti-plugins/rpi_io/README.md).
+Wiring, pin numbers and the I2C LCD setup are in [rti-plugins/dr_panel/README.md](../rti-plugins/dr_panel/README.md).
 
 ## IO API Server
 
 The `io` service is a REST API (under `/api/io/`) for the LEDs, buttons, potentiometers and LCDs on a Raspberry Pi; it
 runs without the hardware too (see [The IO server (Raspberry Pi)](#the-io-server-raspberry-pi)). Its code is in
-[`examples/rti-plugins/rpi_io`](../rti-plugins/rpi_io/README.md).
+[`examples/rti-plugins/dr_panel`](../rti-plugins/dr_panel/README.md).
 
 ```bash
 # from examples/rti-demo
 uv run python launch.py io
 
 # in Docker, its own stack (add -f docker-compose.yaml -f docker-compose.pi.yaml on the Pi)
-cd ../rti-plugins/rpi_io && docker compose up rpi-io
+cd ../rti-plugins/dr_panel && docker compose up dr-panel
 
 # or directly, in the io project's own environment
-cd ../rti-plugins/rpi_io && uv run rpi-io
+cd ../rti-plugins/dr_panel && uv run dr-panel
 ```
 
-`launch.py io` runs `rpi_io` from `../rti-plugins/rpi_io/src` in the repository's environment
+`launch.py io` runs `dr_panel` from `../rti-plugins/dr_panel/src` in the repository's environment
 (`uv sync --all-packages`). The direct command uses the `io` project's own environment instead: `uv run` creates
-`.venv` in `rti-plugins/rpi_io` on first use and installs the Raspberry Pi packages there
+`.venv` in `rti-plugins/dr_panel` on first use and installs the Raspberry Pi packages there
 (`gpiod`, `gpiozero`, ...). Use it on a Raspberry Pi; where those packages don't install, use `launch.py io`.
 
 Devices, configuration (`io_config.json`), wiring, Raspberry Pi setup (GPIO, I2C, SPI) and troubleshooting are in
-[rti-plugins/rpi_io/README.md](../rti-plugins/rpi_io/README.md); the endpoints are in its OpenAPI docs at
+[rti-plugins/dr_panel/README.md](../rti-plugins/dr_panel/README.md); the endpoints are in its OpenAPI docs at
 http://localhost:9000/docs.
 It listens on 9000 however it's started (`PORT` overrides it).
 
@@ -375,7 +375,7 @@ It listens on 9000 however it's started (`PORT` overrides it).
 rti-demo/
 ├── launch.py                  # Main entry point
 ├── README.md                  # This file
-├── docker-compose.yml         # bff, hmi, fsp01, fsp02, so (rpi-io: its own stack)
+├── docker-compose.yml         # bff, hmi, fsp01, fsp02, so (dr-panel: its own stack)
 ├── docker-compose.leds.yaml   # overlay: a sim_leds per FSP and SO, the default plugins
 ├── docker-compose.io.yaml     # overlay: the FSPs and SO connect to the IO server instead
 ├── config/
@@ -391,7 +391,7 @@ rti-demo/
 
 rti-plugins/                   # the plugins the FSP and SO connect to (decisions 0028-0030)
 ├── io/          { pyproject.toml, docker-compose.yaml, docker-compose.pi.yaml, docker/Dockerfile,
-│                  scripts/, src/rpi_io/{server,plugin}/, tests/ }  # the IO plugin (Raspberry Pi)
+│                  scripts/, src/dr_panel/{server,plugin}/, tests/ }  # the IO plugin (Raspberry Pi)
 └── sim_leds/    { pyproject.toml, docker-compose.yaml, docker/Dockerfile,
                    src/sim_leds/{server,plugin}/, tests/ }          # a sample plugin (FastAPI)
 ```
@@ -415,7 +415,7 @@ uv add --package bff <package_name>
 ```
 
 After a dependency change, rebuild the images that use it (`docker compose build`). The `io` module is a separate uv
-project: run `uv add` and `uv lock` in `examples/rti-plugins/rpi_io`.
+project: run `uv add` and `uv lock` in `examples/rti-plugins/dr_panel`.
 
 ## Troubleshooting
 

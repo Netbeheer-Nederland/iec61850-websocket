@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # RTI Demo GPIO LED Control API Docker Image - Multi-stage
-# Build from the project root (examples/rti-plugins/rpi_io, decision 0030):
-#   docker build -f docker/Dockerfile -t rti-io .
+# Build from the project root (examples/rti-plugins/dr_panel, decision 0030):
+#   docker build -f docker/Dockerfile -t dr-panel .
 # Dockerfile.dockerignore, next to this file, applies to that build.
 
 # ============================================================
@@ -37,7 +37,7 @@ COPY pyproject.toml uv.lock /app/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv && uv sync --frozen --no-dev --no-install-project
 
-# The package rpi_io: the server and the plugin (decisions 0023, 0029, 0030).
+# The package dr_panel: the server and the plugin (decisions 0029, 0030, 0038).
 COPY README.md /app/
 COPY src/ /app/src/
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -105,5 +105,5 @@ EXPOSE 9000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:$PORT/api/io/health || exit 1
 
-# The script rpi-io (rpi_io.server.main) is in /app/.venv, which is first on PATH.
-CMD ["rpi-io"]
+# The script dr-panel (dr_panel.server.main) is in /app/.venv, which is first on PATH.
+CMD ["dr-panel"]

@@ -24,7 +24,7 @@ pytestmark = pytest.mark.unit
 IO = {
     "kind": "io",
     "label": "IO server",
-    "address": "http://rpi-io:9000",
+    "address": "http://dr-panel:9000",
     "state": "ok",
     "detail": "6 devices",
     "live": [

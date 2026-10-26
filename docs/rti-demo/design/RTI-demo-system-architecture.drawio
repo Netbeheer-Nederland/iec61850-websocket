@@ -714,7 +714,7 @@
         <mxCell id="n16" parent="1" vertex="1" value="&lt;b&gt;RTI-FSP02&lt;/b&gt;&lt;br&gt;ACSI server · WebSocket active&lt;br&gt;REST 5005&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;plugin host&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
           <mxGeometry x="800" y="430" width="280" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="n17" parent="1" vertex="1" value="&lt;b&gt;rpi-io&lt;/b&gt; (opt-in)&lt;br&gt;IO server + plugin &lt;i&gt;io&lt;/i&gt;&lt;br&gt;:9000/plugin · routes /api/io&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;docker-compose.io.yaml: one for the FSPs and SO, instead of sim_leds&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=#8b3cb8;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;dashed=1;">
+        <mxCell id="n17" parent="1" vertex="1" value="&lt;b&gt;dr-panel&lt;/b&gt; (opt-in)&lt;br&gt;IO server + plugin &lt;i&gt;io&lt;/i&gt;&lt;br&gt;:9000/plugin · routes /api/io&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;docker-compose.io.yaml: one for the FSPs and SO, instead of sim_leds&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=#8b3cb8;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;dashed=1;">
           <mxGeometry x="60" y="690" width="270" height="125" as="geometry" />
         </mxCell>
         <mxCell id="n19" parent="1" vertex="1" value="&lt;b&gt;sim-leds-so&lt;/b&gt;&lt;br&gt;plugin &lt;i&gt;sim_leds&lt;/i&gt;&lt;br&gt;:8099/plugin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
@@ -729,7 +729,7 @@
         <mxCell id="n22" parent="1" vertex="1" value="&lt;b&gt;Default&lt;/b&gt;: docker-compose.leds.yaml, one sim_leds per instance (two simulated LEDs, no hardware). &lt;b&gt;FSP / SO → plugin&lt;/b&gt;: GET / (describe) · POST /start · /stop · /events · /control (FSP: Operates on claimed objRefs) · GET /attached. &lt;b&gt;HMI → BFF → instance&lt;/b&gt;: /api/plugins (list, add, edit, reload, remove) and /api/plugins/{name}/{path} → the plugin's own routes. Configuration: config/plugin-configuration/ (PLUGINS_FILE), PLUGIN_ALLOWED_SOURCES." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#e4c5f7;fontColor=#303238;fontSize=12;fontStyle=0;align=left;verticalAlign=top;spacing=6;opacity=100;">
           <mxGeometry x="360" y="815" width="990" height="75" as="geometry" />
         </mxCell>
-        <mxCell id="n18" parent="1" vertex="1" value="&lt;b&gt;Physical IO devices&lt;/b&gt;&lt;br&gt;GPIO (LEDs, buttons) · SPI ADC (potentiometers) · I2C (SSD1306 OLED, LCD)&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;mock mode off the Pi; on the Pi with rpi_io/docker-compose.pi.yaml&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffdb7d;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
+        <mxCell id="n18" parent="1" vertex="1" value="&lt;b&gt;Physical IO devices&lt;/b&gt;&lt;br&gt;GPIO (LEDs, buttons) · SPI ADC (potentiometers) · I2C (SSD1306 OLED, LCD)&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;mock mode off the Pi; on the Pi with dr_panel/docker-compose.pi.yaml&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffdb7d;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;">
           <mxGeometry x="60" y="975" width="640" height="90" as="geometry" />
         </mxCell>
         <mxCell id="e19" parent="1" edge="1" source="n10" target="n11" value="loads the app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1959c4;endArrow=classic;endFill=1;fontSize=13;fontColor=#1959c4;labelBackgroundColor=#ffffff;dashed=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;">
@@ -803,7 +803,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e36" parent="1" edge="1" source="n15" target="n17" value="opt-in: rpi-io" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#b46504;endArrow=classic;endFill=1;fontSize=13;fontColor=#b46504;labelBackgroundColor=#ffffff;dashed=1;exitX=0;exitY=0.85;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+        <mxCell id="e36" parent="1" edge="1" source="n15" target="n17" value="opt-in: dr-panel" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#b46504;endArrow=classic;endFill=1;fontSize=13;fontColor=#b46504;labelBackgroundColor=#ffffff;dashed=1;exitX=0;exitY=0.85;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="195" y="510" />

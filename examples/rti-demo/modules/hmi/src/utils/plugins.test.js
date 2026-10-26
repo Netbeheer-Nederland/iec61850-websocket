@@ -8,7 +8,7 @@ import { pluginRows, configEntry, addTargets, routeRequest, routeAnswerText, plu
 
 const STATUS = {
   plugins: [
-    { name: 'io', version: '1.2', url: 'http://rpi-io:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], healthy: true, last_error: null },
+    { name: 'io', version: '1.2', url: 'http://dr-panel:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], healthy: true, last_error: null },
     { name: 'leds', version: '0.1', url: 'http://sim-leds:8099/plugin', claims: [], healthy: false, last_error: 'on_event timed out' },
   ],
   failed: { display: "Can't reach http://pi:8000/plugin" },
@@ -26,10 +26,10 @@ describe('plugins', () => {
   it("gives each row its definition, and an unreachable one its URL from it", () => {
     const rows = pluginRows({
       ...STATUS,
-      definitions: { io: { url: 'http://rpi-io:9000/plugin', settings: {} }, display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } } },
+      definitions: { io: { url: 'http://dr-panel:9000/plugin', settings: {} }, display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } } },
     });
     expect(rows.map((r) => [r.name, r.url, r.definition])).toEqual([
-      ['io', 'http://rpi-io:9000/plugin', { url: 'http://rpi-io:9000/plugin', settings: {} }],
+      ['io', 'http://dr-panel:9000/plugin', { url: 'http://dr-panel:9000/plugin', settings: {} }],
       ['leds', 'http://sim-leds:8099/plugin', null],
       ['display', 'http://pi:8000/plugin', { url: 'http://pi:8000/plugin', settings: { rotate: 90 } }],
     ]);
@@ -51,10 +51,10 @@ describe('plugins', () => {
   it('gives a row as a plugin configuration entry, settings only when there are some', () => {
     const rows = pluginRows({
       ...STATUS,
-      definitions: { io: { url: 'http://rpi-io:9000/plugin', settings: {} }, display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } } },
+      definitions: { io: { url: 'http://dr-panel:9000/plugin', settings: {} }, display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } } },
     });
     expect(rows.map(configEntry)).toEqual([
-      { name: 'io', url: 'http://rpi-io:9000/plugin' },
+      { name: 'io', url: 'http://dr-panel:9000/plugin' },
       null,
       { name: 'display', url: 'http://pi:8000/plugin', settings: { rotate: 90 } },
     ]);

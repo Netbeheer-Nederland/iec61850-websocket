@@ -351,7 +351,7 @@ function PluginsPanel({ target, role, pushed, instances = [] }) {
             </select>
           )}
           <input id="plugins-add-name" placeholder="Name, e.g. io" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required disabled={editing} title={editing ? 'The name stays: a plugin with another name is another plugin' : undefined} />
-          <input id="plugins-add-url" placeholder="URL, e.g. http://rpi-io:9000/plugin" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} required />
+          <input id="plugins-add-url" placeholder="URL, e.g. http://dr-panel:9000/plugin" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} required />
           <Suspense fallback={<div style={{ gridColumn: '1 / -1', minHeight: '48px', color: 'var(--text-muted)' }}>Loading the settings editor...</div>}>
             <JsonEditor id="plugins-add-settings" label="Settings (JSON)" placeholder='Settings (JSON, optional), e.g. {"write_inputs": false}' value={form.settings} onChange={setSettings} style={{ gridColumn: '1 / -1' }} />
           </Suspense>

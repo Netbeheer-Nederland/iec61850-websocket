@@ -22,7 +22,7 @@ Test script for LCD I2C implementation.
 Run this script locally to verify the LCD I2C implementation works before deploying to Docker.
 
 Usage, with the project installed (uv sync), or from src/:
-    python -m rpi_io.server.lcd_i2c_check
+    python -m dr_panel.server.lcd_i2c_check
 """
 
 import sys

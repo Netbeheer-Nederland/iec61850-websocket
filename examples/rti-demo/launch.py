@@ -228,17 +228,17 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
     ServiceType.IO: ServiceConfig(
         name="IO Device Control API",
         service_type=ServiceType.IO,
-        module="rpi_io.server.main",
-        entry_point="../rti-plugins/rpi_io/src/rpi_io/server/main.py",
-        # From src/, so rpi_io is importable without installing its
+        module="dr_panel.server.main",
+        entry_point="../rti-plugins/dr_panel/src/dr_panel/server/main.py",
+        # From src/, so dr_panel is importable without installing its
         # hardware packages into this environment (decision 0023). The IO
         # plugin is its own stack in Docker (decisions 0028, 0030); launch.py
         # still runs it, in mock mode off the Pi, so one machine has the whole demo.
-        working_dir="../rti-plugins/rpi_io/src",
+        working_dir="../rti-plugins/dr_panel/src",
         default_port=9000,
         description="IO Device Control API - REST API for Raspberry Pi IO devices",
         # Relative to working_dir: git-ignored copies, seeded from the
-        # shipped rpi_io/server/io_config.json and rpi_io/plugin/io_mapping.json, so saves leave
+        # shipped dr_panel/server/io_config.json and dr_panel/plugin/io_mapping.json, so saves leave
         # those unchanged.
         env_vars={
             "PORT": "9000",
@@ -248,9 +248,9 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
         docker_image=rti_image("io"),
         health_check_path="/api/io/health",
         labels={
-            "rti.service": "rpi-io",
+            "rti.service": "dr-panel",
             "rti.type": "RTI-IO",
-            "rti.host": "rpi-io",
+            "rti.host": "dr-panel",
             "rti.port": "9000",
         },
     ),
@@ -259,9 +259,9 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
 
 def container_name(service_type: ServiceType) -> str:
     """The container's name in Docker, where the others reach it: rti-<type>,
-    and rpi-io for the IO server, after its plugin (rpi_io)."""
+    and dr-panel for the IO server, after its plugin (dr_panel)."""
     if service_type == ServiceType.IO:
-        return "rpi-io"
+        return "dr-panel"
     return f"rti-{service_type.value}"
 
 
@@ -445,7 +445,7 @@ class RTILauncher:
     def _docker_env(config: ServiceConfig) -> dict[str, str]:
         """The service's environment in a container on rti-network, where the
         others are reached by container name (container_name: rti-<type>, and
-        rpi-io for the IO server), not localhost."""
+        dr-panel for the IO server), not localhost."""
         env = dict(config.env_vars)
         if "PLUGINS" in env:
             io_port = SERVICES[ServiceType.IO].default_port

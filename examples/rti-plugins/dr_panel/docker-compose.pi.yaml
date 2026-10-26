@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# On the Raspberry Pi: pass its GPIO, I2C and SPI devices into rpi-io.
+# On the Raspberry Pi: pass its GPIO, I2C and SPI devices into dr-panel.
 #
 #   docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d
 #
@@ -14,7 +14,7 @@
 # host, so list only the nodes your Pi has (ls /dev/gpiochip* /dev/i2c-*
 # /dev/spidev0.*).
 services:
-  rpi-io:
+  dr-panel:
     # The Pi user, a member of the host groups that own the device nodes.
     user: ${PI_USER:-pi}
     group_add:

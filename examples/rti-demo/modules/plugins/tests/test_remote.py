@@ -135,15 +135,15 @@ async def test_a_control_answer_that_is_not_a_result_is_an_error():
 @pytest.mark.parametrize(
     ("url", "allowed"),
     [
-        ("http://rpi-io:9000/plugin", True),
-        ("http://rpi-io:9000", True),
-        ("https://rpi-io:9000/plugin", False),
-        ("http://rpi-io:9001/plugin", False),
-        ("http://rpi-io:9000.evil.test/plugin", False),
+        ("http://dr-panel:9000/plugin", True),
+        ("http://dr-panel:9000", True),
+        ("https://dr-panel:9000/plugin", False),
+        ("http://dr-panel:9001/plugin", False),
+        ("http://dr-panel:9000.evil.test/plugin", False),
     ],
 )
 def test_a_url_is_allowed_by_scheme_host_port_and_path(url, allowed):
-    assert is_allowed(url, ["http://rpi-io:9000"]) is allowed
+    assert is_allowed(url, ["http://dr-panel:9000"]) is allowed
 
 
 def test_an_allowed_path_is_matched_by_whole_segments():
@@ -153,7 +153,7 @@ def test_an_allowed_path_is_matched_by_whole_segments():
 
 
 def test_nothing_is_allowed_by_default():
-    assert not is_allowed("http://rpi-io:9000/plugin", [])
+    assert not is_allowed("http://dr-panel:9000/plugin", [])
 
 
 @pytest.mark.parametrize(
@@ -182,17 +182,17 @@ def test_a_wildcard_label_in_a_host_name_matches_one_label():
 
 def test_a_wildcard_host_matches_any_host_on_that_port():
     allowed = ["http://*:9000"]
-    assert is_allowed("http://rpi-io:9000/plugin", allowed)
+    assert is_allowed("http://dr-panel:9000/plugin", allowed)
     assert is_allowed("http://10.0.0.5:9000/plugin", allowed)
     assert is_allowed("http://[::1]:9000/plugin", allowed)
-    assert not is_allowed("http://rpi-io:9001/plugin", allowed)
-    assert not is_allowed("http://rpi-io/plugin", allowed)
+    assert not is_allowed("http://dr-panel:9001/plugin", allowed)
+    assert not is_allowed("http://dr-panel/plugin", allowed)
 
 
 def test_a_wildcard_port_matches_any_port_and_none():
-    allowed = ["http://rpi-io:*"]
-    assert is_allowed("http://rpi-io:9000/plugin", allowed)
-    assert is_allowed("http://rpi-io/plugin", allowed)
+    allowed = ["http://dr-panel:*"]
+    assert is_allowed("http://dr-panel:9000/plugin", allowed)
+    assert is_allowed("http://dr-panel/plugin", allowed)
     assert not is_allowed("http://other:9000/plugin", allowed)
 
 

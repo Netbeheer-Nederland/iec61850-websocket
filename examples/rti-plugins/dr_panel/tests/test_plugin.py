@@ -11,11 +11,11 @@ from acsi_plugins import Associated, PluginEntry, PluginHost, ValueWritten
 from acsi_plugins.web import PluginService, attach
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from rpi_io.plugin.mapping import SHIPPED_MAPPING, IOMappingManager
-from rpi_io.plugin.plugin import EventRequest, Host, IoPlugin, StartRequest
-from rpi_io.server import io_controller as controller_module
-from rpi_io.server.api_endpoint import create_fastapi_app
-from rpi_io.server.io_controller import IOController
+from dr_panel.plugin.mapping import SHIPPED_MAPPING, IOMappingManager
+from dr_panel.plugin.plugin import EventRequest, Host, IoPlugin, StartRequest
+from dr_panel.server import io_controller as controller_module
+from dr_panel.server.api_endpoint import create_fastapi_app
+from dr_panel.server.io_controller import IOController
 
 pytestmark = pytest.mark.unit
 
@@ -117,13 +117,13 @@ def test_an_fsp_connects_to_it_through_its_plugin_configuration():
 
     def client():
         return httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=io_app), base_url="http://rpi-io:9000"
+            transport=httpx.ASGITransport(app=io_app), base_url="http://dr-panel:9000"
         )
 
     host = PluginHost(role="fsp", host_url="http://fsp.test:5001")
     service = PluginService(
         host,
-        configured=[PluginEntry("io", "http://rpi-io:9000/plugin")],
+        configured=[PluginEntry("io", "http://dr-panel:9000/plugin")],
         client_factory=client,
         retry_seconds=0,
     )
@@ -308,7 +308,7 @@ class Reads:
 
 
 def attaching_io(**devices):
-    from rpi_io.server.devices import DeviceType
+    from dr_panel.server.devices import DeviceType
 
     io = FakeIO()
     io._initialized = True
@@ -332,12 +332,12 @@ async def test_it_attaches_itself_with_its_devices_and_displays():
     plugin = IoPlugin(attaching_io(), IOMappingManager(str(SHIPPED_MAPPING)))
     await deliver(plugin, FSP, {"type": "Associated", "associate_id": "cp1"})
 
-    server, display = plugin.attached("http://rpi-io:9000")["items"]
+    server, display = plugin.attached("http://dr-panel:9000")["items"]
 
     assert server == {
         "kind": "io",
         "label": "IO server",
-        "address": "http://rpi-io:9000",
+        "address": "http://dr-panel:9000",
         "state": "ok",
         "detail": "4 devices",
         "live": [

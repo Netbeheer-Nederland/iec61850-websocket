@@ -15,10 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The rti-demo's IO plugin for the Raspberry Pi (decisions 0018, 0023, 0029, 0030).
+"""The rti-demo's IO plugin for the Raspberry Pi (decisions 0018, 0029, 0030, 0038).
 
-- rpi_io.server: the IO server, GPIO and I2C devices behind the REST API
-  /api/io (python -m rpi_io.server.main, or the script rpi-io). The role is "io".
-- rpi_io.plugin: the plugin API under /plugin, which the FSP and SO connect
+- dr_panel.server: the IO server, GPIO and I2C devices behind the REST API
+  /api/io (python -m dr_panel.server.main, or the script dr-panel). The role is "io".
+- dr_panel.plugin: the plugin API under /plugin, which the FSP and SO connect
   to, and io_mapping.json, which says what the devices show.
 """

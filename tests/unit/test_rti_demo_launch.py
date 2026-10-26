@@ -37,7 +37,7 @@ def test_no_verbose_turns_it_off(launcher):
 
 COMPOSE = LAUNCH_PY.parent / "docker-compose.yml"
 # The IO plugin is its own stack (decisions 0028, 0030); launch.py still runs it.
-IO_PLUGIN = LAUNCH_PY.parents[1] / "rti-plugins" / "rpi_io"
+IO_PLUGIN = LAUNCH_PY.parents[1] / "rti-plugins" / "dr_panel"
 
 
 def test_every_service_type_is_an_rti_type(launcher):
@@ -68,9 +68,9 @@ def test_io_runs_as_a_module_from_the_io_plugin_s_src(launcher):
     module = importlib.import_module(type(launcher).__module__)
     config = module.SERVICES[module.ServiceType.IO]
     cmd, cwd = launcher._command_for(config)
-    assert cmd[-2:] == ["-m", "rpi_io.server.main"]
+    assert cmd[-2:] == ["-m", "dr_panel.server.main"]
     assert cwd.resolve() == IO_PLUGIN / "src"
-    main = cwd / "rpi_io" / "server" / "main.py"
+    main = cwd / "dr_panel" / "server" / "main.py"
     assert main.is_file()
     assert (LAUNCH_PY.parent / config.entry_point).resolve() == main.resolve()
 
@@ -147,7 +147,7 @@ def test_another_port_is_where_the_plugins_reach_it(launcher):
 
 def test_in_docker_the_plugins_use_the_container_names(launcher):
     env = launcher._docker_env(_config(launcher, "fsp2"))
-    assert json.loads(env["PLUGINS"])[0]["url"] == "http://rpi-io:9000/plugin"
+    assert json.loads(env["PLUGINS"])[0]["url"] == "http://dr-panel:9000/plugin"
     assert env["PLUGIN_HOST_URL"] == "http://rti-fsp2:5005"
 
 
@@ -180,5 +180,5 @@ def test_a_developer_s_plugin_sources_are_allowed(launcher, monkeypatch):
 
 def test_in_docker_the_io_server_is_named_after_its_plugin():
     module = _launch_module()
-    assert module.container_name(module.ServiceType.IO) == "rpi-io"
+    assert module.container_name(module.ServiceType.IO) == "dr-panel"
     assert module.container_name(module.ServiceType.SO) == "rti-so"

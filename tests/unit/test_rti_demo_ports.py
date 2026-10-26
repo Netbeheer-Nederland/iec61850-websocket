@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DEMO = ROOT / "examples" / "rti-demo"
 MODULES = DEMO / "modules"
 # The IO plugin, in its own folder (decisions 0028, 0030).
-IO_PLUGIN = ROOT / "examples" / "rti-plugins" / "rpi_io"
+IO_PLUGIN = ROOT / "examples" / "rti-plugins" / "dr_panel"
 
 EXPECTED_PORTS = {
     "hmi": 8080,
@@ -83,15 +83,15 @@ def test_compose_publishes_and_labels_the_port(compose, service, role):
 
 def test_the_io_server_s_compose_publishes_and_labels_the_port(io_compose):
     port = EXPECTED_PORTS["io"]
-    svc = io_compose["rpi-io"]
+    svc = io_compose["dr-panel"]
     assert f"{port}:{port}" in svc["ports"]
     assert f"rti.port={port}" in svc["labels"]
 
 
 def test_the_io_server_is_its_own_stack_on_the_demo_s_network(compose, io_compose):
-    # Decision 0028: rpi-io isn't in the demo's compose, but on its network.
-    assert "rpi-io" not in compose
-    assert io_compose["rpi-io"]["networks"] == ["rti-network"]
+    # Decision 0028: dr-panel isn't in the demo's compose, but on its network.
+    assert "dr-panel" not in compose
+    assert io_compose["dr-panel"]["networks"] == ["rti-network"]
 
 
 def test_compose_publishes_the_hmi_on_8080(compose):
@@ -127,7 +127,7 @@ def test_io_dockerfile_port_and_health_check():
         ("bff/src/bff/bff_server.py", "bff"),
         ("so/src/so/bff_endpoint.py", "so"),
         ("fsp/src/fsp/bff_endpoint.py", "fsp"),
-        ("../../rti-plugins/rpi_io/src/rpi_io/server/main.py", "io"),
+        ("../../rti-plugins/dr_panel/src/dr_panel/server/main.py", "io"),
     ],
 )
 def test_code_default_port(path, role):
@@ -172,13 +172,13 @@ def test_the_leds_overlay_runs_only_sim_leds(leds_compose):
 def test_the_io_overlay_runs_one_io_server(io_overlay, io_compose):
     # Like the LEDs overlay: the plugin's service on rti-network, nothing
     # published. One for all three: on the Pi it holds the pins.
-    svc = io_overlay["rpi-io"]
-    assert set(io_overlay) == {"rpi-io", "rti-fsp01", "rti-fsp02", "rti-so"}
-    assert svc["image"] == io_compose["rpi-io"]["image"]
-    assert svc["build"]["args"] == io_compose["rpi-io"]["build"]["args"]
+    svc = io_overlay["dr-panel"]
+    assert set(io_overlay) == {"dr-panel", "rti-fsp01", "rti-fsp02", "rti-so"}
+    assert svc["image"] == io_compose["dr-panel"]["image"]
+    assert svc["build"]["args"] == io_compose["dr-panel"]["build"]["args"]
     assert svc["networks"] == ["rti-network"]
     assert "ports" not in svc
-    # The Pi's devices come from rpi_io's own docker-compose.pi.yaml.
+    # The Pi's devices come from dr_panel's own docker-compose.pi.yaml.
     for key in ("devices", "group_add", "user", "ipc", "security_opt", "cap_add"):
         assert key not in svc
 
@@ -192,7 +192,7 @@ def test_the_io_overlay_connects_the_io_plugin(io_overlay, service, role):
     config = _plugin_config(io_overlay, service)
     assert config["host_url"] == f"http://{service}:{EXPECTED_PORTS[role]}"
     [io] = config["plugins"]
-    assert io["url"] == f"http://rpi-io:{EXPECTED_PORTS['io']}/plugin"
+    assert io["url"] == f"http://dr-panel:{EXPECTED_PORTS['io']}/plugin"
     # One IO server writes its inputs to the first FSP only.
     write_inputs = io.get("settings", {}).get("write_inputs", True)
     assert write_inputs is (service == "rti-fsp01")

@@ -45,7 +45,7 @@ jobs:
             so:          [ *rti, 'examples/rti-demo/modules/so/**',  'examples/rti-demo/modules/so/pyproject.toml', 'examples/rti-demo/modules/plugins/**' ]
             fsp:         [ *rti, 'examples/rti-demo/modules/fsp/**', 'examples/rti-demo/modules/fsp/pyproject.toml', 'examples/rti-demo/modules/plugins/**' ]
             bff:         [ 'examples/rti-demo/modules/bff/**', 'pyproject.toml', 'uv.lock' ]
-            io:          [ 'examples/rti-plugins/rpi_io/**' ]
+            io:          [ 'examples/rti-plugins/dr_panel/**' ]
             hmi:         [ 'examples/rti-demo/modules/hmi/**' ]
 
       - id: set
@@ -78,7 +78,7 @@ jobs:
             so)          c=. ; f=examples/rti-demo/modules/so/docker/Dockerfile  ; n=iec61850-websocket/rti-so ; p=linux/amd64,linux/arm64 ;;
             fsp)         c=. ; f=examples/rti-demo/modules/fsp/docker/Dockerfile ; n=iec61850-websocket/rti-fsp ; p=linux/amd64,linux/arm64 ;;
             bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=iec61850-websocket/rti-bff ;;
-            io)          c=examples/rti-plugins/rpi_io ; f=examples/rti-plugins/rpi_io/docker/Dockerfile ; n=iec61850-websocket/rti-io ; p=linux/amd64,linux/arm64 ;;
+            io)          c=examples/rti-plugins/dr_panel ; f=examples/rti-plugins/dr_panel/docker/Dockerfile ; n=iec61850-websocket/dr-panel ; p=linux/amd64,linux/arm64 ;;
             hmi)         c=examples/rti-demo/modules/hmi ; f=examples/rti-demo/modules/hmi/docker/Dockerfile ; n=iec61850-websocket/rti-hmi ;;
           esac
           {

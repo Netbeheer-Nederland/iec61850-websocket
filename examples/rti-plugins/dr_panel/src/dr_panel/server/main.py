@@ -29,13 +29,13 @@ Supports:
 
 Usage:
     # Run with default port (9000)
-    python -m rpi_io.server.main      # with the project installed (uv sync), or from src/
+    python -m dr_panel.server.main      # with the project installed (uv sync), or from src/
 
     # Run with custom port
-    PORT=9100 python -m rpi_io.server.main
+    PORT=9100 python -m dr_panel.server.main
 
     # Use custom config file
-    IO_CONFIG_FILE=/path/to/io_config.json python -m rpi_io.server.main
+    IO_CONFIG_FILE=/path/to/io_config.json python -m dr_panel.server.main
 """
 
 from __future__ import annotations
@@ -283,7 +283,7 @@ def main():
         logger.error(
             "Try using a different port by setting the PORT environment variable."
         )
-        logger.error("Example: PORT=8081 python -m rpi_io.server.main")
+        logger.error("Example: PORT=8081 python -m dr_panel.server.main")
         raise
 
 

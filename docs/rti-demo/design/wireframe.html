@@ -597,12 +597,12 @@
             <h3>🔌 Plugins (2) <span style="float:right;"><span class="btn btn-outline">Retry 1 plugin</span> <span class="btn btn-outline">Add plugin</span></span></h3>
             <div class="table-wf">
               <div class="thead"><span class="cell">Plugin</span><span class="cell">State</span><span class="cell">URL</span><span class="cell narrow">Controls</span><span class="cell narrow" style="flex-basis:110px;">Actions</span></div>
-              <div class="trow"><span class="cell">io 1.0</span><span class="cell">Healthy</span><span class="cell">http://rpi-io:9000/plugin</span><span class="cell narrow">1</span><span class="cell narrow" style="flex-basis:130px;">▴ ✎ ↗ ⧉ ⟳ 🗑</span></div>
+              <div class="trow"><span class="cell">io 1.0</span><span class="cell">Healthy</span><span class="cell">http://dr-panel:9000/plugin</span><span class="cell narrow">1</span><span class="cell narrow" style="flex-basis:130px;">▴ ✎ ↗ ⧉ ⟳ 🗑</span></div>
               <div class="trow" style="display:block;background:var(--wf-fill);">
                 <div class="placeholder-text" style="margin:0 0 4px;">▴ Details io:</div>
                 <div><b>Controls</b> LD0/CSWI1.Pos.Oper.ctlVal</div>
                 <div><b>Routes</b> /api/plugins/io/</div>
-                <div><b>Attached</b> ● IO server (io, 6 devices) http://rpi-io:9000 <span class="placeholder-text">- or the attached error, e.g. attached timed out after 1.0s</span></div>
+                <div><b>Attached</b> ● IO server (io, 6 devices) http://dr-panel:9000 <span class="placeholder-text">- or the attached error, e.g. attached timed out after 1.0s</span></div>
                 <div><b>Settings</b> - <span class="placeholder-text">(or the settings JSON)</span></div>
                 <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span class="btn btn-outline">GET ▾</span><span class="placeholder-text">/api/plugins/io/</span><span style="border:1.5px dashed var(--wf-line-soft);border-radius:5px;padding:2px 8px;">leds</span><span style="border:1.5px dashed var(--wf-line-soft);border-radius:5px;padding:2px 8px;">on=1</span><span class="btn btn-solid">Send</span> <span class="placeholder-text">(Body (JSON) editor under it for POST, PUT, PATCH)</span></div>
                 <div style="margin-top:4px;"><b>OK</b> <span class="placeholder-text">GET /api/plugins/io/leds?on=1</span></div>
@@ -632,7 +632,7 @@
               </div>
               <div class="field-row">
                 <div class="field"><span class="label">Name</span><div class="input"></div><span class="hint">io</span></div>
-                <div class="field"><span class="label">URL</span><div class="input"></div><span class="hint">http://rpi-io:9000/plugin - the other instance's PLUGIN_ALLOWED_SOURCES applies</span></div>
+                <div class="field"><span class="label">URL</span><div class="input"></div><span class="hint">http://dr-panel:9000/plugin - the other instance's PLUGIN_ALLOWED_SOURCES applies</span></div>
               </div>
               <div class="modal-footer"><div class="btn btn-outline">Cancel</div><div class="btn btn-solid">Add to instance</div></div>
             </div>
@@ -743,7 +743,7 @@
             <h3>🔌 Plugins (1) <span style="float:right;" class="btn btn-outline">Add plugin</span></h3>
             <div class="table-wf">
               <div class="thead"><span class="cell">Plugin</span><span class="cell">State</span><span class="cell">URL</span><span class="cell narrow" style="flex-basis:110px;">Actions</span></div>
-              <div class="trow"><span class="cell">io 1.0</span><span class="cell">Healthy</span><span class="cell">http://rpi-io:9000/plugin</span><span class="cell narrow" style="flex-basis:130px;">▾ ✎ ↗ ⧉ ⟳ 🗑</span></div>
+              <div class="trow"><span class="cell">io 1.0</span><span class="cell">Healthy</span><span class="cell">http://dr-panel:9000/plugin</span><span class="cell narrow" style="flex-basis:130px;">▾ ✎ ↗ ⧉ ⟳ 🗑</span></div>
             </div>
             <p class="placeholder-text" style="margin:10px 0 0;">ⓘ Same panel as on ACSI Server, Details, Edit, Copy and Retry included, without the Controls column or the Controls line in Details - SO plugins don't answer Operate.</p>
           </div>

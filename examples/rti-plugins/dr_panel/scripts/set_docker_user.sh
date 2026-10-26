@@ -16,12 +16,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# set_docker_user.sh - Set Docker build variables for the rpi-io container
+# set_docker_user.sh - Set Docker build variables for the dr-panel container
 #
 # Detects UID, GID, and group IDs for a given user and exports them as
-# environment variables for Docker Compose to use when building the rpi-io container.
+# environment variables for Docker Compose to use when building the dr-panel container.
 #
-# Usage (run from examples/rti-plugins/rpi_io/, so docker compose finds the IO
+# Usage (run from examples/rti-plugins/dr_panel/, so docker compose finds the IO
 # project's docker-compose.yaml and docker-compose.pi.yaml there):
 #   ./scripts/set_docker_user.sh [username]
 #   Default username: pi

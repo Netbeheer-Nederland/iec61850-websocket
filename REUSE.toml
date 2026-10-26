@@ -33,8 +33,8 @@ path = [
   "examples/rti-demo/config/plugin-configuration/io/*.json",
   "examples/rti-demo/modules/bff/src/bff/connections.json",
   "examples/rti-demo/modules/hmi/package.json",
-  "examples/rti-plugins/rpi_io/src/rpi_io/server/io_config.json",
-  "examples/rti-plugins/rpi_io/src/rpi_io/plugin/io_mapping.json",
+  "examples/rti-plugins/dr_panel/src/dr_panel/server/io_config.json",
+  "examples/rti-plugins/dr_panel/src/dr_panel/plugin/io_mapping.json",
   "scripts/keycloak/data/realm-test.json",
   "testing/certs/*-csr.json",
   "testing/certs/ca-config.json",
@@ -49,7 +49,7 @@ SPDX-License-Identifier = "Apache-2.0"
 path = [
   ".python-version",
   "uv.lock",
-  "examples/rti-plugins/rpi_io/uv.lock",
+  "examples/rti-plugins/dr_panel/uv.lock",
   "examples/rti-plugins/sim_leds/uv.lock",
   "examples/rti-demo/modules/hmi/package-lock.json",
 ]

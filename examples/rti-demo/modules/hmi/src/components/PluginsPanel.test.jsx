@@ -10,10 +10,10 @@ import { EditorView } from '@codemirror/view';
 import PluginsPanel from './PluginsPanel';
 
 const STATUS = {
-  plugins: [{ name: 'io', version: '1.2', url: 'http://rpi-io:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], routes: true, healthy: true, last_error: null }],
+  plugins: [{ name: 'io', version: '1.2', url: 'http://dr-panel:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], routes: true, healthy: true, last_error: null }],
   failed: { display: "Can't reach http://pi:8000/plugin" },
   definitions: {
-    io: { url: 'http://rpi-io:9000/plugin', settings: {} },
+    io: { url: 'http://dr-panel:9000/plugin', settings: {} },
     display: { url: 'http://pi:8000/plugin', settings: { rotate: 90 } },
   },
 };
@@ -116,7 +116,7 @@ describe('PluginsPanel', () => {
   it("shows a plugin's claims, routes, attached items and settings in its details", async () => {
     const status = {
       ...STATUS,
-      plugins: [{ ...STATUS.plugins[0], attached: [{ kind: 'io', label: 'IO server', state: 'ok', address: 'http://rpi-io:9000' }], attached_error: 'attached timed out after 1.0s' }],
+      plugins: [{ ...STATUS.plugins[0], attached: [{ kind: 'io', label: 'IO server', state: 'ok', address: 'http://dr-panel:9000' }], attached_error: 'attached timed out after 1.0s' }],
     };
     mockBff({ 'GET /api/plugins': { status: 200, body: { ok: true, result: status } } });
     const user = userEvent.setup({ delay: null });
@@ -127,7 +127,7 @@ describe('PluginsPanel', () => {
     expect(details).toHaveTextContent('LD0/CSWI1.Pos.Oper.ctlVal');
     expect(details).toHaveTextContent('/api/plugins/io/');
     expect(details).toHaveTextContent('IO server');
-    expect(details).toHaveTextContent('http://rpi-io:9000');
+    expect(details).toHaveTextContent('http://dr-panel:9000');
     expect(details).toHaveTextContent('attached timed out after 1.0s');
 
     await user.click(screen.getByTitle('Details display'));
@@ -182,7 +182,7 @@ describe('PluginsPanel', () => {
   });
 
   it("shows the instance's error as the answer when the plugin route fails", async () => {
-    mockBff({ 'GET /api/plugins/io/nope': { status: 500, body: { detail: '404 Client Error: Not Found for url: http://rpi-io:5001/api/plugins/io/nope' } } });
+    mockBff({ 'GET /api/plugins/io/nope': { status: 500, body: { detail: '404 Client Error: Not Found for url: http://dr-panel:5001/api/plugins/io/nope' } } });
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
     await user.click(await screen.findByTitle('Details io'));
@@ -234,7 +234,7 @@ describe('PluginsPanel', () => {
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
     await user.click(await screen.findByTitle('Copy io as configuration'));
 
-    expect(JSON.parse((await screen.findByTestId('plugins-config-entry')).textContent)).toEqual({ name: 'io', url: 'http://rpi-io:9000/plugin' });
+    expect(JSON.parse((await screen.findByTestId('plugins-config-entry')).textContent)).toEqual({ name: 'io', url: 'http://dr-panel:9000/plugin' });
     await user.click(screen.getByTitle('Dismiss'));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
@@ -358,7 +358,7 @@ describe('PluginsPanel', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('Added io to rti-fsp02.');
     expect(calls).toContainEqual(expect.objectContaining({
-      target: 'rti-fsp02:5005', method: 'POST', path: '/api/plugins', body: { name: 'io', url: 'http://rpi-io:9000/plugin', settings: {} },
+      target: 'rti-fsp02:5005', method: 'POST', path: '/api/plugins', body: { name: 'io', url: 'http://dr-panel:9000/plugin', settings: {} },
     }));
     expect(screen.queryByRole('form')).not.toBeInTheDocument();
   });

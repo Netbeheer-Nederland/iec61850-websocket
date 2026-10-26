@@ -53,6 +53,8 @@ Names for the hardware, as dr-st7789v has, were not considered: the IO plugin's 
   from `io` is the project `io`: stop it with `docker compose -p io down` before starting it from `rpi_io`, or the
   container name `rti-io` is taken.
 - The records 0028-0031 keep the path `io` they were written with; this record says where it is now.
+- Superseded in [0038](0038-io-plugin-name-dr-panel.md): the names `rpi_io` / `rpi-io` and the image `rti-io` are now
+  `dr_panel` / `dr-panel`.
 
 ## In the code
 

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from rpi_io.server.api_endpoint import create_fastapi_app
-from rpi_io.server.io_controller import IOController
+from dr_panel.server.api_endpoint import create_fastapi_app
+from dr_panel.server.io_controller import IOController
 
 IO = Path(__file__).resolve().parents[1]
 
@@ -34,6 +34,6 @@ def test_the_plugin_files_are_not_served(app, path):
 
 
 def test_its_plugin_is_an_api_not_files_to_download():
-    plugin = IO / "src" / "rpi_io" / "plugin"
+    plugin = IO / "src" / "dr_panel" / "plugin"
     assert not (plugin / "plugin.json").exists()
-    assert not (IO / "src" / "rpi_io" / "server" / "plugin_files.py").exists()
+    assert not (IO / "src" / "dr_panel" / "server" / "plugin_files.py").exists()

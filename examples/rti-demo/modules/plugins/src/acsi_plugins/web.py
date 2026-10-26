@@ -302,7 +302,7 @@ class InstallRequest(BaseModel):
     url: str = Field(
         ...,
         description="The plugin's base URL (GET <url> describes it)",
-        examples=["http://rpi-io:9000/plugin"],
+        examples=["http://dr-panel:9000/plugin"],
     )
     settings: dict[str, Any] = Field(
         default_factory=dict, description="The plugin's own settings"
@@ -313,7 +313,7 @@ class EditRequest(BaseModel):
     url: str | None = Field(
         None,
         description="The plugin's new base URL; left out: it stays",
-        examples=["http://rpi-io:9000/plugin"],
+        examples=["http://dr-panel:9000/plugin"],
     )
     settings: dict[str, Any] | None = Field(
         None, description="The plugin's new settings, all of them; left out: they stay"

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Opt-in: the IO server (rpi-io) as the FSPs' and SO's plugin, instead of
+# Opt-in: the IO server (dr-panel) as the FSPs' and SO's plugin, instead of
 # sim_leds (decision 0034). An overlay on docker-compose.yml:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.io.yaml up -d
@@ -12,14 +12,14 @@
 # process can hold. It runs anywhere, in mock mode without the Pi's devices;
 # on the Pi, add its device overlay as a third file:
 #
-#   -f ../rti-plugins/rpi_io/docker-compose.pi.yaml
+#   -f ../rti-plugins/dr_panel/docker-compose.pi.yaml
 #
-# The image is the published rti-io, built from examples/rti-plugins/rpi_io.
-# Don't also run rpi_io's own stack (decision 0028): both are named rpi-io.
-x-rpi-io: &rpi-io
-  image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-io:${RTI_IMAGE_TAG:-latest}
+# The image is the published dr-panel, built from examples/rti-plugins/dr_panel.
+# Don't also run dr_panel's own stack (decision 0028): both are named dr-panel.
+x-dr-panel: &dr-panel
+  image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/dr-panel:${RTI_IMAGE_TAG:-latest}
   build:
-    context: ../rti-plugins/rpi_io
+    context: ../rti-plugins/dr_panel
     dockerfile: docker/Dockerfile
     args:
       PI_USER: ${PI_USER:-pi}
@@ -35,9 +35,9 @@ x-rpi-io: &rpi-io
   # published: the HMI reaches the devices through /api/plugins/io/.
 
 services:
-  rpi-io:
-    <<: *rpi-io
-    container_name: rpi-io
+  dr-panel:
+    <<: *dr-panel
+    container_name: dr-panel
 
   # The FSPs and SO connect to it, from config/plugin-configuration/io/
   # mounted over the default configuration (sim_leds).

@@ -13,7 +13,7 @@ pytestmark = pytest.mark.unit
 CONFIG = {
     "host_url": "http://rti-fsp01:5001",
     "plugins": [
-        {"name": "io", "url": "http://rpi-io:9000/plugin", "settings": {"a": 1}},
+        {"name": "io", "url": "http://dr-panel:9000/plugin", "settings": {"a": 1}},
         {"name": "sim_leds", "url": "http://localhost:8099/plugin"},
     ],
 }
@@ -25,7 +25,7 @@ def test_a_configuration_is_read(tmp_path):
     config = PluginsConfig.read(path)
     assert config.host_url == "http://rti-fsp01:5001"
     assert config.plugins == [
-        PluginEntry("io", "http://rpi-io:9000/plugin", {"a": 1}),
+        PluginEntry("io", "http://dr-panel:9000/plugin", {"a": 1}),
         PluginEntry("sim_leds", "http://localhost:8099/plugin", {}),
     ]
 

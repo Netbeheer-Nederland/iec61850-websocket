@@ -35,7 +35,7 @@ it now runs, to put in `config/plugin-configuration/`.
    ```json
    {
      "plugins": [
-       { "name": "io", "url": "http://rpi-io:9000/plugin" },
+       { "name": "io", "url": "http://dr-panel:9000/plugin" },
        { "name": "display", "url": "http://pi:8000/plugin", "settings": { "rotate": 90 } }
      ]
    }

@@ -47,7 +47,7 @@ wrong setting before the plugin is restarted with it.
 
 ### Sample plugins
 
-sim_leds and rpi_io describe their settings (`write_inputs`, `blink_seconds`, ...), so the HMI has an example.
+sim_leds and dr_panel describe their settings (`write_inputs`, `blink_seconds`, ...), so the HMI has an example.
 
 ## Acceptance
 
@@ -64,7 +64,7 @@ their describe tests.
 ## Docs to update
 
 `openapi.yaml` (`PluginDescription.settings_schema`, `PluginStatus.settings_schema`), plugins README and
-GETTING_STARTED (how to describe settings), sim_leds and rpi_io READMEs, a new decision, wireframe (edit form with a
+GETTING_STARTED (how to describe settings), sim_leds and dr_panel READMEs, a new decision, wireframe (edit form with a
 marked setting), HMI README.
 
 ## Open questions

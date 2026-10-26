@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 [project]
-name = "rpi-io"
+name = "dr-panel"
 version = "0.1.0"
 description = "RTI Demo IO server for the Raspberry Pi (GPIO/I2C device control API)"
 readme = "README.md"
@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-rpi-io = "rpi_io.server.main:main"
+dr-panel = "dr_panel.server.main:main"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
@@ -30,12 +30,12 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"rpi_io.server" = ["io_config.json"]
-"rpi_io.plugin" = ["io_mapping.json"]
+"dr_panel.server" = ["io_config.json"]
+"dr_panel.plugin" = ["io_mapping.json"]
 
 [tool.pytest.ini_options]
 # The tests run in the FSP's environment (decision 0023), which doesn't
-# install this project; pythonpath makes rpi_io importable there.
+# install this project; pythonpath makes dr_panel importable there.
 pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"

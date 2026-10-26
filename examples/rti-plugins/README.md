@@ -17,7 +17,7 @@ imports them: each plugin runs, is built and is released on its own. The decisio
 
 | Folder | What it is | Its plugin URL | Runs on |
 |---|---|---|---|
-| [`rpi_io`](rpi_io/README.md) | The IO plugin, `rpi_io` (image `rti-io`, plugin name `io`): the IO server with the LEDs, buttons, potentiometers and displays, and the plugin API | `http://rpi-io:9000/plugin` | the Raspberry Pi; mock mode elsewhere |
+| [`dr_panel`](dr_panel/README.md) | The IO plugin, `dr_panel` (image `dr-panel`, plugin name `io`): the IO server with the LEDs, buttons, potentiometers and displays, and the plugin API | `http://dr-panel:9000/plugin` | the Raspberry Pi; mock mode elsewhere |
 | [`sim_leds`](sim_leds/README.md) | A sample plugin: two simulated LEDs, FastAPI only | `http://localhost:8099/plugin` | anywhere |
 
 ## The layout of a plugin
@@ -55,21 +55,21 @@ through `sim_leds`. A new integration is a new folder here (or anywhere else) an
 configuration:
 
 ```json
-{"host_url": "http://rti-fsp01:5001", "plugins": [{"name": "io", "url": "http://rpi-io:9000/plugin"}]}
+{"host_url": "http://rti-fsp01:5001", "plugins": [{"name": "io", "url": "http://dr-panel:9000/plugin"}]}
 ```
 
 ## Their own stacks
 
 Each plugin has its own compose file, apart from the demo stack; the IO plugin is built for and runs on the Raspberry
 Pi. All stacks join the external network `rti-network`, where the FSPs and SO reach the plugins' APIs as
-`http://rpi-io:9000/plugin` and `http://sim-leds:8099/plugin`. The demo stack runs its own sim_leds, one per FSP and SO,
+`http://dr-panel:9000/plugin` and `http://sim-leds:8099/plugin`. The demo stack runs its own sim_leds, one per FSP and SO,
 with its overlay `docker-compose.leds.yaml`, and connects to the IO server only with `docker-compose.io.yaml`
 (decision [0034](../../docs/rti-demo/decisions/0034-demo-stack-plugins-sim-leds-io-opt-in.md)).
 
 ```bash
 docker network create rti-network 2>/dev/null || true
 
-cd examples/rti-plugins/rpi_io
+cd examples/rti-plugins/dr_panel
 docker compose up -d                                                      # anywhere (mock mode)
 docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d     # on the Raspberry Pi
 
@@ -79,7 +79,7 @@ docker compose up -d
 
 While a plugin isn't reachable, the FSPs and SO list it as failed and try again every 10 s; the rest of the demo
 works. `launch.py io` in the demo starts the IO plugin as a local process, so one machine can run everything. The Pi's scripts
-(Docker setup, the build user and groups, GPIO simulation) are in [`rpi_io/scripts`](rpi_io/scripts).
+(Docker setup, the build user and groups, GPIO simulation) are in [`dr_panel/scripts`](dr_panel/scripts).
 
 ## Design decisions
 
@@ -105,7 +105,7 @@ Planned changes to the plugin contract (disable, settings schema, check, clear e
 ## Tests
 
 ```bash
-uv run --package fsp pytest examples/rti-plugins/rpi_io/tests -m unit -q   # not a workspace member; needs FastAPI and the plugin host
+uv run --package fsp pytest examples/rti-plugins/dr_panel/tests -m unit -q   # not a workspace member; needs FastAPI and the plugin host
 uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q
 ```
 

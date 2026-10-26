@@ -974,14 +974,14 @@ async def test_build_enriched_connections_adds_plugins(monkeypatch):
     io = {
         "name": "io",
         "version": "1.0",
-        "url": "http://rpi-io:9000/plugin",
+        "url": "http://dr-panel:9000/plugin",
         "claims": ["LD0/CSWI1.Pos.Oper.ctlVal"],
         "routes": True,
         "healthy": True,
         "last_error": None,
     }
     definitions = {
-        "io": {"url": "http://rpi-io:9000/plugin", "settings": {}},
+        "io": {"url": "http://dr-panel:9000/plugin", "settings": {}},
         "display": {"url": "http://pi:8000/plugin", "settings": {"rotate": 90}},
     }
     monkeypatch.setattr(bff_server.conn_manager, "connections", connections)

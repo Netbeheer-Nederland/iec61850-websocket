@@ -31,7 +31,7 @@ The plugins themselves, and the IO server, are in [`examples/rti-plugins`](../..
 
 ## The plugin API
 
-A plugin serves five calls, and an optional sixth, under its base URL (`url` in the configuration, for example `http://rpi-io:9000/plugin`):
+A plugin serves five calls, and an optional sixth, under its base URL (`url` in the configuration, for example `http://dr-panel:9000/plugin`):
 
 | Call | When | Answer |
 |---|---|---|
@@ -88,7 +88,7 @@ An FSP or SO connects to the plugins in its **plugin configuration** at startup:
 {
   "host_url": "http://rti-fsp01:5001",
   "plugins": [
-    {"name": "io", "url": "http://rpi-io:9000/plugin", "settings": {}},
+    {"name": "io", "url": "http://dr-panel:9000/plugin", "settings": {}},
     {"name": "historian", "url": "http://historian:8000/acsi-plugin", "settings": {"retention_days": 30}}
   ]
 }
@@ -105,7 +105,7 @@ default, the IO server in `io/` with the overlay `docker-compose.io.yaml`) and `
 | `PLUGINS` | none | The same JSON inline (a bare list stands for `{"plugins": [...]}`); its plugins and `host_url` win over the file's |
 | `PLUGIN_HOST_URL` | the configuration's `host_url` | Where plugins reach this FSP or SO |
 | `PLUGIN_RETRY_SECONDS` | `10` | How often a configured plugin that isn't connected is tried again; `0`: never |
-| `PLUGIN_ALLOWED_SOURCES` | `*` (any URL) | Comma-separated URLs that `POST /api/plugins` may add plugins from, and `PUT /api/plugins/{name}` may move one to. Scheme, host and port must match exactly; the path by whole segments. `*` stands for any host (`http://*:9000`), any one part of it (`http://192.168.0.*:8000`) or any port (`http://rpi-io:*`); `*` alone allows any URL, and set but empty allows none (decision [0037](../../../../docs/rti-demo/decisions/0037-plugin-allowed-sources-wildcards.md)). The configuration itself is trusted |
+| `PLUGIN_ALLOWED_SOURCES` | `*` (any URL) | Comma-separated URLs that `POST /api/plugins` may add plugins from, and `PUT /api/plugins/{name}` may move one to. Scheme, host and port must match exactly; the path by whole segments. `*` stands for any host (`http://*:9000`), any one part of it (`http://192.168.0.*:8000`) or any port (`http://dr-panel:*`); `*` alone allows any URL, and set but empty allows none (decision [0037](../../../../docs/rti-demo/decisions/0037-plugin-allowed-sources-wildcards.md)). The configuration itself is trusted |
 
 ## Managing plugins
 

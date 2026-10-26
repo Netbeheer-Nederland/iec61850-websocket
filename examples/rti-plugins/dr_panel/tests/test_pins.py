@@ -9,25 +9,25 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from rpi_io.server.api_endpoint import create_io_router
-from rpi_io.server.devices import (
+from dr_panel.server.api_endpoint import create_io_router
+from dr_panel.server.devices import (
     ButtonConfig,
     LCDI2CConfig,
     LEDConfig,
     PotentiometerConfig,
 )
-from rpi_io.server.io_config import (
+from dr_panel.server.io_config import (
     _config_to_dict,
     _dict_to_config,
     load_reserved_pins,
     save_full_config,
 )
-from rpi_io.server.io_controller import IOController
+from dr_panel.server.io_controller import IOController
 
 pytestmark = pytest.mark.unit
 
 SHIPPED = (
-    Path(__file__).resolve().parents[1] / "src" / "rpi_io" / "server" / "io_config.json"
+    Path(__file__).resolve().parents[1] / "src" / "dr_panel" / "server" / "io_config.json"
 )
 
 # The ST7789V display of dr-st7789v, on a Pi shared with the IO server

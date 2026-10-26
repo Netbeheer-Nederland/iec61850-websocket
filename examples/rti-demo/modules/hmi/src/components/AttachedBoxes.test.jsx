@@ -10,7 +10,7 @@ import AttachedBoxes from './AttachedBoxes';
 const IO = {
   kind: 'io',
   label: 'IO server',
-  address: 'http://rpi-io:9000',
+  address: 'http://dr-panel:9000',
   state: 'ok',
   detail: '6 devices',
   live: [
@@ -51,7 +51,7 @@ describe('AttachedBoxes', () => {
     fireEvent.click(screen.getByTestId('attached-box-io:0'));
 
     const details = screen.getByTestId('attached-details-io:0');
-    expect(details).toHaveTextContent('http://rpi-io:9000');
+    expect(details).toHaveTextContent('http://dr-panel:9000');
     expect(details).toHaveTextContent('6 devices');
     expect(details).toHaveTextContent('io 1.0');
     expect(details).toHaveTextContent('attached timed out after 1.0s');

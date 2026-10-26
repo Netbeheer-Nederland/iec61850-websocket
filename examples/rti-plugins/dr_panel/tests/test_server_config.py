@@ -6,10 +6,10 @@ import json
 from pathlib import Path
 
 import pytest
-from rpi_io.server.main import resolve_config_path
+from dr_panel.server.main import resolve_config_path
 
 IO = Path(__file__).resolve().parents[1]
-SHIPPED = IO / "src" / "rpi_io" / "server" / "io_config.json"
+SHIPPED = IO / "src" / "dr_panel" / "server" / "io_config.json"
 
 pytestmark = pytest.mark.unit
 

@@ -86,6 +86,8 @@ Three options were considered for the name:
   new but downloads less.
 - Superseded in 0018: the code name `rti_io` (distribution `rti-io`) and `rti_io.server`; the role name `io` stands.
   Superseded in 0022, point 4: "`modules/io` keeps `rti_io.server`"; the rest stands.
+- Superseded in [0038](0038-io-plugin-name-dr-panel.md): the names `rpi_io` / `rpi-io` and the image `rti-io` are now
+  `dr_panel` / `dr-panel`.
 - Older records (0011, 0017, 0019, 0021, 0022) keep the paths they were written with; this record says where those
   paths went.
 - Review one month after the move: whether anything still starts `rti_io.server.main`, and whether a second IO

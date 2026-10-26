@@ -6,9 +6,9 @@ SPDX-License-Identifier: Apache-2.0
 
 # IO: Raspberry Pi IO Device Control - WebSocket and ACSI Services Integration
 
-This directory contains the **IO plugin** for Raspberry Pi, the package `rpi_io` (`src/rpi_io/`), with the layout of
-every plugin (decision [0030](../../../docs/rti-demo/decisions/0030-plugin-project-layout.md)). `rpi_io.server` is the
-**IO server**, a FastAPI-based REST API service for direct hardware control. `rpi_io.plugin` makes it the FSP's and
+This directory contains the **IO plugin** for Raspberry Pi, the package `dr_panel` (`src/dr_panel/`), with the layout of
+every plugin (decision [0030](../../../docs/rti-demo/decisions/0030-plugin-project-layout.md)). `dr_panel.server` is the
+**IO server**, a FastAPI-based REST API service for direct hardware control. `dr_panel.plugin` makes it the FSP's and
 SO's **IO plugin**: it implements the plugin API under `/plugin`, and an FSP or SO connects to it from its plugin
 configuration (decision
 [0029](../../../docs/rti-demo/decisions/0029-plugins-are-http-services.md)); see
@@ -20,8 +20,8 @@ Raspberry Pi as its own stack, apart from the demo's (decision
 
 The IO service enables remote control and monitoring of physical IO devices (LEDs, potentiometers, buttons, LCD displays) through:
 
-- **Direct REST API** via the IO server (`rpi_io`)
-- **ACSI Integration** as a plugin of the FSP and SO (`/plugin`, `rpi_io/plugin.py`): their events light LEDs and
+- **Direct REST API** via the IO server (`dr_panel`)
+- **ACSI Integration** as a plugin of the FSP and SO (`/plugin`, `dr_panel/plugin.py`): their events light LEDs and
   write displays, and the input devices write back to them
 - **IEC 61850 Object Mapping** to connect IO devices to power system data model objects
 
@@ -47,17 +47,17 @@ The IO service enables remote control and monitoring of physical IO devices (LED
 ## Directory Structure
 
 ```
-examples/rti-plugins/rpi_io/
-├── pyproject.toml, uv.lock   # standalone uv project rpi-io (not in the root workspace); script rpi-io
-├── docker-compose.yaml       # its own stack: rpi-io, on the external network rti-network; runs anywhere
+examples/rti-plugins/dr_panel/
+├── pyproject.toml, uv.lock   # standalone uv project dr-panel (not in the root workspace); script dr-panel
+├── docker-compose.yaml       # its own stack: dr-panel, on the external network rti-network; runs anywhere
 ├── docker-compose.pi.yaml    # overlay: the Raspberry Pi's devices
 ├── docker/
 │   ├── Dockerfile            # multi-stage build; context is this folder
 │   └── Dockerfile.dockerignore
 ├── scripts/                  # Raspberry Pi: Docker setup, build user and groups, GPIO simulation
-├── tests/                    # uv run --package fsp pytest examples/rti-plugins/rpi_io/tests -q
-└── src/rpi_io/
-    ├── server/               # the IO server: rpi-io, or python -m rpi_io.server.main
+├── tests/                    # uv run --package fsp pytest examples/rti-plugins/dr_panel/tests -q
+└── src/dr_panel/
+    ├── server/               # the IO server: dr-panel, or python -m dr_panel.server.main
     │   ├── main.py           # Entry point - creates IOController + FastAPI app
     │   ├── io_controller.py  # Core IO device management (LEDs, pots, buttons, LCDs)
     │   ├── devices.py        # Device configuration classes and types
@@ -74,7 +74,7 @@ examples/rti-plugins/rpi_io/
 
 ---
 
-## Component 1: the IO server (`rpi_io`) - IO Device Control API
+## Component 1: the IO server (`dr_panel`) - IO Device Control API
 
 A **FastAPI-based web service** that provides REST API endpoints for controlling physical IO devices connected to a Raspberry Pi or simulated devices for development.
 
@@ -109,10 +109,10 @@ All endpoints are under the `/api/io/` prefix and provide device management, LED
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 9000 | Server port (the same for a direct run, `launch.py` and Docker) |
-| `IO_CONFIG_FILE` | `src/rpi_io/server/io_config.json` | The device configuration the server reads and saves to. A file that doesn't exist yet is seeded from the shipped `io_config.json`. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_config.json`, so saves leave the shipped file unchanged |
-| `IO_MAPPING_FILE` | `src/rpi_io/plugin/io_mapping.json` | Which devices the IO plugin uses for each event and objRef (see [The IO plugin](#the-io-plugin-plugin)); seeded from the shipped file the same way. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_mapping.json` |
+| `IO_CONFIG_FILE` | `src/dr_panel/server/io_config.json` | The device configuration the server reads and saves to. A file that doesn't exist yet is seeded from the shipped `io_config.json`. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_config.json`, so saves leave the shipped file unchanged |
+| `IO_MAPPING_FILE` | `src/dr_panel/plugin/io_mapping.json` | Which devices the IO plugin uses for each event and objRef (see [The IO plugin](#the-io-plugin-plugin)); seeded from the shipped file the same way. `launch.py` sets it to the git-ignored `examples/rti-demo/config/io_mapping.json` |
 
-Start the server with `uv run rpi-io` from `examples/rti-plugins/rpi_io`, or with `launch.py io`
+Start the server with `uv run dr-panel` from `examples/rti-plugins/dr_panel`, or with `launch.py io`
 in `examples/rti-demo`; the modules use relative imports, so they don't run as scripts. The first installs this project
 in its own environment (`.venv` here, with the Raspberry Pi packages), the second runs it from `src/` in the repository's
 (`uv sync --all-packages`), where devices whose hardware packages are missing stay unavailable.
@@ -135,10 +135,10 @@ For **physical hardware operation** (not mock mode):
 ## The IO plugin (`/plugin`)
 
 The IO server implements the plugin API (`examples/rti-demo/modules/plugins/openapi.yaml`, tag *Plugin API*) in
-`rpi_io/plugin/plugin.py`. An FSP or SO configures it as
+`dr_panel/plugin/plugin.py`. An FSP or SO configures it as
 
 ```json
-{"name": "io", "url": "http://rpi-io:9000/plugin", "settings": {}}
+{"name": "io", "url": "http://dr-panel:9000/plugin", "settings": {}}
 ```
 
 | Call | What the IO server does |
@@ -164,7 +164,7 @@ What each event does (the names are the plugin's own, mapped to devices in `io_m
 | `ServerStopped` (the FSP's Disconnect) | `stopped` off, display "Disconnected" | |
 
 Text goes to every display mapped to the name (the HD44780 LCD and the I2C LCD). `IO_MAPPING_FILE` names the mapping
-file (default: the shipped `src/rpi_io/plugin/io_mapping.json`); a file that doesn't exist yet is seeded from the shipped one.
+file (default: the shipped `src/dr_panel/plugin/io_mapping.json`); a file that doesn't exist yet is seeded from the shipped one.
 
 ### IEC 61850 Object Mapping
 
@@ -200,7 +200,7 @@ This mapping allows:
 
 ## Configuration Files
 
-### src/rpi_io/server/io_config.json
+### src/dr_panel/server/io_config.json
 
 Defines all IO devices and their configurations:
 - Device name, type, and identifier
@@ -211,7 +211,7 @@ Defines all IO devices and their configurations:
 - ACSI server integration settings
 - IEC 61850 object mappings
 
-### src/rpi_io/plugin/io_mapping.json
+### src/dr_panel/plugin/io_mapping.json
 
 Defines mappings between IEC 61850 objects and IO devices:
 - Which IO device corresponds to which IEC 61850 data object
@@ -356,7 +356,7 @@ use, and the free pins.
 
 | Issue                                  | Solution                                                                  |
 |----------------------------------------|---------------------------------------------------------------------------|
-| **Port already in use**                | Use different port: `PORT=8081 python -m rpi_io.server.main`                            |
+| **Port already in use**                | Use different port: `PORT=8081 python -m dr_panel.server.main`                            |
 | **gpiozero import error (Windows)**    | Normal - uses mock mode. Install gpiozero for Pi.                         |
 | **GPIO permission denied (Linux)**     | Run with sudo or add user to gpio group                                   |
 | **MCP3008 not detected**               | Check SPI wiring, enable SPI in raspi-config                              |
@@ -421,7 +421,7 @@ ls /dev/i2c*
 sudo i2cdetect -y 1
 ```
 
-Most PCF8574 backpacks use address **0x27** or **0x3F**. Set the address in `src/rpi_io/io_config.json` as a
+Most PCF8574 backpacks use address **0x27** or **0x3F**. Set the address in `src/dr_panel/io_config.json` as a
 decimal number (`39` is 0x27, `63` is 0x3F):
 
 ```json
@@ -453,12 +453,12 @@ Check the backpack's documentation for whether it needs 5V or 3.3V.
 
 ### Docker: its own stack
 
-`rpi-io` isn't in the demo's `docker-compose.yml`: it has its own here, and joins the same external network,
-`rti-network`, where the FSPs and SO reach it as `http://rpi-io:9000/plugin`.
+`dr-panel` isn't in the demo's `docker-compose.yml`: it has its own here, and joins the same external network,
+`rti-network`, where the FSPs and SO reach it as `http://dr-panel:9000/plugin`.
 
 ```bash
 docker network create rti-network 2>/dev/null || true
-cd examples/rti-plugins/rpi_io
+cd examples/rti-plugins/dr_panel
 docker compose up -d                                                      # anywhere (mock mode)
 docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d     # on the Raspberry Pi
 ```
@@ -470,7 +470,7 @@ persistent on the Pi.
 
 ### Configure Docker User for Hardware Access
 
-The `rpi-io` container runs as a configurable user with access to GPIO, I2C, and SPI groups. By default, the Dockerfile uses standard Raspberry Pi OS values for the `pi` user:
+The `dr-panel` container runs as a configurable user with access to GPIO, I2C, and SPI groups. By default, the Dockerfile uses standard Raspberry Pi OS values for the `pi` user:
 
 - `pi` user: UID=1000, GID=1000
 - `gpio` group: GID=986
@@ -481,7 +481,7 @@ If your system has different values, you can configure them in three ways:
 
 **Method 1: Auto-detect with username (Recommended)**
 Just pass the username - the script detects all IDs automatically (run
-from `examples/rti-plugins/rpi_io/`, so docker compose finds this
+from `examples/rti-plugins/dr_panel/`, so docker compose finds this
 project's compose files in the current directory):
 ```bash
 ./scripts/set_docker_user.sh pi && docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up --build
@@ -522,7 +522,7 @@ When running the IO service in Docker on the Pi, `docker-compose.pi.yaml` adds d
 Error response from daemon: error gathering device information while adding custom device "/dev/spidev0.0": no such file or directory
 ```
 
-This means the host system (Raspberry Pi) does not have the required device files. The `rpi-io` service in docker-compose.pi.yaml mounts the following devices by default:
+This means the host system (Raspberry Pi) does not have the required device files. The `dr-panel` service in docker-compose.pi.yaml mounts the following devices by default:
 
 - **GPIO**: `/dev/gpiochip0`, `/dev/gpiochip4`, `/dev/gpiochip10-13`
 - **I2C**: `/dev/i2c-1`, `/dev/i2c-13`, `/dev/i2c-14`
@@ -535,7 +535,7 @@ This means the host system (Raspberry Pi) does not have the required device file
    - For I2C: Enable I2C in `raspi-config` (Interface Options -> I2C -> Enable)
    - Reboot after enabling: `sudo reboot`
 
-2. **Remove unused device mappings** from `docker-compose.pi.yaml` if you don't need certain device types. Comment out or remove the corresponding lines under the `devices:` section for the `rpi-io` service.
+2. **Remove unused device mappings** from `docker-compose.pi.yaml` if you don't need certain device types. Comment out or remove the corresponding lines under the `devices:` section for the `dr-panel` service.
 
 3. **Verify device files exist** on the host:
    ```bash

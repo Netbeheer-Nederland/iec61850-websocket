@@ -5,7 +5,7 @@
 It implements the plugin API (examples/rti-demo/modules/plugins/openapi.yaml)
 under /plugin, so an FSP or SO configures
 
-    {"name": "io", "url": "http://rpi-io:9000/plugin"}
+    {"name": "io", "url": "http://dr-panel:9000/plugin"}
 
 and nothing of IO is installed in it. The FSP or SO tells it what happens
 (an association, an Operate, a write, a report); it shows that on its LEDs
@@ -62,7 +62,7 @@ class EventRequest(BaseModel):
 
 def _version() -> str:
     try:
-        return importlib.metadata.version("rpi-io")
+        return importlib.metadata.version("dr-panel")
     except importlib.metadata.PackageNotFoundError:
         return ""
 

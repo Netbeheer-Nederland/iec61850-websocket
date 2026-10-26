@@ -38,17 +38,19 @@ def test_old_name_is_gone(name):
     assert sorted(set(found) - ALLOWED) == []
 
 
-def test_the_io_server_code_is_rpi_io():
-    # Decision 0023 renamed rti_io to rpi_io; only the decision records keep
-    # the old name, as the paths they were written with, and the tests that
-    # check it is gone.
+@pytest.mark.parametrize("old", ["rti_io", "rpi_io", "rpi-io", "rti-io"])
+def test_the_io_server_code_is_dr_panel(old):
+    # Decision 0023 renamed rti_io to rpi_io, and 0038 rpi_io to dr_panel
+    # (image rti-io to dr-panel); only the decision records keep the old
+    # names, as the paths they were written with, and the tests that check
+    # they are gone.
     allowed = {
-        "examples/rti-plugins/rpi_io/tests/test_project.py",
+        "examples/rti-plugins/dr_panel/tests/test_project.py",
         "tests/unit/test_rti_demo_io_image.py",
         "tests/unit/test_rti_demo_io_names.py",
     }
     found = subprocess.run(
-        ["git", "grep", "-l", "-F", "rti_io"],
+        ["git", "grep", "-l", "-w", "-F", old],
         cwd=ROOT,
         capture_output=True,
         text=True,

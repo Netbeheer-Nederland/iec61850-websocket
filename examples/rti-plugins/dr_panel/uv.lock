@@ -258,7 +258,7 @@ wheels = [
 ]
 
 [[package]]
-name = "rpi-io"
+name = "dr-panel"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

@@ -7,7 +7,7 @@ A JSON file (PLUGINS_FILE), or the same JSON inline (PLUGINS):
     {
       "host_url": "http://rti-fsp01:5001",
       "plugins": [
-        {"name": "io", "url": "http://rpi-io:9000/plugin", "settings": {}}
+        {"name": "io", "url": "http://dr-panel:9000/plugin", "settings": {}}
       ]
     }
 

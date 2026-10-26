@@ -2,11 +2,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# The IO plugin, rpi-io: the IO server with the plugin API at /plugin
+# The IO plugin, dr-panel: the IO server with the plugin API at /plugin
 # (decisions 0028-0030). Its own stack, apart from the rti-demo's: the FSPs,
 # SO, BFF and HMI can run anywhere, the devices are on a Raspberry Pi. Both
 # join the external network rti-network, so the FSPs and SO reach it as
-# http://rpi-io:9000/plugin.
+# http://dr-panel:9000/plugin.
 #
 #   docker network create rti-network 2>/dev/null || true
 #   docker compose up -d
@@ -15,8 +15,8 @@
 # log an error at startup and stay unavailable. On the Raspberry Pi, add
 # docker-compose.pi.yaml to pass the Pi's devices in.
 services:
-  rpi-io:
-    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-io:${RTI_IMAGE_TAG:-latest}
+  dr-panel:
+    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/dr-panel:${RTI_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -27,7 +27,7 @@ services:
         GPIO_GID: ${GPIO_GID:-986}
         I2C_GID: ${I2C_GID:-988}
         SPI_GID: ${SPI_GID:-989}
-    container_name: rpi-io
+    container_name: dr-panel
     ports:
       - "9000:9000"
     # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
@@ -36,9 +36,9 @@ services:
     restart: unless-stopped
     # Health check already defined in the Dockerfile.
     labels:
-      - "rti.service=rpi-io"
+      - "rti.service=dr-panel"
       - "rti.type=RTI-IO"
-      - "rti.host=rpi-io"
+      - "rti.host=dr-panel"
       - "rti.port=9000"
 
 networks:
