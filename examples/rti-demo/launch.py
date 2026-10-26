@@ -82,17 +82,22 @@ class ServiceType(Enum):
     IO = "io"
 
 
-def rti_image(role: str) -> str:
-    """Image name for an RTI role, matching docker-compose.yml.
+def image(name: str) -> str:
+    """Image name, matching docker-compose.yml.
 
-    ${RTI_IMAGE_REPO}/rti-<role>:${RTI_IMAGE_TAG}, defaulting to the locally
-    built netbeheer-nederland/iec61850-websocket/rti-<role>:latest. Set
+    ${RTI_IMAGE_REPO}/<name>:${RTI_IMAGE_TAG}, defaulting to the locally
+    built netbeheer-nederland/iec61850-websocket/<name>:latest. Set
     RTI_IMAGE_REPO=ghcr.io/netbeheer-nederland/iec61850-websocket to run the
     images published from GitHub.
     """
     repo = os.environ.get("RTI_IMAGE_REPO", "netbeheer-nederland/iec61850-websocket")
     tag = os.environ.get("RTI_IMAGE_TAG", "latest")
-    return f"{repo}/rti-{role}:{tag}"
+    return f"{repo}/{name}:{tag}"
+
+
+def rti_image(role: str) -> str:
+    """Image name for an RTI role: rti-<role>."""
+    return image(f"rti-{role}")
 
 
 @dataclass
@@ -245,7 +250,8 @@ SERVICES: dict[ServiceType, ServiceConfig] = {
             "IO_CONFIG_FILE": "../../../rti-demo/config/io_config.json",
             "IO_MAPPING_FILE": "../../../rti-demo/config/io_mapping.json",
         },
-        docker_image=rti_image("io"),
+        # The IO plugin's image (decision 0038), as in docker-compose.io.yaml.
+        docker_image=image("dr-panel"),
         health_check_path="/api/io/health",
         labels={
             "rti.service": "dr-panel",

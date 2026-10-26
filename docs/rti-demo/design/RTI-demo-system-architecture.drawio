@@ -715,10 +715,10 @@
           <mxGeometry height="120" width="280" x="800" y="405" as="geometry" />
         </mxCell>
         <mxCell id="n17" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=#8b3cb8;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;dashed=1;" value="&lt;b&gt;dr-panel&lt;/b&gt; (opt-in)&lt;br&gt;IO server + plugin &lt;i&gt;io&lt;/i&gt;&lt;br&gt;:9000/plugin · routes /api/io&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;docker-compose.io.yaml: one for the FSPs and SO, instead of dr_leds&lt;/font&gt;" vertex="1">
-          <mxGeometry height="125" width="270" x="60" y="690" as="geometry" />
+          <mxGeometry height="125" width="270" x="66" y="690" as="geometry" />
         </mxCell>
         <mxCell id="n19" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="&lt;b&gt;dr-panel&lt;/b&gt; (opt-in)&lt;br&gt;IO server + plugin &lt;i&gt;io&lt;/i&gt;&lt;br&gt;:9000/plugin · routes /api/io&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;docker-compose.io.yaml: one for the FSPs and SO, instead of dr_leds&lt;/font&gt;" vertex="1">
-          <mxGeometry height="90" width="220" x="580" y="700" as="geometry" />
+          <mxGeometry height="90" width="220" x="1500" y="760" as="geometry" />
         </mxCell>
         <mxCell id="n20" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="&lt;b&gt;dr-leds-fsp02&lt;/b&gt;&lt;br&gt;plugin &lt;i&gt;dr_leds&lt;/i&gt;&lt;br&gt;:8099/plugin" vertex="1">
           <mxGeometry height="90" width="220" x="830" y="700" as="geometry" />
@@ -727,10 +727,10 @@
           <mxGeometry height="90" width="220" x="1110" y="700" as="geometry" />
         </mxCell>
         <mxCell id="n22" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#e4c5f7;fontColor=#303238;fontSize=12;fontStyle=0;align=left;verticalAlign=top;spacing=6;opacity=100;" value="&lt;b&gt;Default&lt;/b&gt;: docker-compose.leds.yaml, one dr_leds per instance (two simulated LEDs, no hardware). &lt;b&gt;FSP / SO → plugin&lt;/b&gt;: GET / (describe) · POST /start · /stop · /events · /control (FSP: Operates on claimed objRefs) · GET /attached. &lt;b&gt;HMI → BFF → instance&lt;/b&gt;: /api/plugins (list, add, edit, reload, remove) and /api/plugins/{name}/{path} → the plugin&#39;s own routes. Configuration: config/plugin-configuration/ (PLUGINS_FILE), PLUGIN_ALLOWED_SOURCES." vertex="1">
-          <mxGeometry height="75" width="990" x="360" y="815" as="geometry" />
+          <mxGeometry height="120" width="440" x="900" y="890" as="geometry" />
         </mxCell>
-        <mxCell id="n18" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffdb7d;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="&lt;b&gt;Physical IO devices&lt;/b&gt;&lt;br&gt;GPIO (LEDs, buttons) · SPI ADC (potentiometers) · I2C (SSD1306 OLED, LCD)&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;mock mode off the Pi; on the Pi with dr_panel/docker-compose.pi.yaml&lt;/font&gt;" vertex="1">
-          <mxGeometry height="90" width="640" x="66" y="1115" as="geometry" />
+        <mxCell id="n18" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffdb7d;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="&lt;b&gt;Physical IO devices&lt;/b&gt;&lt;br&gt;GPIO (LEDs, buttons) · SPI ADC (potentiometers) · I2C (OLED, LCD)&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;mock mode off the Pi; on the Pi with dr_panel/docker-compose.pi.yaml&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="424" x="66" y="1115" as="geometry" />
         </mxCell>
         <mxCell id="e19" edge="1" parent="1" source="n10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1959c4;endArrow=classic;endFill=1;fontSize=13;fontColor=#1959c4;labelBackgroundColor=#ffffff;dashed=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" target="n11" value="loads the app">
           <mxGeometry relative="1" as="geometry" />
@@ -790,8 +790,13 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e26" edge="1" parent="1" source="n16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#b46504;endArrow=classic;endFill=1;fontSize=13;fontColor=#b46504;labelBackgroundColor=#ffffff;dashed=0;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="n19" value="events, control,&lt;br&gt;attached">
-          <mxGeometry relative="1" x="0.6762" as="geometry" />
+        <mxCell id="e26" edge="1" parent="1" source="n16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#b46504;endArrow=classic;endFill=1;fontSize=13;fontColor=#b46504;labelBackgroundColor=#ffffff;dashed=0;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="7ZhRJVLlm_4iVBOSiFri-2" value="events, control,&lt;br&gt;attached">
+          <mxGeometry relative="1" x="0.6747" as="geometry">
+            <Array as="points">
+              <mxPoint x="870" y="570" />
+              <mxPoint x="670" y="570" />
+            </Array>
+          </mxGeometry>
         </mxCell>
         <mxCell id="e34" edge="1" parent="1" source="n16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#b46504;endArrow=classic;endFill=1;fontSize=13;fontColor=#b46504;labelBackgroundColor=#ffffff;dashed=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="n20" value="">
           <mxGeometry relative="1" as="geometry" />
@@ -851,6 +856,12 @@
         </mxCell>
         <mxCell id="8tcJ8k6AEhQGBQObWsZ0-13" parent="8tcJ8k6AEhQGBQObWsZ0-3" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontColor=default;fillColor=none;gradientColor=none;" value="protocol" vertex="1">
           <mxGeometry height="20" width="90" x="150" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="7ZhRJVLlm_4iVBOSiFri-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffdb7d;strokeColor=none;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" value="&lt;b&gt;Physical IO devices&lt;/b&gt;&lt;br&gt;GPIO (LEDs, buttons) · SPI ADC (potentiometers) · I2C (OLED, LCD)&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;mock mode off the Pi; on the Pi with dr_panel/docker-compose.pi.yaml&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="424" x="510" y="1115" as="geometry" />
+        </mxCell>
+        <mxCell id="7ZhRJVLlm_4iVBOSiFri-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=#8b3cb8;fontColor=#303238;fontSize=16;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;dashed=1;" value="&lt;b&gt;dr-panel&lt;/b&gt; (opt-in)&lt;br&gt;IO server + plugin &lt;i&gt;io&lt;/i&gt;&lt;br&gt;:9000/plugin · routes /api/io&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;docker-compose.io.yaml: one for the FSPs and SO, instead of dr_leds&lt;/font&gt;" vertex="1">
+          <mxGeometry height="125" width="270" x="535" y="700" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

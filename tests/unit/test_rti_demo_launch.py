@@ -4,6 +4,7 @@
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -182,3 +183,20 @@ def test_in_docker_the_io_server_is_named_after_its_plugin():
     module = _launch_module()
     assert module.container_name(module.ServiceType.IO) == "dr-panel"
     assert module.container_name(module.ServiceType.SO) == "rti-so"
+
+
+def test_in_docker_the_io_server_runs_the_dr_panel_image(launcher):
+    # The image docker-compose.io.yaml runs (decision 0038), not an rti-<role> one.
+    overlay = yaml.safe_load(
+        (LAUNCH_PY.parent / "docker-compose.io.yaml").read_text(encoding="utf-8")
+    )
+    service = overlay["services"]["dr-panel"]
+    repo = os.environ.get("RTI_IMAGE_REPO", "netbeheer-nederland/iec61850-websocket")
+    tag = os.environ.get("RTI_IMAGE_TAG", "latest")
+    expected = (
+        service["image"]
+        .replace("${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}", repo)
+        .replace("${RTI_IMAGE_TAG:-latest}", tag)
+    )
+    assert expected == f"{repo}/dr-panel:{tag}"
+    assert _config(launcher, "io").docker_image == expected
