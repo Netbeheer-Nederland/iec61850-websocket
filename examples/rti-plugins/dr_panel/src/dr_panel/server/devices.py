@@ -46,6 +46,7 @@ import logging
 import threading
 import time
 from abc import ABC, abstractmethod
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
@@ -184,6 +185,10 @@ class PotentiometerConfig(DeviceConfig):
     spi_bus: int = 0
     spi_device: int = 0
     spi_speed_hz: int = 1_000_000
+    averaging_window: int = (
+        10  # Number of raw samples in the moving average (1 disables)
+    )
+    sample_interval: float = 0.02  # Seconds between raw samples for the moving average
 
     def __post_init__(self):
         if self.identifier == 0 and self.adc_channel != 0:
@@ -206,6 +211,8 @@ class PotentiometerConfig(DeviceConfig):
                 "spi_bus": self.spi_bus,
                 "spi_device": self.spi_device,
                 "spi_speed_hz": self.spi_speed_hz,
+                "averaging_window": self.averaging_window,
+                "sample_interval": self.sample_interval,
             }
         )
         return result
@@ -707,6 +714,9 @@ class PotentiometerDevice(InputDevice):
         self._spi = None
         self._adc_type = None
         self._channel = 0
+        self._readings: deque[float] = deque(maxlen=max(1, config.averaging_window))
+        self._sampler_thread = None
+        self._stop_sampler = False
         self._value_change_threshold = (
             config.change_threshold
         )  # Use config's threshold (as a fraction of the range)
@@ -717,6 +727,9 @@ class PotentiometerDevice(InputDevice):
                 f"ADC not available for potentiometer '{config.name}'. Using mock mode."
             )
             self._hardware_available = True  # Allow operation in mock mode
+        # Moving-average smoothing is applied to MCP3008 ADCs only
+        if self._adc_type == self.ADC_MCP3008:
+            self._start_raw_sampler()
         # Start polling-based change detection for analog inputs
         # Uses threshold to avoid noise-triggered false changes
         # Calculate threshold in scaled units: config.change_threshold of the value range
@@ -813,6 +826,48 @@ class PotentiometerDevice(InputDevice):
             return 0
         return self._adc.read_adc(channel, gain=1)
 
+    def _read_raw(self) -> int:
+        """Take a single raw ADC reading."""
+        if self._adc_type == self.ADC_MCP3008:
+            return self._read_mcp3008(self._channel)
+        return self._read_ads1115(self._channel)
+
+    def _averaged_raw(self) -> float:
+        """Return the mean of the most recent raw ADC samples."""
+        if self._readings:
+            return sum(self._readings) / len(self._readings)
+        return float(self._read_raw())
+
+    def _start_raw_sampler(self) -> None:
+        """Continuously sample the ADC so read() can return a moving average."""
+        self._stop_sampler = False
+
+        def sampler_loop():
+            while not self._stop_sampler:
+                try:
+                    self._readings.append(self._read_raw())
+                except Exception as e:
+                    logger.debug(f"Raw ADC sample failed for '{self.config.name}': {e}")
+                time.sleep(self.config.sample_interval)
+
+        self._sampler_thread = threading.Thread(
+            target=sampler_loop,
+            daemon=True,
+            name=f"{self.config.name}-adc-sampler",
+        )
+        self._sampler_thread.start()
+        logger.info(
+            f"Started ADC sampler for '{self.config.name}': "
+            f"window={self._readings.maxlen} samples every {self.config.sample_interval}s"
+        )
+
+    def _stop_raw_sampler(self) -> None:
+        """Stop the background raw ADC sampler."""
+        self._stop_sampler = True
+        if self._sampler_thread is not None:
+            self._sampler_thread.join(timeout=1.0)
+            self._sampler_thread = None
+
     def read(self, scaled: bool = True) -> float | None:
         """
         Read the current value from the potentiometer.
@@ -828,7 +883,8 @@ class PotentiometerDevice(InputDevice):
             return None
         try:
             if self._adc_type == self.ADC_MCP3008:
-                raw = self._read_mcp3008(self._channel)
+                # raw = self._read_mcp3008(self._channel)
+                raw = self._averaged_raw()
                 max_value = 1023
             elif self._adc_type == self.ADC_ADS1115:
                 raw = self._read_ads1115(self._channel)
@@ -895,6 +951,7 @@ class PotentiometerDevice(InputDevice):
         # Stop monitoring thread
         super().close()
         # Clean up hardware
+        self._stop_raw_sampler()
         if self._spi:
             try:
                 self._spi.close()

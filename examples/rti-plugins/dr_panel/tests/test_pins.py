@@ -137,6 +137,8 @@ def test_potentiometer_settings_survive_a_save():
         is_inverted=True,
         change_threshold=0.1,
         adc_reference_voltage=5.0,
+        averaging_window=16,
+        sample_interval=0.05,
     )
     again = _dict_to_config(_config_to_dict(pot))
     assert (
@@ -146,6 +148,8 @@ def test_potentiometer_settings_survive_a_save():
         again.change_threshold,
         again.adc_reference_voltage,
         again.adc_channel,
+        again.averaging_window,
+        again.sample_interval,
     ) == (1, 500_000, True, 0.1, 5.0, 2)
 
 

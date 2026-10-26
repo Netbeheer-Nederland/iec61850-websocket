@@ -143,6 +143,8 @@ def _config_to_dict(config: DeviceConfig) -> dict[str, Any]:
         base_dict["spi_bus"] = getattr(config, "spi_bus", 0)
         base_dict["spi_device"] = getattr(config, "spi_device", 0)
         base_dict["spi_speed_hz"] = getattr(config, "spi_speed_hz", 1_000_000)
+        base_dict["averaging_window"] = getattr(config, "averaging_window", 10)
+        base_dict["sample_interval"] = getattr(config, "sample_interval", 0.02)
 
     elif config.device_type == DeviceType.PWM:
         base_dict["type"] = "pwm"
@@ -228,6 +230,8 @@ def _dict_to_config(device_dict: dict[str, Any]) -> DeviceConfig | None:
                 spi_bus=device_dict.get("spi_bus", 0),
                 spi_device=device_dict.get("spi_device", 0),
                 spi_speed_hz=device_dict.get("spi_speed_hz", 1_000_000),
+                averaging_window=device_dict.get("averaging_window", 10),
+                sample_interval=device_dict.get("sample_interval", 0.02),
             )
 
         elif device_type_str == "pwm" or device_dict.get("type") == "pwm":
