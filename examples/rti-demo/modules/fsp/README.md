@@ -220,7 +220,7 @@ and decisions [0021](../../../../docs/rti-demo/decisions/0021-acsi-plugin-host.m
 
 The IO server ([`rti-plugins/dr_panel`](../../../rti-plugins/dr_panel/README.md)) is the FSP's IO plugin: compose
 configures it in `config/plugin-configuration/io/rti-fsp01.json` (`http://dr-panel:9000/plugin`, with the overlay
-`docker-compose.io.yaml`; by default each FSP connects to its own `sim_leds`), `launch.py` in `PLUGINS`
+`docker-compose.io.yaml`; by default each FSP connects to its own `dr_leds`), `launch.py` in `PLUGINS`
 (`http://localhost:9000/plugin`). The first FSP gets the input devices' changes (the button, the potentiometers); the second FSP's configuration says
 `"write_inputs": false`. Which devices react to which event or objRef is the IO server's
 `io_mapping.json`; see the *Hardware demo* section of `examples/rti-demo/README.md`.

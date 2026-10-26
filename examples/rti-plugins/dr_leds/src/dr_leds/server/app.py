@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""The sim_leds app: the LEDs' own routes and the plugin API.
+"""The dr_leds app: the LEDs' own routes and the plugin API.
 
-Routes, under /api/plugins/sim_leds/ in the FSP or SO:
+Routes, under /api/plugins/dr_leds/ in the FSP or SO:
 - GET  /leds              the LEDs and what changed them;
 - POST /leds/{color}      {"on": true|false}, set one by hand;
 - POST /leds/reset        both off.
@@ -53,7 +53,7 @@ def create_app(leds: SimulatedLeds | None = None) -> FastAPI:
         yield
         await leds.close()
 
-    app = FastAPI(title="sim_leds plugin", lifespan=lifespan)
+    app = FastAPI(title="dr_leds plugin", lifespan=lifespan)
     app.include_router(create_plugin_router(leds))
     app.include_router(create_leds_router(leds))
     app.state.leds = leds

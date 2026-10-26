@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""The sample plugin sim_leds is an HTTP service on the plugin API: an FSP
+"""The sample plugin dr_leds is an HTTP service on the plugin API: an FSP
 connects to it from its plugin configuration and its LEDs show the events
 (decision 0029; modules/plugins/GETTING_STARTED.md in examples/rti-demo).
 
@@ -22,30 +22,30 @@ from acsi_plugins import (
 )
 from acsi_plugins.web import PluginService, attach
 from fastapi import FastAPI
-from sim_leds.plugin import plugin
-from sim_leds.server.app import create_app
+from dr_leds.plugin import plugin
+from dr_leds.server.app import create_app
 
 pytestmark = pytest.mark.unit
 
-URL = "http://sim-leds.test/plugin"
+URL = "http://dr-leds.test/plugin"
 POS = "LD0/CSWI1.Pos.Oper.ctlVal"
 
 
 @pytest.fixture
 async def setup(monkeypatch):
-    monkeypatch.setenv("SIM_LEDS_CLAIMS", POS)
+    monkeypatch.setenv("DR_LEDS_CLAIMS", POS)
     plugin_app = create_app()
 
     def plugin_client():
         return httpx.AsyncClient(
             transport=httpx.ASGITransport(app=plugin_app),
-            base_url="http://sim-leds.test",
+            base_url="http://dr-leds.test",
         )
 
     host = PluginHost(role="fsp", host_url="http://fsp.test:5001")
     service = PluginService(
         host,
-        configured=[PluginEntry("sim_leds", URL, {"blink_seconds": 0.05})],
+        configured=[PluginEntry("dr_leds", URL, {"blink_seconds": 0.05})],
         client_factory=plugin_client,
         retry_seconds=0,
     )
@@ -67,13 +67,13 @@ async def deliver(host, event):
 
 
 async def leds(client):
-    return (await client.get("/api/plugins/sim_leds/leds")).json()["leds"]
+    return (await client.get("/api/plugins/dr_leds/leds")).json()["leds"]
 
 
 async def test_the_fsp_connects_to_it(setup):
     _, client = setup
-    body = (await client.get("/api/plugins/sim_leds")).json()
-    # From the package metadata: "" here, where sim-leds isn't installed.
+    body = (await client.get("/api/plugins/dr_leds")).json()
+    # From the package metadata: "" here, where dr-leds isn't installed.
     assert body["version"] == plugin._version()
     assert body["claims"] == [POS]
     assert body["healthy"] is True
@@ -86,7 +86,7 @@ async def test_an_association_turns_green_on_and_a_disconnect_turns_it_off(setup
     assert await leds(client) == {"red": False, "green": True}
     await deliver(host, ServerStopped())
     assert await leds(client) == {"red": False, "green": False}
-    history = (await client.get("/api/plugins/sim_leds/leds")).json()["history"]
+    history = (await client.get("/api/plugins/dr_leds/leds")).json()["history"]
     assert history[-1]["reason"] == "disconnected"
 
 
@@ -94,7 +94,7 @@ async def test_a_failed_operate_turns_red_on_until_a_good_one(setup):
     host, client = setup
     await deliver(host, OperateResponse(success=False, add_cause="blockedByMode"))
     assert (await leds(client))["red"] is True
-    history = (await client.get("/api/plugins/sim_leds/leds")).json()["history"]
+    history = (await client.get("/api/plugins/dr_leds/leds")).json()["history"]
     assert history[-1]["reason"] == "operate failed: blockedByMode"
     await deliver(host, OperateResponse(success=True))
     assert (await leds(client))["red"] is False
@@ -121,18 +121,18 @@ async def test_a_failed_write_or_read_turns_red_on(setup, event):
 async def test_an_operate_is_refused_while_red_is_on(setup):
     host, client = setup
     assert await asyncio.to_thread(host.handle_control, POS, {}) is None
-    await client.post("/api/plugins/sim_leds/leds/red", json={"on": True})
+    await client.post("/api/plugins/dr_leds/leds/red", json={"on": True})
     answer = await asyncio.to_thread(host.handle_control, POS, {})
     assert (answer.ok, answer.add_cause) == (False, "blockedByInterlocking")
 
 
 async def test_an_led_can_be_set_and_reset_by_hand(setup):
     _, client = setup
-    await client.post("/api/plugins/sim_leds/leds/red", json={"on": True})
+    await client.post("/api/plugins/dr_leds/leds/red", json={"on": True})
     assert (await leds(client))["red"] is True
-    await client.post("/api/plugins/sim_leds/leds/reset")
+    await client.post("/api/plugins/dr_leds/leds/reset")
     assert await leds(client) == {"red": False, "green": False}
-    response = await client.post("/api/plugins/sim_leds/leds/blue", json={"on": True})
+    response = await client.post("/api/plugins/dr_leds/leds/blue", json={"on": True})
     assert response.status_code == 404
 
 

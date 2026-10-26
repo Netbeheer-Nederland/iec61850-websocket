@@ -60,3 +60,26 @@ def test_the_io_server_code_is_dr_panel(old):
         for f in found
         if not f.startswith("docs/rti-demo/decisions/") and f not in allowed
     ] == []
+
+
+# Links to decision 0034 keep the file name it was written with.
+DECISION_0034 = "0034-demo-stack-plugins-sim-leds-io-opt-in.md"
+
+
+@pytest.mark.parametrize("old", ["sim_leds", "sim-leds", "SIM_LEDS"])
+def test_the_sample_plugin_is_dr_leds(old):
+    # Decision 0039 renamed sim_leds to dr_leds (sim-leds to dr-leds); only the
+    # decision records keep the old names, and this test.
+    found = subprocess.run(
+        ["git", "grep", "-l", "-F", old],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+    assert [
+        f
+        for f in found
+        if not f.startswith("docs/rti-demo/decisions/")
+        and f != "tests/unit/test_rti_demo_io_names.py"
+        and old in (ROOT / f).read_text().replace(DECISION_0034, "")
+    ] == []

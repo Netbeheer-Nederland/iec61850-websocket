@@ -49,5 +49,6 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0036](0036-plugin-definitions-editable.md) | A plugin's definition (URL, settings) can be edited, until the FSP or SO restarts | proposed |
 | [0037](0037-plugin-allowed-sources-wildcards.md) | Allowed plugin sources take wildcards; `*` alone allows any URL, and is the default | proposed |
 | [0038](0038-io-plugin-name-dr-panel.md) | The IO plugin's code, project and image are `dr_panel` / `dr-panel` | proposed |
+| [0039](0039-sample-plugin-name-dr-leds.md) | The sample plugin's name, code, project and image are `dr_leds` / `dr-leds` | proposed |
 
 To add a decision, copy the layout of an existing record, take the next number, and add a line to this table.

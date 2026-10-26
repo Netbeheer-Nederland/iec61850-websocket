@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Opt-in: the IO server (dr-panel) as the FSPs' and SO's plugin, instead of
-# sim_leds (decision 0034). An overlay on docker-compose.yml:
+# dr_leds (decision 0034). An overlay on docker-compose.yml:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.io.yaml up -d
 #
@@ -40,7 +40,7 @@ services:
     container_name: dr-panel
 
   # The FSPs and SO connect to it, from config/plugin-configuration/io/
-  # mounted over the default configuration (sim_leds).
+  # mounted over the default configuration (dr_leds).
   rti-fsp01:
     volumes:
       - ./config/plugin-configuration/io/rti-fsp01.json:/plugins/plugins.json:ro

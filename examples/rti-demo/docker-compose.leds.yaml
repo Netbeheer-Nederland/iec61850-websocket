@@ -2,35 +2,35 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# The demo's default plugins: one sim_leds (two simulated LEDs, no hardware)
+# The demo's default plugins: one dr_leds (two simulated LEDs, no hardware)
 # per FSP and SO, which config/plugin-configuration/ points them at (decision
 # 0034). An overlay on docker-compose.yml:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.leds.yaml up -d
 #
 # or COMPOSE_FILE=docker-compose.yml:docker-compose.leds.yaml in .env. Without
-# it the FSPs and SO list sim_leds as failed and try again every 10 s.
-# The image is built from examples/rti-plugins/sim_leds; it isn't published.
-x-sim-leds: &sim-leds
-  image: sim-leds
+# it the FSPs and SO list dr_leds as failed and try again every 10 s.
+# The image is built from examples/rti-plugins/dr_leds; it isn't published.
+x-dr-leds: &dr-leds
+  image: dr-leds
   build:
-    context: ../rti-plugins/sim_leds
+    context: ../rti-plugins/dr_leds
     dockerfile: docker/Dockerfile
   networks:
     - rti-network
   restart: unless-stopped
   # Port 8099 and the health check are set by the Dockerfile; nothing is
-  # published: the HMI reaches the LEDs through /api/plugins/sim_leds/.
+  # published: the HMI reaches the LEDs through /api/plugins/dr_leds/.
 
 services:
-  sim-leds-fsp01:
-    <<: *sim-leds
-    container_name: sim-leds-fsp01
+  dr-leds-fsp01:
+    <<: *dr-leds
+    container_name: dr-leds-fsp01
 
-  sim-leds-fsp02:
-    <<: *sim-leds
-    container_name: sim-leds-fsp02
+  dr-leds-fsp02:
+    <<: *dr-leds
+    container_name: dr-leds-fsp02
 
-  sim-leds-so:
-    <<: *sim-leds
-    container_name: sim-leds-so
+  dr-leds-so:
+    <<: *dr-leds
+    container_name: dr-leds-so

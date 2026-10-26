@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 [project]
-name = "sim-leds"
+name = "dr-leds"
 version = "2.0.0"
 description = "Sample rti-demo plugin: two simulated LEDs that show what the FSP or SO does"
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-sim-leds = "sim_leds.server.main:main"
+dr-leds = "dr_leds.server.main:main"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
@@ -26,7 +26,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 # The tests run in the plugin host's environment (acsi-plugins), which
-# doesn't install this project; pythonpath makes sim_leds importable there.
+# doesn't install this project; pythonpath makes dr_leds importable there.
 pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"

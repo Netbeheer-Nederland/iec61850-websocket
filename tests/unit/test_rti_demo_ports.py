@@ -146,26 +146,26 @@ def _plugin_config(compose_services, service):
 @pytest.mark.parametrize(
     ("service", "role"), [("rti-so", "so"), ("rti-fsp01", "fsp"), ("rti-fsp02", "fsp2")]
 )
-def test_compose_connects_sim_leds_and_names_the_way_back(
+def test_compose_connects_dr_leds_and_names_the_way_back(
     compose, leds_compose, service, role
 ):
     # Plugins over HTTP, from the plugin configuration (decision 0029): by
-    # default each FSP and SO its own sim_leds, run by docker-compose.leds.yaml
+    # default each FSP and SO its own dr_leds, run by docker-compose.leds.yaml
     # (decision 0034).
     assert "PLUGINS_FILE=/plugins/plugins.json" in compose[service]["environment"]
     config = _plugin_config(compose, service)
     assert config["host_url"] == f"http://{service}:{EXPECTED_PORTS[role]}"
     [leds] = config["plugins"]
-    assert leds["name"] == "sim_leds"
-    sim = service.replace("rti-", "sim-leds-")
+    assert leds["name"] == "dr_leds"
+    sim = service.replace("rti-", "dr-leds-")
     assert leds["url"] == f"http://{sim}:8099/plugin"
     assert leds_compose[sim]["networks"] == ["rti-network"]
 
 
-def test_the_leds_overlay_runs_only_sim_leds(leds_compose):
-    assert set(leds_compose) == {"sim-leds-fsp01", "sim-leds-fsp02", "sim-leds-so"}
+def test_the_leds_overlay_runs_only_dr_leds(leds_compose):
+    assert set(leds_compose) == {"dr-leds-fsp01", "dr-leds-fsp02", "dr-leds-so"}
     for svc in leds_compose.values():
-        assert svc["image"] == "sim-leds"
+        assert svc["image"] == "dr-leds"
         assert "ports" not in svc
 
 

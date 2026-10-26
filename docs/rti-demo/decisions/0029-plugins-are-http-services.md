@@ -108,6 +108,7 @@ Three ways were considered:
   now the wire format) and its version 1, and the `io/plugin` folder of [0028](0028-rti-plugins-folder.md). The
   approach of 0027 (a hand-written spec kept in step by a test) and the rest of 0028 stand.
 - Review once a second plugin, written outside this repository, runs against version 2.
+- Superseded in [0039](0039-sample-plugin-name-dr-leds.md): the plugin name and folder `sim_leds` are now `dr_leds`.
 
 ## In the code
 

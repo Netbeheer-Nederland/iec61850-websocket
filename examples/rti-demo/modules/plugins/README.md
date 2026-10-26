@@ -26,7 +26,7 @@ keeps it in step with the code (decision [0027](../../../../docs/rti-demo/decisi
 | `web.py` | `PluginService` (connect the configured plugins, retry, add, edit, reload, remove) and the routes |
 
 The plugins themselves, and the IO server, are in [`examples/rti-plugins`](../../../rti-plugins/README.md) (decision
-[0028](../../../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)). `sim_leds` there is a small sample, and
+[0028](../../../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)). `dr_leds` there is a small sample, and
 [GETTING_STARTED.md](GETTING_STARTED.md) starts from it.
 
 ## The plugin API
@@ -96,7 +96,7 @@ An FSP or SO connects to the plugins in its **plugin configuration** at startup:
 
 A plugin that can't be reached doesn't stop the FSP or SO: it is listed under `failed` in `GET /api/plugins` and tried
 again every `PLUGIN_RETRY_SECONDS`, so plugin services and the FSP or SO can start in any order. The demo's
-configurations are in [`config/plugin-configuration/`](../../config/plugin-configuration) (compose: `sim_leds` by
+configurations are in [`config/plugin-configuration/`](../../config/plugin-configuration) (compose: `dr_leds` by
 default, the IO server in `io/` with the overlay `docker-compose.io.yaml`) and `launch.py`.
 
 | Variable | Default | Description |
@@ -120,7 +120,7 @@ curl -X DELETE http://localhost:5001/api/plugins/io             # stop it until 
 
 # Add one until the FSP stops, from an allowed source
 curl -X POST http://localhost:5001/api/plugins -H 'Content-Type: application/json' \
-  -d '{"name": "sim_leds", "url": "http://localhost:8099/plugin", "settings": {"blink_seconds": 1}}'
+  -d '{"name": "dr_leds", "url": "http://localhost:8099/plugin", "settings": {"blink_seconds": 1}}'
 ```
 
 **Editing** (`PUT /api/plugins/{name}`, decision

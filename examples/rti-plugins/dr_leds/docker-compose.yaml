@@ -2,26 +2,26 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# The sample plugin sim_leds, its own stack (decision 0030). It joins the
+# The sample plugin dr_leds, its own stack (decision 0030). It joins the
 # external network rti-network, so the FSPs and SO reach it as
-# http://sim-leds:8099/plugin.
+# http://dr-leds:8099/plugin.
 #
 #   docker network create rti-network 2>/dev/null || true
 #   docker compose up -d
 #
 # It has no hardware, so it has no docker-compose.pi.yaml. The port is
-# published on 127.0.0.1; set SIM_LEDS_BIND=0.0.0.0 to reach it from the LAN.
+# published on 127.0.0.1; set DR_LEDS_BIND=0.0.0.0 to reach it from the LAN.
 services:
-  sim-leds:
+  dr-leds:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    image: sim-leds
-    container_name: sim-leds
+    image: dr-leds
+    container_name: dr-leds
     environment:
-      - SIM_LEDS_CLAIMS=${SIM_LEDS_CLAIMS:-}
+      - DR_LEDS_CLAIMS=${DR_LEDS_CLAIMS:-}
     ports:
-      - "${SIM_LEDS_BIND:-127.0.0.1}:${SIM_LEDS_PORT:-8099}:8099"
+      - "${DR_LEDS_BIND:-127.0.0.1}:${DR_LEDS_PORT:-8099}:8099"
     networks:
       - rti-network
     restart: unless-stopped

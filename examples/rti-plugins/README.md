@@ -18,7 +18,7 @@ imports them: each plugin runs, is built and is released on its own. The decisio
 | Folder | What it is | Its plugin URL | Runs on |
 |---|---|---|---|
 | [`dr_panel`](dr_panel/README.md) | The IO plugin, `dr_panel` (image `dr-panel`, plugin name `io`): the IO server with the LEDs, buttons, potentiometers and displays, and the plugin API | `http://dr-panel:9000/plugin` | the Raspberry Pi; mock mode elsewhere |
-| [`sim_leds`](sim_leds/README.md) | A sample plugin: two simulated LEDs, FastAPI only | `http://localhost:8099/plugin` | anywhere |
+| [`dr_leds`](dr_leds/README.md) | A sample plugin: two simulated LEDs, FastAPI only | `http://localhost:8099/plugin` | anywhere |
 
 ## The layout of a plugin
 
@@ -51,7 +51,7 @@ The plugin depends on the server, not the other way round, and nothing in `src/`
 `tests/unit/test_rti_plugins_source_layout.py` checks every plugin here.
 
 To write your own plugin, start with [`GETTING_STARTED.md`](../rti-demo/modules/plugins/GETTING_STARTED.md), which walks
-through `sim_leds`. A new integration is a new folder here (or anywhere else) and an entry in the FSP's or SO's plugin
+through `dr_leds`. A new integration is a new folder here (or anywhere else) and an entry in the FSP's or SO's plugin
 configuration:
 
 ```json
@@ -62,7 +62,7 @@ configuration:
 
 Each plugin has its own compose file, apart from the demo stack; the IO plugin is built for and runs on the Raspberry
 Pi. All stacks join the external network `rti-network`, where the FSPs and SO reach the plugins' APIs as
-`http://dr-panel:9000/plugin` and `http://sim-leds:8099/plugin`. The demo stack runs its own sim_leds, one per FSP and SO,
+`http://dr-panel:9000/plugin` and `http://dr-leds:8099/plugin`. The demo stack runs its own dr_leds, one per FSP and SO,
 with its overlay `docker-compose.leds.yaml`, and connects to the IO server only with `docker-compose.io.yaml`
 (decision [0034](../../docs/rti-demo/decisions/0034-demo-stack-plugins-sim-leds-io-opt-in.md)).
 
@@ -73,7 +73,7 @@ cd examples/rti-plugins/dr_panel
 docker compose up -d                                                      # anywhere (mock mode)
 docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d     # on the Raspberry Pi
 
-cd ../sim_leds
+cd ../dr_leds
 docker compose up -d
 ```
 
@@ -95,7 +95,7 @@ The ones a plugin author needs:
 | [0029](../../docs/rti-demo/decisions/0029-plugins-are-http-services.md) | Plugins are HTTP services the FSP and SO connect to, from a plugin configuration |
 | [0030](../../docs/rti-demo/decisions/0030-plugin-project-layout.md) | Every plugin is a project with one layout |
 | [0031](../../docs/rti-demo/decisions/0031-plugin-source-layout.md) | `server/` is the service, `plugin/` the plugin API, and the plugin depends on the server |
-| [0034](../../docs/rti-demo/decisions/0034-demo-stack-plugins-sim-leds-io-opt-in.md) | The demo stack uses sim_leds by default; the IO server is opt-in |
+| [0034](../../docs/rti-demo/decisions/0034-demo-stack-plugins-sim-leds-io-opt-in.md) | The demo stack uses dr_leds by default; the IO server is opt-in |
 | [0036](../../docs/rti-demo/decisions/0036-plugin-definitions-editable.md) | A plugin's URL and settings can be edited, until the FSP or SO restarts |
 | [0037](../../docs/rti-demo/decisions/0037-plugin-allowed-sources-wildcards.md) | `PLUGIN_ALLOWED_SOURCES` takes wildcards; `*` alone allows any URL |
 
@@ -106,7 +106,7 @@ Planned changes to the plugin contract (disable, settings schema, check, clear e
 
 ```bash
 uv run --package fsp pytest examples/rti-plugins/dr_panel/tests -m unit -q   # not a workspace member; needs FastAPI and the plugin host
-uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q
+uv run --package acsi-plugins pytest examples/rti-plugins/dr_leds/tests -m unit -q
 ```
 
 Both connect the FSP's plugin service (`acsi_plugins`) to the plugin's app, with no network: the plugins themselves

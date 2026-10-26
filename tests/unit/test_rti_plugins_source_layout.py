@@ -47,7 +47,7 @@ def _imports_plugin(path: Path) -> bool:
 
 
 def test_the_plugins_are_found():
-    assert [p.name for p in PROJECTS] == ["dr_panel", "sim_leds"]
+    assert [p.name for p in PROJECTS] == ["dr_leds", "dr_panel"]
 
 
 @pytest.fixture(params=PROJECTS, ids=lambda p: p.name)

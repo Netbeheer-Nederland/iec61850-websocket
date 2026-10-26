@@ -2,8 +2,8 @@
   "host_url": "http://rti-so:5000",
   "plugins": [
     {
-      "name": "sim_leds",
-      "url": "http://sim-leds-so:8099/plugin"
+      "name": "dr_leds",
+      "url": "http://dr-leds-so:8099/plugin"
     }
   ]
 }

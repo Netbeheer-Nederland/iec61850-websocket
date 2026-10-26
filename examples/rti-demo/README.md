@@ -138,11 +138,11 @@ directly, without retagging.
 
 ```shell
 cd examples/rti-demo
-docker compose -f docker-compose.yml -f docker-compose.leds.yaml build   # -> netbeheer-nederland/iec61850-websocket/rti-<role>:latest, and sim-leds
+docker compose -f docker-compose.yml -f docker-compose.leds.yaml build   # -> netbeheer-nederland/iec61850-websocket/rti-<role>:latest, and dr-leds
 docker compose -f docker-compose.yml -f docker-compose.leds.yaml up -d
 ```
 
-`docker-compose.leds.yaml` runs the demo's default plugins: one `sim_leds` per FSP and SO (see *Plugins* below).
+`docker-compose.leds.yaml` runs the demo's default plugins: one `dr_leds` per FSP and SO (see *Plugins* below).
 To save typing, put `COMPOSE_FILE=docker-compose.yml:docker-compose.leds.yaml` in `examples/rti-demo/.env`.
 
 An available `docker-compose.override.yml` is loaded automatically when no `-f` is given, and bind-mounts the module
@@ -156,7 +156,7 @@ cd examples/rti-demo
 export RTI_IMAGE_REPO=ghcr.io/netbeheer-nederland/iec61850-websocket
 export RTI_IMAGE_TAG=latest
 docker compose -f docker-compose.yml pull
-docker compose -f docker-compose.yml -f docker-compose.leds.yaml build sim-leds-fsp01   # sim-leds isn't published
+docker compose -f docker-compose.yml -f docker-compose.leds.yaml build dr-leds-fsp01   # dr-leds isn't published
 docker compose -f docker-compose.yml -f docker-compose.leds.yaml up -d --no-build
 ```
 
@@ -165,7 +165,7 @@ published images and not your local checkout. `--no-build` stops compose from bu
 that could not be pulled. Put the two variables in `examples/rti-demo/.env` to make the setting
 persistent.
 
-### Plugins: sim_leds by default, the IO server opt-in
+### Plugins: dr_leds by default, the IO server opt-in
 
 The FSPs and SO connect to the plugins in their plugin configuration, `config/plugin-configuration/` (decisions
 [0029](../../docs/rti-demo/decisions/0029-plugins-are-http-services.md),
@@ -173,10 +173,10 @@ The FSPs and SO connect to the plugins in their plugin configuration, `config/pl
 
 | Overlay | Plugins | Needs |
 |---|---|---|
-| `docker-compose.leds.yaml` (default) | One [`sim_leds`](../rti-plugins/sim_leds/README.md) each (`sim-leds-fsp01`, `sim-leds-fsp02`, `sim-leds-so`): two simulated LEDs that follow the association, Operates, writes and reports | nothing |
+| `docker-compose.leds.yaml` (default) | One [`dr_leds`](../rti-plugins/dr_leds/README.md) each (`dr-leds-fsp01`, `dr-leds-fsp02`, `dr-leds-so`): two simulated LEDs that follow the association, Operates, writes and reports | nothing |
 | `docker-compose.io.yaml` | One IO server for all three, `dr-panel` (`http://dr-panel:9000/plugin`), from `config/plugin-configuration/io/` | nothing; on the Raspberry Pi also `-f ../rti-plugins/dr_panel/docker-compose.pi.yaml` for its devices (below) |
 
-Without either overlay the FSPs and SO list `sim_leds` as failed, show a red plugin badge, and try again every 10 s;
+Without either overlay the FSPs and SO list `dr_leds` as failed, show a red plugin badge, and try again every 10 s;
 the rest of the demo works.
 
 A plugin's settings can be edited in the HMI's Plugins panel (✎, decision
@@ -195,7 +195,7 @@ The IO server, `dr-panel`, isn't part of `docker-compose.yml`: it is meant for t
 [`examples/rti-plugins/dr_panel`](../rti-plugins/dr_panel/README.md) (decision
 [0028](../../docs/rti-demo/decisions/0028-rti-plugins-folder.md)). It joins `rti-network` too, so the FSPs and SO reach
 it as `http://dr-panel:9000/plugin`. The FSPs and SO connect to it only with the overlay `docker-compose.io.yaml`;
-by default they use sim_leds. That overlay also runs `dr-panel` itself, so on a Pi that runs the whole demo one command
+by default they use dr_leds. That overlay also runs `dr-panel` itself, so on a Pi that runs the whole demo one command
 does it (don't also start the stack below then: both are `dr-panel`):
 
 ```shell
@@ -376,11 +376,11 @@ rti-demo/
 ├── launch.py                  # Main entry point
 ├── README.md                  # This file
 ├── docker-compose.yml         # bff, hmi, fsp01, fsp02, so (dr-panel: its own stack)
-├── docker-compose.leds.yaml   # overlay: a sim_leds per FSP and SO, the default plugins
+├── docker-compose.leds.yaml   # overlay: a dr_leds per FSP and SO, the default plugins
 ├── docker-compose.io.yaml     # overlay: the FSPs and SO connect to the IO server instead
 ├── config/
 │   ├── launch_config.json.example
-│   ├── plugin-configuration/  # the plugins each FSP and SO connects to (compose): sim_leds; io/: the IO server
+│   ├── plugin-configuration/  # the plugins each FSP and SO connects to (compose): dr_leds; io/: the IO server
 │   └── models/                # IED model files (model_1.py, model_2.py)
 └── modules/
     ├── bff/       { pyproject.toml, docker/Dockerfile, src/bff/, tests/ }
@@ -392,8 +392,8 @@ rti-demo/
 rti-plugins/                   # the plugins the FSP and SO connect to (decisions 0028-0030)
 ├── io/          { pyproject.toml, docker-compose.yaml, docker-compose.pi.yaml, docker/Dockerfile,
 │                  scripts/, src/dr_panel/{server,plugin}/, tests/ }  # the IO plugin (Raspberry Pi)
-└── sim_leds/    { pyproject.toml, docker-compose.yaml, docker/Dockerfile,
-                   src/sim_leds/{server,plugin}/, tests/ }          # a sample plugin (FastAPI)
+└── dr_leds/    { pyproject.toml, docker-compose.yaml, docker/Dockerfile,
+                   src/dr_leds/{server,plugin}/, tests/ }          # a sample plugin (FastAPI)
 ```
 
 `bff`, `fsp`, `so` and `plugins` are members of a single uv

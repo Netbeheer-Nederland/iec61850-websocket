@@ -81,9 +81,9 @@ uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m 
 # examples/rti-plugins (decisions 0028-0030): the IO plugin and the
 # sample plugin. They aren't workspace members; the IO plugin's tests need
 # FastAPI and the plugin host, so they run in the fsp environment.
-# sim_leds runs in the plugin host's environment, which its tests connect.
+# dr_leds runs in the plugin host's environment, which its tests connect.
 uv run --package fsp pytest examples/rti-plugins/dr_panel/tests -m unit -q
-uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q
+uv run --package acsi-plugins pytest examples/rti-plugins/dr_leds/tests -m unit -q
 ```
 
 The `-m unit` flag matters: this project defines two pytest markers,
@@ -154,10 +154,10 @@ examples/rti-plugins/ (decisions 0028-0030); not workspace members - see above
 │   ├── src/dr_panel/plugin/        # plugin.py, mapping.py, io_mapping.json: the plugin API
 │   └── tests/test_plugin.py, test_no_plugin_files.py, test_server_config.py,
 │       test_project.py, test_pins.py
-└── sim_leds/   # a sample plugin (modules/plugins/GETTING_STARTED.md)
+└── dr_leds/   # a sample plugin (modules/plugins/GETTING_STARTED.md)
     ├── pyproject.toml, uv.lock, docker-compose.yaml
-    ├── src/sim_leds/server/, src/sim_leds/plugin/
-    └── tests/test_sim_leds.py, test_project.py
+    ├── src/dr_leds/server/, src/dr_leds/plugin/
+    └── tests/test_dr_leds.py, test_project.py
 ```
 
 `fsp` and `so` are each tested through a `fastapi.testclient.TestClient`
@@ -278,7 +278,7 @@ rm -rf dist
   && (uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q) \
   && (uv run --package acsi-plugins pytest examples/rti-demo/modules/plugins/tests -m unit -q) \
   && (uv run --package fsp pytest examples/rti-plugins/dr_panel/tests -m unit -q) \
-  && (uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q) \
+  && (uv run --package acsi-plugins pytest examples/rti-plugins/dr_leds/tests -m unit -q) \
   && (cd examples/rti-demo/modules/hmi && npm test) \
   && (cd examples/rti-demo/modules/hmi && npx vite build && rm -rf dist)
 ```

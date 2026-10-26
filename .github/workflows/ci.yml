@@ -60,7 +60,7 @@ jobs:
   # The rti-demo modules' tests and the rti-plugins' tests, as
   # examples/rti-demo/TESTING.md runs them. The plugins aren't workspace
   # members (decision 0030); the IO plugin's tests run in the fsp
-  # environment, which has FastAPI and the plugin host, sim_leds's in the
+  # environment, which has FastAPI and the plugin host, dr_leds's in the
   # plugin host's.
   rti-demo-modules:
     runs-on: ubuntu-latest
@@ -76,7 +76,7 @@ jobs:
       - run: uv run --package fsp pytest examples/rti-demo/modules/fsp/tests -m unit -q
       - run: uv run --package so pytest examples/rti-demo/modules/so/tests -m unit -q
       - run: uv run --package fsp pytest examples/rti-plugins/dr_panel/tests -m unit -q
-      - run: uv run --package acsi-plugins pytest examples/rti-plugins/sim_leds/tests -m unit -q
+      - run: uv run --package acsi-plugins pytest examples/rti-plugins/dr_leds/tests -m unit -q
 
   # The HMI's tests and production build (vite), with the Node version its
   # Docker image builds with (modules/hmi/docker/Dockerfile).
@@ -106,7 +106,7 @@ jobs:
 
   # The compose stacks parse and resolve as Docker Compose reads them: the
   # demo's, the IO plugin's with and without its Raspberry Pi overlay, and
-  # sim_leds's (decisions 0028, 0030).
+  # dr_leds's (decisions 0028, 0030).
   compose:
     runs-on: ubuntu-latest
     steps:
@@ -119,7 +119,7 @@ jobs:
       - run: docker compose -f docker-compose.yaml -f docker-compose.pi.yaml config -q
         working-directory: examples/rti-plugins/dr_panel
       - run: docker compose config -q
-        working-directory: examples/rti-plugins/sim_leds
+        working-directory: examples/rti-plugins/dr_leds
 
   # Relative links and #anchors in the Markdown docs (config: lychee.toml).
   docs-links:

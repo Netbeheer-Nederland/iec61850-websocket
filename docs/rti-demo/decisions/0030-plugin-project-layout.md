@@ -73,6 +73,8 @@ With plugins written by third parties, the layout is what they copy. 0023 kept `
 - `sim_leds` has an image to build but none is published; `images.yml` publishes `rti-io` only.
 - dr-st7789v's plugin still has contract version 1 (`plugin.json`, downloaded into the FSP); in this layout its
   `plugin/` becomes the plugin API of 0029, as here.
+- Superseded in [0039](0039-sample-plugin-name-dr-leds.md): the project, script and image `sim-leds` and the
+  package `sim_leds` are now `dr-leds` / `dr_leds`.
 
 ## In the code
 

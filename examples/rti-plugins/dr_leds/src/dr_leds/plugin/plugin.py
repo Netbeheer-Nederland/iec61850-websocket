@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""The plugin API of sim_leds, under /plugin (decision 0029).
+"""The plugin API of dr_leds, under /plugin (decision 0029).
 
 What the FSP or SO calls (examples/rti-demo/modules/plugins/openapi.yaml, tag
 Plugin API); it shows each event on the LEDs of the server:
@@ -9,9 +9,9 @@ Plugin API); it shows each event on the LEDs of the server:
 - red: on after a failed Operate, write or read, until a good one or a reset.
 
 Settings (from /start): blink_seconds (default 0.3).
-Claims: the objRefs in SIM_LEDS_CLAIMS (comma-separated, default none); an
+Claims: the objRefs in DR_LEDS_CLAIMS (comma-separated, default none); an
 Operate on one is refused while red is on.
-Routes: the server's /leds-api, under /api/plugins/sim_leds/ in the FSP or SO.
+Routes: the server's /leds-api, under /api/plugins/dr_leds/ in the FSP or SO.
 Attached (optional, decision 0025): its two LEDs, for the HMI to draw next to
 the FSP or SO.
 """
@@ -28,18 +28,18 @@ from pydantic import BaseModel
 from ..server.leds import SimulatedLeds
 
 API_VERSION = 2
-NAME = "sim_leds"
+NAME = "dr_leds"
 
 
 def _version() -> str:
     try:
-        return importlib.metadata.version("sim-leds")
+        return importlib.metadata.version("dr-leds")
     except importlib.metadata.PackageNotFoundError:
         return ""
 
 
 def claims() -> list[str]:
-    return [c.strip() for c in os.getenv("SIM_LEDS_CLAIMS", "").split(",") if c.strip()]
+    return [c.strip() for c in os.getenv("DR_LEDS_CLAIMS", "").split(",") if c.strip()]
 
 
 class Host(BaseModel):

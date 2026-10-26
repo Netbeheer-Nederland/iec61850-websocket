@@ -9,7 +9,7 @@ import { pluginRows, configEntry, addTargets, routeRequest, routeAnswerText, plu
 const STATUS = {
   plugins: [
     { name: 'io', version: '1.2', url: 'http://dr-panel:9000/plugin', claims: ['LD0/CSWI1.Pos.Oper.ctlVal'], healthy: true, last_error: null },
-    { name: 'leds', version: '0.1', url: 'http://sim-leds:8099/plugin', claims: [], healthy: false, last_error: 'on_event timed out' },
+    { name: 'leds', version: '0.1', url: 'http://dr-leds:8099/plugin', claims: [], healthy: false, last_error: 'on_event timed out' },
   ],
   failed: { display: "Can't reach http://pi:8000/plugin" },
 };
@@ -30,7 +30,7 @@ describe('plugins', () => {
     });
     expect(rows.map((r) => [r.name, r.url, r.definition])).toEqual([
       ['io', 'http://dr-panel:9000/plugin', { url: 'http://dr-panel:9000/plugin', settings: {} }],
-      ['leds', 'http://sim-leds:8099/plugin', null],
+      ['leds', 'http://dr-leds:8099/plugin', null],
       ['display', 'http://pi:8000/plugin', { url: 'http://pi:8000/plugin', settings: { rotate: 90 } }],
     ]);
     // From an instance without definitions: nothing to edit.
@@ -98,13 +98,13 @@ describe('attachedItems', () => {
     const items = attachedItems({
       plugins: [
         { name: 'io', version: '1.0', healthy: true, last_error: null, attached_error: null, attached: [{ kind: 'io', label: 'IO server', state: 'ok' }, { kind: 'display', label: 'lcd1', state: 'ok' }] },
-        { name: 'sim_leds', healthy: false, last_error: 'boom', attached_error: 'attached timed out after 1.0s', attached: [{ kind: 'other', label: 'Simulated LEDs', state: 'ok' }] },
+        { name: 'dr_leds', healthy: false, last_error: 'boom', attached_error: 'attached timed out after 1.0s', attached: [{ kind: 'other', label: 'Simulated LEDs', state: 'ok' }] },
         { name: 'old' },
       ],
       failed: { display: 'down' },
     });
-    expect(items.map((i) => i.key)).toEqual(['io:0', 'io:1', 'sim_leds:0', 'display:disconnected']);
-    expect(items[2].plugin).toEqual({ name: 'sim_leds', version: '', healthy: false, state: 'unhealthy', lastError: 'boom', attachedError: 'attached timed out after 1.0s' });
+    expect(items.map((i) => i.key)).toEqual(['io:0', 'io:1', 'dr_leds:0', 'display:disconnected']);
+    expect(items[2].plugin).toEqual({ name: 'dr_leds', version: '', healthy: false, state: 'unhealthy', lastError: 'boom', attachedError: 'attached timed out after 1.0s' });
     expect(items[0].plugin.state).toBe('healthy');
     expect(items[3]).toMatchObject({ label: 'display', disconnected: true, plugin: { state: 'unreachable', lastError: 'down' } });
   });

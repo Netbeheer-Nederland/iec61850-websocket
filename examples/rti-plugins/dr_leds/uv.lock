@@ -192,7 +192,7 @@ wheels = [
 ]
 
 [[package]]
-name = "sim-leds"
+name = "dr-leds"
 version = "2.0.0"
 source = { editable = "." }
 dependencies = [

@@ -309,14 +309,14 @@ def test_from_env_reads_the_file_inline_plugins_and_host_url(monkeypatch, tmp_pa
     monkeypatch.setenv("PLUGINS_FILE", str(path))
     monkeypatch.setenv(
         "PLUGINS",
-        json.dumps([{"name": "sim_leds", "url": "http://localhost:8099/plugin"}]),
+        json.dumps([{"name": "dr_leds", "url": "http://localhost:8099/plugin"}]),
     )
     monkeypatch.setenv("PLUGIN_HOST_URL", "http://from-env:5001")
     monkeypatch.setenv("PLUGIN_ALLOWED_SOURCES", "http://a.test, http://b.test")
     monkeypatch.setenv("PLUGIN_RETRY_SECONDS", "3")
     host = PluginHost(role="so")
     service = PluginService.from_env(host)
-    assert [p.name for p in service.configured] == ["io", "sim_leds"]
+    assert [p.name for p in service.configured] == ["io", "dr_leds"]
     assert host.host_url == "http://from-env:5001"
     assert service.allowed_sources == ["http://a.test", "http://b.test"]
     assert service.retry_seconds == 3

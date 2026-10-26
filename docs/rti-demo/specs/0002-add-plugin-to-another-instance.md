@@ -21,7 +21,7 @@ Give a second FSP (or the SO) the same plugin as the first, from the HMI, withou
   *Describe the plugin*). So a copy of a plugin **within one instance**, under another name, is always refused; this
   is why the earlier idea "Duplicate" became this spec.
 - One plugin service can serve several instances: each `POST <url>/start` carries the instance's `Host` (name, role,
-  `host_url`), as sim_leds does for every FSP.
+  `host_url`), as dr_leds does for every FSP.
 - The BFF's connections list every SO and FSP the HMI can reach (the targets), with their roles.
 
 ## Proposal

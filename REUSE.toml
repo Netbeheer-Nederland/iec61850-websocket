@@ -50,7 +50,7 @@ path = [
   ".python-version",
   "uv.lock",
   "examples/rti-plugins/dr_panel/uv.lock",
-  "examples/rti-plugins/sim_leds/uv.lock",
+  "examples/rti-plugins/dr_leds/uv.lock",
   "examples/rti-demo/modules/hmi/package-lock.json",
 ]
 SPDX-FileCopyrightText = "2026 Netbeheer Nederland"

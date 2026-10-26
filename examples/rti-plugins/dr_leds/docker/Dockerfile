@@ -2,9 +2,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# The sample plugin sim_leds (decision 0030); any architecture.
-# Build from the project root (examples/rti-plugins/sim_leds):
-#   docker build -f docker/Dockerfile -t sim-leds .
+# The sample plugin dr_leds (decision 0030); any architecture.
+# Build from the project root (examples/rti-plugins/dr_leds):
+#   docker build -f docker/Dockerfile -t dr-leds .
 # Dockerfile.dockerignore, next to this file, applies to that build.
 
 FROM python:3.13-slim AS build
@@ -31,4 +31,4 @@ USER app
 EXPOSE 8099
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8099/plugin', timeout=2)"]
-CMD ["sim-leds"]
+CMD ["dr-leds"]

@@ -72,6 +72,8 @@ Options considered:
 - Amends 0029 point 5: compose configures sim_leds by default, and the IO server through the overlay.
 - `tests/unit/test_rti_demo_ports.py` checks that each configuration names its own sim_leds service in the overlay, and
   that the IO overlay names the IO server, with the inputs to the first FSP only.
+- Superseded in [0039](0039-sample-plugin-name-dr-leds.md): the plugin `sim_leds` and the services `sim-leds-<instance>`
+  are now `dr_leds` and `dr-leds-<instance>`.
 
 ## In the code
 

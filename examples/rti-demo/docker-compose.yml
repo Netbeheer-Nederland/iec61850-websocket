@@ -9,7 +9,7 @@
 # pull the images published from GitHub instead - see README.md "Docker".
 #
 # The FSPs and SO connect to their plugins from the plugin configuration in
-# config/plugin-configuration/ (decision 0029): by default one sim_leds each,
+# config/plugin-configuration/ (decision 0029): by default one dr_leds each,
 # which the overlay docker-compose.leds.yaml runs (decision 0034). The IO
 # server, dr-panel, is opt-in: the overlay docker-compose.io.yaml runs it and
 # connects the FSPs and SO to it instead (on the Raspberry Pi with dr_panel's
@@ -97,7 +97,7 @@ services:
       # The ACSI server starts with the FSP, not connected (decision 0033);
       # FSP_AUTOCONNECT=true also dials out to the SO here.
       - FSP_SO_HOST=rti-so
-      # The plugins it connects to: sim_leds, or the IO server with
+      # The plugins it connects to: dr_leds, or the IO server with
       # docker-compose.io.yaml (decisions 0029, 0034).
       - PLUGINS_FILE=/plugins/plugins.json
     networks:
@@ -137,7 +137,7 @@ services:
       # The ACSI server starts with the FSP, not connected (decision 0033);
       # FSP_AUTOCONNECT=true also dials out to the SO here.
       - FSP_SO_HOST=rti-so
-      # The plugins it connects to: sim_leds, or the IO server with
+      # The plugins it connects to: dr_leds, or the IO server with
       # docker-compose.io.yaml (decisions 0029, 0034).
       - PLUGINS_FILE=/plugins/plugins.json
     # Healthcheck already defined in the Dockerfile - it reads $PORT at
@@ -170,7 +170,7 @@ services:
       - "8765:8765"    # WebSocket port - MUST ADD
     # PORT/PYTHONUNBUFFERED and health check already set by the Dockerfile.
     environment:
-      # The plugins it connects to: sim_leds, or the IO server with
+      # The plugins it connects to: dr_leds, or the IO server with
       # docker-compose.io.yaml (decisions 0029, 0034).
       - PLUGINS_FILE=/plugins/plugins.json
     networks:

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Netbeheer Nederland
 # SPDX-License-Identifier: Apache-2.0
-"""sim_leds has the plugin layout (decision 0030): the package sim_leds in
+"""dr_leds has the plugin layout (decision 0030): the package dr_leds in
 src/, with the subpackages server and plugin, and its own image and stack."""
 
 import ast
@@ -13,7 +13,7 @@ pytestmark = pytest.mark.unit
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-PACKAGE = ROOT / "src" / "sim_leds"
+PACKAGE = ROOT / "src" / "dr_leds"
 
 
 def test_the_server_and_the_plugin_are_subpackages():
@@ -23,7 +23,7 @@ def test_the_server_and_the_plugin_are_subpackages():
 
 
 def test_the_script_starts_the_server():
-    assert PROJECT["project"]["scripts"] == {"sim-leds": "sim_leds.server.main:main"}
+    assert PROJECT["project"]["scripts"] == {"dr-leds": "dr_leds.server.main:main"}
 
 
 def test_docker_and_compose_files_are_where_every_plugin_has_them():

@@ -75,12 +75,12 @@ describe('AttachedBoxes', () => {
   });
 
   it('draws a red Disconnected box for a plugin that can\'t be reached', () => {
-    render(<AttachedBoxes conn={{ name: 'FSP01', plugins: { plugins: [], failed: { sim_leds: "Can't reach http://sim-leds:8099/plugin" } } }} />);
-    const box = screen.getByTestId('attached-box-sim_leds:disconnected');
-    expect(box).toHaveTextContent('sim_leds');
+    render(<AttachedBoxes conn={{ name: 'FSP01', plugins: { plugins: [], failed: { dr_leds: "Can't reach http://dr-leds:8099/plugin" } } }} />);
+    const box = screen.getByTestId('attached-box-dr_leds:disconnected');
+    expect(box).toHaveTextContent('dr_leds');
     expect(box).toHaveTextContent('Disconnected');
     expect(box.style.borderLeft).toContain('var(--danger-color)');
-    expect(box.title).toBe("Plugin sim_leds: disconnected - Can't reach http://sim-leds:8099/plugin; click for details");
+    expect(box.title).toBe("Plugin dr_leds: disconnected - Can't reach http://dr-leds:8099/plugin; click for details");
   });
 
   it('draws nothing while there is nothing attached', () => {
