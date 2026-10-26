@@ -70,7 +70,10 @@ IEC61850Client  <-- ACSI services, reports -->  IEC61850Server
   [docs/architecture/data-model-architecture.md](docs/architecture/data-model-architecture.md)).
 - `ws61850.asn1` and `ws61850.protocol` encode and decode the messages defined by the ASN.1 schema.
 - The RTI demo in `examples/rti-demo` builds a complete system on top: RTI-FSP (IEC 61850 server), RTI-SO (IEC 61850
-  client), a BFF and a React HMI.
+  client), a BFF and a React HMI, with plugins for LEDs and a Raspberry Pi's devices. Its
+  [system overview](docs/rti-demo/README.md) has the diagrams of each part.
+
+![RTI demo system architecture overview](docs/rti-demo/images/RTI_Demo_System_Architecture_Overview.png)
 
 ---
 

@@ -1028,7 +1028,7 @@
         <mxCell id="n7" value="bff_endpoint.py&lt;br&gt;REST API · FastAPI&lt;br&gt;Request Router" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=none;fontColor=#303238;fontSize=21;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" vertex="1" parent="1">
           <mxGeometry as="geometry" x="500" y="180" width="310" height="125" />
         </mxCell>
-        <mxCell id="n8" value="acsi_server.py&lt;br&gt;ACSI Server · WebSocket active&lt;br&gt;to RTI-SO :8765, token from the IDP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=21;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" vertex="1" parent="1">
+        <mxCell id="n8" value="acsi_server.py&lt;br&gt;ACSI Server&lt;br&gt;WebSocket active to SO :8765" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=21;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" vertex="1" parent="1">
           <mxGeometry as="geometry" x="965" y="180" width="310" height="125" />
         </mxCell>
         <mxCell id="n9" value="Plugin host (acsi_plugins)&lt;br&gt;/api/plugins/{name}/*&lt;br&gt;plugin configuration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b7f1df;strokeColor=none;fontColor=#303238;fontSize=21;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" vertex="1" parent="1">
@@ -1084,7 +1084,7 @@
         <mxCell id="n7" value="bff_endpoint.py&lt;br&gt;REST API · FastAPI&lt;br&gt;Request Router" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e4c5f7;strokeColor=none;fontColor=#303238;fontSize=21;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" vertex="1" parent="1">
           <mxGeometry as="geometry" x="500" y="180" width="310" height="125" />
         </mxCell>
-        <mxCell id="n8" value="acsi_client.py&lt;br&gt;ACSI Client · WebSocket passive&lt;br&gt;WS :8765, token checked (JWKS)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=21;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" vertex="1" parent="1">
+        <mxCell id="n8" value="acsi_client.py&lt;br&gt;ACSI Client&lt;br&gt;WebSocket passive :8765" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#99e9ca;strokeColor=none;fontColor=#303238;fontSize=21;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" vertex="1" parent="1">
           <mxGeometry as="geometry" x="965" y="180" width="310" height="125" />
         </mxCell>
         <mxCell id="n9" value="Plugin host (acsi_plugins)&lt;br&gt;/api/plugins/{name}/*&lt;br&gt;plugin configuration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b7f1df;strokeColor=none;fontColor=#303238;fontSize=21;fontStyle=0;align=center;verticalAlign=middle;spacing=6;opacity=100;" vertex="1" parent="1">

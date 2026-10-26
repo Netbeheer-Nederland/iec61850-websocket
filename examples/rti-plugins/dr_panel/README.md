@@ -27,8 +27,6 @@ The IO service enables remote control and monitoring of physical IO devices (LED
 
 ### Architecture
 
-![IO service architecture](../../../docs/rti-demo/images/Demo_IO.png)
-
 ```
 +------------------+     +---------------------+     +------------------+
 |                  |     |                     |     |                  |
