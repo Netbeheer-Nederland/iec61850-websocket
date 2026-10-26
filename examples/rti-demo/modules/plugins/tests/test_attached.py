@@ -225,7 +225,9 @@ async def test_a_bad_answer_is_an_error(host):
     await host.add("dr_panel", Attaching(answer=[IO]))
     await host.refresh_attached()
     assert host.status("dr_panel")["attached"] == []
-    assert host.status("dr_panel")["attached_error"].startswith("attached failed: answered")
+    assert host.status("dr_panel")["attached_error"].startswith(
+        "attached failed: answered"
+    )
 
 
 # -------------------- over HTTP --------------------

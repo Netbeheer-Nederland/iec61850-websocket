@@ -9,13 +9,13 @@ import httpx2 as httpx
 import pytest
 from acsi_plugins import Associated, PluginEntry, PluginHost, ValueWritten
 from acsi_plugins.web import PluginService, attach
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from dr_panel.plugin.mapping import SHIPPED_MAPPING, IOMappingManager
 from dr_panel.plugin.plugin import EventRequest, Host, IoPlugin, StartRequest
 from dr_panel.server import io_controller as controller_module
 from dr_panel.server.api_endpoint import create_fastapi_app
 from dr_panel.server.io_controller import IOController
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.unit
 
@@ -138,7 +138,9 @@ def test_an_fsp_connects_to_it_through_its_plugin_configuration():
             f.result(5)
         assert fsp.get("/api/plugins/dr_panel").json()["healthy"] is True
         hosts = TestClient(io_app).get("/plugin/mappings").json()["hosts"]
-    assert hosts == [{"name": "dr_panel", "role": "fsp", "host_url": "http://fsp.test:5001"}]
+    assert hosts == [
+        {"name": "dr_panel", "role": "fsp", "host_url": "http://fsp.test:5001"}
+    ]
 
 
 # ==================== Start and stop: where inputs go ====================

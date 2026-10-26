@@ -6,9 +6,9 @@ HTTP as a plugin, at /plugin (decision 0029), and load no code from it."""
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 from dr_panel.server.api_endpoint import create_fastapi_app
 from dr_panel.server.io_controller import IOController
+from fastapi.testclient import TestClient
 
 IO = Path(__file__).resolve().parents[1]
 

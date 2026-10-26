@@ -297,7 +297,9 @@ def _loads(text: str) -> Any:
 
 class InstallRequest(BaseModel):
     name: str = Field(
-        ..., description="The plugin's name, as it describes itself", examples=["dr_panel"]
+        ...,
+        description="The plugin's name, as it describes itself",
+        examples=["dr_panel"],
     )
     url: str = Field(
         ...,

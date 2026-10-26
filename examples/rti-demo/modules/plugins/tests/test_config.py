@@ -13,7 +13,11 @@ pytestmark = pytest.mark.unit
 CONFIG = {
     "host_url": "http://rti-fsp01:5001",
     "plugins": [
-        {"name": "dr_panel", "url": "http://dr-panel:9000/plugin", "settings": {"a": 1}},
+        {
+            "name": "dr_panel",
+            "url": "http://dr-panel:9000/plugin",
+            "settings": {"a": 1},
+        },
         {"name": "dr_leds", "url": "http://localhost:8099/plugin"},
     ],
 }
@@ -43,7 +47,10 @@ def test_a_list_is_the_plugins():
         [{"name": "dr_panel", "url": "ftp://x"}],
         [{"name": "dr_panel"}],
         [{"name": "dr_panel", "url": "http://x", "settings": []}],
-        [{"name": "dr_panel", "url": "http://x"}, {"name": "dr_panel", "url": "http://y"}],
+        [
+            {"name": "dr_panel", "url": "http://x"},
+            {"name": "dr_panel", "url": "http://y"},
+        ],
         "io",
     ],
 )
@@ -60,7 +67,10 @@ def test_an_unreadable_file_is_refused(tmp_path):
 def test_merged_lets_the_other_win():
     base = PluginsConfig.parse(CONFIG)
     other = PluginsConfig.parse(
-        {"host_url": "http://h:1", "plugins": [{"name": "dr_panel", "url": "http://io2"}]}
+        {
+            "host_url": "http://h:1",
+            "plugins": [{"name": "dr_panel", "url": "http://io2"}],
+        }
     )
     merged = base.merged(other)
     assert merged.host_url == "http://h:1"

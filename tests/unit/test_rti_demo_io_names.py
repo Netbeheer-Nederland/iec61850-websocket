@@ -63,7 +63,8 @@ def test_the_io_server_code_is_dr_panel(old):
 
 
 @pytest.mark.parametrize(
-    "pattern", [r"/api/plugins/io\b", r"""["']name["']\s*:\s*["']io["']""", r"name: 'io'"]
+    "pattern",
+    [r"/api/plugins/io\b", r"""["']name["']\s*:\s*["']io["']""", r"name: 'io'"],
 )
 def test_the_io_plugin_name_is_dr_panel(pattern):
     # Decision 0040 renamed the plugin io to dr_panel, and its routes

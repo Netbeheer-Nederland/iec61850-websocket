@@ -21,9 +21,9 @@ from acsi_plugins import (
     ValueWritten,
 )
 from acsi_plugins.web import PluginService, attach
-from fastapi import FastAPI
 from dr_leds.plugin import plugin
 from dr_leds.server.app import create_app
+from fastapi import FastAPI
 
 pytestmark = pytest.mark.unit
 

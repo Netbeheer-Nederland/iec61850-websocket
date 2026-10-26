@@ -20,7 +20,9 @@ HARDWARE_KEYS = ["devices", "group_add", "user", "ipc", "security_opt", "cap_add
 
 
 def _service(file: str) -> dict:
-    return yaml.safe_load((IO / file).read_text(encoding="utf-8"))["services"]["dr-panel"]
+    return yaml.safe_load((IO / file).read_text(encoding="utf-8"))["services"][
+        "dr-panel"
+    ]
 
 
 @pytest.mark.parametrize("key", HARDWARE_KEYS)

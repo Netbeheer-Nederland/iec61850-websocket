@@ -7,8 +7,6 @@ import json
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from dr_panel.server.api_endpoint import create_io_router
 from dr_panel.server.devices import (
     ButtonConfig,
@@ -23,11 +21,17 @@ from dr_panel.server.io_config import (
     save_full_config,
 )
 from dr_panel.server.io_controller import IOController
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.unit
 
 SHIPPED = (
-    Path(__file__).resolve().parents[1] / "src" / "dr_panel" / "server" / "io_config.json"
+    Path(__file__).resolve().parents[1]
+    / "src"
+    / "dr_panel"
+    / "server"
+    / "io_config.json"
 )
 
 # The ST7789V display of dr-st7789v, on a Pi shared with the IO server
