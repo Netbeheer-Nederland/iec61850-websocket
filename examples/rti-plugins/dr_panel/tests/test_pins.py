@@ -150,7 +150,7 @@ def test_potentiometer_settings_survive_a_save():
         again.adc_channel,
         again.averaging_window,
         again.sample_interval,
-    ) == (1, 500_000, True, 0.1, 5.0, 2)
+    ) == (1, 500_000, True, 0.1, 5.0, 2, 16, 0.05)
 
 
 def test_saving_keeps_the_reserved_pins(tmp_path):
