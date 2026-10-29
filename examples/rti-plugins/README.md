@@ -77,6 +77,9 @@ cd ../dr_leds
 docker compose up -d
 ```
 
+Both images are also published on GitHub, as `ghcr.io/netbeheernederland/iec61850-websocket/dr-panel` and `.../dr-leds`;
+each plugin's README has the `docker pull` and `docker run` for them.
+
 While a plugin isn't reachable, the FSPs and SO list it as failed and try again every 10 s; the rest of the demo
 works. `launch.py io` in the demo starts the IO plugin as a local process, so one machine can run everything. The Pi's scripts
 (Docker setup, the build user and groups, GPIO simulation) are in [`dr_panel/scripts`](dr_panel/scripts).

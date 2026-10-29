@@ -466,6 +466,32 @@ docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d     # on t
 `security_opt`, `cap_add`). Set `COMPOSE_FILE=docker-compose.yaml:docker-compose.pi.yaml` in `.env` here to make it
 persistent on the Pi.
 
+### Docker: the image published on GitHub
+
+Without a checkout, from GitHub's container registry (`linux/amd64` and `linux/arm64`; a tag other than `latest` is a
+version, a branch or `sha-<commit>`):
+
+```bash
+docker network create rti-network 2>/dev/null || true
+docker pull ghcr.io/netbeheernederland/iec61850-websocket/dr-panel:latest
+
+# Anywhere (mock mode)
+docker run -d --name dr-panel --network rti-network -p 9000:9000 --restart unless-stopped \
+  ghcr.io/netbeheernederland/iec61850-websocket/dr-panel:latest
+
+# On the Raspberry Pi: what docker-compose.pi.yaml adds, with the device nodes this Pi has
+docker run -d --name dr-panel --network rti-network -p 9000:9000 --restart unless-stopped \
+  --user pi --group-add gpio --group-add i2c --group-add spi \
+  $(for d in /dev/gpiochip* /dev/i2c-* /dev/spidev0.*; do [ -e "$d" ] && printf -- '--device %s ' "$d"; done) \
+  --ipc host --security-opt seccomp=unconfined --cap-add SYS_RAWIO \
+  ghcr.io/netbeheernederland/iec61850-websocket/dr-panel:latest
+```
+
+The FSPs and SO reach it as `http://dr-panel:9000/plugin`. The published image has the default user `pi` (UID 1000)
+and the Raspberry Pi OS group IDs (`gpio` 986, `i2c` 988, `spi` 989); for other IDs, build it with
+`scripts/set_docker_user.sh` (below). From this folder, `docker compose` uses the published image with
+`RTI_IMAGE_REPO=ghcr.io/netbeheernederland/iec61850-websocket docker compose pull` and `up -d --no-build`.
+
 ### Configure Docker User for Hardware Access
 
 The `dr-panel` container runs as a configurable user with access to GPIO, I2C, and SPI groups. By default, the Dockerfile uses standard Raspberry Pi OS values for the `pi` user:
