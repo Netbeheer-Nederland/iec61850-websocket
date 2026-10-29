@@ -138,7 +138,7 @@ directly, without retagging.
 
 ```shell
 cd examples/rti-demo
-docker compose -f docker-compose.yml -f docker-compose.leds.yaml build   # -> netbeheernederland/iec61850-websocket/rti-<role>:latest, and dr-leds
+docker compose -f docker-compose.yml -f docker-compose.leds.yaml build   # -> netbeheernederland/iec61850-websocket/{rti-<role>,dr-leds}:latest
 docker compose -f docker-compose.yml -f docker-compose.leds.yaml up -d
 ```
 
@@ -155,8 +155,7 @@ sources over the code in the images, so a source edit only needs a container res
 cd examples/rti-demo
 export RTI_IMAGE_REPO=ghcr.io/netbeheernederland/iec61850-websocket
 export RTI_IMAGE_TAG=latest
-docker compose -f docker-compose.yml pull
-docker compose -f docker-compose.yml -f docker-compose.leds.yaml build dr-leds-fsp01   # dr-leds isn't published
+docker compose -f docker-compose.yml -f docker-compose.leds.yaml pull
 docker compose -f docker-compose.yml -f docker-compose.leds.yaml up -d --no-build
 ```
 

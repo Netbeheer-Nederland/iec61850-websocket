@@ -10,9 +10,10 @@
 #
 # or COMPOSE_FILE=docker-compose.yml:docker-compose.leds.yaml in .env. Without
 # it the FSPs and SO list dr_leds as failed and try again every 10 s.
-# The image is built from examples/rti-plugins/dr_leds; it isn't published.
+# The image is built from examples/rti-plugins/dr_leds, and published as
+# dr-leds next to the demo's images (RTI_IMAGE_REPO, RTI_IMAGE_TAG).
 x-dr-leds: &dr-leds
-  image: dr-leds
+  image: ${RTI_IMAGE_REPO:-netbeheernederland/iec61850-websocket}/dr-leds:${RTI_IMAGE_TAG:-latest}
   build:
     context: ../rti-plugins/dr_leds
     dockerfile: docker/Dockerfile

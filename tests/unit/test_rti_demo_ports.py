@@ -165,7 +165,9 @@ def test_compose_connects_dr_leds_and_names_the_way_back(
 def test_the_leds_overlay_runs_only_dr_leds(leds_compose):
     assert set(leds_compose) == {"dr-leds-fsp01", "dr-leds-fsp02", "dr-leds-so"}
     for svc in leds_compose.values():
-        assert svc["image"] == "dr-leds"
+        assert svc["image"] == (
+            "${RTI_IMAGE_REPO:-netbeheernederland/iec61850-websocket}/dr-leds:${RTI_IMAGE_TAG:-latest}"
+        )
         assert "ports" not in svc
 
 

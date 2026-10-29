@@ -16,7 +16,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    image: dr-leds
+    image: ${RTI_IMAGE_REPO:-netbeheernederland/iec61850-websocket}/dr-leds:${RTI_IMAGE_TAG:-latest}
     container_name: dr-leds
     environment:
       - DR_LEDS_CLAIMS=${DR_LEDS_CLAIMS:-}

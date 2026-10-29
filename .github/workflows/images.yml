@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   # Turn the diff into a JSON list of images to build. On a tag or a manual
-  # dispatch the list is forced to all five.
+  # dispatch the list is forced to all six.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -46,6 +46,7 @@ jobs:
             fsp:         [ *rti, 'examples/rti-demo/modules/fsp/**', 'examples/rti-demo/modules/fsp/pyproject.toml', 'examples/rti-demo/modules/plugins/**' ]
             bff:         [ 'examples/rti-demo/modules/bff/**', 'pyproject.toml', 'uv.lock' ]
             io:          [ 'examples/rti-plugins/dr_panel/**' ]
+            leds:        [ 'examples/rti-plugins/dr_leds/**' ]
             hmi:         [ 'examples/rti-demo/modules/hmi/**' ]
 
       - id: set
@@ -54,7 +55,7 @@ jobs:
         run: |
           force=${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
           out='[]'
-          for k in so fsp bff io hmi; do
+          for k in so fsp bff io leds hmi; do
             hit=$(jq -r --arg k "$k" '.[$k] // "false"' <<<"$FIRED")
             if [ "$force" = true ] || [ "$hit" = true ]; then
               out=$(jq -c --arg k "$k" '. + [$k]' <<<"$out")
@@ -79,6 +80,7 @@ jobs:
             fsp)         c=. ; f=examples/rti-demo/modules/fsp/docker/Dockerfile ; n=iec61850-websocket/rti-fsp ; p=linux/amd64,linux/arm64 ;;
             bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=iec61850-websocket/rti-bff ;;
             io)          c=examples/rti-plugins/dr_panel ; f=examples/rti-plugins/dr_panel/docker/Dockerfile ; n=iec61850-websocket/dr-panel ; p=linux/amd64,linux/arm64 ;;
+            leds)        c=examples/rti-plugins/dr_leds ; f=examples/rti-plugins/dr_leds/docker/Dockerfile ; n=iec61850-websocket/dr-leds ; p=linux/amd64,linux/arm64 ;;
             hmi)         c=examples/rti-demo/modules/hmi ; f=examples/rti-demo/modules/hmi/docker/Dockerfile ; n=iec61850-websocket/rti-hmi ;;
           esac
           {
