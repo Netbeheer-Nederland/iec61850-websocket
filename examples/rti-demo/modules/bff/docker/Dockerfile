@@ -47,6 +47,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ============================================================
 FROM python:3.13-slim-bookworm
 
+# OCI labels (decision 0041); CI adds version, revision and created.
+# source connects the image to the repository on ghcr.io.
+LABEL org.opencontainers.image.source="https://github.com/netbeheernederland/iec61850-websocket" \
+      org.opencontainers.image.url="https://github.com/netbeheernederland/iec61850-websocket" \
+      org.opencontainers.image.documentation="https://github.com/netbeheernederland/iec61850-websocket/blob/main/examples/rti-demo/modules/bff/README.md" \
+      org.opencontainers.image.title="rti-bff" \
+      org.opencontainers.image.description="RTI demo BFF: the backend for the HMI" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.vendor="Netbeheer Nederland"
+
 WORKDIR /app
 
 ARG APP_PORT=3000

@@ -21,6 +21,18 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable
 
 FROM python:3.13-slim
+
+# OCI labels (decision 0041); CI adds version, revision and created.
+# source connects the image to the repository on ghcr.io.
+# A copy of this plugin in another repository changes source, url and documentation.
+LABEL org.opencontainers.image.source="https://github.com/netbeheernederland/iec61850-websocket" \
+      org.opencontainers.image.url="https://github.com/netbeheernederland/iec61850-websocket" \
+      org.opencontainers.image.documentation="https://github.com/netbeheernederland/iec61850-websocket/blob/main/examples/rti-plugins/dr_leds/README.md" \
+      org.opencontainers.image.title="dr-leds" \
+      org.opencontainers.image.description="Sample RTI demo plugin dr_leds: two simulated LEDs that show what the FSP or SO does" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.vendor="Netbeheer Nederland"
+
 COPY --from=build /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \

@@ -49,6 +49,17 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ============================================================
 FROM python:3.13-slim AS runtime
 
+# OCI labels (decision 0041); CI adds version, revision and created.
+# source connects the image to the repository on ghcr.io.
+# A copy of this plugin in another repository changes source, url and documentation.
+LABEL org.opencontainers.image.source="https://github.com/netbeheernederland/iec61850-websocket" \
+      org.opencontainers.image.url="https://github.com/netbeheernederland/iec61850-websocket" \
+      org.opencontainers.image.documentation="https://github.com/netbeheernederland/iec61850-websocket/blob/main/examples/rti-plugins/dr_panel/README.md" \
+      org.opencontainers.image.title="dr-panel" \
+      org.opencontainers.image.description="RTI demo plugin dr_panel: GPIO and I2C control of the demonstrator panel on a Raspberry Pi" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.vendor="Netbeheer Nederland"
+
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \

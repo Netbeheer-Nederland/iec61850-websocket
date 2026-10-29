@@ -76,17 +76,19 @@ jobs:
       - id: img
         run: |
           case "${{ matrix.image }}" in
-            so)          c=. ; f=examples/rti-demo/modules/so/docker/Dockerfile  ; n=iec61850-websocket/rti-so ; p=linux/amd64,linux/arm64 ;;
-            fsp)         c=. ; f=examples/rti-demo/modules/fsp/docker/Dockerfile ; n=iec61850-websocket/rti-fsp ; p=linux/amd64,linux/arm64 ;;
-            bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=iec61850-websocket/rti-bff ;;
-            io)          c=examples/rti-plugins/dr_panel ; f=examples/rti-plugins/dr_panel/docker/Dockerfile ; n=iec61850-websocket/dr-panel ; p=linux/amd64,linux/arm64 ;;
-            leds)        c=examples/rti-plugins/dr_leds ; f=examples/rti-plugins/dr_leds/docker/Dockerfile ; n=iec61850-websocket/dr-leds ; p=linux/amd64,linux/arm64 ;;
-            hmi)         c=examples/rti-demo/modules/hmi ; f=examples/rti-demo/modules/hmi/docker/Dockerfile ; n=iec61850-websocket/rti-hmi ;;
+            so)          c=. ; f=examples/rti-demo/modules/so/docker/Dockerfile  ; n=iec61850-websocket/rti-so ; p=linux/amd64,linux/arm64 ; d="RTI demo SO: ACSI client, WebSocket passive side (IEC 61850 over WebSocket)" ;;
+            fsp)         c=. ; f=examples/rti-demo/modules/fsp/docker/Dockerfile ; n=iec61850-websocket/rti-fsp ; p=linux/amd64,linux/arm64 ; d="RTI demo FSP: ACSI server, WebSocket active side (IEC 61850 over WebSocket)" ;;
+            bff)         c=. ; f=examples/rti-demo/modules/bff/docker/Dockerfile ; n=iec61850-websocket/rti-bff ; d="RTI demo BFF: the backend for the HMI" ;;
+            io)          c=examples/rti-plugins/dr_panel ; f=examples/rti-plugins/dr_panel/docker/Dockerfile ; n=iec61850-websocket/dr-panel ; p=linux/amd64,linux/arm64 ; d="RTI demo plugin dr_panel: GPIO and I2C control of the demonstrator panel on a Raspberry Pi" ;;
+            leds)        c=examples/rti-plugins/dr_leds ; f=examples/rti-plugins/dr_leds/docker/Dockerfile ; n=iec61850-websocket/dr-leds ; p=linux/amd64,linux/arm64 ; d="Sample RTI demo plugin dr_leds: two simulated LEDs that show what the FSP or SO does" ;;
+            hmi)         c=examples/rti-demo/modules/hmi ; f=examples/rti-demo/modules/hmi/docker/Dockerfile ; n=iec61850-websocket/rti-hmi ; d="RTI demo HMI: the web interface, served by nginx" ;;
           esac
           {
             echo "ctx=$c"
             echo "file=$f"
             echo "name=$n"
+            echo "title=${n##*/}"
+            echo "description=$d"
             echo "platforms=${p:-linux/amd64}"
             echo "args<<EOF"
             [ -n "$a" ] && tr '|' '\n' <<<"$a"
@@ -104,8 +106,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # title and description per image, the same as the LABEL in its
+      # Dockerfile (decision 0041); metadata-action's defaults, the
+      # repository's, would override those. Annotations go on each platform's
+      # manifest and on the index, where ghcr.io reads a multi-platform
+      # package's description and license.
       - id: meta
         uses: docker/metadata-action@v5
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ steps.img.outputs.name }}
           tags: |
@@ -114,6 +123,14 @@ jobs:
             type=semver,pattern={{version}}
             type=sha,format=long
             type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=${{ steps.img.outputs.title }}
+            org.opencontainers.image.description=${{ steps.img.outputs.description }}
+            org.opencontainers.image.vendor=Netbeheer Nederland
+          annotations: |
+            org.opencontainers.image.title=${{ steps.img.outputs.title }}
+            org.opencontainers.image.description=${{ steps.img.outputs.description }}
+            org.opencontainers.image.vendor=Netbeheer Nederland
 
       # Builds every image for its platforms, but doesn't publish yet: set
       # push to ${{ github.event_name != 'pull_request' }} to push to ghcr.io.
@@ -127,6 +144,7 @@ jobs:
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           provenance: false

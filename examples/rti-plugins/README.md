@@ -31,7 +31,7 @@ Every plugin is its own project, with the same layout (decision 0030; the same a
 ├── docker-compose.yaml       # its own stack, on the external network rti-network; runs anywhere
 ├── docker-compose.pi.yaml    # only with hardware: the overlay that passes the Raspberry Pi's devices in
 ├── docker/
-│   ├── Dockerfile            # built from the project folder: docker build -f docker/Dockerfile .
+│   ├── Dockerfile            # built from the project folder: docker build -f docker/Dockerfile .; OCI labels (0041)
 │   └── Dockerfile.dockerignore
 ├── src/<package>/
 │   ├── server/               # the service: what the plugin is about, with its own routes

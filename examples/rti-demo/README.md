@@ -145,6 +145,10 @@ docker compose -f docker-compose.yml -f docker-compose.leds.yaml up -d
 `docker-compose.leds.yaml` runs the demo's default plugins: one `dr_leds` per FSP and SO (see *Plugins* below).
 To save typing, put `COMPOSE_FILE=docker-compose.yml:docker-compose.leds.yaml` in `examples/rti-demo/.env`.
 
+Every image carries the OCI labels (`org.opencontainers.image.*`: source, title, description, license; decision
+[0041](../../docs/rti-demo/decisions/0041-oci-image-labels.md)). The images built by CI also have their version,
+commit and build time; `docker inspect --format '{{json .Config.Labels}}' <image>` shows them.
+
 An available `docker-compose.override.yml` is loaded automatically when no `-f` is given, and bind-mounts the module
 sources over the code in the images, so a source edit only needs a container restart. With `-f`, name it too
 (`-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.leds.yaml`), or add it to `COMPOSE_FILE`.

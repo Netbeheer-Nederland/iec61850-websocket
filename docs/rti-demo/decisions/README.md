@@ -51,5 +51,6 @@ consequences, and where to find it in the code. The format is in [0001](0001-rec
 | [0038](0038-io-plugin-name-dr-panel.md) | The IO plugin's code, project and image are `dr_panel` / `dr-panel` | proposed |
 | [0039](0039-sample-plugin-name-dr-leds.md) | The sample plugin's name, code, project and image are `dr_leds` / `dr-leds` | proposed |
 | [0040](0040-io-plugin-plugin-name-dr-panel.md) | The IO plugin's plugin name is `dr_panel` | proposed |
+| [0041](0041-oci-image-labels.md) | Every image carries the OCI labels; static ones in the Dockerfile, per-build ones from CI | proposed |
 
 To add a decision, copy the layout of an existing record, take the next number, and add a line to this table.

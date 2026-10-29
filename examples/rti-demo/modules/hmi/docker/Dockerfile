@@ -27,6 +27,16 @@ RUN VITE_BFF_HOST="$VITE_BFF_HOST" VITE_BFF_PORT="$VITE_BFF_PORT" npm run build
 # Production stage
 FROM nginx:alpine
 
+# OCI labels (decision 0041); CI adds version, revision and created.
+# source connects the image to the repository on ghcr.io.
+LABEL org.opencontainers.image.source="https://github.com/netbeheernederland/iec61850-websocket" \
+      org.opencontainers.image.url="https://github.com/netbeheernederland/iec61850-websocket" \
+      org.opencontainers.image.documentation="https://github.com/netbeheernederland/iec61850-websocket/blob/main/examples/rti-demo/modules/hmi/README.md" \
+      org.opencontainers.image.title="rti-hmi" \
+      org.opencontainers.image.description="RTI demo HMI: the web interface, served by nginx" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.vendor="Netbeheer Nederland"
+
 # Copy built files from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
