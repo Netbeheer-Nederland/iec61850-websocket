@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# dr_leds: a claimed control is interlocked while red is on. FSP02's dr_leds
+# claims LED 2 and refuses an Operate on it (blockedByInterlocking) while its
+# red LED is on; LED 1 isn't claimed, so a good Operate on it clears red and
+# LED 2 works again.
+#
+# Needs a claim, which the demo stack doesn't set. In the HMI: ACSI Server
+# (FSP02) -> Plugins -> dr_leds -> Edit, settings
+#   {"claims": ["GenericIO/GGIO1.SPCSO2.Oper.ctlVal"]}
+# (decision 0042). The edit lasts until FSP02 restarts.
+#
+#   cd examples/rti-demo
+#   uv run python -m playbooks.run ../rti-plugins/dr_leds/playbooks/05-interlock-while-red.yaml
+
+name: dr_leds - interlock while red
+pace: 3s
+
+steps:
+  - label: FSP02 linked
+    link: {fsp: FSP02}
+
+  - label: LED 2 works while red is off
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO2, cdc: SPC, value: "on"}
+
+  - label: A refused Operate - red on at FSP02
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO9, cdc: SPC, value: "on"}
+    expect: fail
+  - label: LED 2 is interlocked while red is on
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO2, cdc: SPC, value: "off"}
+    expect: fail
+
+  - label: LED 1 isn't claimed - its Operate clears red
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO1, cdc: SPC, value: "on"}
+  - label: LED 2 works again
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO2, cdc: SPC, value: "off"}

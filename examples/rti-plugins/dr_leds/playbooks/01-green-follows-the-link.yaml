@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# dr_leds: green follows the association. Each FSP's dr_leds turns green
+# when its FSP is associated with the SO (Associated), and goes dark when the
+# FSP drops its connection (ServerStopped); the SO's dr_leds turns green too.
+# Watch the LEDs next to the FSPs and the SO on the HMI's Overview or Traffic.
+#
+#   cd examples/rti-demo
+#   uv run python -m playbooks.run ../rti-plugins/dr_leds/playbooks/01-green-follows-the-link.yaml
+
+name: dr_leds - green follows the link
+pace: 2s
+
+steps:
+  - label: FSP01 dials the SO - FSP01's green on
+    link: {fsp: FSP01}
+  - label: FSP02 dials the SO - FSP02's green on
+    link: {fsp: FSP02}
+    expect: {linked: [FSP01, FSP02]}
+
+  - label: FSP02 drops off - its LEDs go dark, then green again
+    drop: {fsp: FSP02, for: 10s}
+  - label: Both answer again - both FSPs green
+    read:
+      fsp: [FSP01, FSP02]
+      ref: {FSP01: LD0/LLN0.Mod.stVal, FSP02: GenericIO/LLN0.Beh.stVal}
+      fc: st
+    expect: {linked: [FSP01, FSP02]}

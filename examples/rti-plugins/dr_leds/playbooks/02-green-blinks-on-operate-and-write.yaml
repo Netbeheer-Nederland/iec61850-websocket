@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# dr_leds: green blinks on every good Operate and write. FSP02's dr_leds and
+# the SO's blink once per step (OperateResponse with success, ValueWritten);
+# FSP01's stays steady. The pace leaves time to see each blink (blink_seconds,
+# 0.3 s by default).
+#
+#   cd examples/rti-demo
+#   uv run python -m playbooks.run ../rti-plugins/dr_leds/playbooks/02-green-blinks-on-operate-and-write.yaml
+
+name: dr_leds - green blinks on Operate and write
+pace: 2s
+
+steps:
+  - label: Both FSPs linked
+    link: {fsp: [FSP01, FSP02]}
+    expect: {linked: [FSP01, FSP02]}
+
+  - label: LED 1 on - green blinks at FSP02 and the SO
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO1, cdc: SPC, value: "on"}
+  - label: LED 2 on - blink
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO2, cdc: SPC, value: "on"}
+  - label: LED 1 off - blink
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO1, cdc: SPC, value: "off"}
+  - label: LED 2 off - blink
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO2, cdc: SPC, value: "off"}
+
+  - label: Write a setting - blink
+    write: {fsp: FSP02, ref: GenericIO/LLN0.SetInt1.setVal, value: 42, fc: sp, type: int32}
+  - label: And back - blink
+    write: {fsp: FSP02, ref: GenericIO/LLN0.SetInt1.setVal, value: 0, fc: sp, type: int32}

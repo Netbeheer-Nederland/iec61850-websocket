@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# dr_leds: the SO's green blinks on every report it receives
+# (ReportReceived). FSP02 sends an integrity report every second, so the SO's
+# green ticks once a second; FSP01 reports on change, so it gives one burst
+# when reporting starts. The FSPs' own dr_leds don't blink on reports: only
+# the SO gets ReportReceived.
+#
+#   cd examples/rti-demo
+#   uv run python -m playbooks.run ../rti-plugins/dr_leds/playbooks/03-green-blinks-on-reports.yaml
+
+name: dr_leds - the SO's green blinks on reports
+pace: 2s
+
+steps:
+  - label: Both FSPs linked
+    link: {fsp: [FSP01, FSP02]}
+    expect: {linked: [FSP01, FSP02]}
+  - label: Reporting off to start with
+    disable-report:
+      fsp: [FSP01, FSP02]
+      rcb: {FSP01: LD0/LLN0.rcbActualValues, FSP02: GenericIO/LLN0.EventsRCB}
+      type: URCB
+
+  - label: FSP02 reports every second
+    enable-report: {fsp: FSP02, rcb: GenericIO/LLN0.EventsRCB, type: URCB}
+  - label: The SO's green ticks once a second
+    wait: 8s
+    expect: {reports: {fsp: FSP02, min: 5}}
+  - label: FSP02 stops - the SO's green stays still
+    disable-report: {fsp: FSP02, rcb: GenericIO/LLN0.EventsRCB, type: URCB}
+  - wait: 3s
+
+  - label: FSP01 reports - one burst
+    enable-report: {fsp: FSP01, rcb: LD0/LLN0.rcbActualValues, type: URCB}
+  - wait: 2s
+    expect: {reports: {fsp: FSP01, min: 1}}
+  - label: FSP01 stops
+    disable-report: {fsp: FSP01, rcb: LD0/LLN0.rcbActualValues, type: URCB}

@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Netbeheer Nederland
+# SPDX-License-Identifier: Apache-2.0
+#
+# dr_leds: red on a failure, off again on the next success. A refused
+# Operate turns red on at FSP02 and the SO (OperateResponse without success);
+# a failed read turns it on at the SO only (ValueRead not ok: only the SO
+# reads). A good Operate or write turns it off.
+#
+#   cd examples/rti-demo
+#   uv run python -m playbooks.run ../rti-plugins/dr_leds/playbooks/04-red-on-failure.yaml
+
+name: dr_leds - red on failure
+pace: 3s
+
+steps:
+  - label: Both FSPs linked
+    link: {fsp: [FSP01, FSP02]}
+    expect: {linked: [FSP01, FSP02]}
+
+  - label: Operate on a control FSP02 doesn't have - red at FSP02 and the SO
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO9, cdc: SPC, value: "on"}
+    expect: fail
+  - label: A good Operate - red off, green blinks
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO1, cdc: SPC, value: "on"}
+
+  - label: Read something FSP01 doesn't have - red at the SO only
+    read: {fsp: FSP01, ref: LD0/LLN0.NoSuch.stVal, fc: st}
+    expect: fail
+  - label: A good Operate - the SO's red off
+    operate: {fsp: FSP02, ref: GenericIO/GGIO1.SPCSO1, cdc: SPC, value: "off"}
