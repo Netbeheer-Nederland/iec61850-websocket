@@ -284,6 +284,22 @@ describe('PluginsPanel', () => {
     expect(edit.textContent).toMatch(/new URL must be allowed by .*PLUGIN_ALLOWED_SOURCES.*\* for any URL/);
   });
 
+  it('tells an FSP\'s add and edit forms about the claims setting, and not an SO\'s (decision 0042)', async () => {
+    const user = userEvent.setup({ delay: null });
+    const { unmount } = render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);
+    await user.click(await screen.findByTitle('Edit display'));
+    expect(screen.getByRole('form', { name: 'Edit display' }).textContent)
+      .toMatch(/"claims" setting.*GenericIO\/GGIO1\.SPCSO2\.Oper\.ctlVal/);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Add plugin' }));
+    expect(screen.getByRole('form', { name: 'Add plugin' }).textContent).toMatch(/"claims" setting/);
+    unmount();
+
+    render(<PluginsPanel target="rti-so:5000" role="so" />);
+    await user.click(await screen.findByRole('button', { name: 'Add plugin' }));
+    expect(screen.getByRole('form', { name: 'Add plugin' }).textContent).not.toMatch(/claims/);
+  });
+
   it("edits an unreachable plugin's URL and settings, from its definition", async () => {
     const user = userEvent.setup({ delay: null });
     render(<PluginsPanel target="rti-fsp01:5001" role="fsp" />);

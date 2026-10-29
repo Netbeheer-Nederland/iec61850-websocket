@@ -36,6 +36,8 @@ const errorOf = (result) =>
 
 // What PLUGIN_ALLOWED_SOURCES can hold (decision 0037), for the form's hint.
 const SOURCES_HINT = 'exact URLs, wildcards such as http://192.168.0.*:8000 or http://*:9000, or * for any URL';
+// Decision 0042: the FSP reads settings.claims; an Operate on one goes to the plugin.
+const CLAIMS_HINT = 'A "claims" setting, a list of control objRefs such as ["GenericIO/GGIO1.SPCSO2.Oper.ctlVal"], makes the plugin answer their Operates, as well as the objRefs it claims itself.';
 
 const ATTACHED_COLORS = {
   ok: 'var(--success-color)',
@@ -359,8 +361,8 @@ function PluginsPanel({ target, role, pushed, instances = [] }) {
             {copying
               ? `The plugin's name is the one it describes itself with. ${formFor.targets.some((t) => t.role === 'SO') ? '' : 'It controls objects, so only FSPs are offered. '}The other instance's PLUGIN_ALLOWED_SOURCES applies (${SOURCES_HINT}); the plugin stays there until it restarts.`
               : editing
-              ? `A new URL must be allowed by the instance's PLUGIN_ALLOWED_SOURCES (${SOURCES_HINT}); the settings replace all of them. If the plugin doesn't connect with them, it keeps its old URL and settings. The edit stays until the instance restarts; a lasting one goes in its plugin configuration.`
-              : `Only URLs allowed by the instance's PLUGIN_ALLOWED_SOURCES are accepted (${SOURCES_HINT}). An added plugin stays until the instance restarts; a lasting one goes in its plugin configuration.`}
+              ? `A new URL must be allowed by the instance's PLUGIN_ALLOWED_SOURCES (${SOURCES_HINT}); the settings replace all of them. If the plugin doesn't connect with them, it keeps its old URL and settings. The edit stays until the instance restarts; a lasting one goes in its plugin configuration.${showClaims ? ` ${CLAIMS_HINT}` : ''}`
+              : `Only URLs allowed by the instance's PLUGIN_ALLOWED_SOURCES are accepted (${SOURCES_HINT}). An added plugin stays until the instance restarts; a lasting one goes in its plugin configuration.${showClaims ? ` ${CLAIMS_HINT}` : ''}`}
           </small>
           <div style={{ gridColumn: '1 / -1' }}>
             <button type="submit" id="plugins-add-submit" className="btn-primary" disabled={Boolean(busy)}>{editing ? 'Save' : copying ? 'Add to instance' : 'Add'}</button>
