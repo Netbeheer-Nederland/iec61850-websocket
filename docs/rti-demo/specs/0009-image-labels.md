@@ -6,7 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # 0009. The images carry the OCI labels, and the published ones are connected to the repository
 
-- Status: draft
+- Status: done (2026-10-29, commit f3bb194)
 - Date: 2026-10-29
 - Changes: Dockerfiles, `.github/workflows/images.yml`
 
@@ -136,15 +136,13 @@ Gets the Dockerfile labels. It isn't added to `images.yml` by this spec.
 
 ## Docs to update
 
-Decision 0016 (a line on labels, or a new decision that the labels are part of every image), the specs README, and
-the module READMEs where they show `docker build` (one sentence: the image carries the OCI labels, CI adds version,
-revision and creation time).
+A new decision, [0041](../decisions/0041-oci-image-labels.md); the specs and decisions READMEs; the rti-demo README
+(the images carry the labels, CI adds version, revision and creation time) and the rti-plugins README (the `LABEL` of
+a copied plugin).
 
-## Open questions
+## Answered
 
-- `base.name` / `base.digest`: worth setting (Docker Scout and Renovate use them to tell when the base image is
-  stale), but `base.digest` is only right when the `FROM` is pinned by digest, and none is. Pin the bases by digest
-  first, and add both then?
-- The plugins in `examples/rti-plugins/` are what third parties copy for their own plugin (decision 0030). A copy's
-  `source` then has to change by hand; a comment above the `LABEL` says so. Enough?
-- The GitLab mirror: its registry ignores `source`, so images there aren't connected to anything. Nothing to do?
+- `base.name` / `base.digest`: not now. `base.digest` is only right when the `FROM` is pinned by digest, and none is;
+  both can come with pinning.
+- A copied plugin: a comment above its `LABEL` says to change `source`, `url` and `documentation`.
+- The GitLab mirror: its registry ignores `source`; nothing to do.

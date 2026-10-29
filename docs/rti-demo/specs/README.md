@@ -57,7 +57,7 @@ Recommended: 2, since the list of actions is growing and plugins are written by 
 
 | Spec | What | Changes | Status |
 |---|---|---|---|
-| [0009](0009-image-labels.md) | The images carry the OCI labels, and the published ones are connected to the repository | Dockerfiles, CI | draft |
+| [0009](0009-image-labels.md) | The images carry the OCI labels, and the published ones are connected to the repository | Dockerfiles, CI | done |
 
 ## Format
 
