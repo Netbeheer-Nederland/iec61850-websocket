@@ -51,7 +51,7 @@ Recommended: 2, since the list of actions is growing and plugins are written by 
 
 | Spec | What | Changes | Status |
 |---|---|---|---|
-| [0008](0008-hmi-log-level.md) | The HMI takes `LOG_LEVEL` and `--log-level`, as the FSP, SO and BFF do | HMI | draft |
+| [0008](0008-hmi-log-level.md) | The HMI takes `LOG_LEVEL` and `--log-level`, as the FSP, SO and BFF do | HMI | done |
 
 ## Container images
 

@@ -6,7 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # 0008. The HMI takes LOG_LEVEL, as the FSP, SO and BFF do
 
-- Status: draft
+- Status: done (2026-10-29, commit 3619290, decision 0043)
 - Date: 2026-10-25
 - Changes: HMI (bundle, container, dev server)
 
