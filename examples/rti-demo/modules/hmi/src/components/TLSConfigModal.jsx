@@ -22,6 +22,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRuntimeFlag } from '../hooks/useRuntimeFlag';
 import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from '../config';
 import { useCertDir, CertFileSelect, CertReferenceNote } from './CertFileSelect';
+import { log } from '../utils/log';
 
 function parsePythonDictString(pythonStr) {
   if (!pythonStr || typeof pythonStr !== 'string') return pythonStr;
@@ -33,7 +34,7 @@ function parsePythonDictString(pythonStr) {
       .replace(/None/g, 'null');
     return JSON.parse(jsonStr);
   } catch (e) {
-    console.log('Warning: Could not parse Python dict string as JSON:', e);
+    log.debug('Warning: Could not parse Python dict string as JSON:', e);
     return pythonStr;
   }
 }
@@ -176,7 +177,7 @@ const TLSConfigModal = ({
       const host = connection.host || 'localhost';
       const port = connection.port;
       if (!host || !port) {
-        console.warn('Cannot fetch TLS config: missing host or port');
+        log.warn('Cannot fetch TLS config: missing host or port');
         return;
       }
 
@@ -189,7 +190,7 @@ const TLSConfigModal = ({
         if (data.enable_tls) applyFields(data);
         if (data.ws_mode) setWsMode(data.ws_mode);
       } catch (error) {
-        console.warn('Failed to fetch TLS config from server endpoint:', error);
+        log.warn('Failed to fetch TLS config from server endpoint:', error);
       }
     };
 

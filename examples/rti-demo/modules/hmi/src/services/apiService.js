@@ -18,6 +18,7 @@
  */
 
 import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from '../config';
+import { log } from '../utils/log';
 
 /**
  * API Service for BFF Backend
@@ -121,7 +122,7 @@ export const getBffBaseUrl = () => {
   try {
     savedSettings = JSON.parse(localStorage.getItem('rti-hmi-settings') || '{}') || {};
   } catch (e) {
-    console.warn(`Failed to parse rti-hmi-settings: ${e.message}`);
+    log.warn(`Failed to parse rti-hmi-settings: ${e.message}`);
   }
   const host = localStorage.getItem('bffHost') || savedSettings.bffHost || DEFAULT_BFF_HOST;
   const port = localStorage.getItem('bffPort') || savedSettings.bffPort || DEFAULT_BFF_PORT;
@@ -182,7 +183,7 @@ export const executeApiCall = async (apiId, targetValue = null, bodyOverride = n
   const definition = getApiById(apiId);
   
   if (!definition) {
-    console.error(`API ${apiId} not found`);
+    log.error(`API ${apiId} not found`);
     return null;
   }
   const api = {
@@ -232,7 +233,7 @@ export const executeApiCall = async (apiId, targetValue = null, bodyOverride = n
       parsedPayload = JSON.parse(rawText);
     } catch (e) {
       // Keep raw text for non-JSON responses
-      console.warn(`Failed to parse response as JSON: ${e.message}`);
+      log.warn(`Failed to parse response as JSON: ${e.message}`);
     }
     
     return {
@@ -242,7 +243,7 @@ export const executeApiCall = async (apiId, targetValue = null, bodyOverride = n
       rawText,
     };
   } catch (error) {
-    console.error(`Request failed for ${api.label}:`, error.message || error);
+    log.error(`Request failed for ${api.label}:`, error.message || error);
     return null;
   }
 };
@@ -269,7 +270,7 @@ export const ensureBffHealthy = async () => {
     
     return true;
   } catch (error) {
-    console.error('BFF health check failed:', error.message);
+    log.error('BFF health check failed:', error.message);
     throw error;
   }
 };

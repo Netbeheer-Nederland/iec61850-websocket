@@ -18,6 +18,16 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  LOG_LEVEL_NAMES,
+  describeLogLevel,
+  getLogLevel,
+  getStoredLogLevel,
+  getUrlLogLevel,
+  log,
+  resolveServerLogLevel,
+  setStoredLogLevel,
+} from '../utils/log';
 
 // Max time to wait for the BFF /api/health probe before giving up.
 const HEALTH_TIMEOUT_MS = 4000;
@@ -39,6 +49,12 @@ function Settings({ settings, setSettings }) {
     color: 'var(--text-muted)'
   });
 
+  // The HMI's log level (spec 0008): kept in localStorage, applied on change.
+  const [logLevelChoice, setLogLevelChoice] = useState(() => getStoredLogLevel() || '');
+  const [activeLogLevel, setActiveLogLevel] = useState(getLogLevel);
+  const serverLogLevel = resolveServerLogLevel();
+  const urlLogLevel = getUrlLogLevel();
+
   const syncedSettingsRef = useRef(JSON.stringify(settings));
   const didMountRef = useRef(false);
 
@@ -49,7 +65,7 @@ function Settings({ settings, setSettings }) {
       try {
         setRefreshSettings(prev => ({ ...prev, ...JSON.parse(saved) }));
       } catch (e) {
-        console.warn(`Failed to parse rti-hmi-refresh-settings: ${e.message}`);
+        log.warn(`Failed to parse rti-hmi-refresh-settings: ${e.message}`);
       }
     }
   }, []);
@@ -164,6 +180,11 @@ function Settings({ settings, setSettings }) {
     setLocalSettings(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleLogLevelChange = (e) => {
+    setLogLevelChoice(e.target.value);
+    setActiveLogLevel(setStoredLogLevel(e.target.value || null));
+  };
+
   const handleRefreshInputChange = (e) => {
     const { id, value } = e.target;
     setRefreshSettings(prev => ({
@@ -219,6 +240,29 @@ function Settings({ settings, setSettings }) {
             <i className="fas fa-save"></i>
             Save Settings and Test BFF Connection
           </button>
+        </div>
+
+        <div className="settings-group">
+          <h3>Logging</h3>
+          <div className="setting-item" style={{ display: 'block' }}>
+            <label htmlFor="log-level">Log level</label>
+            <select
+              id="log-level"
+              value={logLevelChoice}
+              onChange={handleLogLevelChange}
+              style={{ width: '100%', maxWidth: '300px' }}
+            >
+              <option value="">From the server ({serverLogLevel.name})</option>
+              {LOG_LEVEL_NAMES.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '6px' }}>
+              What the HMI logs in the browser console. Applies straight away and is
+              kept in this browser. In use: <span id="log-level-in-use">{describeLogLevel(activeLogLevel)}</span>.
+              {urlLogLevel && ` ?log=${urlLogLevel} in the URL wins over this choice until the page is reloaded without it.`}
+            </p>
+          </div>
         </div>
 
         <div className="settings-group">

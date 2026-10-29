@@ -19,6 +19,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { generateModelPyCode } from '../utils/sclParser';
+import { log } from '../utils/log';
 
 function Tools() {
   const [sclFile, setSclFile] = useState(null);
@@ -94,7 +95,7 @@ function Tools() {
 
       setStatus(`Found ${iedNamesList.length} IED(s). Select IED and Access Point, then generate model.`);
     } catch (error) {
-      console.error('Error parsing SCL:', error);
+      log.error('Error parsing SCL:', error);
       setStatus(`Error parsing SCL: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -160,7 +161,7 @@ function Tools() {
       
       setStatus(`Downloaded model.py successfully`);
     } catch (error) {
-      console.error('Error downloading model:', error);
+      log.error('Error downloading model:', error);
       setStatus(`Error downloading model: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -273,7 +274,7 @@ function Tools() {
       
       return buildNode(doc.documentElement);
     } catch (error) {
-      console.error('Error building tree:', error);
+      log.error('Error building tree:', error);
       return null;
     }
   };

@@ -520,6 +520,13 @@
             </div>
           </div>
           <div class="section-card">
+            <h3>Logging</h3>
+            <div class="field-row">
+              <div class="field"><span class="label">Log level ▾</span><div class="input"></div><span class="hint">From the server (info) / critical / error / warning / info / debug / trace - applies straight away, kept in this browser. In use: debug (from LOG_LEVEL)</span></div>
+            </div>
+            <p class="placeholder-text" style="margin:10px 0 0;">ⓘ Spec 0008. What the HMI logs in the browser console. Highest first: ?log=&lt;level&gt; in the URL (until a reload without it; the hint then says so), this choice, the container's LOG_LEVEL, the build's (--log-level / LOG_LEVEL of npm run dev or build), info.</p>
+          </div>
+          <div class="section-card">
             <h3>Refresh intervals</h3>
             <div class="field-row">
               <div class="field"><span class="label">Auto-refresh interval</span><div class="input"></div></div>

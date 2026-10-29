@@ -22,6 +22,7 @@ import { subscribe as subscribeLive, onConnectionStateChange } from '../services
 import { executeApiCall, buildTargetValue } from '../services/apiService';
 import { usePersistentFlag } from './usePersistentFlag';
 import { unwrapList } from '../utils/timeline';
+import { log } from '../utils/log';
 
 // Most entries kept per target and kind; older ones drop off.
 export const MAX_ENTRIES = 2000;
@@ -113,7 +114,7 @@ export function useTrafficTimeline(connections = []) {
       if (frames?.ok) ingest(target, 'frames', unwrapList(frames.payload, 'messages'));
       if (actions?.ok) ingest(target, 'acsi', unwrapList(actions.payload, 'actions'));
     } catch (error) {
-      console.error(`Timeline: failed to fetch ${target}:`, error);
+      log.error(`Timeline: failed to fetch ${target}:`, error);
     }
   })), [targets, ingest]);
 

@@ -16,6 +16,7 @@
  * Auto-reconnects with backoff if the BFF restarts or the connection drops.
  */
 import { getBffBaseUrl } from './apiService';
+import { log } from '../utils/log';
 
 let socket = null;
 let reconnectTimer = null;
@@ -32,7 +33,7 @@ const notifyState = (connected) => {
     try {
       fn(connected);
     } catch (e) {
-      console.error('liveSocket state listener failed:', e);
+      log.error('liveSocket state listener failed:', e);
     }
   });
 };
@@ -83,7 +84,7 @@ export const connect = () => {
       try {
         fn(msg);
       } catch (e) {
-        console.error(`liveSocket handler for "${msg.type}" failed:`, e);
+        log.error(`liveSocket handler for "${msg.type}" failed:`, e);
       }
     });
   };

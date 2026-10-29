@@ -19,6 +19,7 @@
 
 import React, { useState, useMemo } from 'react';
 import ConnectionModal from '../components/ConnectionModal';
+import { log } from '../utils/log';
 
 // All instance CRUD (register/edit/delete) lives here now - Overview only
 // ever reads `connections` to render its graphic. Saves go
@@ -158,7 +159,7 @@ function Connections({ settings, connections = [], loading = false, onReload }) 
         alert(`Failed to delete connection: ${await failureReason(response)}`);
       }
     } catch (error) {
-      console.error('Failed to delete connection:', error);
+      log.error('Failed to delete connection:', error);
     }
   };
 
@@ -232,7 +233,7 @@ function Connections({ settings, connections = [], loading = false, onReload }) 
         }
       }
     } catch (error) {
-      console.error('Failed to save connection:', error);
+      log.error('Failed to save connection:', error);
       alert('Failed to save connection. Check console for details.');
     }
   };

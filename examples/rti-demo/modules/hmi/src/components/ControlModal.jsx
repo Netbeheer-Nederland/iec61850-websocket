@@ -21,6 +21,7 @@
 import React, { useState, useEffect } from 'react';
 import { executeApiCall, getApiById } from '../services/apiService';
 import { controlValue, soAnswer } from '../utils/demoActions';
+import { log } from '../utils/log';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
@@ -74,7 +75,7 @@ const ControlModal = ({ objRef, objName, cdc, endpoint, cp, onClose, onSuccess, 
           }
         }
       } catch (error) {
-        console.error('Error fetching ctlModel:', error);
+        log.error('Error fetching ctlModel:', error);
         setCtlModel('N/A');
       }
     };

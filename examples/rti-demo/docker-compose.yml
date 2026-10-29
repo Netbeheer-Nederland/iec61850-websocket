@@ -38,6 +38,8 @@ services:
       - BFF_CONNECTIONS_FILE=/config/connections.json
       # Playbooks saved from the HMI (recordings, uploads), on the config volume.
       - BFF_PLAYBOOKS_DIR=/config/playbooks
+      # One LOG_LEVEL for the whole stack (spec 0008).
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
       - bff-config:/config
       - ./playbooks:/app/examples/rti-demo/playbooks:ro
@@ -69,6 +71,9 @@ services:
       # else localhost:3000. See modules/hmi/README.md.
       - BFF_HOST=${HMI_BFF_HOST:-}
       - BFF_PORT=${HMI_BFF_PORT:-}
+      # One LOG_LEVEL for the whole stack (spec 0008): the browser console's
+      # level and nginx's error log.
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     ports:
       - "8080:80"
     depends_on:
@@ -94,6 +99,8 @@ services:
       # PORT/PYTHONUNBUFFERED already set (matching defaults) by the Dockerfile.
       - CP=cp1
       - MODEL_PATH=/models/model_1.py
+      # One LOG_LEVEL for the whole stack (spec 0008).
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       # The ACSI server starts with the FSP, not connected (decision 0033);
       # FSP_AUTOCONNECT=true also dials out to the SO here.
       - FSP_SO_HOST=rti-so
@@ -134,6 +141,8 @@ services:
       - PORT=5005
       - CP=cp2
       - MODEL_PATH=/models/model_2.py
+      # One LOG_LEVEL for the whole stack (spec 0008).
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       # The ACSI server starts with the FSP, not connected (decision 0033);
       # FSP_AUTOCONNECT=true also dials out to the SO here.
       - FSP_SO_HOST=rti-so
@@ -173,6 +182,8 @@ services:
       # The plugins it connects to: dr_leds, or the IO server with
       # docker-compose.io.yaml (decisions 0029, 0034).
       - PLUGINS_FILE=/plugins/plugins.json
+      # One LOG_LEVEL for the whole stack (spec 0008).
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     networks:
       - rti-network
     labels:

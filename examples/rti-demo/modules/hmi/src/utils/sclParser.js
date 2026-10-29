@@ -17,6 +17,8 @@
  * limitations under the License.
  */
 
+import { log } from './log';
+
 /**
  * SCL Parser Utility
  * Standalone SCL parsing for React components
@@ -467,7 +469,7 @@ export function parseSclContent(sclContent) {
   try {
     templates = parseDataTypeTemplatesFromDoc(doc);
   } catch (error) {
-    console.warn('Could not parse DataTypeTemplates:', error);
+    log.warn('Could not parse DataTypeTemplates:', error);
     templates = { enumTypes: {}, daTypes: {}, doTypes: {}, lnTypes: {} };
   }
 

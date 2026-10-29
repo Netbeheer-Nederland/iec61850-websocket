@@ -20,6 +20,7 @@
 // useRuntimeFlag.js
 import { useState, useCallback, useEffect } from 'react';
 import { executeApiCall } from '../services/apiService';
+import { log } from '../utils/log';
 
 // Whether an instance (e.g. "rti-so:5002") currently has a feature turned on,
 // per its own runtime API (`apiId`, via the BFF's /api/execute) - not what's
@@ -36,7 +37,7 @@ export function useRuntimeFlag(apiId, field, target) {
         setEnabled(Boolean(result.payload?.result?.[field] ?? result.payload?.[field]));
       }
     } catch (error) {
-      console.error(`Failed to fetch ${apiId}:`, error);
+      log.error(`Failed to fetch ${apiId}:`, error);
     }
   }, [apiId, field, target]);
 

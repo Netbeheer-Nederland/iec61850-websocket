@@ -23,6 +23,7 @@ import { subscribe as subscribeLive, isConnected as isLiveConnected, onConnectio
 import { usePersistentFlag } from '../hooks/usePersistentFlag';
 import LogKindBadge, { LOG_KINDS } from './LogKindBadge';
 import { unwrapList } from '../utils/timeline';
+import { log } from '../utils/log';
 
 // Frames (messages log) and ACSI service entries (actions log, kind "acsi")
 // are separate id sequences on the instance, so the kind has to be part of
@@ -159,7 +160,7 @@ function MessageMonitor({
       ].sort(byTime);
       ingestMessages(batch);
     } catch (error) {
-      console.error('Failed to fetch messages:', error);
+      log.error('Failed to fetch messages:', error);
       setStatus(`Error: ${error.message || 'Failed to fetch messages'}`);
     }
   }, [selectedEndpoint, getMessagesApi, ingestMessages]);
@@ -288,7 +289,7 @@ function MessageMonitor({
         setStatus(`Error clearing messages: ${result?.error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Failed to clear messages:', error);
+      log.error('Failed to clear messages:', error);
       setStatus(`Error: ${error.message || 'Failed to clear messages'}`);
     }
   }, [selectedEndpoint, messages]);

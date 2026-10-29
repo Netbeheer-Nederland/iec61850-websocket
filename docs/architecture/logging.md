@@ -138,3 +138,17 @@ logging.basicConfig(level=logging.WARNING)                       # quiet everyth
 logging.getLogger("ws61850").setLevel(logging.INFO)              # normal ws61850 events
 logging.getLogger("ws61850.endpoint").setLevel(logging.DEBUG)    # full endpoint trace
 ```
+
+---
+
+## The RTI demo's services
+
+The BFF, FSP and SO read `LOG_LEVEL` at start, and `--log-level` on their command line wins over it
+(`resolve_log_level`): `critical`, `error`, `warning`, `info`, `debug`, `trace` (as `debug`) or a number, in any case;
+an unknown or empty value is `info`. `examples/rti-demo/docker-compose.yml` passes one `LOG_LEVEL` (default `info`) to
+every service.
+
+The HMI takes the same names (spec [0008](../rti-demo/specs/0008-hmi-log-level.md)). It logs in the browser console,
+through `src/utils/log.js`; its level comes from `?log=` in the URL, the Settings page, the container's `LOG_LEVEL`,
+the build's `--log-level` / `LOG_LEVEL`, or `info`, the first that is set. The container's `LOG_LEVEL` also sets
+nginx's error log. See the [HMI README](../../examples/rti-demo/modules/hmi/README.md#log-level).

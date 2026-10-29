@@ -33,6 +33,7 @@ import WriteValueModal from '../components/WriteValueModal.jsx';
 import ActionLogPanel from '../components/ActionLogPanel.jsx';
 import { usePersistentFlag } from '../hooks/usePersistentFlag';
 import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from '../config';
+import { log } from '../utils/log';
 
 function ACSIServer({ settings, updateModel, getModel, connections: propConnections, bffBaseUrl = `http://${DEFAULT_BFF_HOST}:${DEFAULT_BFF_PORT}`}) {
   const location = useLocation();
@@ -230,7 +231,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         return list;
       }
     } catch (error) {
-      console.error('Failed to fetch connections:', error);
+      log.error('Failed to fetch connections:', error);
     }
     return null;
   }, [bffBaseUrl]);
@@ -327,7 +328,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         .replace(/""+/g, '"');
       return JSON.parse(jsonStr);
     } catch (e) {
-      console.warn('Could not parse Python dict string:', e);
+      log.warn('Could not parse Python dict string:', e);
       return pythonStr;
     }
   }, []);
@@ -404,7 +405,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           setCp(serverStatus.accessPoints[0]);
         }
       }
-    } catch (error) { console.error('Failed to load status:', error); }
+    } catch (error) { log.error('Failed to load status:', error); }
   }, [endpointTarget, executeApiCall, parsePythonDictString, refreshTlsEnabled, refreshOAuthEnabled]);
 
   // Load server status on page load
@@ -415,7 +416,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
         // Load server status
         await loadStatus();
       } catch (error) {
-        console.error('Failed to fetch initial data:', error);
+        log.error('Failed to fetch initial data:', error);
       }
     };
     fetchInitialData();
@@ -448,7 +449,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           }
           initialSyncDoneRef.current = true;
         } catch (e) {
-          console.error('Failed to sync from live server status:', e);
+          log.error('Failed to sync from live server status:', e);
         }
       } else {
         if (!connectionsLoaded || !identitySettled) return; // wait for the real fetch, and for the ?fsp= restore, before deciding
@@ -546,7 +547,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
           });
         }
       }
-    } catch (error) { console.error('Failed to fetch action logs:', error); }
+    } catch (error) { log.error('Failed to fetch action logs:', error); }
   }, [endpointTarget, executeApiCall]);
 
   const startMonitoring = useCallback(async () => {
@@ -630,7 +631,7 @@ function ACSIServer({ settings, updateModel, getModel, connections: propConnecti
             try {
               modelData = JSON.parse(jsonStr);
             } catch (e2) {
-              console.error('Failed to parse model data:', e2);
+              log.error('Failed to parse model data:', e2);
             }
           }
         }

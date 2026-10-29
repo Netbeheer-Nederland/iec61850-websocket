@@ -21,6 +21,7 @@
 import React, { useState, useEffect } from 'react';
 import { executeApiCall } from '../services/apiService';
 import PinActionForm from './PinActionForm';
+import { log } from '../utils/log';
 
 // Default options for optFlds and trgOp checkboxes
 const OPT_FLDS_OPTIONS = [
@@ -146,7 +147,7 @@ const BrcbConfigModal = ({
             });
           }
         } else {
-          console.error(
+          log.error(
             'Failed to fetch BRCB values:',
             result?.payload?.error || 'Unknown error'
           );
@@ -156,7 +157,7 @@ const BrcbConfigModal = ({
           setRptEna(false);
         }
       } catch (error) {
-        console.error('Error fetching BRCB values:', error);
+        log.error('Error fetching BRCB values:', error);
 
         setDataSet('');
         setIntgPd(2000);
@@ -248,7 +249,7 @@ const BrcbConfigModal = ({
         });
       }
     } catch (error) {
-      console.error(`Error saving ${rcbType} configuration:`, error);
+      log.error(`Error saving ${rcbType} configuration:`, error);
 
       setResult({
         visible: true,

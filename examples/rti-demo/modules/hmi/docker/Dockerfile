@@ -43,8 +43,9 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Writes /config.js from BFF_HOST / BFF_PORT at container start (the nginx
-# image runs /docker-entrypoint.d/*.sh before starting nginx).
+# Writes /config.js from BFF_HOST / BFF_PORT / LOG_LEVEL, and nginx's error
+# log level from LOG_LEVEL, at container start (the nginx image runs
+# /docker-entrypoint.d/*.sh before starting nginx).
 COPY --chmod=755 docker/40-rti-config.sh /docker-entrypoint.d/40-rti-config.sh
 
 # Expose port

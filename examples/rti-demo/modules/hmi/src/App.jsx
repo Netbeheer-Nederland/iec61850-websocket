@@ -36,6 +36,7 @@ import { executeApiCall, buildTargetValue } from './services/apiService';
 import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from './config';
 import { linkSoToFsps } from './utils/fspLinks';
 import { connect as connectLiveSocket, reconnect as reconnectLiveSocket, subscribe as subscribeLive, onConnectionStateChange as onLiveSocketStateChange } from './services/liveSocket';
+import { log } from './utils/log';
 
 function App() {
   const [bffStatus, setBffStatus] = useState({
@@ -208,7 +209,7 @@ function App() {
       }
       return connectionsRef.current;
     } catch (error) {
-      console.error('Failed to fetch connections:', error);
+      log.error('Failed to fetch connections:', error);
       return connectionsRef.current;
     } finally {
       if (!background) setConnectionsLoading(false);
@@ -294,7 +295,7 @@ function App() {
         setEndpoints([]);
       }
     } catch (error) {
-      console.error('Failed to fetch endpoints:', error);
+      log.error('Failed to fetch endpoints:', error);
       setEndpoints([]);
     } finally {
       setLoading(false);

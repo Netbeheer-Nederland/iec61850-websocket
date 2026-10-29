@@ -21,6 +21,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { executeApiCall, buildTargetValue, getAutoRefreshIntervalMs } from '../services/apiService';
 import ControlModal from './ControlModal';
 import PinActionForm from './PinActionForm';
+import { log } from '../utils/log';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
@@ -356,7 +357,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
       
       return null;
     } catch (error) {
-      console.error('Failed to extract DO definition from model:', error);
+      log.error('Failed to extract DO definition from model:', error);
       return null;
     }
   };
@@ -409,7 +410,7 @@ function DataAccessPanel({ connections, getModel, updateModel, settings, cp = 'c
         subDataDefinition: subDataObjects
       };
     } catch (error) {
-      console.error('Failed to extract DO definition from tree:', error);
+      log.error('Failed to extract DO definition from tree:', error);
       return null;
     }
   };

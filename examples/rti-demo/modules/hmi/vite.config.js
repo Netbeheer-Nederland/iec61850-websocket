@@ -17,11 +17,21 @@
  * limitations under the License.
  */
 
-import { defineConfig } from 'vite'
+import { createLogger, defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { buildLogLevel, cliLogLevel, viteLogLevel } from './vite.log-level.js'
+
+// The HMI's log level (spec 0008): --log-level, else LOG_LEVEL, becomes
+// VITE_LOG_LEVEL, which Vite reads from the environment after this file.
+const hmiLogLevel = buildLogLevel(process.argv, process.env)
+if (hmiLogLevel !== undefined) {
+  process.env.VITE_LOG_LEVEL = hmiLogLevel
+}
 
 export default defineConfig({
   plugins: [react()],
+  // --log-level also reached Vite as its own --logLevel; keep Vite's.
+  customLogger: cliLogLevel(process.argv) !== undefined ? createLogger(viteLogLevel(process.argv)) : undefined,
   server: {
     port: 8080,
     open: true

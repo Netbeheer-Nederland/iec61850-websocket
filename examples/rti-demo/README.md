@@ -111,6 +111,14 @@ with the service name:
 To disable verbose logging: `uv run python launch.py --no-verbose`
 To run in background: `uv run python launch.py --background`
 
+With Docker, one `LOG_LEVEL` sets the whole stack: `docker-compose.yml` passes it (default `info`) to the BFF, the
+FSPs, the SO and the HMI, whose browser console and nginx error log follow it
+([HMI README](modules/hmi/README.md#log-level)):
+
+```bash
+LOG_LEVEL=debug docker compose up -d
+```
+
 ## Docker
 
 After installing Docker and before starting the demo, create the following network `rti-network` to connect Keycloak for

@@ -24,6 +24,7 @@ import InstanceVisualization from '../components/InstanceVisualization';
 import { executeApiCall, buildTargetValue, getAutoRefreshIntervalMs } from '../services/apiService';
 import { generateModelPyCode } from '../utils/sclParser';
 import { transformModelToTree } from '../utils/modelUtils';
+import { log } from '../utils/log';
 
 function Model({ settings, connections = [], loading = false, onReload }) {
   const navigate = useNavigate();
@@ -91,7 +92,7 @@ function Model({ settings, connections = [], loading = false, onReload }) {
             try {
               modelData = JSON.parse(jsonStr);
             } catch (e2) {
-              console.error('Failed to parse model data:', e2);
+              log.error('Failed to parse model data:', e2);
             }
           }
         }
@@ -116,7 +117,7 @@ function Model({ settings, connections = [], loading = false, onReload }) {
         }
       }
     } catch (error) {
-      console.error('Failed to load model:', error);
+      log.error('Failed to load model:', error);
     }
   }, []);
 
@@ -227,7 +228,7 @@ function Model({ settings, connections = [], loading = false, onReload }) {
             )
           );
         } catch (notifyErr) {
-          console.error('Failed to notify SO instances of model change:', notifyErr);
+          log.error('Failed to notify SO instances of model change:', notifyErr);
         }
 
 
@@ -240,7 +241,7 @@ function Model({ settings, connections = [], loading = false, onReload }) {
         setUploadStatus(`Error updating model: ${result?.error || result?.payload?.error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Failed to update model:', error);
+      log.error('Failed to update model:', error);
       setUploadStatus(`Error: ${error.message}`);
     } finally {
       setUploadingModel(false);

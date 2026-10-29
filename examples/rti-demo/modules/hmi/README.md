@@ -61,6 +61,35 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 
 `src/config.js` resolves the default; `public/config.js` is the empty runtime configuration outside Docker.
 
+### Log level
+
+What the HMI logs in the browser console (spec [0008](../../../../docs/rti-demo/specs/0008-hmi-log-level.md)): every
+message goes through `src/utils/log.js`, at `error`, `warn`, `info` or `debug`. The level takes the names of the FSP,
+SO and BFF's `LOG_LEVEL`, in any case: `critical` (errors only, as `error`), `error`, `warning`, `info`, `debug`,
+`trace` (as `debug`) or a number; an unknown or empty value is `info`. The first that is set wins:
+
+1. **The URL** - `?log=debug` on any page. It lasts while the page is open, navigating included; a reload without it
+   drops it.
+2. **Settings page** - Log level, kept per browser in localStorage, applied straight away. "From the server" clears it.
+3. **Runtime (Docker)** - `LOG_LEVEL` on the `rti-hmi` container, written to `/config.js` by
+   `docker/40-rti-config.sh`. It also sets nginx's error log: `debug` → `info`, `info` → `notice`, `warning` → `warn`,
+   `error` and `critical` → `error`; the access log stays on.
+4. **Build time** - `--log-level` of `npm run dev` / `npm run build`, else `LOG_LEVEL` in their environment, else
+   `VITE_LOG_LEVEL` (the environment or `.env.local`), baked into the bundle.
+5. **Built-in** - `info`.
+
+```bash
+npm run dev -- --log-level debug     # wins over LOG_LEVEL
+LOG_LEVEL=debug npm run dev
+
+# Docker: with docker-compose.yml, one LOG_LEVEL for the whole stack
+LOG_LEVEL=debug docker compose up -d
+```
+
+At start the HMI logs the level in use and where it comes from, at `info`: `HMI log level: debug (from LOG_LEVEL)`.
+`debug` messages use `console.debug`, which Chrome shows only with "Verbose" on in the console's levels. Vite's own
+`--logLevel` (its terminal output) is unchanged, also when `--log-level` is given.
+
 ## Technology stack
 
 - React 19 with functional components and hooks
@@ -83,7 +112,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 | `/tools` | `Tools.jsx` | SCL Model Factory, XML parsing |
 | `/reports` | `Reports.jsx` | Reports and logging (placeholder) |
 | `/diagnostics` | `Diagnostics.jsx` | System log across the BFF and all instances |
-| `/settings` | `Settings.jsx` | BFF configuration |
+| `/settings` | `Settings.jsx` | BFF configuration, log level |
 
 `/` and unknown routes redirect to `/overview`.
 
@@ -243,6 +272,7 @@ HMI_BFF_HOST=192.168.100.10 HMI_BFF_PORT=3000 docker compose up -d rti-hmi
 
 **Features**:
 * BFF server configuration (host, port)
+* Log level of the browser console (spec 0008), applied without a reload
 * Settings persistence using localStorage
 * Form validation
 * Default settings management
@@ -263,7 +293,7 @@ src/
 │                            # useDemoActions, usePlaybookRun, usePlaybookRecorder, persistent flags
 ├── services/                # apiService.js (BFF REST), liveSocket.js (BFF WebSocket)
 ├── utils/                   # sclParser.js, modelUtils.js, timeline.js, reports.js, fspLinks.js,
-│                            # demoActions.js, playbooks.js
+│                            # demoActions.js, playbooks.js, log.js (every console call, at LOG_LEVEL)
 └── assets/styles.css
 ```
 

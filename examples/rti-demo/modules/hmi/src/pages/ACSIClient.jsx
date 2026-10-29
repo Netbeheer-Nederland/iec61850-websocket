@@ -34,6 +34,7 @@ import { executeApiCall, buildTargetValue, getApiById } from '../services/apiSer
 import { subscribe as subscribeLive } from '../services/liveSocket';
 import { usePersistentFlag } from '../hooks/usePersistentFlag';
 import { DEFAULT_BFF_HOST, DEFAULT_BFF_PORT } from '../config';
+import { log } from '../utils/log';
 
 const CONTROLLABLE_CDCS = ['SPC', 'DPC', 'APC', 'INC', 'ENC', 'BSC', 'ING', 'ASG', 'CTE', 'ENG'];
 
@@ -90,7 +91,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = `http://${DEFAULT_BFF_HOST}:${DE
         setConnections(data.connections || []);
       }
     } catch (error) {
-      console.error('Failed to fetch connections:', error);
+      log.error('Failed to fetch connections:', error);
     }
   }, [bffBaseUrl]);
 
@@ -117,7 +118,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = `http://${DEFAULT_BFF_HOST}:${DE
           setAcsiClientList(Array.isArray(clientList) ? clientList : []);
         }
       } catch (error) {
-        console.error('Failed to fetch properties:', error);
+        log.error('Failed to fetch properties:', error);
       }
     };
     fetchProperties();
@@ -229,7 +230,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = `http://${DEFAULT_BFF_HOST}:${DE
       const result = await executeApiCall('status', apiTarget, null);
       if (result?.ok) setStatusInfo(result.payload);
     } catch (error) {
-      console.error('Failed to load status:', error);
+      log.error('Failed to load status:', error);
     }
   }, [apiTarget, refreshTlsEnabled, refreshOAuthEnabled]);
 
@@ -272,7 +273,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = `http://${DEFAULT_BFF_HOST}:${DE
         }
       }
     } catch (error) {
-      console.error('Failed to fetch action logs:', error);
+      log.error('Failed to fetch action logs:', error);
     }
   }, [apiTarget]);
 
@@ -644,7 +645,7 @@ const ACSIClient = ({ updateModel, bffBaseUrl = `http://${DEFAULT_BFF_HOST}:${DE
           return def;
         }
       } catch (error) {
-        console.error('Failed to fetch DO definition:', error);
+        log.error('Failed to fetch DO definition:', error);
       }
       return null;
     },
@@ -744,11 +745,11 @@ const handleNodeClick = useCallback(
           updateTreeWithDataSetChildren(cpToUse, nodeInfo.ref, dataAttributes);
         }
       } catch (error) {
-        console.error('Failed to fetch DataSet directory:', error);
+        log.error('Failed to fetch DataSet directory:', error);
       }
     } else if (nodeInfo.nodeType === 'ReportControl') {
       // Open ReportControl modal (if implemented)
-      console.log('ReportControl clicked:', nodeInfo.ref);
+      log.debug('ReportControl clicked:', nodeInfo.ref);
     }
   },
   [apiTarget, wsCp, clientTrees, fetchDoDefinition]

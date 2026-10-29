@@ -7,6 +7,7 @@
 // OAuth dialogs: a select per PEM field that puts `file:<name>` in it, and a
 // note saying where the instance reads that file from.
 import React, { useState, useEffect } from 'react';
+import { log } from '../utils/log';
 
 const FILE_REF_PREFIX = 'file:';
 
@@ -26,7 +27,7 @@ export function useCertDir(isOpen, bffBaseUrl) {
           setCertDir({ path: body.cert_dir, files: Array.isArray(body.files) ? body.files : [] });
         }
       } catch (error) {
-        console.warn('Certificate directory not available:', error);
+        log.warn('Certificate directory not available:', error);
       }
     })();
     return () => { cancelled = true; };
