@@ -86,11 +86,11 @@ def image(name: str) -> str:
     """Image name, matching docker-compose.yml.
 
     ${RTI_IMAGE_REPO}/<name>:${RTI_IMAGE_TAG}, defaulting to the locally
-    built netbeheer-nederland/iec61850-websocket/<name>:latest. Set
-    RTI_IMAGE_REPO=ghcr.io/netbeheer-nederland/iec61850-websocket to run the
+    built netbeheernederland/iec61850-websocket/<name>:latest. Set
+    RTI_IMAGE_REPO=ghcr.io/netbeheernederland/iec61850-websocket to run the
     images published from GitHub.
     """
-    repo = os.environ.get("RTI_IMAGE_REPO", "netbeheer-nederland/iec61850-websocket")
+    repo = os.environ.get("RTI_IMAGE_REPO", "netbeheernederland/iec61850-websocket")
     tag = os.environ.get("RTI_IMAGE_TAG", "latest")
     return f"{repo}/{name}:{tag}"
 

@@ -16,7 +16,7 @@
 # docker-compose.pi.yaml to pass the Pi's devices in.
 services:
   dr-panel:
-    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/dr-panel:${RTI_IMAGE_TAG:-latest}
+    image: ${RTI_IMAGE_REPO:-netbeheernederland/iec61850-websocket}/dr-panel:${RTI_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/Dockerfile

@@ -328,7 +328,7 @@ With all prerequisites in place, clone the repository and let UV prepare the env
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Netbeheer-Nederland/iec61850-websocket.git
+git clone https://github.com/netbeheernederland/iec61850-websocket.git
 cd iec61850-websocket
 
 # 2. Create the virtual environment and install all dependencies

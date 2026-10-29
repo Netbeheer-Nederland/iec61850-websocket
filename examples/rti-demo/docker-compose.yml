@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Image names follows ${RTI_IMAGE_REPO}/rti-<role>:${RTI_IMAGE_TAG}
-# defaulting to netbeheer-nederland/iec61850-websocket/rti-<role>:latest, so
+# defaulting to netbeheernederland/iec61850-websocket/rti-<role>:latest, so
 # a local `docker compose build` produces exactly the images the demo runs.
-# Point RTI_IMAGE_REPO at ghcr.io/netbeheer-nederland/iec61850-websocket to
+# Point RTI_IMAGE_REPO at ghcr.io/netbeheernederland/iec61850-websocket to
 # pull the images published from GitHub instead - see README.md "Docker".
 #
 # The FSPs and SO connect to their plugins from the plugin configuration in
@@ -18,7 +18,7 @@
 services:
   # BFF Server
   rti-bff:
-    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-bff:${RTI_IMAGE_TAG:-latest}
+    image: ${RTI_IMAGE_REPO:-netbeheernederland/iec61850-websocket}/rti-bff:${RTI_IMAGE_TAG:-latest}
     build:
       # Repo root, not modules/bff/ - the Dockerfile needs the shared uv
       # workspace lock and the ws61850 core library at src/, both of which
@@ -54,7 +54,7 @@ services:
 
   # HMI Web Server
   rti-hmi:
-    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-hmi:${RTI_IMAGE_TAG:-latest}
+    image: ${RTI_IMAGE_REPO:-netbeheernederland/iec61850-websocket}/rti-hmi:${RTI_IMAGE_TAG:-latest}
     build:
       context: modules/hmi
       dockerfile: docker/Dockerfile
@@ -80,7 +80,7 @@ services:
 
   # RTI-FSP (Acsi-Server)
   rti-fsp01:
-    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-fsp:${RTI_IMAGE_TAG:-latest}
+    image: ${RTI_IMAGE_REPO:-netbeheernederland/iec61850-websocket}/rti-fsp:${RTI_IMAGE_TAG:-latest}
     build:
       # Repo root, not modules/fsp - the Dockerfile needs the shared uv
       # workspace lock and the ws61850 core library at src/, both of which
@@ -117,7 +117,7 @@ services:
 
   # Second FSP instance
   rti-fsp02:
-    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-fsp:${RTI_IMAGE_TAG:-latest}
+    image: ${RTI_IMAGE_REPO:-netbeheernederland/iec61850-websocket}/rti-fsp:${RTI_IMAGE_TAG:-latest}
     build:
       # Repo root - see rti-fsp01's build.context comment above.
       context: ../..
@@ -156,7 +156,7 @@ services:
 
   # RTI SO (Acsi-Client)
   rti-so:
-    image: ${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}/rti-so:${RTI_IMAGE_TAG:-latest}
+    image: ${RTI_IMAGE_REPO:-netbeheernederland/iec61850-websocket}/rti-so:${RTI_IMAGE_TAG:-latest}
     build:
       # Repo root, not modules/so - the Dockerfile needs the shared uv
       # workspace lock and the ws61850 core library at src/, both of which

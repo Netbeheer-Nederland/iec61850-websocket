@@ -23,7 +23,7 @@ be buildable locally and also published to GitHub, and the demo should run too w
 - Multi-stage builds; the runtime stage has no build tools. Health checks read `$PORT` when they run, so one image
   serves several instances (the second FSP on 5005).
 - Images are named `${RTI_IMAGE_REPO}/rti-<role>:${RTI_IMAGE_TAG}`. The default repo is
-  `netbeheer-nederland/iec61850-websocket`; the published one is `ghcr.io/netbeheer-nederland/iec61850-websocket`.
+  `netbeheernederland/iec61850-websocket`; the published one is `ghcr.io/netbeheernederland/iec61850-websocket`.
 - The services join the external network `rti-network`, which Keycloak (a separate Compose project under
   `scripts/keycloak`) also joins.
 

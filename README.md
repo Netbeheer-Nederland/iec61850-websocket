@@ -142,7 +142,7 @@ If the prerequisites are already installed, the environment can be set up using 
 
 ```shell
 # 1. Clone and enter the project
-git clone https://github.com/Netbeheer-Nederland/iec61850-websocket.git
+git clone https://github.com/netbeheernederland/iec61850-websocket.git
 cd iec61850-websocket
 ```
 

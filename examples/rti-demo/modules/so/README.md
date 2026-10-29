@@ -115,14 +115,14 @@ needs `src/ws61850` (the core library) and the shared uv workspace lock.
 
 ```bash
 # Build the Docker image
-docker build -t netbeheer-nederland/iec61850-websocket/rti-so -f examples/rti-demo/modules/so/docker/Dockerfile .
+docker build -t netbeheernederland/iec61850-websocket/rti-so -f examples/rti-demo/modules/so/docker/Dockerfile .
 
 # Run the container
-docker run --rm -p 5000:5000 netbeheer-nederland/iec61850-websocket/rti-so
+docker run --rm -p 5000:5000 netbeheernederland/iec61850-websocket/rti-so
 
 # With custom network (for multi-container setup)
 docker network create rti-network
-docker run --rm -p 5000:5000 --network rti-network --name rti-so netbeheer-nederland/iec61850-websocket/rti-so
+docker run --rm -p 5000:5000 --network rti-network --name rti-so netbeheernederland/iec61850-websocket/rti-so
 ```
 
 #### API Health Check

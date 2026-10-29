@@ -128,7 +128,7 @@ ${RTI_IMAGE_REPO}/rti-<role>:${RTI_IMAGE_TAG}     # role: bff, hmi, fsp, so; and
 
 | Variable         | Default                                  | Published on GitHub                                         |
 |------------------|------------------------------------------|-------------------------------------------------------------|
-| `RTI_IMAGE_REPO` | `netbeheer-nederland/iec61850-websocket` | `ghcr.io/netbeheer-nederland/iec61850-websocket`            |
+| `RTI_IMAGE_REPO` | `netbeheernederland/iec61850-websocket`  | `ghcr.io/netbeheernederland/iec61850-websocket`             |
 | `RTI_IMAGE_TAG`  | `latest`                                 | `latest` (main), a branch name, a version or `sha-<commit>` |
 
 `docker-compose.yml`, and `launch.py --docker` all use these names, so an image built here can be used by the demo
@@ -138,7 +138,7 @@ directly, without retagging.
 
 ```shell
 cd examples/rti-demo
-docker compose -f docker-compose.yml -f docker-compose.leds.yaml build   # -> netbeheer-nederland/iec61850-websocket/rti-<role>:latest, and dr-leds
+docker compose -f docker-compose.yml -f docker-compose.leds.yaml build   # -> netbeheernederland/iec61850-websocket/rti-<role>:latest, and dr-leds
 docker compose -f docker-compose.yml -f docker-compose.leds.yaml up -d
 ```
 
@@ -153,7 +153,7 @@ sources over the code in the images, so a source edit only needs a container res
 
 ```shell
 cd examples/rti-demo
-export RTI_IMAGE_REPO=ghcr.io/netbeheer-nederland/iec61850-websocket
+export RTI_IMAGE_REPO=ghcr.io/netbeheernederland/iec61850-websocket
 export RTI_IMAGE_TAG=latest
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml -f docker-compose.leds.yaml build dr-leds-fsp01   # dr-leds isn't published

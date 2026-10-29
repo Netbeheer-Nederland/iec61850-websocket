@@ -144,14 +144,14 @@ needs `src/ws61850` (the core library) and the shared uv workspace lock.
 
 ```bash
 # Build the Docker image
-docker build -t netbeheer-nederland/iec61850-websocket/rti-fsp -f examples/rti-demo/modules/fsp/docker/Dockerfile .
+docker build -t netbeheernederland/iec61850-websocket/rti-fsp -f examples/rti-demo/modules/fsp/docker/Dockerfile .
 
 # Run the container
-docker run --rm -p 5001:5001 netbeheer-nederland/iec61850-websocket/rti-fsp
+docker run --rm -p 5001:5001 netbeheernederland/iec61850-websocket/rti-fsp
 
 # With custom network (for multi-container setup)
 docker network create rti-network
-docker run --rm -p 5001:5001 --network rti-network --name rti-fsp netbeheer-nederland/iec61850-websocket/rti-fsp
+docker run --rm -p 5001:5001 --network rti-network --name rti-fsp netbeheernederland/iec61850-websocket/rti-fsp
 ```
 
 #### API Health Check

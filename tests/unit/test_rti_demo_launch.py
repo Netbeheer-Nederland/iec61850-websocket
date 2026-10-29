@@ -191,11 +191,11 @@ def test_in_docker_the_io_server_runs_the_dr_panel_image(launcher):
         (LAUNCH_PY.parent / "docker-compose.io.yaml").read_text(encoding="utf-8")
     )
     service = overlay["services"]["dr-panel"]
-    repo = os.environ.get("RTI_IMAGE_REPO", "netbeheer-nederland/iec61850-websocket")
+    repo = os.environ.get("RTI_IMAGE_REPO", "netbeheernederland/iec61850-websocket")
     tag = os.environ.get("RTI_IMAGE_TAG", "latest")
     expected = (
         service["image"]
-        .replace("${RTI_IMAGE_REPO:-netbeheer-nederland/iec61850-websocket}", repo)
+        .replace("${RTI_IMAGE_REPO:-netbeheernederland/iec61850-websocket}", repo)
         .replace("${RTI_IMAGE_TAG:-latest}", tag)
     )
     assert expected == f"{repo}/dr-panel:{tag}"
