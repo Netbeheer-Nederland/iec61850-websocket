@@ -48,6 +48,14 @@ def test_a_list_is_the_plugins():
         [{"name": "dr_panel"}],
         [{"name": "dr_panel", "url": "http://x", "settings": []}],
         [
+            {
+                "name": "dr_panel",
+                "url": "http://x",
+                "settings": {"claims": "LD0/CSWI1.Pos"},
+            }
+        ],
+        [{"name": "dr_panel", "url": "http://x", "settings": {"claims": [1]}}],
+        [
             {"name": "dr_panel", "url": "http://x"},
             {"name": "dr_panel", "url": "http://y"},
         ],

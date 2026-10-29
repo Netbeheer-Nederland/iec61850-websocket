@@ -9,8 +9,9 @@ Plugin API); it shows each event on the LEDs of the server:
 - red: on after a failed Operate, write or read, until a good one or a reset.
 
 Settings (from /start): blink_seconds (default 0.3).
-Claims: the objRefs in DR_LEDS_CLAIMS (comma-separated, default none); an
-Operate on one is refused while red is on.
+Claims: the objRefs in DR_LEDS_CLAIMS (comma-separated, default none), and
+those the FSP claims for it from settings.claims (decision 0042), which
+never reach this list; an Operate on one is refused while red is on.
 Routes: the server's /leds-api, under /api/plugins/dr_leds/ in the FSP or SO.
 Attached (optional, decision 0025): its two LEDs, for the HMI to draw next to
 the FSP or SO.

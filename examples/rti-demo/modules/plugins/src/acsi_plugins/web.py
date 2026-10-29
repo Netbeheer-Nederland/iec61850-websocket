@@ -329,7 +329,7 @@ def _http_error(e: Exception) -> HTTPException:
         return HTTPException(403, str(e))
     if isinstance(e, PluginConflictError):
         return HTTPException(409, str(e))
-    if isinstance(e, PluginError):
+    if isinstance(e, (PluginError, ConfigError)):
         return HTTPException(422, str(e))
     return HTTPException(500, str(e))
 

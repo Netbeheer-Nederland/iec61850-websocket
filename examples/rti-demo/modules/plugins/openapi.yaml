@@ -87,7 +87,9 @@ paths:
       description: |
         Called when the plugin is connected and on reload. `name` must be the name in the plugin
         configuration. `claims` are the objRefs whose Operate this plugin answers; at most one plugin
-        per objRef, so a plugin claiming an objRef another one owns is refused.
+        per objRef, so a plugin claiming an objRef another one owns is refused. The FSP or SO adds
+        the objRefs in the plugin's `settings.claims` (decision 0042), so its configuration, or an
+        edit in the HMI, can claim objRefs for it; `GET /api/plugins` lists both.
       responses:
         "200":
           description: What the plugin is.
@@ -726,7 +728,10 @@ components:
           type: object
           additionalProperties: true
           default: {}
-          description: The plugin's settings, sent with `/start`.
+          description: |
+            The plugin's settings, sent with `/start`. `claims`, a list of objRefs, is read by the
+            FSP or SO too: the plugin owns those as well as the ones it describes (decision 0042).
+          examples: [{ blink_seconds: 1, claims: ["GenericIO/GGIO1.SPCSO2"] }]
 
     EditRequest:
       type: object
@@ -738,7 +743,9 @@ components:
         settings:
           type: [object, "null"]
           additionalProperties: true
-          description: The plugin's new settings, all of them, sent with `/start`; left out, they stay.
+          description: |
+            The plugin's new settings, all of them, sent with `/start`; left out, they stay. Their
+            `claims` replace the ones set before (decision 0042).
 
     PluginDefinition:
       type: object

@@ -177,6 +177,26 @@ def test_edit_starts_the_plugin_again_with_the_new_settings(client, fake):
     }
 
 
+def test_edit_changes_the_claims_in_the_settings(client, fake):
+    # Decision 0042: the HMI's Edit changes a plugin's claims through its settings.
+    client.post("/api/plugins", json={"name": "demo", "url": URL})
+    assert client.get("/api/plugins/demo").json()["claims"] == []
+    response = client.put(
+        "/api/plugins/demo", json={"settings": {"claims": ["LD0/CSWI1.Pos"]}}
+    )
+    assert response.status_code == 200, response.text
+    assert client.get("/api/plugins/demo").json()["claims"] == ["LD0/CSWI1.Pos"]
+    assert fake.calls[-1][1]["settings"] == {"claims": ["LD0/CSWI1.Pos"]}
+
+
+def test_claims_that_are_not_a_list_are_422_and_change_nothing(client, fake):
+    client.post("/api/plugins", json={"name": "demo", "url": URL})
+    response = client.put("/api/plugins/demo", json={"settings": {"claims": "x"}})
+    assert response.status_code == 422
+    assert "settings.claims" in response.json()["detail"]
+    assert [c[0] for c in fake.calls] == ["start"]
+
+
 def test_edit_moves_the_plugin_to_an_allowed_url(fake):
     moved = "http://plugin2.test/plugin"
     app, _ = make_app(fake, allowed=[*ALLOWED, "http://plugin2.test"])

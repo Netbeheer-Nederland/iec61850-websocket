@@ -192,7 +192,9 @@ When something goes wrong, the answer says why:
 ### Answering an Operate (FSP)
 
 A plugin can own objRefs: list them in `claims`, and an Operate on one goes to the plugin's `/control`, whose answer is
-the ACSI answer. The sample claims the objRefs in `DR_LEDS_CLAIMS` and refuses an Operate while the red LED is on:
+the ACSI answer. Whoever configures the plugin can add claims too, in its `settings.claims` (decision 0042): the FSP
+reads them before starting the plugin, and the HMI's Edit changes them. The sample claims the objRefs in
+`DR_LEDS_CLAIMS` and those in its settings, and refuses an Operate on any of them while the red LED is on:
 
 ```python
 @plugin.post("/control")

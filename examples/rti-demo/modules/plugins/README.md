@@ -132,6 +132,18 @@ name stays: another name is another plugin. When the new definition doesn't conn
 nothing changes. Like an added plugin, an edit lasts until the FSP or SO stops: to keep it, change the plugin
 configuration. `GET /api/plugins` lists every plugin's definition, settings included: don't put secrets in settings.
 
+**Claims in the settings** (decision [0042](../../../../docs/rti-demo/decisions/0042-plugin-claims-in-settings.md)):
+`settings.claims`, a list of objRefs, is read by the FSP or SO as well as sent to the plugin. The plugin owns those as
+well as the ones it describes, so a claim can be set in the plugin configuration or changed with Edit in the HMI's
+Plugins panel, without touching the plugin. An objRef is the control's `ctlVal`, e.g.
+`GenericIO/GGIO1.SPCSO2.Oper.ctlVal`; a claim another plugin owns is refused (`409`), and claims that aren't a list of
+strings are `422`.
+
+```json
+{"name": "dr_leds", "url": "http://dr-leds-fsp02:8099/plugin",
+ "settings": {"blink_seconds": 1, "claims": ["GenericIO/GGIO1.SPCSO2.Oper.ctlVal"]}}
+```
+
 | Answer | When |
 |---|---|
 | 403 | The URL isn't in `PLUGIN_ALLOWED_SOURCES` |

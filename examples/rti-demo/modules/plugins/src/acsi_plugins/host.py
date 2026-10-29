@@ -25,6 +25,15 @@ from .contract import AcsiPlugin, ControlResult, Event, PluginContext
 logger = logging.getLogger(__name__)
 
 
+def setting_claims(settings: dict[str, Any] | None) -> list[str]:
+    """The objRefs in `settings["claims"]`: claimed for the plugin by its
+    configuration, as well as those it describes (decision 0042)."""
+    claims = (settings or {}).get("claims", [])
+    if not isinstance(claims, list) or not all(isinstance(c, str) for c in claims):
+        raise ValueError("settings.claims must be a list of objRefs")
+    return claims
+
+
 class PluginConflictError(Exception):
     """A plugin can't be added: its name is taken, or it claims an objRef another plugin owns."""
 
@@ -121,11 +130,12 @@ class PluginHost:
     ) -> None:
         """Start `plugin` and add it under `name`.
 
+        It owns the objRefs it claims and those in `settings["claims"]`.
         Raises PluginConflictError, without starting the plugin, when the
         name is taken or an objRef it claims already has an owner.
         """
         self._bind_running_loop()
-        claims = list(dict.fromkeys(plugin.claims()))
+        claims = list(dict.fromkeys([*plugin.claims(), *setting_claims(settings)]))
         with self._lock:
             if name in self._entries:
                 raise PluginConflictError(f"A plugin named '{name}' is already loaded")

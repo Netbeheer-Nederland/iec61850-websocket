@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .host import setting_claims
 from .remote import NAME
 
 
@@ -35,6 +36,12 @@ class PluginEntry:
     name: str
     url: str
     settings: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        try:
+            setting_claims(self.settings)
+        except ValueError as e:
+            raise ConfigError(f"plugin '{self.name}': {e}") from e
 
 
 @dataclass(frozen=True)

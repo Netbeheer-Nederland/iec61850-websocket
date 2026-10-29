@@ -155,6 +155,22 @@ async def test_two_plugins_cannot_claim_one_objref(host):
     assert host.names() == ["one"]
 
 
+async def test_settings_claim_objrefs_for_the_plugin(host):
+    # Decision 0042: settings.claims adds to what the plugin claims itself.
+    await host.add(
+        "one", Recorder(owns=["LD0/CSWI1.Pos"]), settings={"claims": ["LD0/XCBR1.Pos"]}
+    )
+    assert host.status("one")["claims"] == ["LD0/CSWI1.Pos", "LD0/XCBR1.Pos"]
+    with pytest.raises(PluginConflictError, match="owned by 'one'"):
+        await host.add("two", Recorder(), settings={"claims": ["LD0/XCBR1.Pos"]})
+
+
+async def test_settings_claims_must_be_a_list_of_objrefs(host):
+    with pytest.raises(ValueError, match="settings.claims"):
+        await host.add("one", Recorder(), settings={"claims": "LD0/XCBR1.Pos"})
+    assert host.names() == []
+
+
 async def test_a_refused_plugin_is_stopped(host):
     await host.add("one", Recorder(owns=["LD0/CSWI1.Pos"]))
     refused = Recorder(owns=["LD0/CSWI1.Pos"])
